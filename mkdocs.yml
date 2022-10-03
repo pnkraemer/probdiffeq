@@ -69,11 +69,14 @@ nav:
         - examples.md
     - API Documentation:
         - "api_docs/problems.md"
-        - "api_docs/ivp.md"
-        - "api_docs/solvers.md"
+        - "api_docs/ivpsolve.md"
+        - "api_docs/ivpsolvers.md"
     - Advanced API Documentation:
-        - "api_docs/markov.md"
-        - "api_docs/sqrtm.md"
-        - "api_docs/rv.md"
+        - "api_docs_advanced/inits.md"
+        - "api_docs_advanced/step.md"
+    - Super Advanced API Documentation:
+        - "api_docs_util/markov.md"
+        - "api_docs_util/sqrtm.md"
+        - "api_docs_util/rv.md"
     - Developer Documentation:
         - "dev_docs/behind_the_scenes.md"

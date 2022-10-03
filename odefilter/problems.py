@@ -1,6 +1,5 @@
-"""Differential equation problem types."""
+"""Problem types."""
 
-import math
 from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
 
 
@@ -57,7 +56,7 @@ class SecondOrderODE(NamedTuple):
 class InitialValueProblem(NamedTuple):
     """Initial value problem."""
 
-    ode_fun: Union[FirstOrderODE, SecondOrderODE]
+    ode_function: Union[FirstOrderODE, SecondOrderODE]
     """ODE function."""
 
     y0: Union[Any, Iterable[Any]]
@@ -72,7 +71,7 @@ class InitialValueProblem(NamedTuple):
     t0: float
     """Initial time-point."""
 
-    t1: float = math.inf
+    t1: float
     """Terminal time-point. Optional."""
 
     p: Any = ()

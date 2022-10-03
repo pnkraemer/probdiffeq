@@ -1,4 +1,6 @@
-"""Exact initialisation."""
+"""Initialisation of ODE filters via (automatic) differentiation."""
+
+import abc
 from functools import partial
 
 import jax
@@ -7,14 +9,11 @@ from jax.experimental.jet import jet
 
 
 def taylor_mode():
-    return taylormode_fn, ()
+    """Create a Taylor-mode initialisation routine."""
+    return _taylormode_fn, ()
 
 
-def forwardmode_jvp():
-    return forwardmode_jvp_fn, ()
-
-
-def taylormode_fn(*, f, u0, num_derivatives):
+def _taylormode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with Taylor-mode AD."""
     if num_derivatives == 0:
         return u0.reshape((1, -1))
@@ -22,7 +21,7 @@ def taylormode_fn(*, f, u0, num_derivatives):
     f0 = f(u0)
     u_primals, u_series = u0, (f0,)
 
-    # Not a scan, because I dont know how to do it.
+    # Not a scan, because I don't know how to do it.
     # But since the number of derivatives <= 12, it should be okay.
     for _ in range(num_derivatives - 1):
         u_series = _taylormode_next_ode_derivative(
@@ -36,7 +35,13 @@ def _taylormode_next_ode_derivative(fun, primals, series):
     return p, *s
 
 
-def forwardmode_jvp_fn(*, f, u0, num_derivatives):
+def forwardmode_jvp():
+    """Create a forward-mode initialisation routine /
+    using Jacobian-vector products instead of full Jacobians."""
+    return _forwardmode_jvp_fn, ()
+
+
+def _forwardmode_jvp_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with forward-mode AD (JVPs)."""
 
     if num_derivatives == 0:
