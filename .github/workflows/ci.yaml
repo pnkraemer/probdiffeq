@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run:
+        pip install --upgrade pip
+        pip install .[lint]
+    - name: Apply linter
+      run:
+        make lint
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run:
+        pip install .[numpy,jax,test]
+    - name: Run tests
+      run:
+        make test
+
+  example:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run:
+        pip install .[numpy,jax,example]
+    - name: Sync and execute notebooks
+      run:
+        make example
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run:
+        pip install .[doc]
+    - name: Build the HTML docs
+      run:
+        make doc
