@@ -6,8 +6,15 @@ import jax.numpy as jnp
 from jax.experimental.jet import jet
 
 
-@partial(jax.jit, static_argnames=("f", "num_derivatives"))
-def taylormode(*, f, u0, num_derivatives):
+def taylor_mode():
+    return taylormode_fn, ()
+
+
+def forwardmode_jvp():
+    return forwardmode_jvp_fn, ()
+
+
+def taylormode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with Taylor-mode AD."""
     if num_derivatives == 0:
         return u0.reshape((1, -1))
@@ -24,14 +31,12 @@ def taylormode(*, f, u0, num_derivatives):
     return jnp.stack((u_primals,) + u_series)
 
 
-@partial(jax.jit, static_argnames=("fun",))
 def _taylormode_next_ode_derivative(fun, primals, series):
     p, s = jet(fun, primals=(primals,), series=(series,))
     return p, *s
 
 
-@partial(jax.jit, static_argnames=("f", "num_derivatives"))
-def forwardmode_jvp(*, f, u0, num_derivatives):
+def forwardmode_jvp_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with forward-mode AD (JVPs)."""
 
     if num_derivatives == 0:
@@ -54,8 +59,7 @@ def _forwardmode_jvp_next_ode_derivative(fun, fun0):
     return dg
 
 
-@partial(jax.jit, static_argnames=("f", "num_derivatives"))
-def forwardmode(*, f, u0, num_derivatives):
+def forwardmode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with forward-mode AD."""
 
     if num_derivatives == 0:
@@ -76,8 +80,7 @@ def forwardmode(*, f, u0, num_derivatives):
     return jnp.stack(du0)
 
 
-@partial(jax.jit, static_argnames=("f", "num_derivatives"))
-def reversemode(*, f, u0, num_derivatives):
+def reversemode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with reverse-mode AD."""
 
     if num_derivatives == 0:

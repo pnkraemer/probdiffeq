@@ -5,21 +5,12 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 
-from odefilter import sqrtm, step
-from odefilter.inits import autodiff_first_order
+from odefilter import inits, sqrtm, step
 from odefilter.prob import ibm
 
 KroneckerEK0State = namedtuple(
     "KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats", "params")
 )
-
-
-def taylor_mode():
-    return autodiff_first_order.taylormode, ()
-
-
-def forwardmode_jvp():
-    return autodiff_first_order.forwardmode_jvp, ()
 
 
 def ek0(*, num_derivatives, step_control, init):
