@@ -36,6 +36,7 @@ def test_simulate_terminal_values(problem, solver):
         atol=1e-5,
         rtol=1e-7,
     )
-    mean, cov_sqrtm_upper = solution.u
-    assert jnp.allclose(mean[0], 1.0, atol=1e-3, rtol=1e-5)
     assert solution.t == problem.t1
+
+    mean, _ = solution.u
+    assert jnp.allclose(mean[0], 1.0, atol=1e-3, rtol=1e-5)
