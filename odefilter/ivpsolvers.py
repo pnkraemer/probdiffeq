@@ -11,7 +11,7 @@ KroneckerEK0State = namedtuple(
 )
 
 
-def ek0(*, num_derivatives=5):
+class EK0:
     """The Kronecker EK0, but only for computing the terminal value.
 
     Uses adaptive steps and proportional control.
@@ -20,16 +20,20 @@ def ek0(*, num_derivatives=5):
     and forward-mode initialisation otherweise.
     """
 
-    # Create the identity matrix required for Kronecker-type things below.
-    a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+    def __init__(self, *, num_derivatives=5):
 
-    # Initialisation with autodiff
-    if num_derivatives <= 5:
-        autodiff_fun = autodiff_first_order.forwardmode_jvp
-    else:
-        autodiff_fun = autodiff_first_order.taylormode
+        # Create the identity matrix required for Kronecker-type things below.
+        self.a, self.q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+
+        # Initialisation with autodiff
+        if num_derivatives <= 5:
+            self.autodiff_fun = autodiff_first_order.forwardmode_jvp
+        else:
+            self.autodiff_fun = autodiff_first_order.taylormode
+        self.num_derivatives = num_derivatives
 
     def init_fn(
+        self,
         *,
         f,
         t0,
@@ -43,11 +47,11 @@ def ek0(*, num_derivatives=5):
         power_proportional_unscaled=0.4,
     ):
 
-        m0_mat = autodiff_fun(f=f, u0=u0, num_derivatives=num_derivatives)
+        m0_mat = self.autodiff_fun(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
-        c_sqrtm0 = jnp.zeros((num_derivatives + 1, num_derivatives + 1))
+        c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
         dt0 = stepsizes.propose_first_dt_per_tol(
-            f=f, u0=u0, atol=atol, rtol=rtol, num_derivatives=num_derivatives
+            f=f, u0=u0, atol=atol, rtol=rtol, num_derivatives=self.num_derivatives
         )
 
         stats = {
@@ -63,6 +67,7 @@ def ek0(*, num_derivatives=5):
         return state
 
     def perform_step_fn(
+        self,
         state0,
         *,
         f,
@@ -80,8 +85,8 @@ def ek0(*, num_derivatives=5):
         m0, c_sqrtm0 = state0.u
         error_norm_previously_accepted = state0.error_norm
 
-        def cond_fun(state):
-            return state.error_norm > 1
+        def cond_fun(s):
+            return s.error_norm > 1
 
         def body_fun(s_prev):
 
@@ -91,7 +96,7 @@ def ek0(*, num_derivatives=5):
 
             # Compute preconditioner
             p, p_inv = ibm.preconditioner_diagonal(
-                dt=dt_clipped, num_derivatives=num_derivatives
+                dt=dt_clipped, num_derivatives=self.num_derivatives
             )
 
             # Attempt step
@@ -101,8 +106,8 @@ def ek0(*, num_derivatives=5):
                 c_sqrtm=c_sqrtm0,
                 p=p,
                 p_inv=p_inv,
-                a=a,
-                q_sqrtm=q_sqrtm,
+                a=self.a,
+                q_sqrtm=self.q_sqrtm,
             )
             error = dt_clipped * error
 
@@ -115,7 +120,7 @@ def ek0(*, num_derivatives=5):
             # Propose a new time-step
             scale_factor = stepsizes.scale_factor_pi_control(
                 error_norm=error_norm,
-                error_order=num_derivatives + 1,
+                error_order=self.num_derivatives + 1,
                 safety=safety,
                 factor_min=factor_min,
                 factor_max=factor_max,
@@ -163,8 +168,6 @@ def ek0(*, num_derivatives=5):
             stats=stats,
         )
         return state
-
-    return init_fn, perform_step_fn
 
 
 def attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):

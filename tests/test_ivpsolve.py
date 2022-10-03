@@ -20,7 +20,7 @@ def problem_logistic():
 
 @pytest_cases.case
 def solver_ek0():
-    return ivpsolvers.ek0(num_derivatives=2)
+    return ivpsolvers.EK0(num_derivatives=2)
 
 
 @pytest_cases.parametrize_with_cases("problem", cases=".", prefix="problem_")
