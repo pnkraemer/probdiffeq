@@ -23,6 +23,16 @@ def solver_ek0():
     return ivpsolvers.ek0(
         num_derivatives=2,
         step_control=ivpsolvers.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
+        init=ivpsolvers.taylor_mode(),
+    )
+
+
+@pytest_cases.case
+def solver_ek0():
+    return ivpsolvers.ek0(
+        num_derivatives=2,
+        step_control=ivpsolvers.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
+        init=ivpsolvers.forwardmode_jvp(),
     )
 
 

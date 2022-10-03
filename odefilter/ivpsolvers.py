@@ -11,15 +11,30 @@ KroneckerEK0State = namedtuple(
 )
 
 
+def taylor_mode():
+    return autodiff_first_order.taylormode, ()
+
+
+def forwardmode_jvp():
+    return autodiff_first_order.forwardmode_jvp, ()
+
+
 def pi_control(*, atol, rtol, error_order):
     return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
 
 
-def ek0(*, num_derivatives, step_control):
+def ek0(*, num_derivatives, step_control, init):
     step_controller, step_control_params = step_control
+    init_algorithm, init_params = init
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _EK0Params(a=a, q_sqrtm=q_sqrtm, step_control=step_control_params)
-    alg = _EK0(num_derivatives=num_derivatives, step_control=step_controller)
+    params = _EK0Params(
+        a=a, q_sqrtm=q_sqrtm, step_control=step_control_params, init=init_params
+    )
+    alg = _EK0(
+        num_derivatives=num_derivatives,
+        step_control=step_controller,
+        init=init_algorithm,
+    )
     return alg, params
 
 
@@ -73,6 +88,7 @@ class _EK0Params(NamedTuple):
     q_sqrtm: Any
 
     step_control: _PIControlParams
+    init: Any
 
 
 class _EK0:
@@ -84,21 +100,15 @@ class _EK0:
     and forward-mode initialisation otherweise.
     """
 
-    def __init__(self, *, step_control, num_derivatives=5):
+    def __init__(self, *, step_control, init, num_derivatives=5):
 
-        # Create the identity matrix required for Kronecker-type things below.
-
-        # Initialisation with autodiff
-        if num_derivatives <= 5:
-            self.autodiff_fun = autodiff_first_order.forwardmode_jvp
-        else:
-            self.autodiff_fun = autodiff_first_order.taylormode
         self.num_derivatives = num_derivatives
         self.step_control = step_control
+        self.init = init
 
     def init_fn(self, *, f, t0, u0, params):
 
-        m0_mat = self.autodiff_fun(f=f, u0=u0, num_derivatives=self.num_derivatives)
+        m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
         dt0 = self.step_control.propose_first_dt(f=f, u0=u0, params=params.step_control)
