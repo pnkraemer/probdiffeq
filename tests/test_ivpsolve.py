@@ -27,9 +27,10 @@ def solver_ek0():
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="solver_")
 def test_simulate_terminal_values(problem, solver):
 
-    t, solution = ivp.simulate_terminal_values(
+    solution = ivp.simulate_terminal_values(
         f=problem.f,
-        tspan=(problem.t0, problem.t1),
+        t0=problem.t0,
+        t1=problem.t1,
         u0=problem.y0,
         solver=solver,
         atol=1e-5,
@@ -37,3 +38,4 @@ def test_simulate_terminal_values(problem, solver):
     )
     mean, cov_sqrtm_upper = solution.u
     assert jnp.allclose(mean[0], 1.0, atol=1e-3, rtol=1e-5)
+    assert solution.t == problem.t1

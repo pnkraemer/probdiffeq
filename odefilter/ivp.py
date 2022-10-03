@@ -30,22 +30,21 @@ import jax.numpy as jnp
 
 
 @partial(jax.jit, static_argnames=("f", "solver"))
-def simulate_terminal_values(*, f, tspan, u0, solver, **solver_kwargs):
+def simulate_terminal_values(*, f, t0, t1, u0, solver, **solver_kwargs):
 
     init_fn, perform_step_fn = solver
-    t0, state0 = init_fn(f=f, tspan=tspan, u0=u0, **solver_kwargs)
+    state0 = init_fn(f=f, t0=t0, u0=u0, **solver_kwargs)
     perform_step_fn = partial(perform_step_fn, **solver_kwargs)
-    t, state = _solve_ivp_on_interval(
+    state = _solve_ivp_on_interval(
         f=f,
-        t1=tspan[1],
-        t0=t0,
+        t1=t1,
         state0=state0,
         perform_step_fn=perform_step_fn,
     )
-    return (t, state)
+    return state
 
 
-def _solve_ivp_on_interval(*, f, t1, t0, state0, perform_step_fn):
+def _solve_ivp_on_interval(*, f, t1, state0, perform_step_fn):
     """Solve an IVP adaptively on the interval (t0, t1).
 
     This function is used by the saveat() and the terminal_value() versions.
@@ -53,16 +52,15 @@ def _solve_ivp_on_interval(*, f, t1, t0, state0, perform_step_fn):
 
     @jax.jit
     def cond_fun(s):
-        t, _ = s
-        return t < t1
+        return s.t < t1
 
     @jax.jit
     def body_fun(s):
-        t, state = s
-        return perform_step_fn(t, state, f=f, t1=t1)
+        state = s
+        return perform_step_fn(state, f=f, t1=t1)
 
     return jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,
-        init_val=(t0, state0),
+        init_val=state0,
     )
