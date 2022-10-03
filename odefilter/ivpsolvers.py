@@ -4,7 +4,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from odefilter import ibm, inits, sqrtm, stepsizes
+from odefilter import autodiff_first_order, inits, sqrtm, stepsizes
 
 EK0State = namedtuple("KroneckerEK0State", ("u", "dt_proposed", "error_norm", "stats"))
 
@@ -23,9 +23,9 @@ def ek0(*, num_derivatives=5):
 
     # Initialisation with autodiff
     if num_derivatives <= 5:
-        autodiff_fun = inits.ad_first_order.forwardmode_jvp
+        autodiff_fun = autodiff_first_order.forwardmode_jvp
     else:
-        autodiff_fun = inits.ad_first_order.taylormode
+        autodiff_fun = autodiff_first_order.taylormode
 
     def init_fn(
         *,
