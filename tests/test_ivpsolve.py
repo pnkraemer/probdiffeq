@@ -4,7 +4,8 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import ivpsolve, ivpsolvers, markov, problems
+from odefilter import ivpsolve, ivpsolvers, problems
+from odefilter.prob import markov
 
 
 @pytest_cases.case

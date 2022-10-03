@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import jax.tree_util
 import pytest_cases
 
-from odefilter import markov, rv
+from odefilter.prob import markov, rv
 
 
 @pytest_cases.case
