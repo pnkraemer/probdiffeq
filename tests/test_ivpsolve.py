@@ -35,6 +35,4 @@ def test_simulate_terminal_values(problem, solver):
         rtol=1e-4,
     )
 
-    print(solution)
-    assert False
     assert solution is not None

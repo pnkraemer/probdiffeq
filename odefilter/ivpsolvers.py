@@ -4,9 +4,11 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from odefilter import autodiff_first_order, inits, sqrtm, stepsizes
+from odefilter import autodiff_first_order, ibm, inits, sqrtm, stepsizes
 
-EK0State = namedtuple("KroneckerEK0State", ("u", "dt_proposed", "error_norm", "stats"))
+KroneckerEK0State = namedtuple(
+    "KroneckerEK0State", ("u", "dt_proposed", "error_norm", "stats")
+)
 
 
 def ek0(*, num_derivatives=5):
