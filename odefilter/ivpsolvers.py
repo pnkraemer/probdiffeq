@@ -7,11 +7,91 @@ import jax.numpy as jnp
 from odefilter import autodiff_first_order, ibm, inits, sqrtm, stepsizes
 
 KroneckerEK0State = namedtuple(
-    "KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats")
+    "KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats", "params")
 )
 
 
-class EK0:
+def taylor_mode():
+    return autodiff_first_order.taylormode, ()
+
+
+def forwardmode_jvp():
+    return autodiff_first_order.forwardmode_jvp, ()
+
+
+def pi_control(*, atol, rtol, error_order):
+    return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
+
+
+def ek0(*, num_derivatives, step_control, init):
+    step_controller, step_control_params = step_control
+    init_algorithm, init_params = init
+    a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+    params = _EK0Params(
+        a=a, q_sqrtm=q_sqrtm, step_control=step_control_params, init=init_params
+    )
+    alg = _EK0(
+        num_derivatives=num_derivatives,
+        step_control=step_controller,
+        init=init_algorithm,
+    )
+    return alg, params
+
+
+from typing import Any, NamedTuple
+
+
+class _PIControlParams(NamedTuple):
+
+    atol: float
+    rtol: float
+
+    error_order: int
+
+    safety = 0.95
+    factor_min = 0.2
+    factor_max = 10.0
+    power_integral_unscaled = 0.3
+    power_proportional_unscaled = 0.4
+
+
+class _PIControl:
+    def propose_first_dt(self, f, u0, params):
+        return stepsizes.propose_first_dt_per_tol(
+            f=f,
+            u0=u0,
+            num_derivatives=params.error_order - 1,
+            atol=params.atol,
+            rtol=params.rtol,
+        )
+
+    def normalise_error(self, *, error, params, u1_ref):
+        error_rel = error / (params.atol + params.rtol * u1_ref)
+        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
+        return error_norm
+
+    def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
+        return stepsizes.scale_factor_pi_control(
+            error_norm=error_norm,
+            error_norm_previously_accepted=error_norm_previously_accepted,
+            safety=params.safety,
+            error_order=params.error_order,
+            factor_min=params.factor_min,
+            factor_max=params.factor_max,
+            power_integral_unscaled=params.power_integral_unscaled,
+            power_proportional_unscaled=params.power_proportional_unscaled,
+        )
+
+
+class _EK0Params(NamedTuple):
+    a: Any
+    q_sqrtm: Any
+
+    step_control: _PIControlParams
+    init: Any
+
+
+class _EK0:
     """The Kronecker EK0, but only for computing the terminal value.
 
     Uses adaptive steps and proportional control.
@@ -20,39 +100,18 @@ class EK0:
     and forward-mode initialisation otherweise.
     """
 
-    def __init__(self, *, num_derivatives=5):
+    def __init__(self, *, step_control, init, num_derivatives=5):
 
-        # Create the identity matrix required for Kronecker-type things below.
-        self.a, self.q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-
-        # Initialisation with autodiff
-        if num_derivatives <= 5:
-            self.autodiff_fun = autodiff_first_order.forwardmode_jvp
-        else:
-            self.autodiff_fun = autodiff_first_order.taylormode
         self.num_derivatives = num_derivatives
+        self.step_control = step_control
+        self.init = init
 
-    def init_fn(
-        self,
-        *,
-        f,
-        t0,
-        u0,
-        rtol,
-        atol,
-        safety=0.95,
-        factor_min=0.2,
-        factor_max=10.0,
-        power_integral_unscaled=0.3,
-        power_proportional_unscaled=0.4,
-    ):
+    def init_fn(self, *, f, t0, u0, params):
 
-        m0_mat = self.autodiff_fun(f=f, u0=u0, num_derivatives=self.num_derivatives)
+        m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
-        dt0 = stepsizes.propose_first_dt_per_tol(
-            f=f, u0=u0, atol=atol, rtol=rtol, num_derivatives=self.num_derivatives
-        )
+        dt0 = self.step_control.propose_first_dt(f=f, u0=u0, params=params.step_control)
 
         stats = {
             "f_evaluation_count": 0,
@@ -62,24 +121,16 @@ class EK0:
             "dt_max": 0.0,
         }
         state = KroneckerEK0State(
-            t=t0, u=(m0_mat, c_sqrtm0), dt_proposed=dt0, error_norm=1.0, stats=stats
+            t=t0,
+            u=(m0_mat, c_sqrtm0),
+            dt_proposed=dt0,
+            error_norm=1.0,
+            stats=stats,
+            params=params,
         )
         return state
 
-    def perform_step_fn(
-        self,
-        state0,
-        *,
-        f,
-        t1,
-        rtol,
-        atol,
-        safety=0.95,
-        factor_min=0.2,
-        factor_max=10.0,
-        power_integral_unscaled=0.3,
-        power_proportional_unscaled=0.4,
-    ):
+    def perform_step_fn(self, state0, *, f, t1):
         """Perform a successful step."""
 
         larger_than_1 = 1.1
@@ -89,6 +140,7 @@ class EK0:
             dt_proposed=state0.dt_proposed,
             error_norm=larger_than_1,
             stats=state0.stats,
+            params=state0.params,
         )
         state = jax.lax.while_loop(
             cond_fun=lambda s: s.error_norm > 1,
@@ -97,13 +149,6 @@ class EK0:
                 f=f,
                 state0=state0,
                 t1=t1,
-                atol=atol,
-                rtol=rtol,
-                safety=safety,
-                factor_min=factor_min,
-                factor_max=factor_max,
-                power_integral_unscaled=power_integral_unscaled,
-                power_proportional_unscaled=power_proportional_unscaled,
             ),
             init_val=init_val,
         )
@@ -117,6 +162,7 @@ class EK0:
             dt_proposed=state.dt_proposed,
             error_norm=state.error_norm,
             stats=stats,
+            params=state.params,
         )
         return state
 
@@ -127,13 +173,6 @@ class EK0:
         f,
         state0,
         t1,
-        atol,
-        rtol,
-        safety,
-        factor_min,
-        factor_max,
-        power_integral_unscaled,
-        power_proportional_unscaled,
     ):
 
         m0, c_sqrtm0 = state0.u
@@ -155,27 +194,23 @@ class EK0:
             c_sqrtm=c_sqrtm0,
             p=p,
             p_inv=p_inv,
-            a=self.a,
-            q_sqrtm=self.q_sqrtm,
+            a=s_prev.params.a,
+            q_sqrtm=s_prev.params.q_sqrtm,
         )
         error = dt_clipped * error
 
         # Normalise the error
         m_new, _ = u_new
         u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
-        error_rel = error / (atol + rtol * u1_ref)
-        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
+        error_norm = self.step_control.normalise_error(
+            error=error, u1_ref=u1_ref, params=s_prev.params.step_control
+        )
 
         # Propose a new time-step
-        scale_factor = stepsizes.scale_factor_pi_control(
+        scale_factor = self.step_control.scale_factor(
             error_norm=error_norm,
-            error_order=self.num_derivatives + 1,
-            safety=safety,
-            factor_min=factor_min,
-            factor_max=factor_max,
             error_norm_previously_accepted=error_norm_previously_accepted,
-            power_integral_unscaled=power_integral_unscaled,
-            power_proportional_unscaled=power_proportional_unscaled,
+            params=s_prev.params.step_control,
         )
         dt_proposed = scale_factor * dt_clipped
 
@@ -189,6 +224,7 @@ class EK0:
             dt_proposed=dt_proposed,
             error_norm=error_norm,
             stats=stats,
+            params=s_prev.params,
         )
         return state
 

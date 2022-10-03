@@ -1,2 +1,2 @@
 # Solving initial value problems
-::: odefilter.ivp
+::: odefilter.ivpsolve
