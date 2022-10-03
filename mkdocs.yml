@@ -42,16 +42,20 @@ markdown_extensions:
     - admonition
     - toc:
         permalink: "¤"  # Adds a clickable permalink to each section heading
-        toc_depth: 4  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
+        toc_depth: 2  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
 
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 plugins:
     - search  # default search plugin; needs manually re-enabling when using any other plugins
     - mkdocstrings:
         handlers:
             python:
                 options:
-                    inherited_members: true  # Allow looking up inherited methods
-                    show_root_full_path: true  # display "diffrax.asdf" not just "asdf"
+                    inherited_members: true
+                    show_root_full_path: true
                     show_if_no_docstring: true
                     show_signature_annotations: true
                     show_source: false
@@ -64,6 +68,7 @@ nav:
     - Examples:
         - examples.md
     - API Documentation:
+        - "api_docs/problems.md"
         - "api_docs/ivp.md"
         - "api_docs/solvers.md"
     - Advanced API Documentation:
