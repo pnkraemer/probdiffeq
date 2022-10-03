@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from odefilter import autodiff_first_order, ibm, inits, sqrtm, stepsizes
 
 KroneckerEK0State = namedtuple(
-    "KroneckerEK0State", ("u", "dt_proposed", "error_norm", "stats")
+    "KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats")
 )
 
 
@@ -32,7 +32,7 @@ def ek0(*, num_derivatives=5):
     def init_fn(
         *,
         f,
-        tspan,
+        t0,
         u0,
         rtol,
         atol,
@@ -58,12 +58,11 @@ def ek0(*, num_derivatives=5):
             "dt_max": 0.0,
         }
         state = KroneckerEK0State(
-            u=(m0_mat, c_sqrtm0), dt_proposed=dt0, error_norm=1.0, stats=stats
+            t=t0, u=(m0_mat, c_sqrtm0), dt_proposed=dt0, error_norm=1.0, stats=stats
         )
-        return tspan[0], state
+        return state
 
     def perform_step_fn(
-        t0,
         state0,
         *,
         f,
@@ -81,16 +80,14 @@ def ek0(*, num_derivatives=5):
         m0, c_sqrtm0 = state0.u
         error_norm_previously_accepted = state0.error_norm
 
-        def cond_fun(s):
-            _, state = s
+        def cond_fun(state):
             return state.error_norm > 1
 
-        def body_fun(s):
-            _, s_prev = s
+        def body_fun(s_prev):
 
             # Never exceed the terminal value
-            dt_clipped = jnp.minimum(s_prev.dt_proposed, t1 - t0)
-            t_new = t0 + dt_clipped
+            dt_clipped = jnp.minimum(s_prev.dt_proposed, t1 - s_prev.t)
+            t_new = s_prev.t + dt_clipped
 
             # Compute preconditioner
             p, p_inv = ibm.preconditioner_diagonal(
@@ -111,7 +108,6 @@ def ek0(*, num_derivatives=5):
 
             # Normalise the error
             m_new, _ = u_new
-            print(m_new.shape, m0.shape)
             u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
             error_rel = error / (atol + rtol * u1_ref)
             error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
@@ -134,38 +130,41 @@ def ek0(*, num_derivatives=5):
             stats["steps_attempted_count"] += 1
 
             state = KroneckerEK0State(
-                u=u_new, dt_proposed=dt_proposed, error_norm=error_norm, stats=stats
+                t=t_new,
+                u=u_new,
+                dt_proposed=dt_proposed,
+                error_norm=error_norm,
+                stats=stats,
             )
-            return t_new, state
+            return state
 
         larger_than_1 = 1.1
         init_val = KroneckerEK0State(
+            t=state0.t,
             u=state0.u,
             dt_proposed=state0.dt_proposed,
             error_norm=larger_than_1,
             stats=state0.stats,
         )
-        t, state = jax.lax.while_loop(
+        state = jax.lax.while_loop(
             cond_fun=cond_fun,
             body_fun=body_fun,
-            init_val=(t0, init_val),
+            init_val=init_val,
         )
         stats = state.stats
         stats["steps_accepted_count"] += 1
-        stats["dt_min"] = jnp.minimum(stats["dt_min"], t - t0)
-        stats["dt_max"] = jnp.maximum(stats["dt_max"], t - t0)
+        stats["dt_min"] = jnp.minimum(stats["dt_min"], state.t - state0.t)
+        stats["dt_max"] = jnp.maximum(stats["dt_max"], state.t - state0.t)
         state = KroneckerEK0State(
+            t=state.t,
             u=state.u,
             dt_proposed=state.dt_proposed,
             error_norm=state.error_norm,
             stats=stats,
         )
-        return t, state
+        return state
 
-    def extract_qoi_fn(t, state):
-        return t, state.u, state.stats
-
-    return init_fn, perform_step_fn, extract_qoi_fn
+    return init_fn, perform_step_fn
 
 
 def attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):

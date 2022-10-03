@@ -1,9 +1,10 @@
 """Tests for IVP solvers."""
 
 
+import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import ivp, ivpsolvers
+from odefilter import ivp, ivpsolvers, markov
 
 
 @pytest_cases.case
@@ -12,7 +13,7 @@ def problem_logistic():
         f=lambda x: x * (1 - x),
         y0=0.5,
         t0=0.0,
-        t1=1.0,
+        t1=10.0,
         p=(),
     )
 
@@ -28,11 +29,14 @@ def test_simulate_terminal_values(problem, solver):
 
     solution = ivp.simulate_terminal_values(
         f=problem.f,
-        tspan=(problem.t0, problem.t1),
+        t0=problem.t0,
+        t1=problem.t1,
         u0=problem.y0,
         solver=solver,
-        atol=1e-4,
-        rtol=1e-4,
+        atol=1e-5,
+        rtol=1e-7,
     )
+    assert solution.t == problem.t1
 
-    assert solution is not None
+    mean, _ = solution.u
+    assert jnp.allclose(mean[0], 1.0, atol=1e-3, rtol=1e-5)
