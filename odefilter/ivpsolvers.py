@@ -162,10 +162,7 @@ def ek0(*, num_derivatives=5):
         )
         return t, state
 
-    def extract_qoi_fn(t, state):
-        return t, state.u, state.stats
-
-    return init_fn, perform_step_fn, extract_qoi_fn
+    return init_fn, perform_step_fn
 
 
 def attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
