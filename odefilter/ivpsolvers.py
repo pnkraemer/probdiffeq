@@ -55,8 +55,9 @@ class _EK0:
         self.step_control = step_control
         self.init = init
 
-    def init_fn(self, *, f, t0, u0, params):
+    def init_fn(self, *, ivp, params):
 
+        f, u0, t0 = ivp.ode_function.f, ivp.y0, ivp.t0
         m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
@@ -78,7 +79,7 @@ class _EK0:
         )
         return state
 
-    def perform_step_fn(self, state0, *, f, t1, params):
+    def perform_step_fn(self, state0, *, ode_function, t1, params):
         """Perform a successful step."""
 
         larger_than_1 = 1.1
@@ -93,7 +94,7 @@ class _EK0:
             cond_fun=lambda s: s.error_norm > 1,
             body_fun=lambda s: self.attempt_step_fn(
                 s,
-                f=f,
+                ode_function=ode_function,
                 state0=state0,
                 t1=t1,
                 params=params,
@@ -113,7 +114,7 @@ class _EK0:
         )
         return state
 
-    def attempt_step_fn(self, s_prev, *, f, state0, t1, params):
+    def attempt_step_fn(self, s_prev, *, ode_function, state0, t1, params):
 
         m0, c_sqrtm0 = state0.u
         error_norm_previously_accepted = state0.error_norm
@@ -129,7 +130,7 @@ class _EK0:
 
         # Attempt step
         u_new, _, error = attempt_step_forward_only(
-            f=f,
+            f=ode_function.f,
             m=m0,
             c_sqrtm=c_sqrtm0,
             p=p,
