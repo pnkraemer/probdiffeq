@@ -1,7 +1,9 @@
+"""Solvers for IVPs."""
+
 import abc
 from collections import namedtuple
 from functools import partial
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -10,15 +12,15 @@ from odefilter import inits, sqrtm, step
 from odefilter.prob import ibm
 
 
-class AbstractODESolver(abc.ABC):
-    """Abstract ODE Solver."""
+class AbstractIVPSolver(abc.ABC):
+    """Abstract solver for IVPs."""
 
     @abc.abstractmethod
     def init_fn(
         self,
         ivp,
         params,
-    ) -> _State:
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -226,7 +228,6 @@ def _attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
     return (m_cor, c_sqrtm_cor), (m_obs, c_sqrtm_obs), err
 
 
-@jax.jit
 def _final_correction(*, m_obs, m_ext, c_sqrtm_ext):
     # no fancy QR/sqrtm-stuff, because
     # the observation matrices have shape (): they are scalars.
@@ -242,7 +243,6 @@ def _final_correction(*, m_obs, m_ext, c_sqrtm_ext):
     return c_sqrtm_obs, (m_cor, c_sqrtm_cor)
 
 
-@jax.jit
 def _estimate_error(*, m_res, q_sqrtm):
     s_sqrtm = q_sqrtm[1, :]
     s = s_sqrtm @ s_sqrtm.T

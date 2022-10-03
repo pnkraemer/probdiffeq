@@ -1,2 +1,2 @@
-# IVP solvers
+# Solvers for IVPs
 ::: odefilter.ivpsolvers
