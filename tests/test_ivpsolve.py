@@ -11,7 +11,7 @@ from odefilter.prob import markov
 @pytest_cases.case
 def problem_logistic():
     return problems.InitialValueProblem(
-        f=lambda x: x * (1 - x),
+        ode_fun=problems.FirstOrderODE(lambda x: x * (1 - x)),
         y0=0.5,
         t0=0.0,
         t1=10.0,
@@ -42,7 +42,7 @@ def solver_ek0():
 def test_simulate_terminal_values(problem, solver):
     solver_alg, solver_params = solver
     solution = ivpsolve.simulate_terminal_values(
-        f=problem.f,
+        f=problem.ode_fun.f,
         t0=problem.t0,
         t1=problem.t1,
         u0=problem.y0,
