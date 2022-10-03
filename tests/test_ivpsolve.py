@@ -4,12 +4,12 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import ivp, ivpsolvers, markov
+from odefilter import ivpsolve, ivpsolvers, markov, problems
 
 
 @pytest_cases.case
 def problem_logistic():
-    return ivp.InitialValueProblem(
+    return problems.InitialValueProblem(
         f=lambda x: x * (1 - x),
         y0=0.5,
         t0=0.0,
@@ -27,7 +27,7 @@ def solver_ek0():
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="solver_")
 def test_simulate_terminal_values(problem, solver):
 
-    solution = ivp.simulate_terminal_values(
+    solution = ivpsolve.simulate_terminal_values(
         f=problem.f,
         t0=problem.t0,
         t1=problem.t1,
