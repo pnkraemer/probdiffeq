@@ -27,3 +27,6 @@ clean:
 	rm -rf .pytest_cache
 	rm -rf *.egg-info
 	rm -rf dist site
+
+doc:
+	mkdocs build
