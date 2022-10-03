@@ -1,9 +1,56 @@
 """Step-size stuff."""
 
 from functools import partial
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
+
+
+def pi_control(*, atol, rtol, error_order):
+    return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
+
+
+class _PIControlParams(NamedTuple):
+
+    atol: float
+    rtol: float
+
+    error_order: int
+
+    safety = 0.95
+    factor_min = 0.2
+    factor_max = 10.0
+    power_integral_unscaled = 0.3
+    power_proportional_unscaled = 0.4
+
+
+class _PIControl:
+    def propose_first_dt(self, f, u0, params):
+        return propose_first_dt_per_tol(
+            f=f,
+            u0=u0,
+            num_derivatives=params.error_order - 1,
+            atol=params.atol,
+            rtol=params.rtol,
+        )
+
+    def normalise_error(self, *, error, params, u1_ref):
+        error_rel = error / (params.atol + params.rtol * u1_ref)
+        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
+        return error_norm
+
+    def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
+        return scale_factor_pi_control(
+            error_norm=error_norm,
+            error_norm_previously_accepted=error_norm_previously_accepted,
+            safety=params.safety,
+            error_order=params.error_order,
+            factor_min=params.factor_min,
+            factor_max=params.factor_max,
+            power_integral_unscaled=params.power_integral_unscaled,
+            power_proportional_unscaled=params.power_proportional_unscaled,
+        )
 
 
 @partial(jax.jit, static_argnames=("f",))

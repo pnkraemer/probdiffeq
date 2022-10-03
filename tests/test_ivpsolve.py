@@ -4,7 +4,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import ivpsolve, ivpsolvers, problems
+from odefilter import ivpsolve, ivpsolvers, problems, step
 from odefilter.prob import markov
 
 
@@ -23,7 +23,7 @@ def problem_logistic():
 def solver_ek0():
     return ivpsolvers.ek0(
         num_derivatives=2,
-        step_control=ivpsolvers.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
+        step_control=step.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
         init=ivpsolvers.taylor_mode(),
     )
 
@@ -32,7 +32,7 @@ def solver_ek0():
 def solver_ek0():
     return ivpsolvers.ek0(
         num_derivatives=2,
-        step_control=ivpsolvers.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
+        step_control=step.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
         init=ivpsolvers.forwardmode_jvp(),
     )
 

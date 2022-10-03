@@ -1,10 +1,11 @@
 from collections import namedtuple
 from functools import partial
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 
-from odefilter import sqrtm, stepsizes
+from odefilter import sqrtm, step
 from odefilter.inits import autodiff_first_order
 from odefilter.prob import ibm
 
@@ -19,10 +20,6 @@ def taylor_mode():
 
 def forwardmode_jvp():
     return autodiff_first_order.forwardmode_jvp, ()
-
-
-def pi_control(*, atol, rtol, error_order):
-    return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
 
 
 def ek0(*, num_derivatives, step_control, init):
@@ -40,56 +37,11 @@ def ek0(*, num_derivatives, step_control, init):
     return alg, params
 
 
-from typing import Any, NamedTuple
-
-
-class _PIControlParams(NamedTuple):
-
-    atol: float
-    rtol: float
-
-    error_order: int
-
-    safety = 0.95
-    factor_min = 0.2
-    factor_max = 10.0
-    power_integral_unscaled = 0.3
-    power_proportional_unscaled = 0.4
-
-
-class _PIControl:
-    def propose_first_dt(self, f, u0, params):
-        return stepsizes.propose_first_dt_per_tol(
-            f=f,
-            u0=u0,
-            num_derivatives=params.error_order - 1,
-            atol=params.atol,
-            rtol=params.rtol,
-        )
-
-    def normalise_error(self, *, error, params, u1_ref):
-        error_rel = error / (params.atol + params.rtol * u1_ref)
-        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
-        return error_norm
-
-    def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
-        return stepsizes.scale_factor_pi_control(
-            error_norm=error_norm,
-            error_norm_previously_accepted=error_norm_previously_accepted,
-            safety=params.safety,
-            error_order=params.error_order,
-            factor_min=params.factor_min,
-            factor_max=params.factor_max,
-            power_integral_unscaled=params.power_integral_unscaled,
-            power_proportional_unscaled=params.power_proportional_unscaled,
-        )
-
-
 class _EK0Params(NamedTuple):
     a: Any
     q_sqrtm: Any
 
-    step_control: _PIControlParams
+    step_control: step._PIControlParams
     init: Any
 
 
