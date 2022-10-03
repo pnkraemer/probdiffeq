@@ -1,2 +1,2 @@
 # Markov processes
-::: odefilter.markov
+::: odefilter.prob.markov
