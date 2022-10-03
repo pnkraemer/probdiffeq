@@ -4,7 +4,8 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from odefilter import autodiff_first_order, inits, sqrtm, stepsizes
+from odefilter import sqrtm, stepsizes
+from odefilter.inits import autodiff_first_order
 from odefilter.prob import ibm
 
 KroneckerEK0State = namedtuple(
