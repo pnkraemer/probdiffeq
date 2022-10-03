@@ -5,7 +5,8 @@ from typing import Any, Callable, Generic, NamedTuple, TypeVar
 import jax.lax
 import jax.numpy as jnp
 
-from odefilter import rv, sqrtm
+from odefilter import sqrtm
+from odefilter.prob import rv
 
 
 class MarkovSequence(NamedTuple):

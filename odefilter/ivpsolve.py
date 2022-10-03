@@ -16,24 +16,23 @@ def simulate_terminal_values(*, f, t0, t1, u0, solver, solver_params):
         t1=t1,
         state0=state0,
         perform_step_fn=solver.perform_step_fn,
+        params=solver_params,
     )
     return state
 
 
-def _solve_ivp_on_interval(*, f, t1, state0, perform_step_fn):
+def _solve_ivp_on_interval(*, f, t1, state0, perform_step_fn, params):
     """Solve an IVP adaptively on the interval (t0, t1).
 
     This function is used by the saveat() and the terminal_value() versions.
     """
 
-    @jax.jit
     def cond_fun(s):
         return s.t < t1
 
-    @jax.jit
     def body_fun(s):
         state = s
-        return perform_step_fn(state, f=f, t1=t1)
+        return perform_step_fn(state, f=f, t1=t1, params=params)
 
     return jax.lax.while_loop(
         cond_fun=cond_fun,

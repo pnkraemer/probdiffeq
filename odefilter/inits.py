@@ -6,7 +6,15 @@ import jax.numpy as jnp
 from jax.experimental.jet import jet
 
 
-def taylormode(*, f, u0, num_derivatives):
+def taylor_mode():
+    return taylormode_fn, ()
+
+
+def forwardmode_jvp():
+    return forwardmode_jvp_fn, ()
+
+
+def taylormode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with Taylor-mode AD."""
     if num_derivatives == 0:
         return u0.reshape((1, -1))
@@ -28,7 +36,7 @@ def _taylormode_next_ode_derivative(fun, primals, series):
     return p, *s
 
 
-def forwardmode_jvp(*, f, u0, num_derivatives):
+def forwardmode_jvp_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with forward-mode AD (JVPs)."""
 
     if num_derivatives == 0:
@@ -51,7 +59,7 @@ def _forwardmode_jvp_next_ode_derivative(fun, fun0):
     return dg
 
 
-def forwardmode(*, f, u0, num_derivatives):
+def forwardmode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with forward-mode AD."""
 
     if num_derivatives == 0:
@@ -72,7 +80,7 @@ def forwardmode(*, f, u0, num_derivatives):
     return jnp.stack(du0)
 
 
-def reversemode(*, f, u0, num_derivatives):
+def reversemode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with reverse-mode AD."""
 
     if num_derivatives == 0:
