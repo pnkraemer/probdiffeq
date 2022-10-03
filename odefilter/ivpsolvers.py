@@ -82,67 +82,6 @@ class EK0:
     ):
         """Perform a successful step."""
 
-        m0, c_sqrtm0 = state0.u
-        error_norm_previously_accepted = state0.error_norm
-
-        def cond_fun(s):
-            return s.error_norm > 1
-
-        def body_fun(s_prev):
-
-            # Never exceed the terminal value
-            dt_clipped = jnp.minimum(s_prev.dt_proposed, t1 - s_prev.t)
-            t_new = s_prev.t + dt_clipped
-
-            # Compute preconditioner
-            p, p_inv = ibm.preconditioner_diagonal(
-                dt=dt_clipped, num_derivatives=self.num_derivatives
-            )
-
-            # Attempt step
-            u_new, _, error = attempt_step_forward_only(
-                f=f,
-                m=m0,
-                c_sqrtm=c_sqrtm0,
-                p=p,
-                p_inv=p_inv,
-                a=self.a,
-                q_sqrtm=self.q_sqrtm,
-            )
-            error = dt_clipped * error
-
-            # Normalise the error
-            m_new, _ = u_new
-            u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
-            error_rel = error / (atol + rtol * u1_ref)
-            error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
-
-            # Propose a new time-step
-            scale_factor = stepsizes.scale_factor_pi_control(
-                error_norm=error_norm,
-                error_order=self.num_derivatives + 1,
-                safety=safety,
-                factor_min=factor_min,
-                factor_max=factor_max,
-                error_norm_previously_accepted=error_norm_previously_accepted,
-                power_integral_unscaled=power_integral_unscaled,
-                power_proportional_unscaled=power_proportional_unscaled,
-            )
-            dt_proposed = scale_factor * dt_clipped
-
-            stats = s_prev.stats
-            stats["f_evaluation_count"] += 1
-            stats["steps_attempted_count"] += 1
-
-            state = KroneckerEK0State(
-                t=t_new,
-                u=u_new,
-                dt_proposed=dt_proposed,
-                error_norm=error_norm,
-                stats=stats,
-            )
-            return state
-
         larger_than_1 = 1.1
         init_val = KroneckerEK0State(
             t=state0.t,
@@ -152,8 +91,20 @@ class EK0:
             stats=state0.stats,
         )
         state = jax.lax.while_loop(
-            cond_fun=cond_fun,
-            body_fun=body_fun,
+            cond_fun=lambda s: s.error_norm > 1,
+            body_fun=lambda s: self.attempt_step_fn(
+                s,
+                f=f,
+                state0=state0,
+                t1=t1,
+                atol=atol,
+                rtol=rtol,
+                safety=safety,
+                factor_min=factor_min,
+                factor_max=factor_max,
+                power_integral_unscaled=power_integral_unscaled,
+                power_proportional_unscaled=power_proportional_unscaled,
+            ),
             init_val=init_val,
         )
         stats = state.stats
@@ -165,6 +116,78 @@ class EK0:
             u=state.u,
             dt_proposed=state.dt_proposed,
             error_norm=state.error_norm,
+            stats=stats,
+        )
+        return state
+
+    def attempt_step_fn(
+        self,
+        s_prev,
+        *,
+        f,
+        state0,
+        t1,
+        atol,
+        rtol,
+        safety,
+        factor_min,
+        factor_max,
+        power_integral_unscaled,
+        power_proportional_unscaled,
+    ):
+
+        m0, c_sqrtm0 = state0.u
+        error_norm_previously_accepted = state0.error_norm
+
+        # Never exceed the terminal value
+        dt_clipped = jnp.minimum(s_prev.dt_proposed, t1 - s_prev.t)
+        t_new = s_prev.t + dt_clipped
+
+        # Compute preconditioner
+        p, p_inv = ibm.preconditioner_diagonal(
+            dt=dt_clipped, num_derivatives=self.num_derivatives
+        )
+
+        # Attempt step
+        u_new, _, error = attempt_step_forward_only(
+            f=f,
+            m=m0,
+            c_sqrtm=c_sqrtm0,
+            p=p,
+            p_inv=p_inv,
+            a=self.a,
+            q_sqrtm=self.q_sqrtm,
+        )
+        error = dt_clipped * error
+
+        # Normalise the error
+        m_new, _ = u_new
+        u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
+        error_rel = error / (atol + rtol * u1_ref)
+        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
+
+        # Propose a new time-step
+        scale_factor = stepsizes.scale_factor_pi_control(
+            error_norm=error_norm,
+            error_order=self.num_derivatives + 1,
+            safety=safety,
+            factor_min=factor_min,
+            factor_max=factor_max,
+            error_norm_previously_accepted=error_norm_previously_accepted,
+            power_integral_unscaled=power_integral_unscaled,
+            power_proportional_unscaled=power_proportional_unscaled,
+        )
+        dt_proposed = scale_factor * dt_clipped
+
+        stats = s_prev.stats
+        stats["f_evaluation_count"] += 1
+        stats["steps_attempted_count"] += 1
+
+        state = KroneckerEK0State(
+            t=t_new,
+            u=u_new,
+            dt_proposed=dt_proposed,
+            error_norm=error_norm,
             stats=stats,
         )
         return state
