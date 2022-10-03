@@ -1,5 +1,6 @@
-"""Step-size stuff."""
+"""Step-size selection."""
 
+import abc
 from functools import partial
 from typing import Any, NamedTuple
 
@@ -27,7 +28,7 @@ class _PIControlParams(NamedTuple):
 
 class _PIControl:
     def propose_first_dt(self, f, u0, params):
-        return propose_first_dt_per_tol(
+        return _propose_first_dt_per_tol(
             f=f,
             u0=u0,
             num_derivatives=params.error_order - 1,
@@ -41,7 +42,7 @@ class _PIControl:
         return error_norm
 
     def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
-        return scale_factor_pi_control(
+        return _scale_factor_pi_control(
             error_norm=error_norm,
             error_norm_previously_accepted=error_norm_previously_accepted,
             safety=params.safety,
@@ -54,14 +55,14 @@ class _PIControl:
 
 
 @partial(jax.jit, static_argnames=("f",))
-def propose_first_dt(*, f, u0):
+def _propose_first_dt(*, f, u0):
     norm_y0 = jnp.linalg.norm(u0)
     norm_dy0 = jnp.linalg.norm(f(u0))
     return 0.01 * norm_y0 / norm_dy0
 
 
 @partial(jax.jit, static_argnames=("f",))
-def propose_first_dt_per_tol(*, f, u0, num_derivatives, rtol, atol):
+def _propose_first_dt_per_tol(*, f, u0, num_derivatives, rtol, atol):
     # Taken from:
     # https://github.com/google/jax/blob/main/jax/experimental/ode.py
     #
@@ -87,7 +88,7 @@ def propose_first_dt_per_tol(*, f, u0, num_derivatives, rtol, atol):
 
 
 @jax.jit
-def scale_factor_integral_control(
+def _scale_factor_integral_control(
     *, error_norm, safety, error_order, factor_min, factor_max
 ):
     """Integral control."""
@@ -99,7 +100,7 @@ def scale_factor_integral_control(
 
 
 @jax.jit
-def scale_factor_pi_control(
+def _scale_factor_pi_control(
     *,
     error_norm,
     error_norm_previously_accepted,
