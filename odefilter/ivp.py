@@ -32,9 +32,8 @@ import jax.numpy as jnp
 @partial(jax.jit, static_argnames=("f", "solver"))
 def simulate_terminal_values(*, f, t0, t1, u0, solver, **solver_kwargs):
 
-    init_fn, perform_step_fn = solver
-    state0 = init_fn(f=f, t0=t0, u0=u0, **solver_kwargs)
-    perform_step_fn = partial(perform_step_fn, **solver_kwargs)
+    state0 = solver.init_fn(f=f, t0=t0, u0=u0, **solver_kwargs)
+    perform_step_fn = partial(solver.perform_step_fn, **solver_kwargs)
     state = _solve_ivp_on_interval(
         f=f,
         t1=t1,
