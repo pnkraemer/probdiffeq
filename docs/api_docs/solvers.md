@@ -1,2 +1,0 @@
-# IVP solvers
-::: odefilter.solvers

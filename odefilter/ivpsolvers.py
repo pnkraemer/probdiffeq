@@ -1,6 +1,7 @@
+import abc
 from collections import namedtuple
 from functools import partial
-from typing import Any, NamedTuple
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -9,17 +10,35 @@ from odefilter import inits, sqrtm, step
 from odefilter.prob import ibm
 
 
-def ek0(*, num_derivatives, step_control, init):
+class AbstractODESolver(abc.ABC):
+    """Abstract ODE Solver."""
 
+    @abc.abstractmethod
+    def init_fn(
+        self,
+        ivp,
+        params,
+    ) -> _State:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def perform_step_fn(self, state0, *, ode_function, t1, params):
+        raise NotImplementedError
+
+
+def ek0(*, num_derivatives, step_control, init):
+    """Create an ODEFilter that implements the EK0."""
     step_controller, step_control_params = step_control
     init_algorithm, init_params = init
 
+    # Assemble solver
     alg = _EK0(
         num_derivatives=num_derivatives,
         step_control=step_controller,
         init=init_algorithm,
     )
 
+    # Assemble parameters
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
     params = _EK0Params(
         a=a, q_sqrtm=q_sqrtm, step_control=step_control_params, init=init_params
@@ -31,12 +50,12 @@ class _EK0Params(NamedTuple):
     a: Any
     q_sqrtm: Any
 
-    step_control: step._PIControlParams
+    step_control: Any
     init: Any
 
 
-KroneckerEK0State = namedtuple(
-    "KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats")
+_KroneckerEK0State = namedtuple(
+    "_KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats")
 )
 
 
@@ -70,7 +89,7 @@ class _EK0:
             "dt_min": jnp.inf,
             "dt_max": 0.0,
         }
-        state = KroneckerEK0State(
+        state = _KroneckerEK0State(
             t=t0,
             u=(m0_mat, c_sqrtm0),
             dt_proposed=dt0,
@@ -83,7 +102,7 @@ class _EK0:
         """Perform a successful step."""
 
         larger_than_1 = 1.1
-        init_val = KroneckerEK0State(
+        init_val = _KroneckerEK0State(
             t=state0.t,
             u=state0.u,
             dt_proposed=state0.dt_proposed,
@@ -105,7 +124,7 @@ class _EK0:
         stats["steps_accepted_count"] += 1
         stats["dt_min"] = jnp.minimum(stats["dt_min"], state.t - state0.t)
         stats["dt_max"] = jnp.maximum(stats["dt_max"], state.t - state0.t)
-        state = KroneckerEK0State(
+        state = _KroneckerEK0State(
             t=state.t,
             u=state.u,
             dt_proposed=state.dt_proposed,
@@ -129,7 +148,7 @@ class _EK0:
         )
 
         # Attempt step
-        u_new, _, error = attempt_step_forward_only(
+        u_new, _, error = _attempt_step_forward_only(
             f=ode_function.f,
             m=m0,
             c_sqrtm=c_sqrtm0,
@@ -159,7 +178,7 @@ class _EK0:
         stats["f_evaluation_count"] += 1
         stats["steps_attempted_count"] += 1
 
-        state = KroneckerEK0State(
+        state = _KroneckerEK0State(
             t=t_new,
             u=u_new,
             dt_proposed=dt_proposed,
@@ -169,7 +188,7 @@ class _EK0:
         return state
 
 
-def attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
+def _attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
     """A step with the 'KroneckerEK0'.
 
     Includes error estimation.

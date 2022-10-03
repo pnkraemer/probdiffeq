@@ -69,8 +69,8 @@ nav:
         - examples.md
     - API Documentation:
         - "api_docs/problems.md"
-        - "api_docs/ivp.md"
-        - "api_docs/solvers.md"
+        - "api_docs/ivpsolve.md"
+        - "api_docs/ivpsolvers.md"
     - Advanced API Documentation:
         - "api_docs/markov.md"
         - "api_docs/sqrtm.md"
