@@ -20,7 +20,10 @@ def problem_logistic():
 
 @pytest_cases.case
 def solver_ek0():
-    return ivpsolvers.ek0(num_derivatives=2, atol=1e-5, rtol=1e-7)
+    return ivpsolvers.ek0(
+        num_derivatives=2,
+        step_control=ivpsolvers.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
+    )
 
 
 @pytest_cases.parametrize_with_cases("problem", cases=".", prefix="problem_")

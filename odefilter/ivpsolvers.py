@@ -11,28 +11,68 @@ KroneckerEK0State = namedtuple(
 )
 
 
-def ek0(*, num_derivatives, atol, rtol):
+def pi_control(*, atol, rtol, error_order):
+    return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
+
+
+def ek0(*, num_derivatives, step_control):
+    step_controller, step_control_params = step_control
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _EK0Params(a=a, q_sqrtm=q_sqrtm, atol=atol, rtol=rtol)
-    alg = _EK0(num_derivatives=num_derivatives)
+    params = _EK0Params(a=a, q_sqrtm=q_sqrtm, step_control=step_control_params)
+    alg = _EK0(num_derivatives=num_derivatives, step_control=step_controller)
     return alg, params
 
 
 from typing import Any, NamedTuple
 
 
-class _EK0Params(NamedTuple):
-    a: Any
-    q_sqrtm: Any
+class _PIControlParams(NamedTuple):
 
     atol: float
     rtol: float
+
+    error_order: int
 
     safety = 0.95
     factor_min = 0.2
     factor_max = 10.0
     power_integral_unscaled = 0.3
     power_proportional_unscaled = 0.4
+
+
+class _PIControl:
+    def propose_first_dt(self, f, u0, params):
+        return stepsizes.propose_first_dt_per_tol(
+            f=f,
+            u0=u0,
+            num_derivatives=params.error_order - 1,
+            atol=params.atol,
+            rtol=params.rtol,
+        )
+
+    def normalise_error(self, *, error, params, u1_ref):
+        error_rel = error / (params.atol + params.rtol * u1_ref)
+        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
+        return error_norm
+
+    def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
+        return stepsizes.scale_factor_pi_control(
+            error_norm=error_norm,
+            error_norm_previously_accepted=error_norm_previously_accepted,
+            safety=params.safety,
+            error_order=params.error_order,
+            factor_min=params.factor_min,
+            factor_max=params.factor_max,
+            power_integral_unscaled=params.power_integral_unscaled,
+            power_proportional_unscaled=params.power_proportional_unscaled,
+        )
+
+
+class _EK0Params(NamedTuple):
+    a: Any
+    q_sqrtm: Any
+
+    step_control: _PIControlParams
 
 
 class _EK0:
@@ -44,7 +84,7 @@ class _EK0:
     and forward-mode initialisation otherweise.
     """
 
-    def __init__(self, *, num_derivatives=5):
+    def __init__(self, *, step_control, num_derivatives=5):
 
         # Create the identity matrix required for Kronecker-type things below.
 
@@ -54,19 +94,14 @@ class _EK0:
         else:
             self.autodiff_fun = autodiff_first_order.taylormode
         self.num_derivatives = num_derivatives
+        self.step_control = step_control
 
     def init_fn(self, *, f, t0, u0, params):
 
         m0_mat = self.autodiff_fun(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
-        dt0 = stepsizes.propose_first_dt_per_tol(
-            f=f,
-            u0=u0,
-            atol=params.atol,
-            rtol=params.rtol,
-            num_derivatives=self.num_derivatives,
-        )
+        dt0 = self.step_control.propose_first_dt(f=f, u0=u0, params=params.step_control)
 
         stats = {
             "f_evaluation_count": 0,
@@ -157,19 +192,15 @@ class _EK0:
         # Normalise the error
         m_new, _ = u_new
         u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
-        error_rel = error / (s_prev.params.atol + s_prev.params.rtol * u1_ref)
-        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
+        error_norm = self.step_control.normalise_error(
+            error=error, u1_ref=u1_ref, params=s_prev.params.step_control
+        )
 
         # Propose a new time-step
-        scale_factor = stepsizes.scale_factor_pi_control(
+        scale_factor = self.step_control.scale_factor(
             error_norm=error_norm,
-            error_order=self.num_derivatives + 1,
-            safety=s_prev.params.safety,
-            factor_min=s_prev.params.factor_min,
-            factor_max=s_prev.params.factor_max,
             error_norm_previously_accepted=error_norm_previously_accepted,
-            power_integral_unscaled=s_prev.params.power_integral_unscaled,
-            power_proportional_unscaled=s_prev.params.power_proportional_unscaled,
+            params=s_prev.params.step_control,
         )
         dt_proposed = scale_factor * dt_clipped
 
