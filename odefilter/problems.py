@@ -1,4 +1,4 @@
-"""Differential equation problem types."""
+"""Problem types."""
 
 from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
 

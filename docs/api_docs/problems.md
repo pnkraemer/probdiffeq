@@ -1,3 +1,3 @@
-# Differential equation problem types
+# Problem types
 
 ::: odefilter.problems

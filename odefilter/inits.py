@@ -1,5 +1,6 @@
 """Initialisation of ODE filters via (automatic) differentiation."""
 
+import abc
 from functools import partial
 
 import jax
@@ -9,16 +10,10 @@ from jax.experimental.jet import jet
 
 def taylor_mode():
     """Create a Taylor-mode initialisation routine."""
-    return taylormode_fn, ()
+    return _taylormode_fn, ()
 
 
-def forwardmode_jvp():
-    """Create a forward-mode initialisation routine /
-    using Jacobian-vector products instead of full Jacobians."""
-    return forwardmode_jvp_fn, ()
-
-
-def taylormode_fn(*, f, u0, num_derivatives):
+def _taylormode_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with Taylor-mode AD."""
     if num_derivatives == 0:
         return u0.reshape((1, -1))
@@ -40,7 +35,13 @@ def _taylormode_next_ode_derivative(fun, primals, series):
     return p, *s
 
 
-def forwardmode_jvp_fn(*, f, u0, num_derivatives):
+def forwardmode_jvp():
+    """Create a forward-mode initialisation routine /
+    using Jacobian-vector products instead of full Jacobians."""
+    return _forwardmode_jvp_fn, ()
+
+
+def _forwardmode_jvp_fn(*, f, u0, num_derivatives):
     """Compute the initial derivatives with forward-mode AD (JVPs)."""
 
     if num_derivatives == 0:

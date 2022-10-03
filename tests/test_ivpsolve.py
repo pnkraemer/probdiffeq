@@ -20,7 +20,7 @@ def problem_logistic():
 
 
 @pytest_cases.case
-def solver_ek0():
+def solver_ek0_taylor():
     return ivpsolvers.ek0(
         num_derivatives=2,
         step_control=step.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
@@ -29,7 +29,7 @@ def solver_ek0():
 
 
 @pytest_cases.case
-def solver_ek0():
+def solver_ek0_forward():
     return ivpsolvers.ek0(
         num_derivatives=2,
         step_control=step.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
