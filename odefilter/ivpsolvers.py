@@ -28,23 +28,21 @@ class AbstractIVPSolver(abc.ABC):
         raise NotImplementedError
 
 
-def ek0(*, num_derivatives, step_control, init):
+def ek0(*, num_derivatives, control, init):
     """Create an ODEFilter that implements the EK0."""
-    step_controller, step_control_params = step_control
+    controller, control_params = control
     init_algorithm, init_params = init
 
     # Assemble solver
     alg = _EK0(
         num_derivatives=num_derivatives,
-        step_control=step_controller,
+        control=controller,
         init=init_algorithm,
     )
 
     # Assemble parameters
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _EK0Params(
-        a=a, q_sqrtm=q_sqrtm, step_control=step_control_params, init=init_params
-    )
+    params = _EK0Params(a=a, q_sqrtm=q_sqrtm, control=control_params, init=init_params)
     return alg, params
 
 
@@ -52,13 +50,24 @@ class _EK0Params(NamedTuple):
     a: Any
     q_sqrtm: Any
 
-    step_control: Any
+    control: Any
     init: Any
 
 
 _KroneckerEK0State = namedtuple(
     "_KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats")
 )
+"""EK0 State.
+
+state.t
+state.u
+state.params
+state.step.dt_proposed
+state.step.params
+state.step.control.error_norm
+state.step.control.error_norm_previously_accepted
+state.step.control.params
+"""
 
 
 class _EK0:
@@ -70,10 +79,10 @@ class _EK0:
     and forward-mode initialisation otherweise.
     """
 
-    def __init__(self, *, step_control, init, num_derivatives=5):
+    def __init__(self, *, control, init, num_derivatives=5):
 
         self.num_derivatives = num_derivatives
-        self.step_control = step_control
+        self.control = control
         self.init = init
 
     def init_fn(self, *, ivp, params):
@@ -82,7 +91,7 @@ class _EK0:
         m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
-        dt0 = self.step_control.propose_first_dt(f=f, u0=u0, params=params.step_control)
+        dt0 = self.control.propose_first_dt(f=f, u0=u0, params=params.control)
 
         stats = {
             "f_evaluation_count": 0,
@@ -164,15 +173,15 @@ class _EK0:
         # Normalise the error
         m_new, _ = u_new
         u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
-        error_norm = self.step_control.normalise_error(
-            error=error, u1_ref=u1_ref, params=params.step_control
+        error_norm = self.control.normalise_error(
+            error=error, u1_ref=u1_ref, params=params.control
         )
 
         # Propose a new time-step
-        scale_factor = self.step_control.scale_factor(
+        scale_factor = self.control.scale_factor(
             error_norm=error_norm,
             error_norm_previously_accepted=error_norm_previously_accepted,
-            params=params.step_control,
+            params=params.control,
         )
         dt_proposed = scale_factor * dt_clipped
 
