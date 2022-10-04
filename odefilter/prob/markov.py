@@ -1,6 +1,6 @@
 """Markov process, Markov sequences and Markov machinery."""
 
-from typing import Any, Callable, Generic, NamedTuple, TypeVar
+from typing import Any, NamedTuple
 
 import jax.lax
 import jax.numpy as jnp

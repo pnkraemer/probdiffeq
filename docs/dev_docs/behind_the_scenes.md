@@ -4,7 +4,7 @@ How are the `odefilter` solvers implemented, and why are they implemented the wa
 
 
 
-## Algorithm, parameters and factories
+## States, algorithms, parameters and factories
 
 The `odefilter` solvers and all subroutines they rely on are accessible via factory methods:
 ```python
@@ -36,6 +36,14 @@ _**Why?**_
 
 Algorithms become pure functions, parameters are valid pytrees. JAX' power unfolds.
 
+For the same reason are the algorithms stateless, too.
+The commonly behave like:
+```python
+state = init_fn(problem, params)
+state = update_fn(state, problem, params)
+```
+And details are explained in the next section.
+
 
 ## Init, update, and extract
 
@@ -52,7 +60,12 @@ pattern ([see here](https://jax.readthedocs.io/en/latest/jax.example_libraries.o
 This is implemented in one way or another by BlackJax, Flax, Optax, and many other JAX-based simulation codes.
 
 Here, we follow a similar pattern:
-We solve ODEs as
+As explained in the previous section, algorithms in `odefilter` behave like
+```python
+state = init_fn(problem, params)
+state = update_fn(state, problem, params)
+```
+For example, we solve ODEs as
 ```python
 solver, solver_params = algorithm_factory(params)
 
@@ -63,6 +76,17 @@ solver.extract_fn(state, ode_problem, solver_params)
 ```
 where the solver, which implements `init_fn`, `perform_step_fn`, and `extract_fn`, replaces the `init_fn, update_fn, extract_fn` triple;
 and the `perform_step_fn` updates the state given the ODE problem and the solver parameters.
+Sometimes, there will be slight nuances with respect to the `problem` variable.
+
+
+But even inside the ODE solver, algorithms perform this pattern.
+For example, the adaptive step-selection does
+```python
+alg, params = adaptive(solver=ek0(), atol=1e-4, rtol=1e-4)
+state = alg.init_fn(problem, params)  # proposes first step size
+state = alg.update_fn(state, problem, params)  # Proposes the next dt
+```
+
 
 This is very similar to the init-update-extract pattern, but makes a stronger distinction between a solver-state and a solver-parameter.
 

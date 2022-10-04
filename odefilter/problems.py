@@ -50,7 +50,8 @@ class SecondOrderODE(NamedTuple):
     r"""ODE vector field $f=f(u, \dot u, t, \theta)$."""
 
     jac: Optional[Callable] = None
-    r"""Jacobian of the vector field with respect to $u$, $Jf=(Jf)(u, \dot u, t, \theta)$."""
+    r"""Jacobian of the vector field with respect to $u$,
+    $Jf=(Jf)(u, \dot u, t, \theta)$."""
 
 
 class InitialValueProblem(NamedTuple):

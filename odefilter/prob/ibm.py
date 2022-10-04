@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 
 def system_matrices_1d(*, num_derivatives):
+    """Construct the IBM system matrices."""
     x = jnp.arange(num_derivatives + 1)
 
     A_1d = jnp.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
@@ -15,11 +16,13 @@ def system_matrices_1d(*, num_derivatives):
 
 
 def preconditioner(*, dt, num_derivatives):
+    """Construct the IBM preconditioner."""
     p, p_inv = preconditioner_diagonal(dt=dt, num_derivatives=num_derivatives)
     return jnp.diag(p), jnp.diag(p_inv)
 
 
 def preconditioner_diagonal(*, dt, num_derivatives):
+    """Construct the diagonal of the IBM preconditioner."""
     powers = jnp.arange(num_derivatives, -1, -1)
 
     scales = _factorial(powers)
@@ -33,7 +36,7 @@ def preconditioner_diagonal(*, dt, num_derivatives):
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=(0, 0))
 def preconditioner_diagonal_batched(dts, num_derivatives):
-    """Computes the diagonal preconditioner, but for a number of time-steps at once."""
+    """Compute the diagonal preconditioner, but for a number of time-steps at once."""
     return preconditioner_diagonal(dt=dts, num_derivatives=num_derivatives)
 
 
