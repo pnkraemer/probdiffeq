@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 
 
-def pi_control(*, atol, rtol, error_order):
+def proportional_integral(*, atol, rtol, error_order):
     return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
 
 
@@ -42,7 +42,7 @@ class _PIControl:
         return error_norm
 
     def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
-        return _scale_factor_pi_control(
+        return _scale_factor_proportional_integral(
             error_norm=error_norm,
             error_norm_previously_accepted=error_norm_previously_accepted,
             safety=params.safety,
@@ -100,7 +100,7 @@ def _scale_factor_integral_control(
 
 
 @jax.jit
-def _scale_factor_pi_control(
+def _scale_factor_proportional_integral(
     *,
     error_norm,
     error_norm_previously_accepted,

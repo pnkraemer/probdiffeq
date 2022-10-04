@@ -21,7 +21,7 @@ def problem_logistic():
 
 @pytest_cases.parametrize("init", [inits.taylor_mode(), inits.forwardmode_jvp()])
 @pytest_cases.parametrize(
-    "control", [step.pi_control(atol=1e-5, rtol=1e-7, error_order=3)]
+    "control", [step.proportional_integral(atol=1e-5, rtol=1e-7, error_order=3)]
 )
 def solver_ek0(init, control):
     return ivpsolvers.ek0(
