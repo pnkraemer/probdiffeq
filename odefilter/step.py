@@ -1,14 +1,14 @@
 """Step-size selection."""
 
-import abc
 from functools import partial
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 
 
 def proportional_integral(*, atol, rtol, error_order):
+    """Proportional-integral control."""
     return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
 
 

@@ -1,9 +1,6 @@
 """Tests for Markov process machinery."""
 
-from collections import namedtuple
-
 import jax.numpy as jnp
-import jax.tree_util
 import pytest_cases
 
 from odefilter.prob import markov, rv
@@ -38,6 +35,6 @@ def test_marginalise_sequence(markov_sequence):
 
     rvs = markov.marginalise_sequence(markov_sequence=markov_sequence)
 
-    assert type(rvs) == type(markov_sequence.transition_noise_rvs)
+    assert isinstance(rvs, type(markov_sequence.transition_noise_rvs))
     assert rvs[0].shape == markov_sequence.transition_noise_rvs[0].shape
     assert rvs[1].shape == markov_sequence.transition_noise_rvs[1].shape

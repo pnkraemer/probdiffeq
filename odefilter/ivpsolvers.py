@@ -2,13 +2,12 @@
 
 import abc
 from collections import namedtuple
-from functools import partial
-from typing import Any, Generic, NamedTuple, Tuple, TypeVar
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 
-from odefilter import inits, sqrtm, step
+from odefilter import sqrtm
 from odefilter.prob import ibm
 
 
@@ -21,10 +20,12 @@ class AbstractIVPSolver(abc.ABC):
         ivp,
         params,
     ):
+        """Initialise the IVP solver state."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def perform_step_fn(self, state0, *, ode_function, t1, params):
+        """Perform a step."""
         raise NotImplementedError
 
 
@@ -111,7 +112,6 @@ class _EK0:
 
     def perform_step_fn(self, state0, *, ode_function, t1, params):
         """Perform a successful step."""
-
         larger_than_1 = 1.1
         init_val = _KroneckerEK0State(
             t=state0.t,
@@ -200,7 +200,7 @@ class _EK0:
 
 
 def _attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
-    """A step with the 'KroneckerEK0'.
+    """Step with the 'KroneckerEK0'.
 
     Includes error estimation.
     Includes time-varying, scalar diffusion.

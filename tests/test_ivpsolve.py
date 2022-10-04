@@ -5,7 +5,6 @@ import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import inits, ivpsolve, ivpsolvers, problems, step
-from odefilter.prob import markov
 
 
 @pytest_cases.case
