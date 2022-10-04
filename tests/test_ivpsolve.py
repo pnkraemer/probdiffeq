@@ -19,21 +19,15 @@ def problem_logistic():
     )
 
 
-@pytest_cases.case
-def solver_ek0_taylor():
+@pytest_cases.parametrize("init", [inits.taylor_mode(), inits.forwardmode_jvp()])
+@pytest_cases.parametrize(
+    "control", [step.pi_control(atol=1e-5, rtol=1e-7, error_order=3)]
+)
+def solver_ek0(init, control):
     return ivpsolvers.ek0(
         num_derivatives=2,
-        control=step.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
-        init=inits.taylor_mode(),
-    )
-
-
-@pytest_cases.case
-def solver_ek0_forward():
-    return ivpsolvers.ek0(
-        num_derivatives=2,
-        control=step.pi_control(atol=1e-5, rtol=1e-7, error_order=3),
-        init=inits.forwardmode_jvp(),
+        control=control,
+        init=init,
     )
 
 
