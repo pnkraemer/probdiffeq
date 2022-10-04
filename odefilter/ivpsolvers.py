@@ -60,14 +60,11 @@ _KroneckerEK0State = namedtuple(
 )
 """EK0 State.
 
-state.t
-state.u
-state.params
-state.step.dt_proposed
-state.step.params
-state.step.control.error_norm
-state.step.control.error_norm_previously_accepted
-state.step.control.params
+state.dt_proposed
+state.solver.t
+state.solver.u
+state.control.error_norm
+state.control.error_norm_previously_accepted
 """
 
 
