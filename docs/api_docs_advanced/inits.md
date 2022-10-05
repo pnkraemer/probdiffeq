@@ -1,3 +1,3 @@
-# Initialisations
+# Initialisation functions
 
 ::: odefilter.inits
