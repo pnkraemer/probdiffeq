@@ -1,5 +1,6 @@
 """Tests for IVP solvers."""
 
+import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import controls, inits, problems
@@ -27,3 +28,12 @@ def test_solver(solver, ivp_problem):
     assert isinstance(alg, ivp.AbstractIVPSolver)
 
     state = alg.init_fn(ivp=ivp_problem, params=params)
+    assert state.t == ivp_problem.t0
+    assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)
+
+    dt0 = 0.1
+    state = alg.step_fn(
+        state=state, ode_function=ivp_problem.ode_function, dt0=dt0, params=params
+    )
+    assert state.t > ivp_problem.t0
+    assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)
