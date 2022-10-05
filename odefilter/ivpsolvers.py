@@ -89,7 +89,7 @@ class _EK0:
 
     def init_fn(self, *, ivp, params):
 
-        f, u0, t0 = ivp.ode_function.f, ivp.y0, ivp.t0
+        f, u0, t0 = ivp.ode_function.f, ivp.initial_values, ivp.t0
         m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))

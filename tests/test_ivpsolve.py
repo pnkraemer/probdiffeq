@@ -11,10 +11,10 @@ from odefilter import control, inits, ivpsolve, ivpsolvers, problems
 def problem_logistic():
     return problems.InitialValueProblem(
         ode_function=problems.FirstOrderODE(lambda x: x * (1 - x)),
-        y0=0.5,
+        initial_values=0.5,
         t0=0.0,
         t1=10.0,
-        p=(),
+        parameters=(),
     )
 
 
