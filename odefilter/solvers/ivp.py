@@ -144,7 +144,7 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         # no fancy QR/sqrtm-stuff, because
         # the observation matrices have shape (): they are scalars.
         # The correction is almost free.
-        s_sqrtm = c_sqrtm_ext[1, :]  # shape (n,)
+        s_sqrtm = linear_fn(c_sqrtm_ext)  # shape (n,)
         s = s_sqrtm @ s_sqrtm.T
 
         g = (c_sqrtm_ext @ s_sqrtm.T) / s  # shape (n,)

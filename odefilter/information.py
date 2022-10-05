@@ -98,7 +98,7 @@ def linearize_ek0_kron_2nd(
     Parameters
     ----------
     f :
-        Vector field of a first-order ODE.
+        Vector field of a second-order ODE.
     x :
         Linearisation point.
 
