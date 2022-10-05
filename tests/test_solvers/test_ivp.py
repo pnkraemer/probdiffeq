@@ -7,17 +7,23 @@ from odefilter import controls, inits, problems
 from odefilter.solvers import ivp
 
 
-@pytest_cases.parametrize("init", [inits.taylor_mode()])
+@pytest_cases.parametrize(
+    "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
+)
 @pytest_cases.parametrize("num_derivatives", [1])
-def case_non_adaptive_solver_ek0(init, num_derivatives):
-    return ivp.ek0_non_adaptive(init=init, num_derivatives=num_derivatives)
+def case_non_adaptive_solver_ek0(derivative_init_fn, num_derivatives):
+    return ivp.ek0_non_adaptive(
+        derivative_init_fn=derivative_init_fn, num_derivatives=num_derivatives
+    )
 
 
-@pytest_cases.parametrize("init", [inits.taylor_mode()])
+@pytest_cases.parametrize(
+    "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
+)
 @pytest_cases.parametrize("num_derivatives", [2])
-def case_solver_adaptive_ek0(init, num_derivatives):
+def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives):
     non_adaptive_solver = ivp.ek0_non_adaptive(
-        init=init, num_derivatives=num_derivatives
+        derivative_init_fn=derivative_init_fn, num_derivatives=num_derivatives
     )
     control = controls.proportional_integral()
     atol, rtol = 1e-3, 1e-3
