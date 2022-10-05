@@ -70,7 +70,7 @@ nav:
     - API Documentation:
         - "api_docs/problems.md"
         - "api_docs/ivpsolve.md"
-        - "api_docs/ivpsolvers.md"
+        - "api_docs/solvers.md"
     - Advanced API Documentation:
         - "api_docs_advanced/inits.md"
         - "api_docs_advanced/controls.md"

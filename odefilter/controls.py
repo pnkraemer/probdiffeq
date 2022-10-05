@@ -1,10 +1,8 @@
 """Step-size selection."""
 
 import abc
-from functools import partial
 from typing import NamedTuple
 
-import jax
 import jax.numpy as jnp
 
 
@@ -13,15 +11,17 @@ class AbstractControl(abc.ABC):
 
     @abc.abstractmethod
     def init_fn(self):
+        """Initialise a controller state."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def control_fn(self, state, error_normalised, error_order, params):
+    def control_fn(self, *, state, error_normalised, error_order, params):
+        """Control a normalised error estimate."""
         raise NotImplementedError
 
 
 def proportional_integral(**kwargs):
-    """Proportional-integral control."""
+    """Create a proportional-integral (PI) controller."""
     return _PIControl(), _PIControl.Params(**kwargs)
 
 

@@ -82,12 +82,14 @@ class InitialValueProblem(NamedTuple):
     """Parameters of the initial value problem."""
 
     def tree_flatten(self):
+        """Flatten an IVP tree."""
         aux_data = self.ode_function
         children = (self.initial_values, self.t0, self.t1, self.parameters)
         return children, aux_data
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
+        """Unflatten an IVP tree."""
         ode_function = aux_data
         initial_values, t0, t1, parameters = children
         return cls(

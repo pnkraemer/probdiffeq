@@ -1,6 +1,5 @@
 """Tests for control algorithms."""
 
-import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import controls

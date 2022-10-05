@@ -47,7 +47,8 @@ class _EK0(AbstractIVPSolver):
 
         hidden_state: Any
 
-    @jax.tree_util.register_pytree_node_class  # num_derivatives is static, so we register manually
+    # num_derivatives is static, so we register manually
+    # @jax.tree_util.register_pytree_node_class
     class Params(NamedTuple):
         num_derivatives: int
         init: Any
@@ -170,7 +171,7 @@ class _EK0(AbstractIVPSolver):
 
 
 def adaptive(*, solver, control, atol, rtol, error_order):
-
+    """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
     solver_alg, solver_params = solver
     control_alg, control_params = control
 
