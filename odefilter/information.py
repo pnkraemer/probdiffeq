@@ -32,6 +32,8 @@ from typing import Callable, Tuple
 
 from jaxtyping import Array, Float
 
+# todo: make these operator on the ODE object?
+
 
 def linearize_ek0_kron_1st(
     f: Callable[[Float[Array, "n d"]], Float[Array, " d"]], x: Float[Array, "n d"]
