@@ -27,6 +27,7 @@ In the end, this approximates $F(u) = \mathrm{bias} + \mathrm{linearfn}(u)$
 and we can use it in ODE solvers.
 """
 
+from functools import singledispatch
 from typing import Callable, Tuple
 
 from jaxtyping import Array, Float

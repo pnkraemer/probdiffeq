@@ -123,18 +123,17 @@ class InitialValueProblem(NamedTuple):
     def tree_flatten(self):
         """Flatten the data structure."""
         aux_data = self.ode_function
-        children = (self.initial_values, self.t0, self.t1, self.parameters)
+        children = (self.initial_values, self.t0, self.t1)
         return children, aux_data
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
         """Unflatten the data structure."""
         ode_function = aux_data
-        initial_values, t0, t1, parameters = children
+        initial_values, t0, t1 = children
         return cls(
             ode_function=ode_function,
             initial_values=initial_values,
             t0=t0,
             t1=t1,
-            parameters=parameters,
         )

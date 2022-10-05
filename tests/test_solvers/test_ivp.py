@@ -37,7 +37,7 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives):
 
 
 def case_ivp_logistic():
-    ode = problems.FirstOrderODE(f=lambda x: x * (1 - x))
+    ode = problems.FirstOrderODE(vector_field=lambda x: x * (1 - x))
     ivp_problem = problems.InitialValueProblem(
         ode_function=ode, initial_values=0.4, t0=0.0, t1=2.0
     )

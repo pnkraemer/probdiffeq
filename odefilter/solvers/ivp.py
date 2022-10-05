@@ -60,7 +60,7 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         self.num_derivatives = num_derivatives
 
     def init_fn(self, *, ivp, params):
-        f, u0, t0 = ivp.ode_function.f, ivp.initial_values, ivp.t0
+        f, u0, t0 = ivp.ode_function.vector_field, ivp.initial_values, ivp.t0
         m0_mat = self.derivative_init_fn(
             f=f, u0=u0, num_derivatives=self.num_derivatives
         )
@@ -79,7 +79,7 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         )
 
         u_new, _, error_estimate = self._attempt_step_forward_only(
-            f=ode_function.f,
+            f=ode_function.vector_field,
             m=m0,
             c_sqrtm=c_sqrtm0,
             p=p,
@@ -227,7 +227,7 @@ class _SolverWithControl(AbstractIVPSolver):
             norm_ord=params.norm_ord,
         )
         dt_proposed = self._propose_first_dt_per_tol(
-            f=ivp.ode_function.f,
+            f=ivp.ode_function.vector_field,
             u0=ivp.initial_values,
             error_order=params.error_order,
             rtol=params.rtol,
