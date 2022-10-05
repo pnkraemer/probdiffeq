@@ -36,7 +36,7 @@ class _PIControl:
             rtol=params.rtol,
         )
 
-    def normalise_error(self, *, error, params, u1_ref):
+    def normalise_error(self, *, error, u1_ref, params):
         error_rel = error / (params.atol + params.rtol * u1_ref)
         error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
         return error_norm

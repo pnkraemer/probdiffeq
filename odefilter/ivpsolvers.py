@@ -55,20 +55,21 @@ class _EK0Params(NamedTuple):
     init: Any
 
 
+_Stats = namedtuple(
+    "_Stats",
+    (
+        "f_evaluation_count",
+        "steps_accepted_count",
+        "steps_attempted_count",
+        "dt_min",
+        "dt_max",
+    ),
+)
+
 _KroneckerEK0State = namedtuple(
     "_KroneckerEK0State", ("t", "u", "dt_proposed", "error_norm", "stats")
 )
-"""EK0 State.
-
-state.t
-state.u
-state.params
-state.step.dt_proposed
-state.step.params
-state.step.control.error_norm
-state.step.control.error_norm_previously_accepted
-state.step.control.params
-"""
+"""EK0 State."""
 
 
 class _EK0:
@@ -88,19 +89,19 @@ class _EK0:
 
     def init_fn(self, *, ivp, params):
 
-        f, u0, t0 = ivp.ode_function.f, ivp.y0, ivp.t0
+        f, u0, t0 = ivp.ode_function.f, ivp.initial_values, ivp.t0
         m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
         dt0 = self.control.propose_first_dt(f=f, u0=u0, params=params.control)
 
-        stats = {
-            "f_evaluation_count": 0,
-            "steps_accepted_count": 0,
-            "steps_attempted_count": 0,
-            "dt_min": jnp.inf,
-            "dt_max": 0.0,
-        }
+        stats = _Stats(
+            f_evaluation_count=0,
+            steps_accepted_count=0,
+            steps_attempted_count=0,
+            dt_min=jnp.inf,
+            dt_max=0,
+        )
         state = _KroneckerEK0State(
             t=t0,
             u=(m0_mat, c_sqrtm0),
@@ -125,16 +126,19 @@ class _EK0:
             body_fun=lambda s: self.attempt_step_fn(
                 s,
                 ode_function=ode_function,
-                state0=state0,
                 t1=t1,
                 params=params,
             ),
             init_val=init_val,
         )
-        stats = state.stats
-        stats["steps_accepted_count"] += 1
-        stats["dt_min"] = jnp.minimum(stats["dt_min"], state.t - state0.t)
-        stats["dt_max"] = jnp.maximum(stats["dt_max"], state.t - state0.t)
+
+        dt_min = jnp.minimum(state.stats.dt_min, state.t - state0.t)
+        dt_max = jnp.maximum(state.stats.dt_max, state.t - state0.t)
+        stats = state.stats._replace(
+            dt_min=dt_min,
+            dt_max=dt_max,
+            steps_accepted_count=state.stats.steps_accepted_count + 1,
+        )
         state = _KroneckerEK0State(
             t=state.t,
             u=state.u,
@@ -144,20 +148,55 @@ class _EK0:
         )
         return state
 
-    def attempt_step_fn(self, s_prev, *, ode_function, state0, t1, params):
-
-        m0, c_sqrtm0 = state0.u
-        error_norm_previously_accepted = state0.error_norm
+    def attempt_step_fn(self, state0, *, ode_function, t1, params):
 
         # Never exceed the terminal value
-        dt_clipped = jnp.minimum(s_prev.dt_proposed, t1 - s_prev.t)
-        t_new = s_prev.t + dt_clipped
+        dt_clipped = jnp.minimum(state0.dt_proposed, t1 - state0.t)
+        t_new = state0.t + dt_clipped
 
-        # Compute preconditioner
-        p, p_inv = ibm.preconditioner_diagonal(
-            dt=dt_clipped, num_derivatives=self.num_derivatives
+        # Compute preconditioner and make a step
+        u_new, error = self._attempt_step_fn(
+            u0=state0.u,
+            dt=dt_clipped,
+            ode_function=ode_function,
+            params=params,
         )
 
+        # Normalise the error
+        m_new, _ = u_new
+        m0, _ = state0.u
+        u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
+        error_norm = self.control.normalise_error(
+            error=error, u1_ref=u1_ref, params=params.control
+        )
+
+        # Propose a new time-step
+        error_norm_previously_accepted = state0.error_norm
+        scale_factor = self.control.scale_factor(
+            error_norm=error_norm,
+            error_norm_previously_accepted=error_norm_previously_accepted,
+            params=params.control,
+        )
+        dt_proposed = scale_factor * dt_clipped
+
+        stats = state0.stats._replace(
+            f_evaluation_count=state0.stats.f_evaluation_count + 1,
+            steps_attempted_count=state0.stats.steps_attempted_count + 1,
+        )
+        state = _KroneckerEK0State(
+            t=t_new,
+            u=u_new,
+            dt_proposed=dt_proposed,
+            error_norm=error_norm,
+            stats=stats,
+        )
+        return state
+
+    def _attempt_step_fn(self, *, dt, u0, ode_function, params):
+        m0, c_sqrtm0 = u0
+        p, p_inv = ibm.preconditioner_diagonal(
+            dt=dt, num_derivatives=self.num_derivatives
+        )
         # Attempt step
         u_new, _, error = _attempt_step_forward_only(
             f=ode_function.f,
@@ -168,35 +207,8 @@ class _EK0:
             a=params.a,
             q_sqrtm=params.q_sqrtm,
         )
-        error = dt_clipped * error
-
-        # Normalise the error
-        m_new, _ = u_new
-        u1_ref = jnp.abs(jnp.maximum(m_new[0, :], m0[0, :]))
-        error_norm = self.control.normalise_error(
-            error=error, u1_ref=u1_ref, params=params.control
-        )
-
-        # Propose a new time-step
-        scale_factor = self.control.scale_factor(
-            error_norm=error_norm,
-            error_norm_previously_accepted=error_norm_previously_accepted,
-            params=params.control,
-        )
-        dt_proposed = scale_factor * dt_clipped
-
-        stats = s_prev.stats
-        stats["f_evaluation_count"] += 1
-        stats["steps_attempted_count"] += 1
-
-        state = _KroneckerEK0State(
-            t=t_new,
-            u=u_new,
-            dt_proposed=dt_proposed,
-            error_norm=error_norm,
-            stats=stats,
-        )
-        return state
+        error = dt * error
+        return u_new, error
 
 
 def _attempt_step_forward_only(*, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):

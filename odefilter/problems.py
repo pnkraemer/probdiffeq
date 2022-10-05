@@ -60,7 +60,7 @@ class InitialValueProblem(NamedTuple):
     ode_function: Union[FirstOrderODE, SecondOrderODE]
     """ODE function."""
 
-    y0: Union[Any, Iterable[Any]]
+    initial_values: Union[Any, Iterable[Any]]
     r"""Initial values.
     If the ODE is a first-order equation, the initial value is an array $u_0$.
     If it is a second-order equation,
@@ -75,5 +75,5 @@ class InitialValueProblem(NamedTuple):
     t1: float
     """Terminal time-point. Optional."""
 
-    p: Any = ()
+    parameters: Any = ()
     """Parameters of the initial value problem."""
