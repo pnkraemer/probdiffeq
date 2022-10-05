@@ -33,6 +33,7 @@ from typing import Callable, Tuple
 from jaxtyping import Array, Float
 
 # todo: make these operator on the ODE object?
+# todo: remove "linearize_" prefix (bc redundant)
 
 
 def linearize_ek0_kron_1st(
