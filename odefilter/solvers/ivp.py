@@ -28,7 +28,11 @@ def ek0_non_adaptive(*, init, num_derivatives):
     """EK0 solver."""
     init_alg, init_params = init
 
-    alg = _NonAdaptiveEK0(init=init_alg, num_derivatives=num_derivatives)
+    alg = _NonAdaptiveEK0(
+        init=init_alg,
+        information_fn=information.linearize_ek0_kron_1st,
+        num_derivatives=num_derivatives,
+    )
 
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
     params = _NonAdaptiveEK0.Params(init=init_params, a=a, q_sqrtm=q_sqrtm)
@@ -51,8 +55,9 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         a: Any
         q_sqrtm: Any
 
-    def __init__(self, *, init, num_derivatives):
+    def __init__(self, *, init, information_fn, num_derivatives):
         self.init = init
+        self.information_fn = information_fn
 
         # static parameter, therefore a class attribute instead of a parameter
         self.num_derivatives = num_derivatives
@@ -93,27 +98,6 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
             error_estimate=error_estimate,
         )
 
-    # def _attempt_step(self, rv):
-    #
-    #     rv = apply_preconditioner(rv)
-    #     m = extrapolate_mean(m)
-    #
-    #     # depends on the information operator
-    #     fu = value_and_grad(f)
-    #     local_error, local_log_evidence = estimate_error(fu, rv)
-    #
-    #
-    #
-    #     # Differs for different implementation modes
-    #     c = extrapolate_cov(c)  # terminal_values_only
-    #     c = extrapolate_and_revert_transition(c)  # solve
-    #     c = extrapolate_cov_with_dense_output(c)  # solve_dense_output
-    #
-    #
-    #     # Is the same again
-    #     rv = unapply_preconditioner(rv)
-    #     rv, obs = correct(rv, fu)
-
     def _attempt_step_forward_only(self, *, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
         """Step with the 'KroneckerEK0'.
 
@@ -131,7 +115,7 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         # (It is not really necessary for the mean, to be honest.)
         m_ext = p[:, None] * (a @ m)
 
-        bias, linear_fn = information.linearize_ek0_kron_1st(f, m_ext)
+        bias, linear_fn = self.information_fn(f, m_ext)
 
         # Compute the error estimate
         m_obs = bias
