@@ -70,10 +70,10 @@ nav:
     - API Documentation:
         - "api_docs/problems.md"
         - "api_docs/ivpsolve.md"
-        - "api_docs/ivpsolvers.md"
+        - "api_docs/solvers.md"
     - Advanced API Documentation:
         - "api_docs_advanced/inits.md"
-        - "api_docs_advanced/control.md"
+        - "api_docs_advanced/controls.md"
     - Super Advanced API Documentation:
         - "api_docs_util/markov.md"
         - "api_docs_util/sqrtm.md"

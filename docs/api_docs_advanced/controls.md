@@ -1,0 +1,3 @@
+# Control algorithms
+
+::: odefilter.controls
