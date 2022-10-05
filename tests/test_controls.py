@@ -6,14 +6,14 @@ import pytest_cases
 from odefilter import controls
 
 
-@pytest_cases.case
-def case_proportional_integral():
-    return controls.proportional_integral()
+@pytest_cases.parametrize("safety", [0.9, 0.8])
+def case_proportional_integral(safety):
+    return controls.proportional_integral(safety=safety)
 
 
-@pytest_cases.case
-def case_integral():
-    return controls.integral()
+@pytest_cases.parametrize("safety", [0.9, 0.8])
+def case_integral(safety):
+    return controls.integral(safety=safety)
 
 
 @pytest_cases.parametrize_with_cases("control", cases=".")
