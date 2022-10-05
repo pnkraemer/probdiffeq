@@ -5,6 +5,7 @@ from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
 import jax.tree_util
 
 
+@jax.tree_util.register_pytree_node_class
 class FirstOrderODE(NamedTuple):
     r"""Vector field for first-order ordinary differential equations.
 
@@ -24,13 +25,34 @@ class FirstOrderODE(NamedTuple):
     with signature $(u, t, \theta)$ is to be expected.
     """
 
-    f: Callable
+    vector_field: Callable
     r"""ODE vector field $f=f(u, t, \theta)$."""
 
-    jac: Optional[Callable] = None
+    jacobian: Optional[Callable] = None
     r"""Jacobian of the vector field with respect to $u$, $Jf=(Jf)(u, t, \theta)$."""
 
+    parameters: Any = ()
+    """Parameters of the vector field."""
 
+    def tree_flatten(self):
+        """Flatten the data structure."""
+        aux_data = self.vector_field, self.jacobian
+        children = (self.parameters,)
+        return children, aux_data
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Unflatten the data structure."""
+        vector_field, jacobian = aux_data
+        (parameters,) = children
+        return cls(
+            vector_field=vector_field,
+            jacobian=jacobian,
+            parameters=parameters,
+        )
+
+
+@jax.tree_util.register_pytree_node_class
 class SecondOrderODE(NamedTuple):
     r"""Vector field for second-order ordinary differential equations.
 
@@ -48,12 +70,32 @@ class SecondOrderODE(NamedTuple):
     with signature $(u, \dot u, t, \theta)$ is to be expected.
     """
 
-    f: Callable
+    vector_field: Callable
     r"""ODE vector field $f=f(u, \dot u, t, \theta)$."""
 
-    jac: Optional[Callable] = None
+    jacobian: Optional[Callable] = None
     r"""Jacobian of the vector field with respect to $u$,
     $Jf=(Jf)(u, \dot u, t, \theta)$."""
+
+    parameters: Any = ()
+    """Parameters of the vector field."""
+
+    def tree_flatten(self):
+        """Flatten the data structure."""
+        aux_data = self.vector_field, self.jacobian
+        children = (self.parameters,)
+        return children, aux_data
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Unflatten the data structure."""
+        vector_field, jacobian = aux_data
+        (parameters,) = children
+        return cls(
+            vector_field=vector_field,
+            jacobian=jacobian,
+            parameters=parameters,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -78,18 +120,15 @@ class InitialValueProblem(NamedTuple):
     t1: float
     """Terminal time-point. Optional."""
 
-    parameters: Any = ()
-    """Parameters of the initial value problem."""
-
     def tree_flatten(self):
-        """Flatten an IVP tree."""
+        """Flatten the data structure."""
         aux_data = self.ode_function
         children = (self.initial_values, self.t0, self.t1, self.parameters)
         return children, aux_data
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        """Unflatten an IVP tree."""
+        """Unflatten the data structure."""
         ode_function = aux_data
         initial_values, t0, t1, parameters = children
         return cls(
