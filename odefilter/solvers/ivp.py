@@ -26,7 +26,6 @@ class AbstractIVPSolver(abc.ABC):
 
 def ek0_non_adaptive(*, derivative_init_fn, num_derivatives):
     """EK0 solver."""
-
     alg = _NonAdaptiveEK0(
         derivative_init_fn=derivative_init_fn,
         information_fn=information.linearize_ek0_kron_1st,

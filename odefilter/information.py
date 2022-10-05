@@ -29,16 +29,14 @@ and we can use it in ODE solvers.
 
 from typing import Callable, Tuple
 
-import jax
 from jaxtyping import Array, Float
 
 
 def linearize_ek0_kron_1st(
-    f: Callable[[Float[Array, "n d"]], Float[Array, "d"]], x: Float[Array, "n d"]
-) -> Tuple[Float[Array, "d"], Callable[[Float[Array, "n d"]], Float[Array, "d"]]]:
+    f: Callable[[Float[Array, "n d"]], Float[Array, " d"]], x: Float[Array, "n d"]
+) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
     """EK0-Linearize a first-order ODE assuming \
-    a linearization-point with Kronecker structure.
-
+     a linearization-point with Kronecker structure.
 
     Parameters
     ----------
@@ -88,12 +86,11 @@ def linearize_ek0_kron_1st(
 
 
 def linearize_ek0_kron_2nd(
-    f: Callable[[Float[Array, "n d"], Float[Array, "n d"]], Float[Array, "d"]],
+    f: Callable[[Float[Array, "n d"], Float[Array, "n d"]], Float[Array, " d"]],
     x: Float[Array, "n d"],
-) -> Tuple[Float[Array, "d"], Callable[[Float[Array, "n d"]], Float[Array, "d"]]]:
-    """EK0-Linearize a second-order ODE assuming \
-    a linearization-point with Kronecker structure.
-
+) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
+    """EK0-Linearize a second-order ODE assuming a linearization-point with\
+     Kronecker structure.
 
     Parameters
     ----------
