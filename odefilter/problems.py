@@ -2,6 +2,8 @@
 
 from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
 
+import jax.tree_util
+
 
 class FirstOrderODE(NamedTuple):
     r"""Vector field for first-order ordinary differential equations.
@@ -54,6 +56,7 @@ class SecondOrderODE(NamedTuple):
     $Jf=(Jf)(u, \dot u, t, \theta)$."""
 
 
+@jax.tree_util.register_pytree_node_class
 class InitialValueProblem(NamedTuple):
     """Initial value problem."""
 
@@ -77,3 +80,20 @@ class InitialValueProblem(NamedTuple):
 
     parameters: Any = ()
     """Parameters of the initial value problem."""
+
+    def tree_flatten(self):
+        aux_data = self.ode_function
+        children = (self.initial_values, self.t0, self.t1, self.parameters)
+        return children, aux_data
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        ode_function = aux_data
+        initial_values, t0, t1, parameters = children
+        return cls(
+            ode_function=ode_function,
+            initial_values=initial_values,
+            t0=t0,
+            t1=t1,
+            parameters=parameters,
+        )
