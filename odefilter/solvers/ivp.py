@@ -48,7 +48,7 @@ class _EK0(AbstractIVPSolver):
         hidden_state: Any
 
     # num_derivatives is static, so we register manually
-    # @jax.tree_util.register_pytree_node_class
+    @jax.tree_util.register_pytree_node_class
     class Params(NamedTuple):
         num_derivatives: int
         init: Any
