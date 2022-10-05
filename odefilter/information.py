@@ -61,7 +61,7 @@ def linearize_ek0_kron_1st(
     ...     return x*(1-x)
     >>>
     >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> b, fn = linearize_ek0_1st_kron(f, x0)
+    >>> b, fn = linearize_ek0_kron_1st(f, x0)
     >>> assert jnp.allclose(b, x0[1] - f(x0[0]))
     >>>
     >>> print(x0)
@@ -115,7 +115,7 @@ def linearize_ek0_kron_2nd(
     ...     return dx*(1-x)
     >>>
     >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> b, fn = linearize_ek0_1st_kron(f, x0)
+    >>> b, fn = linearize_ek0_kron_2nd(f, x0)
     >>> assert jnp.allclose(b, x0[2] - f(x0[0], x0[1]))
     >>>
     >>> print(x0)
