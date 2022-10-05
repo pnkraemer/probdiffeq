@@ -9,18 +9,20 @@ from odefilter.solvers import ivp
 
 @pytest_cases.parametrize("init", [inits.taylor_mode()])
 @pytest_cases.parametrize("num_derivatives", [1])
-def case_solver_ek0(init, num_derivatives):
-    return ivp.ek0(init=init, num_derivatives=num_derivatives)
+def case_non_adaptive_solver_ek0(init, num_derivatives):
+    return ivp.ek0_non_adaptive(init=init, num_derivatives=num_derivatives)
 
 
 @pytest_cases.parametrize("init", [inits.taylor_mode()])
-@pytest_cases.parametrize("num_derivatives", [1])
+@pytest_cases.parametrize("num_derivatives", [2])
 def case_solver_adaptive_ek0(init, num_derivatives):
-    solver = ivp.ek0(init=init, num_derivatives=num_derivatives)
-    control = controls.integral()
+    non_adaptive_solver = ivp.ek0_non_adaptive(
+        init=init, num_derivatives=num_derivatives
+    )
+    control = controls.proportional_integral()
     atol, rtol = 1e-3, 1e-3
     return ivp.adaptive(
-        solver=solver,
+        non_adaptive_solver=non_adaptive_solver,
         control=control,
         atol=atol,
         rtol=rtol,

@@ -6,7 +6,7 @@ import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter import sqrtm
+from odefilter import information, sqrtm
 from odefilter.prob import ibm
 
 
@@ -24,18 +24,18 @@ class AbstractIVPSolver(abc.ABC):
         raise NotImplementedError
 
 
-def ek0(*, init, num_derivatives):
+def ek0_non_adaptive(*, init, num_derivatives):
     """EK0 solver."""
     init_alg, init_params = init
 
-    alg = _EK0(init=init_alg, num_derivatives=num_derivatives)
+    alg = _NonAdaptiveEK0(init=init_alg, num_derivatives=num_derivatives)
 
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _EK0.Params(init=init_params, a=a, q_sqrtm=q_sqrtm)
+    params = _NonAdaptiveEK0.Params(init=init_params, a=a, q_sqrtm=q_sqrtm)
     return alg, params
 
 
-class _EK0(AbstractIVPSolver):
+class _NonAdaptiveEK0(AbstractIVPSolver):
     """EK0."""
 
     class State(NamedTuple):
@@ -93,6 +93,27 @@ class _EK0(AbstractIVPSolver):
             error_estimate=error_estimate,
         )
 
+    # def _attempt_step(self, rv):
+    #
+    #     rv = apply_preconditioner(rv)
+    #     m = extrapolate_mean(m)
+    #
+    #     # depends on the information operator
+    #     fu = value_and_grad(f)
+    #     local_error, local_log_evidence = estimate_error(fu, rv)
+    #
+    #
+    #
+    #     # Differs for different implementation modes
+    #     c = extrapolate_cov(c)  # terminal_values_only
+    #     c = extrapolate_and_revert_transition(c)  # solve
+    #     c = extrapolate_cov_with_dense_output(c)  # solve_dense_output
+    #
+    #
+    #     # Is the same again
+    #     rv = unapply_preconditioner(rv)
+    #     rv, obs = correct(rv, fu)
+
     def _attempt_step_forward_only(self, *, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
         """Step with the 'KroneckerEK0'.
 
@@ -110,10 +131,12 @@ class _EK0(AbstractIVPSolver):
         # (It is not really necessary for the mean, to be honest.)
         m_ext = p[:, None] * (a @ m)
 
+        bias, linear_fn = information.linearize_ek0_kron_1st(f, m_ext)
+
         # Compute the error estimate
-        m_obs = m_ext[1, :] - f(m_ext[0, :])
+        m_obs = bias
         err, diff_sqrtm = self._estimate_error(
-            m_res=m_obs, q_sqrtm=p[:, None] * q_sqrtm
+            m_res=m_obs, q_sqrtm=p[:, None] * q_sqrtm, linear_fn=linear_fn
         )
 
         # The full extrapolation:
@@ -127,13 +150,13 @@ class _EK0(AbstractIVPSolver):
 
         # The final correction
         c_sqrtm_obs, (m_cor, c_sqrtm_cor) = self._final_correction(
-            m_obs=m_obs, m_ext=m_ext, c_sqrtm_ext=c_sqrtm_ext
+            m_obs=m_obs, m_ext=m_ext, c_sqrtm_ext=c_sqrtm_ext, linear_fn=linear_fn
         )
 
         return (m_cor, c_sqrtm_cor), (m_obs, c_sqrtm_obs), err
 
     @staticmethod
-    def _final_correction(*, m_obs, m_ext, c_sqrtm_ext):
+    def _final_correction(*, m_obs, m_ext, c_sqrtm_ext, linear_fn):
         # no fancy QR/sqrtm-stuff, because
         # the observation matrices have shape (): they are scalars.
         # The correction is almost free.
@@ -148,8 +171,8 @@ class _EK0(AbstractIVPSolver):
         return c_sqrtm_obs, (m_cor, c_sqrtm_cor)
 
     @staticmethod
-    def _estimate_error(*, m_res, q_sqrtm):
-        s_sqrtm = q_sqrtm[1, :]
+    def _estimate_error(*, m_res, q_sqrtm, linear_fn):
+        s_sqrtm = linear_fn(q_sqrtm)
         s = s_sqrtm @ s_sqrtm.T
         diff = m_res.T @ m_res / (m_res.size * s)
         diff_sqrtm = jnp.sqrt(diff)
@@ -157,9 +180,9 @@ class _EK0(AbstractIVPSolver):
         return error_estimate, diff_sqrtm
 
 
-def adaptive(*, solver, control, atol, rtol, error_order):
+def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
     """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
-    solver_alg, solver_params = solver
+    solver_alg, solver_params = non_adaptive_solver
     control_alg, control_params = control
 
     params = _SolverWithControl.Params(

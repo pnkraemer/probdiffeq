@@ -22,12 +22,16 @@ def problem_logistic():
 @pytest_cases.parametrize("init", [inits.taylor_mode(), inits.forwardmode_jvp()])
 @pytest_cases.parametrize("controller", [controls.proportional_integral()])
 def solver_ek0(init, controller):
-    solver = ivp.ek0(
+    solver = ivp.ek0_non_adaptive(
         num_derivatives=2,
         init=init,
     )
     return ivp.adaptive(
-        solver=solver, control=controller, atol=1e-5, rtol=1e-5, error_order=3
+        non_adaptive_solver=solver,
+        control=controller,
+        atol=1e-5,
+        rtol=1e-5,
+        error_order=3,
     )
 
 
