@@ -60,6 +60,7 @@ plugins:
                     show_signature_annotations: true
                     show_source: false
                     members_order: source
+                    docstring_style: numpy
 
 nav:
     - index.md
@@ -73,6 +74,7 @@ nav:
         - "api_docs/solvers.md"
     - Advanced API Documentation:
         - "api_docs_advanced/inits.md"
+        - "api_docs_advanced/information.md"
         - "api_docs_advanced/controls.md"
     - Super Advanced API Documentation:
         - "api_docs_util/markov.md"

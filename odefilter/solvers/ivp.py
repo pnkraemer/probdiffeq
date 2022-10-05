@@ -6,7 +6,7 @@ import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter import sqrtm
+from odefilter import information, sqrtm
 from odefilter.prob import ibm
 
 
@@ -24,18 +24,20 @@ class AbstractIVPSolver(abc.ABC):
         raise NotImplementedError
 
 
-def ek0(*, init, num_derivatives):
+def ek0_non_adaptive(*, derivative_init_fn, num_derivatives):
     """EK0 solver."""
-    init_alg, init_params = init
-
-    alg = _EK0(init=init_alg, num_derivatives=num_derivatives)
+    alg = _NonAdaptiveEK0(
+        derivative_init_fn=derivative_init_fn,
+        information_fn=information.linearize_ek0_kron_1st,
+        num_derivatives=num_derivatives,
+    )
 
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _EK0.Params(init=init_params, a=a, q_sqrtm=q_sqrtm)
+    params = _NonAdaptiveEK0.Params(a=a, q_sqrtm=q_sqrtm)
     return alg, params
 
 
-class _EK0(AbstractIVPSolver):
+class _NonAdaptiveEK0(AbstractIVPSolver):
     """EK0."""
 
     class State(NamedTuple):
@@ -46,20 +48,22 @@ class _EK0(AbstractIVPSolver):
         hidden_state: Any
 
     class Params(NamedTuple):
-        init: Any
 
         a: Any
         q_sqrtm: Any
 
-    def __init__(self, *, init, num_derivatives):
-        self.init = init
+    def __init__(self, *, derivative_init_fn, information_fn, num_derivatives):
+        self.derivative_init_fn = derivative_init_fn
+        self.information_fn = information_fn
 
         # static parameter, therefore a class attribute instead of a parameter
         self.num_derivatives = num_derivatives
 
     def init_fn(self, *, ivp, params):
         f, u0, t0 = ivp.ode_function.f, ivp.initial_values, ivp.t0
-        m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
+        m0_mat = self.derivative_init_fn(
+            f=f, u0=u0, num_derivatives=self.num_derivatives
+        )
         m0_mat = m0_mat[:, None]
         c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
 
@@ -110,10 +114,12 @@ class _EK0(AbstractIVPSolver):
         # (It is not really necessary for the mean, to be honest.)
         m_ext = p[:, None] * (a @ m)
 
+        bias, linear_fn = self.information_fn(f, m_ext)
+
         # Compute the error estimate
-        m_obs = m_ext[1, :] - f(m_ext[0, :])
+        m_obs = bias
         err, diff_sqrtm = self._estimate_error(
-            m_res=m_obs, q_sqrtm=p[:, None] * q_sqrtm
+            m_res=m_obs, q_sqrtm=p[:, None] * q_sqrtm, linear_fn=linear_fn
         )
 
         # The full extrapolation:
@@ -127,17 +133,17 @@ class _EK0(AbstractIVPSolver):
 
         # The final correction
         c_sqrtm_obs, (m_cor, c_sqrtm_cor) = self._final_correction(
-            m_obs=m_obs, m_ext=m_ext, c_sqrtm_ext=c_sqrtm_ext
+            m_obs=m_obs, m_ext=m_ext, c_sqrtm_ext=c_sqrtm_ext, linear_fn=linear_fn
         )
 
         return (m_cor, c_sqrtm_cor), (m_obs, c_sqrtm_obs), err
 
     @staticmethod
-    def _final_correction(*, m_obs, m_ext, c_sqrtm_ext):
+    def _final_correction(*, m_obs, m_ext, c_sqrtm_ext, linear_fn):
         # no fancy QR/sqrtm-stuff, because
         # the observation matrices have shape (): they are scalars.
         # The correction is almost free.
-        s_sqrtm = c_sqrtm_ext[1, :]  # shape (n,)
+        s_sqrtm = linear_fn(c_sqrtm_ext)  # shape (n,)
         s = s_sqrtm @ s_sqrtm.T
 
         g = (c_sqrtm_ext @ s_sqrtm.T) / s  # shape (n,)
@@ -148,8 +154,8 @@ class _EK0(AbstractIVPSolver):
         return c_sqrtm_obs, (m_cor, c_sqrtm_cor)
 
     @staticmethod
-    def _estimate_error(*, m_res, q_sqrtm):
-        s_sqrtm = q_sqrtm[1, :]
+    def _estimate_error(*, m_res, q_sqrtm, linear_fn):
+        s_sqrtm = linear_fn(q_sqrtm)
         s = s_sqrtm @ s_sqrtm.T
         diff = m_res.T @ m_res / (m_res.size * s)
         diff_sqrtm = jnp.sqrt(diff)
@@ -157,9 +163,9 @@ class _EK0(AbstractIVPSolver):
         return error_estimate, diff_sqrtm
 
 
-def adaptive(*, solver, control, atol, rtol, error_order):
+def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
     """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
-    solver_alg, solver_params = solver
+    solver_alg, solver_params = non_adaptive_solver
     control_alg, control_params = control
 
     params = _SolverWithControl.Params(

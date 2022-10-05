@@ -17,6 +17,7 @@ lint:
 
 test:
 	pytest
+	python -m doctest odefilter/*.py
 
 example:
 

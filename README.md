@@ -25,14 +25,23 @@
 
 
 ### Initial value problem solvers
-- [ ] EK0
+- [ ] EK0 (36 solvers!)
+  - [ ] Kronecker vs. diagonal
+  - [ ] Dense output vs terminal value vs checkpoint
+  - [ ] first-order problem vs second-order problem vs general (Kronecker-structure-preserving) information operator
+  - [ ] time-constant diffusion vs time-varying diffusion
 - [ ] EK1
+  - [ ] Full vs. diagonal
+  - [ ] Dense output vs terminal value vs checkpoint
+  - [ ] first-order problem vs second-order problem vs general (Kronecker-structure-preserving) information operator
+  - [ ] time-constant diffusion vs time-varying diffusion
 - [ ] UK1
+  - [ ] Full vs. diagonal
+  - [ ] Dense output vs terminal value vs checkpoint
+  - [ ] first-order problem vs second-order problem vs general (Kronecker-structure-preserving) information operator
+  - [ ] time-constant diffusion vs time-varying diffusion
 - [ ] Error estimation, adaptive steps
 - [ ] Autodiff initialisation
-- [ ] Kronecker-EK0
-- [ ] Scalar, vector-valued diffusion
-- [ ] Checkpointing
 - [ ] Second-order problems
 - [ ] Mass-matrix problems
 - [ ] Build a solver from an information operator
