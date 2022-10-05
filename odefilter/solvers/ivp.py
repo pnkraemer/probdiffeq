@@ -45,6 +45,8 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         u: Any
         error_estimate: Any
 
+        # split this into something like
+        # extrapolated, observed, corrected, and linearised model?
         hidden_state: Any
 
     class Params(NamedTuple):
@@ -72,8 +74,8 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         )
 
     def step_fn(self, *, state, ode_function, dt0, params):
-        t, (m0, c_sqrtm0) = state.t, state.hidden_state
 
+        t, (m0, c_sqrtm0) = state.t, state.hidden_state
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt0, num_derivatives=self.num_derivatives
         )
