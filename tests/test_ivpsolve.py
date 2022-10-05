@@ -4,7 +4,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import control, inits, ivpsolve, ivpsolvers, problems
+from odefilter import controls, inits, ivpsolve, ivpsolvers, problems
 
 
 @pytest_cases.case

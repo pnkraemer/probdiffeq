@@ -73,7 +73,7 @@ nav:
         - "api_docs/ivpsolvers.md"
     - Advanced API Documentation:
         - "api_docs_advanced/inits.md"
-        - "api_docs_advanced/control.md"
+        - "api_docs_advanced/controls.md"
     - Super Advanced API Documentation:
         - "api_docs_util/markov.md"
         - "api_docs_util/sqrtm.md"

@@ -9,6 +9,8 @@ import jax.numpy as jnp
 
 
 class AbstractControl(abc.ABC):
+    """Interface for control algorithms."""
+
     @abc.abstractmethod
     def init_fn(self):
         raise NotImplementedError
@@ -18,18 +20,18 @@ class AbstractControl(abc.ABC):
         raise NotImplementedError
 
 
-def proportional_integral():
+def proportional_integral(**kwargs):
     """Proportional-integral control."""
-    return _PIControl(), _PIControl.Params()
+    return _PIControl(), _PIControl.Params(**kwargs)
 
 
 class _PIControl(AbstractControl):
     class Params(NamedTuple):
-        safety = 0.95
-        factor_min = 0.2
-        factor_max = 10.0
-        power_integral_unscaled = 0.3
-        power_proportional_unscaled = 0.4
+        safety: float = 0.95
+        factor_min: float = 0.2
+        factor_max: float = 10.0
+        power_integral_unscaled: float = 0.3
+        power_proportional_unscaled: float = 0.4
 
     class State(NamedTuple):
         scale_factor: float
@@ -92,19 +94,19 @@ class _PIControl(AbstractControl):
         return scale_factor_clipped
 
 
-def integral():
+def integral(**kwargs):
     """Integral control."""
-    return _IControl(), _IControl.Params()
+    return _IControl(), _IControl.Params(**kwargs)
 
 
 class _IControl(AbstractControl):
+    class Params(NamedTuple):
+        safety: float = 0.95
+        factor_min: float = 0.2
+        factor_max: float = 10.0
+
     class State(NamedTuple):
         scale_factor: float
-
-    class Params(NamedTuple):
-        safety = 0.95
-        factor_min = 0.2
-        factor_max = 10.0
 
     def init_fn(self):
         return self.State(scale_factor=1.0)

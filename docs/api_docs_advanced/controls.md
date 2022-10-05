@@ -1,3 +1,3 @@
-# Step control
+# Control algorithms
 
-::: odefilter.control
+::: odefilter.controls
