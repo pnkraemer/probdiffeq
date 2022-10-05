@@ -4,6 +4,7 @@ from typing import Any, NamedTuple, Union
 
 import jax.lax
 import jax.numpy as jnp
+import jax.tree_util
 
 from odefilter import sqrtm
 from odefilter.prob import ibm
@@ -46,12 +47,24 @@ class _EK0(AbstractIVPSolver):
 
         hidden_state: Any
 
+    @jax.tree_util.register_pytree_node_class  # num_derivatives is static, so we register manually
     class Params(NamedTuple):
         num_derivatives: int
         init: Any
 
         a: Any
         q_sqrtm: Any
+
+        def tree_flatten(self):
+            aux_data = self.num_derivatives
+            children = (self.init, self.a, self.q_sqrtm)
+            return children, aux_data
+
+        @classmethod
+        def tree_unflatten(cls, aux_data, children):
+            num_derivatives = aux_data
+            init, a, q_sqrtm = children
+            return cls(num_derivatives=num_derivatives, init=init, a=a, q_sqrtm=q_sqrtm)
 
     def __init__(self, *, init):
         self.init = init

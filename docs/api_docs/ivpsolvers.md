@@ -1,2 +1,2 @@
 # Solvers
-::: odefilter.ivpsolvers
+::: odefilter.solvers.ivp
