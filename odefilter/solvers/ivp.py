@@ -28,12 +28,10 @@ def ek0(*, init, num_derivatives):
     """EK0 solver."""
     init_alg, init_params = init
 
-    alg = _EK0(init=init_alg)
+    alg = _EK0(init=init_alg, num_derivatives=num_derivatives)
 
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _EK0.Params(
-        num_derivatives=num_derivatives, init=init_params, a=a, q_sqrtm=q_sqrtm
-    )
+    params = _EK0.Params(init=init_params, a=a, q_sqrtm=q_sqrtm)
     return alg, params
 
 
@@ -47,34 +45,23 @@ class _EK0(AbstractIVPSolver):
 
         hidden_state: Any
 
-    # num_derivatives is static, so we register manually
-    @jax.tree_util.register_pytree_node_class
     class Params(NamedTuple):
-        num_derivatives: int
         init: Any
 
         a: Any
         q_sqrtm: Any
 
-        def tree_flatten(self):
-            aux_data = self.num_derivatives
-            children = (self.init, self.a, self.q_sqrtm)
-            return children, aux_data
-
-        @classmethod
-        def tree_unflatten(cls, aux_data, children):
-            num_derivatives = aux_data
-            init, a, q_sqrtm = children
-            return cls(num_derivatives=num_derivatives, init=init, a=a, q_sqrtm=q_sqrtm)
-
-    def __init__(self, *, init):
+    def __init__(self, *, init, num_derivatives):
         self.init = init
+
+        # static parameter, therefore a class attribute instead of a parameter
+        self.num_derivatives = num_derivatives
 
     def init_fn(self, *, ivp, params):
         f, u0, t0 = ivp.ode_function.f, ivp.initial_values, ivp.t0
-        m0_mat = self.init(f=f, u0=u0, num_derivatives=params.num_derivatives)
+        m0_mat = self.init(f=f, u0=u0, num_derivatives=self.num_derivatives)
         m0_mat = m0_mat[:, None]
-        c_sqrtm0 = jnp.zeros((params.num_derivatives + 1, params.num_derivatives + 1))
+        c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
 
         return self.State(
             t=t0, u=u0, hidden_state=(m0_mat, c_sqrtm0), error_estimate=jnp.nan
@@ -84,7 +71,7 @@ class _EK0(AbstractIVPSolver):
         t, (m0, c_sqrtm0) = state.t, state.hidden_state
 
         p, p_inv = ibm.preconditioner_diagonal(
-            dt=dt0, num_derivatives=params.num_derivatives
+            dt=dt0, num_derivatives=self.num_derivatives
         )
 
         u_new, _, error_estimate = self._attempt_step_forward_only(
