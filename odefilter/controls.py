@@ -7,50 +7,45 @@ import jax
 import jax.numpy as jnp
 
 
-def proportional_integral(*, atol, rtol, error_order):
+def proportional_integral():
     """Proportional-integral control."""
-    return _PIControl(), _PIControlParams(atol=atol, rtol=rtol, error_order=error_order)
-
-
-class _PIControlParams(NamedTuple):
-
-    atol: float
-    rtol: float
-
-    error_order: int
-
-    safety = 0.95
-    factor_min = 0.2
-    factor_max = 10.0
-    power_integral_unscaled = 0.3
-    power_proportional_unscaled = 0.4
+    return _PIControl(), _PIControl.Params()
 
 
 class _PIControl:
-    def propose_first_dt(self, f, u0, params):
-        return _propose_first_dt_per_tol(
-            f=f,
-            u0=u0,
-            num_derivatives=params.error_order - 1,
-            atol=params.atol,
-            rtol=params.rtol,
-        )
+    class Params(NamedTuple):
+        safety = 0.95
+        factor_min = 0.2
+        factor_max = 10.0
+        power_integral_unscaled = 0.3
+        power_proportional_unscaled = 0.4
 
-    def normalise_error(self, *, error, u1_ref, params):
-        error_rel = error / (params.atol + params.rtol * u1_ref)
-        error_norm = jnp.linalg.norm(error_rel) / jnp.sqrt(error.size)
-        return error_norm
+    class State(NamedTuple):
+        scale_factor: float
+        error_norm_previously_accepted: float
 
-    def scale_factor(self, *, error_norm, error_norm_previously_accepted, params):
-        return _scale_factor_proportional_integral(
-            error_norm=error_norm,
-            error_norm_previously_accepted=error_norm_previously_accepted,
+    def init_fn(self):
+        return self.State(scale_factor=1.0, error_norm_previously_accepted=1.0)
+
+    def step_fn(self, *, state, error_normalised, error_order, params):
+        scale_factor = _scale_factor_proportional_integral(
+            error_norm=error_normalised,
+            error_order=error_order,
+            error_norm_previously_accepted=state.error_norm_previously_accepted,
             safety=params.safety,
-            error_order=params.error_order,
             factor_min=params.factor_min,
             factor_max=params.factor_max,
             power_integral_unscaled=params.power_integral_unscaled,
             power_proportional_unscaled=params.power_proportional_unscaled,
+        )
+        error_norm_previously_accepted = jnp.where(
+            error_normalised <= 1.0,
+            error_normalised,
+            state.error_norm_previously_accepted,
+        )
+        return state._replace(
+            scale_factor=scale_factor,
+            error_norm_previously_accepted=error_norm_previously_accepted,
         )
 
 
@@ -99,7 +94,6 @@ def _scale_factor_integral_control(
     return scale_factor_clipped
 
 
-@jax.jit
 def _scale_factor_proportional_integral(
     *,
     error_norm,
