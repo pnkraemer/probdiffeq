@@ -6,8 +6,8 @@ import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter import information, sqrtm
-from odefilter.prob import ibm
+from odefilter import sqrtm
+from odefilter.prob import ibm, rv
 
 
 class AbstractIVPSolver(abc.ABC):
@@ -24,35 +24,51 @@ class AbstractIVPSolver(abc.ABC):
         raise NotImplementedError
 
 
-def ek0_non_adaptive(*, derivative_init_fn, num_derivatives):
+def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
     """EK0 solver."""
     alg = _NonAdaptiveEK0(
         derivative_init_fn=derivative_init_fn,
-        information_fn=information.linearize_ek0_kron_1st,
+        information_fn=information_fn,
         num_derivatives=num_derivatives,
     )
 
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _NonAdaptiveEK0.Params(a=a, q_sqrtm=q_sqrtm)
+    params = _NonAdaptiveEK0.Params(a=a, q_sqrtm_upper=q_sqrtm.T)
     return alg, params
 
 
+# todo: this is not really an EK0, it is a KroneckerODEFilter
+#  with an EK0 information operator
+#  Turn this into something like
+#  _KroneckerSolver(
+#   filter_implementation=
+#   EvaluateExtrapolateTimeVaryingDiffusion(information_fn=information_fn)
+#  )
 class _NonAdaptiveEK0(AbstractIVPSolver):
     """EK0."""
 
     class State(NamedTuple):
+
+        # Mandatory
         t: float
         u: Any
         error_estimate: Any
 
         # split this into something like
         # extrapolated, observed, corrected, and linearised model?
-        hidden_state: Any
+        # Is this its own data structure?
+
+        rv_extrapolated: rv.Normal
+        rv_corrected: rv.Normal
 
     class Params(NamedTuple):
 
         a: Any
-        q_sqrtm: Any
+        q_sqrtm_upper: Any
+
+        @property
+        def q_sqrtm_lower(self):
+            return self.q_sqrtm_upper.T
 
     def __init__(self, *, derivative_init_fn, information_fn, num_derivatives):
         self.derivative_init_fn = derivative_init_fn
@@ -63,106 +79,94 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 
     def init_fn(self, *, ivp, params):
         f, u0, t0 = ivp.ode_function.vector_field, ivp.initial_values, ivp.t0
-        m0_mat = self.derivative_init_fn(
+
+        m0_corrected = self.derivative_init_fn(
             f=f, u0=u0, num_derivatives=self.num_derivatives
         )
-        m0_mat = m0_mat[:, None]
-        c_sqrtm0 = jnp.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
+        if m0_corrected.ndim == 1:
+            m0_corrected = m0_corrected[:, None]
+
+        c_sqrtm0_corrected = jnp.zeros(
+            (self.num_derivatives + 1, self.num_derivatives + 1)
+        )
+        rv_corrected = rv.Normal(mean=m0_corrected, cov_sqrtm_upper=c_sqrtm0_corrected)
+
+        m0_extrapolated = jnp.zeros_like(m0_corrected)
+        c_sqrtm0_extrapolated = jnp.eye(*c_sqrtm0_corrected.shape)
+        rv_extrapolated = rv.Normal(
+            mean=m0_extrapolated, cov_sqrtm_upper=c_sqrtm0_extrapolated
+        )
 
         return self.State(
-            t=t0, u=u0, hidden_state=(m0_mat, c_sqrtm0), error_estimate=jnp.nan
+            t=t0,
+            u=u0,
+            error_estimate=jnp.nan,
+            rv_corrected=rv_corrected,
+            rv_extrapolated=rv_extrapolated,
         )
 
     def step_fn(self, *, state, ode_function, dt0, params):
 
-        t, (m0, c_sqrtm0) = state.t, state.hidden_state
+        # Turn this into a state = update_fn() thingy?
+        # Do we want an init() method, too? (We probably need one.)
+        # Is this its own class then? If so, what are the state and the params?
+        x = self._evaluate_and_extrapolate_fn(
+            dt0=dt0, ode_function=ode_function, params=params, state=state
+        )
+        (bias, linear_fn), error_estimate, rv_extrapolated = x
+
+        # Final observation
+        s_sqrtm = linear_fn(rv_extrapolated.cov_sqrtm_upper.T)  # shape (n,)
+        s = jnp.dot(s_sqrtm, s_sqrtm)
+        rv_observed = rv.Normal(mean=bias, cov_sqrtm_upper=jnp.sqrt(s))
+        g = (rv_extrapolated.cov_sqrtm_upper.T @ s_sqrtm.T) / s  # shape (n,)
+
+        # Final correction
+        m_cor = rv_extrapolated.mean - g[:, None] * rv_observed.mean[None, :]
+        c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
+        rv_corrected = rv.Normal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
+
+        t_new = state.t + dt0
+        return self.State(
+            t=t_new,
+            u=jnp.squeeze(rv_corrected.mean[0]),
+            error_estimate=error_estimate,
+            rv_extrapolated=rv_extrapolated,
+            rv_corrected=rv_corrected,
+        )
+
+    def _evaluate_and_extrapolate_fn(self, *, dt0, ode_function, params, state):
+        # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt0, num_derivatives=self.num_derivatives
         )
+        # Extract previous correction
+        (m0, c_sqrtm0) = state.rv_corrected
 
-        u_new, _, error_estimate = self._attempt_step_forward_only(
-            f=ode_function.vector_field,
-            m=m0,
-            c_sqrtm=c_sqrtm0,
-            p=p,
-            p_inv=p_inv,
-            a=params.a,
-            q_sqrtm=params.q_sqrtm,
+        # Extrapolate the mean and linearise the differential equation.
+        m_extrapolated = p[:, None] * (params.a @ (p_inv[:, None] * m0))
+        bias, linear_fn = self.information_fn(ode_function.vector_field, m_extrapolated)
+
+        # Observe the error-free state and calibrate some parameters
+        s_sqrtm_lower = linear_fn(p_inv[:, None] * params.q_sqrtm_lower)
+        s = jnp.dot(s_sqrtm_lower, s_sqrtm_lower)
+        residual_white = bias / jnp.sqrt(s)
+        diffusion_sqrtm = jnp.sqrt(
+            jnp.dot(residual_white, residual_white) / residual_white.size
         )
-        error_estimate = dt0 * error_estimate
+        error_estimate = dt0 * diffusion_sqrtm * jnp.sqrt(s)
 
-        t_new = t + dt0
-        return self.State(
-            t=t_new,
-            u=jnp.squeeze(u_new[0][0]),
-            hidden_state=u_new,
-            error_estimate=error_estimate,
-        )
-
-    def _attempt_step_forward_only(self, *, f, m, c_sqrtm, p, p_inv, a, q_sqrtm):
-        """Step with the 'KroneckerEK0'.
-
-        Includes error estimation.
-        Includes time-varying, scalar diffusion.
-        """
-        # m is an (nu+1,d) array. c_sqrtm is a (nu+1,nu+1) array.
-
-        # Apply the pre-conditioner
-        m, c_sqrtm = p_inv[:, None] * m, p_inv[:, None] * c_sqrtm
-
-        # Predict the mean.
-        # Immediately undo the preconditioning,
-        # because it's served its purpose for the mean.
-        # (It is not really necessary for the mean, to be honest.)
-        m_ext = p[:, None] * (a @ m)
-
-        bias, linear_fn = self.information_fn(f, m_ext)
-
-        # Compute the error estimate
-        m_obs = bias
-        err, diff_sqrtm = self._estimate_error(
-            m_res=m_obs, q_sqrtm=p[:, None] * q_sqrtm, linear_fn=linear_fn
-        )
-
-        # The full extrapolation:
-        c_sqrtm_ext = sqrtm.sum_of_sqrtm_factors(
-            R1=(a @ c_sqrtm).T, R2=diff_sqrtm * q_sqrtm.T
+        # Full extrapolation
+        c_sqrtm_extrapolated_p = sqrtm.sum_of_sqrtm_factors(
+            R1=(params.a @ (p_inv[:, None] * c_sqrtm0)).T,
+            R2=diffusion_sqrtm * params.q_sqrtm_lower,
         ).T
+        c_sqrtm_extrapolated = p[:, None] * c_sqrtm_extrapolated_p
 
-        # Un-apply the pre-conditioner.
-        # Now it is also done serving its purpose for the covariance.
-        c_sqrtm_ext = p[:, None] * c_sqrtm_ext
-
-        # The final correction
-        c_sqrtm_obs, (m_cor, c_sqrtm_cor) = self._final_correction(
-            m_obs=m_obs, m_ext=m_ext, c_sqrtm_ext=c_sqrtm_ext, linear_fn=linear_fn
+        rv_extrapolated = rv.Normal(
+            mean=m_extrapolated, cov_sqrtm_upper=c_sqrtm_extrapolated
         )
-
-        return (m_cor, c_sqrtm_cor), (m_obs, c_sqrtm_obs), err
-
-    @staticmethod
-    def _final_correction(*, m_obs, m_ext, c_sqrtm_ext, linear_fn):
-        # no fancy QR/sqrtm-stuff, because
-        # the observation matrices have shape (): they are scalars.
-        # The correction is almost free.
-        s_sqrtm = linear_fn(c_sqrtm_ext)  # shape (n,)
-        s = s_sqrtm @ s_sqrtm.T
-
-        g = (c_sqrtm_ext @ s_sqrtm.T) / s  # shape (n,)
-        c_sqrtm_cor = c_sqrtm_ext - g[:, None] * s_sqrtm[None, :]
-        m_cor = m_ext - g[:, None] * m_obs[None, :]
-
-        c_sqrtm_obs = jnp.sqrt(s)
-        return c_sqrtm_obs, (m_cor, c_sqrtm_cor)
-
-    @staticmethod
-    def _estimate_error(*, m_res, q_sqrtm, linear_fn):
-        s_sqrtm = linear_fn(q_sqrtm)
-        s = s_sqrtm @ s_sqrtm.T
-        diff = m_res.T @ m_res / (m_res.size * s)
-        diff_sqrtm = jnp.sqrt(diff)
-        error_estimate = diff_sqrtm * jnp.sqrt(s)
-        return error_estimate, diff_sqrtm
+        return (bias, linear_fn), error_estimate, rv_extrapolated
 
 
 def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):

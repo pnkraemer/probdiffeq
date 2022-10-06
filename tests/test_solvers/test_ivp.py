@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, inits, problems
+from odefilter import controls, information, inits, problems
 from odefilter.solvers import ivp
 
 
@@ -11,9 +11,12 @@ from odefilter.solvers import ivp
     "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
 )
 @pytest_cases.parametrize("num_derivatives", [1])
-def case_non_adaptive_solver_ek0(derivative_init_fn, num_derivatives):
+@pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
+def case_non_adaptive_solver_ek0(derivative_init_fn, num_derivatives, information_fn):
     return ivp.ek0_non_adaptive(
-        derivative_init_fn=derivative_init_fn, num_derivatives=num_derivatives
+        derivative_init_fn=derivative_init_fn,
+        num_derivatives=num_derivatives,
+        information_fn=information_fn,
     )
 
 
@@ -21,9 +24,12 @@ def case_non_adaptive_solver_ek0(derivative_init_fn, num_derivatives):
     "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
 )
 @pytest_cases.parametrize("num_derivatives", [2])
-def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives):
+@pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
+def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
     non_adaptive_solver = ivp.ek0_non_adaptive(
-        derivative_init_fn=derivative_init_fn, num_derivatives=num_derivatives
+        derivative_init_fn=derivative_init_fn,
+        num_derivatives=num_derivatives,
+        information_fn=information_fn,
     )
     control = controls.proportional_integral()
     atol, rtol = 1e-3, 1e-3

@@ -4,7 +4,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, inits, ivpsolve, problems
+from odefilter import controls, information, inits, ivpsolve, problems
 from odefilter.solvers import ivp
 
 
@@ -22,10 +22,12 @@ def problem_logistic():
     "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
 )
 @pytest_cases.parametrize("controller", [controls.proportional_integral()])
-def solver_ek0(derivative_init_fn, controller):
+@pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
+def solver_ek0(derivative_init_fn, controller, information_fn):
     solver = ivp.ek0_non_adaptive(
         num_derivatives=2,
         derivative_init_fn=derivative_init_fn,
+        information_fn=information_fn,
     )
     return ivp.adaptive(
         non_adaptive_solver=solver,

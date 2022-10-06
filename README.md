@@ -49,6 +49,10 @@
 - [ ] Build a batch solver from an information operator
 - [ ] Evaluate model-fit 
 - [ ] General priors (and stacked state-space models!)
+- [ ] Discrete event handling
+- [ ] Continuous event handling
+- [ ] Evaluate-extrapolate-correct solvers
+- [ ] Extrapolate-evaluate-correct solvers
 - [ ] TBC
 
 ### Boundary value problem solvers
