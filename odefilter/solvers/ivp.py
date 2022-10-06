@@ -24,11 +24,11 @@ class AbstractIVPSolver(abc.ABC):
         raise NotImplementedError
 
 
-def ek0_non_adaptive(*, derivative_init_fn, num_derivatives):
+def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
     """EK0 solver."""
     alg = _NonAdaptiveEK0(
         derivative_init_fn=derivative_init_fn,
-        information_fn=information.linearize_ek0_kron_1st,
+        information_fn=information_fn,
         num_derivatives=num_derivatives,
     )
 
