@@ -6,7 +6,7 @@ import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter import information, sqrtm
+from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
 
@@ -37,6 +37,13 @@ def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
     return alg, params
 
 
+# todo: this is not really an EK0, it is a KroneckerODEFilter
+#  with an EK0 information operator
+#  Turn this into something like
+#  _KroneckerSolver(
+#   filter_implementation=
+#   EvaluateExtrapolateTimeVaryingDiffusion(information_fn=information_fn)
+#  )
 class _NonAdaptiveEK0(AbstractIVPSolver):
     """EK0."""
 
@@ -150,13 +157,12 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         error_estimate = dt0 * diffusion_sqrtm * jnp.sqrt(s)
 
         # Full extrapolation
-        c_sqrtm_extrapolated = (
-            p[:, None]
-            * sqrtm.sum_of_sqrtm_factors(
-                R1=(params.a @ (p_inv[:, None] * c_sqrtm0)).T,
-                R2=diffusion_sqrtm * params.q_sqrtm_lower,
-            ).T
-        )
+        c_sqrtm_extrapolated_p = sqrtm.sum_of_sqrtm_factors(
+            R1=(params.a @ (p_inv[:, None] * c_sqrtm0)).T,
+            R2=diffusion_sqrtm * params.q_sqrtm_lower,
+        ).T
+        c_sqrtm_extrapolated = p[:, None] * c_sqrtm_extrapolated_p
+
         rv_extrapolated = rv.Normal(
             mean=m_extrapolated, cov_sqrtm_upper=c_sqrtm_extrapolated
         )
@@ -316,21 +322,3 @@ class _SolverWithControl(AbstractIVPSolver):
             (0.01 / jnp.max(b + c)) ** (1.0 / error_order),
         )
         return jnp.minimum(100.0 * dt0, dt1)
-
-
-class ExtrapolationModel:
-    class State(NamedTuple):
-        pass
-
-    class Params(NamedTuple):
-
-        a: Any
-        q_sqrtm_upper: Any
-
-    def extrapolate_mean(self, mean, p, p_inv, params):
-        return p_inv[:, None] * (params.a @ (p[:, None] * mean))
-
-    def extrapolate_cov(self, mean, p, p_inv, params):
-        c_sqrtm_ext = p_inv[:, None] * sqrtm.sum_of_sqrtm_factors(
-            R1=(a @ p[:, None] * c_sqrtm).T, R2=diff_sqrtm * params.q_sqrtm.T
-        )
