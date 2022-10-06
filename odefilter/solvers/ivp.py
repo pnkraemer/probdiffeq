@@ -49,6 +49,8 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 
         # split this into something like
         # extrapolated, observed, corrected, and linearised model?
+        # Is this its own data structure?
+
         rv_extrapolated: rv.Normal
         rv_corrected: rv.Normal
 
@@ -98,11 +100,40 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 
     def step_fn(self, *, state, ode_function, dt0, params):
 
+        # Turn this into a state = update_fn() thingy?
+        # Do we want an init() method, too? (We probably need one.)
+        # Is this its own class then? If so, what are the state and the params?
+        x = self._evaluate_and_extrapolate_fn(
+            dt0=dt0, ode_function=ode_function, params=params, state=state
+        )
+        (bias, linear_fn), error_estimate, rv_extrapolated = x
+
+        # Final observation
+        s_sqrtm = linear_fn(rv_extrapolated.cov_sqrtm_upper.T)  # shape (n,)
+        s = jnp.dot(s_sqrtm, s_sqrtm)
+        rv_observed = rv.Normal(mean=bias, cov_sqrtm_upper=jnp.sqrt(s))
+        g = (rv_extrapolated.cov_sqrtm_upper.T @ s_sqrtm.T) / s  # shape (n,)
+
+        # Final correction
+        m_cor = rv_extrapolated.mean - g[:, None] * rv_observed.mean[None, :]
+        c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
+        rv_corrected = rv.Normal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
+
+        t_new = state.t + dt0
+        return self.State(
+            t=t_new,
+            u=jnp.squeeze(rv_corrected.mean[0]),
+            error_estimate=error_estimate,
+            rv_extrapolated=rv_extrapolated,
+            rv_corrected=rv_corrected,
+        )
+
+    def _evaluate_and_extrapolate_fn(self, *, dt0, ode_function, params, state):
         # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt0, num_derivatives=self.num_derivatives
         )
-
+        # Extract previous correction
         (m0, c_sqrtm0) = state.rv_corrected
 
         # Extrapolate the mean and linearise the differential equation.
@@ -129,26 +160,7 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         rv_extrapolated = rv.Normal(
             mean=m_extrapolated, cov_sqrtm_upper=c_sqrtm_extrapolated
         )
-
-        # Final observation
-        s_sqrtm = linear_fn(rv_extrapolated.cov_sqrtm_upper.T)  # shape (n,)
-        s = jnp.dot(s_sqrtm, s_sqrtm)
-        rv_observed = rv.Normal(mean=bias, cov_sqrtm_upper=jnp.sqrt(s))
-        g = (rv_extrapolated.cov_sqrtm_upper.T @ s_sqrtm.T) / s  # shape (n,)
-
-        # Final correction
-        m_cor = rv_extrapolated.mean - g[:, None] * rv_observed.mean[None, :]
-        c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
-        rv_corrected = rv.Normal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
-
-        t_new = state.t + dt0
-        return self.State(
-            t=t_new,
-            u=jnp.squeeze(rv_corrected.mean[0]),
-            error_estimate=error_estimate,
-            rv_extrapolated=rv_extrapolated,
-            rv_corrected=rv_corrected,
-        )
+        return (bias, linear_fn), error_estimate, rv_extrapolated
 
 
 def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
