@@ -28,7 +28,7 @@ class AbstractIVPSolver(eqx.Module, abc.ABC):
 def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
     """EK0 solver."""
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    return EK0(
+    return _EK0(
         a=a,
         q_sqrtm_upper=q_sqrtm.T,
         derivative_init_fn=derivative_init_fn,
@@ -43,7 +43,7 @@ def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
 #   filter_implementation=
 #   EvaluateExtrapolateTimeVaryingDiffusion(information_fn=information_fn)
 #  )
-class EK0(AbstractIVPSolver):
+class _EK0(AbstractIVPSolver):
     """EK0."""
 
     a: Any
