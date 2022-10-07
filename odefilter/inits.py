@@ -29,7 +29,6 @@ derivatives to "add" to the existing initial conditions.
 from typing import Callable, List, Tuple
 
 import jax
-import jax.numpy as jnp
 from jax.experimental.jet import jet
 from jaxtyping import Array, Float
 
@@ -39,10 +38,10 @@ from jaxtyping import Array, Float
 
 def taylor_mode(
     *,
-    vector_field: Callable[..., Float[Array, "d"]],
-    initial_values: Tuple[Float[Array, "d"], ...],
+    vector_field: Callable[..., Float[Array, " d"]],
+    initial_values: Tuple[Float[Array, " d"], ...],
     num: int
-) -> List[Float[Array, "d"]]:
+) -> List[Float[Array, " d"]]:
     """Recursively differentiate the initial value of an \
      ODE with **Taylor-mode** automatic differentiation.
 
@@ -80,7 +79,8 @@ def taylor_mode(
 
     >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=2)
     >>> print(tree_round(tcoeffs, 1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), DeviceArray([0.4], dtype=float32)]
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), \
+DeviceArray([0.4], dtype=float32)]
 
     >>>
     >>> f = lambda x, dx: dx**2*(1-jnp.sin(x))
@@ -90,11 +90,14 @@ def taylor_mode(
 
     >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 2))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), DeviceArray([0.02], dtype=float32)]
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), \
+DeviceArray([0.02], dtype=float32)]
 
     >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=4)
     >>> print(tree_round(tcoeffs,1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), \
+DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), \
+DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
 
     """
     assert num >= 1
@@ -114,7 +117,7 @@ def taylor_mode(
 
 
 def _subsets(set, n):
-    """Computes specific subsets until exhausted.
+    """Compute specific subsets until exhausted.
 
     See example below.
 
@@ -128,7 +131,10 @@ def _subsets(set, n):
     >>> print(_subsets(a, n=3))
     [(1, 2, 3), (2, 3, 4), (3, 4, 5)]
     """
-    mask = lambda i: None if i == 0 else i
+
+    def mask(i):
+        return None if i == 0 else i
+
     return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
@@ -155,7 +161,8 @@ def forward_mode(*, vector_field, initial_values, num):
 
     >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=2)
     >>> print(tree_round(tcoeffs, 1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), DeviceArray([0.4], dtype=float32)]
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), \
+DeviceArray([0.4], dtype=float32)]
 
     >>>
     >>> f = lambda x, dx: dx**2*(1-jnp.sin(x))
@@ -165,11 +172,14 @@ def forward_mode(*, vector_field, initial_values, num):
 
     >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 2))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), DeviceArray([0.02], dtype=float32)]
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), \
+DeviceArray([0.02], dtype=float32)]
 
     >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=4)
     >>> print(tree_round(tcoeffs,1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), \
+DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), \
+DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
 
     """
     g_n, g_0 = vector_field, vector_field
@@ -181,12 +191,14 @@ def forward_mode(*, vector_field, initial_values, num):
 
 
 def _fwd_recursion_iterate(*, fun_n, fun_0):
-    r"""Implements a general version of the recursion \
-    $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$"""
+    r"""Increment $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$."""
 
     def df(*args):
-        r"""Implements a general version of the chain rule \
-        $F(x) = \langle (Jf)(x), f_0(x)\rangle$."""
+        r"""Differentiate with a general version of the chain rule.
+
+        More specifically, this function implements a generalised
+        call $F(x) = \langle (Jf)(x), f_0(x)\rangle$.
+        """
         # Assign primals and tangents for the JVP
         vals = (*args, fun_0(*args))
         primals_in, tangents_in = vals[:-1], vals[1:]

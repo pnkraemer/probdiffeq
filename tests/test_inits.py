@@ -1,15 +1,9 @@
 """Tests for initialisation functions."""
 
-import jax
 import pytest_cases
 from diffeqzoo import ivps as ivpzoo
 
 from odefilter import inits
-
-
-@pytest_cases.case
-def init_taylor_mode():
-    return inits.taylor_mode
 
 
 @pytest_cases.case
