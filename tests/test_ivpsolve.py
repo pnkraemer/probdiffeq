@@ -33,7 +33,7 @@ def problem_logistic():
 def solver_ek0(derivative_init_fn, controller, information_fn):
     stepping = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        backend=backends.ekf0_isotropic_dynamic(
+        backend=backends.DynamicIsotropicEKF0.from_num_derivatives(
             num_derivatives=2,
             information_fn=information_fn,
         ),
