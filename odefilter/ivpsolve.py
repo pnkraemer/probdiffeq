@@ -1,9 +1,11 @@
 """Solve initial value problems."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 
+@eqx.filter_jit
 def simulate_terminal_values(ivp, /, *, solver):
     """Simulate the terminal values of an initial value problem."""
     state0 = solver.init_fn(ivp=ivp)
