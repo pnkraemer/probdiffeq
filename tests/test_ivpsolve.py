@@ -18,9 +18,7 @@ def problem_logistic():
     )
 
 
-@pytest_cases.parametrize(
-    "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
-)
+@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize("controller", [controls.proportional_integral()])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def solver_ek0(derivative_init_fn, controller, information_fn):

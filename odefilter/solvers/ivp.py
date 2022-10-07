@@ -81,8 +81,9 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         f, u0, t0 = ivp.ode_function.vector_field, ivp.initial_values, ivp.t0
 
         m0_corrected = self.derivative_init_fn(
-            f=f, u0=u0, num_derivatives=self.num_derivatives
+            vector_field=f, initial_values=(u0,), num=self.num_derivatives
         )
+        m0_corrected = jnp.stack(m0_corrected)
         if m0_corrected.ndim == 1:
             m0_corrected = m0_corrected[:, None]
 

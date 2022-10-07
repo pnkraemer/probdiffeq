@@ -7,9 +7,7 @@ from odefilter import controls, information, inits, problems
 from odefilter.solvers import ivp
 
 
-@pytest_cases.parametrize(
-    "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
-)
+@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize("num_derivatives", [1])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def case_non_adaptive_solver_ek0(derivative_init_fn, num_derivatives, information_fn):
@@ -20,9 +18,7 @@ def case_non_adaptive_solver_ek0(derivative_init_fn, num_derivatives, informatio
     )
 
 
-@pytest_cases.parametrize(
-    "derivative_init_fn", [inits.taylormode_fn, inits.forwardmode_jvp_fn]
-)
+@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize("num_derivatives", [2])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
