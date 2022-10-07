@@ -27,7 +27,7 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn
         num_derivatives=num_derivatives,
         information_fn=information_fn,
     )
-    control = controls.proportional_integral()
+    control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return ivp.adaptive(
         non_adaptive_solver=non_adaptive_solver,

@@ -2,6 +2,7 @@
 import abc
 from typing import Any, NamedTuple, Union
 
+import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
@@ -177,17 +178,15 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
     """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
     solver_alg, solver_params = non_adaptive_solver
-    control_alg, control_params = control
 
     params = _SolverWithControl.Params(
         atol=atol,
         rtol=rtol,
         error_order=error_order,
         solver=solver_params,
-        control=control_params,
     )
 
-    alg = _SolverWithControl(solver=solver_alg, control=control_alg)
+    alg = _SolverWithControl(solver=solver_alg, control=control)
     return alg, params
 
 
@@ -218,7 +217,6 @@ class _SolverWithControl(AbstractIVPSolver):
 
         error_order: int
         solver: Any
-        control: Any
         norm_ord: Union[int, str, None] = None
 
     def __init__(self, *, solver, control):
@@ -288,7 +286,6 @@ class _SolverWithControl(AbstractIVPSolver):
             state=state.control,
             error_normalised=error_normalised,
             error_order=params.error_order,
-            params=params.control,
         )
         dt_proposed = dt0 * state_control.scale_factor
         return self.State(
