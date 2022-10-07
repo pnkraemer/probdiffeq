@@ -11,18 +11,15 @@ from odefilter import backends, sqrtm
 from odefilter.prob import ibm, rv
 
 
-def odefilter_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
+def ekf0_isotropic_dynamic(*, num_derivatives, information_fn):
     """EK0 solver."""
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    return _ODEFilter(
-        derivative_init_fn=derivative_init_fn,
-        backend=backends.DynamicIsotropicEKF0(
-            a=a, q_sqrtm_upper=q_sqrtm.T, information_fn=information_fn
-        ),
+    return backends.DynamicIsotropicEKF0(
+        a=a, q_sqrtm_upper=q_sqrtm.T, information_fn=information_fn
     )
 
 
-class _ODEFilter(eqx.Module):
+class ODEFilter(eqx.Module):
     """ODE filter."""
 
     derivative_init_fn: Callable

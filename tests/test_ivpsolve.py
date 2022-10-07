@@ -30,10 +30,12 @@ def problem_logistic():
 @pytest_cases.parametrize("controller", [controls.ProportionalIntegral()])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def solver_ek0(derivative_init_fn, controller, information_fn):
-    odefilter = stepping.odefilter_non_adaptive(
-        num_derivatives=2,
+    odefilter = stepping.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        information_fn=information_fn,
+        backend=stepping.ekf0_isotropic_dynamic(
+            num_derivatives=2,
+            information_fn=information_fn,
+        ),
     )
     return solvers.Adaptive(
         stepping=odefilter,

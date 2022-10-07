@@ -10,11 +10,14 @@ from odefilter import controls, information, inits, problems, solvers, stepping
 @pytest_cases.parametrize("num_derivatives", [2])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
-    odefilter = stepping.odefilter_non_adaptive(
+    odefilter = stepping.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        num_derivatives=num_derivatives,
-        information_fn=information_fn,
+        backend=stepping.ekf0_isotropic_dynamic(
+            num_derivatives=num_derivatives,
+            information_fn=information_fn,
+        ),
     )
+
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return solvers.Adaptive(
