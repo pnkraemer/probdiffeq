@@ -16,7 +16,7 @@ from odefilter import (
 
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize("num_derivatives", [2])
-@pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
+@pytest_cases.parametrize("information_fn", [information.IsotropicEK0(ode_order=1)])
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
     stepping = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
