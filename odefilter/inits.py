@@ -147,7 +147,6 @@ def forward_mode(
     initial_values: Tuple[Float[Array, " d"], ...],
     num: int
 ) -> List[Float[Array, " d"]]:
-
     """Recursively differentiate the initial value of an \
          ODE with **forward-mode** automatic differentiation.
 
