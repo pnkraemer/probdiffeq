@@ -39,7 +39,9 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn
 
 
 def case_ivp_logistic():
-    vf = lambda x, t: x * (1 - x)
+    def vf(x, t):
+        return x * (1 - x)
+
     ivp_problem = problems.InitialValueProblem(
         vector_field=vf, initial_values=0.4, t0=0.0, t1=2.0, parameters=()
     )

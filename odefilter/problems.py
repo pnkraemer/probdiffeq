@@ -1,10 +1,12 @@
 """Problem types."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, Tuple, Union
+from typing import Callable, Tuple
 
 import jax.tree_util
 from jaxtyping import Array, Float, PyTree
+
+# todo: make private and never really show to the end-user?
 
 
 @jax.tree_util.register_pytree_node_class
