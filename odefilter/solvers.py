@@ -45,16 +45,6 @@ class Adaptive(AbstractIVPSolver):
         stepping: Any  # must contain fields "t" and "u".
         control: Any  # must contain field "scale_factor".
 
-        @property
-        def t(self):
-            """Wrap attribute."""
-            return self.stepping.t
-
-        @property
-        def u(self):
-            """Wrap attribute."""
-            return self.stepping.u
-
     def init_fn(self, *, ivp):
         """Initialise the IVP solver state."""
         state_stepping = self.stepping.init_fn(ivp=ivp)
