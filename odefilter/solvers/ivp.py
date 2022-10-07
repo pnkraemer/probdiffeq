@@ -86,6 +86,8 @@ class _ODEFilter(AbstractIVPSolver):
 
 
 class DynamicIsotropicEKF0(eqx.Module):
+    """EK0 for terminal-value simulation with an isotropic covariance \
+     structure and dynamic (time-varying) calibration."""
 
     a: Any
     q_sqrtm_upper: Any
@@ -103,11 +105,13 @@ class DynamicIsotropicEKF0(eqx.Module):
         return self.a.shape[0] - 1
 
     class State(eqx.Module):
+        """State."""
+
         rv_corrected: Any
         rv_extrapolated: Any
 
     def init_fn(self, *, taylor_coefficients):
-
+        """Initialise."""
         m0_corrected = jnp.stack(taylor_coefficients)
         if m0_corrected.ndim == 1:
             m0_corrected = m0_corrected[:, None]
@@ -125,6 +129,7 @@ class DynamicIsotropicEKF0(eqx.Module):
         return self.State(rv_extrapolated=rv_extrapolated, rv_corrected=rv_corrected)
 
     def step_fn(self, *, state, vector_field, dt):
+        """Step."""
         # Turn this into a state = update_fn() thingy?
         # Do we want an init() method, too? (We probably need one.)
         # Is this its own class then? If so, what are the state and the params?
@@ -184,6 +189,8 @@ class DynamicIsotropicEKF0(eqx.Module):
 
 
 class Adaptive(AbstractIVPSolver):
+    """Make an adaptive ODE solver."""
+
     # Take a solver, normalise its error estimate,
     # and propose time-steps based on tolerances.
 
@@ -196,6 +203,7 @@ class Adaptive(AbstractIVPSolver):
     norm_ord: Union[int, str, None] = None
 
     class State(eqx.Module):
+        """Solver state."""
 
         dt_proposed: float
         error_normalised: float
@@ -205,10 +213,12 @@ class Adaptive(AbstractIVPSolver):
 
         @property
         def t(self):
+            """Wrap attribute."""
             return self.solver.t
 
         @property
         def u(self):
+            """Wrap attribute."""
             return self.solver.u
 
     def init_fn(self, *, ivp):
