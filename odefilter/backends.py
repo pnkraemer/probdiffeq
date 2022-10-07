@@ -23,9 +23,7 @@ class FilteringSolution(Generic[NormalLike], eqx.Module):
     extrapolated: NormalLike
 
 
-class DynamicIsotropicFilter(eqx.Module):
-    """EK0 for terminal-value simulation with an isotropic covariance \
-     structure and dynamic (time-varying) calibration."""
+class _IsotropicFilterCommon(eqx.Module):
 
     a: Any
     q_sqrtm_upper: Any
@@ -72,6 +70,11 @@ class DynamicIsotropicFilter(eqx.Module):
             mean=m0_extrapolated, cov_sqrtm_upper=c_sqrtm0_extrapolated
         )
         return FilteringSolution(extrapolated=extrapolated, corrected=corrected)
+
+
+class DynamicIsotropicFilter(_IsotropicFilterCommon):
+    """Terminal-value simulation with an isotropic covariance \
+     structure and dynamic (think: time-varying) calibration."""
 
     def step_fn(
         self,
