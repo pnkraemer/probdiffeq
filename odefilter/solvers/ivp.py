@@ -19,7 +19,7 @@ class AbstractIVPSolver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step_fn(self, state, *, ode_function, dt0, params):
+    def step_fn(self, state, *, vector_field, dt0, params):
         """Perform a step."""
         raise NotImplementedError
 
@@ -78,10 +78,12 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         self.num_derivatives = num_derivatives
 
     def init_fn(self, *, ivp, params):
-        f, u0, t0 = ivp.ode_function.vector_field, ivp.initial_values, ivp.t0
+        f, u0, t0 = ivp.vector_field, ivp.initial_values, ivp.t0
 
         m0_corrected = self.derivative_init_fn(
-            vector_field=f, initial_values=(u0,), num=self.num_derivatives
+            vector_field=lambda *x: f(*x, ivp.t0, *ivp.parameters),
+            initial_values=(u0,),
+            num=self.num_derivatives,
         )
         m0_corrected = jnp.stack(m0_corrected)
         if m0_corrected.ndim == 1:
@@ -106,13 +108,13 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
             rv_extrapolated=rv_extrapolated,
         )
 
-    def step_fn(self, *, state, ode_function, dt0, params):
+    def step_fn(self, *, state, vector_field, dt0, params):
 
         # Turn this into a state = update_fn() thingy?
         # Do we want an init() method, too? (We probably need one.)
         # Is this its own class then? If so, what are the state and the params?
         x = self._evaluate_and_extrapolate_fn(
-            dt0=dt0, ode_function=ode_function, params=params, state=state
+            dt0=dt0, vector_field=vector_field, params=params, state=state
         )
         (bias, linear_fn), error_estimate, rv_extrapolated = x
 
@@ -136,7 +138,7 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
             rv_corrected=rv_corrected,
         )
 
-    def _evaluate_and_extrapolate_fn(self, *, dt0, ode_function, params, state):
+    def _evaluate_and_extrapolate_fn(self, *, dt0, vector_field, params, state):
         # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt0, num_derivatives=self.num_derivatives
@@ -146,7 +148,9 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 
         # Extrapolate the mean and linearise the differential equation.
         m_extrapolated = p[:, None] * (params.a @ (p_inv[:, None] * m0))
-        bias, linear_fn = self.information_fn(ode_function.vector_field, m_extrapolated)
+        bias, linear_fn = self.information_fn(
+            f=lambda *x: vector_field(*x, state.t), x=m_extrapolated
+        )
 
         # Observe the error-free state and calibrate some parameters
         s_sqrtm_lower = linear_fn(p_inv[:, None] * params.q_sqrtm_lower)
@@ -234,7 +238,7 @@ class _SolverWithControl(AbstractIVPSolver):
             norm_ord=params.norm_ord,
         )
         dt_proposed = self._propose_first_dt_per_tol(
-            f=ivp.ode_function.vector_field,
+            f=lambda *x: ivp.vector_field(*x, ivp.t0, *ivp.parameters),
             u0=ivp.initial_values,
             error_order=params.error_order,
             rtol=params.rtol,
@@ -247,7 +251,7 @@ class _SolverWithControl(AbstractIVPSolver):
             control=state_control,
         )
 
-    def step_fn(self, *, state, ode_function, dt0, params):
+    def step_fn(self, *, state, vector_field, dt0, params):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
@@ -255,7 +259,7 @@ class _SolverWithControl(AbstractIVPSolver):
         def body_fn(x):
             _, s = x
             s = self.attempt_step_fn(
-                state=s, ode_function=ode_function, dt0=dt0, params=params
+                state=s, vector_field=vector_field, dt0=dt0, params=params
             )
             proceed_iteration = s.error_normalised > 1.0
             return proceed_iteration, s
@@ -267,11 +271,11 @@ class _SolverWithControl(AbstractIVPSolver):
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
         return state_new
 
-    def attempt_step_fn(self, *, state, ode_function, dt0, params):
+    def attempt_step_fn(self, *, state, vector_field, dt0, params):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         state_solver = self.solver.step_fn(
-            state=state.solver, ode_function=ode_function, dt0=dt0, params=params.solver
+            state=state.solver, vector_field=vector_field, dt0=dt0, params=params.solver
         )
         error_normalised = self._normalise_error(
             error_estimate=state_solver.error_estimate,

@@ -39,9 +39,11 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn
 
 
 def case_ivp_logistic():
-    ode = problems.FirstOrderODE(vector_field=lambda x: x * (1 - x))
+    def vf(x, t):
+        return x * (1 - x)
+
     ivp_problem = problems.InitialValueProblem(
-        ode_function=ode, initial_values=0.4, t0=0.0, t1=2.0
+        vector_field=vf, initial_values=0.4, t0=0.0, t1=2.0, parameters=()
     )
     return ivp_problem
 
@@ -58,7 +60,7 @@ def test_solver(solver, ivp_problem):
 
     dt0 = 10.0
     state = alg.step_fn(
-        state=state, ode_function=ivp_problem.ode_function, dt0=dt0, params=params
+        state=state, vector_field=ivp_problem.vector_field, dt0=dt0, params=params
     )
     assert state.t > ivp_problem.t0
     assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)
