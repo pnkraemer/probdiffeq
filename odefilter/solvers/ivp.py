@@ -1,6 +1,6 @@
 """Initial value problem solvers."""
 import abc
-from typing import Any, Callable, NamedTuple, Union
+from typing import Any, Callable, Union
 
 import equinox as eqx
 import jax.lax
@@ -60,7 +60,7 @@ class EK0(AbstractIVPSolver):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    class State(NamedTuple):
+    class State(eqx.Module):
 
         # Mandatory
         t: float
@@ -141,7 +141,7 @@ class EK0(AbstractIVPSolver):
             dt=dt0, num_derivatives=self.num_derivatives
         )
         # Extract previous correction
-        (m0, c_sqrtm0) = state.rv_corrected
+        (m0, c_sqrtm0) = state.rv_corrected.mean, state.rv_corrected.cov_sqrtm_upper
 
         # Extrapolate the mean and linearise the differential equation.
         m_extrapolated = p[:, None] * (self.a @ (p_inv[:, None] * m0))
@@ -196,7 +196,7 @@ class _SolverWithControl(AbstractIVPSolver):
     control: Any
     norm_ord: Union[int, str, None] = None
 
-    class State(NamedTuple):
+    class State(eqx.Module):
 
         dt_proposed: float
         error_normalised: float

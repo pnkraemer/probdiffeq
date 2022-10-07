@@ -1,7 +1,6 @@
 """Step-size selection."""
 
 import abc
-from typing import NamedTuple
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -16,7 +15,7 @@ class AbstractControl(abc.ABC, eqx.Module):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def control_fn(self, *, state, error_normalised, error_order, params):
+    def control_fn(self, *, state, error_normalised, error_order):
         """Control a normalised error estimate."""
         raise NotImplementedError
 
@@ -96,7 +95,7 @@ class Integral(AbstractControl):
     factor_min: float = 0.2
     factor_max: float = 10.0
 
-    class State(NamedTuple):
+    class State(eqx.Module):
         scale_factor: float
 
     def init_fn(self):

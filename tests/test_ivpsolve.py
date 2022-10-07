@@ -41,6 +41,7 @@ def solver_ek0(derivative_init_fn, controller, information_fn):
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="solver_")
 def test_simulate_terminal_values(ivp, solver):
     solution = ivpsolve.simulate_terminal_values(ivp, solver=solver)
+    print(solution)
 
     assert solution.t == ivp.t1
     assert jnp.allclose(solution.u, 1.0, atol=1e-1, rtol=1e-1)
