@@ -1,12 +1,12 @@
 """Step-size selection."""
 
 import abc
-from typing import NamedTuple
 
+import equinox as eqx
 import jax.numpy as jnp
 
 
-class AbstractControl(abc.ABC):
+class AbstractControl(abc.ABC, eqx.Module):
     """Interface for control algorithms."""
 
     @abc.abstractmethod
@@ -15,48 +15,48 @@ class AbstractControl(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def control_fn(self, *, state, error_normalised, error_order, params):
+    def control_fn(self, *, state, error_normalised, error_order):
         """Control a normalised error estimate."""
         raise NotImplementedError
 
 
-def proportional_integral(**kwargs):
-    """Create a proportional-integral (PI) controller."""
-    return _PIControl(), _PIControl.Params(**kwargs)
+class ProportionalIntegral(AbstractControl):
+    """PI Controller."""
 
+    safety: float = 0.95
+    factor_min: float = 0.2
+    factor_max: float = 10.0
+    power_integral_unscaled: float = 0.3
+    power_proportional_unscaled: float = 0.4
 
-class _PIControl(AbstractControl):
-    class Params(NamedTuple):
-        safety: float = 0.95
-        factor_min: float = 0.2
-        factor_max: float = 10.0
-        power_integral_unscaled: float = 0.3
-        power_proportional_unscaled: float = 0.4
+    class State(eqx.Module):
+        """Proportional-integral controller state."""
 
-    class State(NamedTuple):
         scale_factor: float
         error_norm_previously_accepted: float
 
     def init_fn(self):
+        """Initialise a controller state."""
         return self.State(scale_factor=1.0, error_norm_previously_accepted=1.0)
 
-    def control_fn(self, *, state, error_normalised, error_order, params):
+    def control_fn(self, *, state, error_normalised, error_order):
+        """Control a normalised error estimate."""
         scale_factor = self._scale_factor_proportional_integral(
             error_norm=error_normalised,
             error_order=error_order,
             error_norm_previously_accepted=state.error_norm_previously_accepted,
-            safety=params.safety,
-            factor_min=params.factor_min,
-            factor_max=params.factor_max,
-            power_integral_unscaled=params.power_integral_unscaled,
-            power_proportional_unscaled=params.power_proportional_unscaled,
+            safety=self.safety,
+            factor_min=self.factor_min,
+            factor_max=self.factor_max,
+            power_integral_unscaled=self.power_integral_unscaled,
+            power_proportional_unscaled=self.power_proportional_unscaled,
         )
         error_norm_previously_accepted = jnp.where(
             error_normalised <= 1.0,
             error_normalised,
             state.error_norm_previously_accepted,
         )
-        return state._replace(
+        return self.State(
             scale_factor=scale_factor,
             error_norm_previously_accepted=error_norm_previously_accepted,
         )
@@ -94,30 +94,30 @@ class _PIControl(AbstractControl):
         return scale_factor_clipped
 
 
-def integral(**kwargs):
+class Integral(AbstractControl):
     """Integral control."""
-    return _IControl(), _IControl.Params(**kwargs)
 
+    safety: float = 0.95
+    factor_min: float = 0.2
+    factor_max: float = 10.0
 
-class _IControl(AbstractControl):
-    class Params(NamedTuple):
-        safety: float = 0.95
-        factor_min: float = 0.2
-        factor_max: float = 10.0
+    class State(eqx.Module):
+        """Integral controller state."""
 
-    class State(NamedTuple):
         scale_factor: float
 
     def init_fn(self):
+        """Initialise a controller state."""
         return self.State(scale_factor=1.0)
 
-    def control_fn(self, state, error_normalised, error_order, params):
+    def control_fn(self, state, error_normalised, error_order):
+        """Control a normalised error estimate."""
         scale_factor = self._scale_factor_integral_control(
             error_norm=error_normalised,
             error_order=error_order,
-            safety=params.safety,
-            factor_min=params.factor_min,
-            factor_max=params.factor_max,
+            safety=self.safety,
+            factor_min=self.factor_min,
+            factor_max=self.factor_max,
         )
         return self.State(scale_factor=scale_factor)
 

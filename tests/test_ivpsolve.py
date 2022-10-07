@@ -20,7 +20,7 @@ def problem_logistic():
 
 
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
-@pytest_cases.parametrize("controller", [controls.proportional_integral()])
+@pytest_cases.parametrize("controller", [controls.ProportionalIntegral()])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def solver_ek0(derivative_init_fn, controller, information_fn):
     solver = ivp.ek0_non_adaptive(
@@ -40,10 +40,7 @@ def solver_ek0(derivative_init_fn, controller, information_fn):
 @pytest_cases.parametrize_with_cases("ivp", cases=".", prefix="problem_")
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="solver_")
 def test_simulate_terminal_values(ivp, solver):
-    solver_alg, solver_params = solver
-    solution = ivpsolve.simulate_terminal_values(
-        ivp, solver=solver_alg, solver_params=solver_params
-    )
+    solution = ivpsolve.simulate_terminal_values(ivp, solver=solver)
 
     assert solution.t == ivp.t1
     assert jnp.allclose(solution.u, 1.0, atol=1e-1, rtol=1e-1)

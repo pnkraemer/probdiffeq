@@ -27,7 +27,7 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn
         num_derivatives=num_derivatives,
         information_fn=information_fn,
     )
-    control = controls.proportional_integral()
+    control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return ivp.adaptive(
         non_adaptive_solver=non_adaptive_solver,
@@ -51,16 +51,13 @@ def case_ivp_logistic():
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
 @pytest_cases.parametrize_with_cases("ivp_problem", cases=".", prefix="case_ivp_")
 def test_solver(solver, ivp_problem):
-    alg, params = solver
-    assert isinstance(alg, ivp.AbstractIVPSolver)
+    assert isinstance(solver, ivp.AbstractIVPSolver)
 
-    state = alg.init_fn(ivp=ivp_problem, params=params)
+    state = solver.init_fn(ivp=ivp_problem)
     assert state.t == ivp_problem.t0
     assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)
 
     dt0 = 10.0
-    state = alg.step_fn(
-        state=state, vector_field=ivp_problem.vector_field, dt0=dt0, params=params
-    )
+    state = solver.step_fn(state=state, vector_field=ivp_problem.vector_field, dt0=dt0)
     assert state.t > ivp_problem.t0
     assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)

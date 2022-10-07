@@ -30,11 +30,11 @@ jobs:
     steps:
     - uses: actions/setup-python@v2
       with:
-        python-version: "3.8.x"
+        python-version: "3.8.10"
     - uses: actions/checkout@v2
     - name: Install dependencies
       run:
-        pip install .[numpy,jax,test]
+        pip install .[test]
     - name: Run tests
       run:
         make test

@@ -1,7 +1,8 @@
 """Initial value problem solvers."""
 import abc
-from typing import Any, NamedTuple, Union
+from typing import Any, Callable, Union
 
+import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
@@ -10,31 +11,29 @@ from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
 
-class AbstractIVPSolver(abc.ABC):
+class AbstractIVPSolver(eqx.Module, abc.ABC):
     """Abstract solver for IVPs."""
 
     @abc.abstractmethod
-    def init_fn(self, *, ivp, params):
+    def init_fn(self, *, ivp):
         """Initialise the IVP solver state."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step_fn(self, state, *, vector_field, dt0, params):
+    def step_fn(self, state, *, vector_field, dt0):
         """Perform a step."""
         raise NotImplementedError
 
 
 def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
     """EK0 solver."""
-    alg = _NonAdaptiveEK0(
+    a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+    return EK0(
+        a=a,
+        q_sqrtm_upper=q_sqrtm.T,
         derivative_init_fn=derivative_init_fn,
         information_fn=information_fn,
-        num_derivatives=num_derivatives,
     )
-
-    a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    params = _NonAdaptiveEK0.Params(a=a, q_sqrtm_upper=q_sqrtm.T)
-    return alg, params
 
 
 # todo: this is not really an EK0, it is a KroneckerODEFilter
@@ -44,10 +43,27 @@ def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
 #   filter_implementation=
 #   EvaluateExtrapolateTimeVaryingDiffusion(information_fn=information_fn)
 #  )
-class _NonAdaptiveEK0(AbstractIVPSolver):
+class EK0(AbstractIVPSolver):
     """EK0."""
 
-    class State(NamedTuple):
+    a: Any
+    q_sqrtm_upper: Any
+
+    derivative_init_fn: Callable
+    information_fn: Callable
+
+    @property
+    def q_sqrtm_lower(self):
+        """Lower square root matrix."""
+        return self.q_sqrtm_upper.T
+
+    @property
+    def num_derivatives(self):
+        """Number of derivatives in the state-space model."""  # noqa: D401
+        return self.a.shape[0] - 1
+
+    class State(eqx.Module):
+        """State."""
 
         # Mandatory
         t: float
@@ -61,23 +77,8 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
         rv_extrapolated: rv.Normal
         rv_corrected: rv.Normal
 
-    class Params(NamedTuple):
-
-        a: Any
-        q_sqrtm_upper: Any
-
-        @property
-        def q_sqrtm_lower(self):
-            return self.q_sqrtm_upper.T
-
-    def __init__(self, *, derivative_init_fn, information_fn, num_derivatives):
-        self.derivative_init_fn = derivative_init_fn
-        self.information_fn = information_fn
-
-        # static parameter, therefore a class attribute instead of a parameter
-        self.num_derivatives = num_derivatives
-
-    def init_fn(self, *, ivp, params):
+    def init_fn(self, *, ivp):
+        """Initialise the IVP solver state."""
         f, u0, t0 = ivp.vector_field, ivp.initial_values, ivp.t0
 
         m0_corrected = self.derivative_init_fn(
@@ -108,13 +109,13 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
             rv_extrapolated=rv_extrapolated,
         )
 
-    def step_fn(self, *, state, vector_field, dt0, params):
-
+    def step_fn(self, *, state, vector_field, dt0):
+        """Perform a step."""
         # Turn this into a state = update_fn() thingy?
         # Do we want an init() method, too? (We probably need one.)
         # Is this its own class then? If so, what are the state and the params?
         x = self._evaluate_and_extrapolate_fn(
-            dt0=dt0, vector_field=vector_field, params=params, state=state
+            dt0=dt0, vector_field=vector_field, state=state
         )
         (bias, linear_fn), error_estimate, rv_extrapolated = x
 
@@ -138,22 +139,22 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
             rv_corrected=rv_corrected,
         )
 
-    def _evaluate_and_extrapolate_fn(self, *, dt0, vector_field, params, state):
+    def _evaluate_and_extrapolate_fn(self, *, dt0, vector_field, state):
         # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt0, num_derivatives=self.num_derivatives
         )
         # Extract previous correction
-        (m0, c_sqrtm0) = state.rv_corrected
+        (m0, c_sqrtm0) = state.rv_corrected.mean, state.rv_corrected.cov_sqrtm_upper
 
         # Extrapolate the mean and linearise the differential equation.
-        m_extrapolated = p[:, None] * (params.a @ (p_inv[:, None] * m0))
+        m_extrapolated = p[:, None] * (self.a @ (p_inv[:, None] * m0))
         bias, linear_fn = self.information_fn(
             f=lambda *x: vector_field(*x, state.t), x=m_extrapolated
         )
 
         # Observe the error-free state and calibrate some parameters
-        s_sqrtm_lower = linear_fn(p_inv[:, None] * params.q_sqrtm_lower)
+        s_sqrtm_lower = linear_fn(p_inv[:, None] * self.q_sqrtm_lower)
         s = jnp.dot(s_sqrtm_lower, s_sqrtm_lower)
         residual_white = bias / jnp.sqrt(s)
         diffusion_sqrtm = jnp.sqrt(
@@ -163,8 +164,8 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 
         # Full extrapolation
         c_sqrtm_extrapolated_p = sqrtm.sum_of_sqrtm_factors(
-            R1=(params.a @ (p_inv[:, None] * c_sqrtm0)).T,
-            R2=diffusion_sqrtm * params.q_sqrtm_lower,
+            R1=(self.a @ (p_inv[:, None] * c_sqrtm0)).T,
+            R2=diffusion_sqrtm * self.q_sqrtm_lower,
         ).T
         c_sqrtm_extrapolated = p[:, None] * c_sqrtm_extrapolated_p
 
@@ -176,26 +177,29 @@ class _NonAdaptiveEK0(AbstractIVPSolver):
 
 def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
     """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
-    solver_alg, solver_params = non_adaptive_solver
-    control_alg, control_params = control
-
-    params = _SolverWithControl.Params(
+    alg = _SolverWithControl(
         atol=atol,
         rtol=rtol,
         error_order=error_order,
-        solver=solver_params,
-        control=control_params,
+        solver=non_adaptive_solver,
+        control=control,
     )
-
-    alg = _SolverWithControl(solver=solver_alg, control=control_alg)
-    return alg, params
+    return alg
 
 
 class _SolverWithControl(AbstractIVPSolver):
     # Take a solver, normalise its error estimate,
     # and propose time-steps based on tolerances.
 
-    class State(NamedTuple):
+    atol: float
+    rtol: float
+
+    error_order: int
+    solver: Any
+    control: Any
+    norm_ord: Union[int, str, None] = None
+
+    class State(eqx.Module):
 
         dt_proposed: float
         error_normalised: float
@@ -211,38 +215,24 @@ class _SolverWithControl(AbstractIVPSolver):
         def u(self):
             return self.solver.u
 
-    class Params(NamedTuple):
-
-        atol: float
-        rtol: float
-
-        error_order: int
-        solver: Any
-        control: Any
-        norm_ord: Union[int, str, None] = None
-
-    def __init__(self, *, solver, control):
-        self.solver = solver
-        self.control = control
-
-    def init_fn(self, *, ivp, params):
-
-        state_solver = self.solver.init_fn(ivp=ivp, params=params.solver)
+    def init_fn(self, *, ivp):
+        """Initialise the IVP solver state."""
+        state_solver = self.solver.init_fn(ivp=ivp)
         state_control = self.control.init_fn()
 
         error_normalised = self._normalise_error(
             error_estimate=state_solver.error_estimate,
             u=state_solver.u,
-            atol=params.atol,
-            rtol=params.rtol,
-            norm_ord=params.norm_ord,
+            atol=self.atol,
+            rtol=self.rtol,
+            norm_ord=self.norm_ord,
         )
         dt_proposed = self._propose_first_dt_per_tol(
             f=lambda *x: ivp.vector_field(*x, ivp.t0, *ivp.parameters),
             u0=ivp.initial_values,
-            error_order=params.error_order,
-            rtol=params.rtol,
-            atol=params.atol,
+            error_order=self.error_order,
+            atol=self.atol,
+            rtol=self.rtol,
         )
         return self.State(
             dt_proposed=dt_proposed,
@@ -251,16 +241,16 @@ class _SolverWithControl(AbstractIVPSolver):
             control=state_control,
         )
 
-    def step_fn(self, *, state, vector_field, dt0, params):
+    def step_fn(self, *, state, vector_field, dt0):
+        """Perform a step."""
+
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
 
         def body_fn(x):
             _, s = x
-            s = self.attempt_step_fn(
-                state=s, vector_field=vector_field, dt0=dt0, params=params
-            )
+            s = self.attempt_step_fn(state=s, vector_field=vector_field, dt0=dt0)
             proceed_iteration = s.error_normalised > 1.0
             return proceed_iteration, s
 
@@ -271,24 +261,23 @@ class _SolverWithControl(AbstractIVPSolver):
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
         return state_new
 
-    def attempt_step_fn(self, *, state, vector_field, dt0, params):
+    def attempt_step_fn(self, *, state, vector_field, dt0):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         state_solver = self.solver.step_fn(
-            state=state.solver, vector_field=vector_field, dt0=dt0, params=params.solver
+            state=state.solver, vector_field=vector_field, dt0=dt0
         )
         error_normalised = self._normalise_error(
             error_estimate=state_solver.error_estimate,
             u=state_solver.u,
-            atol=params.atol,
-            rtol=params.rtol,
-            norm_ord=params.norm_ord,
+            atol=self.atol,
+            rtol=self.rtol,
+            norm_ord=self.norm_ord,
         )
         state_control = self.control.control_fn(
             state=state.control,
             error_normalised=error_normalised,
-            error_order=params.error_order,
-            params=params.control,
+            error_order=self.error_order,
         )
         dt_proposed = dt0 * state_control.scale_factor
         return self.State(

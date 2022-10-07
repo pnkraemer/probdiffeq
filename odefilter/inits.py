@@ -32,8 +32,6 @@ import jax
 from jax.experimental.jet import jet
 from jaxtyping import Array, Float
 
-# todo: use in solvers
-
 
 def taylor_mode(
     *,

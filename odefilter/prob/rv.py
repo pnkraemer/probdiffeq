@@ -1,9 +1,11 @@
 """Random variable utilities."""
 
-from typing import Any, NamedTuple
+from typing import Any
+
+import equinox as eqx
 
 
-class Normal(NamedTuple):
+class Normal(eqx.Module):
     """Random variable with a normal distribution."""
 
     mean: Any

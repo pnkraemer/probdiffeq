@@ -35,6 +35,8 @@ def test_marginalise_sequence(markov_sequence):
 
     rvs = markov.marginalise_sequence(markov_sequence=markov_sequence)
 
+    c1shape = rvs.cov_sqrtm_upper.shape
+    c2shape = markov_sequence.transition_noise_rvs.cov_sqrtm_upper.shape
     assert isinstance(rvs, type(markov_sequence.transition_noise_rvs))
-    assert rvs[0].shape == markov_sequence.transition_noise_rvs[0].shape
-    assert rvs[1].shape == markov_sequence.transition_noise_rvs[1].shape
+    assert rvs.mean.shape == markov_sequence.transition_noise_rvs.mean.shape
+    assert c1shape == c2shape

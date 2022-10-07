@@ -1,7 +1,8 @@
 """Markov process, Markov sequences and Markov machinery."""
 
-from typing import Any, NamedTuple
+from typing import Any
 
+import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 
@@ -9,7 +10,7 @@ from odefilter import sqrtm
 from odefilter.prob import rv
 
 
-class MarkovSequence(NamedTuple):
+class MarkovSequence(eqx.Module):
     """Markov sequence.
 
     Markov sequences are discretised Markov processes.
@@ -59,8 +60,8 @@ def marginalise_sequence(*, markov_sequence):
 def marginalise(*, init, operator, noise):
     """Marginalise the output of a linear model."""
     # Read system matrices
-    mean, cov_sqrtm_upper = init
-    noise_mean, noise_cov_sqrtm_upper = noise
+    mean, cov_sqrtm_upper = init.mean, init.cov_sqrtm_upper
+    noise_mean, noise_cov_sqrtm_upper = noise.mean, noise.cov_sqrtm_upper
 
     # Apply transition
     mean_new = jnp.dot(operator, mean) + noise_mean
@@ -69,5 +70,5 @@ def marginalise(*, init, operator, noise):
     )
 
     # Output type equals input type.
-    rv_new = init._replace(mean=mean_new, cov_sqrtm_upper=cov_sqrtm_upper_new)
+    rv_new = rv.Normal(mean=mean_new, cov_sqrtm_upper=cov_sqrtm_upper_new)
     return rv_new
