@@ -19,6 +19,7 @@ class DynamicIsotropicEKF0(eqx.Module):
 
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, information_fn):
+        """Create a backend from hyperparameters."""
         a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_upper=q_sqrtm.T, information_fn=information_fn)
 
