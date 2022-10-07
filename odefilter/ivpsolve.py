@@ -16,17 +16,17 @@ def simulate_terminal_values(ivp, /, *, solver):
         vector_field=lambda x, t: ivp.vector_field(x, t, *ivp.parameters),
         step_fn=solver.step_fn,
     )
-    return state
+    return state.stepping
 
 
 def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, step_fn):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
-        return s.t < t1
+        return s.stepping.t < t1
 
     def body_fun(s):
-        dt = jnp.minimum(t1 - s.t, s.dt_proposed)
+        dt = jnp.minimum(t1 - s.stepping.t, s.dt_proposed)
         return step_fn(state=s, vector_field=vector_field, dt0=dt)
 
     return jax.lax.while_loop(

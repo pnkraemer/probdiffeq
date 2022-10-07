@@ -54,11 +54,11 @@ def test_solver(solver, ivp_problem):
 
     state = solver.init_fn(ivp=ivp_problem)
     assert state.dt_proposed > 0.0
-    assert state.t == ivp_problem.t0
-    assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)
+    assert state.stepping.t == ivp_problem.t0
+    assert jnp.shape(state.stepping.u) == jnp.shape(ivp_problem.initial_values)
 
     dt0 = 1.0
     state = solver.step_fn(state=state, vector_field=ivp_problem.vector_field, dt0=dt0)
     assert state.dt_proposed > 0.0
-    assert state.t > ivp_problem.t0
-    assert jnp.shape(state.u) == jnp.shape(ivp_problem.initial_values)
+    assert state.stepping.t > ivp_problem.t0
+    assert jnp.shape(state.stepping.u) == jnp.shape(ivp_problem.initial_values)
