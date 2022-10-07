@@ -23,7 +23,7 @@ def problem_logistic():
 @pytest_cases.parametrize("controller", [controls.ProportionalIntegral()])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def solver_ek0(derivative_init_fn, controller, information_fn):
-    solver = ivp.ek0_non_adaptive(
+    solver = ivp.odefilter_non_adaptive(
         num_derivatives=2,
         derivative_init_fn=derivative_init_fn,
         information_fn=information_fn,
