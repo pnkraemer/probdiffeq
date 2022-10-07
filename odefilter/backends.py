@@ -1,5 +1,5 @@
 """ODE filter backends."""
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 import equinox as eqx
 import jax.numpy as jnp
