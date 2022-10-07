@@ -198,7 +198,7 @@ class Adaptive(AbstractIVPSolver):
     rtol: float
 
     error_order: int
-    solver: Any
+    stepping: Any
     control: Any
     norm_ord: Union[int, str, None] = None
 
@@ -208,27 +208,27 @@ class Adaptive(AbstractIVPSolver):
         dt_proposed: float
         error_normalised: float
 
-        solver: Any  # must contain fields "t" and "u".
+        stepping: Any  # must contain fields "t" and "u".
         control: Any  # must contain field "scale_factor".
 
         @property
         def t(self):
             """Wrap attribute."""
-            return self.solver.t
+            return self.stepping.t
 
         @property
         def u(self):
             """Wrap attribute."""
-            return self.solver.u
+            return self.stepping.u
 
     def init_fn(self, *, ivp):
         """Initialise the IVP solver state."""
-        state_solver = self.solver.init_fn(ivp=ivp)
+        state_stepping = self.stepping.init_fn(ivp=ivp)
         state_control = self.control.init_fn()
 
         error_normalised = self._normalise_error(
-            error_estimate=state_solver.error_estimate,
-            u=state_solver.u,
+            error_estimate=state_stepping.error_estimate,
+            u=state_stepping.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -243,7 +243,7 @@ class Adaptive(AbstractIVPSolver):
         return self.State(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
-            solver=state_solver,
+            stepping=state_stepping,
             control=state_control,
         )
 
@@ -270,12 +270,12 @@ class Adaptive(AbstractIVPSolver):
     def attempt_step_fn(self, *, state, vector_field, dt0):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
-        state_solver = self.solver.step_fn(
-            state=state.solver, vector_field=vector_field, dt0=dt0
+        state_stepping = self.stepping.step_fn(
+            state=state.stepping, vector_field=vector_field, dt0=dt0
         )
         error_normalised = self._normalise_error(
-            error_estimate=state_solver.error_estimate,
-            u=state_solver.u,
+            error_estimate=state_stepping.error_estimate,
+            u=state_stepping.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -289,7 +289,7 @@ class Adaptive(AbstractIVPSolver):
         return self.State(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
-            solver=state_solver,
+            stepping=state_stepping,
             control=state_control,
         )
 
