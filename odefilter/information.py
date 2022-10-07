@@ -29,32 +29,13 @@ and we can use it in ODE solvers.
 
 from typing import Callable, Tuple
 
+import equinox as eqx
 from jaxtyping import Array, Float
 
-# todo: make these operator on the ODE object?
-# todo: remove "linearize_" prefix (bc redundant)
 
-
-def linearize_ek0_kron_1st(
-    f: Callable[[Float[Array, "n d"]], Float[Array, " d"]], x: Float[Array, "n d"]
-) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
-    """EK0-Linearize a first-order ODE assuming \
-     a linearization-point with Kronecker structure.
-
-    Parameters
-    ----------
-    f :
-        Vector field of a first-order ODE.
-    x :
-        Linearisation point.
-
-    Returns
-    -------
-    :
-        Output bias.
-    :
-        Linear function (pushforward of the tangent spaces).
-
+class IsotropicEK0(eqx.Module):
+    """EK0-Linearize an ODE assuming a linearisation-point with\
+     isotropic Kronecker structure.
 
     Examples
     --------
@@ -64,7 +45,8 @@ def linearize_ek0_kron_1st(
     ...     return x*(1-x)
     >>>
     >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> b, fn = linearize_ek0_kron_1st(f, x0)
+    >>> linearise = IsotropicEK0(ode_order=1)
+    >>> b, fn = linearise(f, x0)
     >>> assert jnp.allclose(b, x0[1] - f(x0[0]))
     >>>
     >>> print(x0)
@@ -77,66 +59,56 @@ def linearize_ek0_kron_1st(
     [0.5]
     """
 
-    def approx_residual(u):
-        return u[1] - f(x[0])
+    ode_order: int
 
-    bias = approx_residual(x)
+    def __call__(
+        self,
+        f: Callable[[Float[Array, "n d"]], Float[Array, " d"]],
+        x: Float[Array, "n d"],
+    ) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
+        """Linearise the ODE.
 
-    def jvp(y):
-        return y[1]
+        Parameters
+        ----------
+        f :
+            Vector field of a first-order ODE.
+        x :
+            Linearisation point.
 
-    return bias, jvp
+        Returns
+        -------
+        :
+            Output bias.
+        :
+            Linear function (pushforward of the tangent spaces).
 
+        """
+        if self.ode_order == 1:
+            return self._linearise_1st(f=f, x=x)
+        if self.ode_order == 2:
+            return self._linearise_2st(f=f, x=x)
+        raise ValueError
 
-def linearize_ek0_kron_2nd(
-    f: Callable[[Float[Array, "n d"], Float[Array, "n d"]], Float[Array, " d"]],
-    x: Float[Array, "n d"],
-) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
-    """EK0-Linearize a second-order ODE assuming a linearization-point with\
-     Kronecker structure.
+    @staticmethod
+    def _linearise_1st(*, f, x):
+        def approx_residual(u):
+            return u[1] - f(x[0])
 
-    Parameters
-    ----------
-    f :
-        Vector field of a second-order ODE.
-    x :
-        Linearisation point.
+        bias = approx_residual(x)
 
-    Returns
-    -------
-    :
-        Output bias.
-    :
-        Linear function (pushforward of the tangent spaces).
+        def jvp(y):
+            return y[1]
 
+        return bias, jvp
 
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>>
-    >>> def f(x, dx):
-    ...     return dx*(1-x)
-    >>>
-    >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> b, fn = linearize_ek0_kron_2nd(f, x0)
-    >>> assert jnp.allclose(b, x0[2] - f(x0[0], x0[1]))
-    >>>
-    >>> print(x0)
-    [[0.5]
-     [0.5]
-     [0.5]]
-    >>> print(x0[1])
-    [0.5]
-    >>> print(fn(x0))
-    [0.5]
-    """
+    @staticmethod
+    def _linearise_2nd(*, f, x):
+        def approx_residual(u):
+            return u[2] - f(x[0], x[1])
 
-    def approx_residual(u):
-        return u[2] - f(x[0], x[1])
+        bias = approx_residual(x)
 
-    bias = approx_residual(x)
+        def jvp(y):
+            return y[2]
 
-    def jvp(y):
-        return y[2]
-
-    return bias, jvp
+        return bias, jvp
