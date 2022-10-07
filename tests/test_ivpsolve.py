@@ -28,8 +28,8 @@ def solver_ek0(derivative_init_fn, controller, information_fn):
         derivative_init_fn=derivative_init_fn,
         information_fn=information_fn,
     )
-    return ivp.adaptive(
-        non_adaptive_solver=solver,
+    return ivp.Adaptive(
+        solver=solver,
         control=controller,
         atol=1e-5,
         rtol=1e-5,

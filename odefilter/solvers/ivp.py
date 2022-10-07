@@ -183,19 +183,7 @@ class DynamicIsotropicEKF0(eqx.Module):
         return (bias, linear_fn), error_estimate, rv_extrapolated
 
 
-def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
-    """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
-    alg = _SolverWithControl(
-        atol=atol,
-        rtol=rtol,
-        error_order=error_order,
-        solver=non_adaptive_solver,
-        control=control,
-    )
-    return alg
-
-
-class _SolverWithControl(AbstractIVPSolver):
+class Adaptive(AbstractIVPSolver):
     # Take a solver, normalise its error estimate,
     # and propose time-steps based on tolerances.
 
