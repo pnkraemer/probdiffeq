@@ -32,7 +32,6 @@ import jax
 from jax.experimental.jet import jet
 from jaxtyping import Array, Float
 
-# todo: docs and doctests for forward_mode
 # todo: use in solvers
 
 
