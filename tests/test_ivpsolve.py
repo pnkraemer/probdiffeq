@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import (
+    backends,
     controls,
     information,
     inits,
@@ -32,7 +33,7 @@ def problem_logistic():
 def solver_ek0(derivative_init_fn, controller, information_fn):
     odefilter = stepping.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        backend=stepping.ekf0_isotropic_dynamic(
+        backend=backends.ekf0_isotropic_dynamic(
             num_derivatives=2,
             information_fn=information_fn,
         ),

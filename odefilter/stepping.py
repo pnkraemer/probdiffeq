@@ -11,14 +11,6 @@ from odefilter import backends, sqrtm
 from odefilter.prob import ibm, rv
 
 
-def ekf0_isotropic_dynamic(*, num_derivatives, information_fn):
-    """EK0 solver."""
-    a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    return backends.DynamicIsotropicEKF0(
-        a=a, q_sqrtm_upper=q_sqrtm.T, information_fn=information_fn
-    )
-
-
 class ODEFilter(eqx.Module):
     """ODE filter."""
 

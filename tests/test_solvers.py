@@ -3,7 +3,15 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, information, inits, problems, solvers, stepping
+from odefilter import (
+    backends,
+    controls,
+    information,
+    inits,
+    problems,
+    solvers,
+    stepping,
+)
 
 
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
@@ -12,7 +20,7 @@ from odefilter import controls, information, inits, problems, solvers, stepping
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
     odefilter = stepping.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        backend=stepping.ekf0_isotropic_dynamic(
+        backend=backends.ekf0_isotropic_dynamic(
             num_derivatives=num_derivatives,
             information_fn=information_fn,
         ),
