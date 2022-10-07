@@ -20,7 +20,7 @@ from odefilter import (
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
     stepping = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        backend=backends.ekf0_isotropic_dynamic(
+        backend=backends.DynamicIsotropicEKF0.from_num_derivatives(
             num_derivatives=num_derivatives,
             information_fn=information_fn,
         ),
