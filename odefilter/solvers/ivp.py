@@ -11,7 +11,7 @@ from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
 
-class AbstractIVPSolver(abc.ABC, eqx.Module):
+class AbstractIVPSolver(eqx.Module, abc.ABC):
     """Abstract solver for IVPs."""
 
     @abc.abstractmethod
@@ -54,13 +54,16 @@ class EK0(AbstractIVPSolver):
 
     @property
     def q_sqrtm_lower(self):
+        """Lower square root matrix."""
         return self.q_sqrtm_upper.T
 
     @property
     def num_derivatives(self):
+        """Number of derivatives in the state-space model."""  # noqa: D401
         return self.a.shape[0] - 1
 
     class State(eqx.Module):
+        """State."""
 
         # Mandatory
         t: float
@@ -75,6 +78,7 @@ class EK0(AbstractIVPSolver):
         rv_corrected: rv.Normal
 
     def init_fn(self, *, ivp):
+        """Initialise the IVP solver state."""
         f, u0, t0 = ivp.vector_field, ivp.initial_values, ivp.t0
 
         m0_corrected = self.derivative_init_fn(
@@ -106,7 +110,7 @@ class EK0(AbstractIVPSolver):
         )
 
     def step_fn(self, *, state, vector_field, dt0):
-
+        """Perform a step."""
         # Turn this into a state = update_fn() thingy?
         # Do we want an init() method, too? (We probably need one.)
         # Is this its own class then? If so, what are the state and the params?
@@ -173,7 +177,6 @@ class EK0(AbstractIVPSolver):
 
 def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
     """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
-
     alg = _SolverWithControl(
         atol=atol,
         rtol=rtol,
@@ -213,7 +216,7 @@ class _SolverWithControl(AbstractIVPSolver):
             return self.solver.u
 
     def init_fn(self, *, ivp):
-
+        """Initialise the IVP solver state."""
         state_solver = self.solver.init_fn(ivp=ivp)
         state_control = self.control.init_fn()
 
@@ -239,6 +242,8 @@ class _SolverWithControl(AbstractIVPSolver):
         )
 
     def step_fn(self, *, state, vector_field, dt0):
+        """Perform a step."""
+
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration

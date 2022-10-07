@@ -21,6 +21,8 @@ class AbstractControl(abc.ABC, eqx.Module):
 
 
 class ProportionalIntegral(AbstractControl):
+    """PI Controller."""
+
     safety: float = 0.95
     factor_min: float = 0.2
     factor_max: float = 10.0
@@ -28,13 +30,17 @@ class ProportionalIntegral(AbstractControl):
     power_proportional_unscaled: float = 0.4
 
     class State(eqx.Module):
+        """Proportional-integral controller state."""
+
         scale_factor: float
         error_norm_previously_accepted: float
 
     def init_fn(self):
+        """Initialise a controller state."""
         return self.State(scale_factor=1.0, error_norm_previously_accepted=1.0)
 
     def control_fn(self, *, state, error_normalised, error_order):
+        """Control a normalised error estimate."""
         scale_factor = self._scale_factor_proportional_integral(
             error_norm=error_normalised,
             error_order=error_order,
@@ -96,12 +102,16 @@ class Integral(AbstractControl):
     factor_max: float = 10.0
 
     class State(eqx.Module):
+        """Integral controller state."""
+
         scale_factor: float
 
     def init_fn(self):
+        """Initialise a controller state."""
         return self.State(scale_factor=1.0)
 
     def control_fn(self, state, error_normalised, error_order):
+        """Control a normalised error estimate."""
         scale_factor = self._scale_factor_integral_control(
             error_norm=error_normalised,
             error_order=error_order,

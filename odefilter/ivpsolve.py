@@ -1,7 +1,5 @@
 """Solve initial value problems."""
 
-from functools import partial
-
 import jax
 import jax.numpy as jnp
 
