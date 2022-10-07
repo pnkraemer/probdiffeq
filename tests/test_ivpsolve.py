@@ -10,9 +10,9 @@ from odefilter import (
     information,
     inits,
     ivpsolve,
+    odefilters,
     problems,
     solvers,
-    stepping,
 )
 
 
@@ -31,7 +31,7 @@ def problem_logistic():
 @pytest_cases.parametrize("controller", [controls.ProportionalIntegral()])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def solver_ek0(derivative_init_fn, controller, information_fn):
-    odefilter = stepping.ODEFilter(
+    stepping = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
         backend=backends.ekf0_isotropic_dynamic(
             num_derivatives=2,
@@ -39,7 +39,7 @@ def solver_ek0(derivative_init_fn, controller, information_fn):
         ),
     )
     return solvers.Adaptive(
-        stepping=odefilter,
+        stepping=stepping,
         control=controller,
         atol=1e-5,
         rtol=1e-5,

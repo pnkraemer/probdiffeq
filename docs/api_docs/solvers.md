@@ -1,2 +1,8 @@
 # Solvers
-::: odefilter.solvers.ivp
+::: odefilter.solvers
+
+# Time-stepping with ODE filters
+::: odefilter.odefilters
+
+# Backends
+::: odefilter.backends

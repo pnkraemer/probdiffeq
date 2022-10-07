@@ -8,9 +8,9 @@ from odefilter import (
     controls,
     information,
     inits,
+    odefilters,
     problems,
     solvers,
-    stepping,
 )
 
 
@@ -18,7 +18,7 @@ from odefilter import (
 @pytest_cases.parametrize("num_derivatives", [2])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
-    odefilter = stepping.ODEFilter(
+    stepping = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
         backend=backends.ekf0_isotropic_dynamic(
             num_derivatives=num_derivatives,
@@ -29,7 +29,7 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return solvers.Adaptive(
-        stepping=odefilter,
+        stepping=stepping,
         control=control,
         atol=atol,
         rtol=rtol,
