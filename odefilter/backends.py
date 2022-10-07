@@ -17,9 +17,6 @@ class FilteringSolution(Generic[RVLike], eqx.Module):
     extrapolated: RVLike
 
 
-# todo: this is not really an EK0-kind-of-solver, because
-#  the EK0-machinery enters through the information operator
-#  it is rather a DynamicIsotropicFilter(information=IsotropicEK0(ode_order=1)).
 class DynamicIsotropicFilter(eqx.Module):
     """EK0 for terminal-value simulation with an isotropic covariance \
      structure and dynamic (time-varying) calibration."""
