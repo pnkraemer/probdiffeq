@@ -51,9 +51,13 @@ def taylor_mode(
         An autonomous vector field to be differentiated.
     initial_values :
         A tuple (or iterable) of initial values.
-        The vector field evalautes as ``vector_field(*initial_values)``.
+        This is the initial set of Taylor coefficients.
+        The vector field evaluates as ``vector_field(*initial_values)``.
     num :
         How many recursions the iteration shall use.
+        One recursion adds one derivative to
+        the existing set of Taylor coefficients.
+
 
     Returns
     -------
@@ -138,9 +142,33 @@ def _subsets(set, n):
     return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode(*, vector_field, initial_values, num):
+def forward_mode(
+    *,
+    vector_field: Callable[..., Float[Array, " d"]],
+    initial_values: Tuple[Float[Array, " d"], ...],
+    num: int
+) -> List[Float[Array, " d"]]:
+
     """Recursively differentiate the initial value of an \
          ODE with **forward-mode** automatic differentiation.
+
+    Parameters
+    ----------
+    vector_field :
+        An autonomous vector field to be differentiated.
+    initial_values :
+        A tuple (or iterable) of initial values.
+        This is the initial set of Taylor coefficients.
+        The vector field evaluates as ``vector_field(*initial_values)``.
+    num :
+        How many recursions the iteration shall use.
+        One recursion adds one derivative to
+        the existing set of Taylor coefficients.
+
+    Returns
+    -------
+    :
+        A list of (unnormalised) Taylor coefficients.
 
     Examples
     --------
