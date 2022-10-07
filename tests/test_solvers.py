@@ -3,14 +3,14 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, information, inits, problems, solvers
+from odefilter import controls, information, inits, problems, solvers, stepping
 
 
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize("num_derivatives", [2])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn):
-    solver = solvers.odefilter_non_adaptive(
+    odefilter = stepping.odefilter_non_adaptive(
         derivative_init_fn=derivative_init_fn,
         num_derivatives=num_derivatives,
         information_fn=information_fn,
@@ -18,7 +18,7 @@ def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information_fn
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return solvers.Adaptive(
-        stepping=solver,
+        stepping=odefilter,
         control=control,
         atol=atol,
         rtol=rtol,

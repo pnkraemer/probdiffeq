@@ -4,7 +4,15 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, information, inits, ivpsolve, problems, solvers
+from odefilter import (
+    controls,
+    information,
+    inits,
+    ivpsolve,
+    problems,
+    solvers,
+    stepping,
+)
 
 
 @pytest_cases.case
@@ -22,13 +30,13 @@ def problem_logistic():
 @pytest_cases.parametrize("controller", [controls.ProportionalIntegral()])
 @pytest_cases.parametrize("information_fn", [information.linearize_ek0_kron_1st])
 def solver_ek0(derivative_init_fn, controller, information_fn):
-    stepping = solvers.odefilter_non_adaptive(
+    odefilter = stepping.odefilter_non_adaptive(
         num_derivatives=2,
         derivative_init_fn=derivative_init_fn,
         information_fn=information_fn,
     )
     return solvers.Adaptive(
-        stepping=stepping,
+        stepping=odefilter,
         control=controller,
         atol=1e-5,
         rtol=1e-5,
