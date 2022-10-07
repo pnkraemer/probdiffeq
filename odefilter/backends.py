@@ -1,5 +1,5 @@
 """ODE filter backends."""
-from typing import Any, Callable
+from typing import Any, Callable, Generic, TypeVar
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -7,7 +7,19 @@ import jax.numpy as jnp
 from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
+RVLike = TypeVar("RVLike")
 
+
+class FilteringSolution(Generic[RVLike], eqx.Module):
+    """Filtering solution."""
+
+    corrected: RVLike
+    extrapolated: RVLike
+
+
+# todo: this is not really an EK0-kind-of-solver, because
+#  the EK0-machinery enters through the information operator
+#  it is rather a DynamicIsotropicFilter(information=IsotropicEK0FirstOrder()).
 class DynamicIsotropicEKF0(eqx.Module):
     """EK0 for terminal-value simulation with an isotropic covariance \
      structure and dynamic (time-varying) calibration."""
@@ -33,12 +45,6 @@ class DynamicIsotropicEKF0(eqx.Module):
         """Number of derivatives in the state-space model."""  # noqa: D401
         return self.a.shape[0] - 1
 
-    class State(eqx.Module):
-        """State."""
-
-        rv_corrected: Any
-        rv_extrapolated: Any
-
     def init_fn(self, *, taylor_coefficients):
         """Initialise."""
         m0_corrected = jnp.stack(taylor_coefficients)
@@ -55,7 +61,7 @@ class DynamicIsotropicEKF0(eqx.Module):
         rv_extrapolated = rv.Normal(
             mean=m0_extrapolated, cov_sqrtm_upper=c_sqrtm0_extrapolated
         )
-        return self.State(rv_extrapolated=rv_extrapolated, rv_corrected=rv_corrected)
+        return FilteringSolution(extrapolated=rv_extrapolated, corrected=rv_corrected)
 
     def step_fn(self, *, state, vector_field, dt):
         """Step."""
@@ -78,8 +84,8 @@ class DynamicIsotropicEKF0(eqx.Module):
         c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
         rv_corrected = rv.Normal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
 
-        state_new = self.State(
-            rv_extrapolated=rv_extrapolated, rv_corrected=rv_corrected
+        state_new = FilteringSolution(
+            extrapolated=rv_extrapolated, corrected=rv_corrected
         )
         return state_new, error_estimate, jnp.squeeze(rv_corrected.mean[0])
 
@@ -89,7 +95,7 @@ class DynamicIsotropicEKF0(eqx.Module):
             dt=dt, num_derivatives=self.num_derivatives
         )
         # Extract previous correction
-        (m0, c_sqrtm0) = state.rv_corrected.mean, state.rv_corrected.cov_sqrtm_upper
+        (m0, c_sqrtm0) = state.corrected.mean, state.corrected.cov_sqrtm_upper
 
         # Extrapolate the mean and linearise the differential equation.
         m_extrapolated = p[:, None] * (self.a @ (p_inv[:, None] * m0))
