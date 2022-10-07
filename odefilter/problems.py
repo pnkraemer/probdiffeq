@@ -1,26 +1,26 @@
 """Problem types."""
 
-from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable, Optional, Tuple, Union
 
 import jax.tree_util
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, PyTree
 
 
 @jax.tree_util.register_pytree_node_class
-class InitialValueProblem(NamedTuple):
+@dataclass(frozen=True)
+class InitialValueProblem:
     """Initial value problem."""
 
     vector_field: Callable[..., Float[Array, " d"]]
-    """ODE function. Signature f(*initial_values, t0, *parameters)."""
+    """ODE function. Signature ``f(*initial_values, t0, *parameters)``."""
 
     # todo: Make into a tuple of initial values?
-    initial_values: Union[Any, Iterable[Any]]
+    initial_values: Tuple[Float[Array, " d"], ...]
     r"""Initial values.
-    If the ODE is a first-order equation, the initial value is an array $u_0$.
-    If it is a second-order equation,
-    the initial values are a tuple of arrays $(u_0, \dot u_0)$.
-    If it is an $n$-th order equation, the initial values are an $n$-tuple
-    of arrays $(u_0, \dot u_0, ...)$.
+
+    A tuple of arrays: one of
+    $(u_0,)$, $(u_0, \dot u_0)$, $(u_0, \dot u_0, \ddot u_0)$, et cetera.
     """
 
     t0: float
@@ -29,7 +29,7 @@ class InitialValueProblem(NamedTuple):
     t1: float
     """Terminal time-point. Optional."""
 
-    parameters: Any
+    parameters: PyTree
     """Pytree of parameters."""
 
     def tree_flatten(self):
