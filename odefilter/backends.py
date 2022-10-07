@@ -19,21 +19,21 @@ class FilteringSolution(Generic[RVLike], eqx.Module):
 
 # todo: this is not really an EK0-kind-of-solver, because
 #  the EK0-machinery enters through the information operator
-#  it is rather a DynamicIsotropicFilter(information=IsotropicEK0FirstOrder()).
-class DynamicIsotropicEKF0(eqx.Module):
+#  it is rather a DynamicIsotropicFilter(information=IsotropicEK0(ode_order=1)).
+class DynamicIsotropicFilter(eqx.Module):
     """EK0 for terminal-value simulation with an isotropic covariance \
      structure and dynamic (time-varying) calibration."""
 
     a: Any
     q_sqrtm_upper: Any
 
-    information_fn: Callable
+    information: Any
 
     @classmethod
-    def from_num_derivatives(cls, *, num_derivatives, information_fn):
+    def from_num_derivatives(cls, *, num_derivatives, information):
         """Create a backend from hyperparameters."""
         a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-        return cls(a=a, q_sqrtm_upper=q_sqrtm.T, information_fn=information_fn)
+        return cls(a=a, q_sqrtm_upper=q_sqrtm.T, information=information)
 
     @property
     def q_sqrtm_lower(self):
@@ -99,7 +99,7 @@ class DynamicIsotropicEKF0(eqx.Module):
 
         # Extrapolate the mean and linearise the differential equation.
         m_extrapolated = p[:, None] * (self.a @ (p_inv[:, None] * m0))
-        bias, linear_fn = self.information_fn(f=vector_field, x=m_extrapolated)
+        bias, linear_fn = self.information(f=vector_field, x=m_extrapolated)
 
         # Observe the error-free state and calibrate some parameters
         s_sqrtm_lower = linear_fn(p_inv[:, None] * self.q_sqrtm_lower)
