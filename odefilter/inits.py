@@ -33,6 +33,10 @@ import jax.numpy as jnp
 from jax.experimental.jet import jet
 from jaxtyping import Array, Float
 
+# todo: docs and doctests for forward_mode
+# todo: fix doctests
+# todo: use in solvers
+
 
 def taylor_mode(
     *,
@@ -55,7 +59,7 @@ def taylor_mode(
     Returns
     -------
     :
-        A tuple of (unnormalised) Taylor coefficients.
+        A list of (unnormalised) Taylor coefficients.
 
     Examples
     --------
@@ -70,14 +74,13 @@ def taylor_mode(
     >>> print(tree_round(f(*u0), 1))
     [0.3]
 
-    >>> tcoeffs = taylor_mode(vector_field=f, initial_conditions=u0, num=1)
+    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 1))
-    (DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32))
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32)]
 
-    >>> tcoeffs = tm(f=f, init=u0, num=2)
+    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=2)
     >>> print(tree_round(tcoeffs, 1))
-    (DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), DeviceArray([0.4], dtype=float32))
-
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), DeviceArray([0.4], dtype=float32)]
 
     >>>
     >>> f = lambda x, dx: dx**2*(1-jnp.sin(x))
@@ -85,13 +88,13 @@ def taylor_mode(
     >>> print(tree_round(f(*u0), 2))
     [0.02]
 
-    >>> tcoeffs = tm(f=f, init=u0, num=1)
+    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 2))
-    (DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), DeviceArray([0.02], dtype=float32))
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), DeviceArray([0.02], dtype=float32)]
 
-    >>> tcoeffs = tm(f=f, init=u0, num=4)
+    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=4)
     >>> print(tree_round(tcoeffs,1))
-    (DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32))
+    [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
 
     """
     assert num >= 1
