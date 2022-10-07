@@ -1,20 +1,26 @@
 """ODE filter backends."""
-from typing import Any, Generic, TypeVar
+from typing import Any, Callable, Generic, List, Tuple, TypeVar
 
 import equinox as eqx
 import jax.numpy as jnp
+from jaxtyping import Array, Float
 
 from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
-RVLike = TypeVar("RVLike")
+NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
+"""A type-variable to alias appropriate Normal-like random variables."""
 
 
-class FilteringSolution(Generic[RVLike], eqx.Module):
-    """Filtering solution."""
+class FilteringSolution(Generic[NormalLike], eqx.Module):
+    """Filtering solution.
 
-    corrected: RVLike
-    extrapolated: RVLike
+    By construction right-including, i.e. it defines the solution
+    on the interval $(t_0, t_1]$.
+    """
+
+    corrected: NormalLike
+    extrapolated: NormalLike
 
 
 class DynamicIsotropicFilter(eqx.Module):
@@ -42,51 +48,41 @@ class DynamicIsotropicFilter(eqx.Module):
         """Number of derivatives in the state-space model."""  # noqa: D401
         return self.a.shape[0] - 1
 
-    def init_fn(self, *, taylor_coefficients):
+    def init_fn(
+        self, *, taylor_coefficients: List[Float[Array, " d"]]
+    ) -> FilteringSolution[rv.IsotropicNormal]:
         """Initialise."""
+        # Infer the "corrected" random variable from the Taylor coefficients.
+        # (There is no actual correction, because we have perfect information.)
         m0_corrected = jnp.stack(taylor_coefficients)
         if m0_corrected.ndim == 1:
             m0_corrected = m0_corrected[:, None]
-
-        c_sqrtm0_corrected = jnp.zeros(
-            (self.num_derivatives + 1, self.num_derivatives + 1)
+        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_upper)
+        corrected = rv.IsotropicNormal(
+            mean=m0_corrected, cov_sqrtm_upper=c_sqrtm0_corrected
         )
-        rv_corrected = rv.Normal(mean=m0_corrected, cov_sqrtm_upper=c_sqrtm0_corrected)
 
+        # Invent an "extrapolated" random variable.
+        # It is required to have type- and shape-stability in the loop.
+        # We make it standard-normal because of a lack of better ideas.
+        # Its values are irrelevant.
         m0_extrapolated = jnp.zeros_like(m0_corrected)
         c_sqrtm0_extrapolated = jnp.eye(*c_sqrtm0_corrected.shape)
-        rv_extrapolated = rv.Normal(
+        extrapolated = rv.IsotropicNormal(
             mean=m0_extrapolated, cov_sqrtm_upper=c_sqrtm0_extrapolated
         )
-        return FilteringSolution(extrapolated=rv_extrapolated, corrected=rv_corrected)
+        return FilteringSolution(extrapolated=extrapolated, corrected=corrected)
 
-    def step_fn(self, *, state, vector_field, dt):
+    def step_fn(
+        self,
+        *,
+        state: FilteringSolution[rv.IsotropicNormal],
+        vector_field: Callable[..., Float[Array, " d"]],
+        dt: float,
+    ) -> Tuple[
+        FilteringSolution[rv.IsotropicNormal], Float[Array, " d"], Float[Array, " d"]
+    ]:
         """Step."""
-        # Turn this into a state = update_fn() thingy?
-        # Do we want an init() method, too? (We probably need one.)
-        # Is this its own class then? If so, what are the state and the params?
-        x = self._evaluate_and_extrapolate_fn(
-            dt=dt, vector_field=vector_field, state=state
-        )
-        (bias, linear_fn), error_estimate, rv_extrapolated = x
-
-        # Final observation
-        s_sqrtm = linear_fn(rv_extrapolated.cov_sqrtm_upper.T)  # shape (n,)
-        s = jnp.dot(s_sqrtm, s_sqrtm)
-        rv_observed = rv.Normal(mean=bias, cov_sqrtm_upper=jnp.sqrt(s))
-        g = (rv_extrapolated.cov_sqrtm_upper.T @ s_sqrtm.T) / s  # shape (n,)
-
-        # Final correction
-        m_cor = rv_extrapolated.mean - g[:, None] * rv_observed.mean[None, :]
-        c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
-        rv_corrected = rv.Normal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
-
-        state_new = FilteringSolution(
-            extrapolated=rv_extrapolated, corrected=rv_corrected
-        )
-        return state_new, error_estimate, jnp.squeeze(rv_corrected.mean[0])
-
-    def _evaluate_and_extrapolate_fn(self, *, dt, vector_field, state):
         # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
@@ -114,7 +110,22 @@ class DynamicIsotropicFilter(eqx.Module):
         ).T
         c_sqrtm_extrapolated = p[:, None] * c_sqrtm_extrapolated_p
 
-        rv_extrapolated = rv.Normal(
+        rv_extrapolated = rv.IsotropicNormal(
             mean=m_extrapolated, cov_sqrtm_upper=c_sqrtm_extrapolated
         )
-        return (bias, linear_fn), error_estimate, rv_extrapolated
+
+        # Final observation
+        s_sqrtm = linear_fn(rv_extrapolated.cov_sqrtm_upper.T)  # shape (n,)
+        s = jnp.dot(s_sqrtm, s_sqrtm)
+        rv_observed = rv.IsotropicNormal(mean=bias, cov_sqrtm_upper=jnp.sqrt(s))
+        g = (rv_extrapolated.cov_sqrtm_upper.T @ s_sqrtm.T) / s  # shape (n,)
+
+        # Final correction
+        m_cor = rv_extrapolated.mean - g[:, None] * rv_observed.mean[None, :]
+        c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
+        rv_corrected = rv.IsotropicNormal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
+
+        state_new = FilteringSolution(
+            extrapolated=rv_extrapolated, corrected=rv_corrected
+        )
+        return state_new, error_estimate, jnp.squeeze(rv_corrected.mean[0])
