@@ -1,18 +1,61 @@
-"""Initialisation of ODE filters via (automatic) differentiation."""
+r"""Differentiate the initial conditions of a differential equation.
+
+Commonly, this is done with recursive automatic differentiation.
+
+ODE filters require an initialisation of the state
+and its first $\nu$ derivatives, and numerical stability
+requires an accurate initialisation.
+The gold standard is Taylor-mode differentiation, but others can be
+useful, too.
+
+The general interface of these differentiation functions is as follows:
+
+\begin{align*}
+(u_0, \dot u_0, \ddot u_0, ...) &= G(f, (u_0,), n), \\
+(u_0, \dot u_0, \ddot u_0, ...) &= G(f, (u_0, \dot u_0), n), \\
+(u_0, \dot u_0, \ddot u_0, ...) &= G(f, (u_0, \dot u_0, ...), n).
+\end{align*}
+
+The inputs are vector fields, initial conditions, and an integer;
+the outputs are unnormalised Taylor coefficients (or equivalently,
+higher-order derivatives of the initial condition).
+$f = f(u, du, ...)$ is an autonomous vector field of a
+potentially high-order differential equation; $(u_0, \dot u_0, ...)$
+is a tuple of initial conditions that matches the signature of the vector field;
+and $n$ is the number of recursions, which commonly describes how many
+derivatives to "add" to the existing initial conditions.
+"""
+
+from typing import Callable, List, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax.experimental.jet import jet
+from jaxtyping import Array, Float
 
 
-def taylor_mode(*, vector_field, initial_values, num_recursions):
-    """
+def taylor_mode(
+    *,
+    vector_field: Callable[..., Float[Array, "d"]],
+    initial_values: Tuple[Float[Array, "d"], ...],
+    num: int
+) -> List[Float[Array, "d"]]:
+    """Differentiate the initial value with Taylor-mode automatic differentiation.
 
     Parameters
     ----------
-    f: Function with signature f(*init)
-    init: Tuple of initial values
-    num: number of derivatives <to add?>
+    vector_field :
+        An autonomous vector field to be differentiated.
+    initial_values :
+        A tuple (or iterable) of initial values.
+        The vector field evalautes as ``vector_field(*initial_values)``.
+    num :
+        How many recursions the iteration shall use.
+
+    Returns
+    -------
+    :
+        A tuple of (unnormalised) Taylor coefficients.
 
     Examples
     --------
@@ -27,7 +70,7 @@ def taylor_mode(*, vector_field, initial_values, num_recursions):
     >>> print(tree_round(f(*u0), 1))
     [0.3]
 
-    >>> tcoeffs = tm(f=f, init=u0, num=1)
+    >>> tcoeffs = taylor_mode(vector_field=f, initial_conditions=u0, num=1)
     >>> print(tree_round(tcoeffs, 1))
     (DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32))
 
@@ -51,24 +94,26 @@ def taylor_mode(*, vector_field, initial_values, num_recursions):
     (DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32))
 
     """
-    assert num_recursions >= 1
+    assert num >= 1
 
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
     # Initial Taylor series (u_0, u_1, ..., u_k)
     primals = vector_field(*initial_values)
-    taylor_coeffs = (*initial_values, primals)
-    for _ in range(num_recursions - 1):
+    taylor_coeffs = [*initial_values, primals]
+    for _ in range(num - 1):
         series = _subsets(taylor_coeffs[1:], num_arguments)
         primals, series_new = jet(vector_field, primals=initial_values, series=series)
-        taylor_coeffs = (*initial_values, primals, *series_new)
+        taylor_coeffs = [*initial_values, primals, *series_new]
 
     return taylor_coeffs
 
 
 def _subsets(set, n):
     """Computes specific subsets until exhausted.
+
+    See example below.
 
     Examples
     --------
@@ -84,63 +129,28 @@ def _subsets(set, n):
     return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forwardmode_jvp_fn(*, f, u0, num_derivatives):
-    """Compute the initial derivatives with forward-mode AD (JVPs)."""
-    if num_derivatives == 0:
-        return u0.reshape((1, -1))
+def forward_mode(*, vector_field, initial_values, num):
 
-    g, g0 = f, f
-    du0 = [u0, g(u0)]
-    for _ in range(num_derivatives - 1):
-        g = _forwardmode_jvp_next_ode_derivative(fun=g, fun0=g0)
-        du0.append(g(u0))
-
-    return jnp.stack(du0)
+    g_n, g_0 = vector_field, vector_field
+    taylor_coeffs = [*initial_values, vector_field(*initial_values)]
+    for _ in range(num - 1):
+        g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
+        taylor_coeffs.append(g_n(*initial_values))
+    return taylor_coeffs
 
 
-def _forwardmode_jvp_next_ode_derivative(fun, fun0):
-    def dg(x):
-        _, y = jax.jvp(fun, (x,), (fun0(x),))
-        return y
+def _fwd_recursion_iterate(*, fun_n, fun_0):
+    r"""Implements a general version of the recursion \
+    $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$"""
 
-    return dg
+    def df(*args):
+        r"""Implements a general version of the chain rule \
+        $F(x) = \langle (Jf)(x), f_0(x)\rangle$."""
+        # Assign primals and tangents for the JVP
+        vals = (*args, fun_0(*args))
+        primals_in, tangents_in = vals[:-1], vals[1:]
 
+        primals_out, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
+        return tangents_out
 
-def forwardmode_fn(*, f, u0, num_derivatives):
-    """Compute the initial derivatives with forward-mode AD."""
-    if num_derivatives == 0:
-        return u0.reshape((1, -1))
-
-    def next_ode_derivative(fun, fun0):
-        def dg(x):
-            return jax.jacfwd(fun)(x) @ fun0(x)
-
-        return dg
-
-    g, g0 = f, f
-    du0 = [u0, g(u0)]
-    for _ in range(num_derivatives - 1):
-        g = next_ode_derivative(fun=g, fun0=g0)
-        du0.append(g(u0))
-
-    return jnp.stack(du0)
-
-
-def reversemode_fn(*, f, u0, num_derivatives):
-    """Compute the initial derivatives with reverse-mode AD."""
-    if num_derivatives == 0:
-        return u0.reshape((1, -1))
-
-    def next_ode_derivative(fun, fun0):
-        def dg(x):
-            return jax.jacrev(fun)(x) @ fun0(x)
-
-        return dg
-
-    g, g0 = f, f
-    du0 = [u0, g(u0)]
-    for _ in range(num_derivatives - 1):
-        g = next_ode_derivative(fun=g, fun0=g0)
-        du0.append(g(u0))
-
-    return jnp.stack(du0)
+    return df
