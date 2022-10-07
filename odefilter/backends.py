@@ -52,7 +52,6 @@ class DynamicIsotropicFilter(eqx.Module):
         self, *, taylor_coefficients: List[Float[Array, " d"]]
     ) -> FilteringSolution[rv.IsotropicNormal]:
         """Initialise."""
-
         # Infer the "corrected" random variable from the Taylor coefficients.
         # (There is no actual correction, because we have perfect information.)
         m0_corrected = jnp.stack(taylor_coefficients)
@@ -84,7 +83,6 @@ class DynamicIsotropicFilter(eqx.Module):
         FilteringSolution[rv.IsotropicNormal], Float[Array, " d"], Float[Array, " d"]
     ]:
         """Step."""
-
         # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
