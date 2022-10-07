@@ -25,31 +25,73 @@ class AbstractIVPSolver(eqx.Module, abc.ABC):
         raise NotImplementedError
 
 
-def ek0_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
+def odefilter_non_adaptive(*, derivative_init_fn, num_derivatives, information_fn):
     """EK0 solver."""
     a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
-    return EK0(
-        a=a,
-        q_sqrtm_upper=q_sqrtm.T,
+    return _ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        information_fn=information_fn,
+        backend=DynamicIsotropicEKF0(
+            a=a, q_sqrtm_upper=q_sqrtm.T, information_fn=information_fn
+        ),
     )
 
 
-# todo: this is not really an EK0, it is a KroneckerODEFilter
-#  with an EK0 information operator
-#  Turn this into something like
-#  _KroneckerSolver(
-#   filter_implementation=
-#   EvaluateExtrapolateTimeVaryingDiffusion(information_fn=information_fn)
-#  )
-class EK0(AbstractIVPSolver):
-    """EK0."""
+class _ODEFilter(AbstractIVPSolver):
+    """ODE filter."""
+
+    derivative_init_fn: Callable
+    backend: Any
+
+    class State(eqx.Module):
+        """State."""
+
+        # Mandatory
+        t: float
+        u: Any
+        error_estimate: Any
+
+        backend: Any
+
+    def init_fn(self, *, ivp):
+        """Initialise the IVP solver state."""
+        f, u0, t0 = ivp.vector_field, ivp.initial_values, ivp.t0
+
+        taylor_coefficients = self.derivative_init_fn(
+            vector_field=lambda *x: f(*x, ivp.t0, *ivp.parameters),
+            initial_values=(u0,),
+            num=self.backend.num_derivatives,
+        )
+
+        backend_state = self.backend.init_fn(taylor_coefficients=taylor_coefficients)
+
+        return self.State(
+            t=t0,
+            u=u0,
+            error_estimate=jnp.nan,
+            backend=backend_state,
+        )
+
+    def step_fn(self, *, state, vector_field, dt0):
+        """Perform a step."""
+
+        def vf(y):
+            return vector_field(y, state.t)
+
+        backend_state, error_estimate, u = self.backend.step_fn(
+            state=state.backend, vector_field=vf, dt=dt0
+        )
+        return self.State(
+            t=state.t + dt0, u=u, error_estimate=error_estimate, backend=backend_state
+        )
+
+
+class DynamicIsotropicEKF0(eqx.Module):
+    """EK0 for terminal-value simulation with an isotropic covariance \
+     structure and dynamic (time-varying) calibration."""
 
     a: Any
     q_sqrtm_upper: Any
 
-    derivative_init_fn: Callable
     information_fn: Callable
 
     @property
@@ -65,28 +107,12 @@ class EK0(AbstractIVPSolver):
     class State(eqx.Module):
         """State."""
 
-        # Mandatory
-        t: float
-        u: Any
-        error_estimate: Any
+        rv_corrected: Any
+        rv_extrapolated: Any
 
-        # split this into something like
-        # extrapolated, observed, corrected, and linearised model?
-        # Is this its own data structure?
-
-        rv_extrapolated: rv.Normal
-        rv_corrected: rv.Normal
-
-    def init_fn(self, *, ivp):
-        """Initialise the IVP solver state."""
-        f, u0, t0 = ivp.vector_field, ivp.initial_values, ivp.t0
-
-        m0_corrected = self.derivative_init_fn(
-            vector_field=lambda *x: f(*x, ivp.t0, *ivp.parameters),
-            initial_values=(u0,),
-            num=self.num_derivatives,
-        )
-        m0_corrected = jnp.stack(m0_corrected)
+    def init_fn(self, *, taylor_coefficients):
+        """Initialise."""
+        m0_corrected = jnp.stack(taylor_coefficients)
         if m0_corrected.ndim == 1:
             m0_corrected = m0_corrected[:, None]
 
@@ -100,22 +126,15 @@ class EK0(AbstractIVPSolver):
         rv_extrapolated = rv.Normal(
             mean=m0_extrapolated, cov_sqrtm_upper=c_sqrtm0_extrapolated
         )
+        return self.State(rv_extrapolated=rv_extrapolated, rv_corrected=rv_corrected)
 
-        return self.State(
-            t=t0,
-            u=u0,
-            error_estimate=jnp.nan,
-            rv_corrected=rv_corrected,
-            rv_extrapolated=rv_extrapolated,
-        )
-
-    def step_fn(self, *, state, vector_field, dt0):
-        """Perform a step."""
+    def step_fn(self, *, state, vector_field, dt):
+        """Step."""
         # Turn this into a state = update_fn() thingy?
         # Do we want an init() method, too? (We probably need one.)
         # Is this its own class then? If so, what are the state and the params?
         x = self._evaluate_and_extrapolate_fn(
-            dt0=dt0, vector_field=vector_field, state=state
+            dt=dt, vector_field=vector_field, state=state
         )
         (bias, linear_fn), error_estimate, rv_extrapolated = x
 
@@ -130,28 +149,22 @@ class EK0(AbstractIVPSolver):
         c_sqrtm_cor = rv_extrapolated.cov_sqrtm_upper.T - g[:, None] * s_sqrtm[None, :]
         rv_corrected = rv.Normal(mean=m_cor, cov_sqrtm_upper=c_sqrtm_cor.T)
 
-        t_new = state.t + dt0
-        return self.State(
-            t=t_new,
-            u=jnp.squeeze(rv_corrected.mean[0]),
-            error_estimate=error_estimate,
-            rv_extrapolated=rv_extrapolated,
-            rv_corrected=rv_corrected,
+        state_new = self.State(
+            rv_extrapolated=rv_extrapolated, rv_corrected=rv_corrected
         )
+        return state_new, error_estimate, jnp.squeeze(rv_corrected.mean[0])
 
-    def _evaluate_and_extrapolate_fn(self, *, dt0, vector_field, state):
+    def _evaluate_and_extrapolate_fn(self, *, dt, vector_field, state):
         # Compute preconditioner
         p, p_inv = ibm.preconditioner_diagonal(
-            dt=dt0, num_derivatives=self.num_derivatives
+            dt=dt, num_derivatives=self.num_derivatives
         )
         # Extract previous correction
         (m0, c_sqrtm0) = state.rv_corrected.mean, state.rv_corrected.cov_sqrtm_upper
 
         # Extrapolate the mean and linearise the differential equation.
         m_extrapolated = p[:, None] * (self.a @ (p_inv[:, None] * m0))
-        bias, linear_fn = self.information_fn(
-            f=lambda *x: vector_field(*x, state.t), x=m_extrapolated
-        )
+        bias, linear_fn = self.information_fn(f=vector_field, x=m_extrapolated)
 
         # Observe the error-free state and calibrate some parameters
         s_sqrtm_lower = linear_fn(p_inv[:, None] * self.q_sqrtm_lower)
@@ -160,7 +173,7 @@ class EK0(AbstractIVPSolver):
         diffusion_sqrtm = jnp.sqrt(
             jnp.dot(residual_white, residual_white) / residual_white.size
         )
-        error_estimate = dt0 * diffusion_sqrtm * jnp.sqrt(s)
+        error_estimate = dt * diffusion_sqrtm * jnp.sqrt(s)
 
         # Full extrapolation
         c_sqrtm_extrapolated_p = sqrtm.sum_of_sqrtm_factors(
@@ -175,19 +188,9 @@ class EK0(AbstractIVPSolver):
         return (bias, linear_fn), error_estimate, rv_extrapolated
 
 
-def adaptive(*, non_adaptive_solver, control, atol, rtol, error_order):
-    """Turn a non-adaptive IVP solver into an adaptive IVP solver."""
-    alg = _SolverWithControl(
-        atol=atol,
-        rtol=rtol,
-        error_order=error_order,
-        solver=non_adaptive_solver,
-        control=control,
-    )
-    return alg
+class Adaptive(AbstractIVPSolver):
+    """Make an adaptive ODE solver."""
 
-
-class _SolverWithControl(AbstractIVPSolver):
     # Take a solver, normalise its error estimate,
     # and propose time-steps based on tolerances.
 
@@ -200,6 +203,7 @@ class _SolverWithControl(AbstractIVPSolver):
     norm_ord: Union[int, str, None] = None
 
     class State(eqx.Module):
+        """Solver state."""
 
         dt_proposed: float
         error_normalised: float
@@ -209,10 +213,12 @@ class _SolverWithControl(AbstractIVPSolver):
 
         @property
         def t(self):
+            """Wrap attribute."""
             return self.solver.t
 
         @property
         def u(self):
+            """Wrap attribute."""
             return self.solver.u
 
     def init_fn(self, *, ivp):
