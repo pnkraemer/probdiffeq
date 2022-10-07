@@ -1,14 +1,8 @@
 """Time-stepping."""
-import abc
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import equinox as eqx
-import jax.lax
 import jax.numpy as jnp
-import jax.tree_util
-
-from odefilter import backends, sqrtm
-from odefilter.prob import ibm, rv
 
 
 class ODEFilter(eqx.Module):
