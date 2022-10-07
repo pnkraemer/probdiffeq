@@ -6,7 +6,6 @@ import jax
 import jax.numpy as jnp
 
 
-@partial(jax.jit, static_argnames=["solver"])
 def simulate_terminal_values(ivp, /, *, solver, solver_params):
     """Simulate the terminal values of an initial value problem."""
     state0 = solver.init_fn(ivp=ivp, params=solver_params)
