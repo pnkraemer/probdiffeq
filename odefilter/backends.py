@@ -9,6 +9,13 @@ from jaxtyping import Array, Float
 from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
+# Filter/Smoother decides the type of the state and which extrapolate_cov function is called
+
+# Isotropic/<nothing> decides the inputs/outputs of each function
+# and governs most of the actual implementation
+# Dynamic/<nothing> decides the order of extrapolation
+
+
 NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
 """A type-variable to alias appropriate Normal-like random variables."""
 
