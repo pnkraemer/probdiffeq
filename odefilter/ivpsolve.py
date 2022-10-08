@@ -5,14 +5,20 @@ import jax
 
 
 @eqx.filter_jit
-def simulate_terminal_values(ivp, /, *, solver):
+def simulate_terminal_values(
+    vector_field, initial_values, t0, t1, parameters, *, solver
+):
     """Simulate the terminal values of an initial value problem."""
-    state0 = solver.init_fn(ivp=ivp)
+
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
+
+    state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
 
     state = _advance_ivp_solution_adaptively(
         state0=state0,
-        t1=ivp.t1,
-        vector_field=lambda x, t: ivp.vector_field(x, t, *ivp.parameters),
+        t1=t1,
+        vector_field=vf,
         step_fn=solver.step_fn,
     )
     return state.accepted

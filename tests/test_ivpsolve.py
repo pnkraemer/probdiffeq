@@ -19,7 +19,7 @@ from odefilter import (
 def case_problem_logistic():
     return problems.InitialValueProblem(
         vector_field=lambda x, t: x * (1 - x),
-        initial_values=0.5,
+        initial_values=(0.5,),
         t0=0.0,
         t1=10.0,
         parameters=(),
@@ -65,7 +65,14 @@ def case_solver_adaptive_ek0(derivative_init_fn, ek0):
 @pytest_cases.parametrize_with_cases("ivp", cases=".", prefix="case_problem_")
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
 def test_simulate_terminal_values(ivp, solver):
-    solution = ivpsolve.simulate_terminal_values(ivp, solver=solver)
+    solution = ivpsolve.simulate_terminal_values(
+        vector_field=ivp.vector_field,
+        initial_values=ivp.initial_values,
+        t0=ivp.t0,
+        t1=ivp.t1,
+        parameters=ivp.parameters,
+        solver=solver,
+    )
 
     assert solution.t == ivp.t1
     assert jnp.allclose(solution.u, 1.0, atol=1e-1, rtol=1e-1)
