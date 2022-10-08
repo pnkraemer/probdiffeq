@@ -2,7 +2,6 @@
 from typing import Any, Callable
 
 import equinox as eqx
-import jax.numpy as jnp
 
 
 class ODEFilter(eqx.Module):

@@ -47,7 +47,7 @@ class IsotropicEK0FirstOrder(eqx.Module):
     ...     return x*(1-x)
     >>>
     >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> linearise = IsotropicEK0FirstOrder(ode_order=1)
+    >>> linearise = IsotropicEK0FirstOrder()
     >>> b, fn = linearise(f, x0)
     >>> assert jnp.allclose(b, x0[1] - f(x0[0]))
     >>>
@@ -100,6 +100,8 @@ class EK1(eqx.Module):
     ode_dimension: int
 
     def __call__(self, f, x):
+        """Linearise the ODE."""
+
         def residual(u):
             u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
             return u_reshaped[1] - f(u_reshaped[0])

@@ -329,9 +329,11 @@ class DynamicFilter(_Common):
         # Its values are irrelevant.
         extrapolated = tree_util.tree_map(jnp.empty_like, corrected)
 
-        return FilteringSolution(
+        filtering_solution = FilteringSolution(
             extrapolated=extrapolated, corrected=corrected
-        ), jnp.empty_like(taylor_coefficients[0])
+        )
+        error_estimate = jnp.empty_like(taylor_coefficients[0])
+        return filtering_solution, error_estimate
 
     def step_fn(
         self,
