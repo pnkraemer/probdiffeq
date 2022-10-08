@@ -10,20 +10,13 @@ from odefilter import (
     inits,
     ivpsolve,
     odefilters,
-    problems,
     solvers,
 )
 
 
 @pytest_cases.case
 def case_problem_logistic():
-    return problems.InitialValueProblem(
-        vector_field=lambda x, t: x * (1 - x),
-        initial_values=0.5,
-        t0=0.0,
-        t1=10.0,
-        parameters=(),
-    )
+    return lambda x, t: x * (1 - x), (0.5,), 0.0, 10.0, ()
 
 
 @pytest_cases.parametrize("information_op", [information.IsotropicEK0(ode_order=1)])
@@ -62,10 +55,19 @@ def case_solver_adaptive_ek0(derivative_init_fn, ek0):
     )
 
 
-@pytest_cases.parametrize_with_cases("ivp", cases=".", prefix="case_problem_")
+@pytest_cases.parametrize_with_cases(
+    "vf, u0, t0, t1, p", cases=".", prefix="case_problem_"
+)
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
-def test_simulate_terminal_values(ivp, solver):
-    solution = ivpsolve.simulate_terminal_values(ivp, solver=solver)
+def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
+    solution = ivpsolve.simulate_terminal_values(
+        vector_field=vf,
+        initial_values=u0,
+        t0=t0,
+        t1=t1,
+        parameters=p,
+        solver=solver,
+    )
 
-    assert solution.t == ivp.t1
+    assert solution.t == t1
     assert jnp.allclose(solution.u, 1.0, atol=1e-1, rtol=1e-1)

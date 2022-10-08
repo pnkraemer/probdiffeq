@@ -12,7 +12,7 @@ class AbstractIVPSolver(eqx.Module, abc.ABC):
     """Abstract solver for IVPs."""
 
     @abc.abstractmethod
-    def init_fn(self, *, ivp):
+    def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
         raise NotImplementedError
 
@@ -52,9 +52,11 @@ class Adaptive(AbstractIVPSolver):
 
         control: Any  # must contain field "scale_factor".
 
-    def init_fn(self, *, ivp):
+    def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
-        state_stepping = self.stepping.init_fn(ivp=ivp)
+        state_stepping = self.stepping.init_fn(
+            vector_field=vector_field, initial_values=initial_values, t0=t0
+        )
         state_control = self.control.init_fn()
 
         error_normalised = self._normalise_error(
@@ -65,8 +67,8 @@ class Adaptive(AbstractIVPSolver):
             norm_ord=self.norm_ord,
         )
         dt_proposed = self._propose_first_dt_per_tol(
-            f=lambda *x: ivp.vector_field(*x, ivp.t0, *ivp.parameters),
-            u0=ivp.initial_values,
+            f=lambda *x: vector_field(*x, t=t0),
+            u0=initial_values,
             error_order=self.error_order,
             atol=self.atol,
             rtol=self.rtol,
@@ -150,13 +152,14 @@ class Adaptive(AbstractIVPSolver):
         #
         # E. Hairer, S. P. Norsett G. Wanner,
         # Solving Ordinary Differential Equations I: Nonstiff Problems, Sec. II.4.
-        f0 = f(u0)
-        scale = atol + u0 * rtol
-        a = jnp.linalg.norm(u0 / scale)
+        assert len(u0) == 1
+        f0 = f(*u0)
+        scale = atol + u0[0] * rtol
+        a = jnp.linalg.norm(u0[0] / scale)
         b = jnp.linalg.norm(f0 / scale)
         dt0 = jnp.where((a < 1e-5) | (b < 1e-5), 1e-6, 0.01 * a / b)
 
-        u1 = u0 + dt0 * f0
+        u1 = u0[0] + dt0 * f0
         f1 = f(u1)
         c = jnp.linalg.norm((f1 - f0) / scale) / dt0
         dt1 = jnp.where(

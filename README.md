@@ -84,11 +84,6 @@ pip install git+https://github.com/pnkraemer/odefilter.git
 Read more about installing this package [here](https://odefilter.readthedocs.io/en/latest/getting_started/installation.html).
 
 
-
-## Quick example
-
-TBD
-
 ## Similar projects
 
 * ProbNum
