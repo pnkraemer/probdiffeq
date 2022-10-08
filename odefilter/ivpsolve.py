@@ -1,6 +1,5 @@
 """Solve initial value problems."""
 
-import inspect
 
 import equinox as eqx
 import jax
@@ -20,7 +19,8 @@ def simulate_terminal_values(
 
     !!! warn "Initial value format"
         This function expects that the initial values are a tuple of arrays
-        such that the vector field evaluates as ``vector_field(*initial_values, t, *parameters)``.
+        such that the vector field evaluates as
+        ``vector_field(*initial_values, t, *parameters)``.
         This is different to most other ODE solver libraries, and done
         on purpose because higher-order ODEs are treated very similarly
         to first-order ODEs in this package.
