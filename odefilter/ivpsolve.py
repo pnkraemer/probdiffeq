@@ -9,15 +9,15 @@ import jax
 def simulate_terminal_values(
     vector_field,
     initial_values,
+    *,
     t0,
     t1,
-    *,
     solver,
     parameters=(),
 ):
     """Simulate the terminal values of an initial value problem.
 
-    !!! warn "Initial value format"
+    !!! danger "Initial value format"
         This function expects that the initial values are a tuple of arrays
         such that the vector field evaluates as
         ``vector_field(*initial_values, t, *parameters)``.
@@ -35,10 +35,10 @@ def simulate_terminal_values(
         Initial time.
     t1 :
         Terminal time.
-    parameters :
-        ODE parameters.
     solver :
         ODE solver.
+    parameters :
+        ODE parameters.
     """
 
     def vf(*ys, t):
