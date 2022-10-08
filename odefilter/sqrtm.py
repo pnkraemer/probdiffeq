@@ -5,15 +5,15 @@ import jax.numpy as jnp
 
 # todo: clean up and make R- instead of L-based.
 def revert_gaussian_markov_kernel(*, h_matmul_c_sqrtm, c_sqrtm, r_sqrtm):
-    """Revert a Markov kernel."""
+    """Revert a Gaussian Markov kernel."""
     output_dim, input_dim = h_matmul_c_sqrtm.shape
 
     blockmat = jnp.block(
         [
-            [r_sqrtm, h_matmul_c_sqrtm],
-            [jnp.zeros((input_dim, output_dim)), c_sqrtm],
+            [r_sqrtm.T, jnp.zeros((output_dim, input_dim))],
+            [h_matmul_c_sqrtm.T, c_sqrtm.T],
         ]
-    ).T
+    )
 
     R = jnp.linalg.qr(blockmat, mode="r")
 
