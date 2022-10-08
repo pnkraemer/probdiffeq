@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 
 # todo: clean up and make R- instead of L-based.
-def revert_markov_kernel(*, h_matmul_c_sqrtm, c_sqrtm, r_sqrtm):
+def revert_gaussian_markov_kernel(*, h_matmul_c_sqrtm, c_sqrtm, r_sqrtm):
     """Revert a Markov kernel."""
     output_dim, input_dim = h_matmul_c_sqrtm.shape
 
