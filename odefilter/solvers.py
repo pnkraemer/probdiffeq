@@ -67,7 +67,7 @@ class Adaptive(AbstractIVPSolver):
             norm_ord=self.norm_ord,
         )
         dt_proposed = self._propose_first_dt_per_tol(
-            f=lambda *x: vector_field(*x, t0),
+            f=lambda *x: vector_field(*x, t=t0),
             u0=initial_values,
             error_order=self.error_order,
             atol=self.atol,

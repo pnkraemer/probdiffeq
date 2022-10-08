@@ -1,14 +1,45 @@
 """Solve initial value problems."""
 
+import inspect
+
 import equinox as eqx
 import jax
 
 
 @eqx.filter_jit
 def simulate_terminal_values(
-    vector_field, initial_values, t0, t1, parameters, *, solver
+    vector_field,
+    initial_values,
+    t0,
+    t1,
+    *,
+    solver,
+    parameters=(),
 ):
-    """Simulate the terminal values of an initial value problem."""
+    """Simulate the terminal values of an initial value problem.
+
+    !!! warn "Initial value format"
+        This function expects that the initial values are a tuple of arrays
+        such that the vector field evaluates as ``vector_field(*initial_values, t, *parameters)``.
+        This is different to most other ODE solver libraries, and done
+        on purpose because higher-order ODEs are treated very similarly
+        to first-order ODEs in this package.
+
+    Parameters
+    ----------
+    vector_field :
+        ODE vector field. Signature ``vector_field(*initial_values, t, *parameters)``.
+    initial_values :
+        Initial values.
+    t0 :
+        Initial time.
+    t1 :
+        Terminal time.
+    parameters :
+        ODE parameters.
+    solver :
+        ODE solver.
+    """
 
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)

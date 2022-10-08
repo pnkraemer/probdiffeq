@@ -24,8 +24,11 @@ class ODEFilter(eqx.Module):
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
 
+        def vf(*x):
+            return vector_field(*x, t=t0)
+
         taylor_coefficients = self.derivative_init_fn(
-            vector_field=lambda *x: vector_field(*x, t0),
+            vector_field=vf,
             initial_values=initial_values,
             num=self.backend.num_derivatives,
         )
@@ -43,8 +46,8 @@ class ODEFilter(eqx.Module):
     def step_fn(self, *, state, vector_field, dt0):
         """Perform a step."""
 
-        def vf(y):
-            return vector_field(y, state.t)
+        def vf(*y):
+            return vector_field(*y, t=state.t)
 
         backend_state, error_estimate, u = self.backend.step_fn(
             state=state.backend, vector_field=vf, dt=dt0
