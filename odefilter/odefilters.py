@@ -29,7 +29,7 @@ class ODEFilter(eqx.Module):
         taylor_coefficients = self.derivative_init_fn(
             vector_field=vf,
             initial_values=initial_values,
-            num=self.backend.num_derivatives,
+            num=self.backend.implementation.num_derivatives,
         )
 
         backend_state, error_estimate = self.backend.init_fn(
