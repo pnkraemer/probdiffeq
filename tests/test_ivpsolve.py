@@ -41,7 +41,7 @@ def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
     ids=["IsotropicEK0FirstOrder"],
 )
 @pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
+def case_backend_dynamic_smoother(num_derivatives, information_op):
     return backends.DynamicSmoother(
         implementation=implementations.IsotropicImplementation.from_num_derivatives(
             num_derivatives=num_derivatives
@@ -52,7 +52,7 @@ def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
 
 @pytest_cases.parametrize("information_op", [information.EK1(ode_dimension=1)])
 @pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_ek1_filter(num_derivatives, information_op):
+def case_backend_dynamic_filter(num_derivatives, information_op):
     return backends.DynamicFilter(
         implementation=implementations.DenseImplementation.from_num_derivatives(
             num_derivatives=num_derivatives, ode_dimension=1
@@ -63,7 +63,7 @@ def case_backend_ek1_filter(num_derivatives, information_op):
 
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize_with_cases("backend", cases=".", prefix="case_backend_")
-def case_solver_adaptive_ek0(derivative_init_fn, backend):
+def case_solver_odefilter(derivative_init_fn, backend):
     odefilter = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
         backend=backend,
