@@ -1,5 +1,5 @@
 """Tests for IVP solvers."""
-import jax
+
 import jax.numpy as jnp
 import pytest_cases
 
@@ -25,7 +25,7 @@ def case_ek0_filter(num_derivatives, information_op):
 
 @pytest_cases.parametrize("information_op", [information.IsotropicEK0(ode_order=1)])
 @pytest_cases.parametrize("num_derivatives", [2])
-def case_ek0_filter(num_derivatives, information_op):
+def case_ek0_smoother(num_derivatives, information_op):
     return backends.DynamicIsotropicSmoother.from_num_derivatives(
         num_derivatives=num_derivatives,
         information=information_op,
@@ -67,14 +67,15 @@ def test_solver(solver, ivp_problem):
 
     state0 = solver.init_fn(ivp=ivp_problem)
     assert state0.dt_proposed > 0.0
-    assert state0.stepping.t == ivp_problem.t0
-    assert jnp.shape(state0.stepping.u) == jnp.shape(ivp_problem.initial_values)
+    assert state0.accepted.t == ivp_problem.t0
+    assert jnp.shape(state0.accepted.u) == jnp.shape(ivp_problem.initial_values)
 
-    dt0 = 1.0
+    dt0 = 100.0
     state1 = solver.step_fn(
         state=state0, vector_field=ivp_problem.vector_field, dt0=dt0
     )
     assert isinstance(state0, type(state1))
     assert state1.dt_proposed > 0.0
-    assert state1.stepping.t > ivp_problem.t0
-    assert jnp.shape(state1.stepping.u) == jnp.shape(ivp_problem.initial_values)
+    assert state1.accepted.t > ivp_problem.t0
+    assert state1.accepted.t <= ivp_problem.t0 + dt0
+    assert jnp.shape(state1.proposed.u) == jnp.shape(ivp_problem.initial_values)

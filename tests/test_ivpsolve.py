@@ -1,6 +1,5 @@
 """Tests for IVP solvers."""
 
-
 import jax.numpy as jnp
 import pytest_cases
 

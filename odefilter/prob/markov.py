@@ -60,15 +60,15 @@ def marginalise_sequence(*, markov_sequence):
 def marginalise(*, init, operator, noise):
     """Marginalise the output of a linear model."""
     # Read system matrices
-    mean, cov_sqrtm_upper = init.mean, init.cov_sqrtm_upper
-    noise_mean, noise_cov_sqrtm_upper = noise.mean, noise.cov_sqrtm_upper
+    mean, cov_sqrtm_lower = init.mean, init.cov_sqrtm_lower
+    noise_mean, noise_cov_sqrtm_lower = noise.mean, noise.cov_sqrtm_lower
 
     # Apply transition
     mean_new = jnp.dot(operator, mean) + noise_mean
-    cov_sqrtm_upper_new = sqrtm.sum_of_sqrtm_factors(
-        R1=jnp.dot(operator, cov_sqrtm_upper), R2=noise_cov_sqrtm_upper
-    )
+    cov_sqrtm_lower_new = sqrtm.sum_of_sqrtm_factors(
+        R1=jnp.dot(operator, cov_sqrtm_lower).T, R2=noise_cov_sqrtm_lower.T
+    ).T
 
     # Output type equals input type.
-    rv_new = rv.Normal(mean=mean_new, cov_sqrtm_upper=cov_sqrtm_upper_new)
+    rv_new = rv.Normal(mean=mean_new, cov_sqrtm_lower=cov_sqrtm_lower_new)
     return rv_new
