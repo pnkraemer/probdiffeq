@@ -30,6 +30,8 @@ and we can use it in ODE solvers.
 from typing import Callable, Tuple
 
 import equinox as eqx
+import jax
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 
@@ -99,8 +101,8 @@ class EK1(eqx.Module):
 
     def __call__(self, f, x):
         def residual(u):
-            u_reshaped = jnp.reshape(u, (-1, ode_dimension), order="F")
+            u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
             return u_reshaped[1] - f(u_reshaped[0])
 
-        bias, jvp = jax.linearize(residual)
-        return bias, jax.vmap(jvp, in_axes=1)
+        bias, jvp = jax.linearize(residual, x)
+        return bias, jvp

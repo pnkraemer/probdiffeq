@@ -33,13 +33,15 @@ class ODEFilter(eqx.Module):
             num=self.backend.num_derivatives,
         )
 
-        backend_state = self.backend.init_fn(taylor_coefficients=taylor_coefficients)
+        backend_state, error_estimate = self.backend.init_fn(
+            taylor_coefficients=taylor_coefficients
+        )
 
         u0, *_ = initial_values
         return self.State(
             t=t0,
             u=u0,
-            error_estimate=jnp.nan,
+            error_estimate=error_estimate,
             backend=backend_state,
         )
 

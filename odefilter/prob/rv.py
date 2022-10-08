@@ -16,6 +16,12 @@ class Normal(eqx.Module):
 class IsotropicNormal(eqx.Module):
     """Random variable with a normal distribution."""
 
-    # "n" can be "", i.e. (d,), (), are also acceptable.
     mean: Float[Array, "n d"]
     cov_sqrtm_lower: Float[Array, "n n"]
+
+
+class MultivariateNormal(eqx.Module):
+    """Random variable with a normal distribution."""
+
+    mean: Float[Array, "k"]
+    cov_sqrtm_lower: Float[Array, "k k"]
