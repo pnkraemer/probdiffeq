@@ -24,6 +24,17 @@ def case_backend_ek0_smoother(num_derivatives, information_op):
     )
 
 
+#
+# @pytest_cases.parametrize("information_op", [information.EK1(ode_dimension=1)])
+# @pytest_cases.parametrize("num_derivatives", [2])
+# def case_backend_ek1_filter(num_derivatives, information_op):
+#     return backends.DynamicFilter.from_num_derivatives(
+#         num_derivatives=num_derivatives,
+#         information=information_op,
+#     )
+#
+
+
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
 @pytest_cases.parametrize_with_cases("backend", cases=".", prefix="case_backend_")
 def case_solver_adaptive_ek0(derivative_init_fn, backend):

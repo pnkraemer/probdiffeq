@@ -16,7 +16,7 @@ from odefilter import (
 
 @pytest_cases.case
 def case_problem_logistic():
-    return lambda x, t: x * (1 - x), (0.5,), 0.0, 10.0, ()
+    return lambda x, t: x * (1 - x), (jnp.asarray([0.5]),), 0.0, 10.0, ()
 
 
 @pytest_cases.parametrize("information_op", [information.IsotropicEK0FirstOrder()])

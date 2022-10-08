@@ -153,7 +153,7 @@ class DynamicIsotropicFilter(_IsotropicCommon):
             m_ext=m_ext, l_ext=l_ext, linear_fn=linear_fn, m_obs=m_obs
         )
         state_new = FilteringSolution(extrapolated=extrapolated, corrected=corrected)
-        return state_new, error_estimate, jnp.squeeze(corrected.mean[0])
+        return state_new, error_estimate, (corrected.mean[0])
 
 
 class DynamicIsotropicSmoother(_IsotropicCommon):
@@ -245,4 +245,4 @@ class DynamicIsotropicSmoother(_IsotropicCommon):
             backward_transition=backward_op,
             backward_noise=backward_noise,
         )
-        return state_new, error_estimate, jnp.squeeze(corrected.mean[0])
+        return state_new, error_estimate, (corrected.mean[0])
