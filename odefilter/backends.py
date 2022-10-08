@@ -217,10 +217,10 @@ class DynamicIsotropicSmoother(_IsotropicCommon):
 
         # Full extrapolation
         l0_p = p_inv[:, None] * l0
-        r_ext_p, (r_bw_p, g_bw_p) = sqrtm.revert_gaussian_markov_kernel(
-            h_matmul_c_sqrtm_upper=(self.a @ l0_p).T,
-            c_sqrtm_upper=l0_p.T,
-            r_sqrtm_upper=(diffusion_sqrtm * self.q_sqrtm_lower).T,
+        r_ext_p, (r_bw_p, g_bw_p) = sqrtm.revert_gauss_markov_correlation(
+            R_X_F=(self.a @ l0_p).T,
+            R_X=l0_p.T,
+            R_YX=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         )
         l_ext_p, l_bw_p = r_ext_p.T, r_bw_p.T
         m_bw_p = m0_p - g_bw_p @ m_ext_p

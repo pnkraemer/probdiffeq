@@ -18,13 +18,13 @@ r"""Utilities for square root matrices and conditional distributions.
 """
 
 import jax.numpy as jnp
+import jax.scipy as jsp
 
 
 # todo: clean up and make R- instead of L-based.
-def revert_gaussian_markov_kernel(
-    *, h_matmul_c_sqrtm_upper, c_sqrtm_upper, r_sqrtm_upper
-):
-    r"""Revert the correlation structure of a Gaussian transition kernel.
+def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
+    r"""Revert the correlation structure of a Gaussian transition kernel \
+    without leaving the square-root parametrisation.
 
     What does this mean? Assume we have two normally-distributed random variables,
     $X$ and $Y$.
@@ -93,26 +93,27 @@ def revert_gaussian_markov_kernel(
 
     """
 
-    blockmat = jnp.block(
+    R = jnp.block(
         [
-            [r_sqrtm_upper, jnp.zeros_like(h_matmul_c_sqrtm_upper.T)],
-            [h_matmul_c_sqrtm_upper, c_sqrtm_upper],
+            [R_YX, jnp.zeros_like(R_X_F.T)],
+            [R_X_F, R_X],
         ]
     )
-    R = jnp.linalg.qr(blockmat, mode="r")
+    R = jnp.linalg.qr(R, mode="r")
+    d = R_YX.shape[0]
 
-    d = r_sqrtm_upper.shape[0]
-    R1 = R[:d, :d]  # observed RV
-    R12 = R[:d, d:]  # something like the crosscov
-    R3 = R[d:, d:]  # corrected RV
+    # ~R_{Y}
+    R1 = R[:d, :d]
+    R_Y = _make_diagonal_positive(R=R1)
 
-    # todo: what is going on here???
-    #  why lstsq? The matrix should be well-conditioned.
-    gain = jnp.linalg.lstsq(R1, R12)[0].T
+    # something like the cross-covariance
+    R12 = R[:d, d:]
+    G = jsp.linalg.solve_triangular(R_Y, R12).T
 
-    c_sqrtm_cor_upper = _make_diagonal_positive(R=R3)
-    c_sqrtm_obs_upper = _make_diagonal_positive(R=R1)
-    return c_sqrtm_obs_upper, (c_sqrtm_cor_upper, gain)
+    # ~R_{X \mid Y}
+    R3 = R[d:, d:]
+    R_XY = _make_diagonal_positive(R=R3)
+    return R_Y, (R_XY, G)
 
 
 def sum_of_sqrtm_factors(*, R1, R2):
