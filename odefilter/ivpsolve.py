@@ -3,6 +3,7 @@
 
 import equinox as eqx
 import jax
+import jax.numpy as jnp
 
 
 @eqx.filter_jit
@@ -40,6 +41,13 @@ def simulate_terminal_values(
     parameters :
         ODE parameters.
     """
+    # There is no clear mechanism for the internals if the IVP is
+    # scalar. Therefore, we don't allow them for now.
+    # todo: allow scalar problems.
+    initial_value_is_not_scalar = jax.tree_util.tree_map(
+        lambda x: jnp.ndim(x) > 0, initial_values
+    )
+    assert jax.tree_util.tree_all(initial_value_is_not_scalar)
 
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)

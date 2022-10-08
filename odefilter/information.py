@@ -30,10 +30,12 @@ and we can use it in ODE solvers.
 from typing import Callable, Tuple
 
 import equinox as eqx
+import jax
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 
-class IsotropicEK0(eqx.Module):
+class IsotropicEK0FirstOrder(eqx.Module):
     """EK0-Linearize an ODE assuming a linearisation-point with\
      isotropic Kronecker structure.
 
@@ -45,7 +47,7 @@ class IsotropicEK0(eqx.Module):
     ...     return x*(1-x)
     >>>
     >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> linearise = IsotropicEK0(ode_order=1)
+    >>> linearise = IsotropicEK0FirstOrder()
     >>> b, fn = linearise(f, x0)
     >>> assert jnp.allclose(b, x0[1] - f(x0[0]))
     >>>
@@ -59,8 +61,6 @@ class IsotropicEK0(eqx.Module):
     [0.5]
     """
 
-    ode_order: int
-
     def __call__(
         self,
         f: Callable[[Float[Array, "n d"]], Float[Array, " d"]],
@@ -71,7 +71,7 @@ class IsotropicEK0(eqx.Module):
         Parameters
         ----------
         f :
-            Vector field of a first-order ODE.
+            Vector field of a first-order ODE. Signature ``f(x)``.
         x :
             Linearisation point.
 
@@ -81,16 +81,8 @@ class IsotropicEK0(eqx.Module):
             Output bias.
         :
             Linear function (pushforward of the tangent spaces).
-
         """
-        if self.ode_order == 1:
-            return self._linearise_1st(f=f, x=x)
-        if self.ode_order == 2:
-            return self._linearise_2st(f=f, x=x)
-        raise ValueError
 
-    @staticmethod
-    def _linearise_1st(*, f, x):
         def approx_residual(u):
             return u[1] - f(x[0])
 
@@ -101,14 +93,18 @@ class IsotropicEK0(eqx.Module):
 
         return bias, jvp
 
-    @staticmethod
-    def _linearise_2nd(*, f, x):
-        def approx_residual(u):
-            return u[2] - f(x[0], x[1])
 
-        bias = approx_residual(x)
+class EK1(eqx.Module):
+    """EK1 information."""
 
-        def jvp(y):
-            return y[2]
+    ode_dimension: int
 
+    def __call__(self, f, x):
+        """Linearise the ODE."""
+
+        def residual(u):
+            u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
+            return u_reshaped[1] - f(u_reshaped[0])
+
+        bias, jvp = jax.linearize(residual, x)
         return bias, jvp
