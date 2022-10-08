@@ -26,9 +26,7 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, step_fn):
         return s.accepted.t < t1
 
     def body_fun(s):
-        # todo: move to controller?
-        dt = jnp.minimum(t1 - s.accepted.t, s.dt_proposed)
-        return step_fn(state=s, vector_field=vector_field, dt0=dt)
+        return step_fn(state=s, vector_field=vector_field, t1=t1)
 
     return jax.lax.while_loop(
         cond_fun=cond_fun,

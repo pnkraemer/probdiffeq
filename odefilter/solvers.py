@@ -79,7 +79,7 @@ class Adaptive(AbstractIVPSolver):
             control=state_control,
         )
 
-    def step_fn(self, *, state, vector_field, dt0):
+    def step_fn(self, *, state, vector_field, t1):
         """Perform a step."""
 
         def cond_fn(x):
@@ -88,21 +88,14 @@ class Adaptive(AbstractIVPSolver):
 
         def body_fn(x):
             _, s = x
-            s = self.attempt_step_fn(state=s, vector_field=vector_field)
+            s = self.attempt_step_fn(state=s, vector_field=vector_field, t1=t1)
             proceed_iteration = s.error_normalised > 1.0
             return proceed_iteration, s
 
-        def init_fn(s, *, dt_clipped):
-            s_with_clipped_dt = self.State(
-                dt_proposed=dt_clipped,  # holla! New! :)
-                error_normalised=s.error_normalised,
-                proposed=s.proposed,
-                accepted=s.accepted,
-                control=s.control,
-            )
-            return True, s_with_clipped_dt
+        def init_fn(s):
+            return True, s
 
-        init_val = init_fn(state, dt_clipped=dt0)
+        init_val = init_fn(state)
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
         return self.State(
             dt_proposed=state_new.dt_proposed,
@@ -112,11 +105,16 @@ class Adaptive(AbstractIVPSolver):
             control=state_new.control,
         )
 
-    def attempt_step_fn(self, *, state, vector_field):
+    def attempt_step_fn(self, *, state, vector_field, t1):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
+
+        # todo: should this be at the end of this function?
+        #  or even happen inside the controller?
+        dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
+
         state_proposed = self.stepping.step_fn(
-            state=state.accepted, vector_field=vector_field, dt0=state.dt_proposed
+            state=state.accepted, vector_field=vector_field, dt0=dt_proposed
         )
         error_normalised = self._normalise_error(
             error_estimate=state_proposed.error_estimate,

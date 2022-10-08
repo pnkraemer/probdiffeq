@@ -70,12 +70,10 @@ def test_solver(solver, ivp_problem):
     assert state0.accepted.t == ivp_problem.t0
     assert jnp.shape(state0.accepted.u) == jnp.shape(ivp_problem.initial_values)
 
-    dt0 = 100.0
     state1 = solver.step_fn(
-        state=state0, vector_field=ivp_problem.vector_field, dt0=dt0
+        state=state0, vector_field=ivp_problem.vector_field, t1=ivp_problem.t1
     )
     assert isinstance(state0, type(state1))
     assert state1.dt_proposed > 0.0
-    assert state1.accepted.t > ivp_problem.t0
-    assert state1.accepted.t <= ivp_problem.t0 + dt0
+    assert ivp_problem.t0 < state1.accepted.t <= ivp_problem.t1
     assert jnp.shape(state1.proposed.u) == jnp.shape(ivp_problem.initial_values)
