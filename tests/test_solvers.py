@@ -3,7 +3,15 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import backends, controls, information, inits, odefilters, solvers
+from odefilter import (
+    backends,
+    controls,
+    implementations,
+    information,
+    inits,
+    odefilters,
+    solvers,
+)
 
 
 @pytest_cases.parametrize(
@@ -14,7 +22,7 @@ from odefilter import backends, controls, information, inits, odefilters, solver
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
     return backends.DynamicFilter(
-        implementation=backends.IsotropicImplementation.from_num_derivatives(
+        implementation=implementations.IsotropicImplementation.from_num_derivatives(
             num_derivatives=num_derivatives
         ),
         information=information_op,
@@ -29,7 +37,7 @@ def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
     return backends.DynamicSmoother(
-        implementation=backends.IsotropicImplementation.from_num_derivatives(
+        implementation=implementations.IsotropicImplementation.from_num_derivatives(
             num_derivatives=num_derivatives
         ),
         information=information_op,
@@ -40,7 +48,7 @@ def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_backend_ek1_filter(num_derivatives, information_op):
     return backends.DynamicFilter(
-        implementation=backends.DenseImplementation.from_num_derivatives(
+        implementation=implementations.DenseImplementation.from_num_derivatives(
             num_derivatives=num_derivatives, ode_dimension=1
         ),
         information=information_op,
