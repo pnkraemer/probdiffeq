@@ -6,6 +6,7 @@ import pytest_cases
 from odefilter import (
     backends,
     controls,
+    implementations,
     information,
     inits,
     ivpsolve,
@@ -26,8 +27,10 @@ def case_problem_logistic():
 )
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
-    return backends.DynamicIsotropicFilter.from_num_derivatives(
-        num_derivatives=num_derivatives,
+    return backends.DynamicFilter(
+        implementation=implementations.IsotropicImplementation.from_num_derivatives(
+            num_derivatives=num_derivatives
+        ),
         information=information_op,
     )
 
@@ -38,28 +41,41 @@ def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
     ids=["IsotropicEK0FirstOrder"],
 )
 @pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
-    return backends.DynamicIsotropicSmoother.from_num_derivatives(
-        num_derivatives=num_derivatives,
+def case_backend_dynamic_smoother(num_derivatives, information_op):
+    return backends.DynamicSmoother(
+        implementation=implementations.IsotropicImplementation.from_num_derivatives(
+            num_derivatives=num_derivatives
+        ),
+        information=information_op,
+    )
+
+
+@pytest_cases.parametrize("information_op", [information.EK1(ode_dimension=1)])
+@pytest_cases.parametrize("num_derivatives", [2])
+def case_backend_dynamic_filter(num_derivatives, information_op):
+    return backends.DynamicFilter(
+        implementation=implementations.DenseImplementation.from_num_derivatives(
+            num_derivatives=num_derivatives, ode_dimension=1
+        ),
         information=information_op,
     )
 
 
 @pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
-@pytest_cases.parametrize_with_cases("ek0", cases=".", prefix="case_backend_")
-def case_solver_odefilter(derivative_init_fn, ek0):
+@pytest_cases.parametrize_with_cases("backend", cases=".", prefix="case_backend_")
+def case_solver_odefilter(derivative_init_fn, backend):
     odefilter = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        backend=ek0,
+        backend=backend,
     )
     control = controls.ProportionalIntegral()
-    atol, rtol = 1e-5, 1e-5
+    atol, rtol = 1e-3, 1e-3
     return solvers.Adaptive(
         stepping=odefilter,
         control=control,
         atol=atol,
         rtol=rtol,
-        error_order=ek0.num_derivatives + 1,
+        error_order=backend.implementation.num_derivatives + 1,
     )
 
 
