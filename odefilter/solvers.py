@@ -22,6 +22,11 @@ class AbstractIVPSolver(eqx.Module, abc.ABC):
         raise NotImplementedError
 
 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# warning: rejected steps do not have their "stepping" attribute reset!!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 class Adaptive(AbstractIVPSolver):
     """Make an adaptive ODE solver."""
 
@@ -42,7 +47,9 @@ class Adaptive(AbstractIVPSolver):
         dt_proposed: float
         error_normalised: float
 
-        stepping: Any  # must contain fields "t" and "u".
+        proposed: Any  # must contain fields "t" and "u".
+        accepted: Any  # must contain fields "t" and "u".
+
         control: Any  # must contain field "scale_factor".
 
     def init_fn(self, *, ivp):
@@ -67,7 +74,8 @@ class Adaptive(AbstractIVPSolver):
         return self.State(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
-            stepping=state_stepping,
+            proposed=state_stepping,
+            accepted=state_stepping,
             control=state_control,
         )
 
@@ -80,26 +88,39 @@ class Adaptive(AbstractIVPSolver):
 
         def body_fn(x):
             _, s = x
-            s = self.attempt_step_fn(state=s, vector_field=vector_field, dt0=dt0)
+            s = self.attempt_step_fn(state=s, vector_field=vector_field)
             proceed_iteration = s.error_normalised > 1.0
             return proceed_iteration, s
 
-        def init_fn(s):
-            return True, s
+        def init_fn(s, *, dt_clipped):
+            s_with_clipped_dt = self.State(
+                dt_proposed=dt_clipped,  # holla! New! :)
+                error_normalised=s.error_normalised,
+                proposed=s.proposed,
+                accepted=s.accepted,
+                control=s.control,
+            )
+            return True, s_with_clipped_dt
 
-        init_val = init_fn(state)
+        init_val = init_fn(state, dt_clipped=dt0)
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
-        return state_new
+        return self.State(
+            dt_proposed=state_new.dt_proposed,
+            error_normalised=state_new.error_normalised,
+            proposed=state_new.proposed,
+            accepted=state_new.proposed,  # holla! New! :)
+            control=state_new.control,
+        )
 
-    def attempt_step_fn(self, *, state, vector_field, dt0):
+    def attempt_step_fn(self, *, state, vector_field):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
-        state_stepping = self.stepping.step_fn(
-            state=state.stepping, vector_field=vector_field, dt0=dt0
+        state_proposed = self.stepping.step_fn(
+            state=state.accepted, vector_field=vector_field, dt0=state.dt_proposed
         )
         error_normalised = self._normalise_error(
-            error_estimate=state_stepping.error_estimate,
-            u=state_stepping.u,
+            error_estimate=state_proposed.error_estimate,
+            u=state_proposed.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -109,11 +130,12 @@ class Adaptive(AbstractIVPSolver):
             error_normalised=error_normalised,
             error_order=self.error_order,
         )
-        dt_proposed = dt0 * state_control.scale_factor
+        dt_proposed = state.dt_proposed * state_control.scale_factor
         return self.State(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
-            stepping=state_stepping,
+            proposed=state_proposed,
+            accepted=state.accepted,  # too early to accept :)
             control=state_control,
         )
 

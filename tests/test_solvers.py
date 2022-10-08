@@ -14,26 +14,39 @@ from odefilter import (
 )
 
 
-@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
+@pytest_cases.parametrize("information_op", [information.IsotropicEK0(ode_order=1)])
 @pytest_cases.parametrize("num_derivatives", [2])
-@pytest_cases.parametrize("information", [information.IsotropicEK0(ode_order=1)])
-def case_solver_adaptive_ek0(derivative_init_fn, num_derivatives, information):
-    stepping = odefilters.ODEFilter(
-        derivative_init_fn=derivative_init_fn,
-        backend=backends.DynamicIsotropicFilter.from_num_derivatives(
-            num_derivatives=num_derivatives,
-            information=information,
-        ),
+def case_ek0_filter(num_derivatives, information_op):
+    return backends.DynamicIsotropicFilter.from_num_derivatives(
+        num_derivatives=num_derivatives,
+        information=information_op,
     )
 
+
+@pytest_cases.parametrize("information_op", [information.IsotropicEK0(ode_order=1)])
+@pytest_cases.parametrize("num_derivatives", [2])
+def case_ek0_smoother(num_derivatives, information_op):
+    return backends.DynamicIsotropicSmoother.from_num_derivatives(
+        num_derivatives=num_derivatives,
+        information=information_op,
+    )
+
+
+@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
+@pytest_cases.parametrize_with_cases("ek0", cases=".", prefix="case_ek0_")
+def case_solver_adaptive_ek0(derivative_init_fn, ek0):
+    odefilter = odefilters.ODEFilter(
+        derivative_init_fn=derivative_init_fn,
+        backend=ek0,
+    )
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return solvers.Adaptive(
-        stepping=stepping,
+        stepping=odefilter,
         control=control,
         atol=atol,
         rtol=rtol,
-        error_order=num_derivatives + 1,
+        error_order=ek0.num_derivatives + 1,
     )
 
 
@@ -52,13 +65,17 @@ def case_ivp_logistic():
 def test_solver(solver, ivp_problem):
     assert isinstance(solver, solvers.AbstractIVPSolver)
 
-    state = solver.init_fn(ivp=ivp_problem)
-    assert state.dt_proposed > 0.0
-    assert state.stepping.t == ivp_problem.t0
-    assert jnp.shape(state.stepping.u) == jnp.shape(ivp_problem.initial_values)
+    state0 = solver.init_fn(ivp=ivp_problem)
+    assert state0.dt_proposed > 0.0
+    assert state0.accepted.t == ivp_problem.t0
+    assert jnp.shape(state0.accepted.u) == jnp.shape(ivp_problem.initial_values)
 
-    dt0 = 1.0
-    state = solver.step_fn(state=state, vector_field=ivp_problem.vector_field, dt0=dt0)
-    assert state.dt_proposed > 0.0
-    assert state.stepping.t > ivp_problem.t0
-    assert jnp.shape(state.stepping.u) == jnp.shape(ivp_problem.initial_values)
+    dt0 = 100.0
+    state1 = solver.step_fn(
+        state=state0, vector_field=ivp_problem.vector_field, dt0=dt0
+    )
+    assert isinstance(state0, type(state1))
+    assert state1.dt_proposed > 0.0
+    assert state1.accepted.t > ivp_problem.t0
+    assert state1.accepted.t <= ivp_problem.t0 + dt0
+    assert jnp.shape(state1.proposed.u) == jnp.shape(ivp_problem.initial_values)

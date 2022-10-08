@@ -13,8 +13,8 @@ def case_univariate():
 
     return markov.MarkovSequence(
         transition_operators=ones,
-        transition_noise_rvs=rv.Normal(mean=zeros, cov_sqrtm_upper=ones),
-        init=rv.Normal(mean=0.0, cov_sqrtm_upper=1.0),
+        transition_noise_rvs=rv.Normal(mean=zeros, cov_sqrtm_lower=ones),
+        init=rv.Normal(mean=0.0, cov_sqrtm_lower=1.0),
     )
 
 
@@ -25,8 +25,8 @@ def case_multivariate():
 
     return markov.MarkovSequence(
         transition_operators=eyes,
-        transition_noise_rvs=rv.Normal(mean=zeros, cov_sqrtm_upper=eyes),
-        init=rv.Normal(mean=zeros[0], cov_sqrtm_upper=eyes[0]),
+        transition_noise_rvs=rv.Normal(mean=zeros, cov_sqrtm_lower=eyes),
+        init=rv.Normal(mean=zeros[0], cov_sqrtm_lower=eyes[0]),
     )
 
 
@@ -35,8 +35,8 @@ def test_marginalise_sequence(markov_sequence):
 
     rvs = markov.marginalise_sequence(markov_sequence=markov_sequence)
 
-    c1shape = rvs.cov_sqrtm_upper.shape
-    c2shape = markov_sequence.transition_noise_rvs.cov_sqrtm_upper.shape
+    c1shape = rvs.cov_sqrtm_lower.shape
+    c2shape = markov_sequence.transition_noise_rvs.cov_sqrtm_lower.shape
     assert isinstance(rvs, type(markov_sequence.transition_noise_rvs))
     assert rvs.mean.shape == markov_sequence.transition_noise_rvs.mean.shape
     assert c1shape == c2shape
