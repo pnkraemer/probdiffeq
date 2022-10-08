@@ -90,3 +90,17 @@ class IsotropicEK0FirstOrder(eqx.Module):
             return y[1]
 
         return bias, jvp
+
+
+class EK1(eqx.Module):
+    """EK1 information."""
+
+    ode_dimension: int
+
+    def __call__(self, f, x):
+        def residual(u):
+            u_reshaped = jnp.reshape(u, (-1, ode_dimension), order="F")
+            return u_reshaped[1] - f(u_reshaped[0])
+
+        bias, jvp = jax.linearize(residual)
+        return bias, jax.vmap(jvp, in_axes=1)
