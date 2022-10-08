@@ -108,7 +108,6 @@ class Adaptive(AbstractIVPSolver):
     def attempt_step_fn(self, *, state, vector_field, t1):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
-
         # todo: should this be at the end of this function?
         #  or even happen inside the controller?
         dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
