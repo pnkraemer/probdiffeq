@@ -16,7 +16,7 @@ from odefilter import (
 
 
 @pytest_cases.case
-def problem_logistic():
+def case_problem_logistic():
     return problems.InitialValueProblem(
         vector_field=lambda x, t: x * (1 - x),
         initial_values=0.5,
@@ -26,28 +26,44 @@ def problem_logistic():
     )
 
 
-@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
-@pytest_cases.parametrize("controller", [controls.ProportionalIntegral()])
 @pytest_cases.parametrize("information_op", [information.IsotropicEK0(ode_order=1)])
-def solver_ek0(derivative_init_fn, controller, information_op):
-    stepping = odefilters.ODEFilter(
+@pytest_cases.parametrize("num_derivatives", [2])
+def case_ek0_filter(num_derivatives, information_op):
+    return backends.DynamicIsotropicFilter.from_num_derivatives(
+        num_derivatives=num_derivatives,
+        information=information_op,
+    )
+
+
+@pytest_cases.parametrize("information_op", [information.IsotropicEK0(ode_order=1)])
+@pytest_cases.parametrize("num_derivatives", [2])
+def case_ek0_smoother(num_derivatives, information_op):
+    return backends.DynamicIsotropicSmoother.from_num_derivatives(
+        num_derivatives=num_derivatives,
+        information=information_op,
+    )
+
+
+@pytest_cases.parametrize("derivative_init_fn", [inits.taylor_mode, inits.forward_mode])
+@pytest_cases.parametrize_with_cases("ek0", cases=".", prefix="case_ek0_")
+def case_solver_adaptive_ek0(derivative_init_fn, ek0):
+    odefilter = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
-        backend=backends.DynamicIsotropicFilter.from_num_derivatives(
-            num_derivatives=2,
-            information=information_op,
-        ),
+        backend=ek0,
     )
+    control = controls.ProportionalIntegral()
+    atol, rtol = 1e-5, 1e-5
     return solvers.Adaptive(
-        stepping=stepping,
-        control=controller,
-        atol=1e-5,
-        rtol=1e-5,
-        error_order=3,
+        stepping=odefilter,
+        control=control,
+        atol=atol,
+        rtol=rtol,
+        error_order=ek0.num_derivatives + 1,
     )
 
 
-@pytest_cases.parametrize_with_cases("ivp", cases=".", prefix="problem_")
-@pytest_cases.parametrize_with_cases("solver", cases=".", prefix="solver_")
+@pytest_cases.parametrize_with_cases("ivp", cases=".", prefix="case_problem_")
+@pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
 def test_simulate_terminal_values(ivp, solver):
     solution = ivpsolve.simulate_terminal_values(ivp, solver=solver)
 
