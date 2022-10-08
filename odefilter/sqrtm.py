@@ -40,28 +40,33 @@ def revert_gaussian_markov_kernel(
 
     _The present function provides the machinery to change the covariance
     parametrisation from $p(Y \mid X) p(X)$ to $p(X \mid Y) p(Y)$._
-    Let $p(X) = N(..., R_A^\top R_A)$ and $p(Y \mid X) = N(F^\top X, R_B^\top R_B)$.
+    Let $p(X) = N(..., R_X^\top R_X)$ and $p(Y \mid X) = N(F^\top X, R_{Y \mid X}^\top R_{Y \mid X})$.
     Then, the joint covariance of $X$ and $Y$ is
 
     $$
     \mathrm{cov}(X, Y) =
     \begin{pmatrix}
-        R_A^\top R_A & R_A^\top (R_A F) \\
-        (R_A F)^\top R_A & (R_A F)^\top (R_A F) + R_B^\top R_B
+        R_X^\top R_X & R_X^\top (R_X F) \\
+        (R_X F)^\top R_X & (R_X F)^\top (R_X F) + R_{Y \mid X}^\top R_{Y \mid X}
     \end{pmatrix}
     $$
 
     The marginal
-    $p(Y) = N(..., R_C^\top R_C) = N(..., (R_A R_F)^\top R_A R_F + R_B^\top R_B)$
+
+    $$
+    p(Y) = N(..., R_{Y}^\top R_{Y}) =
+    N(..., (R_X R_F)^\top R_X R_F + R_{Y \mid X}^\top R_{Y \mid X})
+    $$
+
     could also be the starting point of a different parametrisation;
-    let $p(X \mid Y) = N(G^\top Y, R_D^\top R_D)$, then the joint covariance
+    let $p(X \mid Y) = N(G^\top Y, R_{X \mid Y}^\top R_{X \mid Y})$, then the joint covariance
     of $X$ and $Y$ is
 
     $$
     \mathrm{cov}(X, Y) =
     \begin{pmatrix}
-        (R_C G)^\top (R_C G) + R_D^\top R_D & R_C^\top (R_C G) \\
-        (R_C G)^\top R_C &  R_C^\top R_C
+        (R_{Y} G)^\top (R_{Y} G) + R_{X \mid Y}^\top R_{X \mid Y} & R_{Y}^\top (R_{Y} G) \\
+        (R_{Y} G)^\top R_{Y} &  R_{Y}^\top R_{Y}
     \end{pmatrix}
     $$
 
@@ -76,11 +81,14 @@ def revert_gaussian_markov_kernel(
     The signature of this function is now
 
     $$
-    (R_C, (R_D, G)) = \Phi(R_A, R_AF, R_B)
+    (R_{Y}, (R_{X \mid Y}, G)) = \Phi(R_X, R_XF, R_{Y \mid X})
     $$
 
     and these quantities suffice to compute, e.g., smoothing posteriors
-    and dense output.
+    and dense output. In the context of Kalman filtering,
+    the matrix $G$ is often called the _Kalman gain_;
+    in the context of Rauch-Tung-Striebel smoothing, it is called hte
+    _smoothing gain_.
 
 
     """
