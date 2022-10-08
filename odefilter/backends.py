@@ -1,15 +1,11 @@
 """ODE filter backends."""
-from typing import Any, Callable, Generic, List, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 from jax import tree_util
-from jaxtyping import Array, Float
 
-from odefilter import sqrtm
-from odefilter.prob import ibm, rv
+from odefilter.prob import rv
 
 NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
 """A type-variable to alias appropriate Normal-like random variables."""
@@ -40,10 +36,13 @@ class SmoothingSolution(Generic[NormalLike], eqx.Module):
 
 
 class DynamicFilter(eqx.Module):
+    """Filter implementation with dynamic calibration (time-varying diffusion)."""
+
     implementation: Any
     information: Any
 
     def init_fn(self, *, taylor_coefficients):
+        """Initialise."""
         corrected = self.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
@@ -55,7 +54,7 @@ class DynamicFilter(eqx.Module):
         return solution, error_estimate
 
     def step_fn(self, *, state, vector_field, dt):
-
+        """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean
@@ -87,10 +86,13 @@ class DynamicFilter(eqx.Module):
 
 
 class DynamicSmoother(eqx.Module):
+    """Smoother implementation with dynamic calibration (time-varying diffusion)."""
+
     implementation: Any
     information: Any
 
     def init_fn(self, *, taylor_coefficients):
+        """Initialise."""
         corrected = self.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
@@ -108,7 +110,7 @@ class DynamicSmoother(eqx.Module):
         return solution, error_estimate
 
     def step_fn(self, *, state, vector_field, dt):
-
+        """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean

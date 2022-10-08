@@ -1,19 +1,18 @@
 """ODE filter backend implementations."""
 
-from typing import Any, Callable, Generic, List, Tuple, TypeVar
+from typing import Any
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-from jax import tree_util
-from jaxtyping import Array, Float
 
 from odefilter import sqrtm
 from odefilter.prob import ibm, rv
 
 
 class IsotropicImplementation(eqx.Module):
+    """Handle isotropic covariances."""
 
     a: Any
     q_sqrtm_lower: Any
@@ -41,22 +40,22 @@ class IsotropicImplementation(eqx.Module):
         return rv.IsotropicNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     @staticmethod
-    def init_error_estimate():
+    def init_error_estimate():  # noqa: D102
         return jnp.empty(())
 
-    def init_backward_transition(self):
+    def init_backward_transition(self):  # noqa: D102
         return jnp.empty_like(self.a)
 
-    def assemble_preconditioner(self, *, dt):
+    def assemble_preconditioner(self, *, dt):  # noqa: D102
         return ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
-    def extrapolate_mean(self, m0, /, *, p, p_inv):
+    def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p_inv):
+    def estimate_error(self, *, linear_fn, m_obs, p_inv):  # noqa: D102
         l_obs_raw = linear_fn(p_inv[:, None] * self.q_sqrtm_lower)
         c_obs_raw = jnp.dot(l_obs_raw, l_obs_raw)
         res_white = m_obs / jnp.sqrt(c_obs_raw)
@@ -64,7 +63,9 @@ class IsotropicImplementation(eqx.Module):
         error_estimate = diffusion_sqrtm * jnp.sqrt(c_obs_raw)
         return diffusion_sqrtm, error_estimate
 
-    def complete_extrapolation(self, *, m_ext, l0, p_inv, p, diffusion_sqrtm):
+    def complete_extrapolation(  # noqa: D102
+        self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
+    ):
         l_ext_p = sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ (p_inv[:, None] * l0)).T,
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
@@ -72,7 +73,7 @@ class IsotropicImplementation(eqx.Module):
         l_ext = p[:, None] * l_ext_p
         return rv.IsotropicNormal(m_ext, l_ext)
 
-    def revert_markov_kernel(
+    def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
     ):
         l0_p = p_inv[:, None] * l0
@@ -94,7 +95,7 @@ class IsotropicImplementation(eqx.Module):
         return extrapolated, (backward_noise, backward_op)
 
     @staticmethod
-    def final_correction(*, extrapolated, linear_fn, m_obs):
+    def final_correction(*, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = linear_fn(l_ext)  # shape (n,)
         c_obs = jnp.dot(l_obs, l_obs)
@@ -106,6 +107,7 @@ class IsotropicImplementation(eqx.Module):
 
 
 class DenseImplementation(eqx.Module):
+    """Handle dense covariances."""
 
     a: Any
     q_sqrtm_lower: Any
@@ -134,13 +136,13 @@ class DenseImplementation(eqx.Module):
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
 
-    def init_error_estimate(self):
+    def init_error_estimate(self):  # noqa: D102
         return jnp.empty((self.ode_dimension,))
 
-    def init_backward_transition(self):
+    def init_backward_transition(self):  # noqa: D102
         raise NotImplementedError
 
-    def assemble_preconditioner(self, *, dt):
+    def assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -148,13 +150,13 @@ class DenseImplementation(eqx.Module):
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
 
-    def extrapolate_mean(self, m0, /, *, p, p_inv):
+    def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv * m0
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p_inv):
+    def estimate_error(self, *, linear_fn, m_obs, p_inv):  # noqa: D102
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(
             p_inv[:, None] * self.q_sqrtm_lower
         )
@@ -166,7 +168,9 @@ class DenseImplementation(eqx.Module):
         )
         return diffusion_sqrtm, error_estimate
 
-    def complete_extrapolation(self, *, m_ext, l0, p_inv, p, diffusion_sqrtm):
+    def complete_extrapolation(  # noqa: D102
+        self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
+    ):
         l_ext_p = sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ (p_inv[:, None] * l0)).T,
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
@@ -174,12 +178,12 @@ class DenseImplementation(eqx.Module):
         l_ext = p[:, None] * l_ext_p
         return rv.MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
-    def revert_markov_kernel(
+    def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
     ):
         raise NotImplementedError
 
-    def final_correction(self, *, extrapolated, linear_fn, m_obs):
+    def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(l_ext)
 
