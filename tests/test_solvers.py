@@ -6,7 +6,11 @@ import pytest_cases
 from odefilter import backends, controls, information, inits, odefilters, solvers
 
 
-@pytest_cases.parametrize("information_op", [information.IsotropicEK0FirstOrder()])
+@pytest_cases.parametrize(
+    "information_op",
+    [information.IsotropicEK0FirstOrder()],
+    ids=["IsotropicEK0FirstOrder"],
+)
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
     return backends.DynamicIsotropicFilter.from_num_derivatives(
@@ -15,7 +19,11 @@ def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
     )
 
 
-@pytest_cases.parametrize("information_op", [information.IsotropicEK0FirstOrder()])
+@pytest_cases.parametrize(
+    "information_op",
+    [information.IsotropicEK0FirstOrder()],
+    ids=["IsotropicEK0FirstOrder"],
+)
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
     return backends.DynamicIsotropicSmoother.from_num_derivatives(
