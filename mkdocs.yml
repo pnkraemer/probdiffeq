@@ -70,11 +70,12 @@ nav:
         - examples.md
     - API Documentation:
         - "api_docs/ivpsolve.md"
-        - "api_docs/solvers.md"
-        - "api_docs/odefilters.md"
-        - "api_docs/backends.md"
-        - "api_docs/implementations.md"
+        - "api_docs/recipes.md"
     - Advanced API Documentation:
+        - "api_docs_advanced/solvers.md"
+        - "api_docs_advanced/odefilters.md"
+        - "api_docs_advanced/backends.md"
+        - "api_docs_advanced/implementations.md"
         - "api_docs_advanced/taylor_series.md"
         - "api_docs_advanced/information.md"
         - "api_docs_advanced/controls.md"

@@ -1,0 +1,3 @@
+# Solver recipes
+
+::: odefilter.recipes
