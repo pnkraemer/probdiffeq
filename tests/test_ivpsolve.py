@@ -3,71 +3,14 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import (
-    backends,
-    controls,
-    implementations,
-    information,
-    inits,
-    ivpsolve,
-    odefilters,
-    solvers,
-)
+from odefilter import controls, inits, ivpsolve, odefilters, solvers
 
 
-@pytest_cases.case
-def case_problem_logistic():
-    return lambda x, t: x * (1 - x), (jnp.asarray([0.5]),), 0.0, 10.0, ()
-
-
-@pytest_cases.parametrize(
-    "information_op",
-    [information.IsotropicEK0FirstOrder()],
-    ids=["IsotropicEK0FirstOrder"],
-)
-@pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
-    return backends.DynamicFilter(
-        implementation=implementations.IsotropicImplementation.from_num_derivatives(
-            num_derivatives=num_derivatives
-        ),
-        information=information_op,
-    )
-
-
-@pytest_cases.parametrize(
-    "information_op",
-    [information.IsotropicEK0FirstOrder()],
-    ids=["IsotropicEK0FirstOrder"],
-)
-@pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_smoother(num_derivatives, information_op):
-    return backends.DynamicSmoother(
-        implementation=implementations.IsotropicImplementation.from_num_derivatives(
-            num_derivatives=num_derivatives
-        ),
-        information=information_op,
-    )
-
-
-@pytest_cases.parametrize("information_op", [information.EK1(ode_dimension=1)])
-@pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_filter(num_derivatives, information_op):
-    return backends.DynamicFilter(
-        implementation=implementations.DenseImplementation.from_num_derivatives(
-            num_derivatives=num_derivatives, ode_dimension=1
-        ),
-        information=information_op,
-    )
-
-
-@pytest_cases.parametrize(
-    "derivative_init_fn", [inits.TaylorMode(), inits.ForwardMode()]
-)
-@pytest_cases.parametrize_with_cases("backend", cases=".", prefix="case_backend_")
-def case_solver_odefilter(derivative_init_fn, backend):
+@pytest_cases.parametrize("init_fn", [inits.TaylorMode(), inits.ForwardMode()])
+@pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
+def case_solver_odefilter(init_fn, backend):
     odefilter = odefilters.ODEFilter(
-        derivative_init_fn=derivative_init_fn,
+        derivative_init_fn=init_fn,
         backend=backend,
     )
     control = controls.ProportionalIntegral()
@@ -81,10 +24,8 @@ def case_solver_odefilter(derivative_init_fn, backend):
     )
 
 
-@pytest_cases.parametrize_with_cases(
-    "vf, u0, t0, t1, p", cases=".", prefix="case_problem_"
-)
-@pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
+@pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
+@pytest_cases.parametrize_with_cases("solver", cases=".")
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     solution = ivpsolve.simulate_terminal_values(
         vector_field=vf,
