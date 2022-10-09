@@ -43,13 +43,7 @@ def simulate_terminal_values(
     parameters :
         ODE parameters.
     """
-    # todo: allow scalar problems.
-    #  There is no clear mechanism for the internals if the IVP is
-    #  scalar. Therefore, we don't allow them for now.
-    initial_value_is_not_scalar = jax.tree_util.tree_map(
-        lambda x: jnp.ndim(x) > 0, initial_values
-    )
-    assert jax.tree_util.tree_all(initial_value_is_not_scalar)
+    _verify_not_scalar(initial_values=initial_values)
 
     # Include the parameters into the vector field.
     # This is done inside this function, because we don't want to
@@ -68,11 +62,10 @@ def simulate_terminal_values(
     return state.accepted
 
 
+# todo: don't evaluate the ODE if the time-step has been clipped
 def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
-    initial_value_is_not_scalar = jax.tree_util.tree_map(
-        lambda x: jnp.ndim(x) > 0, initial_values
-    )
-    assert jax.tree_util.tree_all(initial_value_is_not_scalar)
+    """Solve an IVP and return the solution at checkpoints."""
+    _verify_not_scalar(initial_values=initial_values)
 
     # Include the parameters into the vector field.
     # This is done inside this function, because we don't want to
@@ -101,6 +94,16 @@ def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()
     # Return the initial value along with the rest, because
     # it contains components of the filtering solution
     return extract_qoi_fn(*state_terminal), state_qoi, extract_qoi_fn(*init_val)
+
+
+# todo: allow scalar problems.
+#  There is no clear mechanism for the internals if the IVP is
+#  scalar. Therefore, we don't allow them for now.
+def _verify_not_scalar(initial_values):
+    initial_value_is_not_scalar = jax.tree_util.tree_map(
+        lambda x: jnp.ndim(x) > 0, initial_values
+    )
+    assert jax.tree_util.tree_all(initial_value_is_not_scalar)
 
 
 def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, step_fn):

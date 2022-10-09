@@ -47,7 +47,6 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 def test_solve_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
     # todo:
-    #  smoothers condense the backward transitions
     #  smoothers reset the backward transition at checkpoints
     solution = ivpsolve.solve_checkpoints(
         vector_field=vf,
