@@ -2,7 +2,7 @@
 
 import pytest_cases
 
-from odefilter import backends, implementations, information
+from odefilter import implementations, inferences, information
 
 
 @pytest_cases.parametrize(
@@ -12,7 +12,7 @@ from odefilter import backends, implementations, information
 )
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_dynamic_isotropic_filter(num_derivatives, information_op):
-    return backends.DynamicFilter(
+    return inferences.DynamicFilter(
         implementation=implementations.IsotropicImplementation.from_num_derivatives(
             num_derivatives=num_derivatives
         ),
@@ -27,7 +27,7 @@ def case_dynamic_isotropic_filter(num_derivatives, information_op):
 )
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_dynamic_smoother(num_derivatives, information_op):
-    return backends.DynamicSmoother(
+    return inferences.DynamicSmoother(
         implementation=implementations.IsotropicImplementation.from_num_derivatives(
             num_derivatives=num_derivatives
         ),
@@ -40,7 +40,7 @@ def case_dynamic_smoother(num_derivatives, information_op):
 )
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_dynamic_filter(num_derivatives, information_op):
-    return backends.DynamicFilter(
+    return inferences.DynamicFilter(
         implementation=implementations.DenseImplementation.from_num_derivatives(
             num_derivatives=num_derivatives, ode_dimension=2
         ),
