@@ -13,7 +13,7 @@ def init_forward_mode():
 
 @pytest_cases.case
 def init_taylor_mode():
-    return inits.taylor_mode
+    return inits.TaylorMode()
 
 
 @pytest_cases.case
