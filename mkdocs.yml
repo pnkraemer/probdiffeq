@@ -84,4 +84,5 @@ nav:
         - "api_docs_util/sqrtm.md"
         - "api_docs_util/rv.md"
     - Developer Documentation:
+        - "dev_docs/init_apply_extract.md"
         - "dev_docs/on_the_edges.md"
