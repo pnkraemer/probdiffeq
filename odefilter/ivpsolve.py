@@ -63,6 +63,7 @@ def simulate_terminal_values(
 
 
 # todo: don't evaluate the ODE if the time-step has been clipped
+@eqx.filter_jit
 def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
     """Solve an IVP and return the solution at checkpoints."""
     _verify_not_scalar(initial_values=initial_values)
@@ -114,8 +115,9 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     def body_fun(s):
         return solver.step_fn(state=s, vector_field=vector_field, t1=t1)
 
+    init_val = solver.reset_fn(state=state0)
     return jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,
-        init_val=state0,
+        init_val=init_val,
     )
