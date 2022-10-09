@@ -1,4 +1,5 @@
-"""Random variable utilities."""
+"""ODE filter solutions components."""
+
 
 from typing import Any
 

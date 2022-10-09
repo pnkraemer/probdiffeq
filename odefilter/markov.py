@@ -6,7 +6,7 @@ import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 
-from odefilter import rv, sqrtm
+from odefilter import solution, sqrtm
 
 
 class MarkovSequence(eqx.Module):
@@ -21,10 +21,10 @@ class MarkovSequence(eqx.Module):
     transition_operators: Any
     """Transition operators. Matrix or linear operator."""
 
-    transition_noise_rvs: rv.Normal
+    transition_noise_rvs: solution.Normal
     """Process noises."""
 
-    init: rv.Normal
+    init: solution.Normal
     """Initial random variable."""
 
     reverse: bool = False
@@ -69,5 +69,5 @@ def marginalise(*, init, operator, noise):
     ).T
 
     # Output type equals input type.
-    rv_new = rv.Normal(mean=mean_new, cov_sqrtm_lower=cov_sqrtm_lower_new)
+    rv_new = solution.Normal(mean=mean_new, cov_sqrtm_lower=cov_sqrtm_lower_new)
     return rv_new

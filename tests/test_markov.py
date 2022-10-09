@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import markov, rv
+from odefilter import markov, solution
 
 
 @pytest_cases.case
@@ -13,8 +13,8 @@ def case_univariate():
 
     return markov.MarkovSequence(
         transition_operators=ones,
-        transition_noise_rvs=rv.Normal(mean=zeros, cov_sqrtm_lower=ones),
-        init=rv.Normal(mean=0.0, cov_sqrtm_lower=1.0),
+        transition_noise_rvs=solution.Normal(mean=zeros, cov_sqrtm_lower=ones),
+        init=solution.Normal(mean=0.0, cov_sqrtm_lower=1.0),
     )
 
 
@@ -25,8 +25,8 @@ def case_multivariate():
 
     return markov.MarkovSequence(
         transition_operators=eyes,
-        transition_noise_rvs=rv.Normal(mean=zeros, cov_sqrtm_lower=eyes),
-        init=rv.Normal(mean=zeros[0], cov_sqrtm_lower=eyes[0]),
+        transition_noise_rvs=solution.Normal(mean=zeros, cov_sqrtm_lower=eyes),
+        init=solution.Normal(mean=zeros[0], cov_sqrtm_lower=eyes[0]),
     )
 
 

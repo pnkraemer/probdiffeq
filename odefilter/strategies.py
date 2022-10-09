@@ -8,9 +8,9 @@ from typing import Any, Generic, TypeVar
 
 import equinox as eqx
 
-from odefilter import rv
+from odefilter import solution
 
-NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
+NormalLike = TypeVar("RVLike", solution.Normal, solution.IsotropicNormal)
 """A type-variable to alias appropriate Normal-like random variables."""
 
 
