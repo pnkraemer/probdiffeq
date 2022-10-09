@@ -72,14 +72,16 @@ nav:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"
     - Advanced API Documentation:
-        - "api_docs_advanced/solvers.md"
-        - "api_docs_advanced/odefilters.md"
-        - "api_docs_advanced/inferences.md"
-        - "api_docs_advanced/implementations.md"
-        - "api_docs_advanced/taylor_series.md"
-        - "api_docs_advanced/information.md"
-        - "api_docs_advanced/controls.md"
-    - Super Advanced API Documentation:
+        - Implementations:
+          - "api_docs_advanced/solvers.md"
+          - "api_docs_advanced/odefilters.md"
+          - "api_docs_advanced/strategies.md"
+          - "api_docs_advanced/implementations.md"
+        - Components:
+          - "api_docs_advanced/taylor_series.md"
+          - "api_docs_advanced/information.md"
+          - "api_docs_advanced/controls.md"
+    - Utility API Documentation:
         - "api_docs_util/markov.md"
         - "api_docs_util/sqrtm.md"
         - "api_docs_util/rv.md"
