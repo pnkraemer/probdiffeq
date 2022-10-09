@@ -8,7 +8,7 @@ class ODEFilter(eqx.Module):
     """ODE filter."""
 
     taylor_series_init: Callable
-    inference: Any
+    strategy: Any
 
     class State(eqx.Module):
         """State."""
@@ -18,7 +18,7 @@ class ODEFilter(eqx.Module):
         u: Any
         error_estimate: Any
 
-        inference: Any
+        strategy: Any
 
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
@@ -29,10 +29,10 @@ class ODEFilter(eqx.Module):
         taylor_coefficients = self.taylor_series_init(
             vector_field=vf,
             initial_values=initial_values,
-            num=self.inference.implementation.num_derivatives,
+            num=self.strategy.implementation.num_derivatives,
         )
 
-        inference_state, error_estimate = self.inference.init_fn(
+        strategy_state, error_estimate = self.strategy.init_fn(
             taylor_coefficients=taylor_coefficients
         )
 
@@ -41,7 +41,7 @@ class ODEFilter(eqx.Module):
             t=t0,
             u=u0,
             error_estimate=error_estimate,
-            inference=inference_state,
+            strategy=strategy_state,
         )
 
     def step_fn(self, *, state, vector_field, dt0):
@@ -50,21 +50,18 @@ class ODEFilter(eqx.Module):
         def vf(*y):
             return vector_field(*y, t=state.t)
 
-        inference_state, error_estimate, u = self.inference.step_fn(
-            state=state.inference, vector_field=vf, dt=dt0
+        strategy_state, error_estimate, u = self.strategy.step_fn(
+            state=state.strategy, vector_field=vf, dt=dt0
         )
         return self.State(
-            t=state.t + dt0,
-            u=u,
-            error_estimate=error_estimate,
-            inference=inference_state,
+            t=state.t + dt0, u=u, error_estimate=error_estimate, strategy=strategy_state
         )
 
     def reset_fn(self, *, state):  # noqa: D102
-        inference_new = self.inference.reset_fn(state=state.inference)
+        strategy_new = self.strategy.reset_fn(state=state.strategy)
         return self.State(
             t=state.t,
             u=state.u,
             error_estimate=state.error_estimate,
-            inference=inference_new,
+            strategy=strategy_new,
         )

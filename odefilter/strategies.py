@@ -1,4 +1,4 @@
-"""ODE filter inferences.
+"""ODE filter strategies.
 
 By construction (extrapolate-correct, not correct-extrapolate)
 the solution intervals are right-including, i.e. defined

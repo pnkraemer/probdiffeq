@@ -17,10 +17,10 @@ but until you do so, use one of ours.
 from odefilter import (
     controls,
     implementations,
-    inferences,
     information,
     odefilters,
     solvers,
+    strategies,
     taylor_series,
 )
 
@@ -35,11 +35,11 @@ def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
     implementation = implementations.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    inference = inferences.DynamicFilter(
+    strategy = strategies.DynamicFilter(
         implementation=implementation, information=information_op
     )
     stepping = odefilters.ODEFilter(
-        taylor_series_init=taylor_series.TaylorMode(), inference=inference
+        taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
     )
     control = controls.ProportionalIntegral()
     return solvers.Adaptive(
@@ -61,11 +61,11 @@ def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
     implementation = implementations.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    inference = inferences.DynamicSmoother(
+    strategy = strategies.DynamicSmoother(
         implementation=implementation, information=information_op
     )
     stepping = odefilters.ODEFilter(
-        taylor_series_init=taylor_series.TaylorMode(), inference=inference
+        taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
     )
     control = controls.ProportionalIntegral()
     return solvers.Adaptive(
@@ -86,11 +86,11 @@ def dynamic_ekf1(num_derivatives, atol, rtol):
     implementation = implementations.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    inference = inferences.DynamicSmoother(
+    strategy = strategies.DynamicSmoother(
         implementation=implementation, information=information_op
     )
     stepping = odefilters.ODEFilter(
-        taylor_series_init=taylor_series.TaylorMode(), inference=inference
+        taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
     )
     control = controls.ProportionalIntegral()
     return solvers.Adaptive(

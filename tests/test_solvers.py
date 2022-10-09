@@ -9,11 +9,11 @@ from odefilter import controls, odefilters, solvers, taylor_series
 @pytest_cases.parametrize(
     "tseries", [taylor_series.TaylorMode(), taylor_series.ForwardMode()]
 )
-@pytest_cases.parametrize_with_cases("inference", cases=".cases_inferences")
-def case_odefilter(tseries, inference):
+@pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
+def case_odefilter(tseries, strategy):
     odefilter = odefilters.ODEFilter(
         taylor_series_init=tseries,
-        inference=inference,
+        strategy=strategy,
     )
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
@@ -22,7 +22,7 @@ def case_odefilter(tseries, inference):
         control=control,
         atol=atol,
         rtol=rtol,
-        error_order=inference.implementation.num_derivatives + 1,
+        error_order=strategy.implementation.num_derivatives + 1,
     )
 
 
