@@ -108,8 +108,6 @@ DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), \
 DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
 
         """
-        assert num >= 1
-
         # Number of positional arguments in f
         num_arguments = len(initial_values)
 
@@ -224,7 +222,7 @@ DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
         taylor_coeffs = [*initial_values, vector_field(*initial_values)]
         for _ in range(num - 1):
             g_n = self._fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-            taylor_coeffs.append(g_n(*initial_values))
+            taylor_coeffs = [*taylor_coeffs, g_n(*initial_values)]
         return taylor_coeffs
 
     @staticmethod
