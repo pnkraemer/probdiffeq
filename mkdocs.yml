@@ -73,6 +73,7 @@ nav:
         - "api_docs/solvers.md"
         - "api_docs/odefilters.md"
         - "api_docs/backends.md"
+        - "api_docs/implementations.md"
     - Advanced API Documentation:
         - "api_docs_advanced/inits.md"
         - "api_docs_advanced/information.md"
