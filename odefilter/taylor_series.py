@@ -1,7 +1,9 @@
-r"""Differentiate the initial conditions of a differential equation.
+r"""Compute the Taylor series of the solution of a differential equation.
 
-Commonly, this is done with recursive automatic differentiation.
+Commonly, this is done with recursive automatic differentiation
+and used for the consistent initialisation of ODE filters.
 
+More specifically:
 ODE filters require an initialisation of the state
 and its first $\nu$ derivatives, and numerical stability
 requires an accurate initialisation.

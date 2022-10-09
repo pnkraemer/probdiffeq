@@ -3,11 +3,11 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, inits, odefilters, solvers
+from odefilter import controls, odefilters, solvers, taylor_series
 
 
 @pytest_cases.parametrize(
-    "derivative_init_fn", [inits.TaylorMode(), inits.ForwardMode()]
+    "derivative_init_fn", [taylor_series.TaylorMode(), taylor_series.ForwardMode()]
 )
 @pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
 def case_odefilter(derivative_init_fn, backend):
