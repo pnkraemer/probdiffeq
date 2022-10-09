@@ -32,7 +32,7 @@ repos:
       - id: no-commit-to-branch
         args: [ '--branch', 'master', '--branch', 'main' ]
   - repo: https://github.com/psf/black
-    rev: 22.8.0 # Make sure to use the same tag/version as specified in tox.ini.
+    rev: 22.10.0 # Make sure to use the same tag/version as specified in tox.ini.
     hooks:
       - id: black
         language_version: python3
@@ -47,3 +47,7 @@ repos:
        additional_dependencies: [black==22.8.0]
      - id: nbqa-isort
        additional_dependencies: [isort==5.10.1]
+  -   repo: https://github.com/pycqa/flake8
+      rev: 5.0.4
+      hooks:
+      -   id: flake8
