@@ -50,13 +50,13 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
 @pytest_cases.parametrize_with_cases("solver", cases=".")
-def test_solve_checkpoints(vf, u0, t0, t1, p, solver):
+def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
 
     odeint_solution = odeint(vf, u0[0], ts, *p, atol=1e-6, rtol=1e-6)
     ts_reference, ys_reference = ts[1:], odeint_solution[1:, :]
 
-    solution = ivpsolve.solve_checkpoints(
+    solution = ivpsolve.simulate_checkpoints(
         vector_field=vf,
         initial_values=u0,
         ts=ts,

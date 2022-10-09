@@ -1,14 +1,12 @@
 """Solve initial value problems."""
 
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 
 # todo: remove this and replace with jax.jit.
 #  We need more transparency of what is static and what is not
-@eqx.filter_jit
 def simulate_terminal_values(
     vector_field,
     initial_values,
@@ -63,8 +61,7 @@ def simulate_terminal_values(
 
 
 # todo: don't evaluate the ODE if the time-step has been clipped
-@eqx.filter_jit
-def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
+def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
     """Solve an IVP and return the solution at checkpoints."""
     _verify_not_scalar(initial_values=initial_values)
 
@@ -74,7 +71,7 @@ def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
-    def solve_for_next_checkpoint(s, t_next):
+    def advance_to_next_checkpoint(s, t_next):
         state_ = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
@@ -85,7 +82,7 @@ def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = jax.lax.scan(
-        f=solve_for_next_checkpoint,
+        f=advance_to_next_checkpoint,
         init=state0,
         xs=ts[1:],
         reverse=False,
