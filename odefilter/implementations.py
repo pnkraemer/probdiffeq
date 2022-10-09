@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 
-from odefilter import ibm, rv, sqrtm
+from odefilter import ibm, solutions, sqrtm
 
 
 class IsotropicImplementation(eqx.Module):
@@ -31,7 +31,9 @@ class IsotropicImplementation(eqx.Module):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return rv.IsotropicNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return solutions.IsotropicNormal(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
 
     @staticmethod
     def init_error_estimate():  # noqa: D102
@@ -43,7 +45,7 @@ class IsotropicImplementation(eqx.Module):
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
         shape_m = rv_proto.mean.shape
         shape_l = rv_proto.cov_sqrtm_lower.shape
-        return rv.IsotropicNormal(
+        return solutions.IsotropicNormal(
             mean=jnp.zeros(shape_m), cov_sqrtm_lower=jnp.zeros(shape_l)
         )
 
@@ -72,7 +74,7 @@ class IsotropicImplementation(eqx.Module):
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return rv.IsotropicNormal(m_ext, l_ext)
+        return solutions.IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
@@ -91,8 +93,8 @@ class IsotropicImplementation(eqx.Module):
         m_bw, l_bw = p[:, None] * m_bw_p, p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
         backward_op = g_bw
-        backward_noise = rv.IsotropicNormal(m_bw, l_bw)
-        extrapolated = rv.IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = solutions.IsotropicNormal(m_bw, l_bw)
+        extrapolated = solutions.IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
     @staticmethod
@@ -103,7 +105,7 @@ class IsotropicImplementation(eqx.Module):
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = rv.IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = solutions.IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return corrected, (corrected.mean[0])
 
     @staticmethod
@@ -118,7 +120,7 @@ class IsotropicImplementation(eqx.Module):
         xi = A @ d + b
         Xi = sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
-        noise = rv.IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = solutions.IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
 
@@ -148,7 +150,7 @@ class DenseImplementation(eqx.Module):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return rv.MultivariateNormal(
+        return solutions.MultivariateNormal(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
 
@@ -192,7 +194,7 @@ class DenseImplementation(eqx.Module):
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return rv.MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return solutions.MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
@@ -209,6 +211,6 @@ class DenseImplementation(eqx.Module):
 
         m_cor = m_ext - gain @ m_obs
         l_cor = l_ext - gain @ l_obs_nonsquare
-        corrected = rv.MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = solutions.MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         u = m_cor.reshape((-1, self.ode_dimension), order="F")[0]
         return corrected, u

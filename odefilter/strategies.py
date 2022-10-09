@@ -1,31 +1,9 @@
-"""ODE filter strategies.
-
-By construction (extrapolate-correct, not correct-extrapolate)
-the solution intervals are right-including, i.e. defined
-on the interval $(t_0, t_1]$.
-"""
-from typing import Any, Generic, TypeVar
+"""ODE filter strategies."""
+from typing import Any
 
 import equinox as eqx
 
-from odefilter import rv
-
-NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
-"""A type-variable to alias appropriate Normal-like random variables."""
-
-
-class BackwardModel(Generic[NormalLike], eqx.Module):
-    """Backward model for backward-Gauss--Markov process representations."""
-
-    transition: Any
-    noise: NormalLike
-
-
-class MarkovSequence(Generic[NormalLike], eqx.Module):
-    """Markov sequences as smoothing solutions."""
-
-    init: NormalLike
-    backward_model: BackwardModel[NormalLike]
+from odefilter import solutions
 
 
 class DynamicFilter(eqx.Module):
@@ -92,11 +70,11 @@ class DynamicSmoother(eqx.Module):
 
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
-        backward_model = BackwardModel(
+        backward_model = solutions.BackwardModel(
             transition=backward_transition, noise=backward_noise
         )
 
-        solution = MarkovSequence(
+        solution = solutions.MarkovSequence(
             init=corrected,
             backward_model=backward_model,
         )
@@ -114,10 +92,10 @@ class DynamicSmoother(eqx.Module):
             rv_proto=state.backward_model.noise
         )
 
-        backward_model = BackwardModel(
+        backward_model = solutions.BackwardModel(
             transition=backward_transition, noise=backward_noise
         )
-        return MarkovSequence(
+        return solutions.MarkovSequence(
             init=state.init,
             backward_model=backward_model,
         )
@@ -156,14 +134,16 @@ class DynamicSmoother(eqx.Module):
         )
 
         # Condense backward models
-        bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
+        bw_increment = solutions.BackwardModel(
+            transition=backward_op, noise=backward_noise
+        )
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment, bw_init=state.backward_model
         )
-        backward_model = BackwardModel(transition=gain, noise=noise)
+        backward_model = solutions.BackwardModel(transition=gain, noise=noise)
 
         # Return solution
-        smoothing_solution = MarkovSequence(
+        smoothing_solution = solutions.MarkovSequence(
             init=corrected, backward_model=backward_model
         )
         return smoothing_solution, error_estimate, u
