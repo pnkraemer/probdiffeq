@@ -81,7 +81,7 @@ nav:
           - "api_docs_advanced/taylor_series.md"
           - "api_docs_advanced/information.md"
           - "api_docs_advanced/controls.md"
-          - "api_docs_advanced/solution.md"
+          - "api_docs_advanced/solutions.md"
           - "api_docs_advanced/sqrtm.md"
     - Developer Documentation:
         - "dev_docs/init_apply_extract.md"

@@ -1,2 +1,0 @@
-# Solution objects
-::: odefilter.solution
