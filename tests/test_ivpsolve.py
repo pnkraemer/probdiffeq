@@ -63,5 +63,7 @@ def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
         parameters=p,
         solver=solver,
     )
+    print(solution)
+    assert False
     assert jnp.allclose(solution.t, ts_reference)
     assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
