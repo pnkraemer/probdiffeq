@@ -1,3 +1,3 @@
-# Backend implementations
+# Inference implementations
 
 ::: odefilter.implementations
