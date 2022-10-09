@@ -41,8 +41,8 @@ def case_isotropic_eks0():
     return recipes.dynamic_isotropic_eks0(num_derivatives=3, atol=1e-3, rtol=1e-6)
 
 
-def case_ekf1():
-    return recipes.ekf1(num_derivatives=3, atol=1e-3, rtol=1e-6)
+def case_dynamic_ekf1():
+    return recipes.dynamic_ekf1(num_derivatives=3, atol=1e-3, rtol=1e-6)
 
 
 @pytest_cases.parametrize_with_cases("solver", cases=".")

@@ -1,5 +1,12 @@
 """Recipes for ODE filters.
 
+Learning about the inner workings of an ODE filter is a little too much?
+We hear ya -- tt can indeed get quite complicated.
+Therefore, here we provide some recipes that create our favourite,
+time-tested ODE filter versions.
+We still recommend to build an ODE filter yourself,
+but until you do so, use one of ours.
+
 !!! danger "Highly experimental"
 
     Don't trust that this module survives.
