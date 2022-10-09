@@ -21,6 +21,11 @@ class AbstractIVPSolver(eqx.Module, abc.ABC):
         """Perform a step."""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def reset_fn(self, state):
+        """Reset the solver state."""
+        raise NotImplementedError
+
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # warning: rejected steps do not have their "stepping" attribute reset!!
@@ -168,3 +173,12 @@ class Adaptive(AbstractIVPSolver):
             (0.01 / jnp.max(b + c)) ** (1.0 / error_order),
         )
         return jnp.minimum(100.0 * dt0, dt1)
+
+    def reset_fn(self, *, state):  # noqa: D102
+        return self.State(
+            dt_proposed=state.dt_proposed,
+            error_normalised=state.error_normalised,
+            proposed=state.proposed,  # reset this one too?
+            accepted=self.stepping.reset_fn(state=state.accepted),
+            control=state.control,  # reset this one too?
+        )

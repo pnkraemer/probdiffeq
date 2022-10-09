@@ -22,6 +22,13 @@ class FilteringSolution(Generic[NormalLike], eqx.Module):
     extrapolated: NormalLike
 
 
+class BackwardModel(Generic[NormalLike], eqx.Module):
+    """Backward model for posterior Gauss--Markov processes."""
+
+    transition: Any
+    noise: NormalLike
+
+
 class SmoothingSolution(Generic[NormalLike], eqx.Module):
     """Filtering solution.
 
@@ -30,9 +37,7 @@ class SmoothingSolution(Generic[NormalLike], eqx.Module):
     """
 
     filtering_solution: FilteringSolution[NormalLike]
-
-    backward_transition: Any
-    backward_noise: NormalLike
+    backward_model: BackwardModel[NormalLike]
 
 
 class DynamicFilter(eqx.Module):
@@ -84,6 +89,10 @@ class DynamicFilter(eqx.Module):
         state_new = FilteringSolution(extrapolated=extrapolated, corrected=corrected)
         return state_new, error_estimate, u
 
+    @staticmethod
+    def reset_fn(*, state):  # noqa: D102
+        return state
+
 
 class DynamicSmoother(eqx.Module):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
@@ -96,18 +105,42 @@ class DynamicSmoother(eqx.Module):
         corrected = self.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
-        error_estimate = self.implementation.init_error_estimate()
-        backward_transition = self.implementation.init_backward_transition()
-
         empty = tree_util.tree_map(jnp.empty_like, corrected)
         filtering_solution = FilteringSolution(extrapolated=empty, corrected=corrected)
 
+        backward_transition = self.implementation.init_backward_transition()
+        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
+        backward_model = BackwardModel(
+            transition=backward_transition, noise=backward_noise
+        )
+
         solution = SmoothingSolution(
             filtering_solution=filtering_solution,
-            backward_transition=backward_transition,
-            backward_noise=empty,
+            backward_model=backward_model,
         )
+
+        error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
+
+    def reset_fn(self, *, state):
+        """Change the backward model back to the identity.
+
+        Initialises a new fixed-point smoother.
+        """
+        backward_transition = self.implementation.init_backward_transition()
+        backward_noise = self.implementation.init_backward_noise(
+            rv_proto=state.backward_model.noise
+        )
+
+        backward_model = BackwardModel(
+            transition=backward_transition, noise=backward_noise
+        )
+
+        return SmoothingSolution(
+            filtering_solution=state.filtering_solution,
+            backward_model=backward_model,
+        )
+        return state
 
     def step_fn(self, *, state, vector_field, dt):
         """Step."""
@@ -144,9 +177,17 @@ class DynamicSmoother(eqx.Module):
         filtering_solution = FilteringSolution(
             extrapolated=extrapolated, corrected=corrected
         )
+
+        # Condense backward models
+        bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
+        noise, gain = self.implementation.condense_backward_models(
+            bw_state=bw_increment, bw_init=state.backward_model
+        )
+        backward_model = BackwardModel(transition=gain, noise=noise)
+
+        # Return solution
         smoothing_solution = SmoothingSolution(
             filtering_solution=filtering_solution,
-            backward_noise=backward_noise,
-            backward_transition=backward_op,
+            backward_model=backward_model,
         )
         return smoothing_solution, error_estimate, u

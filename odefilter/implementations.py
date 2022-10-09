@@ -31,11 +31,6 @@ class IsotropicImplementation(eqx.Module):
     def init_corrected(self, *, taylor_coefficients):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_corrected = jnp.vstack(taylor_coefficients)
-
-        # todo: remove? not necessary anymore?
-        if m0_corrected.ndim == 1:
-            m0_corrected = m0_corrected[:, None]
-
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return rv.IsotropicNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
@@ -44,7 +39,14 @@ class IsotropicImplementation(eqx.Module):
         return jnp.empty(())
 
     def init_backward_transition(self):  # noqa: D102
-        return jnp.empty_like(self.a)
+        return jnp.eye(*self.a.shape)
+
+    def init_backward_noise(self, *, rv_proto):  # noqa: D102
+        shape_m = rv_proto.mean.shape
+        shape_l = rv_proto.cov_sqrtm_lower.shape
+        return rv.IsotropicNormal(
+            mean=jnp.zeros(shape_m), cov_sqrtm_lower=jnp.zeros(shape_l)
+        )
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         return ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
@@ -104,6 +106,21 @@ class IsotropicImplementation(eqx.Module):
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = rv.IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return corrected, (corrected.mean[0])
+
+    @staticmethod
+    def condense_backward_models(*, bw_init, bw_state):  # noqa: D102
+        A = bw_init.transition
+        (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
+
+        C = bw_state.transition
+        (d, D_sqrtm) = bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        noise = rv.IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return noise, g
 
 
 class DenseImplementation(eqx.Module):

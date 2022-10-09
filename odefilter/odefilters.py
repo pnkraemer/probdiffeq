@@ -56,3 +56,12 @@ class ODEFilter(eqx.Module):
         return self.State(
             t=state.t + dt0, u=u, error_estimate=error_estimate, backend=backend_state
         )
+
+    def reset_fn(self, *, state):  # noqa: D102
+        backend_new = self.backend.reset_fn(state=state.backend)
+        return self.State(
+            t=state.t,
+            u=state.u,
+            error_estimate=state.error_estimate,
+            backend=backend_new,
+        )
