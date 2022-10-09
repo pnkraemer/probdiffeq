@@ -58,7 +58,7 @@ def case_backend_ek1_filter(num_derivatives, information_op):
 @pytest_cases.parametrize(
     "derivative_init_fn", [inits.TaylorMode(), inits.ForwardMode()]
 )
-@pytest_cases.parametrize_with_cases("backend", cases=".", prefix="case_backend_")
+@pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
 def case_solver_adaptive_ek0(derivative_init_fn, backend):
     odefilter = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
@@ -75,15 +75,8 @@ def case_solver_adaptive_ek0(derivative_init_fn, backend):
     )
 
 
-def case_ivp_logistic():
-    def vf(x, t):
-        return x * (1 - x)
-
-    return vf, (jnp.asarray([0.4]),), 0.0, 2.0
-
-
 @pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
-@pytest_cases.parametrize_with_cases("vf, u0, t0, t1", cases=".", prefix="case_ivp_")
+@pytest_cases.parametrize_with_cases("vf, u0, t0, t1", cases=".cases_problems")
 def test_solver(solver, vf, u0, t0, t1):
     assert isinstance(solver, solvers.AbstractIVPSolver)
 
