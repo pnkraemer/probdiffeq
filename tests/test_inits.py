@@ -8,7 +8,7 @@ from odefilter import inits
 
 @pytest_cases.case
 def init_forward_mode():
-    return inits.forward_mode
+    return inits.ForwardMode()
 
 
 @pytest_cases.case

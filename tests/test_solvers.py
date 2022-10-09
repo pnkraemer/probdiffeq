@@ -56,7 +56,7 @@ def case_backend_ek1_filter(num_derivatives, information_op):
 
 
 @pytest_cases.parametrize(
-    "derivative_init_fn", [inits.TaylorMode(), inits.forward_mode]
+    "derivative_init_fn", [inits.TaylorMode(), inits.ForwardMode()]
 )
 @pytest_cases.parametrize_with_cases("backend", cases=".", prefix="case_backend_")
 def case_solver_adaptive_ek0(derivative_init_fn, backend):

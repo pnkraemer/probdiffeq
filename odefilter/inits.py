@@ -148,95 +148,100 @@ def _subsets(set, n):
     return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode(
-    *,
-    vector_field: Callable[..., Float[Array, " d"]],
-    initial_values: Tuple[Float[Array, " d"], ...],
-    num: int
-) -> List[Float[Array, " d"]]:
-    """Recursively differentiate the initial value of an \
-         ODE with **forward-mode** automatic differentiation.
+class ForwardMode(eqx.Module):
+    """Forward-mode initialisation."""
 
-    Parameters
-    ----------
-    vector_field :
-        An autonomous vector field to be differentiated.
-    initial_values :
-        A tuple (or iterable) of initial values.
-        This is the initial set of Taylor coefficients.
-        The vector field evaluates as ``vector_field(*initial_values)``.
-    num :
-        How many recursions the iteration shall use.
-        One recursion adds one derivative to
-        the existing set of Taylor coefficients.
+    def __call__(
+        self,
+        *,
+        vector_field: Callable[..., Float[Array, " d"]],
+        initial_values: Tuple[Float[Array, " d"], ...],
+        num: int
+    ) -> List[Float[Array, " d"]]:
+        """Recursively differentiate the initial value of an \
+             ODE with **forward-mode** automatic differentiation.
 
-    Returns
-    -------
-    :
-        A list of (unnormalised) Taylor coefficients.
+        Parameters
+        ----------
+        vector_field :
+            An autonomous vector field to be differentiated.
+        initial_values :
+            A tuple (or iterable) of initial values.
+            This is the initial set of Taylor coefficients.
+            The vector field evaluates as ``vector_field(*initial_values)``.
+        num :
+            How many recursions the iteration shall use.
+            One recursion adds one derivative to
+            the existing set of Taylor coefficients.
 
-    Examples
-    --------
-    >>> import jax.tree_util
-    >>>
-    >>> def tree_round(x, *a, **kw):
-    ...     return jax.tree_util.tree_map(lambda s: jnp.round(s, *a, **kw), x)
-    >>>
-    >>> import jax.numpy as jnp
-    >>> f = lambda x: (x+1)**2*(1-jnp.cos(x))
-    >>> u0 = (jnp.ones(1)*0.5,)
-    >>> print(tree_round(f(*u0), 1))
-    [0.3]
+        Returns
+        -------
+        :
+            A list of (unnormalised) Taylor coefficients.
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
-    >>> print(tree_round(tcoeffs, 1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32)]
+        Examples
+        --------
+        >>> import jax.tree_util
+        >>>
+        >>> def tree_round(x, *a, **kw):
+        ...     return jax.tree_util.tree_map(lambda s: jnp.round(s, *a, **kw), x)
+        >>>
+        >>> import jax.numpy as jnp
+        >>> f = lambda x: (x+1)**2*(1-jnp.cos(x))
+        >>> u0 = (jnp.ones(1)*0.5,)
+        >>> print(tree_round(f(*u0), 1))
+        [0.3]
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=2)
-    >>> print(tree_round(tcoeffs, 1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), \
+        >>> forward_mode = ForwardMode()
+        >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
+        >>> print(tree_round(tcoeffs, 1))
+        [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32)]
+
+        >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=2)
+        >>> print(tree_round(tcoeffs, 1))
+        [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), \
 DeviceArray([0.4], dtype=float32)]
 
-    >>>
-    >>> f = lambda x, dx: dx**2*(1-jnp.sin(x))
-    >>> u0 = (jnp.ones(1)*0.5, jnp.ones(1)*0.2)
-    >>> print(tree_round(f(*u0), 2))
-    [0.02]
+        >>>
+        >>> f = lambda x, dx: dx**2*(1-jnp.sin(x))
+        >>> u0 = (jnp.ones(1)*0.5, jnp.ones(1)*0.2)
+        >>> print(tree_round(f(*u0), 2))
+        [0.02]
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
-    >>> print(tree_round(tcoeffs, 2))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), \
+        >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
+        >>> print(tree_round(tcoeffs, 2))
+        [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), \
 DeviceArray([0.02], dtype=float32)]
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=4)
-    >>> print(tree_round(tcoeffs,1))
-    [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), \
+        >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=4)
+        >>> print(tree_round(tcoeffs,1))
+        [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), \
 DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), \
 DeviceArray([-0.], dtype=float32), DeviceArray([-0.], dtype=float32)]
 
-    """
-    g_n, g_0 = vector_field, vector_field
-    taylor_coeffs = [*initial_values, vector_field(*initial_values)]
-    for _ in range(num - 1):
-        g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-        taylor_coeffs.append(g_n(*initial_values))
-    return taylor_coeffs
-
-
-def _fwd_recursion_iterate(*, fun_n, fun_0):
-    r"""Increment $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$."""
-
-    def df(*args):
-        r"""Differentiate with a general version of the chain rule.
-
-        More specifically, this function implements a generalised
-        call $F(x) = \langle (Jf)(x), f_0(x)\rangle$.
         """
-        # Assign primals and tangents for the JVP
-        vals = (*args, fun_0(*args))
-        primals_in, tangents_in = vals[:-1], vals[1:]
+        g_n, g_0 = vector_field, vector_field
+        taylor_coeffs = [*initial_values, vector_field(*initial_values)]
+        for _ in range(num - 1):
+            g_n = self._fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
+            taylor_coeffs.append(g_n(*initial_values))
+        return taylor_coeffs
 
-        primals_out, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
-        return tangents_out
+    @staticmethod
+    def _fwd_recursion_iterate(*, fun_n, fun_0):
+        r"""Increment $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$."""
 
-    return df
+        def df(*args):
+            r"""Differentiate with a general version of the chain rule.
+
+            More specifically, this function implements a generalised
+            call $F(x) = \langle (Jf)(x), f_0(x)\rangle$.
+            """
+            # Assign primals and tangents for the JVP
+            vals = (*args, fun_0(*args))
+            primals_in, tangents_in = vals[:-1], vals[1:]
+
+            primals_out, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
+            return tangents_out
+
+        return df
