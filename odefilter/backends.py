@@ -1,9 +1,12 @@
-"""ODE filter backends."""
+"""ODE filter backends.
+
+By construction (extrapolate-correct, not correct-extrapolate)
+the solution intervals are right-including, i.e. defined
+on the interval $(t_0, t_1]$.
+"""
 from typing import Any, Generic, TypeVar
 
 import equinox as eqx
-import jax.numpy as jnp
-from jax import tree_util
 
 from odefilter import rv
 
@@ -11,32 +14,17 @@ NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
 """A type-variable to alias appropriate Normal-like random variables."""
 
 
-class FilteringSolution(Generic[NormalLike], eqx.Module):
-    """Filtering solution.
-
-    By construction right-including, i.e. it defines the solution
-    on the interval $(t_0, t_1]$.
-    """
-
-    corrected: NormalLike
-    extrapolated: NormalLike
-
-
 class BackwardModel(Generic[NormalLike], eqx.Module):
-    """Backward model for posterior Gauss--Markov processes."""
+    """Backward model for backward-Gauss--Markov process representations."""
 
     transition: Any
     noise: NormalLike
 
 
-class SmoothingSolution(Generic[NormalLike], eqx.Module):
-    """Filtering solution.
+class MarkovSequence(Generic[NormalLike], eqx.Module):
+    """Markov sequences as smoothing solutions."""
 
-    By construction right-including, i.e. it defines the solution
-    on the interval $(t_0, t_1]$.
-    """
-
-    filtering_solution: FilteringSolution[NormalLike]
+    init: NormalLike
     backward_model: BackwardModel[NormalLike]
 
 
@@ -53,10 +41,7 @@ class DynamicFilter(eqx.Module):
         )
         error_estimate = self.implementation.init_error_estimate()
 
-        extrapolated = tree_util.tree_map(jnp.empty_like, corrected)
-
-        solution = FilteringSolution(extrapolated=extrapolated, corrected=corrected)
-        return solution, error_estimate
+        return corrected, error_estimate
 
     def step_fn(self, *, state, vector_field, dt):
         """Step."""
@@ -64,7 +49,7 @@ class DynamicFilter(eqx.Module):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.corrected.mean, p=p, p_inv=p_inv
+            state.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -76,7 +61,7 @@ class DynamicFilter(eqx.Module):
         error_estimate *= dt
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
-            l0=state.corrected.cov_sqrtm_lower,
+            l0=state.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -86,8 +71,7 @@ class DynamicFilter(eqx.Module):
         corrected, u = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-        state_new = FilteringSolution(extrapolated=extrapolated, corrected=corrected)
-        return state_new, error_estimate, u
+        return corrected, error_estimate, u
 
     @staticmethod
     def reset_fn(*, state):  # noqa: D102
@@ -105,8 +89,6 @@ class DynamicSmoother(eqx.Module):
         corrected = self.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
-        empty = tree_util.tree_map(jnp.empty_like, corrected)
-        filtering_solution = FilteringSolution(extrapolated=empty, corrected=corrected)
 
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
@@ -114,8 +96,8 @@ class DynamicSmoother(eqx.Module):
             transition=backward_transition, noise=backward_noise
         )
 
-        solution = SmoothingSolution(
-            filtering_solution=filtering_solution,
+        solution = MarkovSequence(
+            init=corrected,
             backward_model=backward_model,
         )
 
@@ -135,12 +117,10 @@ class DynamicSmoother(eqx.Module):
         backward_model = BackwardModel(
             transition=backward_transition, noise=backward_noise
         )
-
-        return SmoothingSolution(
-            filtering_solution=state.filtering_solution,
+        return MarkovSequence(
+            init=state.init,
             backward_model=backward_model,
         )
-        return state
 
     def step_fn(self, *, state, vector_field, dt):
         """Step."""
@@ -148,7 +128,7 @@ class DynamicSmoother(eqx.Module):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.filtering_solution.corrected.mean, p=p, p_inv=p_inv
+            state.init.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -161,7 +141,7 @@ class DynamicSmoother(eqx.Module):
 
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=state.filtering_solution.corrected.cov_sqrtm_lower,
+            l0=state.init.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -174,9 +154,6 @@ class DynamicSmoother(eqx.Module):
         corrected, u = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-        filtering_solution = FilteringSolution(
-            extrapolated=extrapolated, corrected=corrected
-        )
 
         # Condense backward models
         bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
@@ -186,8 +163,7 @@ class DynamicSmoother(eqx.Module):
         backward_model = BackwardModel(transition=gain, noise=noise)
 
         # Return solution
-        smoothing_solution = SmoothingSolution(
-            filtering_solution=filtering_solution,
-            backward_model=backward_model,
+        smoothing_solution = MarkovSequence(
+            init=corrected, backward_model=backward_model
         )
         return smoothing_solution, error_estimate, u
