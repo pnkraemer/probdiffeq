@@ -3,15 +3,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import (
-    backends,
-    controls,
-    implementations,
-    information,
-    inits,
-    odefilters,
-    solvers,
-)
+from odefilter import controls, inits, odefilters, solvers
 
 
 @pytest_cases.parametrize(

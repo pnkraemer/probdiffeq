@@ -1,18 +1,8 @@
 """Cases."""
 
-import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import (
-    backends,
-    controls,
-    implementations,
-    information,
-    inits,
-    ivpsolve,
-    odefilters,
-    solvers,
-)
+from odefilter import backends, implementations, information
 
 
 @pytest_cases.parametrize(
