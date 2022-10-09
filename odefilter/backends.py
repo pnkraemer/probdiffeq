@@ -102,11 +102,13 @@ class DynamicSmoother(eqx.Module):
             taylor_coefficients=taylor_coefficients
         )
         empty = tree_util.tree_map(jnp.empty_like, corrected)
-
         filtering_solution = FilteringSolution(extrapolated=empty, corrected=corrected)
 
         backward_transition = self.implementation.init_backward_transition()
-        backward_model = BackwardModel(transition=backward_transition, noise=empty)
+        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
+        backward_model = BackwardModel(
+            transition=backward_transition, noise=backward_noise
+        )
 
         solution = SmoothingSolution(
             filtering_solution=filtering_solution,
@@ -159,6 +161,7 @@ class DynamicSmoother(eqx.Module):
         )
         backward_model = BackwardModel(transition=gain, noise=noise)
 
+        # Return solution
         smoothing_solution = SmoothingSolution(
             filtering_solution=filtering_solution,
             backward_model=backward_model,
