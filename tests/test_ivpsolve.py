@@ -15,13 +15,11 @@ from odefilter import (
 )
 
 
-@pytest_cases.parametrize(
-    "derivative_init_fn", [inits.TaylorMode(), inits.ForwardMode()]
-)
+@pytest_cases.parametrize("init_fn", [inits.TaylorMode(), inits.ForwardMode()])
 @pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
-def case_solver_odefilter(derivative_init_fn, backend):
+def case_solver_odefilter(init_fn, backend):
     odefilter = odefilters.ODEFilter(
-        derivative_init_fn=derivative_init_fn,
+        derivative_init_fn=init_fn,
         backend=backend,
     )
     control = controls.ProportionalIntegral()

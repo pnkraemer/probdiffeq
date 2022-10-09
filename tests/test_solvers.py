@@ -15,51 +15,10 @@ from odefilter import (
 
 
 @pytest_cases.parametrize(
-    "information_op",
-    [information.IsotropicEK0FirstOrder()],
-    ids=["IsotropicEK0FirstOrder"],
-)
-@pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_isotropic_filter(num_derivatives, information_op):
-    return backends.DynamicFilter(
-        implementation=implementations.IsotropicImplementation.from_num_derivatives(
-            num_derivatives=num_derivatives
-        ),
-        information=information_op,
-    )
-
-
-@pytest_cases.parametrize(
-    "information_op",
-    [information.IsotropicEK0FirstOrder()],
-    ids=["IsotropicEK0FirstOrder"],
-)
-@pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_dynamic_isotropic_smoother(num_derivatives, information_op):
-    return backends.DynamicSmoother(
-        implementation=implementations.IsotropicImplementation.from_num_derivatives(
-            num_derivatives=num_derivatives
-        ),
-        information=information_op,
-    )
-
-
-@pytest_cases.parametrize("information_op", [information.EK1(ode_dimension=1)])
-@pytest_cases.parametrize("num_derivatives", [2])
-def case_backend_ek1_filter(num_derivatives, information_op):
-    return backends.DynamicFilter(
-        implementation=implementations.DenseImplementation.from_num_derivatives(
-            num_derivatives=num_derivatives, ode_dimension=1
-        ),
-        information=information_op,
-    )
-
-
-@pytest_cases.parametrize(
     "derivative_init_fn", [inits.TaylorMode(), inits.ForwardMode()]
 )
 @pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
-def case_solver_adaptive_ek0(derivative_init_fn, backend):
+def case_odefilter(derivative_init_fn, backend):
     odefilter = odefilters.ODEFilter(
         derivative_init_fn=derivative_init_fn,
         backend=backend,
@@ -75,7 +34,7 @@ def case_solver_adaptive_ek0(derivative_init_fn, backend):
     )
 
 
-@pytest_cases.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
+@pytest_cases.parametrize_with_cases("solver", cases=".")
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1", cases=".cases_problems")
 def test_solver(solver, vf, u0, t0, t1):
     assert isinstance(solver, solvers.AbstractIVPSolver)
