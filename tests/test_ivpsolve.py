@@ -1,18 +1,22 @@
 """Tests for IVP solvers."""
 
+import jax
 import jax.numpy as jnp
 import pytest_cases
+from jax.experimental.ode import odeint
 
 from odefilter import controls, ivpsolve, odefilters, solvers, taylor_series
 
 
 @pytest_cases.parametrize(
-    "tseries", [taylor_series.TaylorMode(), taylor_series.ForwardMode()]
+    "taylor",
+    [taylor_series.TaylorMode(), taylor_series.ForwardMode()],
+    ids=["TaylorMode", "ForwardMode"],
 )
 @pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
-def case_solver_odefilter(tseries, backend):
+def case_odefilter(taylor, backend):
     odefilter = odefilters.ODEFilter(
-        taylor_series_init=tseries,
+        taylor_series_init=taylor,
         backend=backend,
     )
     control = controls.ProportionalIntegral()
@@ -29,6 +33,8 @@ def case_solver_odefilter(tseries, backend):
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
 @pytest_cases.parametrize_with_cases("solver", cases=".")
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
+    odeint_sol = odeint(vf, u0[0], jnp.asarray([t0, t1]), *p, atol=1e-6, rtol=1e-6)
+    ys_reference = odeint_sol[-1, :]
     solution = ivpsolve.simulate_terminal_values(
         vector_field=vf,
         initial_values=u0,
@@ -39,7 +45,7 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     )
 
     assert solution.t == t1
-    assert jnp.allclose(solution.u, 1.0, atol=1e-1, rtol=1e-1)
+    assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
 
 
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")

@@ -8,7 +8,7 @@ from diffeqzoo import ivps
 
 
 @pytest_cases.case
-def case_lotka_volterra():
+def case_lv():
 
     f, u0, tspan, f_args = ivps.lotka_volterra()
 
