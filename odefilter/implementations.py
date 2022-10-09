@@ -7,8 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 
-from odefilter import sqrtm
-from odefilter.prob import ibm, rv
+from odefilter import ibm, rv, sqrtm
 
 
 class IsotropicImplementation(eqx.Module):

@@ -6,8 +6,7 @@ import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 
-from odefilter import sqrtm
-from odefilter.prob import rv
+from odefilter import rv, sqrtm
 
 
 class MarkovSequence(eqx.Module):

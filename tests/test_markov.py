@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter.prob import markov, rv
+from odefilter import markov, rv
 
 
 @pytest_cases.case
