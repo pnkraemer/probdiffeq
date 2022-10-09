@@ -40,3 +40,21 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 
     assert solution.t == t1
     assert jnp.allclose(solution.u, 1.0, atol=1e-1, rtol=1e-1)
+
+
+@pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
+@pytest_cases.parametrize_with_cases("solver", cases=".")
+def test_solve_checkpoints(vf, u0, t0, t1, p, solver):
+    ts = jnp.linspace(t0, t1, num=10)
+    solution = ivpsolve.solve_checkpoints(
+        vector_field=vf,
+        initial_values=u0,
+        ts=ts,
+        parameters=p,
+        solver=solver,
+    )
+
+    assert jnp.allclose(solution.t, ts[1:])
+    assert jnp.allclose(solution.u[-1], 1.0, atol=1e-1, rtol=1e-1)
+    print(solution)
+    assert False

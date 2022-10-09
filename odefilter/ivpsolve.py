@@ -68,6 +68,41 @@ def simulate_terminal_values(
     return state.accepted
 
 
+def solve_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
+    initial_value_is_not_scalar = jax.tree_util.tree_map(
+        lambda x: jnp.ndim(x) > 0, initial_values
+    )
+    assert jax.tree_util.tree_all(initial_value_is_not_scalar)
+
+    # Include the parameters into the vector field.
+    # This is done inside this function, because we don't want to
+    # re-compile the whole solve if a parameter changes.
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
+
+    def solve_for_next_checkpoint(s, t_next):
+        state_ = _advance_ivp_solution_adaptively(
+            state0=s,
+            t1=t_next,
+            vector_field=vf,
+            step_fn=solver.step_fn,
+        )
+        return state_, state_.accepted
+
+    state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
+    _, solution = jax.lax.scan(
+        f=solve_for_next_checkpoint,
+        init=state0,
+        xs=ts[1:],
+        reverse=False,
+    )
+    return solution
+
+    # Return the initial value along with the rest, because
+    # it contains components of the filtering solution
+    return extract_qoi_fn(*state_terminal), state_qoi, extract_qoi_fn(*init_val)
+
+
 def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, step_fn):
     """Advance an IVP solution from an initial state to a terminal state."""
 
