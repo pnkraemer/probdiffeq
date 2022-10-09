@@ -7,12 +7,12 @@ from odefilter import controls, ivpsolve, odefilters, solvers, taylor_series
 
 
 @pytest_cases.parametrize(
-    "init_fn", [taylor_series.TaylorMode(), taylor_series.ForwardMode()]
+    "tseries", [taylor_series.TaylorMode(), taylor_series.ForwardMode()]
 )
 @pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
-def case_solver_odefilter(init_fn, backend):
+def case_solver_odefilter(tseries, backend):
     odefilter = odefilters.ODEFilter(
-        derivative_init_fn=init_fn,
+        taylor_series_init=tseries,
         backend=backend,
     )
     control = controls.ProportionalIntegral()
