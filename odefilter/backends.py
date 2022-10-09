@@ -5,7 +5,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jax import tree_util
 
-from odefilter.prob import rv
+from odefilter import rv
 
 NormalLike = TypeVar("RVLike", rv.Normal, rv.IsotropicNormal)
 """A type-variable to alias appropriate Normal-like random variables."""
