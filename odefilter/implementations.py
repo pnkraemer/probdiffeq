@@ -105,6 +105,21 @@ class IsotropicImplementation(eqx.Module):
         corrected = rv.IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return corrected, (corrected.mean[0])
 
+    @staticmethod
+    def condense_backward_models(*, bw_init, bw_state):
+        A = bw_init.transition
+        (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
+
+        C = bw_state.transition
+        (d, D_sqrtm) = bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        noise = rv.IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return noise, g
+
 
 class DenseImplementation(eqx.Module):
     """Handle dense covariances."""
