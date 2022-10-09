@@ -1,4 +1,4 @@
-"""ODE filter backend implementations."""
+"""ODE filter strategy implementations."""
 
 from typing import Any
 
@@ -18,7 +18,7 @@ class IsotropicImplementation(eqx.Module):
 
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives):
-        """Create a backend from hyperparameters."""
+        """Create a strategy from hyperparameters."""
         a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
@@ -133,7 +133,7 @@ class DenseImplementation(eqx.Module):
 
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
-        """Create a backend from hyperparameters."""
+        """Create a strategy from hyperparameters."""
         a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
         return cls(

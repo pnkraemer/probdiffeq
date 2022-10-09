@@ -12,11 +12,11 @@ from odefilter import controls, ivpsolve, odefilters, solvers, taylor_series
     [taylor_series.TaylorMode(), taylor_series.ForwardMode()],
     ids=["TaylorMode", "ForwardMode"],
 )
-@pytest_cases.parametrize_with_cases("backend", cases=".cases_backends")
-def case_odefilter(taylor, backend):
+@pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
+def case_odefilter(taylor, strategy):
     odefilter = odefilters.ODEFilter(
         taylor_series_init=taylor,
-        backend=backend,
+        strategy=strategy,
     )
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-5, 1e-5
@@ -25,7 +25,7 @@ def case_odefilter(taylor, backend):
         control=control,
         atol=atol,
         rtol=rtol,
-        error_order=backend.implementation.num_derivatives + 1,
+        error_order=strategy.implementation.num_derivatives + 1,
     )
 
 
