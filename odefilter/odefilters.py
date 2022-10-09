@@ -7,7 +7,7 @@ import equinox as eqx
 class ODEFilter(eqx.Module):
     """ODE filter."""
 
-    derivative_init_fn: Callable
+    taylor_series_init: Callable
     backend: Any
 
     class State(eqx.Module):
@@ -26,7 +26,7 @@ class ODEFilter(eqx.Module):
         def vf(*x):
             return vector_field(*x, t=t0)
 
-        taylor_coefficients = self.derivative_init_fn(
+        taylor_coefficients = self.taylor_series_init(
             vector_field=vf,
             initial_values=initial_values,
             num=self.backend.implementation.num_derivatives,

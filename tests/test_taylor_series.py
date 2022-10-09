@@ -3,17 +3,17 @@
 import pytest_cases
 from diffeqzoo import ivps as ivpzoo
 
-from odefilter import inits
+from odefilter import taylor_series
 
 
 @pytest_cases.case
 def init_forward_mode():
-    return inits.ForwardMode()
+    return taylor_series.ForwardMode()
 
 
 @pytest_cases.case
 def init_taylor_mode():
-    return inits.TaylorMode()
+    return taylor_series.TaylorMode()
 
 
 @pytest_cases.case

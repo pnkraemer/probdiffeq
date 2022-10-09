@@ -43,14 +43,17 @@ def simulate_terminal_values(
     parameters :
         ODE parameters.
     """
-    # There is no clear mechanism for the internals if the IVP is
-    # scalar. Therefore, we don't allow them for now.
     # todo: allow scalar problems.
+    #  There is no clear mechanism for the internals if the IVP is
+    #  scalar. Therefore, we don't allow them for now.
     initial_value_is_not_scalar = jax.tree_util.tree_map(
         lambda x: jnp.ndim(x) > 0, initial_values
     )
     assert jax.tree_util.tree_all(initial_value_is_not_scalar)
 
+    # Include the parameters into the vector field.
+    # This is done inside this function, because we don't want to
+    # re-compile the whole solve if a parameter changes.
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
