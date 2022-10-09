@@ -6,6 +6,8 @@ import jax
 import jax.numpy as jnp
 
 
+# todo: remove this and replace with jax.jit.
+#  We need more transparency of what is static and what is not
 @eqx.filter_jit
 def simulate_terminal_values(
     vector_field,
