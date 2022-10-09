@@ -174,7 +174,7 @@ class Adaptive(AbstractIVPSolver):
         )
         return jnp.minimum(100.0 * dt0, dt1)
 
-    def reset_fn(self, *, state):
+    def reset_fn(self, *, state):  # noqa: D102
         return self.State(
             dt_proposed=state.dt_proposed,
             error_normalised=state.error_normalised,

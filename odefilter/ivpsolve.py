@@ -106,9 +106,6 @@ def _verify_not_scalar(initial_values):
 def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
-    # todo:
-    #  we need a call to solver.(re)init_fn to allow the smoothers to reset their backward models
-
     def cond_fun(s):
         return s.accepted.t < t1
 

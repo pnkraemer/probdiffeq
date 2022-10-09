@@ -108,7 +108,7 @@ class IsotropicImplementation(eqx.Module):
         return corrected, (corrected.mean[0])
 
     @staticmethod
-    def condense_backward_models(*, bw_init, bw_state):
+    def condense_backward_models(*, bw_init, bw_state):  # noqa: D102
         A = bw_init.transition
         (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
 

@@ -90,7 +90,7 @@ class DynamicFilter(eqx.Module):
         return state_new, error_estimate, u
 
     @staticmethod
-    def reset_fn(*, state):
+    def reset_fn(*, state):  # noqa: D102
         return state
 
 
