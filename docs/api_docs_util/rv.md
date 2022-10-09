@@ -1,2 +1,2 @@
 # Random variables
-::: odefilter.prob.rv
+::: odefilter.rv
