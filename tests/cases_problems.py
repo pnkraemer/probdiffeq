@@ -1,10 +1,14 @@
 """Cases for problems."""
 
 
-import jax.numpy as jnp
+import jax
 import pytest_cases
+from diffeqzoo import ivps
 
 
 @pytest_cases.case
-def case_problem_logistic():
-    return lambda x, t: x * (1 - x), (jnp.asarray([0.5]),), 0.0, 10.0, ()
+def case_lv():
+
+    f, u0, tspan, f_args = ivps.lotka_volterra()
+
+    return jax.jit(lambda x, t, *p: f(x, *p)), (u0,), *tspan, f_args
