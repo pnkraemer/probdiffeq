@@ -1,6 +1,5 @@
 """Tests for IVP solvers."""
 
-import jax
 import jax.numpy as jnp
 import pytest_cases
 from jax.experimental.ode import odeint

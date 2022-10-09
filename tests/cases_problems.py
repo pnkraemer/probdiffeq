@@ -2,7 +2,6 @@
 
 
 import jax
-import jax.numpy as jnp
 import pytest_cases
 from diffeqzoo import ivps
 
