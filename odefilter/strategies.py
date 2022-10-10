@@ -64,7 +64,7 @@ class DynamicFilter(eqx.Module):
         m_obs, linear_fn = self.information(f=vector_field, x=m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p_inv=p_inv
+            linear_fn=linear_fn, m_obs=m_obs, p=p
         )
         error_estimate *= dt
         extrapolated = self.implementation.complete_extrapolation(
@@ -98,7 +98,7 @@ class DynamicFilter(eqx.Module):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+        m_ext, *_ = self.implementation.extrapolate_mean(
             s0.filtered.mean, p=p, p_inv=p_inv
         )
         extrapolated = self.implementation.complete_extrapolation(
@@ -176,7 +176,7 @@ class DynamicSmoother(eqx.Module):
         m_obs, linear_fn = self.information(f=vector_field, x=m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p_inv=p_inv
+            linear_fn=linear_fn, m_obs=m_obs, p=p
         )
         error_estimate *= dt
 

@@ -63,8 +63,8 @@ class IsotropicImplementation(eqx.Module):
         m_ext = p[:, None] * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p_inv):  # noqa: D102
-        l_obs_raw = linear_fn(p_inv[:, None] * self.q_sqrtm_lower)
+    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
+        l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
         c_obs_raw = jnp.dot(l_obs_raw, l_obs_raw)
         res_white = m_obs / jnp.sqrt(c_obs_raw)
         diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white) / res_white.size)

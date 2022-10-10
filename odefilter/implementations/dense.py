@@ -66,9 +66,9 @@ class DenseImplementation(eqx.Module):
         m_ext = p * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p_inv):  # noqa: D102
+    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(
-            p_inv[:, None] * self.q_sqrtm_lower
+            p[:, None] * self.q_sqrtm_lower
         )
         l_obs_raw = sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)

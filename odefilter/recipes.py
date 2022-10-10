@@ -43,7 +43,7 @@ def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
     )
     control = controls.ProportionalIntegral()
     return adaptive.Adaptive(
-        stepping=stepping,
+        odefilter=stepping,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -69,7 +69,7 @@ def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
     )
     control = controls.ProportionalIntegral()
     return adaptive.Adaptive(
-        stepping=stepping,
+        odefilter=stepping,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -94,7 +94,7 @@ def dynamic_ekf1(num_derivatives, ode_dimension, atol, rtol):
     )
     control = controls.ProportionalIntegral()
     return adaptive.Adaptive(
-        stepping=stepping,
+        odefilter=stepping,
         control=control,
         atol=atol,
         rtol=rtol,

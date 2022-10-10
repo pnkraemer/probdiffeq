@@ -119,11 +119,9 @@ class Adaptive(eqx.Module):
         propose a future time-step based on tolerances and error estimates."""
         # todo: should this be at the end of this function?
         #  or even happen inside the controller?
-        # dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
-        dt_proposed = state.dt_proposed
 
         state_proposed = self.odefilter.step_fn(
-            state=state.accepted, vector_field=vector_field, dt0=dt_proposed
+            state=state.accepted, vector_field=vector_field, dt0=state.dt_proposed
         )
         error_normalised = self._normalise_error(
             error_estimate=state_proposed.error_estimate,
