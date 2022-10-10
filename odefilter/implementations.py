@@ -1,5 +1,6 @@
 """ODE filter strategy implementations."""
 
+from functools import partial
 from typing import Any
 
 import equinox as eqx
@@ -8,7 +9,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Float
 
-from odefilter import ibm, sqrtm
+from odefilter import sqrtm
 
 
 class IsotropicNormal(eqx.Module):
@@ -34,7 +35,7 @@ class IsotropicImplementation(eqx.Module):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
     @property
@@ -63,7 +64,7 @@ class IsotropicImplementation(eqx.Module):
         )
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
-        return ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
+        return preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
     def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv[:, None] * m0
@@ -174,7 +175,7 @@ class DenseImplementation(eqx.Module):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
         return cls(
             a=jnp.kron(eye_d, a),
@@ -197,9 +198,7 @@ class DenseImplementation(eqx.Module):
         raise NotImplementedError
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
-        p, p_inv = ibm.preconditioner_diagonal(
-            dt=dt, num_derivatives=self.num_derivatives
-        )
+        p, p_inv = preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
         p = jnp.tile(p, self.ode_dimension)
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
@@ -250,3 +249,63 @@ class DenseImplementation(eqx.Module):
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         u = m_cor.reshape((-1, self.ode_dimension), order="F")[0]
         return corrected, u
+
+
+def system_matrices_1d(*, num_derivatives):
+    """Construct the IBM system matrices."""
+    x = jnp.arange(num_derivatives + 1)
+
+    A_1d = jnp.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
+    Q_1d = jnp.flip(_hilbert(x))
+    return A_1d, jnp.linalg.cholesky(Q_1d)
+
+
+def preconditioner(*, dt, num_derivatives):
+    """Construct the IBM preconditioner."""
+    p, p_inv = preconditioner_diagonal(dt=dt, num_derivatives=num_derivatives)
+    return jnp.diag(p), jnp.diag(p_inv)
+
+
+def preconditioner_diagonal(*, dt, num_derivatives):
+    """Construct the diagonal of the IBM preconditioner."""
+    powers = jnp.arange(num_derivatives, -1, -1)
+
+    scales = _factorial(powers)
+    powers = powers + 0.5
+
+    scaling_vector = (jnp.abs(dt) ** powers) / scales
+    scaling_vector_inv = (jnp.abs(dt) ** (-powers)) * scales
+
+    return scaling_vector, scaling_vector_inv
+
+
+@partial(jax.vmap, in_axes=(0, None), out_axes=(0, 0))
+def preconditioner_diagonal_batched(dts, num_derivatives):
+    """Compute the diagonal preconditioner, but for a number of time-steps at once."""
+    return preconditioner_diagonal(dt=dts, num_derivatives=num_derivatives)
+
+
+def _hilbert(a):
+    return 1 / (a[:, None] + a[None, :] + 1)
+
+
+def _pascal(a):
+    return _binom(a[:, None], a[None, :])
+
+
+def _batch_gram(k):
+    k_vmapped_x = jax.vmap(k, in_axes=(0, None), out_axes=-1)
+    k_vmapped_xy = jax.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+    return jax.jit(k_vmapped_xy)
+
+
+@_batch_gram
+def _binom(n, k):
+    a = _factorial(n)
+    b = _factorial(n - k)
+    c = _factorial(k)
+    return a / (b * c)
+
+
+def _factorial(n):
+    return jax.lax.exp(jax.lax.lgamma(n + 1.0))
