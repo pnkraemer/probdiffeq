@@ -61,11 +61,13 @@ plugins:
                     show_source: false
                     members_order: source
                     docstring_style: numpy
+                    show_root_heading: true
 
 nav:
     - index.md
     - Quickstart:
-        - quickstart.md
+        - "quickstart/quickstart.md"
+        - "quickstart/transitioning_from_other_packages.md"
     - Examples:
         - examples.md
     - API Documentation:

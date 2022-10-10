@@ -1,22 +1,10 @@
-"""Solve initial value problems.
-
-!!! danger "Initial value format"
-    This function expects that the initial values are a tuple of arrays
-    such that the vector field evaluates as
-    ``vector_field(*initial_values, t, *parameters)``.
-    This is different to most other ODE solver libraries, and done
-    on purpose because higher-order ODEs are treated very similarly
-    to first-order ODEs in this package.
-
-"""
+"""Solve initial value problems."""
 
 
 import jax
 import jax.numpy as jnp
 
 
-# todo: remove this and replace with jax.jit.
-#  We need more transparency of what is static and what is not
 def simulate_terminal_values(
     vector_field,
     initial_values,
