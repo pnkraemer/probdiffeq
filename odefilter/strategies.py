@@ -1,9 +1,30 @@
-"""ODE filter strategies."""
-from typing import Any
+"""ODE filter strategies.
+
+By construction (extrapolate-correct, not correct-extrapolate)
+the solution intervals are right-including, i.e. defined
+on the interval $(t_0, t_1]$.
+"""
+from typing import Any, Generic, TypeVar
 
 import equinox as eqx
+import jax.tree_util
 
-from odefilter import solutions
+T = TypeVar("T")
+"""A type-variable to alias appropriate Normal-like random variables."""
+
+
+class BackwardModel(Generic[T], eqx.Module):
+    """Backward model for backward-Gauss--Markov process representations."""
+
+    transition: Any
+    noise: T
+
+
+class SmoothingPosterior(Generic[T], eqx.Module):
+    """Markov sequences as smoothing solutions."""
+
+    filtered: T
+    backward_model: BackwardModel[T]
 
 
 class DynamicFilter(eqx.Module):
@@ -55,6 +76,10 @@ class DynamicFilter(eqx.Module):
     def reset_fn(*, state):  # noqa: D102
         return state
 
+    @staticmethod
+    def extract_fn(*, state):  # noqa: D102
+        return state
+
 
 class DynamicSmoother(eqx.Module):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
@@ -70,12 +95,12 @@ class DynamicSmoother(eqx.Module):
 
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
-        backward_model = solutions.BackwardModel(
+        backward_model = BackwardModel(
             transition=backward_transition, noise=backward_noise
         )
 
-        solution = solutions.MarkovSequence(
-            init=corrected,
+        solution = SmoothingPosterior(
+            filtered=corrected,
             backward_model=backward_model,
         )
 
@@ -92,11 +117,11 @@ class DynamicSmoother(eqx.Module):
             rv_proto=state.backward_model.noise
         )
 
-        backward_model = solutions.BackwardModel(
+        backward_model = BackwardModel(
             transition=backward_transition, noise=backward_noise
         )
-        return solutions.MarkovSequence(
-            init=state.init,
+        return SmoothingPosterior(
+            filtered=state.filtered,
             backward_model=backward_model,
         )
 
@@ -106,7 +131,7 @@ class DynamicSmoother(eqx.Module):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.init.mean, p=p, p_inv=p_inv
+            state.filtered.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -119,7 +144,7 @@ class DynamicSmoother(eqx.Module):
 
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=state.init.cov_sqrtm_lower,
+            l0=state.filtered.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -134,16 +159,30 @@ class DynamicSmoother(eqx.Module):
         )
 
         # Condense backward models
-        bw_increment = solutions.BackwardModel(
-            transition=backward_op, noise=backward_noise
-        )
+        bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment, bw_init=state.backward_model
         )
-        backward_model = solutions.BackwardModel(transition=gain, noise=noise)
+        backward_model = BackwardModel(transition=gain, noise=noise)
 
         # Return solution
-        smoothing_solution = solutions.MarkovSequence(
-            init=corrected, backward_model=backward_model
+        smoothing_solution = SmoothingPosterior(
+            filtered=corrected, backward_model=backward_model
         )
         return smoothing_solution, error_estimate, u
+
+    def extract_fn(self, *, state):  # noqa: D102
+        # todo: this function checks in which mode it has been called,
+        #  which is quite a dirty implementation.
+        #  it also bastardises the filter/smoother naming.
+
+        # If there is something to smooth, go ahead:
+        if state.filtered.mean.ndim == 3:
+            init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.filtered)
+            return self.implementation.marginalise_backwards(
+                init=init, backward_model=state.backward_model
+            )
+
+        # Otherwise, we are still in filtering mode and simply return
+        # the input.
+        return state

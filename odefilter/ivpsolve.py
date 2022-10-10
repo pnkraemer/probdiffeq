@@ -31,11 +31,8 @@ def simulate_terminal_values(
     parameters :
         ODE parameters.
     """
-    _verify_not_scalar(initial_values=initial_values)
+    _assert_not_scalar(initial_values=initial_values)
 
-    # Include the parameters into the vector field.
-    # This is done inside this function, because we don't want to
-    # re-compile the whole solve if a parameter changes.
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
@@ -47,17 +44,15 @@ def simulate_terminal_values(
         vector_field=vf,
         solver=solver,
     )
-    return state.accepted
+
+    return solver.extract_fn(state=state)
 
 
 # todo: don't evaluate the ODE if the time-step has been clipped
 def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
     """Solve an IVP and return the solution at checkpoints."""
-    _verify_not_scalar(initial_values=initial_values)
+    _assert_not_scalar(initial_values=initial_values)
 
-    # Include the parameters into the vector field.
-    # This is done inside this function, because we don't want to
-    # re-compile the whole solve if a parameter changes.
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
@@ -68,7 +63,7 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
             vector_field=vf,
             solver=solver,
         )
-        return state_, state_.accepted
+        return state_, state_
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = jax.lax.scan(
@@ -77,13 +72,17 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         xs=ts[1:],
         reverse=False,
     )
-    return solution
+    return solver.extract_fn(state=solution)
 
 
-# todo: allow scalar problems.
-#  There is no clear mechanism for the internals if the IVP is
-#  scalar. Therefore, we don't allow them for now.
-def _verify_not_scalar(initial_values):
+def _assert_not_scalar(initial_values):
+    """Verify the initial conditions are not scalar.
+
+    There is no clear mechanism for the internals if the IVP is
+    scalar. Therefore, we don't allow them for now.
+
+    todo: allow scalar problems.
+    """
     initial_value_is_not_scalar = jax.tree_util.tree_map(
         lambda x: jnp.ndim(x) > 0, initial_values
     )
@@ -99,7 +98,10 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     def body_fun(s):
         return solver.step_fn(state=s, vector_field=vector_field, t1=t1)
 
+    # todo: this conflicts with the init_fn, doesnt it?
+    #  There needs to be a smarter distinction.
     init_val = solver.reset_fn(state=state0)
+
     return jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,

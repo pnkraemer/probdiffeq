@@ -6,8 +6,23 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
+from jaxtyping import Array, Float
 
-from odefilter import ibm, solutions, sqrtm
+from odefilter import ibm, sqrtm
+
+
+class IsotropicNormal(eqx.Module):
+    """Random variable with a normal distribution."""
+
+    mean: Float[Array, "n d"]
+    cov_sqrtm_lower: Float[Array, "n n"]
+
+
+class MultivariateNormal(eqx.Module):
+    """Random variable with a normal distribution."""
+
+    mean: Float[Array, " k"]
+    cov_sqrtm_lower: Float[Array, "k k"]
 
 
 class IsotropicImplementation(eqx.Module):
@@ -31,9 +46,7 @@ class IsotropicImplementation(eqx.Module):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return solutions.IsotropicNormal(
-            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
-        )
+        return IsotropicNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     @staticmethod
     def init_error_estimate():  # noqa: D102
@@ -45,7 +58,7 @@ class IsotropicImplementation(eqx.Module):
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
         shape_m = rv_proto.mean.shape
         shape_l = rv_proto.cov_sqrtm_lower.shape
-        return solutions.IsotropicNormal(
+        return IsotropicNormal(
             mean=jnp.zeros(shape_m), cov_sqrtm_lower=jnp.zeros(shape_l)
         )
 
@@ -74,7 +87,7 @@ class IsotropicImplementation(eqx.Module):
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return solutions.IsotropicNormal(m_ext, l_ext)
+        return IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
@@ -93,8 +106,8 @@ class IsotropicImplementation(eqx.Module):
         m_bw, l_bw = p[:, None] * m_bw_p, p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
         backward_op = g_bw
-        backward_noise = solutions.IsotropicNormal(m_bw, l_bw)
-        extrapolated = solutions.IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = IsotropicNormal(m_bw, l_bw)
+        extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
     @staticmethod
@@ -105,7 +118,7 @@ class IsotropicImplementation(eqx.Module):
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = solutions.IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return corrected, (corrected.mean[0])
 
     @staticmethod
@@ -120,8 +133,33 @@ class IsotropicImplementation(eqx.Module):
         xi = A @ d + b
         Xi = sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
-        noise = solutions.IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
+
+    @staticmethod
+    def marginalise_backwards(*, init, backward_model):
+        """Compute marginals of a markov sequence."""
+
+        def body_fun(carry, x):
+            linop, noise = x.transition, x.noise
+            out = IsotropicImplementation.marginalise_model_isotropic(
+                init=carry, linop=linop, noise=noise
+            )
+            return out, out
+
+        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=False)
+        return rvs
+
+    @staticmethod
+    def marginalise_model_isotropic(*, init, linop, noise):
+        """Marginalise the output of a linear model."""
+        # Apply transition
+        m_new = jnp.dot(linop, init.mean) + noise.mean
+        l_new = sqrtm.sum_of_sqrtm_factors(
+            R1=jnp.dot(linop, init.cov_sqrtm_lower).T, R2=noise.cov_sqrtm_lower.T
+        ).T
+
+        return IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
 
 class DenseImplementation(eqx.Module):
@@ -150,9 +188,7 @@ class DenseImplementation(eqx.Module):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return solutions.MultivariateNormal(
-            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
-        )
+        return MultivariateNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_error_estimate(self):  # noqa: D102
         return jnp.empty((self.ode_dimension,))
@@ -194,7 +230,7 @@ class DenseImplementation(eqx.Module):
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return solutions.MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
@@ -211,6 +247,6 @@ class DenseImplementation(eqx.Module):
 
         m_cor = m_ext - gain @ m_obs
         l_cor = l_ext - gain @ l_obs_nonsquare
-        corrected = solutions.MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         u = m_cor.reshape((-1, self.ode_dimension), order="F")[0]
         return corrected, u
