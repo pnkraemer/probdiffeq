@@ -1,5 +1,4 @@
 """Initial value problem solvers."""
-import abc
 from typing import Any, Union
 
 import equinox as eqx
@@ -8,31 +7,19 @@ import jax.numpy as jnp
 import jax.tree_util
 
 
-class AbstractIVPSolver(eqx.Module, abc.ABC):
-    """Abstract solver for IVPs."""
+class AdaptiveSolverState(eqx.Module):
+    """Solver state."""
 
-    @abc.abstractmethod
-    def init_fn(self, *, vector_field, initial_values, t0):
-        """Initialise the IVP solver state."""
-        raise NotImplementedError
+    dt_proposed: float
+    error_normalised: float
 
-    @abc.abstractmethod
-    def step_fn(self, state, *, vector_field, dt0):
-        """Perform a step."""
-        raise NotImplementedError
+    proposed: Any  # must contain fields "t" and "u".
+    accepted: Any  # must contain fields "t" and "u".
 
-    @abc.abstractmethod
-    def reset_fn(self, state):
-        """Reset the solver state."""
-        raise NotImplementedError
+    control: Any  # must contain field "scale_factor".
 
 
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# warning: rejected steps do not have their "stepping" attribute reset!!
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-class Adaptive(AbstractIVPSolver):
+class Adaptive(eqx.Module):
     """Make an adaptive ODE solver."""
 
     # Take a solver, normalise its error estimate,
@@ -45,17 +32,6 @@ class Adaptive(AbstractIVPSolver):
     stepping: Any
     control: Any
     norm_ord: Union[int, str, None] = None
-
-    class State(eqx.Module):
-        """Solver state."""
-
-        dt_proposed: float
-        error_normalised: float
-
-        proposed: Any  # must contain fields "t" and "u".
-        accepted: Any  # must contain fields "t" and "u".
-
-        control: Any  # must contain field "scale_factor".
 
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
@@ -78,7 +54,7 @@ class Adaptive(AbstractIVPSolver):
             atol=self.atol,
             rtol=self.rtol,
         )
-        return self.State(
+        return AdaptiveSolverState(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
             proposed=state_stepping,
@@ -104,7 +80,7 @@ class Adaptive(AbstractIVPSolver):
 
         init_val = init_fn(state)
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
-        return self.State(
+        return AdaptiveSolverState(
             dt_proposed=state_new.dt_proposed,
             error_normalised=state_new.error_normalised,
             proposed=state_new.proposed,
@@ -135,7 +111,7 @@ class Adaptive(AbstractIVPSolver):
             error_order=self.error_order,
         )
         dt_proposed = state.dt_proposed * state_control.scale_factor
-        return self.State(
+        return AdaptiveSolverState(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
             proposed=state_proposed,
@@ -175,10 +151,13 @@ class Adaptive(AbstractIVPSolver):
         return jnp.minimum(100.0 * dt0, dt1)
 
     def reset_fn(self, *, state):  # noqa: D102
-        return self.State(
+        return AdaptiveSolverState(
             dt_proposed=state.dt_proposed,
             error_normalised=state.error_normalised,
             proposed=state.proposed,  # reset this one too?
             accepted=self.stepping.reset_fn(state=state.accepted),
             control=state.control,  # reset this one too?
         )
+
+    def extract_fn(self, *, state):  # noqa: D102
+        return self.stepping.extract_fn(state=state.accepted)

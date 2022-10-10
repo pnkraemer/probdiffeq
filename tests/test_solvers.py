@@ -29,7 +29,7 @@ def case_odefilter(tseries, strategy):
 @pytest_cases.parametrize_with_cases("solver", cases=".")
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
 def test_solver(solver, vf, u0, t0, t1, p):
-    assert isinstance(solver, solvers.AbstractIVPSolver)
+    assert isinstance(solver, solvers.Adaptive)
 
     def vf_p(*ys, t):
         return vf(*ys, t, *p)

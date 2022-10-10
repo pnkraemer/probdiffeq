@@ -65,3 +65,12 @@ class ODEFilter(eqx.Module):
             error_estimate=state.error_estimate,
             posterior=posterior_new,
         )
+
+    def extract_fn(self, *, state):  # noqa: D102
+        posterior_new = self.strategy.extract_fn(state=state.posterior)
+        return ODEFilterSolution(
+            t=state.t,
+            u=state.u,
+            error_estimate=state.error_estimate,
+            posterior=posterior_new,
+        )

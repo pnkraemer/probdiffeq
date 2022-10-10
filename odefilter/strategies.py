@@ -55,6 +55,10 @@ class DynamicFilter(eqx.Module):
     def reset_fn(*, state):  # noqa: D102
         return state
 
+    @staticmethod
+    def extract_fn(*, state):  # noqa: D102
+        return state
+
 
 class DynamicSmoother(eqx.Module):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
@@ -147,3 +151,6 @@ class DynamicSmoother(eqx.Module):
             init=corrected, backward_model=backward_model
         )
         return smoothing_solution, error_estimate, u
+
+    def extract_fn(self, *, state):  # noqa: D102
+        raise NotImplementedError
