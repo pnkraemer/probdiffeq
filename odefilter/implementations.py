@@ -123,6 +123,12 @@ class IsotropicImplementation(eqx.Module):
         noise = solutions.IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
+    @staticmethod
+    def marginalise_backwards(*, init, backward_model):  # noqa: D102
+        return solutions.marginalise_sequence_isotropic(
+            init=init, backward_model=backward_model
+        )
+
 
 class DenseImplementation(eqx.Module):
     """Handle dense covariances."""

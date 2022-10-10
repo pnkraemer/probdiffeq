@@ -48,44 +48,36 @@ class BackwardModel(Generic[NormalLike], eqx.Module):
     noise: NormalLike
 
 
-class MarkovSequence(Generic[NormalLike], eqx.Module):
+class SmoothingPosterior(Generic[NormalLike], eqx.Module):
     """Markov sequences as smoothing solutions."""
 
-    # by default: reverse!
-    # make some noise if you want forward!
-    init: NormalLike
+    filtered: NormalLike
     backward_model: BackwardModel[NormalLike]
 
 
-def marginalise_sequence(*, markov_sequence):
+# todo: move to implementations?
+
+
+def marginalise_sequence_isotropic(*, init, backward_model):
     """Compute marginals of a markov sequence."""
+    print(init)
+    print(backward_model)
 
     def body_fun(carry, x):
-        op, noise = x.transition, x.noise
-        out = marginalise_model(init=carry, operator=op, noise=noise)
+        linop, noise = x.transition, x.noise
+        out = marginalise_model_isotropic(init=carry, linop=linop, noise=noise)
         return out, out
 
-    _, rvs = jax.lax.scan(
-        f=body_fun,
-        init=markov_sequence.init,
-        xs=markov_sequence.backward_model,
-        reverse=False,
-    )
+    _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=False)
     return rvs
 
 
-def marginalise_model(*, init, operator, noise):
+def marginalise_model_isotropic(*, init, linop, noise):
     """Marginalise the output of a linear model."""
-    # Read system matrices
-    mean, cov_sqrtm_lower = init.mean, init.cov_sqrtm_lower
-    noise_mean, noise_cov_sqrtm_lower = noise.mean, noise.cov_sqrtm_lower
-
     # Apply transition
-    mean_new = jnp.dot(operator, mean) + noise_mean
-    cov_sqrtm_lower_new = sqrtm.sum_of_sqrtm_factors(
-        R1=jnp.dot(operator, cov_sqrtm_lower).T, R2=noise_cov_sqrtm_lower.T
+    m_new = jnp.dot(linop, init.mean) + noise.mean
+    l_new = sqrtm.sum_of_sqrtm_factors(
+        R1=jnp.dot(linop, init.cov_sqrtm_lower).T, R2=noise.cov_sqrtm_lower.T
     ).T
 
-    # Output type equals input type.
-    rv_new = Normal(mean=mean_new, cov_sqrtm_lower=cov_sqrtm_lower_new)
-    return rv_new
+    return IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)
