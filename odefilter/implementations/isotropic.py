@@ -1,4 +1,4 @@
-"""ODE filter strategy implementations."""
+"""State-space models with isotropic covariance structure."""
 
 from typing import Any
 
