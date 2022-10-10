@@ -13,6 +13,12 @@ T = TypeVar("T")
 """A type-variable to alias appropriate Normal-like random variables."""
 
 
+class FilteringDistribution(Generic[T], eqx.Module):
+
+    filtered: T
+    diffusion_sqrtm: float
+
+
 class BackwardModel(Generic[T], eqx.Module):
     """Backward model for backward-Gauss--Markov process representations."""
 
@@ -24,6 +30,7 @@ class SmoothingPosterior(Generic[T], eqx.Module):
     """Markov sequences as smoothing solutions."""
 
     filtered: T
+    diffusion_sqrtm: float
     backward_model: BackwardModel[T]
 
 
@@ -40,7 +47,8 @@ class DynamicFilter(eqx.Module):
         )
         error_estimate = self.implementation.init_error_estimate()
 
-        return corrected, error_estimate
+        filtered = FilteringDistribution(filtered=corrected, diffusion_sqrtm=1.0)
+        return filtered, error_estimate
 
     def step_fn(self, *, state, vector_field, dt):
         """Step."""
@@ -48,7 +56,7 @@ class DynamicFilter(eqx.Module):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.mean, p=p, p_inv=p_inv
+            state.filtered.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -60,17 +68,22 @@ class DynamicFilter(eqx.Module):
         error_estimate *= dt
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
-            l0=state.cov_sqrtm_lower,
+            l0=state.filtered.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
         )
 
         # Final observation
-        corrected, u = self.implementation.final_correction(
+        corrected = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-        return corrected, error_estimate, u
+        u = self.implementation.extract_u(rv=corrected)
+
+        filtered = FilteringDistribution(
+            filtered=corrected, diffusion_sqrtm=diffusion_sqrtm
+        )
+        return filtered, error_estimate, u
 
     @staticmethod
     def reset_fn(*, state):  # noqa: D102
@@ -79,6 +92,26 @@ class DynamicFilter(eqx.Module):
     @staticmethod
     def extract_fn(*, state):  # noqa: D102
         return state
+
+    def interpolate_fn(self, *, s0, s1, t0, t1, t):
+        dt = t - t0
+        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
+
+        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+            s0.filtered.mean, p=p, p_inv=p_inv
+        )
+        extrapolated = self.implementation.complete_extrapolation(
+            m_ext=m_ext,
+            l0=s0.filtered.cov_sqrtm_lower,
+            p=p,
+            p_inv=p_inv,
+            diffusion_sqrtm=s1.diffusion_sqrtm,  # right-including intervals
+        )
+        solution = FilteringDistribution(
+            filtered=extrapolated, diffusion_sqrtm=s1.diffusion_sqrtm
+        )
+        u = self.implementation.extract_u(rv=extrapolated)
+        return solution, u
 
 
 class DynamicSmoother(eqx.Module):
@@ -101,6 +134,7 @@ class DynamicSmoother(eqx.Module):
 
         solution = SmoothingPosterior(
             filtered=corrected,
+            diffusion_sqrtm=1.0,
             backward_model=backward_model,
         )
 
@@ -122,6 +156,7 @@ class DynamicSmoother(eqx.Module):
         )
         return SmoothingPosterior(
             filtered=state.filtered,
+            diffusion_sqrtm=state.diffusion_sqrtm,
             backward_model=backward_model,
         )
 
@@ -167,7 +202,9 @@ class DynamicSmoother(eqx.Module):
 
         # Return solution
         smoothing_solution = SmoothingPosterior(
-            filtered=corrected, backward_model=backward_model
+            filtered=corrected,
+            diffusion_sqrtm=diffusion_sqrtm,
+            backward_model=backward_model,
         )
         return smoothing_solution, error_estimate, u
 
@@ -186,3 +223,6 @@ class DynamicSmoother(eqx.Module):
         # Otherwise, we are still in filtering mode and simply return
         # the input.
         return state
+
+    def interpolate_fn(self, *, s0, s1, t):
+        raise NotImplementedError(s0)

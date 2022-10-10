@@ -93,7 +93,8 @@ class Adaptive(eqx.Module):
         propose a future time-step based on tolerances and error estimates."""
         # todo: should this be at the end of this function?
         #  or even happen inside the controller?
-        dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
+        # dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
+        dt_proposed = state.dt_proposed
 
         state_proposed = self.stepping.step_fn(
             state=state.accepted, vector_field=vector_field, dt0=dt_proposed
@@ -161,3 +162,21 @@ class Adaptive(eqx.Module):
 
     def extract_fn(self, *, state):  # noqa: D102
         return self.stepping.extract_fn(state=state.accepted)
+
+    def interpolate_fn(self, *, s0, s1, t):
+
+        accepted_new = self.stepping.interpolate_and_extract_fn(
+            s0=s0.accepted, s1=s1.accepted, t=t
+        )
+
+        return AdaptiveSolverState(
+            dt_proposed=jnp.empty_like(s0.dt_proposed),
+            error_normalised=jnp.empty_like(s0.error_normalised),
+            proposed=_empty_like(s0.proposed),  # reset this one too?
+            accepted=accepted_new,
+            control=_empty_like(s0.control),  # reset this one too?
+        )
+
+
+def _empty_like(tree):
+    return jax.tree_util.tree_map(jnp.empty_like, tree)

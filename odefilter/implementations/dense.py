@@ -104,5 +104,8 @@ class DenseImplementation(eqx.Module):
         m_cor = m_ext - gain @ m_obs
         l_cor = l_ext - gain @ l_obs_nonsquare
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        u = m_cor.reshape((-1, self.ode_dimension), order="F")[0]
-        return corrected, u
+        return corrected
+
+    @staticmethod
+    def extract_u(*, rv):
+        return rv.mean.reshape((-1, self.ode_dimension), order="F")[0]

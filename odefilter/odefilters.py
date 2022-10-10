@@ -2,6 +2,7 @@
 from typing import Any, Callable
 
 import equinox as eqx
+import jax.numpy as jnp
 
 
 class ODEFilterSolution(eqx.Module):
@@ -72,5 +73,17 @@ class ODEFilter(eqx.Module):
             t=state.t,
             u=state.u,
             error_estimate=state.error_estimate,
+            posterior=posterior_new,
+        )
+
+    def interpolate_and_extract_fn(self, *, s0, s1, t):
+        posterior_new, u = self.strategy.interpolate_fn(
+            s0=s0.posterior, s1=s1.posterior, t0=s0.t, t1=s1.t, t=t
+        )
+        error_estimate = jnp.empty_like(s0.error_estimate)
+        return ODEFilterSolution(
+            t=t,
+            u=u,
+            error_estimate=error_estimate,
             posterior=posterior_new,
         )

@@ -38,14 +38,13 @@ def simulate_terminal_values(
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
 
-    state = _advance_ivp_solution_adaptively(
-        state0=state0,
+    _, solution = _advance_ivp_solution_adaptively(
+        state0=(state0, state0),
         t1=t1,
         vector_field=vf,
         solver=solver,
     )
-
-    return solver.extract_fn(state=state)
+    return solution
 
 
 # todo: don't evaluate the ODE if the time-step has been clipped
@@ -57,22 +56,21 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         return vector_field(*ys, t, *parameters)
 
     def advance_to_next_checkpoint(s, t_next):
-        state_ = _advance_ivp_solution_adaptively(
+        return _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
             vector_field=vf,
             solver=solver,
         )
-        return state_, state_
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = jax.lax.scan(
         f=advance_to_next_checkpoint,
-        init=state0,
+        init=(state0, state0),
         xs=ts[1:],
         reverse=False,
     )
-    return solver.extract_fn(state=solution)
+    return solution
 
 
 def _assert_not_scalar(initial_values):
@@ -93,17 +91,31 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
-        return s.accepted.t < t1
+        current, _previous = s
+        return current.accepted.t < t1
 
     def body_fun(s):
-        return solver.step_fn(state=s, vector_field=vector_field, t1=t1)
+        old, _older = s
+        new = solver.step_fn(state=old, vector_field=vector_field, t1=t1)
+        return new, old
 
     # todo: this conflicts with the init_fn, doesnt it?
     #  There needs to be a smarter distinction.
-    init_val = solver.reset_fn(state=state0)
+    old, older = state0
+    old_reset = solver.reset_fn(state=old)
 
-    return jax.lax.while_loop(
+    (ultim, penultim) = jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,
-        init_val=init_val,
+        init_val=(old_reset, older),
     )
+
+    def true_fn(ult, penult):
+        targ = solver.interpolate_fn(s0=penult, s1=ult, t=t1)
+        return (ult, targ), solver.extract_fn(state=targ)
+
+    def false_fn(ult, penult):
+        return (ult, penult), solver.extract_fn(state=ult)
+
+    pred = ultim.accepted.t > t1
+    return jax.lax.cond(pred, true_fn, false_fn, ultim, penultim)

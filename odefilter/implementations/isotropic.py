@@ -111,7 +111,11 @@ class IsotropicImplementation(eqx.Module):
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return corrected, (corrected.mean[0])
+        return corrected
+
+    @staticmethod
+    def extract_u(*, rv):
+        return rv.mean[0]
 
     @staticmethod
     def condense_backward_models(*, bw_init, bw_state):  # noqa: D102
