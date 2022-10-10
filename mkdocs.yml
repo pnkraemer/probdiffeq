@@ -2,8 +2,6 @@ theme:
     name: material
     features:
         - navigation.sections  # Sections are included in the navigation on the left.
-        - toc.integrate  # Table of contents is integrated on the left; does not appear separately on the right.
-        - header.autohide  # header disappears as you scroll
     palette:
         # Light mode / dark mode
         # We deliberately don't automatically use `media` to check a user's preferences. We default to light mode as
@@ -58,8 +56,7 @@ plugins:
                     show_root_full_path: true
                     show_if_no_docstring: true
                     show_signature_annotations: true
-                    show_source: false
-                    members_order: source
+                    show_source: true
                     docstring_style: numpy
                     show_root_heading: true
 
@@ -69,21 +66,21 @@ nav:
         - "quickstart/quickstart.md"
         - "quickstart/transitioning_from_other_packages.md"
     - Examples:
-        - examples.md
+        - "examples.md"
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"
     - Advanced API Documentation:
-        - Solver variations:
-          - "api_docs_advanced/solvers.md"
-          - "api_docs_advanced/odefilters.md"
-          - "api_docs_advanced/strategies.md"
-          - "api_docs_advanced/implementations.md"
-        - Solver components:
+        - "api_docs_advanced/solvers.md"
+        - "api_docs_advanced/odefilters.md"
+        - "api_docs_advanced/strategies.md"
+        - Additional components:
           - "api_docs_advanced/taylor_series.md"
           - "api_docs_advanced/information.md"
           - "api_docs_advanced/controls.md"
-          - "api_docs_advanced/sqrtm.md"
+        - Solver implementations:
+          - "api_docs_advanced/implementations/dense.md"
+          - "api_docs_advanced/implementations/isotropic.md"
     - Developer Documentation:
         - "dev_docs/init_apply_extract.md"
         - "dev_docs/on_the_edges.md"

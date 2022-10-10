@@ -1,3 +1,3 @@
-# ODE filter inference strategies
+# Inference strategies
 
 ::: odefilter.strategies
