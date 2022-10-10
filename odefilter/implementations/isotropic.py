@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from odefilter.implementations import ibm, sqrtm
+from odefilter.implementations import _ibm, sqrtm
 
 
 class IsotropicNormal(eqx.Module):
@@ -26,7 +26,7 @@ class IsotropicImplementation(eqx.Module):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
     @property
@@ -55,7 +55,7 @@ class IsotropicImplementation(eqx.Module):
         )
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
-        return ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
+        return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
     def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv[:, None] * m0

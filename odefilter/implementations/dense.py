@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Float
 
-from odefilter.implementations import ibm, sqrtm
+from odefilter.implementations import _ibm, sqrtm
 
 
 class MultivariateNormal(eqx.Module):
@@ -30,7 +30,7 @@ class DenseImplementation(eqx.Module):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
         return cls(
             a=jnp.kron(eye_d, a),
@@ -53,7 +53,7 @@ class DenseImplementation(eqx.Module):
         raise NotImplementedError
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
-        p, p_inv = ibm.preconditioner_diagonal(
+        p, p_inv = _ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
         p = jnp.tile(p, self.ode_dimension)

@@ -81,8 +81,6 @@ nav:
         - Solver implementations:
           - "api_docs_advanced/implementations/dense.md"
           - "api_docs_advanced/implementations/isotropic.md"
-          - "api_docs_advanced/implementations/ibm.md"
-          - "api_docs_advanced/implementations/sqrtm.md"
     - Developer Documentation:
         - "dev_docs/init_apply_extract.md"
         - "dev_docs/on_the_edges.md"
