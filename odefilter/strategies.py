@@ -14,6 +14,7 @@ T = TypeVar("T")
 
 
 class FilteringDistribution(Generic[T], eqx.Module):
+    """Filtering solution."""
 
     filtered: T
     diffusion_sqrtm: float
@@ -93,7 +94,7 @@ class DynamicFilter(eqx.Module):
     def extract_fn(*, state):  # noqa: D102
         return state
 
-    def interpolate_fn(self, *, s0, s1, t0, t1, t):
+    def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -227,13 +228,13 @@ class DynamicSmoother(eqx.Module):
         # the input.
         return state
 
-    def interpolate_fn(self, *, s0, s1, t0, t1, t):
+    def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
         rv0, diff = s0.filtered, s1.diffusion_sqrtm
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
             rv=rv0, diffusion_sqrtm=diff, t=t, t0=t0
         )
         extrapolated1, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, diffusion_sqrtm=diff, t=t, t0=t0
+            rv=extrapolated0, diffusion_sqrtm=diff, t=t1, t0=t
         )
 
         s0 = SmoothingPosterior(

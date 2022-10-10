@@ -163,7 +163,7 @@ class Adaptive(eqx.Module):
     def extract_fn(self, *, state):  # noqa: D102
         return self.stepping.extract_fn(state=state.accepted)
 
-    def interpolate_fn(self, *, s0, s1, t):
+    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
 
         accepted_new, target_new = self.stepping.interpolate_fn(
             s0=s0.accepted, s1=s1.accepted, t=t

@@ -76,7 +76,7 @@ class ODEFilter(eqx.Module):
             posterior=posterior_new,
         )
 
-    def interpolate_fn(self, *, s0, s1, t):
+    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
 
         s1_new, (target_p, target_u) = self.strategy.interpolate_fn(
             s0=s0.posterior, s1=s1.posterior, t0=s0.t, t1=s1.t, t=t

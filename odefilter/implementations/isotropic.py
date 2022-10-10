@@ -114,7 +114,7 @@ class IsotropicImplementation(eqx.Module):
         return corrected
 
     @staticmethod
-    def extract_u(*, rv):
+    def extract_u(*, rv):  # noqa: D102
         return rv.mean[0]
 
     @staticmethod
