@@ -60,8 +60,6 @@ class SmoothingPosterior(Generic[NormalLike], eqx.Module):
 
 def marginalise_sequence_isotropic(*, init, backward_model):
     """Compute marginals of a markov sequence."""
-    print(init)
-    print(backward_model)
 
     def body_fun(carry, x):
         linop, noise = x.transition, x.noise
