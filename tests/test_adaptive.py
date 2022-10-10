@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import controls, odefilters, solvers, taylor_series
+from odefilter import adaptive, controls, odefilters, taylor_series
 
 
 @pytest_cases.parametrize(
@@ -17,7 +17,7 @@ def case_odefilter(tseries, strategy):
     )
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
-    return solvers.Adaptive(
+    return adaptive.Adaptive(
         stepping=odefilter,
         control=control,
         atol=atol,
@@ -29,7 +29,7 @@ def case_odefilter(tseries, strategy):
 @pytest_cases.parametrize_with_cases("solver", cases=".")
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
 def test_solver(solver, vf, u0, t0, t1, p):
-    assert isinstance(solver, solvers.Adaptive)
+    assert isinstance(solver, adaptive.Adaptive)
 
     def vf_p(*ys, t):
         return vf(*ys, t, *p)

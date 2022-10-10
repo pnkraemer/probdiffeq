@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest_cases
 from jax.experimental.ode import odeint
 
-from odefilter import controls, ivpsolve, odefilters, solvers, taylor_series
+from odefilter import adaptive, controls, ivpsolve, odefilters, taylor_series
 
 
 @pytest_cases.parametrize(
@@ -20,7 +20,7 @@ def case_odefilter(taylor, strategy):
     )
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-5, 1e-5
-    return solvers.Adaptive(
+    return adaptive.Adaptive(
         stepping=odefilter,
         control=control,
         atol=atol,

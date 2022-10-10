@@ -1,22 +1,44 @@
 """Initial value problem solvers."""
-from typing import Any, Union
+from typing import Any, Generic, TypeVar, Union
 
 import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
+T = TypeVar("T")
+"""A generic ODE Filter state."""
 
-class AdaptiveSolverState(eqx.Module):
+
+class AdaptiveSolverState(Generic[T], eqx.Module):
     """Solver state."""
 
     dt_proposed: float
     error_normalised: float
-
-    proposed: Any  # must contain fields "t" and "u".
-    accepted: Any  # must contain fields "t" and "u".
-
     control: Any  # must contain field "scale_factor".
+    """Controller."""
+
+    # All sorts of solution objects.
+    # Maybe we can simplify here. But not yet.
+
+    solution: T
+    """The current best solution.
+
+    Sometimes equal to :attr:`accepted`, but not always.
+    Not equal to :attr:`accepted` if the solution has been obtained
+    by overstepping a boundary and subsequent interpolation.
+    In this case, it equals :attr:`previous`
+    (which has been the interpolation result).
+    """
+
+    proposed: T  # must contain fields "t" and "u".
+    """The most recent proposal."""
+
+    accepted: T  # must contain fields "t" and "u".
+    """The most recent accepted state."""
+
+    previous: T  # must contain fields "t" and "u".
+    """The penultimate (2nd most recent) accepted state."""
 
 
 class Adaptive(eqx.Module):
@@ -57,8 +79,10 @@ class Adaptive(eqx.Module):
         return AdaptiveSolverState(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
+            solution=state_stepping,
             proposed=state_stepping,
             accepted=state_stepping,
+            previous=state_stepping,
             control=state_control,
         )
 
@@ -84,7 +108,9 @@ class Adaptive(eqx.Module):
             dt_proposed=state_new.dt_proposed,
             error_normalised=state_new.error_normalised,
             proposed=state_new.proposed,
+            solution=state_new.proposed,  # holla! New! :)
             accepted=state_new.proposed,  # holla! New! :)
+            previous=state_new.accepted,  # holla! New! :)
             control=state_new.control,
         )
 
@@ -116,7 +142,9 @@ class Adaptive(eqx.Module):
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
             proposed=state_proposed,
+            solution=state.solution,  # too early to accept :)
             accepted=state.accepted,  # too early to accept :)
+            previous=state.previous,  # too early to accept :)
             control=state_control,
         )
 
@@ -155,35 +183,34 @@ class Adaptive(eqx.Module):
         return AdaptiveSolverState(
             dt_proposed=state.dt_proposed,
             error_normalised=state.error_normalised,
+            solution=state.solution,  # reset this one too?????
             proposed=state.proposed,  # reset this one too?
             accepted=self.stepping.reset_fn(state=state.accepted),
+            previous=state.previous,
             control=state.control,  # reset this one too?
         )
 
     def extract_fn(self, *, state):  # noqa: D102
-        return self.stepping.extract_fn(state=state.accepted)
+        return self.stepping.extract_fn(state=state.solution)
 
-    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
+    def interpolate_fn(self, *, state, t):  # noqa: D102
+        """Interpolate between state.recent and state.accepted.
 
-        accepted_new, target_new = self.stepping.interpolate_fn(
-            s0=s0.accepted, s1=s1.accepted, t=t
+        t must be in between state.recent.t and state.accepted.t
+        """
+        # todo: the time-points seem to be inappropriately assigned
+        accepted_new, interpolated = self.stepping.interpolate_fn(
+            state0=state.previous, state1=state.accepted, t=t
         )
-
-        target = AdaptiveSolverState(
-            dt_proposed=jnp.empty_like(s0.dt_proposed),
-            error_normalised=jnp.empty_like(s0.error_normalised),
-            proposed=_empty_like(s0.proposed),  # reset this one too?
-            accepted=target_new,
-            control=_empty_like(s0.control),  # reset this one too?
-        )
-        ultimate = AdaptiveSolverState(
-            dt_proposed=s1.dt_proposed,
-            error_normalised=s1.error_normalised,
-            proposed=s1.proposed,  # reset this one too?
+        return AdaptiveSolverState(
+            dt_proposed=state.dt_proposed,
+            error_normalised=state.error_normalised,
+            proposed=state.proposed,  # reset this one too?
             accepted=accepted_new,
-            control=s1.control,  # reset this one too?
+            solution=interpolated,
+            previous=interpolated,
+            control=state.control,  # reset this one too?
         )
-        return ultimate, target
 
 
 def _empty_like(tree):

@@ -76,24 +76,24 @@ class ODEFilter(eqx.Module):
             posterior=posterior_new,
         )
 
-    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
+    def interpolate_fn(self, *, state0, state1, t):  # noqa: D102
 
-        s1_new, (target_p, target_u) = self.strategy.interpolate_fn(
-            s0=s0.posterior, s1=s1.posterior, t0=s0.t, t1=s1.t, t=t
+        state1_new, (state0_new, state0_u) = self.strategy.interpolate_fn(
+            s0=state0.posterior, t0=state0.t, s1=state1.posterior, t1=state1.t, t=t
         )
 
-        ultimate = ODEFilterSolution(
-            t=s1.t,
-            u=s1.u,
-            error_estimate=s1.error_estimate,
-            posterior=s1_new,  # updated backward models, for example
+        accepted = ODEFilterSolution(
+            t=state1.t,
+            u=state1.u,
+            error_estimate=state1.error_estimate,
+            posterior=state1_new,  # updated backward models, for example
         )
 
-        target_error = jnp.empty_like(s0.error_estimate)
-        target = ODEFilterSolution(
+        recent_error = jnp.empty_like(state0.error_estimate)
+        recent = ODEFilterSolution(
             t=t,
-            u=target_u,
-            error_estimate=target_error,
-            posterior=target_p,
+            u=state0_u,
+            error_estimate=recent_error,
+            posterior=state0_new,
         )
-        return ultimate, target
+        return accepted, recent

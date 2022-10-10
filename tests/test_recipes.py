@@ -2,7 +2,7 @@
 
 import pytest_cases
 
-from odefilter import recipes, solvers
+from odefilter import adaptive, recipes
 
 # They all use PIControl and TaylorMode, unless specified otherwise
 #
@@ -50,4 +50,4 @@ def case_dynamic_ekf1():
 
 @pytest_cases.parametrize_with_cases("solver", cases=".")
 def test_is_solver(solver):
-    assert isinstance(solver, solvers.Adaptive)
+    assert isinstance(solver, adaptive.Adaptive)

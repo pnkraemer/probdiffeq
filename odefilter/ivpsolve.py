@@ -38,13 +38,13 @@ def simulate_terminal_values(
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
 
-    _, solution = _advance_ivp_solution_adaptively(
-        state0=(state0, state0),
+    solution = _advance_ivp_solution_adaptively(
+        state0=state0,
         t1=t1,
         vector_field=vf,
         solver=solver,
     )
-    return solution
+    return solver.extract_fn(state=solution)
 
 
 # todo: don't evaluate the ODE if the time-step has been clipped
@@ -56,17 +56,18 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         return vector_field(*ys, t, *parameters)
 
     def advance_to_next_checkpoint(s, t_next):
-        return _advance_ivp_solution_adaptively(
+        s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
             vector_field=vf,
             solver=solver,
         )
+        return s_next, solver.extract_fn(state=s_next)
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = jax.lax.scan(
         f=advance_to_next_checkpoint,
-        init=(state0, state0),
+        init=state0,
         xs=ts[1:],
         reverse=False,
     )
@@ -91,33 +92,26 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
-        current, _previous = s
-        return current.accepted.t < t1
+        return s.accepted.t < t1
 
     def body_fun(s):
-        old, _older = s
-        new = solver.step_fn(state=old, vector_field=vector_field, t1=t1)
-        return new, old
+        return solver.step_fn(state=s, vector_field=vector_field, t1=t1)
 
     # todo: this conflicts with the init_fn, doesnt it?
     #  There needs to be a smarter distinction.
-    old, older = state0
-    old_reset = solver.reset_fn(state=old)
-
-    (ultim, penultim) = jax.lax.while_loop(
+    state0 = solver.reset_fn(state=state0)
+    state1 = jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,
-        init_val=(old_reset, older),
+        init_val=state0,
     )
 
-    def true_fn(ult, penult):
-        # the backward model in ult needs to be adapted for all smoothers!
-        ult_new, targ = solver.interpolate_fn(s0=penult, s1=ult, t=t1)
+    def true_fn(s1):
+        state = solver.interpolate_fn(state=s1, t=t1)
+        return state
 
-        return (ult_new, targ), solver.extract_fn(state=targ)
+    def false_fn(s1):
+        return s1
 
-    def false_fn(ult, penult):
-        return (ult, penult), solver.extract_fn(state=ult)
-
-    pred = ultim.accepted.t > t1
-    return jax.lax.cond(pred, true_fn, false_fn, ultim, penultim)
+    pred = state1.accepted.t > t1
+    return jax.lax.cond(pred, true_fn, false_fn, state1)
