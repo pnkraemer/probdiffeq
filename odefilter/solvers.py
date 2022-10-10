@@ -165,17 +165,25 @@ class Adaptive(eqx.Module):
 
     def interpolate_fn(self, *, s0, s1, t):
 
-        accepted_new = self.stepping.interpolate_and_extract_fn(
+        accepted_new, target_new = self.stepping.interpolate_fn(
             s0=s0.accepted, s1=s1.accepted, t=t
         )
 
-        return AdaptiveSolverState(
+        target = AdaptiveSolverState(
             dt_proposed=jnp.empty_like(s0.dt_proposed),
             error_normalised=jnp.empty_like(s0.error_normalised),
             proposed=_empty_like(s0.proposed),  # reset this one too?
-            accepted=accepted_new,
+            accepted=target_new,
             control=_empty_like(s0.control),  # reset this one too?
         )
+        ultimate = AdaptiveSolverState(
+            dt_proposed=s1.dt_proposed,
+            error_normalised=s1.error_normalised,
+            proposed=s1.proposed,  # reset this one too?
+            accepted=accepted_new,
+            control=s1.control,  # reset this one too?
+        )
+        return ultimate, target
 
 
 def _empty_like(tree):

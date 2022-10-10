@@ -111,8 +111,10 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     )
 
     def true_fn(ult, penult):
-        targ = solver.interpolate_fn(s0=penult, s1=ult, t=t1)
-        return (ult, targ), solver.extract_fn(state=targ)
+        # the backward model in ult needs to be adapted for all smoothers!
+        ult_new, targ = solver.interpolate_fn(s0=penult, s1=ult, t=t1)
+
+        return (ult_new, targ), solver.extract_fn(state=targ)
 
     def false_fn(ult, penult):
         return (ult, penult), solver.extract_fn(state=ult)

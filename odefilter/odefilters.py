@@ -76,14 +76,24 @@ class ODEFilter(eqx.Module):
             posterior=posterior_new,
         )
 
-    def interpolate_and_extract_fn(self, *, s0, s1, t):
-        posterior_new, u = self.strategy.interpolate_fn(
+    def interpolate_fn(self, *, s0, s1, t):
+
+        s1_new, (target_p, target_u) = self.strategy.interpolate_fn(
             s0=s0.posterior, s1=s1.posterior, t0=s0.t, t1=s1.t, t=t
         )
-        error_estimate = jnp.empty_like(s0.error_estimate)
-        return ODEFilterSolution(
-            t=t,
-            u=u,
-            error_estimate=error_estimate,
-            posterior=posterior_new,
+
+        ultimate = ODEFilterSolution(
+            t=s1.t,
+            u=s1.u,
+            error_estimate=s1.error_estimate,
+            posterior=s1_new,  # updated backward models, for example
         )
+
+        target_error = jnp.empty_like(s0.error_estimate)
+        target = ODEFilterSolution(
+            t=t,
+            u=target_u,
+            error_estimate=target_error,
+            posterior=target_p,
+        )
+        return ultimate, target

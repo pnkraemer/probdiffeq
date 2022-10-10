@@ -107,11 +107,13 @@ class DynamicFilter(eqx.Module):
             p_inv=p_inv,
             diffusion_sqrtm=s1.diffusion_sqrtm,  # right-including intervals
         )
-        solution = FilteringDistribution(
+        target_p = FilteringDistribution(
             filtered=extrapolated, diffusion_sqrtm=s1.diffusion_sqrtm
         )
-        u = self.implementation.extract_u(rv=extrapolated)
-        return solution, u
+        target_u = self.implementation.extract_u(rv=extrapolated)
+        target = (target_p, target_u)
+
+        return s1, target
 
 
 class DynamicSmoother(eqx.Module):
@@ -187,14 +189,15 @@ class DynamicSmoother(eqx.Module):
             m_ext_p=m_ext_p,
         )
         extrapolated, (backward_noise, backward_op) = x
+        bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
 
         # Final observation
-        corrected, u = self.implementation.final_correction(
+        corrected = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
+        u = self.implementation.extract_u(rv=corrected)
 
         # Condense backward models
-        bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment, bw_init=state.backward_model
         )
@@ -224,5 +227,39 @@ class DynamicSmoother(eqx.Module):
         # the input.
         return state
 
-    def interpolate_fn(self, *, s0, s1, t):
-        raise NotImplementedError(s0)
+    def interpolate_fn(self, *, s0, s1, t0, t1, t):
+        rv0, diff = s0.filtered, s1.diffusion_sqrtm
+        extrapolated0, backward_model0 = self._interpolate_from_to_fn(
+            rv=rv0, diffusion_sqrtm=diff, t=t, t0=t0
+        )
+        extrapolated1, backward_model1 = self._interpolate_from_to_fn(
+            rv=extrapolated0, diffusion_sqrtm=diff, t=t, t0=t0
+        )
+
+        s0 = SmoothingPosterior(
+            filtered=extrapolated0, diffusion_sqrtm=diff, backward_model=backward_model0
+        )
+        u = self.implementation.extract_u(rv=extrapolated0)
+        s1 = SmoothingPosterior(
+            filtered=extrapolated1, diffusion_sqrtm=diff, backward_model=backward_model1
+        )
+        return s1, (s0, u)
+
+    def _interpolate_from_to_fn(self, rv, diffusion_sqrtm, t, t0):
+        dt = t - t0
+        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
+        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+            rv.mean, p=p, p_inv=p_inv
+        )
+        x = self.implementation.revert_markov_kernel(
+            m_ext=m_ext,
+            l0=rv.cov_sqrtm_lower,
+            p=p,
+            p_inv=p_inv,
+            diffusion_sqrtm=diffusion_sqrtm,
+            m0_p=m0_p,
+            m_ext_p=m_ext_p,
+        )
+        extrapolated, (backward_noise, backward_op) = x
+        backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
+        return extrapolated, backward_model

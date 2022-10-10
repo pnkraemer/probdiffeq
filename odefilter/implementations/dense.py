@@ -106,6 +106,5 @@ class DenseImplementation(eqx.Module):
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return corrected
 
-    @staticmethod
-    def extract_u(*, rv):
+    def extract_u(self, *, rv):
         return rv.mean.reshape((-1, self.ode_dimension), order="F")[0]
