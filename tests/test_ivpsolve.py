@@ -21,7 +21,7 @@ def case_odefilter(taylor, strategy):
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-5, 1e-5
     return adaptive.Adaptive(
-        stepping=odefilter,
+        odefilter=odefilter,
         control=control,
         atol=atol,
         rtol=rtol,

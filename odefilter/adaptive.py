@@ -51,20 +51,20 @@ class Adaptive(eqx.Module):
     rtol: float
 
     error_order: int
-    stepping: Any
+    odefilter: Any
     control: Any
     norm_ord: Union[int, str, None] = None
 
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
-        state_stepping = self.stepping.init_fn(
+        state_odefilter = self.odefilter.init_fn(
             vector_field=vector_field, initial_values=initial_values, t0=t0
         )
         state_control = self.control.init_fn()
 
         error_normalised = self._normalise_error(
-            error_estimate=state_stepping.error_estimate,
-            u=state_stepping.u,
+            error_estimate=state_odefilter.error_estimate,
+            u=state_odefilter.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -79,10 +79,10 @@ class Adaptive(eqx.Module):
         return AdaptiveSolverState(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
-            solution=state_stepping,
-            proposed=state_stepping,
-            accepted=state_stepping,
-            previous=state_stepping,
+            solution=state_odefilter,
+            proposed=state_odefilter,
+            accepted=state_odefilter,
+            previous=state_odefilter,
             control=state_control,
         )
 
@@ -122,7 +122,7 @@ class Adaptive(eqx.Module):
         # dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
         dt_proposed = state.dt_proposed
 
-        state_proposed = self.stepping.step_fn(
+        state_proposed = self.odefilter.step_fn(
             state=state.accepted, vector_field=vector_field, dt0=dt_proposed
         )
         error_normalised = self._normalise_error(
@@ -185,13 +185,13 @@ class Adaptive(eqx.Module):
             error_normalised=state.error_normalised,
             solution=state.solution,  # reset this one too?????
             proposed=state.proposed,  # reset this one too?
-            accepted=self.stepping.reset_fn(state=state.accepted),
+            accepted=self.odefilter.reset_fn(state=state.accepted),
             previous=state.previous,
             control=state.control,  # reset this one too?
         )
 
     def extract_fn(self, *, state):  # noqa: D102
-        return self.stepping.extract_fn(state=state.solution)
+        return self.odefilter.extract_fn(state=state.solution)
 
     def interpolate_fn(self, *, state, t):  # noqa: D102
         """Interpolate between state.recent and state.accepted.
@@ -199,7 +199,7 @@ class Adaptive(eqx.Module):
         t must be in between state.recent.t and state.accepted.t
         """
         # todo: the time-points seem to be inappropriately assigned
-        accepted_new, interpolated = self.stepping.interpolate_fn(
+        accepted_new, interpolated = self.odefilter.interpolate_fn(
             state0=state.previous, state1=state.accepted, t=t
         )
         return AdaptiveSolverState(
