@@ -20,6 +20,8 @@ class AdaptiveSolverState(Generic[T], eqx.Module):
 
     # All sorts of solution objects.
     # Maybe we can simplify here. But not yet.
+    # Edit: I am pretty sure one of them can go.
+    # (I am looking at you, "previous".)
 
     solution: T
     """The current best solution.

@@ -48,10 +48,9 @@ class IsotropicImplementation(eqx.Module):
         return jnp.eye(*self.a.shape)
 
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
-        shape_m = rv_proto.mean.shape
-        shape_l = rv_proto.cov_sqrtm_lower.shape
         return IsotropicNormal(
-            mean=jnp.zeros(shape_m), cov_sqrtm_lower=jnp.zeros(shape_l)
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
@@ -65,17 +64,23 @@ class IsotropicImplementation(eqx.Module):
 
     def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
         l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
-        c_obs_raw = jnp.dot(l_obs_raw, l_obs_raw)
-        res_white = m_obs / jnp.sqrt(c_obs_raw)
-        diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white) / res_white.size)
-        error_estimate = diffusion_sqrtm * jnp.sqrt(c_obs_raw)
+
+        # jnp.sqrt(l_obs.T @ l_obs) without forming the square
+        l_obs = sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None])[0, 0]
+        res_white = m_obs / l_obs / jnp.sqrt(m_obs.size)
+
+        # jnp.sqrt(\|res_white\|^2/d) without forming the square
+        diffusion_sqrtm = sqrtm.sqrtm_to_cholesky(R=res_white[:, None])[0, 0]
+
+        error_estimate = diffusion_sqrtm * l_obs
         return diffusion_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
         self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
     ):
+        l0_p = p_inv[:, None] * l0
         l_ext_p = sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * l0)).T,
+            R1=(self.a @ l0_p).T,
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p

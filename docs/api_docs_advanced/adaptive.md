@@ -1,0 +1,3 @@
+# Adaptive solvers
+
+::: odefilter.adaptive

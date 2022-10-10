@@ -153,7 +153,6 @@ class DynamicSmoother(eqx.Module):
         backward_noise = self.implementation.init_backward_noise(
             rv_proto=state.backward_model.noise
         )
-
         backward_model = BackwardModel(
             transition=backward_transition, noise=backward_noise
         )
@@ -228,20 +227,39 @@ class DynamicSmoother(eqx.Module):
         return state
 
     def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
-        rv0, diff = s0.filtered, s1.diffusion_sqrtm
+        rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
+
+        # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=rv0, diffusion_sqrtm=diff, t=t, t0=t0
+            rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=t0
         )
         extrapolated1, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, diffusion_sqrtm=diff, t=t1, t0=t
+            rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=t1, t0=t
         )
 
+        # The interpolated variable is the solution at the checkpoint,
+        # and we need to update the backward models by condensing the
+        # model from the previous checkpoint to t0 with the newly acquired
+        # model from t0 to t. This will imply a backward model from the
+        # previous checkpoint to the current checkpoint.
+        # noise0, g0 = self.implementation.condense_backward_models(
+        #     bw_init=s0.backward_model, bw_state=backward_model0
+        # )
+        # backward_model0 = BackwardModel(transition=g0, noise=noise0)
+
+        # This is the new solution object at t.
         s0 = SmoothingPosterior(
-            filtered=extrapolated0, diffusion_sqrtm=diff, backward_model=backward_model0
+            filtered=extrapolated0,
+            diffusion_sqrtm=diffsqrtm,
+            backward_model=backward_model0,
         )
         u = self.implementation.extract_u(rv=extrapolated0)
+
+        # We update the backward model from
         s1 = SmoothingPosterior(
-            filtered=extrapolated1, diffusion_sqrtm=diff, backward_model=backward_model1
+            filtered=s1.filtered,
+            diffusion_sqrtm=diffsqrtm,
+            backward_model=backward_model1,
         )
         return s1, (s0, u)
 
@@ -261,5 +279,6 @@ class DynamicSmoother(eqx.Module):
             m_ext_p=m_ext_p,
         )
         extrapolated, (backward_noise, backward_op) = x
+
         backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
         return extrapolated, backward_model
