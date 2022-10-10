@@ -16,13 +16,13 @@ but until you do so, use one of ours.
 """
 from odefilter import (
     controls,
-    implementations,
     information,
     odefilters,
     solvers,
     strategies,
     taylor_series,
 )
+from odefilter.implementations import dense, isotropic
 
 
 def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
@@ -32,7 +32,7 @@ def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
     Suitable for high-dimensional, non-stiff problems.
     """
     information_op = information.IsotropicEK0FirstOrder()
-    implementation = implementations.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = strategies.DynamicFilter(
@@ -58,7 +58,7 @@ def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
     Suitable for high-dimensional, non-stiff problems.
     """
     information_op = information.IsotropicEK0FirstOrder()
-    implementation = implementations.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = strategies.DynamicSmoother(
@@ -77,14 +77,14 @@ def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
     )
 
 
-def dynamic_ekf1(num_derivatives, atol, rtol):
+def dynamic_ekf1(num_derivatives, ode_dimension, atol, rtol):
     """Construct the equivalent of a semi-implicit solver with dynamic calibration.
 
     Suitable for low-dimensional, stiff problems.
     """
     information_op = information.IsotropicEK0FirstOrder()
-    implementation = implementations.IsotropicImplementation.from_num_derivatives(
-        num_derivatives=num_derivatives
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = strategies.DynamicSmoother(
         implementation=implementation, information=information_op
