@@ -62,7 +62,7 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
             vector_field=vf,
             solver=solver,
         )
-        return s_next, solver.extract_fn(state=s_next)
+        return s_next, s_next
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = jax.lax.scan(
@@ -71,7 +71,7 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         xs=ts[1:],
         reverse=False,
     )
-    return solution
+    return solver.extract_fn(state=solution)
 
 
 def _assert_not_scalar(initial_values):

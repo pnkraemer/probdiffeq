@@ -98,7 +98,7 @@ class IsotropicImplementation(eqx.Module):
         m_bw, l_bw = p[:, None] * m_bw_p, p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
         backward_op = g_bw
-        backward_noise = IsotropicNormal(m_bw, l_bw)
+        backward_noise = IsotropicNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 

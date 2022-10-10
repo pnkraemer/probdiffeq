@@ -95,8 +95,6 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     the matrix $G$ is often called the _Kalman gain_;
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
-
-
     """
     R = jnp.block(
         [
@@ -105,7 +103,7 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
         ]
     )
     R = jnp.linalg.qr(R, mode="r")
-    d = R_YX.shape[0]
+    d = R_X_F.shape[1]
 
     # ~R_{Y}
     R1 = R[:d, :d]
@@ -113,6 +111,7 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
 
     # something like the cross-covariance
     R12 = R[:d, d:]
+    # G = jnp.linalg.lstsq(R_Y, R12)[0].T
     G = jsp.linalg.solve_triangular(R_Y, R12).T
 
     # ~R_{X \mid Y}

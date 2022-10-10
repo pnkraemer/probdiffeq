@@ -92,7 +92,7 @@ class DynamicFilter(eqx.Module):
 
     @staticmethod
     def extract_fn(*, state):  # noqa: D102
-        return state
+        return state.filtered
 
     def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
         dt = t - t0
@@ -224,8 +224,7 @@ class DynamicSmoother(eqx.Module):
                 init=init, backward_model=state.backward_model
             )
 
-        # Otherwise, we are still in filtering mode and simply return
-        # the input.
+        # Otherwise, we are still in filtering mode and simply return the input
         return state
 
     def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
