@@ -9,11 +9,7 @@ on the interval $(t_0, t_1]$.
 from typing import Any, Generic, TypeVar
 
 import equinox as eqx
-import jax.lax
-import jax.numpy as jnp
 from jaxtyping import Array, Float
-
-from odefilter import sqrtm
 
 
 class Normal(eqx.Module):
@@ -53,29 +49,3 @@ class SmoothingPosterior(Generic[NormalLike], eqx.Module):
 
     filtered: NormalLike
     backward_model: BackwardModel[NormalLike]
-
-
-# todo: move to implementations?
-
-
-def marginalise_sequence_isotropic(*, init, backward_model):
-    """Compute marginals of a markov sequence."""
-
-    def body_fun(carry, x):
-        linop, noise = x.transition, x.noise
-        out = marginalise_model_isotropic(init=carry, linop=linop, noise=noise)
-        return out, out
-
-    _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=False)
-    return rvs
-
-
-def marginalise_model_isotropic(*, init, linop, noise):
-    """Marginalise the output of a linear model."""
-    # Apply transition
-    m_new = jnp.dot(linop, init.mean) + noise.mean
-    l_new = sqrtm.sum_of_sqrtm_factors(
-        R1=jnp.dot(linop, init.cov_sqrtm_lower).T, R2=noise.cov_sqrtm_lower.T
-    ).T
-
-    return IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)

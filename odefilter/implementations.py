@@ -124,10 +124,29 @@ class IsotropicImplementation(eqx.Module):
         return noise, g
 
     @staticmethod
-    def marginalise_backwards(*, init, backward_model):  # noqa: D102
-        return solutions.marginalise_sequence_isotropic(
-            init=init, backward_model=backward_model
-        )
+    def marginalise_backwards(*, init, backward_model):
+        """Compute marginals of a markov sequence."""
+
+        def body_fun(carry, x):
+            linop, noise = x.transition, x.noise
+            out = IsotropicImplementation.marginalise_model_isotropic(
+                init=carry, linop=linop, noise=noise
+            )
+            return out, out
+
+        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=False)
+        return rvs
+
+    @staticmethod
+    def marginalise_model_isotropic(*, init, linop, noise):
+        """Marginalise the output of a linear model."""
+        # Apply transition
+        m_new = jnp.dot(linop, init.mean) + noise.mean
+        l_new = sqrtm.sum_of_sqrtm_factors(
+            R1=jnp.dot(linop, init.cov_sqrtm_lower).T, R2=noise.cov_sqrtm_lower.T
+        ).T
+
+        return solutions.IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
 
 class DenseImplementation(eqx.Module):
