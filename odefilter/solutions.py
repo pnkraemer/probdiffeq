@@ -12,13 +12,6 @@ import equinox as eqx
 from jaxtyping import Array, Float
 
 
-class Normal(eqx.Module):
-    """Random variable with a normal distribution."""
-
-    mean: Any
-    cov_sqrtm_lower: Any
-
-
 class IsotropicNormal(eqx.Module):
     """Random variable with a normal distribution."""
 
@@ -33,7 +26,7 @@ class MultivariateNormal(eqx.Module):
     cov_sqrtm_lower: Float[Array, "k k"]
 
 
-NormalLike = TypeVar("RVLike", Normal, IsotropicNormal)
+NormalLike = TypeVar("RVLike", MultivariateNormal, IsotropicNormal)
 """A type-variable to alias appropriate Normal-like random variables."""
 
 
