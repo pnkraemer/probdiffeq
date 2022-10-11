@@ -157,9 +157,6 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     def body_fun(s):
         return solver.step_fn(state=s, vector_field=vector_field, t1=t1)
 
-    # todo: this conflicts with the init_fn, doesnt it?
-    #  There needs to be a smarter distinction.
-    # state0 = solver.reset_fn(state=state0)
     state1 = jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,

@@ -182,18 +182,6 @@ class Adaptive(eqx.Module):
         return jnp.minimum(100.0 * dt0, dt1)
 
     @eqx.filter_jit
-    def reset_fn(self, *, state):  # noqa: D102
-        return AdaptiveSolverState(
-            dt_proposed=state.dt_proposed,
-            error_normalised=state.error_normalised,
-            solution=state.solution,  # reset this one too?????
-            proposed=state.proposed,  # reset this one too?
-            accepted=self.odefilter.reset_fn(state=state.accepted),
-            previous=state.previous,
-            control=state.control,  # reset this one too?
-        )
-
-    @eqx.filter_jit
     def extract_fn(self, *, state):  # noqa: D102
         return self.odefilter.extract_fn(state=state.solution)
 
@@ -210,11 +198,11 @@ class Adaptive(eqx.Module):
         return AdaptiveSolverState(
             dt_proposed=state.dt_proposed,
             error_normalised=state.error_normalised,
-            proposed=state.proposed,  # reset this one too?
+            proposed=state.proposed,
             accepted=accepted_new,
             solution=interpolated,
             previous=interpolated,
-            control=state.control,  # reset this one too?
+            control=state.control,
         )
 
 
