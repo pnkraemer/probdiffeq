@@ -12,7 +12,7 @@ class ODEFilterSolution(eqx.Module):
     u: Any
     error_estimate: Any
 
-    posterior: Any
+    posterior: Any  # todo: rename to probsol? It is not always a _posterior_
 
 
 class ODEFilter(eqx.Module):
