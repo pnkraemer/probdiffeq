@@ -11,7 +11,7 @@ SOLVERS = [
     pytest.param(
         recipes.dynamic_isotropic_eks0(num_derivatives=2),
         id="DynIsoEKS0",
-        # marks=pytest.mark.xfail(reason="Checkpoint-smoother is buggy"),
+        marks=pytest.mark.xfail(reason="Checkpoint-smoother is buggy"),
     ),
     pytest.param(recipes.dynamic_isotropic_ekf0(num_derivatives=2), id="DynIsoEKF0"),
     pytest.param(

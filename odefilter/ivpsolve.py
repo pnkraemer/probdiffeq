@@ -22,7 +22,7 @@ def solve(
     Returns the full solution, but uses native python control flow.
     Not JITable, not reverse-mode-differentiable.
     """
-    solution_gen = _solution_generator(
+    solution_gen = solution_generator(
         vector_field=vector_field,
         initial_values=initial_values,
         t0=t0,
@@ -33,7 +33,7 @@ def solve(
     return _control_flow.tree_stack([sol for sol in solution_gen])
 
 
-def _solution_generator(
+def solution_generator(
     vector_field,
     initial_values,
     *,
@@ -42,7 +42,11 @@ def _solution_generator(
     solver,
     parameters=(),
 ):
+    """Construct a generator of an IVP solution.
 
+    Uses native python control flow.
+    Not JITable, not reverse-mode-differentiable.
+    """
     _assert_not_scalar(initial_values=initial_values)
 
     def vf(*ys, t):
