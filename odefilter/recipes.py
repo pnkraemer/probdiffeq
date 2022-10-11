@@ -15,10 +15,10 @@ but until you do so, use one of ours.
 
 """
 from odefilter import (
+    adaptive,
     controls,
     information,
     odefilters,
-    solvers,
     strategies,
     taylor_series,
 )
@@ -42,8 +42,8 @@ def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
         taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
     )
     control = controls.ProportionalIntegral()
-    return solvers.Adaptive(
-        stepping=stepping,
+    return adaptive.Adaptive(
+        odefilter=stepping,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -68,8 +68,8 @@ def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
         taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
     )
     control = controls.ProportionalIntegral()
-    return solvers.Adaptive(
-        stepping=stepping,
+    return adaptive.Adaptive(
+        odefilter=stepping,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -93,8 +93,8 @@ def dynamic_ekf1(num_derivatives, ode_dimension, atol, rtol):
         taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
     )
     control = controls.ProportionalIntegral()
-    return solvers.Adaptive(
-        stepping=stepping,
+    return adaptive.Adaptive(
+        odefilter=stepping,
         control=control,
         atol=atol,
         rtol=rtol,

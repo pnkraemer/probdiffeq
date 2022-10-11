@@ -1,22 +1,46 @@
 """Initial value problem solvers."""
-from typing import Any, Union
+from typing import Any, Generic, TypeVar, Union
 
 import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
+T = TypeVar("T")
+"""A generic ODE Filter state."""
 
-class AdaptiveSolverState(eqx.Module):
+
+class AdaptiveSolverState(Generic[T], eqx.Module):
     """Solver state."""
 
     dt_proposed: float
     error_normalised: float
-
-    proposed: Any  # must contain fields "t" and "u".
-    accepted: Any  # must contain fields "t" and "u".
-
     control: Any  # must contain field "scale_factor".
+    """Controller."""
+
+    # All sorts of solution objects.
+    # Maybe we can simplify here. But not yet.
+    # Edit: I am pretty sure one of them can go.
+    # (I am looking at you, "previous".)
+
+    solution: T
+    """The current best solution.
+
+    Sometimes equal to :attr:`accepted`, but not always.
+    Not equal to :attr:`accepted` if the solution has been obtained
+    by overstepping a boundary and subsequent interpolation.
+    In this case, it equals :attr:`previous`
+    (which has been the interpolation result).
+    """
+
+    proposed: T  # must contain fields "t" and "u".
+    """The most recent proposal."""
+
+    accepted: T  # must contain fields "t" and "u".
+    """The most recent accepted state."""
+
+    previous: T  # must contain fields "t" and "u".
+    """The penultimate (2nd most recent) accepted state."""
 
 
 class Adaptive(eqx.Module):
@@ -29,20 +53,20 @@ class Adaptive(eqx.Module):
     rtol: float
 
     error_order: int
-    stepping: Any
+    odefilter: Any
     control: Any
     norm_ord: Union[int, str, None] = None
 
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
-        state_stepping = self.stepping.init_fn(
+        state_odefilter = self.odefilter.init_fn(
             vector_field=vector_field, initial_values=initial_values, t0=t0
         )
         state_control = self.control.init_fn()
 
         error_normalised = self._normalise_error(
-            error_estimate=state_stepping.error_estimate,
-            u=state_stepping.u,
+            error_estimate=state_odefilter.error_estimate,
+            u=state_odefilter.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -57,8 +81,10 @@ class Adaptive(eqx.Module):
         return AdaptiveSolverState(
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
-            proposed=state_stepping,
-            accepted=state_stepping,
+            solution=state_odefilter,
+            proposed=state_odefilter,
+            accepted=state_odefilter,
+            previous=state_odefilter,
             control=state_control,
         )
 
@@ -84,7 +110,9 @@ class Adaptive(eqx.Module):
             dt_proposed=state_new.dt_proposed,
             error_normalised=state_new.error_normalised,
             proposed=state_new.proposed,
+            solution=state_new.proposed,  # holla! New! :)
             accepted=state_new.proposed,  # holla! New! :)
+            previous=state_new.accepted,  # holla! New! :)
             control=state_new.control,
         )
 
@@ -93,10 +121,9 @@ class Adaptive(eqx.Module):
         propose a future time-step based on tolerances and error estimates."""
         # todo: should this be at the end of this function?
         #  or even happen inside the controller?
-        dt_proposed = jnp.minimum(t1 - state.accepted.t, state.dt_proposed)
 
-        state_proposed = self.stepping.step_fn(
-            state=state.accepted, vector_field=vector_field, dt0=dt_proposed
+        state_proposed = self.odefilter.step_fn(
+            state=state.accepted, vector_field=vector_field, dt0=state.dt_proposed
         )
         error_normalised = self._normalise_error(
             error_estimate=state_proposed.error_estimate,
@@ -115,7 +142,9 @@ class Adaptive(eqx.Module):
             dt_proposed=dt_proposed,
             error_normalised=error_normalised,
             proposed=state_proposed,
+            solution=state.solution,  # too early to accept :)
             accepted=state.accepted,  # too early to accept :)
+            previous=state.previous,  # too early to accept :)
             control=state_control,
         )
 
@@ -154,10 +183,35 @@ class Adaptive(eqx.Module):
         return AdaptiveSolverState(
             dt_proposed=state.dt_proposed,
             error_normalised=state.error_normalised,
+            solution=state.solution,  # reset this one too?????
             proposed=state.proposed,  # reset this one too?
-            accepted=self.stepping.reset_fn(state=state.accepted),
+            accepted=self.odefilter.reset_fn(state=state.accepted),
+            previous=state.previous,
             control=state.control,  # reset this one too?
         )
 
     def extract_fn(self, *, state):  # noqa: D102
-        return self.stepping.extract_fn(state=state.accepted)
+        return self.odefilter.extract_fn(state=state.solution)
+
+    def interpolate_fn(self, *, state, t):  # noqa: D102
+        """Interpolate between state.recent and state.accepted.
+
+        t must be in between state.recent.t and state.accepted.t
+        """
+        # todo: the time-points seem to be inappropriately assigned
+        accepted_new, interpolated = self.odefilter.interpolate_fn(
+            state0=state.previous, state1=state.accepted, t=t
+        )
+        return AdaptiveSolverState(
+            dt_proposed=state.dt_proposed,
+            error_normalised=state.error_normalised,
+            proposed=state.proposed,  # reset this one too?
+            accepted=accepted_new,
+            solution=interpolated,
+            previous=interpolated,
+            control=state.control,  # reset this one too?
+        )
+
+
+def _empty_like(tree):
+    return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)

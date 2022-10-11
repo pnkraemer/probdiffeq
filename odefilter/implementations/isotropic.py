@@ -42,16 +42,15 @@ class IsotropicImplementation(eqx.Module):
 
     @staticmethod
     def init_error_estimate():  # noqa: D102
-        return jnp.empty(())
+        return jnp.nan * jnp.ones(())
 
     def init_backward_transition(self):  # noqa: D102
         return jnp.eye(*self.a.shape)
 
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
-        shape_m = rv_proto.mean.shape
-        shape_l = rv_proto.cov_sqrtm_lower.shape
         return IsotropicNormal(
-            mean=jnp.zeros(shape_m), cov_sqrtm_lower=jnp.zeros(shape_l)
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
@@ -63,19 +62,25 @@ class IsotropicImplementation(eqx.Module):
         m_ext = p[:, None] * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p_inv):  # noqa: D102
-        l_obs_raw = linear_fn(p_inv[:, None] * self.q_sqrtm_lower)
-        c_obs_raw = jnp.dot(l_obs_raw, l_obs_raw)
-        res_white = m_obs / jnp.sqrt(c_obs_raw)
-        diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white) / res_white.size)
-        error_estimate = diffusion_sqrtm * jnp.sqrt(c_obs_raw)
+    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
+        l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
+
+        # jnp.sqrt(l_obs.T @ l_obs) without forming the square
+        l_obs = sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None])[0, 0]
+        res_white = m_obs / l_obs / jnp.sqrt(m_obs.size)
+
+        # jnp.sqrt(\|res_white\|^2/d) without forming the square
+        diffusion_sqrtm = sqrtm.sqrtm_to_cholesky(R=res_white[:, None])[0, 0]
+
+        error_estimate = diffusion_sqrtm * l_obs
         return diffusion_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
         self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
     ):
+        l0_p = p_inv[:, None] * l0
         l_ext_p = sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * l0)).T,
+            R1=(self.a @ l0_p).T,
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
@@ -93,12 +98,16 @@ class IsotropicImplementation(eqx.Module):
         l_ext_p, l_bw_p = r_ext_p.T, r_bw_p.T
         m_bw_p = m0_p - g_bw_p @ m_ext_p
 
-        # Un-apply the pre-conditioner
+        # Un-apply the pre-conditioner.
+        # The backward models remains preconditioned, because
+        # we do backward passes in preconditioner-space.
         l_ext = p[:, None] * l_ext_p
-        m_bw, l_bw = p[:, None] * m_bw_p, p[:, None] * l_bw_p
+        m_bw = p[:, None] * m_bw_p
+        l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
+
         backward_op = g_bw
-        backward_noise = IsotropicNormal(m_bw, l_bw)
+        backward_noise = IsotropicNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
@@ -111,7 +120,11 @@ class IsotropicImplementation(eqx.Module):
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return corrected, (corrected.mean[0])
+        return corrected
+
+    @staticmethod
+    def extract_u(*, rv):  # noqa: D102
+        return rv.mean[0]
 
     @staticmethod
     def condense_backward_models(*, bw_init, bw_state):  # noqa: D102
@@ -119,7 +132,7 @@ class IsotropicImplementation(eqx.Module):
         (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
 
         C = bw_state.transition
-        (d, D_sqrtm) = bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower
+        (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
 
         g = A @ C
         xi = A @ d + b
@@ -139,16 +152,29 @@ class IsotropicImplementation(eqx.Module):
             )
             return out, out
 
-        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=False)
+        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=True)
+
         return rvs
 
     @staticmethod
     def marginalise_model_isotropic(*, init, linop, noise):
         """Marginalise the output of a linear model."""
+        # Pull into preconditioned space
+        m0_p = init.mean
+        l0_p = init.cov_sqrtm_lower
+
         # Apply transition
-        m_new = jnp.dot(linop, init.mean) + noise.mean
-        l_new = sqrtm.sum_of_sqrtm_factors(
-            R1=jnp.dot(linop, init.cov_sqrtm_lower).T, R2=noise.cov_sqrtm_lower.T
+        m_new_p = linop @ m0_p + noise.mean
+        l_new_p = sqrtm.sum_of_sqrtm_factors(
+            R1=(linop @ l0_p).T, R2=noise.cov_sqrtm_lower.T
         ).T
 
+        # Push back into non-preconditioned space
+        m_new = m_new_p
+        l_new = l_new_p
+
         return IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)
+
+    def init_preconditioner(self):  # noqa: D102
+        empty = jnp.nan * jnp.ones((self.a.shape[0],))
+        return empty, empty

@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 
 
+# rename: reparametrise_conditional_correlation?
 def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
 
@@ -95,8 +96,6 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     the matrix $G$ is often called the _Kalman gain_;
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
-
-
     """
     R = jnp.block(
         [
@@ -105,7 +104,7 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
         ]
     )
     R = jnp.linalg.qr(R, mode="r")
-    d = R_YX.shape[0]
+    d = R_X_F.shape[1]
 
     # ~R_{Y}
     R1 = R[:d, :d]
@@ -113,7 +112,8 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
 
     # something like the cross-covariance
     R12 = R[:d, d:]
-    G = jsp.linalg.solve_triangular(R_Y, R12).T
+    G = jsp.linalg.solve_triangular(R_Y.T, R12.T, lower=True).T
+    # G = R12 @ jnp.linalg.inv(R_Y)
 
     # ~R_{X \mid Y}
     R3 = R[d:, d:]

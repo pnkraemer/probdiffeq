@@ -47,7 +47,7 @@ class DenseImplementation(eqx.Module):
         return MultivariateNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_error_estimate(self):  # noqa: D102
-        return jnp.empty((self.ode_dimension,))
+        return jnp.nan * jnp.ones((self.ode_dimension,))
 
     def init_backward_transition(self):  # noqa: D102
         raise NotImplementedError
@@ -66,9 +66,9 @@ class DenseImplementation(eqx.Module):
         m_ext = p * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p_inv):  # noqa: D102
+    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(
-            p_inv[:, None] * self.q_sqrtm_lower
+            p[:, None] * self.q_sqrtm_lower
         )
         l_obs_raw = sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
@@ -104,5 +104,7 @@ class DenseImplementation(eqx.Module):
         m_cor = m_ext - gain @ m_obs
         l_cor = l_ext - gain @ l_obs_nonsquare
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        u = m_cor.reshape((-1, self.ode_dimension), order="F")[0]
-        return corrected, u
+        return corrected
+
+    def extract_u(self, *, rv):  # noqa: D102
+        return rv.mean.reshape((-1, self.ode_dimension), order="F")[0]

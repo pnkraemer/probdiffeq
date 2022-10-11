@@ -2,6 +2,7 @@
 from typing import Any, Callable
 
 import equinox as eqx
+import jax.numpy as jnp
 
 
 class ODEFilterSolution(eqx.Module):
@@ -67,6 +68,9 @@ class ODEFilter(eqx.Module):
         )
 
     def extract_fn(self, *, state):  # noqa: D102
+
+        # todo: state.u should also be updated when smoothing!
+        #  and it is a bit strange what the smoother returns at t0 and t1.
         posterior_new = self.strategy.extract_fn(state=state.posterior)
         return ODEFilterSolution(
             t=state.t,
@@ -74,3 +78,25 @@ class ODEFilter(eqx.Module):
             error_estimate=state.error_estimate,
             posterior=posterior_new,
         )
+
+    def interpolate_fn(self, *, state0, state1, t):  # noqa: D102
+
+        state_accep, (state_interp, state_interp_u) = self.strategy.interpolate_fn(
+            s0=state0.posterior, t0=state0.t, s1=state1.posterior, t1=state1.t, t=t
+        )
+
+        accepted = ODEFilterSolution(
+            t=state1.t,
+            u=state1.u,
+            error_estimate=state1.error_estimate,
+            posterior=state_accep,  # updated backward models, for example
+        )
+
+        error_interp = jnp.nan * jnp.ones_like(state0.error_estimate)
+        interpolated = ODEFilterSolution(
+            t=t,
+            u=state_interp_u,
+            error_estimate=error_interp,
+            posterior=state_interp,
+        )
+        return accepted, interpolated

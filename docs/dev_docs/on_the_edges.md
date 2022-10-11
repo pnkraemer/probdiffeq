@@ -12,16 +12,51 @@ In this case, we have the choices between
 4. Stepping over the terminal time and using dense output to evaluate the solution at the terminal time.
 
 Option 1. is not good, because it goes against what a user would expect.
-Optional 2. is easiest to implement, but leads to issues with checkpointing:
+Option 2. is easiest to implement, but leads to issues with checkpointing:
 when the number of checkpoints is larger than the number of solver-grid points,
 which happens if you want to plot a high-resolution version of an inaccurate approximation,
 then this strategy does not work.
 Option 3. requires something like dense output.
 Option 4. might be the "best" solution in terms of intuitive behaviour, but it requires that the ODE solution is defined beyond the terminal time point.
-Most are, but some are not (todo: give example).
 
+We do 4. Here is how.
 
-**What do SciPy/Diffrax/JAX-ODE/Matlab/OrdinaryDiffeq.jl do?**
+## Implementation
 
+Adaptive ODE solvers track a ``proposed`` state and an ``accepted`` state.
+The ``proposed`` state is refined until some error criterion is satisfied,
+and then the ``proposed`` state becomes the ``accepted`` state.
 
-ODE filters are extrapolate-correct algorithms.
+To implement this overstepping behaviour, we additionally track a ``solution`` state.
+The ``solution`` state usually coincides with the ``accepted`` state.
+It gets interesting when they disagree, which is usually when the time-location
+of the accepted state disagrees with a user-specified checkpoint.
+The following cases are distinguished.
+
+### Case 1: $t < t + \Delta t < t_1$
+Nothing special happens, we step as usual. The ``accepted`` and the ``solution``
+state coincide at all locations.
+The next step starts at the ``solution`` state
+(which coincides with the ``accepted`` state anyway).
+
+### Case 2: $t < t_1 < t + \Delta t$
+We step from $t$ to $\Delta t$ and interpolate the solution to obtain
+an estimate at $t_1$.
+Here, the ``accepted`` state is at time-point $t + \Delta t$,
+but the ``solution`` state is at time-point $t_1 < t + \Delta t$.
+How does this work?
+Consider the following example implementation
+
+```python
+def iterate(state, t1, step_fn, *problem):
+    while state.accepted.t < t1:
+        # state.solution = state.accepted
+        state = step_fn(*problem, state)
+
+    if state.accepted.t > t1:
+        # state.solution != state.accepted
+        state.solution = interpolate(*problem, s0=state.previous, s1=state.accepted, t=t1)
+    return state
+
+```
+Interpolation itself is solver-specific.

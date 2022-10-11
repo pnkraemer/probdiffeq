@@ -38,14 +38,13 @@ def simulate_terminal_values(
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
 
-    state = _advance_ivp_solution_adaptively(
+    solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
         vector_field=vf,
         solver=solver,
     )
-
-    return solver.extract_fn(state=state)
+    return solver.extract_fn(state=solution)
 
 
 # todo: don't evaluate the ODE if the time-step has been clipped
@@ -57,13 +56,13 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         return vector_field(*ys, t, *parameters)
 
     def advance_to_next_checkpoint(s, t_next):
-        state_ = _advance_ivp_solution_adaptively(
+        s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
             vector_field=vf,
             solver=solver,
         )
-        return state_, state_
+        return s_next, s_next
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = jax.lax.scan(
@@ -100,10 +99,19 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
 
     # todo: this conflicts with the init_fn, doesnt it?
     #  There needs to be a smarter distinction.
-    init_val = solver.reset_fn(state=state0)
-
-    return jax.lax.while_loop(
+    # state0 = solver.reset_fn(state=state0)
+    state1 = jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,
-        init_val=init_val,
+        init_val=state0,
     )
+
+    def true_fn(s1):
+        state = solver.interpolate_fn(state=s1, t=t1)
+        return state
+
+    def false_fn(s1):
+        return s1
+
+    pred = state1.accepted.t > t1
+    return jax.lax.cond(pred, true_fn, false_fn, state1)
