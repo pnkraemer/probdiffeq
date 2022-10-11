@@ -1,7 +1,8 @@
 """Solve initial value problems."""
 
 
-import equinox as eqx
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 
@@ -63,7 +64,7 @@ def solution_generator(
     yield solver.extract_fn(state=state_terminal)
 
 
-@eqx.filter_jit
+@partial(jax.jit, static_argnames=("vector_field",))
 def simulate_terminal_values(
     vector_field,
     initial_values,
@@ -106,7 +107,7 @@ def simulate_terminal_values(
     return solver.extract_fn(state=solution)
 
 
-@eqx.filter_jit
+@partial(jax.jit, static_argnames=("vector_field",))
 def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
     """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values=initial_values)

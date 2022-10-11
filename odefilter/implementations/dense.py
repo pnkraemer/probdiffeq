@@ -24,8 +24,8 @@ class DenseImplementation(eqx.Module):
     a: Any
     q_sqrtm_lower: Any
 
-    num_derivatives: int
-    ode_dimension: int
+    num_derivatives: int = eqx.static_field()
+    ode_dimension: int = eqx.static_field()
 
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):

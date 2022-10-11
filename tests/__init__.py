@@ -13,5 +13,3 @@ warnings.filterwarnings("error")
 
 # Test on CPU.
 config.update("jax_platform_name", "cpu")
-config.update("jax_debug_nans", True)
-config.update("jax_debug_infs", True)
