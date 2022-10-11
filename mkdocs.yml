@@ -70,7 +70,7 @@ nav:
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"
-        - "api_docs/taylor_series.md"
+        - "api_docs/taylor.md"
     - Advanced API Documentation:
         - "api_docs_advanced/adaptive.md"
         - "api_docs_advanced/odefilters.md"

@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import adaptive, controls, odefilters, taylor_series
+from odefilter import adaptive, controls, odefilters, taylor
 
 
 @pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
@@ -31,8 +31,7 @@ def test_solver(solver, vf, u0, t0, t1, p):
     def vf_p_0(*ys):
         return vf_p(*ys, t=t0)
 
-    taylor_series_fn = taylor_series.TaylorMode()
-    tcoeffs = taylor_series_fn(
+    tcoeffs = taylor.taylor_mode_fn(
         vector_field=vf_p_0,
         initial_values=u0,
         num=solver.odefilter.strategy.implementation.num_derivatives,

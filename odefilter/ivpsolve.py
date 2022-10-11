@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow, taylor_series
+from odefilter import _control_flow, taylor
 
 
 def solve(
@@ -17,7 +17,7 @@ def solve(
     t1,
     solver,
     parameters=(),
-    taylor_series_fn=taylor_series.taylor_mode_fn,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Solve an initial value problem.
 
@@ -31,7 +31,7 @@ def solve(
         t1=t1,
         solver=solver,
         parameters=parameters,
-        taylor_series_fn=taylor_series.taylor_mode_fn,
+        taylor_series_fn=taylor.taylor_mode_fn,
     )
     return _control_flow.tree_stack([sol for sol in solution_gen])
 
@@ -44,7 +44,7 @@ def solution_generator(
     t1,
     solver,
     parameters=(),
-    taylor_series_fn=taylor_series.taylor_mode_fn,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Construct a generator of an IVP solution.
 
@@ -84,7 +84,7 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters=(),
-    taylor_series_fn=taylor_series.taylor_mode_fn,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Simulate the terminal values of an initial value problem."""
     _assert_not_scalar(initial_values=initial_values)
@@ -119,7 +119,7 @@ def simulate_checkpoints(
     ts,
     solver,
     parameters=(),
-    taylor_series_fn=taylor_series.taylor_mode_fn,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values=initial_values)

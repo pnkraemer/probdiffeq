@@ -1,0 +1,3 @@
+# Taylor series
+
+::: odefilter.taylor
