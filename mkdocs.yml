@@ -72,12 +72,10 @@ nav:
         - "api_docs/recipes.md"
         - "api_docs/taylor.md"
     - Advanced API Documentation:
-        - "api_docs_advanced/adaptive.md"
         - "api_docs_advanced/odefilters.md"
         - "api_docs_advanced/strategies.md"
-        - Additional components:
-          - "api_docs_advanced/information.md"
-          - "api_docs_advanced/controls.md"
+        - "api_docs_advanced/information.md"
+        - "api_docs_advanced/controls.md"
         - Solver implementations:
           - "api_docs_advanced/implementations/dense.md"
           - "api_docs_advanced/implementations/isotropic.md"
