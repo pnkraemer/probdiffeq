@@ -9,12 +9,12 @@ from odefilter import taylor_series
 
 @pytest_cases.case
 def init_forward_mode():
-    return taylor_series.ForwardMode()
+    return taylor_series.taylor_mode_fn
 
 
 @pytest_cases.case
 def init_taylor_mode():
-    return taylor_series.TaylorMode()
+    return taylor_series.forward_mode_fn
 
 
 @pytest_cases.case
