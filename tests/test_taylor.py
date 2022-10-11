@@ -4,17 +4,17 @@ import jax
 import pytest_cases
 from diffeqzoo import ivps as ivpzoo
 
-from odefilter import taylor_series
+from odefilter import taylor
 
 
 @pytest_cases.case
 def init_forward_mode():
-    return taylor_series.ForwardMode()
+    return taylor.taylor_mode_fn
 
 
 @pytest_cases.case
 def init_taylor_mode():
-    return taylor_series.TaylorMode()
+    return taylor.forward_mode_fn
 
 
 @pytest_cases.case

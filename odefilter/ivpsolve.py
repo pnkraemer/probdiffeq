@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow, taylor_series
+from odefilter import _control_flow, taylor
 
 
 def solve(
@@ -17,7 +17,7 @@ def solve(
     t1,
     solver,
     parameters=(),
-    taylor_series_fn=None,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Solve an initial value problem.
 
@@ -31,6 +31,7 @@ def solve(
         t1=t1,
         solver=solver,
         parameters=parameters,
+        taylor_series_fn=taylor.taylor_mode_fn,
     )
     return _control_flow.tree_stack([sol for sol in solution_gen])
 
@@ -43,7 +44,7 @@ def solution_generator(
     t1,
     solver,
     parameters=(),
-    taylor_series_fn=None,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Construct a generator of an IVP solution.
 
@@ -51,8 +52,6 @@ def solution_generator(
     Not JITable, not reverse-mode-differentiable.
     """
     _assert_not_scalar(initial_values=initial_values)
-
-    taylor_series_fn = taylor_series_fn or taylor_series.TaylorMode()
 
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
@@ -85,28 +84,10 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters=(),
-    taylor_series_fn=None,
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
-    """Simulate the terminal values of an initial value problem.
-
-    Parameters
-    ----------
-    vector_field :
-        ODE vector field. Signature ``vector_field(*initial_values, t, *parameters)``.
-    initial_values :
-        Initial values.
-    t0 :
-        Initial time.
-    t1 :
-        Terminal time.
-    solver :
-        ODE solver.
-    parameters :
-        ODE parameters.
-    """
+    """Simulate the terminal values of an initial value problem."""
     _assert_not_scalar(initial_values=initial_values)
-
-    taylor_series_fn = taylor_series_fn or taylor_series.TaylorMode()
 
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
@@ -132,12 +113,16 @@ def simulate_terminal_values(
 
 @partial(jax.jit, static_argnames=("vector_field",))
 def simulate_checkpoints(
-    vector_field, initial_values, *, ts, solver, parameters=(), taylor_series_fn=None
+    vector_field,
+    initial_values,
+    *,
+    ts,
+    solver,
+    parameters=(),
+    taylor_series_fn=taylor.taylor_mode_fn,
 ):
     """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values=initial_values)
-
-    taylor_series_fn = taylor_series_fn or taylor_series.TaylorMode()
 
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
