@@ -95,7 +95,7 @@ class DynamicFilter(eqx.Module):
 
     @staticmethod
     def extract_fn(*, state):  # noqa: D102
-        return state.filtered
+        return state.filtered, state.solution
 
     def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
         dt = t - t0
@@ -230,12 +230,14 @@ class DynamicSmoother(eqx.Module):
         # If there is something to smooth, go ahead:
         if state.filtered.mean.ndim == 3:
             init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.filtered)
-            return self.implementation.marginalise_backwards(
+            marginals = self.implementation.marginalise_backwards(
                 init=init, backward_model=state.backward_model
             )
+            sol = self.implementation.extract_sol(rv=marginals)
+            return marginals, sol
 
         # Otherwise, we are still in filtering mode and simply return the input
-        return state.filtered
+        return state.filtered, state.solution
 
     def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
         rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm

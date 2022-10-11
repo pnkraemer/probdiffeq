@@ -60,6 +60,7 @@ class ODEFilter(eqx.Module):
         )
 
     def reset_fn(self, *, state):  # noqa: D102
+        raise RuntimeError
         posterior_new = self.strategy.reset_fn(state=state.posterior)
         return ODEFilterSolution(
             t=state.t,
@@ -72,11 +73,12 @@ class ODEFilter(eqx.Module):
 
         # todo: state.u should also be updated when smoothing!
         #  and it is a bit strange what the smoother returns at t0 and t1.
-        posterior_new = self.strategy.extract_fn(state=state.posterior)
+        posterior_new, u_new = self.strategy.extract_fn(state=state.posterior)
+
         return ODEFilterSolution(
             t=state.t,
-            u=state.u,
-            error_estimate=state.error_estimate,
+            u=u_new.mean,
+            error_estimate=state.error_estimate,  # this is a bit meaningless now innit
             posterior=posterior_new,
         )
 
