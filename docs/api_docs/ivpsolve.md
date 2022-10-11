@@ -63,7 +63,12 @@ all arguments are used (with some minor exceptions).
     on purpose because higher-order ODEs are treated very similarly
     to first-order ODEs in this package.
 
+## Adaptive simulation of specific time-points
 
 ::: odefilter.ivpsolve.simulate_terminal_values
 
 ::: odefilter.ivpsolve.simulate_checkpoints
+
+## Adaptive simulation using native Python control flow
+::: odefilter.ivpsolve.solve
+::: odefilter.ivpsolve.solution_generator

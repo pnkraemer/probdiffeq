@@ -57,6 +57,7 @@ class Adaptive(eqx.Module):
     control: Any
     norm_ord: Union[int, str, None] = None
 
+    @eqx.filter_jit
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
         state_odefilter = self.odefilter.init_fn(
@@ -88,6 +89,7 @@ class Adaptive(eqx.Module):
             control=state_control,
         )
 
+    @eqx.filter_jit
     def step_fn(self, *, state, vector_field, t1):
         """Perform a step."""
 
@@ -179,6 +181,7 @@ class Adaptive(eqx.Module):
         )
         return jnp.minimum(100.0 * dt0, dt1)
 
+    @eqx.filter_jit
     def reset_fn(self, *, state):  # noqa: D102
         return AdaptiveSolverState(
             dt_proposed=state.dt_proposed,
@@ -190,9 +193,11 @@ class Adaptive(eqx.Module):
             control=state.control,  # reset this one too?
         )
 
+    @eqx.filter_jit
     def extract_fn(self, *, state):  # noqa: D102
         return self.odefilter.extract_fn(state=state.solution)
 
+    @eqx.filter_jit
     def interpolate_fn(self, *, state, t):  # noqa: D102
         """Interpolate between state.recent and state.accepted.
 
