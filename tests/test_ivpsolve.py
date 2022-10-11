@@ -9,7 +9,8 @@ from odefilter import ivpsolve, recipes
 
 SOLVERS = [
     recipes.dynamic_isotropic_eks0(num_derivatives=2),
-    recipes.dynamic_isotropic_eks0(num_derivatives=3),
+    recipes.dynamic_isotropic_ekf0(num_derivatives=2),
+    recipes.dynamic_ekf1(ode_dimension=2, num_derivatives=2),
 ]
 
 
