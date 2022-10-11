@@ -35,23 +35,21 @@ class AdaptiveODEFilterState(Generic[T], eqx.Module):
     (which has been the interpolation result).
     """
 
-    proposed: T  # must contain fields "t" and "u".
+    proposed: T
     """The most recent proposal."""
 
-    accepted: T  # must contain fields "t" and "u".
+    accepted: T
     """The most recent accepted state."""
 
-    previous: T  # must contain fields "t" and "u".
-    """The penultimate (2nd most recent) accepted state."""
+    previous: T
+    """The penultimate (2nd most recent) accepted state. Needed for interpolation.
+    """
 
 
 class AdaptiveODEFilter(eqx.Module):
     """Make an adaptive ODE filter."""
 
     strategy: Any
-
-    # Take a solver, normalise its error estimate,
-    # and propose time-steps based on tolerances.
 
     atol: float
     rtol: float
@@ -63,29 +61,25 @@ class AdaptiveODEFilter(eqx.Module):
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise the IVP solver state."""
+        # Initialise the components
         posterior, error_estimate = self.strategy.init_fn(
             taylor_coefficients=taylor_coefficients, t0=t0
         )
         state_control = self.control.init_fn()
 
+        # Initialise (prototypes for) proposed values
         u0, f0, *_ = taylor_coefficients
-        error_normalised = self._normalise_error(
+        error_norm_proposed = self._normalise_error(
             error_estimate=error_estimate,
             u=u0,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
-        dt_proposed = self._propose_first_dt_per_tol(
-            f0=f0,
-            u0=(u0,),
-            error_order=self.error_order,
-            atol=self.atol,
-            rtol=self.rtol,
-        )
+        dt_proposed = self._propose_first_dt(taylor_coefficients=taylor_coefficients)
         return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,
-            error_norm_proposed=error_normalised,
+            error_norm_proposed=error_norm_proposed,
             solution=posterior,
             proposed=posterior,
             accepted=posterior,
@@ -111,11 +105,11 @@ class AdaptiveODEFilter(eqx.Module):
             return True, s
 
         init_val = init_fn(state)
-        _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
+        _proceed, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
-            proposed=state_new.proposed,
+            proposed=state_new.proposed,  # meaningless
             solution=state_new.proposed,  # holla! New! :)
             accepted=state_new.proposed,  # holla! New! :)
             previous=state_new.accepted,  # holla! New! :)
@@ -125,11 +119,8 @@ class AdaptiveODEFilter(eqx.Module):
     def attempt_step_fn(self, *, state, vector_field, t1):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
-        # todo: should this be at the end of this function?
-        #  or even happen inside the controller?
 
-        # todo: this should not happen here?!
-        def vf(*y):
+        def vf(*y):  # todo: this should not happen here?!
             return vector_field(*y, t=state.accepted.t + state.dt_proposed)
 
         posterior, error_estimate = self.strategy.step_fn(
@@ -149,14 +140,15 @@ class AdaptiveODEFilter(eqx.Module):
             error_order=self.error_order,
         )
         dt_proposed = state.dt_proposed * state_control.scale_factor
+
         return AdaptiveODEFilterState(
-            dt_proposed=dt_proposed,
-            error_norm_proposed=error_normalised,
-            proposed=posterior,
+            dt_proposed=dt_proposed,  # new
+            error_norm_proposed=error_normalised,  # new
+            proposed=posterior,  # new
             solution=state.solution,  # too early to accept :)
             accepted=state.accepted,  # too early to accept :)
             previous=state.previous,  # too early to accept :)
-            control=state_control,
+            control=state_control,  # new
         )
 
     @staticmethod
@@ -165,31 +157,11 @@ class AdaptiveODEFilter(eqx.Module):
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
     @staticmethod
-    def _propose_first_dt_per_tol(*, f0, u0, error_order, rtol, atol):
-        # Taken from:
-        # https://github.com/google/jax/blob/main/jax/experimental/ode.py
-        #
-        # which uses the algorithm from
-        #
-        # E. Hairer, S. P. Norsett G. Wanner,
-        # Solving Ordinary Differential Equations I: Nonstiff Problems, Sec. II.4.
-        assert len(u0) == 1
-        scale = atol + u0[0] * rtol
-        a = jnp.linalg.norm(u0[0] / scale)
-        b = jnp.linalg.norm(f0 / scale)
-        dt0 = jnp.where((a < 1e-5) | (b < 1e-5), 1e-6, 0.01 * a / b)
-        return 100 * dt0
-        # todo:
-        #
-        # u1 = u0[0] + dt0 * f0
-        # f1 = f(u1)
-        # c = jnp.linalg.norm((f1 - f0) / scale) / dt0
-        # dt1 = jnp.where(
-        #     (b <= 1e-15) & (c <= 1e-15),
-        #     jnp.maximum(1e-6, dt0 * 1e-3),
-        #     (0.01 / jnp.max(b + c)) ** (1.0 / error_order),
-        # )
-        # return jnp.minimum(100.0 * dt0, dt1)
+    def _propose_first_dt(*, taylor_coefficients, scale=0.01):
+        u0, f0, *_ = taylor_coefficients
+        norm_y0 = jnp.linalg.norm(u0)
+        norm_dy0 = jnp.linalg.norm(f0)
+        return scale * norm_y0 / norm_dy0
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
