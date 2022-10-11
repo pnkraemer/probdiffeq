@@ -95,8 +95,8 @@ class DynamicFilter(eqx.Module):
     def extract_fn(*, state):  # noqa: D102
         return state
 
-    def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
-        dt = t - t0
+    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
+        dt = t - s0.t
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         m_ext, *_ = self.implementation.extrapolate_mean(
@@ -219,15 +219,15 @@ class DynamicSmoother(eqx.Module):
         # Otherwise, we are still in filtering mode and simply return the input
         return state.filtered, state.solution
 
-    def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
+    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
         rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=t0
+            rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=s0.t
         )
         extrapolated1, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=t1, t0=t
+            rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=s1.t, t0=t
         )
 
         # The interpolated variable is the solution at the checkpoint,
@@ -243,6 +243,7 @@ class DynamicSmoother(eqx.Module):
         # This is the new solution object at t.
         sol = self.implementation.extract_sol(rv=extrapolated0)
         s0 = Posterior(
+            t=t,
             u=sol,
             filtered=extrapolated0,
             diffusion_sqrtm=diffsqrtm,
@@ -257,6 +258,7 @@ class DynamicSmoother(eqx.Module):
         # to the previous checkpoint.
         bw1 = backward_model1
         s1 = Posterior(
+            t=s1.t,
             u=sol,
             filtered=s1.filtered,
             diffusion_sqrtm=diffsqrtm,
