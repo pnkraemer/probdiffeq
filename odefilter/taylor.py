@@ -78,13 +78,11 @@ def taylor_mode_fn(
     >>> print(tree_round(f(*u0), 1))
     [0.3]
 
-    >>> taylor_mode = TaylorMode()
-    >>>
-    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=1)
+    >>> tcoeffs = taylor_mode_fn(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 1))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32)]
 
-    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=2)
+    >>> tcoeffs = taylor_mode_fn(vector_field=f, initial_values=u0, num=2)
     >>> print(tree_round(tcoeffs, 1))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), \
 DeviceArray([0.4], dtype=float32)]
@@ -95,12 +93,12 @@ DeviceArray([0.4], dtype=float32)]
     >>> print(tree_round(f(*u0), 2))
     [0.02]
 
-    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=1)
+    >>> tcoeffs = taylor_mode_fn(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 2))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), \
 DeviceArray([0.02], dtype=float32)]
 
-    >>> tcoeffs = taylor_mode(vector_field=f, initial_values=u0, num=4)
+    >>> tcoeffs = taylor_mode_fn(vector_field=f, initial_values=u0, num=4)
     >>> print(tree_round(tcoeffs,1))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), \
 DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), \
@@ -184,12 +182,11 @@ def forward_mode_fn(
     >>> print(tree_round(f(*u0), 1))
     [0.3]
 
-    >>> forward_mode = ForwardMode()
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
+    >>> tcoeffs = forward_mode_fn(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 1))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32)]
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=2)
+    >>> tcoeffs = forward_mode_fn(vector_field=f, initial_values=u0, num=2)
     >>> print(tree_round(tcoeffs, 1))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.3], dtype=float32), \
 DeviceArray([0.4], dtype=float32)]
@@ -200,12 +197,12 @@ DeviceArray([0.4], dtype=float32)]
     >>> print(tree_round(f(*u0), 2))
     [0.02]
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=1)
+    >>> tcoeffs = forward_mode_fn(vector_field=f, initial_values=u0, num=1)
     >>> print(tree_round(tcoeffs, 2))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.19999999], dtype=float32), \
 DeviceArray([0.02], dtype=float32)]
 
-    >>> tcoeffs = forward_mode(vector_field=f, initial_values=u0, num=4)
+    >>> tcoeffs = forward_mode_fn(vector_field=f, initial_values=u0, num=4)
     >>> print(tree_round(tcoeffs,1))
     [DeviceArray([0.5], dtype=float32), DeviceArray([0.2], dtype=float32), \
 DeviceArray([0.], dtype=float32), DeviceArray([-0.], dtype=float32), \
