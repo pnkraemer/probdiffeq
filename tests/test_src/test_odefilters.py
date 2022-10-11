@@ -3,14 +3,14 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import adaptive, controls, taylor
+from odefilter import controls, odefilters, taylor
 
 
 @pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
 def case_odefilter(strategy):
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
-    return adaptive.AdaptiveODEFilter(
+    return odefilters.AdaptiveODEFilter(
         strategy=strategy,
         control=control,
         atol=atol,
@@ -22,7 +22,7 @@ def case_odefilter(strategy):
 @pytest_cases.parametrize_with_cases("solver", cases=".")
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
 def test_solver(solver, vf, u0, t0, t1, p):
-    assert isinstance(solver, adaptive.AdaptiveODEFilter)
+    assert isinstance(solver, odefilters.AdaptiveODEFilter)
 
     def vf_p(*ys, t):
         return vf(*ys, t, *p)
