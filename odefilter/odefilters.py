@@ -51,9 +51,10 @@ class ODEFilter(eqx.Module):
         def vf(*y):
             return vector_field(*y, t=state.t)
 
-        posterior, error_estimate, u = self.strategy.step_fn(
+        posterior, error_estimate = self.strategy.step_fn(
             state=state.posterior, vector_field=vf, dt=dt0
         )
+        u = posterior.solution.mean
         return ODEFilterSolution(
             t=state.t + dt0, u=u, error_estimate=error_estimate, posterior=posterior
         )
@@ -81,7 +82,7 @@ class ODEFilter(eqx.Module):
 
     def interpolate_fn(self, *, state0, state1, t):  # noqa: D102
 
-        state_accep, (state_interp, state_interp_u) = self.strategy.interpolate_fn(
+        state_accep, state_interp = self.strategy.interpolate_fn(
             s0=state0.posterior, t0=state0.t, s1=state1.posterior, t1=state1.t, t=t
         )
 
@@ -95,7 +96,7 @@ class ODEFilter(eqx.Module):
         error_interp = jnp.nan * jnp.ones_like(state0.error_estimate)
         interpolated = ODEFilterSolution(
             t=t,
-            u=state_interp_u,
+            u=state_interp.solution.mean,
             error_estimate=error_interp,
             posterior=state_interp,
         )

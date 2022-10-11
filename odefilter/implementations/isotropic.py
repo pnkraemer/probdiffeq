@@ -123,8 +123,11 @@ class IsotropicImplementation(eqx.Module):
         return corrected
 
     @staticmethod
-    def extract_u(*, rv):  # noqa: D102
-        return rv.mean[0]
+    def extract_sol(*, rv):  # noqa: D102
+        m = rv.mean[0]
+        l_nonsquare = rv.cov_sqrtm_lower[0, :]
+        l_chol = sqrtm.sqrtm_to_cholesky(R=l_nonsquare[:, None].T)[0, 0]
+        return IsotropicNormal(m, l_chol)
 
     @staticmethod
     def condense_backward_models(*, bw_init, bw_state):  # noqa: D102
