@@ -25,6 +25,8 @@ class BackwardModel(Generic[T], eqx.Module):
 
     transition: Any
     noise: T
+    p: Any
+    p_inv: Any
 
 
 class SmoothingPosterior(Generic[T], eqx.Module):
@@ -129,10 +131,14 @@ class DynamicSmoother(eqx.Module):
             taylor_coefficients=taylor_coefficients
         )
 
+        p, p_inv = self.implementation.init_preconditioner()
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
         backward_model = BackwardModel(
-            transition=backward_transition, noise=backward_noise
+            transition=backward_transition,
+            noise=backward_noise,
+            p=p,
+            p_inv=p_inv,
         )
 
         solution = SmoothingPosterior(
@@ -189,7 +195,9 @@ class DynamicSmoother(eqx.Module):
             m_ext_p=m_ext_p,
         )
         extrapolated, (backward_noise, backward_op) = x
-        bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
+        bw_increment = BackwardModel(
+            transition=backward_op, noise=backward_noise, p=p, p_inv=p_inv
+        )
 
         # Final observation
         corrected = self.implementation.final_correction(
@@ -198,10 +206,11 @@ class DynamicSmoother(eqx.Module):
         u = self.implementation.extract_u(rv=corrected)
 
         # Condense backward models
-        noise, gain = self.implementation.condense_backward_models(
-            bw_state=bw_increment, bw_init=state.backward_model
+        noise, gain, (p_, p_inv_) = self.implementation.condense_backward_models(
+            bw_state=bw_increment,
+            bw_init=state.backward_model,
         )
-        backward_model = BackwardModel(transition=gain, noise=noise)
+        backward_model = BackwardModel(transition=gain, noise=noise, p=p_, p_inv=p_inv_)
 
         # Return solution
         smoothing_solution = SmoothingPosterior(
@@ -242,10 +251,10 @@ class DynamicSmoother(eqx.Module):
         # model from the previous checkpoint to t0 with the newly acquired
         # model from t0 to t. This will imply a backward model from the
         # previous checkpoint to the current checkpoint.
-        # noise0, g0 = self.implementation.condense_backward_models(
-        #     bw_init=s0.backward_model, bw_state=backward_model0
-        # )
-        # backward_model0 = BackwardModel(transition=g0, noise=noise0)
+        noise0, g0, (p, p_inv) = self.implementation.condense_backward_models(
+            bw_init=s0.backward_model, bw_state=backward_model0
+        )
+        backward_model0 = BackwardModel(transition=g0, noise=noise0, p=p, p_inv=p_inv)
 
         # This is the new solution object at t.
         s0 = SmoothingPosterior(
@@ -280,5 +289,7 @@ class DynamicSmoother(eqx.Module):
         )
         extrapolated, (backward_noise, backward_op) = x
 
-        backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
+        backward_model = BackwardModel(
+            transition=backward_op, noise=backward_noise, p=p, p_inv=p_inv
+        )
         return extrapolated, backward_model

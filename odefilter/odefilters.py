@@ -92,7 +92,7 @@ class ODEFilter(eqx.Module):
             posterior=state_accep,  # updated backward models, for example
         )
 
-        error_interp = jnp.empty_like(state0.error_estimate)
+        error_interp = jnp.nan * jnp.ones_like(state0.error_estimate)
         interpolated = ODEFilterSolution(
             t=t,
             u=state_interp_u,

@@ -111,7 +111,6 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
 
     # something like the cross-covariance
     R12 = R[:d, d:]
-    # G = jnp.linalg.lstsq(R_Y, R12)[0].T
     G = jsp.linalg.solve_triangular(R_Y, R12).T
 
     # ~R_{X \mid Y}

@@ -214,4 +214,4 @@ class Adaptive(eqx.Module):
 
 
 def _empty_like(tree):
-    return jax.tree_util.tree_map(jnp.empty_like, tree)
+    return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)

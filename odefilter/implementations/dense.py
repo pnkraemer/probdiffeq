@@ -47,7 +47,7 @@ class DenseImplementation(eqx.Module):
         return MultivariateNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_error_estimate(self):  # noqa: D102
-        return jnp.empty((self.ode_dimension,))
+        return jnp.nan * jnp.ones((self.ode_dimension,))
 
     def init_backward_transition(self):  # noqa: D102
         raise NotImplementedError

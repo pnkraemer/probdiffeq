@@ -16,8 +16,8 @@ config.update("jax_enable_x64", True)  # x64 precision
 f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 # High-res plot
-ts = jnp.linspace(t0, 2.5, num=3, endpoint=True)
-ek0 = recipes.dynamic_isotropic_eks0(num_derivatives=1, atol=2e-1, rtol=2e-1)
+ts = jnp.linspace(t0, 1.5, num=153, endpoint=True)
+ek0 = recipes.dynamic_isotropic_ekf0(num_derivatives=1, atol=1e-2, rtol=1e-2)
 solution = ivpsolve.simulate_checkpoints(
     vector_field=lambda y, t, *p: f(y, *p),
     initial_values=(u0,),
