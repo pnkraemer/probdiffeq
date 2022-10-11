@@ -1,9 +1,17 @@
 """Tests."""
 
+import warnings
+
 from diffeqzoo import backend
 from jax.config import config
 
+# ODE examples must be in JAX
 backend.select("jax")
 
+# All warnings shall be errors
+warnings.filterwarnings("error")
 
-config.update("jax_enable_x64", True)
+# Test on CPU.
+config.update("jax_platform_name", "cpu")
+config.update("jax_debug_nans", True)
+config.update("jax_debug_infs", True)
