@@ -146,8 +146,6 @@ class IsotropicImplementation(eqx.Module):
         ).T
 
         noise = IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
-        # print(pa, pc_inv)
-
         return noise, g, (pa, pc_inv)
 
     @staticmethod
