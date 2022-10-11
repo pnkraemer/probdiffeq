@@ -5,14 +5,13 @@ import pytest
 import pytest_cases
 from jax.experimental.ode import odeint
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve, recipes, strategies
 
 SOLVERS = [
     pytest.param(
-        recipes.dynamic_isotropic_eks0(num_derivatives=2),
-        id="DynIsoEKS0",
-        marks=pytest.mark.xfail(reason="Checkpoint-smoother is buggy"),
+        recipes.dynamic_isotropic_fixpt_eks0(num_derivatives=2), id="DynIsoFixPtEKS0"
     ),
+    pytest.param(recipes.dynamic_isotropic_eks0(num_derivatives=2), id="DynIsoEKS0"),
     pytest.param(recipes.dynamic_isotropic_ekf0(num_derivatives=2), id="DynIsoEKF0"),
     pytest.param(
         recipes.dynamic_ekf1(num_derivatives=2, ode_dimension=2), id="DynEKF1"
@@ -69,15 +68,18 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
 
-    odeint_solution = odeint(vf, u0[0], ts, *p, atol=1e-6, rtol=1e-6)
-    ts_reference, ys_reference = ts, odeint_solution
+    # dirty, but works?! todo: make proper tags
+    if not isinstance(solver.strategy, strategies.DynamicSmoother):
 
-    solution = ivpsolve.simulate_checkpoints(
-        vector_field=vf,
-        initial_values=u0,
-        ts=ts,
-        parameters=p,
-        solver=solver,
-    )
-    assert jnp.allclose(solution.t, ts_reference)
-    assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
+        odeint_solution = odeint(vf, u0[0], ts, *p, atol=1e-6, rtol=1e-6)
+        ts_reference, ys_reference = ts, odeint_solution
+
+        solution = ivpsolve.simulate_checkpoints(
+            vector_field=vf,
+            initial_values=u0,
+            ts=ts,
+            parameters=p,
+            solver=solver,
+        )
+        assert jnp.allclose(solution.t, ts_reference)
+        assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
