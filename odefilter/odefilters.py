@@ -111,7 +111,8 @@ class AdaptiveODEFilter(eqx.Module):
         state_new = jax.lax.cond(enter_accept_reject_loop, true_fn1, false_fn1, state)
 
         # Part II/II: If we have previously overstepped
-        # the boundary, interpolate to t1:
+        # the boundary, interpolate to t1
+
         interpolate = state_new.accepted.t > t1
 
         def true_fn(s):
@@ -136,16 +137,16 @@ class AdaptiveODEFilter(eqx.Module):
         def init_fn(s):
             return True, s
 
-        _, state_new_ = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
+        _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
 
         return AdaptiveODEFilterState(
-            dt_proposed=state_new_.dt_proposed,
-            error_norm_proposed=state_new_.error_norm_proposed,
-            proposed=state_new_.proposed,
-            accepted=state_new_.proposed,  # holla! New! :)
-            solution=state_new_.accepted,  # holla! New! :)
+            dt_proposed=state_new.dt_proposed,
+            error_norm_proposed=state_new.error_norm_proposed,
+            proposed=state_new.proposed,
+            accepted=state_new.proposed,  # holla! New! :)
+            solution=state_new.accepted,  # holla! New! :)
             previous=state0.accepted,  # holla! New! :)
-            control=state_new_.control,
+            control=state_new.control,
         )
 
     def _attempt_step_fn(self, *, state, vector_field):
@@ -204,8 +205,7 @@ class AdaptiveODEFilter(eqx.Module):
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-        posterior_new = self.strategy.extract_fn(state=state.solution)
-        return posterior_new
+        return self.strategy.extract_fn(state=state.solution)
 
 
 def _empty_like(tree):
