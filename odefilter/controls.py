@@ -20,6 +20,13 @@ class AbstractControl(abc.ABC, eqx.Module):
         raise NotImplementedError
 
 
+class PIState(eqx.Module):
+    """Proportional-integral controller state."""
+
+    scale_factor: float
+    error_norm_previously_accepted: float
+
+
 class ProportionalIntegral(AbstractControl):
     """PI Controller."""
 
@@ -29,15 +36,9 @@ class ProportionalIntegral(AbstractControl):
     power_integral_unscaled: float = 0.3
     power_proportional_unscaled: float = 0.4
 
-    class State(eqx.Module):
-        """Proportional-integral controller state."""
-
-        scale_factor: float
-        error_norm_previously_accepted: float
-
     def init_fn(self):
         """Initialise a controller state."""
-        return self.State(scale_factor=1.0, error_norm_previously_accepted=1.0)
+        return PIState(scale_factor=1.0, error_norm_previously_accepted=1.0)
 
     def control_fn(self, *, state, error_normalised, error_order):
         """Control a normalised error estimate."""
@@ -56,7 +57,7 @@ class ProportionalIntegral(AbstractControl):
             error_normalised,
             state.error_norm_previously_accepted,
         )
-        return self.State(
+        return PIState(
             scale_factor=scale_factor,
             error_norm_previously_accepted=error_norm_previously_accepted,
         )
@@ -94,6 +95,12 @@ class ProportionalIntegral(AbstractControl):
         return scale_factor_clipped
 
 
+class IState(eqx.Module):
+    """Integral controller state."""
+
+    scale_factor: float
+
+
 class Integral(AbstractControl):
     """Integral control."""
 
@@ -101,14 +108,9 @@ class Integral(AbstractControl):
     factor_min: float = 0.2
     factor_max: float = 10.0
 
-    class State(eqx.Module):
-        """Integral controller state."""
-
-        scale_factor: float
-
     def init_fn(self):
         """Initialise a controller state."""
-        return self.State(scale_factor=1.0)
+        return IState(scale_factor=1.0)
 
     def control_fn(self, state, error_normalised, error_order):
         """Control a normalised error estimate."""
@@ -119,7 +121,7 @@ class Integral(AbstractControl):
             factor_min=self.factor_min,
             factor_max=self.factor_max,
         )
-        return self.State(scale_factor=scale_factor)
+        return IState(scale_factor=scale_factor)
 
     @staticmethod
     def _scale_factor_integral_control(

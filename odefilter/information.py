@@ -97,7 +97,8 @@ class IsotropicEK0FirstOrder(eqx.Module):
 class EK1FirstOrder(eqx.Module):
     """EK1 information."""
 
-    ode_dimension: int
+    # static, because it affects the behaviour of the residual fn
+    ode_dimension: int = eqx.static_field()
 
     def __call__(self, f, x):
         """Linearise the ODE."""

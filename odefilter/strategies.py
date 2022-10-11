@@ -90,10 +90,6 @@ class DynamicFilter(eqx.Module):
         return filtered, error_estimate
 
     @staticmethod
-    def reset_fn(*, state):  # noqa: D102
-        return state
-
-    @staticmethod
     def extract_fn(*, state):  # noqa: D102
         return state.filtered, state.solution
 
@@ -147,26 +143,6 @@ class DynamicSmoother(eqx.Module):
 
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
-
-    def reset_fn(self, *, state):
-        """Change the backward model back to the identity.
-
-        Initialises a new fixed-point smoother.
-        """
-        raise RuntimeError
-        backward_transition = self.implementation.init_backward_transition()
-        backward_noise = self.implementation.init_backward_noise(
-            rv_proto=state.backward_model.noise
-        )
-        backward_model = BackwardModel(
-            transition=backward_transition, noise=backward_noise
-        )
-        return Posterior(
-            solution=state.sol,
-            filtered=state.filtered,
-            diffusion_sqrtm=state.diffusion_sqrtm,
-            backward_model=backward_model,
-        )
 
     def step_fn(self, *, state, vector_field, dt):
         """Step."""

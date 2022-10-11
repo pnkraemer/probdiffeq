@@ -28,6 +28,7 @@ and $n$ is the number of recursions, which commonly describes how many
 derivatives to "add" to the existing initial conditions.
 """
 
+from functools import partial
 from typing import Callable, List, Tuple
 
 import equinox as eqx
@@ -39,6 +40,7 @@ from jaxtyping import Array, Float
 class TaylorMode(eqx.Module):
     """Taylor-mode initialisation."""
 
+    @partial(jax.jit, static_argnames=("vector_field", "num"))
     def __call__(
         self,
         *,
@@ -151,6 +153,7 @@ def _subsets(set, n):
 class ForwardMode(eqx.Module):
     """Forward-mode initialisation."""
 
+    @partial(jax.jit, static_argnames=("vector_field", "num"))
     def __call__(
         self,
         *,
