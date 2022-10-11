@@ -8,6 +8,57 @@ import jax.numpy as jnp
 from odefilter import _control_flow
 
 
+def solve(
+    vector_field,
+    initial_values,
+    *,
+    t0,
+    t1,
+    solver,
+    parameters=(),
+):
+    """Solve an initial value problem.
+
+    Returns the full solution, but uses native python control flow.
+    Not JITable, not reverse-mode-differentiable.
+    """
+    solution_gen = _solution_generator(
+        vector_field=vector_field,
+        initial_values=initial_values,
+        t0=t0,
+        t1=t1,
+        solver=solver,
+        parameters=parameters,
+    )
+    return _control_flow.tree_stack([sol for sol in solution_gen])
+
+
+def _solution_generator(
+    vector_field,
+    initial_values,
+    *,
+    t0,
+    t1,
+    solver,
+    parameters=(),
+):
+
+    _assert_not_scalar(initial_values=initial_values)
+
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
+
+    state = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
+
+    while state.accepted.t < t1:
+        yield solver.extract_fn(state=state)
+        state = solver.step_fn(state=state, vector_field=vf, t1=t1)
+
+    state_terminal = _maybe_interpolate(state=state, t1=t1, solver=solver)
+
+    yield solver.extract_fn(state=state_terminal)
+
+
 @eqx.filter_jit
 def simulate_terminal_values(
     vector_field,
@@ -109,13 +160,16 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
         body_fun=body_fun,
         init_val=state0,
     )
+    return _maybe_interpolate(state=state1, t1=t1, solver=solver)
 
+
+def _maybe_interpolate(state, t1, solver):
     def true_fn(s1):
-        state = solver.interpolate_fn(state=s1, t=t1)
-        return state
+        return solver.interpolate_fn(state=s1, t=t1)
 
     def false_fn(s1):
         return s1
 
-    pred = state1.accepted.t > t1
-    return jax.lax.cond(pred, true_fn, false_fn, state1)
+    pred = state.accepted.t > t1
+    state_terminal = jax.lax.cond(pred, true_fn, false_fn, state)
+    return state_terminal

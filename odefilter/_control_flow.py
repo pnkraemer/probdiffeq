@@ -23,6 +23,14 @@ def scan_with_init(*, f, init, xs, reverse=False, **kwargs):
     return carry, ys_stacked
 
 
+def tree_stack(list_of_trees):
+    """Apply  tree_transpose and jnp.stack() to a list of PyTrees."""
+    tree_of_lists = _tree_transpose(list_of_trees)
+    return jax.tree_util.tree_map(
+        jnp.stack, tree_of_lists, is_leaf=lambda x: isinstance(x, list)
+    )
+
+
 # From https://jax.readthedocs.io/en/latest/jax-101/05.1-pytrees.html
 def _tree_transpose(list_of_trees):
     """Convert a list of trees of identical structure into a single tree of lists."""
