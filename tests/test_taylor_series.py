@@ -1,5 +1,6 @@
 """Tests for initialisation functions."""
 
+import jax
 import pytest_cases
 from diffeqzoo import ivps as ivpzoo
 
@@ -19,19 +20,19 @@ def init_taylor_mode():
 @pytest_cases.case
 def problem_three_body_second_order():
     f, (u0, du0), _, f_args = ivpzoo.three_body_restricted()
-    return lambda u, du: f(u, du, *f_args), (u0, du0)
+    return jax.jit(lambda u, du: f(u, du, *f_args)), (u0, du0)
 
 
 @pytest_cases.case
 def problem_three_body_first_order():
     f, u0, _, f_args = ivpzoo.three_body_restricted_first_order()
-    return lambda u: f(u, *f_args), (u0,)
+    return jax.jit(lambda u: f(u, *f_args)), (u0,)
 
 
 @pytest_cases.case
 def problem_van_der_pol_second_order():
     f, (u0, du0), _, f_args = ivpzoo.van_der_pol()
-    return lambda u, du: f(u, du, *f_args), (u0, du0)
+    return jax.jit(lambda u, du: f(u, du, *f_args)), (u0, du0)
 
 
 @pytest_cases.parametrize_with_cases("init_fn", cases=".", prefix="init_")
