@@ -24,8 +24,11 @@ from odefilter import (
 )
 from odefilter.implementations import dense, isotropic
 
+ATOL_DEFAULTS = 1e-6
+RTOL_DEFAULTS = 1e-3
 
-def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
+
+def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, dynamic calibration, and optimised for terminal-value simulation.
 
@@ -51,7 +54,7 @@ def dynamic_isotropic_ekf0(num_derivatives, atol, rtol):
     )
 
 
-def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
+def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 
@@ -77,7 +80,9 @@ def dynamic_isotropic_eks0(num_derivatives, atol, rtol):
     )
 
 
-def dynamic_ekf1(num_derivatives, ode_dimension, atol, rtol):
+def dynamic_ekf1(
+    num_derivatives, ode_dimension, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS
+):
     """Construct the equivalent of a semi-implicit solver with dynamic calibration.
 
     Suitable for low-dimensional, stiff problems.

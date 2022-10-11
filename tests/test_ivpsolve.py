@@ -1,36 +1,20 @@
 """Tests for IVP solvers."""
 
 import jax.numpy as jnp
+import pytest
 import pytest_cases
 from jax.experimental.ode import odeint
 
-from odefilter import adaptive, controls, ivpsolve, odefilters, taylor_series
+from odefilter import ivpsolve, recipes
 
-
-@pytest_cases.parametrize(
-    "taylor",
-    [taylor_series.TaylorMode(), taylor_series.ForwardMode()],
-    ids=["TaylorMode", "ForwardMode"],
-)
-@pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
-def case_odefilter(taylor, strategy):
-    odefilter = odefilters.ODEFilter(
-        taylor_series_init=taylor,
-        strategy=strategy,
-    )
-    control = controls.ProportionalIntegral()
-    atol, rtol = 1e-5, 1e-5
-    return adaptive.Adaptive(
-        odefilter=odefilter,
-        control=control,
-        atol=atol,
-        rtol=rtol,
-        error_order=strategy.implementation.num_derivatives + 1,
-    )
+SOLVERS = [
+    recipes.dynamic_isotropic_eks0(num_derivatives=2),
+    recipes.dynamic_isotropic_eks0(num_derivatives=3),
+]
 
 
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
-@pytest_cases.parametrize_with_cases("solver", cases=".")
+@pytest.mark.parametrize("solver", SOLVERS)
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     odeint_solution = odeint(vf, u0[0], jnp.asarray([t0, t1]), *p, atol=1e-6, rtol=1e-6)
     ys_reference = odeint_solution[-1, :]
@@ -49,7 +33,7 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 
 
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
-@pytest_cases.parametrize_with_cases("solver", cases=".")
+@pytest.mark.parametrize("solver", SOLVERS)
 def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
 
