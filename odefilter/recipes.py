@@ -67,6 +67,31 @@ def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     )
 
 
+def dynamic_isotropic_fixpt_eks0(
+    num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS
+):
+    """Construct the equivalent of an explicit solver with an isotropic covariance \
+    structure and dynamic calibration.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    information_op = information.IsotropicEK0FirstOrder()
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives
+    )
+    strategy = strategies.DynamicFixedPointSmoother(
+        implementation=implementation, information=information_op
+    )
+    control = controls.ProportionalIntegral()
+    return odefilters.AdaptiveODEFilter(
+        strategy=strategy,
+        control=control,
+        atol=atol,
+        rtol=rtol,
+        error_order=num_derivatives + 1,
+    )
+
+
 def dynamic_ekf1(
     num_derivatives, ode_dimension, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS
 ):
