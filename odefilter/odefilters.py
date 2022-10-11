@@ -20,27 +20,16 @@ class ODEFilterSolution(eqx.Module):
 class ODEFilter(eqx.Module):
     """ODE filter."""
 
-    taylor_series_init: Any
     strategy: Any
 
-    @partial(jax.jit, static_argnames=("vector_field",))
-    def init_fn(self, *, vector_field, initial_values, t0):
+    @jax.jit
+    def init_fn(self, *, taylor_coefficients, t0):
         """Initialise the IVP solver state."""
-
-        def vf(*x):
-            return vector_field(*x, t=t0)
-
-        taylor_coefficients = self.taylor_series_init(
-            vector_field=vf,
-            initial_values=initial_values,
-            num=self.strategy.implementation.num_derivatives,
-        )
-
         posterior, error_estimate = self.strategy.init_fn(
             taylor_coefficients=taylor_coefficients
         )
 
-        u0, *_ = initial_values
+        u0, *_ = taylor_coefficients
         return ODEFilterSolution(
             t=t0,
             u=u0,

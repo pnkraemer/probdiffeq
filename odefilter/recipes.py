@@ -14,14 +14,7 @@ but until you do so, use one of ours.
     Tomorrow, this module might go again.
 
 """
-from odefilter import (
-    adaptive,
-    controls,
-    information,
-    odefilters,
-    strategies,
-    taylor_series,
-)
+from odefilter import adaptive, controls, information, odefilters, strategies
 from odefilter.implementations import dense, isotropic
 
 ATOL_DEFAULTS = 1e-6
@@ -41,9 +34,7 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     strategy = strategies.DynamicFilter(
         implementation=implementation, information=information_op
     )
-    stepping = odefilters.ODEFilter(
-        taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
-    )
+    stepping = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
     return adaptive.Adaptive(
         odefilter=stepping,
@@ -67,9 +58,7 @@ def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     strategy = strategies.DynamicSmoother(
         implementation=implementation, information=information_op
     )
-    stepping = odefilters.ODEFilter(
-        taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
-    )
+    stepping = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
     return adaptive.Adaptive(
         odefilter=stepping,
@@ -94,9 +83,7 @@ def dynamic_ekf1(
     strategy = strategies.DynamicFilter(
         implementation=implementation, information=information_op
     )
-    stepping = odefilters.ODEFilter(
-        taylor_series_init=taylor_series.TaylorMode(), strategy=strategy
-    )
+    stepping = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
     return adaptive.Adaptive(
         odefilter=stepping,

@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
+from odefilter import _control_flow, taylor_series
 
 
 def solve(
@@ -17,6 +17,7 @@ def solve(
     t1,
     solver,
     parameters=(),
+    taylor_series_fn=None,
 ):
     """Solve an initial value problem.
 
@@ -42,6 +43,7 @@ def solution_generator(
     t1,
     solver,
     parameters=(),
+    taylor_series_fn=None,
 ):
     """Construct a generator of an IVP solution.
 
@@ -50,10 +52,20 @@ def solution_generator(
     """
     _assert_not_scalar(initial_values=initial_values)
 
+    taylor_series_fn = taylor_series_fn or taylor_series.TaylorMode()
+
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
-    state = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
+    def vf_auto_t0(*x):
+        return vf(*x, t=t0)
+
+    taylor_coefficients = taylor_series_fn(
+        vector_field=vf_auto_t0,
+        initial_values=initial_values,
+        num=solver.odefilter.strategy.implementation.num_derivatives,
+    )
+    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     while state.accepted.t < t1:
         yield solver.extract_fn(state=state)
@@ -73,6 +85,7 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters=(),
+    taylor_series_fn=None,
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -93,10 +106,20 @@ def simulate_terminal_values(
     """
     _assert_not_scalar(initial_values=initial_values)
 
+    taylor_series_fn = taylor_series_fn or taylor_series.TaylorMode()
+
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
-    state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=t0)
+    def vf_auto_t0(*x):
+        return vf(*x, t=t0)
+
+    taylor_coefficients = taylor_series_fn(
+        vector_field=vf_auto_t0,
+        initial_values=initial_values,
+        num=solver.odefilter.strategy.implementation.num_derivatives,
+    )
+    state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
@@ -108,12 +131,26 @@ def simulate_terminal_values(
 
 
 @partial(jax.jit, static_argnames=("vector_field",))
-def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
+def simulate_checkpoints(
+    vector_field, initial_values, *, ts, solver, parameters=(), taylor_series_fn=None
+):
     """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values=initial_values)
 
+    taylor_series_fn = taylor_series_fn or taylor_series.TaylorMode()
+
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
+
+    def vf_auto_t0(*x):
+        return vf(*x, t=ts[0])
+
+    taylor_coefficients = taylor_series_fn(
+        vector_field=vf_auto_t0,
+        initial_values=initial_values,
+        num=solver.odefilter.strategy.implementation.num_derivatives,
+    )
+    state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
@@ -124,7 +161,6 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         )
         return s_next, s_next
 
-    state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
         init=state0,
