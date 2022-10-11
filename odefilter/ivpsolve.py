@@ -70,9 +70,7 @@ def solution_generator(
         yield solver.extract_fn(state=state)
         state = solver.step_fn(state=state, vector_field=vf, t1=t1)
 
-    state_terminal = _maybe_interpolate(state=state, t1=t1, solver=solver)
-
-    yield solver.extract_fn(state=state_terminal)
+    yield solver.extract_fn(state=state)
 
 
 @partial(jax.jit, static_argnames=("vector_field",))
@@ -183,16 +181,4 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
         body_fun=body_fun,
         init_val=state0,
     )
-    return _maybe_interpolate(state=state1, t1=t1, solver=solver)
-
-
-def _maybe_interpolate(state, t1, solver):
-    def true_fn(s1):
-        return solver.interpolate_fn(state=s1, t=t1)
-
-    def false_fn(s1):
-        return s1
-
-    pred = state.accepted.t > t1
-    state_terminal = jax.lax.cond(pred, true_fn, false_fn, state)
-    return state_terminal
+    return state1

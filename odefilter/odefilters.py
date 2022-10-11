@@ -91,32 +91,58 @@ class AdaptiveODEFilter(eqx.Module):
     def step_fn(self, *, state, vector_field, t1):
         """Perform a step."""
 
-        def cond_fn(x):
-            proceed_iteration, _ = x
-            return proceed_iteration
+        def true_fn1(state_):
+            def cond_fn(x):
+                proceed_iteration, _ = x
+                return proceed_iteration
 
-        def body_fn(x):
-            _, s = x
-            s = self.attempt_step_fn(state=s, vector_field=vector_field, t1=t1)
-            proceed_iteration = s.error_norm_proposed > 1.0
-            return proceed_iteration, s
+            def body_fn(x):
+                _, s = x
+                s = self.attempt_step_fn(state=s, vector_field=vector_field)
+                proceed_iteration = s.error_norm_proposed > 1.0
+                return proceed_iteration, s
 
-        def init_fn(s):
-            return True, s
+            _, state_new_ = jax.lax.while_loop(cond_fn, body_fn, (True, state_))
 
-        init_val = init_fn(state)
-        _proceed, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
-        return AdaptiveODEFilterState(
-            dt_proposed=state_new.dt_proposed,
-            error_norm_proposed=state_new.error_norm_proposed,
-            proposed=state_new.proposed,  # meaningless
-            solution=state_new.proposed,  # holla! New! :)
-            accepted=state_new.proposed,  # holla! New! :)
-            previous=state_new.accepted,  # holla! New! :)
-            control=state_new.control,
-        )
+            return AdaptiveODEFilterState(
+                dt_proposed=state_new_.dt_proposed,
+                error_norm_proposed=state_new_.error_norm_proposed,
+                proposed=state_new_.proposed,
+                accepted=state_new_.proposed,  # holla! New! :)
+                solution=state_new_.accepted,  # holla! New! :)
+                previous=state_.accepted,  # holla! New! :)
+                control=state_new_.control,
+            )
 
-    def attempt_step_fn(self, *, state, vector_field, t1):
+        def false_fn1(state_):
+            return state_
+
+        enter_accept_reject_loop = state.accepted.t < t1
+
+        state_new = jax.lax.cond(enter_accept_reject_loop, true_fn1, false_fn1, state)
+
+        # If we overstepped the boundary, interpolate:
+        def true_fn(s1):  # interpolation. s.accepted.t > t1
+            accepted_new, interpolated = self.strategy.interpolate_fn(
+                s0=s1.previous, s1=s1.accepted, t=t1
+            )
+            return AdaptiveODEFilterState(
+                dt_proposed=s1.dt_proposed,
+                error_norm_proposed=s1.error_norm_proposed,
+                proposed=s1.proposed,
+                accepted=accepted_new,  # holla! New! :)
+                solution=interpolated,  # holla! New! :)
+                previous=interpolated,  # holla! New! :)
+                control=s1.control,
+            )
+
+        def false_fn(s1):  # no interpolation. s.accepted.t <= t1
+            return s1
+
+        interpolate = state_new.accepted.t > t1
+        return jax.lax.cond(interpolate, true_fn, false_fn, state_new)
+
+    def attempt_step_fn(self, *, state, vector_field):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
 
@@ -167,30 +193,6 @@ class AdaptiveODEFilter(eqx.Module):
     def extract_fn(self, *, state):  # noqa: D102
         posterior_new = self.strategy.extract_fn(state=state.solution)
         return posterior_new
-
-    @jax.jit
-    def interpolate_fn(self, *, state, t):  # noqa: D102
-        """Interpolate between state.recent and state.accepted.
-
-        t must be in between state.recent.t and state.accepted.t
-        """
-        # todo: the time-points seem to be inappropriately assigned
-        accepted_new, interpolated = self.strategy.interpolate_fn(
-            s0=state.previous,
-            s1=state.accepted,
-            t=t,
-            t0=state.previous.t,
-            t1=state.accepted.t,
-        )
-        return AdaptiveODEFilterState(
-            dt_proposed=state.dt_proposed,
-            error_norm_proposed=state.error_norm_proposed,
-            proposed=state.proposed,
-            accepted=accepted_new,
-            solution=interpolated,
-            previous=interpolated,
-            control=state.control,
-        )
 
 
 def _empty_like(tree):
