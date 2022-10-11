@@ -5,6 +5,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from odefilter import _control_flow
+
 
 @eqx.filter_jit
 def simulate_terminal_values(
@@ -67,7 +69,7 @@ def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters
         return s_next, s_next
 
     state0 = solver.init_fn(vector_field=vf, initial_values=initial_values, t0=ts[0])
-    _, solution = jax.lax.scan(
+    _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
         init=state0,
         xs=ts[1:],
