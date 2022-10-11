@@ -3,7 +3,9 @@
 from typing import Any
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
+import jax.tree_util
 from jaxtyping import Array, Float
 
 from odefilter import _control_flow
@@ -124,9 +126,13 @@ class IsotropicImplementation(eqx.Module):
 
     @staticmethod
     def extract_sol(*, rv):  # noqa: D102
-        m = rv.mean[0]
-        l_nonsquare = rv.cov_sqrtm_lower[0, :]
-        l_square = sqrtm.sqrtm_to_cholesky(R=l_nonsquare[:, None].T)[0, 0]
+        m = rv.mean[..., 0, :]
+        l_nonsquare = rv.cov_sqrtm_lower[..., 0, :]
+        if l_nonsquare.ndim == 1:  # non-batch setting
+            l_square = sqrtm.sqrtm_to_cholesky(R=l_nonsquare[:, None].T)[0, 0]
+        else:  # batch setting
+            l_t = jnp.swapaxes(l_nonsquare[..., None], -2, -1)
+            l_square = jax.vmap(sqrtm.sqrtm_to_cholesky)(R=l_t)[..., 0, 0]
         return IsotropicNormal(m, l_square)
 
     @staticmethod
@@ -155,10 +161,11 @@ class IsotropicImplementation(eqx.Module):
             )
             return out, out
 
+        # Initial condition does not matter
+        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], backward_model)
         _, rvs = _control_flow.scan_with_init(
-            f=body_fun, init=init, xs=backward_model, reverse=True
+            f=body_fun, init=init, xs=bw_models, reverse=True
         )
-
         return rvs
 
     @staticmethod
