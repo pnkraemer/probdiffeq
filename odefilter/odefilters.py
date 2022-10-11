@@ -1,7 +1,9 @@
 """Time-stepping."""
-from typing import Any, Callable
+from functools import partial
+from typing import Any
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 
 
@@ -18,9 +20,10 @@ class ODEFilterSolution(eqx.Module):
 class ODEFilter(eqx.Module):
     """ODE filter."""
 
-    taylor_series_init: Callable
+    taylor_series_init: Any
     strategy: Any
 
+    @partial(jax.jit, static_argnames=("vector_field",))
     def init_fn(self, *, vector_field, initial_values, t0):
         """Initialise the IVP solver state."""
 
@@ -45,6 +48,7 @@ class ODEFilter(eqx.Module):
             posterior=posterior,
         )
 
+    @partial(jax.jit, static_argnames=("vector_field",))
     def step_fn(self, *, state, vector_field, dt0):
         """Perform a step."""
 
@@ -57,16 +61,6 @@ class ODEFilter(eqx.Module):
         u = posterior.solution.mean
         return ODEFilterSolution(
             t=state.t + dt0, u=u, error_estimate=error_estimate, posterior=posterior
-        )
-
-    def reset_fn(self, *, state):  # noqa: D102
-        raise RuntimeError
-        posterior_new = self.strategy.reset_fn(state=state.posterior)
-        return ODEFilterSolution(
-            t=state.t,
-            u=state.u,
-            error_estimate=state.error_estimate,
-            posterior=posterior_new,
         )
 
     def extract_fn(self, *, state):  # noqa: D102
