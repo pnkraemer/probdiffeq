@@ -3,10 +3,10 @@
 from typing import Any
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from odefilter import _control_flow
 from odefilter.implementations import _ibm, sqrtm
 
 
@@ -152,7 +152,9 @@ class IsotropicImplementation(eqx.Module):
             )
             return out, out
 
-        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=backward_model, reverse=True)
+        _, rvs = _control_flow.scan_with_init(
+            f=body_fun, init=init, xs=backward_model, reverse=True
+        )
 
         return rvs
 
