@@ -37,7 +37,7 @@ def case_dynamic_smoother(num_derivatives, information_op):
 
 
 @pytest_cases.parametrize(
-    "information_op", [information.EK1(ode_dimension=2)], ids=["EK1"]
+    "information_op", [information.EK1FirstOrder(ode_dimension=2)], ids=["EK1"]
 )
 @pytest_cases.parametrize("num_derivatives", [2])
 def case_dynamic_filter(num_derivatives, information_op):

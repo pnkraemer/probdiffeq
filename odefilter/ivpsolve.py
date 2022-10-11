@@ -1,10 +1,12 @@
 """Solve initial value problems."""
 
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 
+@eqx.filter_jit
 def simulate_terminal_values(
     vector_field,
     initial_values,
@@ -47,7 +49,7 @@ def simulate_terminal_values(
     return solver.extract_fn(state=solution)
 
 
-# todo: don't evaluate the ODE if the time-step has been clipped
+@eqx.filter_jit
 def simulate_checkpoints(vector_field, initial_values, *, ts, solver, parameters=()):
     """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values=initial_values)

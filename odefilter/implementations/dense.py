@@ -49,9 +49,6 @@ class DenseImplementation(eqx.Module):
     def init_error_estimate(self):  # noqa: D102
         return jnp.nan * jnp.ones((self.ode_dimension,))
 
-    def init_backward_transition(self):  # noqa: D102
-        raise NotImplementedError
-
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
@@ -108,3 +105,17 @@ class DenseImplementation(eqx.Module):
 
     def extract_u(self, *, rv):  # noqa: D102
         return rv.mean.reshape((-1, self.ode_dimension), order="F")[0]
+
+    def init_preconditioner(self):  # noqa: D102
+        empty = jnp.nan * jnp.ones((self.num_derivatives * self.ode_dimension,))
+        return empty, empty
+
+    def init_backward_transition(self):  # noqa: D102
+        k = self.num_derivatives * self.ode_dimension
+        return jnp.eye(k)
+
+    def init_backward_noise(self, rv_proto):  # noqa: D102
+        return MultivariateNormal(
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+        )

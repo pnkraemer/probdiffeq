@@ -94,7 +94,7 @@ class IsotropicEK0FirstOrder(eqx.Module):
         return bias, jvp
 
 
-class EK1(eqx.Module):
+class EK1FirstOrder(eqx.Module):
     """EK1 information."""
 
     ode_dimension: int
