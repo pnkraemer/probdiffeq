@@ -6,15 +6,9 @@ import pytest_cases
 from odefilter import adaptive, controls, odefilters, taylor_series
 
 
-@pytest_cases.parametrize(
-    "tseries", [taylor_series.TaylorMode(), taylor_series.ForwardMode()]
-)
 @pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
-def case_odefilter(tseries, strategy):
-    odefilter = odefilters.ODEFilter(
-        taylor_series_init=tseries,
-        strategy=strategy,
-    )
+def case_odefilter(strategy):
+    odefilter = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
     return adaptive.Adaptive(
@@ -34,9 +28,17 @@ def test_solver(solver, vf, u0, t0, t1, p):
     def vf_p(*ys, t):
         return vf(*ys, t, *p)
 
-    state0 = solver.init_fn(
-        vector_field=vf_p,
+    def vf_p_0(*ys):
+        return vf_p(*ys, t=t0)
+
+    taylor_series_fn = taylor_series.TaylorMode()
+    tcoeffs = taylor_series_fn(
+        vector_field=vf_p_0,
         initial_values=u0,
+        num=solver.odefilter.strategy.implementation.num_derivatives,
+    )
+    state0 = solver.init_fn(
+        taylor_coefficients=tcoeffs,
         t0=t0,
     )
     assert state0.dt_proposed > 0.0
