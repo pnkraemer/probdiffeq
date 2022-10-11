@@ -87,62 +87,68 @@ class AdaptiveODEFilter(eqx.Module):
             control=state_control,
         )
 
+    @staticmethod
+    def _propose_first_dt(*, taylor_coefficients, scale=0.01):
+        u0, f0, *_ = taylor_coefficients
+        norm_y0 = jnp.linalg.norm(u0)
+        norm_dy0 = jnp.linalg.norm(f0)
+        return scale * norm_y0 / norm_dy0
+
     @partial(jax.jit, static_argnames=("vector_field",))
     def step_fn(self, *, state, vector_field, t1):
         """Perform a step."""
-
-        def true_fn1(state_):
-            def cond_fn(x):
-                proceed_iteration, _ = x
-                return proceed_iteration
-
-            def body_fn(x):
-                _, s = x
-                s = self.attempt_step_fn(state=s, vector_field=vector_field)
-                proceed_iteration = s.error_norm_proposed > 1.0
-                return proceed_iteration, s
-
-            _, state_new_ = jax.lax.while_loop(cond_fn, body_fn, (True, state_))
-
-            return AdaptiveODEFilterState(
-                dt_proposed=state_new_.dt_proposed,
-                error_norm_proposed=state_new_.error_norm_proposed,
-                proposed=state_new_.proposed,
-                accepted=state_new_.proposed,  # holla! New! :)
-                solution=state_new_.accepted,  # holla! New! :)
-                previous=state_.accepted,  # holla! New! :)
-                control=state_new_.control,
-            )
-
-        def false_fn1(state_):
-            return state_
+        # Part I/II: accept-reject loop unless we have gathered ODE
+        # evaluations _beyond_ t1.
 
         enter_accept_reject_loop = state.accepted.t < t1
 
+        def true_fn1(s):
+            return self._accept_reject_loop(state0=s, vector_field=vector_field)
+
+        def false_fn1(s):
+            return s
+
         state_new = jax.lax.cond(enter_accept_reject_loop, true_fn1, false_fn1, state)
 
-        # If we overstepped the boundary, interpolate:
-        def true_fn(s1):  # interpolation. s.accepted.t > t1
-            accepted_new, interpolated = self.strategy.interpolate_fn(
-                s0=s1.previous, s1=s1.accepted, t=t1
-            )
-            return AdaptiveODEFilterState(
-                dt_proposed=s1.dt_proposed,
-                error_norm_proposed=s1.error_norm_proposed,
-                proposed=s1.proposed,
-                accepted=accepted_new,  # holla! New! :)
-                solution=interpolated,  # holla! New! :)
-                previous=interpolated,  # holla! New! :)
-                control=s1.control,
-            )
-
-        def false_fn(s1):  # no interpolation. s.accepted.t <= t1
-            return s1
-
+        # Part II/II: If we have previously overstepped
+        # the boundary, interpolate to t1:
         interpolate = state_new.accepted.t > t1
+
+        def true_fn(s):
+            return self._interpolate(state=s, t=t1)
+
+        def false_fn(s):
+            return s
+
         return jax.lax.cond(interpolate, true_fn, false_fn, state_new)
 
-    def attempt_step_fn(self, *, state, vector_field):
+    def _accept_reject_loop(self, *, vector_field, state0):
+        def cond_fn(x):
+            proceed_iteration, _ = x
+            return proceed_iteration
+
+        def body_fn(x):
+            _, s = x
+            s = self._attempt_step_fn(state=s, vector_field=vector_field)
+            proceed_iteration = s.error_norm_proposed > 1.0
+            return proceed_iteration, s
+
+        def init_fn(s):
+            return True, s
+
+        _, state_new_ = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
+
+        return AdaptiveODEFilterState(
+            dt_proposed=state_new_.dt_proposed,
+            error_norm_proposed=state_new_.error_norm_proposed,
+            proposed=state_new_.proposed,
+            accepted=state_new_.proposed,  # holla! New! :)
+            solution=state_new_.accepted,  # holla! New! :)
+            previous=state0.accepted,  # holla! New! :)
+            control=state_new_.control,
+        )
+
+    def _attempt_step_fn(self, *, state, vector_field):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
 
@@ -182,12 +188,19 @@ class AdaptiveODEFilter(eqx.Module):
         error_relative = error_estimate / (atol + rtol * jnp.abs(u))
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
-    @staticmethod
-    def _propose_first_dt(*, taylor_coefficients, scale=0.01):
-        u0, f0, *_ = taylor_coefficients
-        norm_y0 = jnp.linalg.norm(u0)
-        norm_dy0 = jnp.linalg.norm(f0)
-        return scale * norm_y0 / norm_dy0
+    def _interpolate(self, *, state, t):
+        accepted_new, interpolated = self.strategy.interpolate_fn(
+            s0=state.previous, s1=state.accepted, t=t
+        )
+        return AdaptiveODEFilterState(
+            dt_proposed=state.dt_proposed,
+            error_norm_proposed=state.error_norm_proposed,
+            proposed=state.proposed,
+            accepted=accepted_new,  # holla! New! :)
+            solution=interpolated,  # holla! New! :)
+            previous=interpolated,  # holla! New! :)
+            control=state.control,
+        )
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
