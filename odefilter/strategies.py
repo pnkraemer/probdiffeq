@@ -155,6 +155,7 @@ class DynamicSmoother(eqx.Module):
 
         Initialises a new fixed-point smoother.
         """
+        raise RuntimeError
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(
             rv_proto=state.backward_model.noise
@@ -231,7 +232,7 @@ class DynamicSmoother(eqx.Module):
             return self.implementation.marginalise_backwards(
                 init=init, backward_model=state.backward_model
             )
-
+        raise ValueError("what?")
         # Otherwise, we are still in filtering mode and simply return the input
         return state
 
@@ -251,10 +252,10 @@ class DynamicSmoother(eqx.Module):
         # model from the previous checkpoint to t0 with the newly acquired
         # model from t0 to t. This will imply a backward model from the
         # previous checkpoint to the current checkpoint.
-        noise0, g0, (p, p_inv) = self.implementation.condense_backward_models(
-            bw_init=s0.backward_model, bw_state=backward_model0
-        )
-        backward_model0 = BackwardModel(transition=g0, noise=noise0, p=p, p_inv=p_inv)
+        # noise0, g0, (p, p_inv) = self.implementation.condense_backward_models(
+        #     bw_init=s0.backward_model, bw_state=backward_model0
+        # )
+        # backward_model0 = BackwardModel(transition=g0, noise=noise0, p=p, p_inv=p_inv)
 
         # This is the new solution object at t.
         s0 = SmoothingPosterior(
@@ -264,7 +265,8 @@ class DynamicSmoother(eqx.Module):
         )
         u = self.implementation.extract_u(rv=extrapolated0)
 
-        # We update the backward model from
+        # We update the backward model from t_interp to t_accep
+        # because the time-increment has changed.
         s1 = SmoothingPosterior(
             filtered=s1.filtered,
             diffusion_sqrtm=diffsqrtm,
