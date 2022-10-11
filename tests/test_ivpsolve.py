@@ -20,7 +20,9 @@ SOLVERS = [
 ]
 
 
-@pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
+@pytest_cases.parametrize_with_cases(
+    "vf, u0, t0, t1, p", cases=".test_src.cases_problems"
+)
 @pytest.mark.parametrize("solver", SOLVERS)
 def test_solve(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
@@ -39,7 +41,9 @@ def test_solve(vf, u0, t0, t1, p, solver):
     assert jnp.allclose(solution.u[-1], ys_reference[-1], atol=1e-3, rtol=1e-3)
 
 
-@pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
+@pytest_cases.parametrize_with_cases(
+    "vf, u0, t0, t1, p", cases=".test_src.cases_problems"
+)
 @pytest.mark.parametrize("solver", SOLVERS)
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     odeint_solution = odeint(vf, u0[0], jnp.asarray([t0, t1]), *p, atol=1e-6, rtol=1e-6)
@@ -58,7 +62,9 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
 
 
-@pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
+@pytest_cases.parametrize_with_cases(
+    "vf, u0, t0, t1, p", cases=".test_src.cases_problems"
+)
 @pytest.mark.parametrize("solver", SOLVERS)
 def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
