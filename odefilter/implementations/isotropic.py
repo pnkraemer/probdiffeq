@@ -127,13 +127,7 @@ class IsotropicImplementation(eqx.Module):
     @staticmethod
     def extract_sol(*, rv):  # noqa: D102
         m = rv.mean[..., 0, :]
-        l_nonsquare = rv.cov_sqrtm_lower[..., 0, :]
-        if l_nonsquare.ndim == 1:  # non-batch setting
-            l_square = sqrtm.sqrtm_to_cholesky(R=l_nonsquare[:, None].T)[0, 0]
-        else:  # batch setting
-            l_t = jnp.swapaxes(l_nonsquare[..., None], -2, -1)
-            l_square = jax.vmap(sqrtm.sqrtm_to_cholesky)(R=l_t)[..., 0, 0]
-        return IsotropicNormal(m, l_square)
+        return m
 
     @staticmethod
     def condense_backward_models(*, bw_init, bw_state):  # noqa: D102

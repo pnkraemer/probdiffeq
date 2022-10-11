@@ -16,7 +16,8 @@ T = TypeVar("T")
 class FilterOutput(Generic[T], eqx.Module):
     """Filtering solution."""
 
-    solution: T
+    t: float
+    u: Any
     filtered: T
     diffusion_sqrtm: float
 
@@ -31,7 +32,8 @@ class BackwardModel(Generic[T], eqx.Module):
 class Posterior(Generic[T], eqx.Module):
     """Markov sequences as smoothing solutions."""
 
-    solution: T
+    t: float
+    u: Any
     filtered: T
     diffusion_sqrtm: float
     backward_model: BackwardModel[T]
@@ -43,7 +45,7 @@ class DynamicFilter(eqx.Module):
     implementation: Any
     information: Any
 
-    def init_fn(self, *, taylor_coefficients):
+    def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
         corrected = self.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
@@ -51,7 +53,7 @@ class DynamicFilter(eqx.Module):
         error_estimate = self.implementation.init_error_estimate()
 
         sol = self.implementation.extract_sol(rv=corrected)
-        filtered = FilterOutput(solution=sol, filtered=corrected, diffusion_sqrtm=1.0)
+        filtered = FilterOutput(t=t0, u=sol, filtered=corrected, diffusion_sqrtm=1.0)
         return filtered, error_estimate
 
     def step_fn(self, *, state, vector_field, dt):
@@ -85,13 +87,13 @@ class DynamicFilter(eqx.Module):
         sol = self.implementation.extract_sol(rv=corrected)
 
         filtered = FilterOutput(
-            solution=sol, filtered=corrected, diffusion_sqrtm=diffusion_sqrtm
+            t=state.t + dt, u=sol, filtered=corrected, diffusion_sqrtm=diffusion_sqrtm
         )
         return filtered, error_estimate
 
     @staticmethod
     def extract_fn(*, state):  # noqa: D102
-        return state.filtered, state.solution
+        return state
 
     def interpolate_fn(self, *, s0, s1, t0, t1, t):  # noqa: D102
         dt = t - t0
@@ -109,7 +111,7 @@ class DynamicFilter(eqx.Module):
         )
         sol = self.implementation.extract_sol(rv=extrapolated)
         target_p = FilterOutput(
-            solution=sol, filtered=extrapolated, diffusion_sqrtm=s1.diffusion_sqrtm
+            t=t, u=sol, filtered=extrapolated, diffusion_sqrtm=s1.diffusion_sqrtm
         )
         return s1, target_p
 
@@ -120,7 +122,7 @@ class DynamicSmoother(eqx.Module):
     implementation: Any
     information: Any
 
-    def init_fn(self, *, taylor_coefficients):
+    def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
         corrected = self.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
@@ -135,7 +137,8 @@ class DynamicSmoother(eqx.Module):
         sol = self.implementation.extract_sol(rv=corrected)
 
         solution = Posterior(
-            solution=sol,
+            t=t0,
+            u=sol,
             filtered=corrected,
             diffusion_sqrtm=1.0,
             backward_model=backward_model,
@@ -188,7 +191,8 @@ class DynamicSmoother(eqx.Module):
         # Return solution
         sol = self.implementation.extract_sol(rv=corrected)
         smoothing_solution = Posterior(
-            solution=sol,
+            t=state.t + dt,
+            u=sol,
             filtered=corrected,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model,
@@ -239,7 +243,7 @@ class DynamicSmoother(eqx.Module):
         # This is the new solution object at t.
         sol = self.implementation.extract_sol(rv=extrapolated0)
         s0 = Posterior(
-            solution=sol,
+            u=sol,
             filtered=extrapolated0,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model0,
@@ -253,7 +257,7 @@ class DynamicSmoother(eqx.Module):
         # to the previous checkpoint.
         bw1 = backward_model1
         s1 = Posterior(
-            solution=sol,
+            u=sol,
             filtered=s1.filtered,
             diffusion_sqrtm=diffsqrtm,
             backward_model=bw1,

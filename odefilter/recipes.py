@@ -14,7 +14,7 @@ but until you do so, use one of ours.
     Tomorrow, this module might go again.
 
 """
-from odefilter import adaptive, controls, information, odefilters, strategies
+from odefilter import adaptive, controls, information, strategies
 from odefilter.implementations import dense, isotropic
 
 ATOL_DEFAULTS = 1e-6
@@ -34,10 +34,9 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     strategy = strategies.DynamicFilter(
         implementation=implementation, information=information_op
     )
-    stepping = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
-    return adaptive.Adaptive(
-        odefilter=stepping,
+    return adaptive.AdaptiveODEFilter(
+        strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -58,10 +57,9 @@ def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     strategy = strategies.DynamicSmoother(
         implementation=implementation, information=information_op
     )
-    stepping = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
-    return adaptive.Adaptive(
-        odefilter=stepping,
+    return adaptive.AdaptiveODEFilter(
+        strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -83,10 +81,9 @@ def dynamic_ekf1(
     strategy = strategies.DynamicFilter(
         implementation=implementation, information=information_op
     )
-    stepping = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
-    return adaptive.Adaptive(
-        odefilter=stepping,
+    return adaptive.AdaptiveODEFilter(
+        strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,

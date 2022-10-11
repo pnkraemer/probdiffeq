@@ -3,16 +3,15 @@
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import adaptive, controls, odefilters, taylor
+from odefilter import adaptive, controls, taylor
 
 
 @pytest_cases.parametrize_with_cases("strategy", cases=".cases_strategies")
 def case_odefilter(strategy):
-    odefilter = odefilters.ODEFilter(strategy=strategy)
     control = controls.ProportionalIntegral()
     atol, rtol = 1e-3, 1e-3
-    return adaptive.Adaptive(
-        odefilter=odefilter,
+    return adaptive.AdaptiveODEFilter(
+        strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
@@ -23,7 +22,7 @@ def case_odefilter(strategy):
 @pytest_cases.parametrize_with_cases("solver", cases=".")
 @pytest_cases.parametrize_with_cases("vf, u0, t0, t1, p", cases=".cases_problems")
 def test_solver(solver, vf, u0, t0, t1, p):
-    assert isinstance(solver, adaptive.Adaptive)
+    assert isinstance(solver, adaptive.AdaptiveODEFilter)
 
     def vf_p(*ys, t):
         return vf(*ys, t, *p)
@@ -34,7 +33,7 @@ def test_solver(solver, vf, u0, t0, t1, p):
     tcoeffs = taylor.taylor_mode_fn(
         vector_field=vf_p_0,
         initial_values=u0,
-        num=solver.odefilter.strategy.implementation.num_derivatives,
+        num=solver.strategy.implementation.num_derivatives,
     )
     state0 = solver.init_fn(
         taylor_coefficients=tcoeffs,
@@ -48,4 +47,4 @@ def test_solver(solver, vf, u0, t0, t1, p):
     assert isinstance(state0, type(state1))
     assert state1.dt_proposed > 0.0
     assert t0 < state1.accepted.t <= t1
-    assert jnp.shape(state1.proposed.u) == jnp.shape(u0[0])
+    assert jnp.shape(state1.accepted.u) == jnp.shape(u0[0])

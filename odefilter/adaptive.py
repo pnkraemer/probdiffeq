@@ -11,11 +11,12 @@ T = TypeVar("T")
 """A generic ODE Filter state."""
 
 
-class AdaptiveSolverState(Generic[T], eqx.Module):
+class AdaptiveODEFilterState(Generic[T], eqx.Module):
     """Solver state."""
 
     dt_proposed: float
-    error_normalised: float
+    error_norm_proposed: float
+
     control: Any  # must contain field "scale_factor".
     """Controller."""
 
@@ -44,8 +45,10 @@ class AdaptiveSolverState(Generic[T], eqx.Module):
     """The penultimate (2nd most recent) accepted state."""
 
 
-class Adaptive(eqx.Module):
-    """Make an adaptive ODE solver."""
+class AdaptiveODEFilter(eqx.Module):
+    """Make an adaptive ODE filter."""
+
+    strategy: Any
 
     # Take a solver, normalise its error estimate,
     # and propose time-steps based on tolerances.
@@ -54,22 +57,21 @@ class Adaptive(eqx.Module):
     rtol: float
 
     error_order: int
-    odefilter: Any
     control: Any
     norm_ord: Union[int, str, None] = None
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise the IVP solver state."""
-        state_odefilter = self.odefilter.init_fn(
+        posterior, error_estimate = self.strategy.init_fn(
             taylor_coefficients=taylor_coefficients, t0=t0
         )
         state_control = self.control.init_fn()
 
         u0, f0, *_ = taylor_coefficients
         error_normalised = self._normalise_error(
-            error_estimate=state_odefilter.error_estimate,
-            u=state_odefilter.u,
+            error_estimate=error_estimate,
+            u=u0,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -81,13 +83,13 @@ class Adaptive(eqx.Module):
             atol=self.atol,
             rtol=self.rtol,
         )
-        return AdaptiveSolverState(
+        return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,
-            error_normalised=error_normalised,
-            solution=state_odefilter,
-            proposed=state_odefilter,
-            accepted=state_odefilter,
-            previous=state_odefilter,
+            error_norm_proposed=error_normalised,
+            solution=posterior,
+            proposed=posterior,
+            accepted=posterior,
+            previous=posterior,
             control=state_control,
         )
 
@@ -102,7 +104,7 @@ class Adaptive(eqx.Module):
         def body_fn(x):
             _, s = x
             s = self.attempt_step_fn(state=s, vector_field=vector_field, t1=t1)
-            proceed_iteration = s.error_normalised > 1.0
+            proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
 
         def init_fn(s):
@@ -110,9 +112,9 @@ class Adaptive(eqx.Module):
 
         init_val = init_fn(state)
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_val)
-        return AdaptiveSolverState(
+        return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
-            error_normalised=state_new.error_normalised,
+            error_norm_proposed=state_new.error_norm_proposed,
             proposed=state_new.proposed,
             solution=state_new.proposed,  # holla! New! :)
             accepted=state_new.proposed,  # holla! New! :)
@@ -126,12 +128,17 @@ class Adaptive(eqx.Module):
         # todo: should this be at the end of this function?
         #  or even happen inside the controller?
 
-        state_proposed = self.odefilter.step_fn(
-            state=state.accepted, vector_field=vector_field, dt0=state.dt_proposed
+        # todo: this should not happen here?!
+        def vf(*y):
+            return vector_field(*y, t=state.accepted.t + state.dt_proposed)
+
+        posterior, error_estimate = self.strategy.step_fn(
+            state=state.accepted, vector_field=vf, dt=state.dt_proposed
         )
+
         error_normalised = self._normalise_error(
-            error_estimate=state_proposed.error_estimate,
-            u=state_proposed.u,
+            error_estimate=error_estimate,
+            u=posterior.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -142,10 +149,10 @@ class Adaptive(eqx.Module):
             error_order=self.error_order,
         )
         dt_proposed = state.dt_proposed * state_control.scale_factor
-        return AdaptiveSolverState(
+        return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,
-            error_normalised=error_normalised,
-            proposed=state_proposed,
+            error_norm_proposed=error_normalised,
+            proposed=posterior,
             solution=state.solution,  # too early to accept :)
             accepted=state.accepted,  # too early to accept :)
             previous=state.previous,  # too early to accept :)
@@ -186,7 +193,8 @@ class Adaptive(eqx.Module):
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-        return self.odefilter.extract_fn(state=state.solution)
+        posterior_new = self.strategy.extract_fn(state=state.solution)
+        return posterior_new
 
     @jax.jit
     def interpolate_fn(self, *, state, t):  # noqa: D102
@@ -195,12 +203,16 @@ class Adaptive(eqx.Module):
         t must be in between state.recent.t and state.accepted.t
         """
         # todo: the time-points seem to be inappropriately assigned
-        accepted_new, interpolated = self.odefilter.interpolate_fn(
-            state0=state.previous, state1=state.accepted, t=t
+        accepted_new, interpolated = self.strategy.interpolate_fn(
+            s0=state.previous,
+            s1=state.accepted,
+            t=t,
+            t0=state.previous.t,
+            t1=state.accepted.t,
         )
-        return AdaptiveSolverState(
+        return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
-            error_normalised=state.error_normalised,
+            error_norm_proposed=state.error_norm_proposed,
             proposed=state.proposed,
             accepted=accepted_new,
             solution=interpolated,
