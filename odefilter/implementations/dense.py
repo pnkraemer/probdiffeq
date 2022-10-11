@@ -108,9 +108,7 @@ class DenseImplementation(eqx.Module):
             return jnp.reshape(x, (-1, self.ode_dimension), order="F")[0]
 
         m = proj(rv.mean)
-        l_nonsquare = jax.vmap(proj, in_axes=1, out_axes=1)(rv.cov_sqrtm_lower)
-        l_square = sqrtm.sqrtm_to_cholesky(R=l_nonsquare.T)
-        return MultivariateNormal(m, l_square)
+        return m
 
     def init_preconditioner(self):  # noqa: D102
         empty = jnp.nan * jnp.ones((self.num_derivatives * self.ode_dimension,))

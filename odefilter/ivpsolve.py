@@ -62,7 +62,7 @@ def solution_generator(
     taylor_coefficients = taylor_series_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
-        num=solver.odefilter.strategy.implementation.num_derivatives,
+        num=solver.strategy.implementation.num_derivatives,
     )
     state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
@@ -98,7 +98,7 @@ def simulate_terminal_values(
     taylor_coefficients = taylor_series_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
-        num=solver.odefilter.strategy.implementation.num_derivatives,
+        num=solver.strategy.implementation.num_derivatives,
     )
     state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
@@ -133,7 +133,7 @@ def simulate_checkpoints(
     taylor_coefficients = taylor_series_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
-        num=solver.odefilter.strategy.implementation.num_derivatives,
+        num=solver.strategy.implementation.num_derivatives,
     )
     state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
 
