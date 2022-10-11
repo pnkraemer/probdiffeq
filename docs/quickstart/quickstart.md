@@ -16,7 +16,7 @@ config.update("jax_enable_x64", False)  # x64 precision
 f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 # High-res plot
-ts = jnp.linspace(t0, .3, num=20, endpoint=True)
+ts = jnp.linspace(t0, .3, num=1_000, endpoint=True)
 ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=1, atol=1e-1, rtol=1e-1)
 eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=1, atol=1e-1, rtol=1e-1)
 
