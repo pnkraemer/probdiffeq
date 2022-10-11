@@ -16,7 +16,7 @@ lint:
 	nbqa flake8 docs/
 
 test:
-	pytest
+	pytest -x -v
 	python -m doctest odefilter/*.py
 
 example:

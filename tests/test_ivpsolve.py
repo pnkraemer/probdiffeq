@@ -8,9 +8,11 @@ from jax.experimental.ode import odeint
 from odefilter import ivpsolve, recipes
 
 SOLVERS = [
-    recipes.dynamic_isotropic_eks0(num_derivatives=2),
-    recipes.dynamic_isotropic_ekf0(num_derivatives=2),
-    recipes.dynamic_ekf1(ode_dimension=2, num_derivatives=2),
+    pytest.param(recipes.dynamic_isotropic_eks0(num_derivatives=2), id="DynIsoEKS0"),
+    pytest.param(recipes.dynamic_isotropic_ekf0(num_derivatives=2), id="DynIsoEKF0"),
+    pytest.param(
+        recipes.dynamic_ekf1(num_derivatives=2, ode_dimension=2), id="DynEKF1"
+    ),
 ]
 
 

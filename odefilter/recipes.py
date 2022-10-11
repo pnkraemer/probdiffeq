@@ -87,11 +87,11 @@ def dynamic_ekf1(
 
     Suitable for low-dimensional, stiff problems.
     """
-    information_op = information.IsotropicEK0FirstOrder()
+    information_op = information.EK1FirstOrder(ode_dimension=ode_dimension)
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = strategies.DynamicSmoother(
+    strategy = strategies.DynamicFilter(
         implementation=implementation, information=information_op
     )
     stepping = odefilters.ODEFilter(
