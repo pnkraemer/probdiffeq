@@ -59,7 +59,6 @@ plugins:
                     show_source: true
                     docstring_style: numpy
                     show_root_heading: true
-    - mkdocs-jupyter:
     - exclude:
         glob:
           - "examples/*.ipynb"
