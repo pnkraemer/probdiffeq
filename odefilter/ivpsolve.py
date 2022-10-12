@@ -23,20 +23,42 @@ def simulate_terminal_values(
     parameters=(),
     taylor_series_fn=taylor.taylor_mode_fn,
 ):
-    """Simulate the terminal values of an initial value problem."""
-    _assert_not_scalar(initial_values=initial_values)
+    """Simulate the terminal values of an initial value problem.
 
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
+    Thin wrapper around :func:`odefilter_terminal_values`.
+    """
+    _assert_not_scalar(initial_values)
 
+    @jax.jit
     def vf_auto_t0(*x):
-        return vf(*x, t=t0)
+        return vector_field(*x, t0, *parameters)
 
     taylor_coefficients = taylor_series_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
+    return odefilter_terminal_values(
+        vector_field,
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        t1=t1,
+        solver=solver,
+        parameters=parameters,
+    )
+
+
+@partial(jax.jit, static_argnums=[0])
+def odefilter_terminal_values(
+    vector_field, /, *, taylor_coefficients, t0, t1, solver, parameters=()
+):
+    """Simulate the terminal values of an ODE with an ODE filter."""
+    _assert_not_scalar(taylor_coefficients)
+
+    @jax.jit
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
+
     state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     solution = _advance_ivp_solution_adaptively(
@@ -59,23 +81,41 @@ def simulate_checkpoints(
     parameters=(),
     taylor_series_fn=taylor.taylor_mode_fn,
 ):
-    """Solve an IVP and return the solution at checkpoints."""
-    _assert_not_scalar(initial_values=initial_values)
+    """Solve an IVP and return the solution at checkpoints.
 
-    @jax.jit
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
+    Thin wrapper around :func:`odefilter_checkpoints`.
+    """
+    _assert_not_scalar(initial_values)
 
     @jax.jit
     def vf_auto_t0(*x):
-        return vf(*x, t=ts[0])
+        return vector_field(*x, ts[0], *parameters)
 
     taylor_coefficients = taylor_series_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
-    state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
+
+    return odefilter_checkpoints(
+        vector_field,
+        taylor_coefficients=taylor_coefficients,
+        ts=ts,
+        solver=solver,
+        parameters=parameters,
+    )
+
+
+@partial(jax.jit, static_argnums=[0])
+def odefilter_checkpoints(
+    vector_field, /, *, taylor_coefficients, ts, solver, parameters=()
+):
+    """Simulate checkpoints of an ODE solution with an ODE filter."""
+    _assert_not_scalar(taylor_coefficients)
+
+    @jax.jit
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
@@ -85,6 +125,8 @@ def simulate_checkpoints(
             solver=solver,
         )
         return s_next, s_next
+
+    state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
@@ -144,7 +186,7 @@ def solution_generator(
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
-    _assert_not_scalar(initial_values=initial_values)
+    _assert_not_scalar(initial_values)
 
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
@@ -169,7 +211,7 @@ def solution_generator(
 # Auxiliary routines
 
 
-def _assert_not_scalar(initial_values):
+def _assert_not_scalar(x, /):
     """Verify the initial conditions are not scalar.
 
     There is no clear mechanism for the internals if the IVP is
@@ -177,10 +219,8 @@ def _assert_not_scalar(initial_values):
 
     todo: allow scalar problems.
     """
-    initial_value_is_not_scalar = jax.tree_util.tree_map(
-        lambda x: jnp.ndim(x) > 0, initial_values
-    )
-    assert jax.tree_util.tree_all(initial_value_is_not_scalar)
+    is_not_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) > 0, x)
+    assert jax.tree_util.tree_all(is_not_scalar)
 
 
 def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
