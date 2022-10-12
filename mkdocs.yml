@@ -59,6 +59,10 @@ plugins:
                     show_source: true
                     docstring_style: numpy
                     show_root_heading: true
+    - mkdocs-jupyter:
+    - exclude:
+        glob:
+          - "examples/*.ipynb"
 
 nav:
     - index.md
@@ -66,7 +70,7 @@ nav:
         - "quickstart/quickstart.md"
         - "quickstart/transitioning_from_other_packages.md"
     - Examples:
-        - "examples.md"
+        - "examples/posterior_uncertainties.md"
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"
