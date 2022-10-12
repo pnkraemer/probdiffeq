@@ -48,7 +48,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install dependencies
       run:
-        pip install .[numpy,jax,example]
+        pip install .[example]
     - name: Sync and execute notebooks
       run:
         make example
