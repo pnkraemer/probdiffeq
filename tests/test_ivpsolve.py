@@ -7,6 +7,8 @@ from pytest_cases import case, parametrize_with_cases
 
 from odefilter import ivpsolve, recipes
 
+# All tests assume that we are dealing with a first-order, 2d-problem!
+
 
 @case(tags=("checkpoint",))
 def solver_dynamic_isotropic_fixpt_eks0():
