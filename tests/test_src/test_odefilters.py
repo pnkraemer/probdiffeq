@@ -24,11 +24,11 @@ def case_odefilter(strategy):
 def test_solver(solver, vf, u0, t0, t1, p):
     assert isinstance(solver, odefilters.AdaptiveODEFilter)
 
-    def vf_p(*ys, t):
-        return vf(*ys, t, *p)
+    def vf_p(t, *ys):
+        return vf(t, *ys, *p)
 
     def vf_p_0(*ys):
-        return vf_p(*ys, t=t0)
+        return vf_p(t0, *ys)
 
     tcoeffs = taylor.taylor_mode_fn(
         vector_field=vf_p_0,

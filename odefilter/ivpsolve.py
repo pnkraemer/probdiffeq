@@ -23,7 +23,7 @@ def simulate_terminal_values(
 
     @jax.jit
     def vf_auto_t0(*x):
-        return vector_field(*x, t0, *parameters)
+        return vector_field(t0, *x, *parameters)
 
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_auto_t0,
@@ -48,8 +48,8 @@ def odefilter_terminal_values(
     _assert_not_scalar(taylor_coefficients)
 
     @jax.jit
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
+    def vf(t, *ys):
+        return vector_field(t, *ys, *parameters)
 
     state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
@@ -72,7 +72,7 @@ def simulate_checkpoints(vector_field, /, initial_values, *, ts, solver, paramet
 
     @jax.jit
     def vf_auto_t0(*x):
-        return vector_field(*x, ts[0], *parameters)
+        return vector_field(ts[0], *x, *parameters)
 
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_auto_t0,
@@ -97,8 +97,8 @@ def odefilter_checkpoints(
     _assert_not_scalar(taylor_coefficients)
 
     @jax.jit
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
+    def vf(t, *ys):
+        return vector_field(t, *ys, *parameters)
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
@@ -156,7 +156,7 @@ def solution_generator(
 
     @jax.jit
     def vf_auto_t0(*x):
-        return vector_field(*x, t0, *parameters)
+        return vector_field(t0, *x, *parameters)
 
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_auto_t0,
@@ -181,8 +181,8 @@ def odefilter_generator(
     _assert_not_scalar(taylor_coefficients)
 
     @jax.jit
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
+    def vf(t, *ys):
+        return vector_field(t, *ys, *parameters)
 
     state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
@@ -212,7 +212,7 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
-        return s.accepted.t < t1
+        return s.solution.t < t1
 
     def body_fun(s):
         return solver.step_fn(state=s, vector_field=vector_field, t1=t1)

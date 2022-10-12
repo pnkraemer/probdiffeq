@@ -144,7 +144,7 @@ class AdaptiveODEFilter(eqx.Module):
             error_norm_proposed=state_new.error_norm_proposed,
             proposed=state_new.proposed,
             accepted=state_new.proposed,  # holla! New! :)
-            solution=state_new.accepted,  # holla! New! :)
+            solution=state_new.accepted,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )
@@ -154,7 +154,7 @@ class AdaptiveODEFilter(eqx.Module):
         propose a future time-step based on tolerances and error estimates."""
 
         def vf(*y):  # todo: this should not happen here?!
-            return vector_field(*y, t=state.accepted.t + state.dt_proposed)
+            return vector_field(state.accepted.t + state.dt_proposed, *y)
 
         posterior, error_estimate = self.strategy.step_fn(
             state=state.accepted, vector_field=vf, dt=state.dt_proposed

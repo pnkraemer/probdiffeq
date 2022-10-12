@@ -11,4 +11,4 @@ def case_lv():
 
     f, u0, tspan, f_args = ivps.lotka_volterra()
 
-    return jax.jit(lambda x, t, *p: f(x, *p)), (u0,), *tspan, f_args
+    return jax.jit(lambda t, x, *p: f(x, *p)), (u0,), *tspan, f_args

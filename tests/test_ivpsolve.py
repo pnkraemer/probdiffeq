@@ -35,7 +35,7 @@ def problem_lotka():
     f, u0, tspan, f_args = ivps.lotka_volterra()
 
     @jax.jit
-    def vf(x, t, *p):
+    def vf(_t, x, *p):
         return f(x, *p)
 
     return vf, (u0,), *tspan, f_args
@@ -45,7 +45,9 @@ def problem_lotka():
 @parametrize_with_cases("solver", cases=".", prefix="solver_", has_tag=("solve",))
 def test_solve(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
-    odeint_solution = odeint(vf, u0[0], ts, *p, atol=1e-6, rtol=1e-6)
+    odeint_solution = odeint(
+        lambda y, t, *p: vf(t, y, *p), u0[0], ts, *p, atol=1e-6, rtol=1e-6
+    )
     ts_reference, ys_reference = ts, odeint_solution
 
     solution = ivpsolve.solve(vf, u0, t0=t0, t1=t1, parameters=p, solver=solver)
@@ -58,7 +60,14 @@ def test_solve(vf, u0, t0, t1, p, solver):
     "solver", cases=".", prefix="solver_", has_tag=("terminal_value",)
 )
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
-    odeint_solution = odeint(vf, u0[0], jnp.asarray([t0, t1]), *p, atol=1e-6, rtol=1e-6)
+    odeint_solution = odeint(
+        lambda y, t, *p: vf(t, y, *p),
+        u0[0],
+        jnp.asarray([t0, t1]),
+        *p,
+        atol=1e-6,
+        rtol=1e-6,
+    )
     ys_reference = odeint_solution[-1, :]
 
     solution = ivpsolve.simulate_terminal_values(
@@ -74,9 +83,13 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
 
-    odeint_solution = odeint(vf, u0[0], ts, *p, atol=1e-6, rtol=1e-6)
+    odeint_solution = odeint(
+        lambda y, t, *p: vf(t, y, *p), u0[0], ts, *p, atol=1e-6, rtol=1e-6
+    )
     ts_reference, ys_reference = ts, odeint_solution
 
     solution = ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+    print(solution.t, ts)
+    assert jnp.allclose(solution.t, ts)
     assert jnp.allclose(solution.t, ts_reference)
     assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
