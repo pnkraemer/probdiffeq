@@ -8,74 +8,13 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow, taylor
 
-
-def solve(
-    vector_field,
-    initial_values,
-    *,
-    t0,
-    t1,
-    solver,
-    parameters=(),
-    taylor_series_fn=taylor.taylor_mode_fn,
-):
-    """Solve an initial value problem.
-
-    Returns the full solution, but uses native python control flow.
-    Not JITable, not reverse-mode-differentiable.
-    """
-    solution_gen = solution_generator(
-        vector_field=vector_field,
-        initial_values=initial_values,
-        t0=t0,
-        t1=t1,
-        solver=solver,
-        parameters=parameters,
-        taylor_series_fn=taylor.taylor_mode_fn,
-    )
-    return _control_flow.tree_stack([sol for sol in solution_gen])
+# The high-level checkpoint-style routines
 
 
-def solution_generator(
-    vector_field,
-    initial_values,
-    *,
-    t0,
-    t1,
-    solver,
-    parameters=(),
-    taylor_series_fn=taylor.taylor_mode_fn,
-):
-    """Construct a generator of an IVP solution.
-
-    Uses native python control flow.
-    Not JITable, not reverse-mode-differentiable.
-    """
-    _assert_not_scalar(initial_values=initial_values)
-
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
-
-    def vf_auto_t0(*x):
-        return vf(*x, t=t0)
-
-    taylor_coefficients = taylor_series_fn(
-        vector_field=vf_auto_t0,
-        initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives,
-    )
-    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
-
-    while state.accepted.t < t1:
-        yield solver.extract_fn(state=state)
-        state = solver.step_fn(state=state, vector_field=vf, t1=t1)
-
-    yield solver.extract_fn(state=state)
-
-
-@partial(jax.jit, static_argnames=("vector_field",))
+@partial(jax.jit, static_argnums=[0])
 def simulate_terminal_values(
     vector_field,
+    /,
     initial_values,
     *,
     t0,
@@ -109,9 +48,10 @@ def simulate_terminal_values(
     return solver.extract_fn(state=solution)
 
 
-@partial(jax.jit, static_argnames=("vector_field",))
+@partial(jax.jit, static_argnums=[0])
 def simulate_checkpoints(
     vector_field,
+    /,
     initial_values,
     *,
     ts,
@@ -122,9 +62,11 @@ def simulate_checkpoints(
     """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values=initial_values)
 
+    @jax.jit
     def vf(*ys, t):
         return vector_field(*ys, t, *parameters)
 
+    @jax.jit
     def vf_auto_t0(*x):
         return vf(*x, t=ts[0])
 
@@ -151,6 +93,80 @@ def simulate_checkpoints(
         reverse=False,
     )
     return solver.extract_fn(state=solution)
+
+
+# Full solver routines
+
+
+def solve(
+    vector_field,
+    /,
+    initial_values,
+    *,
+    t0,
+    t1,
+    solver,
+    parameters=(),
+    taylor_series_fn=taylor.taylor_mode_fn,
+):
+    """Solve an initial value problem.
+
+    !!! warning
+        Uses native python control flow.
+        Not JITable, not reverse-mode-differentiable.
+    """
+    solution_gen = solution_generator(
+        vector_field,
+        initial_values=initial_values,
+        t0=t0,
+        t1=t1,
+        solver=solver,
+        parameters=parameters,
+        taylor_series_fn=taylor_series_fn,
+    )
+    return _control_flow.tree_stack([sol for sol in solution_gen])
+
+
+def solution_generator(
+    vector_field,
+    /,
+    initial_values,
+    *,
+    t0,
+    t1,
+    solver,
+    parameters=(),
+    taylor_series_fn=taylor.taylor_mode_fn,
+):
+    """Construct a generator of an IVP solution.
+
+    !!! warning
+        Uses native python control flow.
+        Not JITable, not reverse-mode-differentiable.
+    """
+    _assert_not_scalar(initial_values=initial_values)
+
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
+
+    def vf_auto_t0(*x):
+        return vf(*x, t=t0)
+
+    taylor_coefficients = taylor_series_fn(
+        vector_field=vf_auto_t0,
+        initial_values=initial_values,
+        num=solver.strategy.implementation.num_derivatives,
+    )
+    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+
+    while state.accepted.t < t1:
+        yield solver.extract_fn(state=state)
+        state = solver.step_fn(state=state, vector_field=vf, t1=t1)
+
+    yield solver.extract_fn(state=state)
+
+
+# Auxiliary routines
 
 
 def _assert_not_scalar(initial_values):
