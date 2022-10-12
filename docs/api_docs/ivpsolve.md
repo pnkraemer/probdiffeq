@@ -7,8 +7,10 @@ Most libraries expose a single ``solve_ode()`` method.
 time-stepping modes and/or quantities of interest. We distinguish
 
 ### Adaptive time-stepping
-* Terminal value simulation
-* Checkpoint simulation
+* Terminal value simulation (traditional API)
+* Checkpoint simulation (traditional API)
+* Terminal value simulation (ODE-filter-specific)
+* Checkpoint simulation (ODE-filter-specific)
 * Complete simulation (native python)
 * Complete simulation (diffrax' bounded_while_loop)
 
@@ -17,8 +19,7 @@ time-stepping modes and/or quantities of interest. We distinguish
 * Fixed evaluation grids
 
 
-
-_**Why this distinction?**_
+## Why this distinction?
 
 ### Specialised solvers
 
@@ -63,12 +64,39 @@ all arguments are used (with some minor exceptions).
     on purpose because higher-order ODEs are treated very similarly
     to first-order ODEs in this package.
 
-## Adaptive simulation of specific time-points
+## ODEFilters are not traditional IVP solvers
+ODE-filters are not traditional IVP solvers.
+What does this mean?
+It means that the problem they are solving is not that of inferring the
+solution of an initial value problem
+
+$$
+\dot u(t) = f(u(t)), \quad u(0) = u_0
+$$
+
+but a $\nu$-th order ODE filter solves the same problem subject to
+what is often thought of as consistent initialisation,
+
+$$
+\dot u(t) = f(u(t)),
+\quad u(0) = u_0, ~ \dot u(0) = \dot u_0, ..., u^{(\nu)}(0) = u^{(\nu)}_0.
+$$
+
+We can always create the second problem out of the first problem
+with efficient automatic differentiation (see ``odefilters.taylor``).
+The initial values are the Taylor coefficients of $u$ at time $t=0$.
+
+This difference is evident if you compare the different signatures of the
+ODE-filter-specific routines to those of the traditional APIs.
+
+
+### Adaptive simulation of specific time-points
 
 ::: odefilter.ivpsolve.simulate_terminal_values
-
+::: odefilter.ivpsolve.odefilter_terminal_values
 ::: odefilter.ivpsolve.simulate_checkpoints
+::: odefilter.ivpsolve.odefilter_checkpoints
 
-## Adaptive simulation using native Python control flow
+### Adaptive simulation using native Python control flow
 ::: odefilter.ivpsolve.solve
 ::: odefilter.ivpsolve.solution_generator
