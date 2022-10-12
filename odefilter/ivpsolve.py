@@ -13,15 +13,7 @@ from odefilter import _control_flow, taylor
 
 @partial(jax.jit, static_argnums=[0])
 def simulate_terminal_values(
-    vector_field,
-    /,
-    initial_values,
-    *,
-    t0,
-    t1,
-    solver,
-    parameters=(),
-    taylor_series_fn=taylor.taylor_mode_fn,
+    vector_field, /, initial_values, *, t0, t1, solver, parameters=()
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -33,7 +25,7 @@ def simulate_terminal_values(
     def vf_auto_t0(*x):
         return vector_field(*x, t0, *parameters)
 
-    taylor_coefficients = taylor_series_fn(
+    taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
@@ -71,16 +63,7 @@ def odefilter_terminal_values(
 
 
 @partial(jax.jit, static_argnums=[0])
-def simulate_checkpoints(
-    vector_field,
-    /,
-    initial_values,
-    *,
-    ts,
-    solver,
-    parameters=(),
-    taylor_series_fn=taylor.taylor_mode_fn,
-):
+def simulate_checkpoints(vector_field, /, initial_values, *, ts, solver, parameters=()):
     """Solve an IVP and return the solution at checkpoints.
 
     Thin wrapper around :func:`odefilter_checkpoints`.
@@ -91,7 +74,7 @@ def simulate_checkpoints(
     def vf_auto_t0(*x):
         return vector_field(*x, ts[0], *parameters)
 
-    taylor_coefficients = taylor_series_fn(
+    taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
@@ -140,17 +123,7 @@ def odefilter_checkpoints(
 # Full solver routines
 
 
-def solve(
-    vector_field,
-    /,
-    initial_values,
-    *,
-    t0,
-    t1,
-    solver,
-    parameters=(),
-    taylor_series_fn=taylor.taylor_mode_fn,
-):
+def solve(vector_field, /, initial_values, *, t0, t1, solver, parameters=()):
     """Solve an initial value problem.
 
     !!! warning
@@ -164,23 +137,16 @@ def solve(
         t1=t1,
         solver=solver,
         parameters=parameters,
-        taylor_series_fn=taylor_series_fn,
     )
     return _control_flow.tree_stack([sol for sol in solution_gen])
 
 
 def solution_generator(
-    vector_field,
-    /,
-    initial_values,
-    *,
-    t0,
-    t1,
-    solver,
-    parameters=(),
-    taylor_series_fn=taylor.taylor_mode_fn,
+    vector_field, /, initial_values, *, t0, t1, solver, parameters=()
 ):
     """Construct a generator of an IVP solution.
+
+    Thin wrapper around :func:`odefilter_generator`.
 
     !!! warning
         Uses native python control flow.
@@ -188,17 +154,36 @@ def solution_generator(
     """
     _assert_not_scalar(initial_values)
 
-    def vf(*ys, t):
-        return vector_field(*ys, t, *parameters)
-
+    @jax.jit
     def vf_auto_t0(*x):
-        return vf(*x, t=t0)
+        return vector_field(*x, t0, *parameters)
 
-    taylor_coefficients = taylor_series_fn(
+    taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_auto_t0,
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
+
+    return odefilter_generator(
+        vector_field,
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        t1=t1,
+        solver=solver,
+        parameters=parameters,
+    )
+
+
+def odefilter_generator(
+    vector_field, /, taylor_coefficients, *, t0, t1, solver, parameters=()
+):
+    """Generate an ODE filter solution iteratively."""
+    _assert_not_scalar(taylor_coefficients)
+
+    @jax.jit
+    def vf(*ys, t):
+        return vector_field(*ys, t, *parameters)
+
     state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     while state.accepted.t < t1:

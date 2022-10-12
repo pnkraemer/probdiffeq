@@ -9,14 +9,15 @@ time-stepping modes and/or quantities of interest. We distinguish
 ### Adaptive time-stepping
 * Terminal value simulation (traditional API)
 * Checkpoint simulation (traditional API)
+* Complete simulation (native python)
 * Terminal value simulation (ODE-filter-specific)
 * Checkpoint simulation (ODE-filter-specific)
-* Complete simulation (native python)
-* Complete simulation (diffrax' bounded_while_loop)
+* Complete simulation (ODE-filter-specific)
+
 
 ### Constant time-stepping
-* Fixed step-sizes
-* Fixed evaluation grids
+* Fixed step-sizes (TBD)
+* Fixed evaluation grids (TBD)
 
 
 ## Why this distinction?
@@ -89,6 +90,10 @@ The initial values are the Taylor coefficients of $u$ at time $t=0$.
 This difference is evident if you compare the different signatures of the
 ODE-filter-specific routines to those of the traditional APIs.
 
+## Which one should I use?
+
+It is perfectly fine to use the traditional API (not the functions marked with ``odefilter_``).
+But a true pro calls the ODE filter the way it is supposed to be called.
 
 ### Adaptive simulation of specific time-points
 
@@ -100,3 +105,4 @@ ODE-filter-specific routines to those of the traditional APIs.
 ### Adaptive simulation using native Python control flow
 ::: odefilter.ivpsolve.solve
 ::: odefilter.ivpsolve.solution_generator
+::: odefilter.ivpsolve.odefilter_generator
