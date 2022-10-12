@@ -60,7 +60,7 @@ all arguments are used (with some minor exceptions).
 !!! warning "Initial value format"
     Functions in this module expect that the initial values are a tuple of arrays
     such that the vector field evaluates as
-    ``vector_field(*initial_values, t, *parameters)``.
+    ``vector_field(t, *initial_values, *parameters)``.
     This is different to most other ODE solver libraries, and done
     on purpose because higher-order ODEs are treated very similarly
     to first-order ODEs in this package.

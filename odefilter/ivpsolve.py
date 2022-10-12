@@ -212,7 +212,7 @@ def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
-        return s.accepted.t < t1
+        return s.solution.t < t1
 
     def body_fun(s):
         return solver.step_fn(state=s, vector_field=vector_field, t1=t1)

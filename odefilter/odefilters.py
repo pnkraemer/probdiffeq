@@ -144,7 +144,7 @@ class AdaptiveODEFilter(eqx.Module):
             error_norm_proposed=state_new.error_norm_proposed,
             proposed=state_new.proposed,
             accepted=state_new.proposed,  # holla! New! :)
-            solution=state_new.accepted,  # holla! New! :)
+            solution=state_new.accepted,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )

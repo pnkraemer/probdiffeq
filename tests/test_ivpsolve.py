@@ -89,5 +89,7 @@ def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts_reference, ys_reference = ts, odeint_solution
 
     solution = ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+    print(solution.t, ts)
+    assert jnp.allclose(solution.t, ts)
     assert jnp.allclose(solution.t, ts_reference)
     assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)
