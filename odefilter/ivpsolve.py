@@ -155,6 +155,8 @@ def solution_generator(
         num=solver.strategy.implementation.num_derivatives,
     )
 
+    # todo: move this curry to information.py
+    # todo: include parameters here
     def info_op_curried(t, *ys):
         def vf(*xs):
             return vector_field(t, *xs, *parameters)
