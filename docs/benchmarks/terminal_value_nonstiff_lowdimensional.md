@@ -13,32 +13,41 @@ jupyter:
     name: python3
 ---
 
+# Terminal-value simulation
+
+Let's find the fastest solver for a non-stiff, low-dimensional test problem.
+
 ```python
-import timeit
 from functools import partial
 
 import jax
 import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from _benchmark_utils import most_recent_commit, plot_config, time
 from diffeqzoo import backend, ivps
 from jax import config
 from tqdm import tqdm
-from tueplots import axes, bundles, cycler
-from tueplots.constants.color import palettes
 
 from odefilter import ivpsolve, recipes
 
 # Nice-looking plots
-plt.rcParams.update(bundles.beamer_moml())
-plt.rcParams.update(axes.color(base="black"))
-plt.rcParams.update(cycler.cycler(color=palettes.muted))
-
+plt.rcParams.update(plot_config())
 # x64 precision
 config.update("jax_enable_x64", True)
 
 # IVP examples in JAX, not in NumPy
 backend.select("jax")
+```
+
+```python
+from odefilter import __version__ as odefilter_version  # noqa: E402
+
+commit = most_recent_commit(abbrev=6)
+
+
+print(f"Most recent commit:\n\t{commit}")
+print(f"odefilter version:\n\t{odefilter_version}")
 ```
 
 ```python
@@ -78,9 +87,7 @@ def solve(solver, info_op):
 ```
 
 ```python
-%%time
-
-tolerances = 0.1 ** jnp.arange(1.0, 8.0, step=1)
+tolerances = 0.1 ** jnp.arange(1.0, 13.0, step=2.0)
 
 
 def ekf1_factory(n, **kw):
@@ -104,10 +111,9 @@ for factory, label in tqdm(factories):
         def bench():
             return benchmark(4, 1e-3 * rtol, rtol, factory)
 
-        error = bench()
-        time = min(timeit.repeat(bench, number=10, repeat=1))
+        t, error = time(bench)
 
-        times.append(time)
+        times.append(t)
         errors.append(error)
 
     results[label] = (times, errors)
@@ -118,8 +124,9 @@ fig, ax = plt.subplots(dpi=300)
 
 for solver in results:
     times, errors = results[solver]
-    ax.loglog(errors, times, "o-", label=solver)
+    ax.loglog(errors, times, label=solver)
 
+ax.grid("both")
 ax.set_title("Internal solvers [*_terminal_values(three_body_first_order())]")
 ax.set_xlabel("Precision [rel. RMSE]")
 ax.set_ylabel("Work [wall time, s]")
