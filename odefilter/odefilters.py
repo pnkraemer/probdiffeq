@@ -116,7 +116,6 @@ class AdaptiveODEFilter(eqx.Module):
 
         # Part II/II: If we have previously overstepped
         # the boundary, interpolate to t1
-
         interpolate = state_new.accepted.t > t1
 
         def true_fn(s):
@@ -148,7 +147,7 @@ class AdaptiveODEFilter(eqx.Module):
             error_norm_proposed=state_new.error_norm_proposed,
             proposed=state_new.proposed,
             accepted=state_new.proposed,  # holla! New! :)
-            solution=state_new.accepted,  # Overwritten by interpolate() if necessary
+            solution=state_new.proposed,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )
