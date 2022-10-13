@@ -11,7 +11,7 @@ from odefilter import _control_flow, taylor
 # The high-level checkpoint-style routines
 
 
-@partial(jax.jit, static_argnums=[0])
+@partial(jax.jit, static_argnums=[0], static_argnames=("info_op",))
 def simulate_terminal_values(
     vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()
 ):
@@ -27,7 +27,7 @@ def simulate_terminal_values(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    info_op_curried = _curry_info_op(info_op=info_op, vector_field=vector_field)
+    info_op_curried = info_op(vector_field)
     return odefilter_terminal_values(
         lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
@@ -53,7 +53,7 @@ def odefilter_terminal_values(info, /, *, taylor_coefficients, t0, t1, solver):
     return solver.extract_fn(state=solution)
 
 
-@partial(jax.jit, static_argnums=[0])
+@partial(jax.jit, static_argnums=[0], static_argnames=("info_op",))
 def simulate_checkpoints(
     vector_field, /, initial_values, *, ts, solver, info_op, parameters=()
 ):
@@ -69,8 +69,7 @@ def simulate_checkpoints(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    info_op_curried = _curry_info_op(info_op=info_op, vector_field=vector_field)
-
+    info_op_curried = info_op(vector_field)
     return odefilter_checkpoints(
         lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
@@ -137,7 +136,7 @@ def solution_generator(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    info_op_curried = _curry_info_op(info_op=info_op, vector_field=vector_field)
+    info_op_curried = info_op(vector_field)
 
     return odefilter_generator(
         lambda t, *xs: info_op_curried(t, *xs, *parameters),
@@ -190,20 +189,3 @@ def _advance_ivp_solution_adaptively(*, info_op, t1, state0, solver):
         body_fun=body_fun,
         init_val=state0,
     )
-
-
-# todo: move this curry to information.py
-# todo: include parameters here
-
-
-def _curry_info_op(
-    info_op,
-    vector_field,
-):
-    def info_op_curried(t, *ys_and_ps):
-        def vf(*xs_and_ps):
-            return vector_field(t, *xs_and_ps)
-
-        return info_op(vf, *ys_and_ps)
-
-    return info_op_curried

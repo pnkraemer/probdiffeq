@@ -33,28 +33,42 @@ import jax
 import jax.numpy as jnp
 
 
-class IsotropicEK0FirstOrder(eqx.Module):
+def isotropic_ek0_first_order():
     """EK0-Linearize an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
+    op = _IsotropicEK0FIrstOrder()
 
+    def fn(f, /):
+        return _curry_info_op(op, f)
+
+    return fn
+
+
+def ek1_first_order(**kwargs):
+    """EK1 information."""
+    op = _EK1FirstOrder(**kwargs)
+
+    def fn(f, /):
+        return _curry_info_op(op, f)
+
+    return fn
+
+
+def _curry_info_op(
+    info_op,
+    vector_field,
+):
+    def info_op_curried(t, *ys_and_ps):
+        def vf(*xs_and_ps):
+            return vector_field(t, *xs_and_ps)
+
+        return info_op(vf, *ys_and_ps)
+
+    return info_op_curried
+
+
+class _IsotropicEK0FIrstOrder(eqx.Module):
     def __call__(self, f, x, *p):
-        """Linearise the ODE.
-
-        Parameters
-        ----------
-        f :
-            Vector field of a first-order ODE. Signature ``f(x)``.
-        x :
-            Linearisation point.
-
-        Returns
-        -------
-        :
-            Output bias.
-        :
-            Linear function (pushforward of the tangent spaces).
-        """
-
         def approx_residual(u):
             return u[1] - f(x[0], *p)
 
@@ -66,15 +80,12 @@ class IsotropicEK0FirstOrder(eqx.Module):
         return bias, jvp
 
 
-class EK1FirstOrder(eqx.Module):
-    """EK1 information."""
+class _EK1FirstOrder(eqx.Module):
 
     # static, because it affects the behaviour of the residual fn
     ode_dimension: int = eqx.static_field()
 
     def __call__(self, f, x, *p):
-        """Linearise the ODE."""
-
         def residual(u):
             u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
             return u_reshaped[1] - f(u_reshaped[0], *p)
