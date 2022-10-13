@@ -27,23 +27,17 @@ In the end, this approximates $F(u) = \mathrm{bias} + \mathrm{linearfn}(u)$
 and we can use it in ODE solvers.
 """
 
-from typing import Callable, Tuple
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float
 
 
 class IsotropicEK0FirstOrder(eqx.Module):
     """EK0-Linearize an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def __call__(
-        self,
-        f: Callable[[Float[Array, "n d"]], Float[Array, " d"]],
-        x: Float[Array, "n d"],
-    ) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
+    def __call__(self, f, x, *p):
         """Linearise the ODE.
 
         Parameters
@@ -62,7 +56,7 @@ class IsotropicEK0FirstOrder(eqx.Module):
         """
 
         def approx_residual(u):
-            return u[1] - f(x[0])
+            return u[1] - f(x[0], *p)
 
         bias = approx_residual(x)
 
@@ -78,12 +72,12 @@ class EK1FirstOrder(eqx.Module):
     # static, because it affects the behaviour of the residual fn
     ode_dimension: int = eqx.static_field()
 
-    def __call__(self, f, x):
+    def __call__(self, f, x, *p):
         """Linearise the ODE."""
 
         def residual(u):
             u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
-            return u_reshaped[1] - f(u_reshaped[0])
+            return u_reshaped[1] - f(u_reshaped[0], *p)
 
         bias, jvp = jax.linearize(residual, x)
         return bias, jvp

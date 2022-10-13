@@ -21,22 +21,15 @@ def simulate_terminal_values(
     """
     _assert_not_scalar(initial_values)
 
-    @jax.jit
-    def vf_auto_t0(*x):
-        return vector_field(t0, *x, *parameters)
-
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vf_auto_t0,
+        vector_field=lambda *x: vector_field(t0, *x, *parameters),
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    info_op_curried = _curry_info_op(
-        *parameters, info_op=info_op, vector_field=vector_field
-    )
-
+    info_op_curried = _curry_info_op(info_op=info_op, vector_field=vector_field)
     return odefilter_terminal_values(
-        info_op_curried,
+        lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
@@ -70,22 +63,16 @@ def simulate_checkpoints(
     """
     _assert_not_scalar(initial_values)
 
-    @jax.jit
-    def vf_auto_t0(*x):
-        return vector_field(ts[0], *x, *parameters)
-
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vf_auto_t0,
+        vector_field=lambda *x: vector_field(ts[0], *x, *parameters),
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    info_op_curried = _curry_info_op(
-        *parameters, info_op=info_op, vector_field=vector_field
-    )
+    info_op_curried = _curry_info_op(info_op=info_op, vector_field=vector_field)
 
     return odefilter_checkpoints(
-        info_op_curried,
+        lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
         ts=ts,
         solver=solver,
@@ -144,22 +131,16 @@ def solution_generator(
     """
     _assert_not_scalar(initial_values)
 
-    @jax.jit
-    def vf_auto_t0(*x):
-        return vector_field(t0, *x, *parameters)
-
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vf_auto_t0,
+        vector_field=lambda *x: vector_field(t0, *x, *parameters),
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    info_op_curried = _curry_info_op(
-        *parameters, info_op=info_op, vector_field=vector_field
-    )
+    info_op_curried = _curry_info_op(info_op=info_op, vector_field=vector_field)
 
     return odefilter_generator(
-        info_op_curried,
+        lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
@@ -216,14 +197,13 @@ def _advance_ivp_solution_adaptively(*, info_op, t1, state0, solver):
 
 
 def _curry_info_op(
-    *parameters,
     info_op,
     vector_field,
 ):
-    def info_op_curried(t, *ys):
-        def vf(*xs):
-            return vector_field(t, *xs, *parameters)
+    def info_op_curried(t, *ys_and_ps):
+        def vf(*xs_and_ps):
+            return vector_field(t, *xs_and_ps)
 
-        return info_op(vf, *ys)
+        return info_op(vf, *ys_and_ps)
 
     return info_op_curried
