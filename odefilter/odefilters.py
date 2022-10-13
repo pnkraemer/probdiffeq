@@ -152,12 +152,8 @@ class AdaptiveODEFilter(eqx.Module):
     def _attempt_step_fn(self, *, state, info_op):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
-
-        def info(*y):  # todo: this should not happen here?!
-            return info_op(state.accepted.t + state.dt_proposed, *y)
-
         posterior, error_estimate = self.strategy.step_fn(
-            state=state.accepted, info_op=info, dt=state.dt_proposed
+            state=state.accepted, info_op=info_op, dt=state.dt_proposed
         )
 
         error_normalised = self._normalise_error(

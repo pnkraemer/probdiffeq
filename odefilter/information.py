@@ -28,67 +28,41 @@ and we can use it in ODE solvers.
 """
 
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 
 def isotropic_ek0_first_order():
-    """EK0-Linearize an ODE assuming a linearisation-point with\
+    """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
-    op = _IsotropicEK0FIrstOrder()
 
-    def fn(f, /):
-        return _curry_info_op(op, f)
+    def create_ek0_info_op_linearised(f):
+        """Create a "linearize()" implementation according to what\
+         the EK0 does to the ODE residual."""
 
-    return fn
+        def jvp(t, x, *p):
+            return x[1]
+
+        def info_op(t, x, *p):
+            bias = x[1, ...] - f(t, x[0, ...], *p)
+            return bias, lambda s: jvp(t, s, *p)
+
+        return info_op
+
+    return create_ek0_info_op_linearised
 
 
-def ek1_first_order(**kwargs):
+def ek1_first_order(*, ode_dimension):
     """EK1 information."""
-    op = _EK1FirstOrder(**kwargs)
 
-    def fn(f, /):
-        return _curry_info_op(op, f)
+    def create_ek1_info_op_linearised(f):
+        def residual(t, x, *p):
+            x_reshaped = jnp.reshape(x, (-1, ode_dimension), order="F")
+            return x_reshaped[1, ...] - f(t, x_reshaped[0, ...], *p)
 
-    return fn
+        def info_op(t, x, *p):
+            return jax.linearize(lambda s: residual(t, s, *p), x)
 
+        return info_op
 
-def _curry_info_op(
-    info_op,
-    vector_field,
-):
-    def info_op_curried(t, *ys_and_ps):
-        def vf(*xs_and_ps):
-            return vector_field(t, *xs_and_ps)
-
-        return info_op(vf, *ys_and_ps)
-
-    return info_op_curried
-
-
-class _IsotropicEK0FIrstOrder(eqx.Module):
-    def __call__(self, f, x, *p):
-        def approx_residual(u):
-            return u[1] - f(x[0], *p)
-
-        bias = approx_residual(x)
-
-        def jvp(y):
-            return y[1]
-
-        return bias, jvp
-
-
-class _EK1FirstOrder(eqx.Module):
-
-    # static, because it affects the behaviour of the residual fn
-    ode_dimension: int = eqx.static_field()
-
-    def __call__(self, f, x, *p):
-        def residual(u):
-            u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
-            return u_reshaped[1] - f(u_reshaped[0], *p)
-
-        bias, jvp = jax.linearize(residual, x)
-        return bias, jvp
+    return create_ek1_info_op_linearised

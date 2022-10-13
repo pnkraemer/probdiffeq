@@ -65,7 +65,7 @@ class DynamicFilter(eqx.Module):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(m_ext)
+        m_obs, linear_fn = info_op(state.t + dt, m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
@@ -201,7 +201,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(m_ext)
+        m_obs, linear_fn = info_op(state.t + dt, m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
@@ -288,7 +288,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(m_ext)
+        m_obs, linear_fn = info_op(state.t + dt, m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
