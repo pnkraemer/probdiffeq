@@ -54,9 +54,13 @@ class AdaptiveODEFilter(eqx.Module):
     atol: float
     rtol: float
 
-    error_order: int
     control: Any
     norm_ord: Union[int, str, None] = None
+
+    @property
+    def error_order(self):
+        """Error order."""
+        return self.strategy.implementation.num_derivatives + 1
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):

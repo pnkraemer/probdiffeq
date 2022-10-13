@@ -7,21 +7,15 @@ time-tested ODE filter versions.
 We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
-!!! danger "Highly experimental"
-
-    Don't trust that this module survives.
-    It adds nothing to the actual code, it just makes it easier to use.
-    Tomorrow, this module might go again.
-
 """
 from odefilter import controls, information, odefilters, strategies
 from odefilter.implementations import dense, isotropic
 
-ATOL_DEFAULTS = 1e-6
-RTOL_DEFAULTS = 1e-3
+_ATOL_DEFAULTS = 1e-6
+_RTOL_DEFAULTS = 1e-3
 
 
-def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS):
+def dynamic_isotropic_ekf0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, dynamic calibration, and optimised for terminal-value simulation.
 
@@ -33,17 +27,13 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     strategy = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy,
-        control=control,
-        atol=atol,
-        rtol=rtol,
-        error_order=num_derivatives + 1,
+        strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
 
 
-def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS):
+def dynamic_isotropic_eks0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 
@@ -55,18 +45,14 @@ def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
     strategy = strategies.DynamicSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy,
-        control=control,
-        atol=atol,
-        rtol=rtol,
-        error_order=num_derivatives + 1,
+        strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
 
 
 def dynamic_isotropic_fixpt_eks0(
-    num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS
+    num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS
 ):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
@@ -79,18 +65,14 @@ def dynamic_isotropic_fixpt_eks0(
     strategy = strategies.DynamicFixedPointSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy,
-        control=control,
-        atol=atol,
-        rtol=rtol,
-        error_order=num_derivatives + 1,
+        strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
 
 
 def dynamic_ekf1(
-    num_derivatives, ode_dimension, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS
+    num_derivatives, ode_dimension, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS
 ):
     """Construct the equivalent of a semi-implicit solver with dynamic calibration.
 
@@ -102,11 +84,7 @@ def dynamic_ekf1(
     strategy = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy,
-        control=control,
-        atol=atol,
-        rtol=rtol,
-        error_order=num_derivatives + 1,
+        strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return odefilter, information_op
