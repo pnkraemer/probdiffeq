@@ -79,8 +79,10 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".", prefix="problem_")
-@parametrize_with_cases("solver", cases=".", prefix="solver_", has_tag=("checkpoint",))
-def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
+@parametrize_with_cases(
+    "solver, info_op", cases=".", prefix="solver_", has_tag=("checkpoint",)
+)
+def test_simulate_checkpoints(vf, u0, t0, t1, p, solver, info_op):
     ts = jnp.linspace(t0, t1, num=10)
 
     odeint_solution = odeint(
@@ -88,7 +90,9 @@ def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     )
     ts_reference, ys_reference = ts, odeint_solution
 
-    solution = ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+    solution = ivpsolve.simulate_checkpoints(
+        vf, u0, ts=ts, parameters=p, solver=solver, info_op=info_op
+    )
     print(solution.t, ts)
     assert jnp.allclose(solution.t, ts)
     assert jnp.allclose(solution.t, ts_reference)

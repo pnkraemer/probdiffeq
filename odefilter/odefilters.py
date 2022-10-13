@@ -94,8 +94,8 @@ class AdaptiveODEFilter(eqx.Module):
         norm_dy0 = jnp.linalg.norm(f0)
         return scale * norm_y0 / norm_dy0
 
-    @partial(jax.jit, static_argnames=("vector_field",))
-    def step_fn(self, *, state, vector_field, t1):
+    @partial(jax.jit, static_argnames=("info_op",))
+    def step_fn(self, *, state, info_op, t1):
         """Perform a step."""
         # Part I/II: accept-reject loop unless we have gathered ODE
         # evaluations _beyond_ t1.
@@ -103,7 +103,7 @@ class AdaptiveODEFilter(eqx.Module):
         enter_accept_reject_loop = state.accepted.t < t1
 
         def true_fn1(s):
-            return self._accept_reject_loop(state0=s, vector_field=vector_field)
+            return self._accept_reject_loop(state0=s, info_op=info_op)
 
         def false_fn1(s):
             return s
@@ -123,14 +123,14 @@ class AdaptiveODEFilter(eqx.Module):
 
         return jax.lax.cond(interpolate, true_fn, false_fn, state_new)
 
-    def _accept_reject_loop(self, *, vector_field, state0):
+    def _accept_reject_loop(self, *, info_op, state0):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
 
         def body_fn(x):
             _, s = x
-            s = self._attempt_step_fn(state=s, vector_field=vector_field)
+            s = self._attempt_step_fn(state=s, info_op=info_op)
             proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
 
@@ -149,15 +149,15 @@ class AdaptiveODEFilter(eqx.Module):
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, vector_field):
+    def _attempt_step_fn(self, *, state, info_op):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
 
-        def vf(*y):  # todo: this should not happen here?!
-            return vector_field(state.accepted.t + state.dt_proposed, *y)
+        def info(*y):  # todo: this should not happen here?!
+            return info_op(state.accepted.t + state.dt_proposed, *y)
 
         posterior, error_estimate = self.strategy.step_fn(
-            state=state.accepted, vector_field=vf, dt=state.dt_proposed
+            state=state.accepted, info_op=info, dt=state.dt_proposed
         )
 
         error_normalised = self._normalise_error(

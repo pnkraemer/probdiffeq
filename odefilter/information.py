@@ -37,29 +37,7 @@ from jaxtyping import Array, Float
 
 class IsotropicEK0FirstOrder(eqx.Module):
     """EK0-Linearize an ODE assuming a linearisation-point with\
-     isotropic Kronecker structure.
-
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>>
-    >>> def f(x):
-    ...     return x*(1-x)
-    >>>
-    >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> linearise = IsotropicEK0FirstOrder()
-    >>> b, fn = linearise(f, x0)
-    >>> assert jnp.allclose(b, x0[1] - f(x0[0]))
-    >>>
-    >>> print(x0)
-    [[0.5]
-     [0.5]
-     [0.5]]
-    >>> print(x0[1])
-    [0.5]
-    >>> print(fn(x0))
-    [0.5]
-    """
+     isotropic Kronecker structure."""
 
     def __call__(
         self,

@@ -63,7 +63,9 @@ def odefilter_terminal_values(
 
 
 @partial(jax.jit, static_argnums=[0])
-def simulate_checkpoints(vector_field, /, initial_values, *, ts, solver, parameters=()):
+def simulate_checkpoints(
+    vector_field, /, initial_values, *, ts, solver, info_op, parameters=()
+):
     """Solve an IVP and return the solution at checkpoints.
 
     Thin wrapper around :func:`odefilter_checkpoints`.
@@ -80,8 +82,14 @@ def simulate_checkpoints(vector_field, /, initial_values, *, ts, solver, paramet
         num=solver.strategy.implementation.num_derivatives,
     )
 
+    def info_op_curried(t, *ys):
+        def vf(*xs):
+            return vector_field(t, *xs, *parameters)
+
+        return info_op(vf, *ys)
+
     return odefilter_checkpoints(
-        vector_field,
+        info_op_curried,
         taylor_coefficients=taylor_coefficients,
         ts=ts,
         solver=solver,
@@ -90,21 +98,15 @@ def simulate_checkpoints(vector_field, /, initial_values, *, ts, solver, paramet
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_checkpoints(
-    vector_field, /, *, taylor_coefficients, ts, solver, parameters=()
-):
+def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver, parameters=()):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
-
-    @jax.jit
-    def vf(t, *ys):
-        return vector_field(t, *ys, *parameters)
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
-            vector_field=vf,
+            info_op=info,
             solver=solver,
         )
         return s_next, s_next
@@ -208,14 +210,14 @@ def _assert_not_scalar(x, /):
     assert jax.tree_util.tree_all(is_not_scalar)
 
 
-def _advance_ivp_solution_adaptively(*, vector_field, t1, state0, solver):
+def _advance_ivp_solution_adaptively(*, info_op, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
         return s.solution.t < t1
 
     def body_fun(s):
-        return solver.step_fn(state=s, vector_field=vector_field, t1=t1)
+        return solver.step_fn(state=s, info_op=info_op, t1=t1)
 
     return jax.lax.while_loop(
         cond_fun=cond_fun,

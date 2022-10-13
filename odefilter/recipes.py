@@ -27,21 +27,20 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
 
     Suitable for high-dimensional, non-stiff problems.
     """
-    information_op = information.IsotropicEK0FirstOrder()
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicFilter(
-        implementation=implementation, information=information_op
-    )
+    strategy = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
-    return odefilters.AdaptiveODEFilter(
+    odefilter = odefilters.AdaptiveODEFilter(
         strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
+    information_op = information.IsotropicEK0FirstOrder()
+    return odefilter, information_op
 
 
 def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAULTS):
@@ -50,21 +49,20 @@ def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
 
     Suitable for high-dimensional, non-stiff problems.
     """
-    information_op = information.IsotropicEK0FirstOrder()
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicSmoother(
-        implementation=implementation, information=information_op
-    )
+    strategy = strategies.DynamicSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
-    return odefilters.AdaptiveODEFilter(
+    odefilter = odefilters.AdaptiveODEFilter(
         strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
+    information_op = information.IsotropicEK0FirstOrder()
+    return odefilter, information_op
 
 
 def dynamic_isotropic_fixpt_eks0(
@@ -75,21 +73,20 @@ def dynamic_isotropic_fixpt_eks0(
 
     Suitable for high-dimensional, non-stiff problems.
     """
-    information_op = information.IsotropicEK0FirstOrder()
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicFixedPointSmoother(
-        implementation=implementation, information=information_op
-    )
+    strategy = strategies.DynamicFixedPointSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
-    return odefilters.AdaptiveODEFilter(
+    odefilter = odefilters.AdaptiveODEFilter(
         strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
+    information_op = information.IsotropicEK0FirstOrder()
+    return odefilter, information_op
 
 
 def dynamic_ekf1(
@@ -99,18 +96,17 @@ def dynamic_ekf1(
 
     Suitable for low-dimensional, stiff problems.
     """
-    information_op = information.EK1FirstOrder(ode_dimension=ode_dimension)
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = strategies.DynamicFilter(
-        implementation=implementation, information=information_op
-    )
+    strategy = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
-    return odefilters.AdaptiveODEFilter(
+    odefilter = odefilters.AdaptiveODEFilter(
         strategy=strategy,
         control=control,
         atol=atol,
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
+    information_op = information.EK1FirstOrder(ode_dimension=ode_dimension)
+    return odefilter, information_op
