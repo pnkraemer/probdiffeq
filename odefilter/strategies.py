@@ -187,6 +187,10 @@ class _DynamicSmootherCommon(eqx.Module):
         backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
         return extrapolated, backward_model
 
+    @staticmethod
+    def reset_at_checkpoint_fn(*, state):
+        return state
+
 
 class DynamicSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
@@ -244,7 +248,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
             rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=s0.t
         )
-        extrapolated1, backward_model1 = self._interpolate_from_to_fn(
+        _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=s1.t, t0=t
         )
 
@@ -258,21 +262,18 @@ class DynamicSmoother(_DynamicSmootherCommon):
             backward_model=backward_model0,
         )
 
-        # We update the backward model from t_interp to t_accep
-        # because the time-increment has changed.
-        # In the next iteration, we iterate from t_accep to the next
-        # checkpoint, and condense the backward models starting at the
-        # backward model from t_accep, which must know how to get back
-        # to the previous checkpoint.
-        bw1 = backward_model1
         s1 = Posterior(
             t=s1.t,
             u=sol,
             filtered=s1.filtered,
             diffusion_sqrtm=diffsqrtm,
-            backward_model=bw1,
+            backward_model=backward_model1,
         )
         return s1, s0
+
+    @staticmethod
+    def reset_at_checkpoint_fn(*, state):
+        return state
 
 
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):
@@ -377,3 +378,17 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             backward_model=bw1,
         )
         return s1, s0
+
+    def reset_at_checkpoint_fn(self, *, state):
+        bw_noise = self.implementation.init_backward_noise(
+            rv_proto=state.backward_model.noise
+        )
+        bw_transition = self.implementation.init_backward_transition()
+        bw_identity = BackwardModel(transition=bw_transition, noise=bw_noise)
+        return Posterior(
+            t=state.t,
+            u=state.u,
+            filtered=state.filtered,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=bw_identity,
+        )
