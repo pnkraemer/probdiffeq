@@ -39,7 +39,7 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
-    information_op = information.isotropic_ek0_first_order()
+    information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
 
 
@@ -61,7 +61,7 @@ def dynamic_isotropic_eks0(num_derivatives, atol=ATOL_DEFAULTS, rtol=RTOL_DEFAUL
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
-    information_op = information.isotropic_ek0_first_order()
+    information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
 
 
@@ -85,7 +85,7 @@ def dynamic_isotropic_fixpt_eks0(
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
-    information_op = information.isotropic_ek0_first_order()
+    information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
 
 
@@ -108,5 +108,5 @@ def dynamic_ekf1(
         rtol=rtol,
         error_order=num_derivatives + 1,
     )
-    information_op = information.ek1_first_order(ode_dimension=ode_dimension)
+    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return odefilter, information_op
