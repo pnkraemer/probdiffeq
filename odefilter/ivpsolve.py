@@ -31,11 +31,9 @@ def simulate_terminal_values(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    def info_op_curried(t, *ys):
-        def vf(*xs):
-            return vector_field(t, *xs, *parameters)
-
-        return info_op(vf, *ys)
+    info_op_curried = _curry_info_op(
+        *parameters, info_op=info_op, vector_field=vector_field
+    )
 
     return odefilter_terminal_values(
         info_op_curried,
@@ -87,7 +85,10 @@ def simulate_checkpoints(
     )
 
     return odefilter_checkpoints(
-        info_op_curried, taylor_coefficients=taylor_coefficients, ts=ts, solver=solver
+        info_op_curried,
+        taylor_coefficients=taylor_coefficients,
+        ts=ts,
+        solver=solver,
     )
 
 
@@ -153,11 +154,9 @@ def solution_generator(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    def info_op_curried(t, *ys):
-        def vf(*xs):
-            return vector_field(t, *xs, *parameters)
-
-        return info_op(vf, *ys)
+    info_op_curried = _curry_info_op(
+        *parameters, info_op=info_op, vector_field=vector_field
+    )
 
     return odefilter_generator(
         info_op_curried,
