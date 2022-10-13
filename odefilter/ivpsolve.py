@@ -82,11 +82,9 @@ def simulate_checkpoints(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    def info_op_curried(t, *ys):
-        def vf(*xs):
-            return vector_field(t, *xs, *parameters)
-
-        return info_op(vf, *ys)
+    info_op_curried = _curry_info_op(
+        *parameters, info_op=info_op, vector_field=vector_field
+    )
 
     return odefilter_checkpoints(
         info_op_curried, taylor_coefficients=taylor_coefficients, ts=ts, solver=solver
@@ -155,8 +153,6 @@ def solution_generator(
         num=solver.strategy.implementation.num_derivatives,
     )
 
-    # todo: move this curry to information.py
-    # todo: include parameters here
     def info_op_curried(t, *ys):
         def vf(*xs):
             return vector_field(t, *xs, *parameters)
@@ -214,3 +210,21 @@ def _advance_ivp_solution_adaptively(*, info_op, t1, state0, solver):
         body_fun=body_fun,
         init_val=state0,
     )
+
+
+# todo: move this curry to information.py
+# todo: include parameters here
+
+
+def _curry_info_op(
+    *parameters,
+    info_op,
+    vector_field,
+):
+    def info_op_curried(t, *ys):
+        def vf(*xs):
+            return vector_field(t, *xs, *parameters)
+
+        return info_op(vf, *ys)
+
+    return info_op_curried
