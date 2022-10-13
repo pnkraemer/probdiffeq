@@ -43,7 +43,6 @@ class DynamicFilter(eqx.Module):
     """Filter implementation with dynamic calibration (time-varying diffusion)."""
 
     implementation: Any
-    information: Any
 
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
@@ -56,7 +55,7 @@ class DynamicFilter(eqx.Module):
         filtered = FilterOutput(t=t0, u=sol, filtered=corrected, diffusion_sqrtm=1.0)
         return filtered, error_estimate
 
-    def step_fn(self, *, state, vector_field, dt):
+    def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -66,7 +65,7 @@ class DynamicFilter(eqx.Module):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = self.information(f=vector_field, x=m_ext)
+        m_obs, linear_fn = info_op(state.t + dt, m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
@@ -119,7 +118,6 @@ class DynamicFilter(eqx.Module):
 class _DynamicSmootherCommon(eqx.Module):
 
     implementation: Any
-    information: Any
 
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
@@ -193,7 +191,7 @@ class _DynamicSmootherCommon(eqx.Module):
 class DynamicSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
-    def step_fn(self, *, state, vector_field, dt):
+    def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -203,7 +201,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = self.information(f=vector_field, x=m_ext)
+        m_obs, linear_fn = info_op(state.t + dt, m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
@@ -280,7 +278,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
-    def step_fn(self, *, state, vector_field, dt):
+    def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -290,7 +288,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = self.information(f=vector_field, x=m_ext)
+        m_obs, linear_fn = info_op(state.t + dt, m_ext)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p

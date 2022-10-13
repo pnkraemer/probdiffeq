@@ -27,85 +27,42 @@ In the end, this approximates $F(u) = \mathrm{bias} + \mathrm{linearfn}(u)$
 and we can use it in ODE solvers.
 """
 
-from typing import Callable, Tuple
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float
 
 
-class IsotropicEK0FirstOrder(eqx.Module):
-    """EK0-Linearize an ODE assuming a linearisation-point with\
-     isotropic Kronecker structure.
+def isotropic_ek0(*, ode_order=1):
+    """EK0-linearise an ODE assuming a linearisation-point with\
+     isotropic Kronecker structure."""
 
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>>
-    >>> def f(x):
-    ...     return x*(1-x)
-    >>>
-    >>> x0 = 0.5 * jnp.ones((3, 1))
-    >>> linearise = IsotropicEK0FirstOrder()
-    >>> b, fn = linearise(f, x0)
-    >>> assert jnp.allclose(b, x0[1] - f(x0[0]))
-    >>>
-    >>> print(x0)
-    [[0.5]
-     [0.5]
-     [0.5]]
-    >>> print(x0[1])
-    [0.5]
-    >>> print(fn(x0))
-    [0.5]
-    """
+    def create_ek0_info_op_linearised(f):
+        """Create a "linearize()" implementation according to what\
+         the EK0 does to the ODE residual."""
 
-    def __call__(
-        self,
-        f: Callable[[Float[Array, "n d"]], Float[Array, " d"]],
-        x: Float[Array, "n d"],
-    ) -> Tuple[Float[Array, " d"], Callable[[Float[Array, "n d"]], Float[Array, " d"]]]:
-        """Linearise the ODE.
+        def jvp(t, x, *p):
+            return x[ode_order]
 
-        Parameters
-        ----------
-        f :
-            Vector field of a first-order ODE. Signature ``f(x)``.
-        x :
-            Linearisation point.
+        def info_op(t, x, *p):
+            bias = x[ode_order, ...] - f(t, *x[:ode_order, ...], *p)
+            return bias, lambda s: jvp(t, s, *p)
 
-        Returns
-        -------
-        :
-            Output bias.
-        :
-            Linear function (pushforward of the tangent spaces).
-        """
+        return info_op
 
-        def approx_residual(u):
-            return u[1] - f(x[0])
-
-        bias = approx_residual(x)
-
-        def jvp(y):
-            return y[1]
-
-        return bias, jvp
+    return create_ek0_info_op_linearised
 
 
-class EK1FirstOrder(eqx.Module):
+def ek1(*, ode_dimension, ode_order=1):
     """EK1 information."""
 
-    # static, because it affects the behaviour of the residual fn
-    ode_dimension: int = eqx.static_field()
+    def create_ek1_info_op_linearised(f):
+        def residual(t, x, *p):
+            x_reshaped = jnp.reshape(x, (-1, ode_dimension), order="F")
+            return x_reshaped[ode_order, ...] - f(t, *x_reshaped[:ode_order, ...], *p)
 
-    def __call__(self, f, x):
-        """Linearise the ODE."""
+        def info_op(t, x, *p):
+            return jax.linearize(lambda s: residual(t, s, *p), x)
 
-        def residual(u):
-            u_reshaped = jnp.reshape(u, (-1, self.ode_dimension), order="F")
-            return u_reshaped[1] - f(u_reshaped[0])
+        return info_op
 
-        bias, jvp = jax.linearize(residual, x)
-        return bias, jvp
+    return create_ek1_info_op_linearised
