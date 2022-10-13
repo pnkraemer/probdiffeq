@@ -13,7 +13,7 @@ from odefilter import _control_flow, taylor
 
 @partial(jax.jit, static_argnums=[0])
 def simulate_terminal_values(
-    vector_field, /, initial_values, *, t0, t1, solver, parameters=()
+    vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -30,33 +30,33 @@ def simulate_terminal_values(
         initial_values=initial_values,
         num=solver.strategy.implementation.num_derivatives,
     )
+
+    def info_op_curried(t, *ys):
+        def vf(*xs):
+            return vector_field(t, *xs, *parameters)
+
+        return info_op(vf, *ys)
+
     return odefilter_terminal_values(
-        vector_field,
+        info_op_curried,
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
         solver=solver,
-        parameters=parameters,
     )
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_terminal_values(
-    vector_field, /, *, taylor_coefficients, t0, t1, solver, parameters=()
-):
+def odefilter_terminal_values(info, /, *, taylor_coefficients, t0, t1, solver):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
-
-    @jax.jit
-    def vf(t, *ys):
-        return vector_field(t, *ys, *parameters)
 
     state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
-        vector_field=vf,
+        info_op=info,
         solver=solver,
     )
     return solver.extract_fn(state=solution)
@@ -89,16 +89,12 @@ def simulate_checkpoints(
         return info_op(vf, *ys)
 
     return odefilter_checkpoints(
-        info_op_curried,
-        taylor_coefficients=taylor_coefficients,
-        ts=ts,
-        solver=solver,
-        parameters=parameters,
+        info_op_curried, taylor_coefficients=taylor_coefficients, ts=ts, solver=solver
     )
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver, parameters=()):
+def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -125,26 +121,19 @@ def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver, parameter
 # Full solver routines
 
 
-def solve(vector_field, /, initial_values, *, t0, t1, solver, parameters=()):
+def solve(*args, **kwargs):
     """Solve an initial value problem.
 
     !!! warning
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
-    solution_gen = solution_generator(
-        vector_field,
-        initial_values=initial_values,
-        t0=t0,
-        t1=t1,
-        solver=solver,
-        parameters=parameters,
-    )
+    solution_gen = solution_generator(*args, **kwargs)
     return _control_flow.tree_stack([sol for sol in solution_gen])
 
 
 def solution_generator(
-    vector_field, /, initial_values, *, t0, t1, solver, parameters=()
+    vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()
 ):
     """Construct a generator of an IVP solution.
 
@@ -166,31 +155,30 @@ def solution_generator(
         num=solver.strategy.implementation.num_derivatives,
     )
 
+    def info_op_curried(t, *ys):
+        def vf(*xs):
+            return vector_field(t, *xs, *parameters)
+
+        return info_op(vf, *ys)
+
     return odefilter_generator(
-        vector_field,
+        info_op_curried,
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
         solver=solver,
-        parameters=parameters,
     )
 
 
-def odefilter_generator(
-    vector_field, /, taylor_coefficients, *, t0, t1, solver, parameters=()
-):
+def odefilter_generator(info_op, /, taylor_coefficients, *, t0, t1, solver):
     """Generate an ODE filter solution iteratively."""
     _assert_not_scalar(taylor_coefficients)
-
-    @jax.jit
-    def vf(t, *ys):
-        return vector_field(t, *ys, *parameters)
 
     state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     while state.accepted.t < t1:
         yield solver.extract_fn(state=state)
-        state = solver.step_fn(state=state, vector_field=vf, t1=t1)
+        state = solver.step_fn(state=state, info_op=info_op, t1=t1)
 
     yield solver.extract_fn(state=state)
 
