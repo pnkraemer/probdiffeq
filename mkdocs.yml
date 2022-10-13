@@ -85,3 +85,5 @@ nav:
     - Developer Documentation:
         - "dev_docs/init_apply_extract.md"
         - "dev_docs/on_the_edges.md"
+    - Benchmarks:
+        - "benchmarks/terminal_value_nonstiff_lowdimensional.md"

@@ -7,6 +7,7 @@ format:
 	nbqa black docs/
 	nbqa isort docs/
 	jupytext --sync docs/examples/*
+	jupytext --sync docs/benchmarks/*
 
 lint:
 	isort --check --diff .
@@ -23,6 +24,8 @@ test:
 example:
 	jupytext --sync docs/examples/*
 	jupytext --execute docs/examples/*
+    # No --execute for benchmarks (takes too long)
+	jupytext --sync docs/benchmarks/*
 
 pre-commit:
 	pre-commit autoupdate
