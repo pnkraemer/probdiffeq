@@ -21,9 +21,7 @@ class AdaptiveODEFilterState(Generic[T], eqx.Module):
     """Controller."""
 
     # All sorts of solution objects.
-    # Maybe we can simplify here. But not yet.
-    # Edit: I am pretty sure one of them can go.
-    # (I am looking at you, "previous".)
+    # todo: sort according to previous <= solution <= accepted <= proposed
 
     solution: T
     """The current best solution.
@@ -101,30 +99,50 @@ class AdaptiveODEFilter(eqx.Module):
     @partial(jax.jit, static_argnames=("info_op",))
     def step_fn(self, *, state, info_op, t1):
         """Perform a step."""
-        # Part I/II: accept-reject loop unless we have gathered ODE
-        # evaluations _beyond_ t1.
+        # todo: the actual I-II-III is a bit more nested than that...
 
+        # Part I/III: accept-reject loop unless we have gathered ODE
+        # evaluations _beyond_ t1.
         enter_accept_reject_loop = state.accepted.t < t1
 
-        def true_fn1(s):
+        def acc_rej_lop(s):
             return self._accept_reject_loop(state0=s, info_op=info_op)
 
-        def false_fn1(s):
-            return s
+        state_new = jax.lax.cond(
+            enter_accept_reject_loop, acc_rej_lop, lambda x: x, state
+        )
 
-        state_new = jax.lax.cond(enter_accept_reject_loop, true_fn1, false_fn1, state)
+        # Part II/III: if we stepped _exactly_ to the check-point,
+        # reset the backward model of the new iteration
+        # so the next backward-collapse can happen correctly.
+        enter_reset = jnp.abs(state_new.accepted.t - t1) == 0
 
-        # Part II/II: If we have previously overstepped
-        # the boundary, interpolate to t1
-        interpolate = state_new.accepted.t > t1
+        def reset(s):
+            return self._reset_at_checkpoint_fn(state=s)
 
-        def true_fn(s):
+        state_new = jax.lax.cond(enter_reset, reset, lambda x: x, state_new)
+
+        # Part III/III: If we have previously overstepped
+        # the boundary, interpolate to t1.
+        # todo: should this be an "else"?
+        enter_interpolate = state_new.accepted.t > t1  # todo: magic value
+
+        def interpolate(s):
             return self._interpolate(state=s, t=t1)
 
-        def false_fn(s):
-            return s
+        return jax.lax.cond(enter_interpolate, interpolate, lambda x: x, state_new)
 
-        return jax.lax.cond(interpolate, true_fn, false_fn, state_new)
+    def _reset_at_checkpoint_fn(self, *, state):
+        new_accepted = self.strategy.reset_at_checkpoint_fn(state=state.accepted)
+        return AdaptiveODEFilterState(
+            dt_proposed=state.dt_proposed,
+            error_norm_proposed=state.error_norm_proposed,
+            accepted=new_accepted,
+            solution=state.solution,  # don't reset!
+            proposed=new_accepted,  # irrelevant?
+            previous=new_accepted,  # irrelevant?
+            control=state.control,
+        )
 
     def _accept_reject_loop(self, *, info_op, state0):
         def cond_fn(x):
@@ -142,12 +160,21 @@ class AdaptiveODEFilter(eqx.Module):
 
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
 
+        solution = state_new.proposed
+
+        # Guards against wrong backward models if there are
+        # two acceptances in a row
+        # accepted = state_new.proposed
+        accepted = self.strategy.reset_at_checkpoint_fn(state=state_new.proposed)
+
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
-            proposed=state_new.proposed,
-            accepted=state_new.proposed,  # holla! New! :)
-            solution=state_new.proposed,  # Overwritten by interpolate() if necessary
+            proposed=jax.tree_map(
+                lambda x: jnp.nan * x, state_new.proposed
+            ),  # meaningless?
+            accepted=accepted,  # holla! New! :)
+            solution=solution,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )
@@ -192,13 +219,18 @@ class AdaptiveODEFilter(eqx.Module):
         accepted_new, interpolated = self.strategy.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
+
+        # Either one of those two...
+        new_previous = interpolated
+        # new_previous = self.strategy.reset_at_checkpoint_fn(state=interpolated)
+
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             proposed=state.proposed,
             accepted=accepted_new,  # holla! New! :)
             solution=interpolated,  # holla! New! :)
-            previous=interpolated,  # holla! New! :)
+            previous=new_previous,  # holla! New! :)
             control=state.control,
         )
 
