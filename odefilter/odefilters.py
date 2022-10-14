@@ -216,7 +216,7 @@ class AdaptiveODEFilter(eqx.Module):
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
     def _interpolate(self, *, state, t):
-        accepted_new, interpolated, new_previous = self.strategy.interpolate_fn(
+        accepted_new, interpolated = self.strategy.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
 

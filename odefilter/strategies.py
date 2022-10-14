@@ -114,6 +114,10 @@ class DynamicFilter(eqx.Module):
         )
         return s1, target_p
 
+    @staticmethod
+    def reset_at_checkpoint_fn(*, state):  # noqa: D102
+        return state
+
 
 class _DynamicSmootherCommon(eqx.Module):
 
@@ -188,7 +192,7 @@ class _DynamicSmootherCommon(eqx.Module):
         return extrapolated, backward_model
 
     @staticmethod
-    def reset_at_checkpoint_fn(*, state):
+    def reset_at_checkpoint_fn(*, state):  # noqa: D102
         return state
 
 
@@ -272,7 +276,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return s1, s0
 
     @staticmethod
-    def reset_at_checkpoint_fn(*, state):
+    def reset_at_checkpoint_fn(*, state):  # noqa: D102
         return state
 
 
@@ -317,6 +321,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment,
             bw_init=state.backward_model,
+            # bw_state=state.backward_model,
+            # bw_init=bw_increment,
         )
         backward_model = BackwardModel(transition=gain, noise=noise)
 
@@ -349,7 +355,9 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         # model from t0 to t. This will imply a backward model from the
         # previous checkpoint to the current checkpoint.
         noise0, g0 = self.implementation.condense_backward_models(
-            bw_init=s0.backward_model, bw_state=backward_model0
+            bw_init=s0.backward_model,
+            bw_state=backward_model0
+            # bw_init=backward_model0, bw_state=s0.backward_model
         )
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
 
@@ -379,7 +387,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
         return s1, s0
 
-    def reset_at_checkpoint_fn(self, *, state):
+    def reset_at_checkpoint_fn(self, *, state):  # noqa: D102
         bw_noise = self.implementation.init_backward_noise(
             rv_proto=state.backward_model.noise
         )
