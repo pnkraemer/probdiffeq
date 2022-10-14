@@ -101,7 +101,7 @@ class AdaptiveODEFilter(eqx.Module):
     # todo: this function has some strange side-effects (of using equinox?)
     #  if you add a jit, the results get worse (much worse!)
     #  Comment this out if you don't believe me:
-    # @partial(jax.jit, static_argnames=["info_op"])
+    @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, t1):
         """Perform a step."""
         enter_accept_reject_loop = state.accepted.t < t1
@@ -167,6 +167,7 @@ class AdaptiveODEFilter(eqx.Module):
 
         solution = state_new.proposed
         accepted = state_new.proposed
+
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
