@@ -104,5 +104,4 @@ But a true pro calls the ODE filter the way it is supposed to be called.
 
 ### Adaptive simulation using native Python control flow
 ::: odefilter.ivpsolve.solve
-::: odefilter.ivpsolve.solution_generator
-::: odefilter.ivpsolve.odefilter_generator
+::: odefilter.ivpsolve.odefilter
