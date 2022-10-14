@@ -2,14 +2,17 @@
 
 import jax
 import jax.numpy as jnp
+import pytest
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
 
 from odefilter import ivpsolve, recipes
 
+# todo: reuse solve() calls with default smoothers.
+
 
 @case
-@parametrize("n", [1, 3])
+@parametrize("n", [2, 3])
 @parametrize("tol", [1e-1, 1e-3])
 def filter_smoother_pair_eks0(n, tol):
     ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
@@ -18,7 +21,7 @@ def filter_smoother_pair_eks0(n, tol):
 
 
 @case
-@parametrize("n", [1, 3])
+@parametrize("n", [2, 3])
 @parametrize("tol", [1e-1, 1e-3])
 def filter_smoother_pair_fixpt_eks0(n, tol):
     ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
@@ -47,7 +50,7 @@ def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks):
 
 
 @case
-@parametrize("n", [1, 3])
+@parametrize("n", [2, 3])
 @parametrize("tol", [1e-1, 1e-3])
 def smoother_fixpt_smoother_pair_eks0(n, tol):
     eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
@@ -57,14 +60,14 @@ def smoother_fixpt_smoother_pair_eks0(n, tol):
     return eks0, fixpt_eks0
 
 
+@pytest.mark.skip
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
 )
 def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_eks):
-    """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid
-    of a previous call to solve(), the results should be identical."""
-
+    """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid\
+     of a previous call to solve(), the results should be identical."""
     eks_sol = ivpsolve.solve(
         vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
     )
@@ -90,10 +93,12 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol)
 
 
+@pytest.mark.skip
 def test_smoothing_coarser_checkpoints():
-    pass
+    """Similar to the above, but the checkpoint grid is finer than the solver-grid."""
 
 
+@pytest.mark.skip
 def test_smoothing_finer_checkpoints():
     pass
 
