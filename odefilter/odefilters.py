@@ -99,38 +99,32 @@ class AdaptiveODEFilter(eqx.Module):
     @partial(jax.jit, static_argnames=("info_op",))
     def step_fn(self, *, state, info_op, t1):
         """Perform a step."""
-        # todo: the actual I-II-III is a bit more nested than that...
 
-        # Part I/III: accept-reject loop unless we have gathered ODE
-        # evaluations _beyond_ t1.
-        enter_accept_reject_loop = state.accepted.t < t1
+        def reject_accept_loop(s):
+            s_new = self._accept_reject_loop(state0=s, info_op=info_op)
 
-        def acc_rej_lop(s):
-            return self._accept_reject_loop(state0=s, info_op=info_op)
+            def reset_fn(s_):
+                return self._reset_at_checkpoint_fn(state=s_)
 
-        state_new = jax.lax.cond(
-            enter_accept_reject_loop, acc_rej_lop, lambda x: x, state
-        )
+            def no_reset_fn(s_):
+                def interpolate_fn(s__):
+                    return self._interpolate(state=s__, t=t1)
 
-        # Part II/III: if we stepped _exactly_ to the check-point,
-        # reset the backward model of the new iteration
-        # so the next backward-collapse can happen correctly.
-        enter_reset = jnp.abs(state_new.accepted.t - t1) == 0
+                enter_interpolation = s_.accepted.t > t1
+                return jax.lax.cond(
+                    enter_interpolation, interpolate_fn, lambda x: x, s_
+                )
 
-        def reset(s):
-            return self._reset_at_checkpoint_fn(state=s)
+            enter_reset = jnp.abs(s_new.accepted.t - t1) == 0
+            return jax.lax.cond(enter_reset, reset_fn, no_reset_fn, s_new)
 
-        state_new = jax.lax.cond(enter_reset, reset, lambda x: x, state_new)
-
-        # Part III/III: If we have previously overstepped
-        # the boundary, interpolate to t1.
-        # todo: should this be an "else"?
-        enter_interpolate = state_new.accepted.t > t1  # todo: magic value
-
-        def interpolate(s):
+        def no_reject_accept_loop(s):
             return self._interpolate(state=s, t=t1)
 
-        return jax.lax.cond(enter_interpolate, interpolate, lambda x: x, state_new)
+        enter_accept_reject_loop = state.accepted.t < t1
+        return jax.lax.cond(
+            enter_accept_reject_loop, reject_accept_loop, no_reject_accept_loop, state
+        )
 
     def _reset_at_checkpoint_fn(self, *, state):
         new_accepted = self.strategy.reset_at_checkpoint_fn(state=state.accepted)
@@ -161,11 +155,7 @@ class AdaptiveODEFilter(eqx.Module):
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
 
         solution = state_new.proposed
-
-        # Guards against wrong backward models if there are
-        # two acceptances in a row
-        # accepted = state_new.proposed
-        accepted = self.strategy.reset_at_checkpoint_fn(state=state_new.proposed)
+        accepted = state_new.proposed
 
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,

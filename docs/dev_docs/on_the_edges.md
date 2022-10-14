@@ -27,36 +27,79 @@ Adaptive ODE solvers track a ``proposed`` state and an ``accepted`` state.
 The ``proposed`` state is refined until some error criterion is satisfied,
 and then the ``proposed`` state becomes the ``accepted`` state.
 
-To implement this overstepping behaviour, we additionally track a ``solution`` state.
+To implement this overstepping behaviour, we need to be super careful:
+Smoothing-based ODE filters finalise the function call with a backward pass
+after the forward-solve, and the state-space model for this backward pass
+is implemented during the forward pass.
+But overstepping-interpolating changes the backward model quite drastically:
+the interpolating depends on the previous _and the future state_, and
+the backward state-space model needs to be reset appropriately (trust us for now).
+
+
+One extra factor is to additionally track a ``solution`` state.
 The ``solution`` state usually coincides with the ``accepted`` state.
 It gets interesting when they disagree, which is usually when the time-location
-of the accepted state disagrees with a user-specified checkpoint.
-The following cases are distinguished.
+of the accepted state is beyond the next user-specified checkpoint.
 
-### Case 1: $t < t + \Delta t < t_1$
-Nothing special happens, we step as usual. The ``accepted`` and the ``solution``
-state coincide at all locations.
-The next step starts at the ``solution`` state
-(which coincides with the ``accepted`` state anyway).
 
-### Case 2: $t < t_1 < t + \Delta t$
-We step from $t$ to $\Delta t$ and interpolate the solution to obtain
-an estimate at $t_1$.
-Here, the ``accepted`` state is at time-point $t + \Delta t$,
-but the ``solution`` state is at time-point $t_1 < t + \Delta t$.
-How does this work?
 Consider the following example implementation
 
 ```python
-def iterate(state, t1, step_fn, *problem):
-    while state.accepted.t < t1:
-        # state.solution = state.accepted
-        state = step_fn(*problem, state)
+def step_fn(*problem, state):
 
-    if state.accepted.t > t1:
-        # state.solution != state.accepted
-        state.solution = interpolate(*problem, s0=state.previous, s1=state.accepted, t=t1)
+    if state.accepted.t < t1:  # A/A'
+        state = reject_accept_loop(*problem, state)
+
+        if state.accepted.t == t1:  # B/B'
+            state.accepted = reset_at_checkpoint(state.accepted)
+
+        elif state.accepted.t > t1:  # C/C'
+            state = interpolate(state, t0=t1)
+
+    else:  # C/C'
+        assert state.accepted.t > t1
+        state = interpolate(state, to=t1)
+
     return state
 
 ```
-Interpolation itself is solver-specific.
+
+A, A') Attempt-step-loop / no loop
+
+B, B') Stepped exactly to final time / did not
+
+C, C') Overstepped - interpolate / did not
+
+
+
+* if A happens, only _either_ B or C or B'&C' can happen
+* if A does not happen, B cannot happen; but C must happen because otherwise, nothing happens
+* if in the previous step, B happened, A must happen in the next step
+* if in the previous step, A-B'-C' happens, A must happen in the next step
+
+Cases for a single step:
+
+1) A-B'-C'
+2) A-B-C'
+3) A-B'-C
+4) A'-B'-C
+
+Cases for a step-step combination:
+1-1,
+1-2,
+1-3,
+2-1,
+2-2,
+2-3,
+3-1,
+3-2,
+3-3,
+3-4,
+4-1,
+4-2,
+4-3,
+4-4,
+
+Impossible combinations:
+2-4,
+1-4,
