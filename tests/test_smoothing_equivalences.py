@@ -95,12 +95,12 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
 
 @pytest.mark.skip
 def test_smoothing_coarser_checkpoints():
-    """Similar to the above, but the checkpoint grid is finer than the solver-grid."""
+    """Similar to the above, but the checkpoint grid is coarser than the solver-grid."""
 
 
 @pytest.mark.skip
 def test_smoothing_finer_checkpoints():
-    pass
+    """Similar to the above, but the checkpoint grid is finer than the solver-grid."""
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
