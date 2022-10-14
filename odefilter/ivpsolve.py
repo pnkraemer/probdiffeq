@@ -106,23 +106,8 @@ def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver):
 # Full solver routines
 
 
-def solve(*args, **kwargs):
+def solve(vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()):
     """Solve an initial value problem.
-
-    !!! warning
-        Uses native python control flow.
-        Not JITable, not reverse-mode-differentiable.
-    """
-    solution_gen = solution_generator(*args, **kwargs)
-    return _control_flow.tree_stack([sol for sol in solution_gen])
-
-
-def solution_generator(
-    vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()
-):
-    """Construct a generator of an IVP solution.
-
-    Thin wrapper around :func:`odefilter_generator`.
 
     !!! warning
         Uses native python control flow.
@@ -137,8 +122,7 @@ def solution_generator(
     )
 
     info_op_curried = info_op(vector_field)
-
-    return odefilter_generator(
+    return odefilter(
         lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -147,17 +131,28 @@ def solution_generator(
     )
 
 
-def odefilter_generator(info_op, /, taylor_coefficients, *, t0, t1, solver):
+def odefilter(info_op, /, *, taylor_coefficients, t0, t1, solver):
+    """Solve an initial value problem.
+
+    !!! warning
+        Uses native python control flow.
+        Not JITable, not reverse-mode-differentiable.
+    """
+    generator = _odefilter_generator(
+        info_op, taylor_coefficients=taylor_coefficients, t0=t0, t1=t1, solver=solver
+    )
+    forward_solution = _control_flow.tree_stack([sol for sol in generator])
+    return solver.extract_fn(state=forward_solution)
+
+
+def _odefilter_generator(info_op, /, taylor_coefficients, *, t0, t1, solver):
     """Generate an ODE filter solution iteratively."""
     _assert_not_scalar(taylor_coefficients)
-
     state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
-
-    while state.accepted.t < t1:
-        yield solver.extract_fn(state=state)
+    yield state
+    while state.solution.t < t1:
         state = solver.step_fn(state=state, info_op=info_op, t1=t1)
-
-    yield solver.extract_fn(state=state)
+        yield state
 
 
 # Auxiliary routines

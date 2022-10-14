@@ -70,6 +70,7 @@ nav:
         - "quickstart/transitioning_from_other_packages.md"
     - Examples:
         - "examples/posterior_uncertainties.md"
+        - "examples/smoothing.md"
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"

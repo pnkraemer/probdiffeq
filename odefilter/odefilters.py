@@ -1,5 +1,5 @@
 """Initial value problem solvers."""
-from functools import partial
+from functools import partial  # noqa: F401
 from typing import Any, Generic, TypeVar, Union
 
 import equinox as eqx
@@ -55,6 +55,8 @@ class AdaptiveODEFilter(eqx.Module):
     control: Any
     norm_ord: Union[int, str, None] = None
 
+    numerical_zero: float = 1e-12
+
     @property
     def error_order(self):
         """Error order."""
@@ -96,34 +98,43 @@ class AdaptiveODEFilter(eqx.Module):
         norm_dy0 = jnp.linalg.norm(f0)
         return scale * norm_y0 / norm_dy0
 
-    @partial(jax.jit, static_argnames=("info_op",))
+    # todo: this function has some strange side-effects (of using equinox?)
+    #  if you add a jit, the results get worse (much worse!)
+    #  Comment this out if you don't believe me:
+    @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, t1):
         """Perform a step."""
-
-        def reject_accept_loop(s):
-            s_new = self._accept_reject_loop(state0=s, info_op=info_op)
-
-            def reset_fn(s_):
-                return self._reset_at_checkpoint_fn(state=s_)
-
-            def no_reset_fn(s_):
-                def interpolate_fn(s__):
-                    return self._interpolate(state=s__, t=t1)
-
-                enter_interpolation = s_.accepted.t > t1
-                return jax.lax.cond(
-                    enter_interpolation, interpolate_fn, lambda x: x, s_
-                )
-
-            enter_reset = jnp.abs(s_new.accepted.t - t1) == 0
-            return jax.lax.cond(enter_reset, reset_fn, no_reset_fn, s_new)
-
-        def no_reject_accept_loop(s):
-            return self._interpolate(state=s, t=t1)
-
         enter_accept_reject_loop = state.accepted.t < t1
+        result = jax.lax.cond(
+            enter_accept_reject_loop,
+            lambda s: self._reject_accept_loop(s, info_op=info_op, t1=t1),
+            lambda s: self._no_reject_accept_loop(s, t1=t1),
+            state,
+        )
+        return result
+
+    def _no_reject_accept_loop(self, s, t1):
+        return self._interpolate(state=s, t=t1)
+
+    def _reject_accept_loop(self, s, info_op, t1):
+        s_new = self._accept_reject_loop(state0=s, info_op=info_op)
+
+        enter_reset = jnp.abs(s_new.accepted.t - t1) <= self.numerical_zero
         return jax.lax.cond(
-            enter_accept_reject_loop, reject_accept_loop, no_reject_accept_loop, state
+            enter_reset, self._reset_fn, lambda s_: self._no_reset_fn(s_, t1), s_new
+        )
+
+    def _reset_fn(self, s_):
+        return self._reset_at_checkpoint_fn(state=s_)
+
+    def _no_reset_fn(self, s_, t1):
+
+        enter_interpolation = s_.accepted.t > t1
+        return jax.lax.cond(
+            enter_interpolation,
+            lambda s: self._interpolate(state=s, t=t1),
+            lambda x: x,
+            s_,
         )
 
     def _reset_at_checkpoint_fn(self, *, state):
@@ -133,8 +144,8 @@ class AdaptiveODEFilter(eqx.Module):
             error_norm_proposed=state.error_norm_proposed,
             accepted=new_accepted,
             solution=state.solution,  # don't reset!
-            proposed=new_accepted,  # irrelevant?
-            previous=new_accepted,  # irrelevant?
+            proposed=_nan_like(new_accepted),  # irrelevant?
+            previous=_nan_like(new_accepted),  # irrelevant?
             control=state.control,
         )
 
@@ -160,9 +171,7 @@ class AdaptiveODEFilter(eqx.Module):
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
-            proposed=jax.tree_map(
-                lambda x: jnp.nan * x, state_new.proposed
-            ),  # meaningless?
+            proposed=_nan_like(state_new.proposed),  # meaningless?
             accepted=accepted,  # holla! New! :)
             solution=solution,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
@@ -231,3 +240,7 @@ class AdaptiveODEFilter(eqx.Module):
 
 def _empty_like(tree):
     return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)
+
+
+def _nan_like(tree):
+    return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)
