@@ -99,11 +99,10 @@ class AdaptiveODEFilter(eqx.Module):
     @partial(jax.jit, static_argnames=("info_op",))
     def step_fn(self, *, state, info_op, t1):
         """Perform a step."""
-        # todo: if state.accepted.t == t1, raise error?
+        # todo: the actual I-II-III is a bit more nested than that...
 
         # Part I/III: accept-reject loop unless we have gathered ODE
         # evaluations _beyond_ t1.
-
         enter_accept_reject_loop = state.accepted.t < t1
 
         def acc_rej_lop(s):
@@ -116,7 +115,7 @@ class AdaptiveODEFilter(eqx.Module):
         # Part II/III: if we stepped _exactly_ to the check-point,
         # reset the backward model of the new iteration
         # so the next backward-collapse can happen correctly.
-        enter_reset = state_new.accepted.t == t1
+        enter_reset = jnp.abs(state_new.accepted.t - t1) == 0
 
         def reset(s):
             return self._reset_at_checkpoint_fn(state=s)
@@ -124,8 +123,9 @@ class AdaptiveODEFilter(eqx.Module):
         state_new = jax.lax.cond(enter_reset, reset, lambda x: x, state_new)
 
         # Part III/III: If we have previously overstepped
-        # the boundary, interpolate to t1
-        enter_interpolate = state_new.accepted.t > t1
+        # the boundary, interpolate to t1.
+        # todo: should this be an "else"?
+        enter_interpolate = state_new.accepted.t > t1  # todo: magic value
 
         def interpolate(s):
             return self._interpolate(state=s, t=t1)
@@ -133,9 +133,6 @@ class AdaptiveODEFilter(eqx.Module):
         return jax.lax.cond(enter_interpolate, interpolate, lambda x: x, state_new)
 
     def _reset_at_checkpoint_fn(self, *, state):
-        print(
-            f"Resetting at {state.accepted.t}, because we stepped perfectly to the next checkpoint."
-        )
         new_accepted = self.strategy.reset_at_checkpoint_fn(state=state.accepted)
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
@@ -148,8 +145,6 @@ class AdaptiveODEFilter(eqx.Module):
         )
 
     def _accept_reject_loop(self, *, info_op, state0):
-        print(f"Entering accept-reject loop at {state0.accepted.t}")
-
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
@@ -165,12 +160,21 @@ class AdaptiveODEFilter(eqx.Module):
 
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
 
+        solution = state_new.proposed
+
+        # Guards against wrong backward models if there are
+        # two acceptances in a row
+        # accepted = state_new.proposed
+        accepted = self.strategy.reset_at_checkpoint_fn(state=state_new.proposed)
+
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
-            proposed=state_new.proposed,
-            accepted=state_new.proposed,  # holla! New! :)
-            solution=state_new.proposed,  # Overwritten by interpolate() if necessary
+            proposed=jax.tree_map(
+                lambda x: jnp.nan * x, state_new.proposed
+            ),  # meaningless?
+            accepted=accepted,  # holla! New! :)
+            solution=solution,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )
@@ -212,14 +216,13 @@ class AdaptiveODEFilter(eqx.Module):
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
     def _interpolate(self, *, state, t):
-        # print(f"Interpolating from {state.previous.t} to {t} to {state.accepted.t}")
-
-        accepted_new, interpolated = self.strategy.interpolate_fn(
+        accepted_new, interpolated, new_previous = self.strategy.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
 
-        # new_previous = interpolated
-        new_previous = self.strategy.reset_at_checkpoint_fn(state=interpolated)
+        # Either one of those two...
+        new_previous = interpolated
+        # new_previous = self.strategy.reset_at_checkpoint_fn(state=interpolated)
 
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
