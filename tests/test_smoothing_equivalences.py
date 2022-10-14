@@ -77,15 +77,15 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
             solver=fixpt_eks[0],
             info_op=fixpt_eks[1],
         )
-    allclose = _tree_allclose(fixpt_eks_sol, eks_sol)
+    is_allclose = _tree_allclose(fixpt_eks_sol, eks_sol)
 
-    print(allclose.t)
-    print(allclose.u)
-    print(allclose.filtered.mean)
-    print(allclose.filtered.cov_sqrtm_lower)
-    print(allclose.backward_model.transition)
-    print(allclose.backward_model.noise.mean)
-    print(allclose.backward_model.noise.cov_sqrtm_lower)
+    print(is_allclose.t)
+    print(is_allclose.u)
+    print(is_allclose.filtered.mean)
+    print(is_allclose.filtered.cov_sqrtm_lower)
+    print(is_allclose.backward_model.transition)
+    print(is_allclose.backward_model.noise.mean)
+    print(is_allclose.backward_model.noise.cov_sqrtm_lower)
 
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol)
 
