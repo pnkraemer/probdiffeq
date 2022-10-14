@@ -153,7 +153,6 @@ def _odefilter_generator(info_op, /, taylor_coefficients, *, t0, t1, solver):
     while state.solution.t < t1:
         state = solver.step_fn(state=state, info_op=info_op, t1=t1)
         yield state
-        print(state.solution.t)
 
 
 # Auxiliary routines
