@@ -101,9 +101,11 @@ plt.show()
 # collapse the backward models if we interpolated twice in a row,
 # which is equivalent to
 
-# is the remainder a preconditioning issue? Should be backward-marginalise with a preconditioner?
+# is the remainder a preconditioning issue?
+?preconditioner
 
-# what happens if we accept-reject and then overstep very slightly and therefore immediately interpolate?
+# what happens if we accept-reject and then overstep
+# very slightly and therefore immediately interpolate?
 # Should this be possible?
 ```
 
