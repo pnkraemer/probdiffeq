@@ -7,9 +7,9 @@ from pytest_cases import parametrize_with_cases
 from odefilter import ivpsolve
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivps_cases", prefix="problem_")
+@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver, info_op", cases=".recipes_cases", prefix="solver_", has_tag=("checkpoint",)
+    "solver, info_op", cases=".recipe_cases", prefix="solver_", has_tag=("checkpoint",)
 )
 def test_simulate_checkpoints(vf, u0, t0, t1, p, solver, info_op):
     ts = jnp.linspace(t0, t1, num=10)
