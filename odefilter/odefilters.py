@@ -1,17 +1,20 @@
 """Initial value problem solvers."""
+from dataclasses import dataclass
 from functools import partial  # noqa: F401
-from typing import Any, Generic, TypeVar, Union
+from typing import Any, Generic, NamedTuple, TypeVar, Union
 
-import equinox as eqx
 import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
+from jax.tree_util import register_pytree_node_class
 
 T = TypeVar("T")
 """A generic ODE Filter state."""
 
 
-class AdaptiveODEFilterState(Generic[T], eqx.Module):
+@register_pytree_node_class
+@dataclass(frozen=True)
+class AdaptiveODEFilterState(Generic[T]):
     """Solver state."""
 
     dt_proposed: float
@@ -43,8 +46,27 @@ class AdaptiveODEFilterState(Generic[T], eqx.Module):
     """The penultimate (2nd most recent) accepted state. Needed for interpolation.
     """
 
+    def tree_flatten(self):
+        children = (
+            self.dt_proposed,
+            self.error_norm_proposed,
+            self.control,
+            self.solution,
+            self.proposed,
+            self.accepted,
+            self.previous,
+        )
+        aux = ()
+        return children, aux
 
-class AdaptiveODEFilter(eqx.Module):
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
+
+@register_pytree_node_class
+@dataclass(frozen=True)
+class AdaptiveODEFilter:
     """Make an adaptive ODE filter."""
 
     strategy: Any
@@ -55,7 +77,31 @@ class AdaptiveODEFilter(eqx.Module):
     control: Any
     norm_ord: Union[int, str, None] = None
 
-    numerical_zero: float = 1e-12
+    numerical_zero: float = 1e-4
+
+    def tree_flatten(self):
+        children = (
+            self.strategy,
+            self.atol,
+            self.rtol,
+            self.control,
+            self.numerical_zero,
+        )
+        aux = self.norm_ord
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        strategy, atol, rtol, control, numerical_zero = children
+        norm_ord = aux
+        return cls(
+            strategy=strategy,
+            atol=atol,
+            rtol=rtol,
+            control=control,
+            numerical_zero=numerical_zero,
+            norm_ord=norm_ord,
+        )
 
     @property
     def error_order(self):
@@ -98,11 +144,12 @@ class AdaptiveODEFilter(eqx.Module):
         norm_dy0 = jnp.linalg.norm(f0)
         return scale * norm_y0 / norm_dy0
 
-    # todo: this function has some strange side-effects (of using equinox?)
+    # todo: this function has some unknown side-effects (of using equinox?)
     #  if you add a jit, the results get worse (much worse!)
-    #  Comment this out if you don't believe me:
+    #  Comment the jit below out and run all tests without disable_jit()
+    #  if you don't believe me:
     @partial(jax.jit, static_argnames=["info_op"])
-    def step_fn(self, *, state, info_op, t1):
+    def step_fn(self, state, info_op, t1):
         """Perform a step."""
         enter_accept_reject_loop = state.accepted.t < t1
         result = jax.lax.cond(
@@ -120,6 +167,7 @@ class AdaptiveODEFilter(eqx.Module):
         s_new = self._accept_reject_loop(state0=s, info_op=info_op)
 
         enter_reset = jnp.abs(s_new.accepted.t - t1) <= self.numerical_zero
+        # enter_reset = True
         return jax.lax.cond(
             enter_reset, self._reset_fn, lambda s_: self._no_reset_fn(s_, t1), s_new
         )
@@ -128,7 +176,6 @@ class AdaptiveODEFilter(eqx.Module):
         return self._reset_at_checkpoint_fn(state=s_)
 
     def _no_reset_fn(self, s_, t1):
-
         enter_interpolation = s_.accepted.t > t1
         return jax.lax.cond(
             enter_interpolation,

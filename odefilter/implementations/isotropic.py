@@ -1,8 +1,8 @@
 """State-space models with isotropic covariance structure."""
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, NamedTuple
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.tree_util
@@ -12,18 +12,30 @@ from odefilter import _control_flow
 from odefilter.implementations import _ibm, sqrtm
 
 
-class IsotropicNormal(eqx.Module):
+class IsotropicNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
     mean: Float[Array, "n d"]
     cov_sqrtm_lower: Float[Array, "n n"]
 
 
-class IsotropicImplementation(eqx.Module):
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class IsotropicImplementation:
     """Handle isotropic covariances."""
 
     a: Any
     q_sqrtm_lower: Any
+
+    def tree_flatten(self):
+        children = self.a, self.q_sqrtm_lower
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        a, q_sqrtm_lower = children
+        return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives):

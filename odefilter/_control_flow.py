@@ -1,25 +1,35 @@
 """Custom control flow."""
 
+from functools import partial
+
+import jax
 import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
 
-def scan_with_init(*, f, init, xs, reverse=False, **kwargs):
+@partial(jax.jit, static_argnames=["f", "reverse"])
+def scan_with_init(*, f, init, xs, reverse=False):
     """Scan, but include the ``init`` parameter into the output.
 
     Needed to compute checkpoint-ODE-solutions.
     """
-    carry, ys = jax.lax.scan(f=f, init=init, xs=xs, reverse=reverse, **kwargs)
-
+    carry, ys = jax.lax.scan(f=f, init=init, xs=xs, reverse=reverse)
     init_broadcast = jax.tree_util.tree_map(lambda x: jnp.asarray(x)[None, ...], init)
-    if reverse:
-        stack_list = _tree_transpose([ys, init_broadcast])
-    else:
-        stack_list = _tree_transpose([init_broadcast, ys])
-    ys_stacked = jax.tree_util.tree_map(
-        jnp.concatenate, stack_list, is_leaf=lambda x: isinstance(x, list)
-    )
+
+    def stack(x):
+        stack_list = _tree_transpose([x[0], x[1]])
+        return jax.tree_util.tree_map(
+            jnp.concatenate, stack_list, is_leaf=lambda s: isinstance(s, list)
+        )
+
+    def stack_rev(x):
+        stack_list = _tree_transpose([x[1], x[0]])
+        return jax.tree_util.tree_map(
+            jnp.concatenate, stack_list, is_leaf=lambda s: isinstance(s, list)
+        )
+
+    ys_stacked = jax.lax.cond(reverse, stack, stack_rev, (ys, init_broadcast))
     return carry, ys_stacked
 
 

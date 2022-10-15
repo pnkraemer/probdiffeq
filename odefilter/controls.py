@@ -1,12 +1,14 @@
 """Step-size selection."""
 
 import abc
+from dataclasses import dataclass
+from typing import NamedTuple
 
-import equinox as eqx
 import jax.numpy as jnp
+from jax.tree_util import register_pytree_node_class
 
 
-class AbstractControl(abc.ABC, eqx.Module):
+class AbstractControl(abc.ABC):
     """Interface for control algorithms."""
 
     @abc.abstractmethod
@@ -20,13 +22,15 @@ class AbstractControl(abc.ABC, eqx.Module):
         raise NotImplementedError
 
 
-class PIState(eqx.Module):
+class PIState(NamedTuple):
     """Proportional-integral controller state."""
 
     scale_factor: float
     error_norm_previously_accepted: float
 
 
+@register_pytree_node_class
+@dataclass(frozen=True)
 class ProportionalIntegral(AbstractControl):
     """PI Controller."""
 
@@ -35,6 +39,21 @@ class ProportionalIntegral(AbstractControl):
     factor_max: float = 10.0
     power_integral_unscaled: float = 0.3
     power_proportional_unscaled: float = 0.4
+
+    def tree_flatten(self):
+        children = (
+            self.safety,
+            self.factor_min,
+            self.factor_max,
+            self.power_integral_unscaled,
+            self.power_proportional_unscaled,
+        )
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
 
     def init_fn(self):
         """Initialise a controller state."""
@@ -95,7 +114,7 @@ class ProportionalIntegral(AbstractControl):
         return scale_factor_clipped
 
 
-class IState(eqx.Module):
+class IState(NamedTuple):
     """Integral controller state."""
 
     scale_factor: float

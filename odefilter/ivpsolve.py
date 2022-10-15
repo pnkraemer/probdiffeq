@@ -11,9 +11,9 @@ from odefilter import _control_flow, taylor
 # The high-level checkpoint-style routines
 
 
-@partial(jax.jit, static_argnums=[0], static_argnames=("info_op",))
+@partial(jax.jit, static_argnums=[0, 5])
 def simulate_terminal_values(
-    vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()
+    vector_field, /, initial_values, t0, t1, solver, info_op, parameters=()
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -38,7 +38,7 @@ def simulate_terminal_values(
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_terminal_values(info, /, *, taylor_coefficients, t0, t1, solver):
+def odefilter_terminal_values(info, /, taylor_coefficients, t0, t1, solver):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -53,9 +53,9 @@ def odefilter_terminal_values(info, /, *, taylor_coefficients, t0, t1, solver):
     return solver.extract_fn(state=solution)
 
 
-@partial(jax.jit, static_argnums=[0], static_argnames=("info_op",))
+@partial(jax.jit, static_argnums=[0, 4])
 def simulate_checkpoints(
-    vector_field, /, initial_values, *, ts, solver, info_op, parameters=()
+    vector_field, /, initial_values, ts, solver, info_op, parameters=()
 ):
     """Solve an IVP and return the solution at checkpoints.
 
@@ -79,7 +79,7 @@ def simulate_checkpoints(
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver):
+def odefilter_checkpoints(info, /, taylor_coefficients, ts, solver):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -106,7 +106,7 @@ def odefilter_checkpoints(info, /, *, taylor_coefficients, ts, solver):
 # Full solver routines
 
 
-def solve(vector_field, /, initial_values, *, t0, t1, solver, info_op, parameters=()):
+def solve(vector_field, /, initial_values, t0, t1, solver, info_op, parameters=()):
     """Solve an initial value problem.
 
     !!! warning
@@ -131,7 +131,7 @@ def solve(vector_field, /, initial_values, *, t0, t1, solver, info_op, parameter
     )
 
 
-def odefilter(info_op, /, *, taylor_coefficients, t0, t1, solver):
+def odefilter(info_op, /, taylor_coefficients, t0, t1, solver):
     """Solve an initial value problem.
 
     !!! warning
