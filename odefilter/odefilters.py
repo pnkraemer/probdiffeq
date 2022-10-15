@@ -77,7 +77,7 @@ class AdaptiveODEFilter:
     control: Any
     norm_ord: Union[int, str, None] = None
 
-    numerical_zero: float = 1e-4
+    numerical_zero: float = 1e-10
 
     def tree_flatten(self):
         children = (
@@ -158,6 +158,7 @@ class AdaptiveODEFilter:
             lambda s: self._no_reject_accept_loop(s, t1=t1),
             state,
         )
+
         return result
 
     def _no_reject_accept_loop(self, s, t1):
@@ -167,13 +168,15 @@ class AdaptiveODEFilter:
         s_new = self._accept_reject_loop(state0=s, info_op=info_op)
 
         enter_reset = jnp.abs(s_new.accepted.t - t1) <= self.numerical_zero
-        # enter_reset = True
         return jax.lax.cond(
-            enter_reset, self._reset_fn, lambda s_: self._no_reset_fn(s_, t1), s_new
+            enter_reset,
+            lambda s_: self._reset_fn(s_, t1),
+            lambda s_: self._no_reset_fn(s_, t1),
+            s_new,
         )
 
-    def _reset_fn(self, s_):
-        return self._reset_at_checkpoint_fn(state=s_)
+    def _reset_fn(self, s_, t1):
+        return self._reset_at_checkpoint_fn(state=s_, t1=t1)
 
     def _no_reset_fn(self, s_, t1):
         enter_interpolation = s_.accepted.t > t1
@@ -184,13 +187,15 @@ class AdaptiveODEFilter:
             s_,
         )
 
-    def _reset_at_checkpoint_fn(self, *, state):
-        new_accepted = self.strategy.reset_at_checkpoint_fn(state=state.accepted)
+    def _reset_at_checkpoint_fn(self, *, state, t1):
+        new_accepted, new_solution = self.strategy.reset_at_checkpoint_fn(
+            accepted=state.accepted, solution=state.solution, t1=t1
+        )
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             accepted=new_accepted,
-            solution=state.solution,  # don't reset!
+            solution=new_solution,
             proposed=_nan_like(new_accepted),  # irrelevant?
             previous=_nan_like(new_accepted),  # irrelevant?
             control=state.control,
