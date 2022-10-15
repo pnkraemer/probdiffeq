@@ -229,7 +229,6 @@ class _DynamicSmootherCommon:
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-
         # no jax.lax.cond here, because we condition on the _shape_ of the array
         # which is available at compilation time already.
         do_backward_pass = state.filtered.mean.ndim == 3

@@ -1,5 +1,8 @@
 """There are too many ways to smooth. We assert they all do the same."""
 
+from functools import partial
+
+import jax
 import jax.numpy as jnp
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
@@ -18,18 +21,6 @@ def smoother_fixpt_smoother_pair_eks0(n, tol):
     return eks0, fixpt_eks0
 
 
-@case
-@parametrize("n", [2])
-@parametrize("tol", [1e-2])
-def smoother_fixpt_smoother_pair_two_eks0(n, tol):
-    # if the checkpoints are equal to the solver states,
-    # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
-    # smoother does. So the tests must also pass in this setup.
-    eks0a = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    eks0b = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    return eks0a, eks0b
-
-
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
@@ -40,16 +31,53 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     eks_sol = ivpsolve.solve(
         vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
     )
+
+    # eks_sol.t is an adaptive grid
+    # here, create an even grid which shares one point with the adaptive one.
+    # This one point will be used for error-estimation.
+    ts = _grid(eks_sol.t, t0=t0, t1=t1, factor=2)
     fixpt_eks_sol = ivpsolve.simulate_checkpoints(
         vf,
         u0,
-        ts=eks_sol.t,
+        ts=ts,
         parameters=p,
         solver=fixpt_eks[0],
         info_op=fixpt_eks[1],
     )
 
+    import matplotlib.pyplot as plt
+
+    plt.plot(
+        eks_sol.t,
+        eks_sol.filtered.mean[:, -1, :],
+        # linestyle="None",
+        marker="o",
+        markersize=6,
+        label="EKS",
+    )
+    plt.plot(
+        fixpt_eks_sol.t,
+        fixpt_eks_sol.filtered.mean[:, -1, :],
+        # linestyle="None",
+        marker="^",
+        markersize=6,
+        label="FixPtEKS",
+    )
+    plt.legend()
+    plt.ylim((-10, 10))
+    plt.show()
+
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol, atol=1e-2, rtol=1e-2)
+
+
+# jit to reduce potential floating-point inconsistencies
+@partial(jax.jit, static_argnames=["factor"])
+def _grid(t_old, *, t0, t1, factor=1):
+    midpoint = t_old[len(t_old) // 2]
+    t_a = jnp.asarray([midpoint])
+    t_b = jnp.linspace(t0, t1, num=factor * len(t_old), endpoint=True)
+    ts = jnp.union1d(t_a, t_b, size=factor * len(t_old) + 1)
+    return ts
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
