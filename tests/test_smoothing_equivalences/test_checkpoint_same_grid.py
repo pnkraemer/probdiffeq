@@ -2,7 +2,6 @@
 
 import jax
 import jax.numpy as jnp
-import pytest
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
 
@@ -29,8 +28,9 @@ def smoother_fixpt_smoother_pair_two_eks0(n, tol):
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
-    eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    return eks0, eks0
+    eks0a = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
+    eks0b = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
+    return eks0a, eks0b
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
@@ -47,6 +47,8 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
         eks_sol = ivpsolve.solve(
             vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
         )
+        print()
+        print()
         fixpt_eks_sol = ivpsolve.simulate_checkpoints(
             vf,
             u0,
@@ -56,12 +58,13 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
             info_op=fixpt_eks[1],
         )
 
+    #
     # import matplotlib.pyplot as plt
     #
     # plt.plot(
     #     eks_sol.t,
     #     eks_sol.filtered.mean[:, -1, :],
-    #     # linestyle="None",
+    #     linestyle="None",
     #     marker="o",
     #     markersize=6,
     #     label="EKS",
@@ -69,7 +72,7 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     # plt.plot(
     #     fixpt_eks_sol.t,
     #     fixpt_eks_sol.filtered.mean[:, -1, :],
-    #     # linestyle="None",
+    #     linestyle="None",
     #     marker="^",
     #     markersize=6,
     #     label="FixPtEKS",
@@ -79,16 +82,6 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     # plt.show()
 
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol, atol=1e-2, rtol=1e-2)
-
-
-@pytest.mark.skip
-def test_smoothing_coarser_checkpoints():
-    """Similar to the above, but the checkpoint grid is coarser than the solver-grid."""
-
-
-@pytest.mark.skip
-def test_smoothing_finer_checkpoints():
-    """Similar to the above, but the checkpoint grid is finer than the solver-grid."""
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
