@@ -170,8 +170,13 @@ class DynamicFilter:
         return s1, target_p
 
     @staticmethod
-    def reset_at_checkpoint_fn(*, state):  # noqa: D102
-        return state
+    def reset_at_checkpoint_fn(*, state, t1):  # noqa: D102
+        return FilterOutput(
+            t=t1,
+            u=state.u,
+            filtered=state.filtered,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -260,10 +265,6 @@ class _DynamicSmootherCommon:
         backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
         return extrapolated, backward_model
 
-    @staticmethod
-    def reset_at_checkpoint_fn(*, state):  # noqa: D102
-        return state
-
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
@@ -349,8 +350,14 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return s1, s0
 
     @staticmethod
-    def reset_at_checkpoint_fn(*, state):  # noqa: D102
-        return state
+    def reset_at_checkpoint_fn(*, state, t1):  # noqa: D102
+        return Posterior(
+            t=t1,  # new (better safe than sorry...)
+            u=state.u,
+            filtered=state.filtered,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=state.backward_model,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -465,14 +472,14 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         return s1, s0
 
     @jax.jit
-    def reset_at_checkpoint_fn(self, *, state):  # noqa: D102
+    def reset_at_checkpoint_fn(self, *, state, t1):  # noqa: D102
         bw_noise = self.implementation.init_backward_noise(
             rv_proto=state.backward_model.noise
         )
         bw_transition = self.implementation.init_backward_transition()
         bw_identity = BackwardModel(transition=bw_transition, noise=bw_noise)
         return Posterior(
-            t=state.t,
+            t=t1,
             u=state.u,
             filtered=state.filtered,
             diffusion_sqrtm=state.diffusion_sqrtm,
