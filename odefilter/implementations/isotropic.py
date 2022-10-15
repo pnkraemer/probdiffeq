@@ -6,7 +6,6 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 import jax.tree_util
-from jaxtyping import Array, Float
 
 from odefilter import _control_flow
 from odefilter.implementations import _ibm, sqrtm
@@ -15,8 +14,8 @@ from odefilter.implementations import _ibm, sqrtm
 class IsotropicNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
-    mean: Float[Array, "n d"]
-    cov_sqrtm_lower: Float[Array, "n n"]
+    mean: Any  # (n, d) shape
+    cov_sqrtm_lower: Any  # (n,n) shape
 
 
 @jax.tree_util.register_pytree_node_class

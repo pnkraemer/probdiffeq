@@ -7,7 +7,6 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.tree_util import register_pytree_node_class
-from jaxtyping import Array, Float
 
 from odefilter.implementations import _ibm, sqrtm
 
@@ -15,8 +14,8 @@ from odefilter.implementations import _ibm, sqrtm
 class MultivariateNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
-    mean: Float[Array, " k"]
-    cov_sqrtm_lower: Float[Array, "k k"]
+    mean: Any  # (k,) shape
+    cov_sqrtm_lower: Any  # (k,k) shape
 
 
 @register_pytree_node_class
