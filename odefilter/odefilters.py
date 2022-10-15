@@ -78,6 +78,8 @@ class AdaptiveODEFilter:
     norm_ord: Union[int, str, None] = None
 
     numerical_zero: float = 1e-10
+    """Assume we reached the checkpoint if the distance of the current \
+     state to the checkpoint is smaller than this value."""
 
     def tree_flatten(self):
         children = (
@@ -151,7 +153,28 @@ class AdaptiveODEFilter:
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
-        enter_accept_reject_loop = state.accepted.t < t1
+        # Refactor:
+        #
+        # if state.accepted.t < t1:
+        #     state = self.rejection_loop(state)  # changes state.accepted.t
+        #
+        #
+        # if state.accepted.t == t1:
+        #     return self.reset_fn(state)
+        #
+        # else:
+        #     assert state.accepted.t > t1
+        #     return self.interpolate(state, t1)
+        #
+        #
+        # which is different to the current implementation.
+        # At the moment, the if t == t1 else ... is in an else block from "if t < t1".
+        # But this messes with the corner case of stepping right to the end-point,
+        # having to interpolate multiple times, but then returning the terminal
+        # value as is.
+        # Currently, nothing is returned as is, but interpolation always happens.
+        #
+        enter_accept_reject_loop = state.accepted.t + self.numerical_zero < t1
         result = jax.lax.cond(
             enter_accept_reject_loop,
             lambda s: self._reject_accept_loop(s, info_op=info_op, t1=t1),
@@ -179,7 +202,9 @@ class AdaptiveODEFilter:
         return self._reset_at_checkpoint_fn(state=s_, t1=t1)
 
     def _no_reset_fn(self, s_, t1):
-        enter_interpolation = s_.accepted.t > t1
+        enter_interpolation = (
+            s_.accepted.t > t1 + self.numerical_zero
+        )  # work with numerical zero?!
         return jax.lax.cond(
             enter_interpolation,
             lambda s: self._interpolate(state=s, t=t1),
@@ -272,8 +297,10 @@ class AdaptiveODEFilter:
         )
 
         # Either one of those two...
-        new_previous = interpolated
-        # new_previous = self.strategy.reset_at_checkpoint_fn(state=interpolated)
+        # new_previous = interpolated
+        new_previous, _ = self.strategy.reset_at_checkpoint_fn(
+            accepted=interpolated, solution=interpolated, t1=t
+        )
 
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,

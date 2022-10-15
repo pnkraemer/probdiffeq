@@ -35,32 +35,41 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     # eks_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
-    ts = _grid(eks_sol.t, t0=t0, t1=t1, factor=2)
-    fixpt_eks_sol = ivpsolve.simulate_checkpoints(
-        vf,
-        u0,
-        ts=ts,
-        parameters=p,
-        solver=fixpt_eks[0],
-        info_op=fixpt_eks[1],
-    )
+    ts = _grid(eks_sol.t, t0=t0, t1=t1, factor=5)
+    ts = ts[: ((len(ts) - 2) // 2)]
+    print(ts)
+    print()
+    print()
+    with jax.disable_jit():
+        fixpt_eks_sol = ivpsolve.simulate_checkpoints(
+            vf,
+            u0,
+            ts=ts,
+            parameters=p,
+            solver=fixpt_eks[0],
+            info_op=fixpt_eks[1],
+        )
+    assert jnp.allclose(fixpt_eks_sol.t, ts)
 
     import matplotlib.pyplot as plt
 
     plt.plot(
         eks_sol.t,
         eks_sol.filtered.mean[:, -1, :],
-        # linestyle="None",
-        marker="o",
-        markersize=6,
+        linestyle="None",
+        marker="X",
+        markersize=8,
+        color="k",
         label="EKS",
     )
     plt.plot(
         fixpt_eks_sol.t,
         fixpt_eks_sol.filtered.mean[:, -1, :],
         # linestyle="None",
-        marker="^",
-        markersize=6,
+        linewidth=0.1,
+        marker="P",
+        markersize=12,
+        alpha=0.5,
         label="FixPtEKS",
     )
     plt.legend()
