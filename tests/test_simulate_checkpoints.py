@@ -24,4 +24,5 @@ def test_simulate_checkpoints(vf, u0, t0, t1, p, solver, info_op):
     )
     assert jnp.allclose(solution.t, ts)
     assert jnp.allclose(solution.t, ts_reference)
+    print((solution.u - ys_reference) / ys_reference)
     assert jnp.allclose(solution.u, ys_reference, atol=1e-3, rtol=1e-3)

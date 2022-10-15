@@ -4,16 +4,20 @@ By construction (extrapolate-correct, not correct-extrapolate)
 the solution intervals are right-including, i.e. defined
 on the interval $(t_0, t_1]$.
 """
+from dataclasses import dataclass
+from functools import partial
 from typing import Any, Generic, TypeVar
 
-import equinox as eqx
+import jax
 import jax.tree_util
 
 T = TypeVar("T")
 """A type-variable to alias appropriate Normal-like random variables."""
 
 
-class FilterOutput(Generic[T], eqx.Module):
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class FilterOutput(Generic[T]):
     """Filtering solution."""
 
     t: float
@@ -21,15 +25,37 @@ class FilterOutput(Generic[T], eqx.Module):
     filtered: T
     diffusion_sqrtm: float
 
+    def tree_flatten(self):
+        children = self.t, self.u, self.filtered, self.diffusion_sqrtm
+        aux = ()
+        return children, aux
 
-class BackwardModel(Generic[T], eqx.Module):
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class BackwardModel(Generic[T]):
     """Backward model for backward-Gauss--Markov process representations."""
 
     transition: Any
     noise: T
 
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
 
-class Posterior(Generic[T], eqx.Module):
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class Posterior(Generic[T]):
     """Markov sequences as smoothing solutions."""
 
     t: float
@@ -38,12 +64,39 @@ class Posterior(Generic[T], eqx.Module):
     diffusion_sqrtm: float
     backward_model: BackwardModel[T]
 
+    def tree_flatten(self):
+        children = (
+            self.t,
+            self.u,
+            self.filtered,
+            self.diffusion_sqrtm,
+            self.backward_model,
+        )
+        aux = ()
+        return children, aux
 
-class DynamicFilter(eqx.Module):
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DynamicFilter:
     """Filter implementation with dynamic calibration (time-varying diffusion)."""
 
     implementation: Any
 
+    def tree_flatten(self):
+        children = (self.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
+    @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
         corrected = self.implementation.init_corrected(
@@ -55,6 +108,7 @@ class DynamicFilter(eqx.Module):
         filtered = FilterOutput(t=t0, u=sol, filtered=corrected, diffusion_sqrtm=1.0)
         return filtered, error_estimate
 
+    @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
@@ -94,6 +148,7 @@ class DynamicFilter(eqx.Module):
     def extract_fn(*, state):  # noqa: D102
         return state
 
+    @jax.jit
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
         dt = t - s0.t
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
@@ -119,10 +174,22 @@ class DynamicFilter(eqx.Module):
         return state
 
 
-class _DynamicSmootherCommon(eqx.Module):
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class _DynamicSmootherCommon:
 
     implementation: Any
 
+    def tree_flatten(self):
+        children = (self.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
+    @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
         corrected = self.implementation.init_corrected(
@@ -148,28 +215,30 @@ class _DynamicSmootherCommon(eqx.Module):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
+    @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-        # todo: this function checks in which mode it has been called,
-        #  which is quite a dirty implementation.
-        #  it also bastardises the filter/smoother naming.
 
-        # If there is something to smooth, go ahead:
-        if state.filtered.mean.ndim == 3:
-            init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.filtered)
-            marginals = self.implementation.marginalise_backwards(
-                init=init, backward_model=state.backward_model
-            )
-            sol = self.implementation.extract_sol(rv=marginals)
-            return Posterior(
-                t=state.t,
-                u=sol,
-                filtered=marginals,
-                diffusion_sqrtm=state.diffusion_sqrtm,
-                backward_model=state.backward_model,
-            )
+        # no jax.lax.cond here, because we condition on the _shape_ of the array
+        # which is available at compilation time already.
+        do_backward_pass = state.filtered.mean.ndim == 3
+        if do_backward_pass:
+            return self._smooth(state)
 
-        # Otherwise, we are still in filtering mode and simply return the input
         return state
+
+    def _smooth(self, state):
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.filtered)
+        marginals = self.implementation.marginalise_backwards(
+            init=init, backward_model=state.backward_model
+        )
+        sol = self.implementation.extract_sol(rv=marginals)
+        return Posterior(
+            t=state.t,
+            u=sol,
+            filtered=marginals,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=state.backward_model,
+        )
 
     def _interpolate_from_to_fn(self, rv, diffusion_sqrtm, t, t0):
         dt = t - t0
@@ -196,9 +265,12 @@ class _DynamicSmootherCommon(eqx.Module):
         return state
 
 
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
 class DynamicSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
+    @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
@@ -245,6 +317,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
         return smoothing_solution, error_estimate
 
+    @jax.jit
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
         rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
 
@@ -280,9 +353,12 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return state
 
 
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
+    @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
@@ -338,6 +414,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
 
         return smoothing_solution, error_estimate
 
+    @jax.jit
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
         rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
 
@@ -387,6 +464,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
         return s1, s0
 
+    @jax.jit
     def reset_at_checkpoint_fn(self, *, state):  # noqa: D102
         bw_noise = self.implementation.init_backward_noise(
             rv_proto=state.backward_model.noise

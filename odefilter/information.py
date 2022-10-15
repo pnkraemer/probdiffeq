@@ -26,7 +26,7 @@ In fact, most of the `EK`-like functions are implemented with `jax.linearize`.
 In the end, this approximates $F(u) = \mathrm{bias} + \mathrm{linearfn}(u)$
 and we can use it in ODE solvers.
 """
-
+import functools
 
 import jax
 import jax.numpy as jnp
@@ -36,6 +36,7 @@ def isotropic_ek0(*, ode_order=1):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
+    @functools.lru_cache(maxsize=None)
     def create_ek0_info_op_linearised(f):
         """Create a "linearize()" implementation according to what\
          the EK0 does to the ODE residual."""
@@ -55,6 +56,7 @@ def isotropic_ek0(*, ode_order=1):
 def ek1(*, ode_dimension, ode_order=1):
     """EK1 information."""
 
+    @functools.lru_cache(maxsize=None)
     def create_ek1_info_op_linearised(f):
         def residual(t, x, *p):
             x_reshaped = jnp.reshape(x, (-1, ode_dimension), order="F")

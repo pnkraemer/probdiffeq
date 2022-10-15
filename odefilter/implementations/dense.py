@@ -1,31 +1,44 @@
 """State-space models with dense covariance structure   ."""
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, NamedTuple
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-from jaxtyping import Array, Float
+from jax.tree_util import register_pytree_node_class
 
 from odefilter.implementations import _ibm, sqrtm
 
 
-class MultivariateNormal(eqx.Module):
+class MultivariateNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
-    mean: Float[Array, " k"]
-    cov_sqrtm_lower: Float[Array, "k k"]
+    mean: Any  # (k,) shape
+    cov_sqrtm_lower: Any  # (k,k) shape
 
 
-class DenseImplementation(eqx.Module):
+@register_pytree_node_class
+@dataclass(frozen=True)
+class DenseImplementation:
     """Handle dense covariances."""
 
     a: Any
     q_sqrtm_lower: Any
 
-    num_derivatives: int = eqx.static_field()
-    ode_dimension: int = eqx.static_field()
+    num_derivatives: int
+    ode_dimension: int
+
+    def tree_flatten(self):
+        children = self.a, self.q_sqrtm_lower
+        aux = self.num_derivatives, self.ode_dimension
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        a, q_sqrtm_lower = children
+        n, d = aux
+        return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
 
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
