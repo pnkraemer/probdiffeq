@@ -45,31 +45,17 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
      of a previous call to solve(), the results should be identical."""
     with jax.disable_jit():
         eks_sol = ivpsolve.solve(
-            vf,
-            initial_values=u0,
-            t0=t0,
-            t1=t1,
-            solver=eks[0],
-            info_op=eks[1],
-            parameters=p,
+            vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
         )
         fixpt_eks_sol = ivpsolve.simulate_checkpoints(
             vf,
-            initial_values=u0,
+            u0,
             ts=eks_sol.t,
-            solver=eks[0],
-            info_op=eks[1],
             parameters=p,
+            solver=fixpt_eks[0],
+            info_op=fixpt_eks[1],
         )
 
-    print(eks_sol.t)
-    print(fixpt_eks_sol.t)
-    print()
-    print(eks_sol.u)
-    print(fixpt_eks_sol.u)
-    print()
-
-    #
     # import matplotlib.pyplot as plt
     #
     # plt.plot(
