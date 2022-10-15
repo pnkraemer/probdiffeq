@@ -9,7 +9,7 @@ from odefilter import ivpsolve, recipes
 # todo: reuse solve() calls with default smoothers.
 
 
-@case(tags=["works"])
+@case
 @parametrize("n", [2])
 @parametrize("tol", [1e-2])
 def smoother_fixpt_smoother_pair_eks0(n, tol):
@@ -20,7 +20,7 @@ def smoother_fixpt_smoother_pair_eks0(n, tol):
     return eks0, fixpt_eks0
 
 
-@case(tags=[])
+@case
 @parametrize("n", [2])
 @parametrize("tol", [1e-2])
 def smoother_fixpt_smoother_pair_two_eks0(n, tol):
@@ -34,10 +34,7 @@ def smoother_fixpt_smoother_pair_two_eks0(n, tol):
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "eks, fixpt_eks",
-    cases=".",
-    prefix="smoother_fixpt_smoother_pair_",
-    has_tag=["works"],
+    "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
 )
 def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_eks):
     """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid\
