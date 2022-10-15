@@ -4,6 +4,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import pytest
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
 
@@ -21,6 +22,7 @@ def smoother_fixpt_smoother_pair_eks0(n, tol):
     return eks0, fixpt_eks0
 
 
+@pytest.mark.skip
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
