@@ -193,7 +193,8 @@ def _advance_ivp_solution_adaptively(info_op, t1, state0, solver):
         return s.solution.t < t1
 
     def body_fun(s):
-        return solver.step_fn(state=s, info_op=info_op, t1=t1)
+        state = solver.step_fn(state=s, info_op=info_op, t1=t1)
+        return state
 
     return jax.lax.while_loop(
         cond_fun=cond_fun,
