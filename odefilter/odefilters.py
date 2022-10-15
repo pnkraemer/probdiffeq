@@ -151,7 +151,6 @@ class AdaptiveODEFilter:
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
-        print("Recompiling step_fn...", info_op)
         enter_accept_reject_loop = state.accepted.t < t1
         result = jax.lax.cond(
             enter_accept_reject_loop,

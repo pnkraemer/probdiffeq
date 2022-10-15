@@ -40,7 +40,6 @@ def isotropic_ek0(*, ode_order=1):
     def create_ek0_info_op_linearised(f):
         """Create a "linearize()" implementation according to what\
          the EK0 does to the ODE residual."""
-        print("New info op")
 
         def jvp(t, x, *p):
             return x[ode_order]
