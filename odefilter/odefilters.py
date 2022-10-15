@@ -153,27 +153,6 @@ class AdaptiveODEFilter:
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
-        # Refactor:
-        #
-        # if state.accepted.t < t1:
-        #     state = self.rejection_loop(state)  # changes state.accepted.t
-        #
-        #
-        # if state.accepted.t == t1:
-        #     return self.reset_fn(state)
-        #
-        # else:
-        #     assert state.accepted.t > t1
-        #     return self.interpolate(state, t1)
-        #
-        #
-        # which is different to the current implementation.
-        # At the moment, the if t == t1 else ... is in an else block from "if t < t1".
-        # But this messes with the corner case of stepping right to the end-point,
-        # having to interpolate multiple times, but then returning the terminal
-        # value as is.
-        # Currently, nothing is returned as is, but interpolation always happens.
-        #
         enter_accept_reject_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_accept_reject_loop,
