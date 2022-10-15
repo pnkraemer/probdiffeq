@@ -13,7 +13,7 @@ from odefilter import _control_flow, taylor
 
 @partial(jax.jit, static_argnums=[0, 5])
 def simulate_terminal_values(
-    vector_field, /, initial_values, t0, t1, solver, info_op, parameters=()
+    vector_field, initial_values, t0, t1, solver, info_op, parameters=()
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -38,7 +38,7 @@ def simulate_terminal_values(
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_terminal_values(info, /, taylor_coefficients, t0, t1, solver):
+def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -55,7 +55,7 @@ def odefilter_terminal_values(info, /, taylor_coefficients, t0, t1, solver):
 
 @partial(jax.jit, static_argnums=[0, 4])
 def simulate_checkpoints(
-    vector_field, /, initial_values, ts, solver, info_op, parameters=()
+    vector_field, initial_values, ts, solver, info_op, parameters=()
 ):
     """Solve an IVP and return the solution at checkpoints.
 
@@ -79,7 +79,7 @@ def simulate_checkpoints(
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_checkpoints(info, /, taylor_coefficients, ts, solver):
+def odefilter_checkpoints(info, taylor_coefficients, ts, solver):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -106,12 +106,19 @@ def odefilter_checkpoints(info, /, taylor_coefficients, ts, solver):
 # Full solver routines
 
 
-def solve(vector_field, /, initial_values, t0, t1, solver, info_op, parameters=()):
+def solve(vector_field, initial_values, t0, t1, solver, info_op, parameters=()):
     """Solve an initial value problem.
 
     !!! warning
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
+
+    !!! warning
+        The parameters are essentially static. Why?
+        Because we use ``lambda t, y: f(t, y, p)``-style implementations
+        and pass this lambda function to lower-level implementations,
+        which have static "fun" arguments. Since we cannot jit this function.
+        the lower-level stuff must recompile... :(
     """
     _assert_not_scalar(initial_values)
 
@@ -121,7 +128,16 @@ def solve(vector_field, /, initial_values, t0, t1, solver, info_op, parameters=(
         num=solver.strategy.implementation.num_derivatives,
     )
 
+    # todo: because of this line, the function recompiles
+    #  every single time it is called.
+    #  This is because odefilter() marks the info_op as static, and because
+    #  info_op() creates a new function every time it is called.
+    #  Is it sufficient to make information operators cache output?
     info_op_curried = info_op(vector_field)
+
+    # todo: this lambda function below is newly created at every
+    #  call to solve() and therefore we recompile steps
+    #  every single time. This is strange.
     return odefilter(
         lambda t, *xs: info_op_curried(t, *xs, *parameters),
         taylor_coefficients=taylor_coefficients,
@@ -131,7 +147,7 @@ def solve(vector_field, /, initial_values, t0, t1, solver, info_op, parameters=(
     )
 
 
-def odefilter(info_op, /, taylor_coefficients, t0, t1, solver):
+def odefilter(info_op, taylor_coefficients, t0, t1, solver):
     """Solve an initial value problem.
 
     !!! warning
@@ -145,7 +161,7 @@ def odefilter(info_op, /, taylor_coefficients, t0, t1, solver):
     return solver.extract_fn(state=forward_solution)
 
 
-def _odefilter_generator(info_op, /, taylor_coefficients, *, t0, t1, solver):
+def _odefilter_generator(info_op, taylor_coefficients, t0, t1, solver):
     """Generate an ODE filter solution iteratively."""
     _assert_not_scalar(taylor_coefficients)
     state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
@@ -170,7 +186,7 @@ def _assert_not_scalar(x, /):
     assert jax.tree_util.tree_all(is_not_scalar)
 
 
-def _advance_ivp_solution_adaptively(*, info_op, t1, state0, solver):
+def _advance_ivp_solution_adaptively(info_op, t1, state0, solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):

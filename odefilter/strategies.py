@@ -6,7 +6,7 @@ on the interval $(t_0, t_1]$.
 """
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 import jax
 import jax.tree_util
