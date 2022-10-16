@@ -114,27 +114,19 @@ class _StrategyCommon(abc.ABC):
 
         # Cases to switch between
         branches = [
-            # self._case_left_corner,  # todo: this should not be a valid case!
             self._case_right_corner,
             self._case_interpolate,
         ]
 
         # Which case applies
-        # is_left_corner = (s0.t - t) ** 2 <= 1e-10
         is_right_corner = (s1.t - t) ** 2 <= 1e-10
         is_in_between = jnp.logical_not(is_right_corner)
-        # is_in_between = jnp.logical_not(jnp.logical_or(is_left_corner, is_right_corner))
 
         index_as_array, *_ = jnp.where(
             jnp.asarray([is_right_corner, is_in_between]), size=1
         )
         index = jnp.reshape(index_as_array, ())
         return jax.lax.switch(index, branches, s0, s1, t)
-
-    #
-    # @abc.abstractmethod
-    # def _case_left_corner(self, s0, s1, t):
-    #     raise NotImplementedError
 
     @abc.abstractmethod
     def _case_right_corner(self, s0, s1, t):
@@ -201,19 +193,6 @@ class DynamicFilter(_StrategyCommon):
     @staticmethod
     def extract_fn(*, state):  # noqa: D102
         return state
-
-    #
-    # def _case_left_corner(self, s0, s1, t):  # s0.t == t
-    #     accepted = s1
-    #
-    #     solution = FilterOutput(
-    #         t=t,
-    #         u=s0.t,
-    #         filtered=s0.filtered,
-    #         diffusion_sqrtm=s0.diffusion_sqrtm,
-    #     )
-    #     previous = solution
-    #     return accepted, solution, previous
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
 
@@ -316,12 +295,6 @@ class _DynamicSmootherCommon(_StrategyCommon):
             diffusion_sqrtm=state.diffusion_sqrtm,
             backward_model=state.backward_model,
         )
-
-    # def _case_left_corner(self, s0, s1, t):  # t == s0.t
-    #     accepted = s1
-    #     solution = s0
-    #     previous = self._duplicate_with_unit_backward_model(s0, t)
-    #     return accepted, solution, previous
 
     def _duplicate_with_unit_backward_model(self, s0, t):
         bw_transition0 = self.implementation.init_backward_transition()
