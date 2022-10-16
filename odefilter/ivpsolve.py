@@ -196,8 +196,9 @@ def _advance_ivp_solution_adaptively(info_op, t1, state0, solver):
         state = solver.step_fn(state=s, info_op=info_op, t1=t1)
         return state
 
-    return jax.lax.while_loop(
+    sol = jax.lax.while_loop(
         cond_fun=cond_fun,
         body_fun=body_fun,
         init_val=state0,
     )
+    return sol

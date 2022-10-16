@@ -60,7 +60,7 @@ class DenseImplementation:
         return MultivariateNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_error_estimate(self):  # noqa: D102
-        return jnp.nan * jnp.ones((self.ode_dimension,))
+        return jnp.inf * jnp.ones((self.ode_dimension,))
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
@@ -124,7 +124,7 @@ class DenseImplementation:
         return m
 
     def init_preconditioner(self):  # noqa: D102
-        empty = jnp.nan * jnp.ones((self.num_derivatives * self.ode_dimension,))
+        empty = jnp.inf * jnp.ones((self.num_derivatives * self.ode_dimension,))
         return empty, empty
 
     def init_backward_transition(self):  # noqa: D102

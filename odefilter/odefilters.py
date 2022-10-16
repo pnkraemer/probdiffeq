@@ -78,6 +78,8 @@ class AdaptiveODEFilter:
     norm_ord: Union[int, str, None] = None
 
     numerical_zero: float = 1e-10
+    """Assume we reached the checkpoint if the distance of the current \
+     state to the checkpoint is smaller than this value."""
 
     def tree_flatten(self):
         children = (
@@ -144,64 +146,25 @@ class AdaptiveODEFilter:
         norm_dy0 = jnp.linalg.norm(f0)
         return scale * norm_y0 / norm_dy0
 
-    # todo: this function has some unknown side-effects (of using equinox?)
-    #  if you add a jit, the results get worse (much worse!)
-    #  Comment the jit below out and run all tests without disable_jit()
-    #  if you don't believe me:
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
-        enter_accept_reject_loop = state.accepted.t < t1
-        result = jax.lax.cond(
-            enter_accept_reject_loop,
-            lambda s: self._reject_accept_loop(s, info_op=info_op, t1=t1),
-            lambda s: self._no_reject_accept_loop(s, t1=t1),
+        enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
+        state = jax.lax.cond(
+            enter_rejection_loop,
+            lambda s: self._rejection_loop(state0=s, info_op=info_op),
+            lambda s: s,
             state,
         )
-
-        return result
-
-    def _no_reject_accept_loop(self, s, t1):
-        return self._interpolate(state=s, t=t1)
-
-    def _reject_accept_loop(self, s, info_op, t1):
-        s_new = self._accept_reject_loop(state0=s, info_op=info_op)
-
-        enter_reset = jnp.abs(s_new.accepted.t - t1) <= self.numerical_zero
-        return jax.lax.cond(
-            enter_reset,
-            lambda s_: self._reset_fn(s_, t1),
-            lambda s_: self._no_reset_fn(s_, t1),
-            s_new,
-        )
-
-    def _reset_fn(self, s_, t1):
-        return self._reset_at_checkpoint_fn(state=s_, t1=t1)
-
-    def _no_reset_fn(self, s_, t1):
-        enter_interpolation = s_.accepted.t > t1
-        return jax.lax.cond(
-            enter_interpolation,
+        state = jax.lax.cond(
+            state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
-            lambda x: x,
-            s_,
+            lambda s: s,
+            state,
         )
+        return state
 
-    def _reset_at_checkpoint_fn(self, *, state, t1):
-        new_accepted, new_solution = self.strategy.reset_at_checkpoint_fn(
-            accepted=state.accepted, solution=state.solution, t1=t1
-        )
-        return AdaptiveODEFilterState(
-            dt_proposed=state.dt_proposed,
-            error_norm_proposed=state.error_norm_proposed,
-            accepted=new_accepted,
-            solution=new_solution,
-            proposed=_nan_like(new_accepted),  # irrelevant?
-            previous=_nan_like(new_accepted),  # irrelevant?
-            control=state.control,
-        )
-
-    def _accept_reject_loop(self, *, info_op, state0):
+    def _rejection_loop(self, *, info_op, state0):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
@@ -216,16 +179,12 @@ class AdaptiveODEFilter:
             return True, s
 
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
-
-        solution = state_new.proposed
-        accepted = state_new.proposed
-
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
-            proposed=_nan_like(state_new.proposed),  # meaningless?
-            accepted=accepted,  # holla! New! :)
-            solution=solution,  # Overwritten by interpolate() if necessary
+            proposed=_inf_like(state_new.proposed),  # meaningless?
+            accepted=state_new.proposed,  # holla! New! :)
+            solution=state_new.proposed,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )
@@ -250,7 +209,6 @@ class AdaptiveODEFilter:
             error_order=self.error_order,
         )
         dt_proposed = state.dt_proposed * state_control.scale_factor
-
         return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
@@ -267,21 +225,16 @@ class AdaptiveODEFilter:
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
     def _interpolate(self, *, state, t):
-        accepted_new, interpolated = self.strategy.interpolate_fn(
+        accepted, solution, previous = self.strategy.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
-
-        # Either one of those two...
-        new_previous = interpolated
-        # new_previous = self.strategy.reset_at_checkpoint_fn(state=interpolated)
-
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
-            proposed=state.proposed,
-            accepted=accepted_new,  # holla! New! :)
-            solution=interpolated,  # holla! New! :)
-            previous=new_previous,  # holla! New! :)
+            proposed=_inf_like(state.proposed),
+            accepted=accepted,  # holla! New! :)
+            solution=solution,  # holla! New! :)
+            previous=previous,  # holla! New! :)
             control=state.control,
         )
 
@@ -291,8 +244,12 @@ class AdaptiveODEFilter:
 
 
 def _empty_like(tree):
-    return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)
+    return jax.tree_util.tree_map(jnp.empty_like, tree)
 
 
 def _nan_like(tree):
     return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)
+
+
+def _inf_like(tree):
+    return jax.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)

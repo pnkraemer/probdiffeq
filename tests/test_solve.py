@@ -13,7 +13,7 @@ from odefilter import ivpsolve
 def test_solve(vf, u0, t0, t1, p, solver, info_op):
     ts = jnp.linspace(t0, t1, num=10)
     odeint_solution = odeint(
-        lambda y, t, *p: vf(t, y, *p), u0[0], ts, *p, atol=1e-6, rtol=1e-6
+        lambda y, t, *par: vf(t, y, *par), u0[0], ts, *p, atol=1e-6, rtol=1e-6
     )
     ts_reference, ys_reference = ts, odeint_solution
 
