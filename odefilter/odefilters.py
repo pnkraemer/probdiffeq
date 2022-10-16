@@ -214,8 +214,8 @@ class AdaptiveODEFilter:
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
             solution=state.solution,  # too early to accept :)
-            accepted=state.solution,  # too early to accept :)
-            previous=state.solution,  # too early to accept :)
+            accepted=state.accepted,  # too early to accept :)
+            previous=state.previous,  # too early to accept :)
             control=state_control,  # new
         )
 
