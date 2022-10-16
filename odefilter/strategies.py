@@ -191,7 +191,11 @@ class DynamicFilter(_StrategyCommon):
         sol = self.implementation.extract_sol(rv=corrected)
 
         filtered = FilterOutput(
-            t=state.t + dt, u=sol, filtered=corrected, diffusion_sqrtm=diffusion_sqrtm
+            t=state.t + dt,
+            t_previous=state.t,
+            u=sol,
+            filtered=corrected,
+            diffusion_sqrtm=diffusion_sqrtm,
         )
         return filtered, error_estimate
 
@@ -232,7 +236,11 @@ class DynamicFilter(_StrategyCommon):
         )
         sol = self.implementation.extract_sol(rv=extrapolated)
         target_p = FilterOutput(
-            t=t, u=sol, filtered=extrapolated, diffusion_sqrtm=s1.diffusion_sqrtm
+            t=t,
+            t_previous=t,
+            u=sol,
+            filtered=extrapolated,
+            diffusion_sqrtm=s1.diffusion_sqrtm,
         )
         return s1, target_p, target_p
 
@@ -253,35 +261,11 @@ class _DynamicSmootherCommon(_StrategyCommon):
         raise NotImplementedError
 
     @jax.jit
-    def init_fn(self, *, taylor_coefficients, t0):
-        """Initialise."""
-        corrected = self.implementation.init_corrected(
-            taylor_coefficients=taylor_coefficients
-        )
-
-        backward_transition = self.implementation.init_backward_transition()
-        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
-        backward_model = BackwardModel(
-            transition=backward_transition,
-            noise=backward_noise,
-        )
-        sol = self.implementation.extract_sol(rv=corrected)
-
-        solution = Posterior(
-            t=t0,
-            t_previous=-jnp.inf,
-            u=sol,
-            filtered=corrected,
-            diffusion_sqrtm=1.0,
-            backward_model=backward_model,
-        )
-
-        error_estimate = self.implementation.init_error_estimate()
-        return solution, error_estimate
-
-    @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-        # return state
+        # todo: are we looping correctly?
+        #  what does the backward transition at time t say?
+        #  How to get from t to the previous t, right?
+
         # no jax.lax.cond here, because we condition on the _shape_ of the array
         # which is available at compilation time already.
         do_backward_pass = state.filtered.mean.ndim == 3
@@ -313,7 +297,7 @@ class _DynamicSmootherCommon(_StrategyCommon):
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
         state1 = Posterior(
             t=t,
-            t_previous=t,
+            t_previous=t,  # identity transition: this is what it does...
             u=s0.u,
             filtered=s0.filtered,
             diffusion_sqrtm=s0.diffusion_sqrtm,
@@ -346,6 +330,33 @@ class _DynamicSmootherCommon(_StrategyCommon):
 @dataclass(frozen=True)
 class DynamicSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
+
+    @jax.jit
+    def init_fn(self, *, taylor_coefficients, t0):
+        """Initialise."""
+        corrected = self.implementation.init_corrected(
+            taylor_coefficients=taylor_coefficients
+        )
+
+        backward_transition = self.implementation.init_backward_transition()
+        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
+        backward_model = BackwardModel(
+            transition=backward_transition,
+            noise=backward_noise,
+        )
+        sol = self.implementation.extract_sol(rv=corrected)
+
+        solution = Posterior(
+            t=t0,
+            t_previous=-jnp.inf,
+            u=sol,
+            filtered=corrected,
+            diffusion_sqrtm=1.0,
+            backward_model=backward_model,
+        )
+
+        error_estimate = self.implementation.init_error_estimate()
+        return solution, error_estimate
 
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, dt):
@@ -456,6 +467,33 @@ class DynamicSmoother(_DynamicSmootherCommon):
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
+    @jax.jit
+    def init_fn(self, *, taylor_coefficients, t0):
+        """Initialise."""
+        corrected = self.implementation.init_corrected(
+            taylor_coefficients=taylor_coefficients
+        )
+
+        backward_transition = self.implementation.init_backward_transition()
+        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
+        backward_model = BackwardModel(
+            transition=backward_transition,
+            noise=backward_noise,
+        )
+        sol = self.implementation.extract_sol(rv=corrected)
+
+        solution = Posterior(
+            t=t0,
+            t_previous=t0,
+            u=sol,
+            filtered=corrected,
+            diffusion_sqrtm=1.0,
+            backward_model=backward_model,
+        )
+
+        error_estimate = self.implementation.init_error_estimate()
+        return solution, error_estimate
+
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, *, state, info_op, dt):
         """Step."""
@@ -502,7 +540,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         sol = self.implementation.extract_sol(rv=corrected)
         smoothing_solution = Posterior(
             t=state.t + dt,
-            t_previous=state.t,
+            t_previous=state.t_previous,  # condensing the models...
             u=sol,
             filtered=corrected,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -512,31 +550,28 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         return smoothing_solution, error_estimate
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
-
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        _, backward_model1 = self._interpolate_from_to_fn(
-            rv=s0.filtered, diffusion_sqrtm=s1.diffusion_sqrtm, t=s1.t, t0=s0.t
-        )
+        # _, backward_model1 = self._interpolate_from_to_fn(
+        #     rv=s0.filtered, diffusion_sqrtm=s1.diffusion_sqrtm, t=s1.t, t0=s0.t
+        # )
 
-        # backward_model1 = s1.backward_model
+        backward_model1 = s1.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
             bw_init=s0.backward_model, bw_state=backward_model1
         )
-        backward_model0 = BackwardModel(transition=g0, noise=noise0)
+        backward_model1 = BackwardModel(transition=g0, noise=noise0)
         solution = Posterior(
             t=t,
-            t_previous=s0.t,
+            t_previous=s0.t_previous,  # condensed the model...
             u=s1.u,
             filtered=s1.filtered,
-            backward_model=backward_model0,
+            backward_model=backward_model1,
             diffusion_sqrtm=s1.diffusion_sqrtm,
         )
 
         accepted = self._duplicate_with_unit_backward_model(solution, t)
         previous = accepted
-
-        print("Case: right corner", t)
 
         return accepted, solution, previous
 
@@ -563,23 +598,23 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = Posterior(
             t=t,
-            t_previous=s0.t,
+            t_previous=s0.t_previous,  # condensed the model...
             u=sol,
             filtered=extrapolated0,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model0,
         )
 
-        #
+        # new model! no condensing...
         previous = self._duplicate_with_unit_backward_model(solution, t)
 
         # From t to s1.t
-        _, backward_model1 = self._interpolate_from_to_fn(
+        extra1, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, diffusion_sqrtm=diffusion_sqrtm, t=s1.t, t0=t
         )
         accepted = Posterior(
             t=s1.t,
-            t_previous=t,
+            t_previous=t,  # new model! No condensing...
             u=s1.u,
             filtered=s1.filtered,
             diffusion_sqrtm=diffusion_sqrtm,
