@@ -22,6 +22,7 @@ def smoother_fixpt_smoother_pair_eks0(n, tol):
     return eks0, fixpt_eks0
 
 
+@pytest.mark.skip
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
@@ -37,19 +38,23 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
     ts, t = _grid(eks_sol.t, t0=t0, t1=t1, factor=3)
-    with jax.disable_jit():
-        fixpt_eks_sol = ivpsolve.simulate_checkpoints(
-            vf,
-            u0,
-            ts=ts,
-            parameters=p,
-            solver=fixpt_eks[0],
-            info_op=fixpt_eks[1],
-        )
+    fixpt_eks_sol = ivpsolve.simulate_checkpoints(
+        vf,
+        u0,
+        ts=ts,
+        parameters=p,
+        solver=fixpt_eks[0],
+        info_op=fixpt_eks[1],
+    )
     assert t in ts
     assert t in eks_sol.t
 
-    assert jnp.allclose(fixpt_eks_sol.t, ts)
+    idx_eks, *_ = jnp.where(eks_sol.t[:, None] == jnp.asarray([t0, t, t1]))
+    idx_fixpt, *_ = jnp.where(fixpt_eks_sol.t[:, None] == jnp.asarray([t0, t, t1]))
+
+    print(fixpt_eks_sol.u[idx_fixpt], eks_sol.u[idx_eks])
+    assert jnp.allclose(fixpt_eks_sol.t[idx_fixpt], eks_sol.t[idx_eks])
+    assert jnp.allclose(fixpt_eks_sol.u[idx_fixpt], eks_sol.u[idx_eks])
 
     import matplotlib.pyplot as plt
 
@@ -62,6 +67,7 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
         color="k",
         label="EKS",
     )
+    plt.axvline(t)
     plt.plot(
         fixpt_eks_sol.t,
         fixpt_eks_sol.filtered.mean[:, -1, :],
@@ -75,8 +81,6 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     plt.legend()
     plt.ylim((-15, 15))
     plt.show()
-
-    assert _tree_all_allclose(fixpt_eks_sol, eks_sol, atol=1e-2, rtol=1e-2)
 
 
 # jit to reduce potential floating-point inconsistencies
