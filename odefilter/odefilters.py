@@ -181,15 +181,12 @@ class AdaptiveODEFilter:
 
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
 
-        solution = state_new.proposed
-        accepted = state_new.proposed
-
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
             proposed=_nan_like(state_new.proposed),  # meaningless?
-            accepted=accepted,  # holla! New! :)
-            solution=solution,  # Overwritten by interpolate() if necessary
+            accepted=state_new.proposed,  # holla! New! :)
+            solution=state_new.proposed,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
             control=state_new.control,
         )
@@ -219,9 +216,9 @@ class AdaptiveODEFilter:
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
-            solution=state.solution,  # too early to accept :)
-            accepted=state.accepted,  # too early to accept :)
-            previous=state.previous,  # too early to accept :)
+            solution=_nan_like(state.solution),  # too early to accept :)
+            accepted=_nan_like(state.solution),  # too early to accept :)
+            previous=_nan_like(state.solution),  # too early to accept :)
             control=state_control,  # new
         )
 
@@ -230,39 +227,18 @@ class AdaptiveODEFilter:
         error_relative = error_estimate / (atol + rtol * jnp.abs(u))
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
-    #
-    # def _reset_at_checkpoint_fn(self, *, state, t1):
-    #     new_accepted, new_solution = self.strategy.reset_at_checkpoint_fn(
-    #         accepted=state.accepted, solution=state.solution, t1=t1
-    #     )
-    #     return AdaptiveODEFilterState(
-    #         dt_proposed=state.dt_proposed,
-    #         error_norm_proposed=state.error_norm_proposed,
-    #         accepted=new_accepted,
-    #         solution=new_solution,
-    #         proposed=_nan_like(new_accepted),  # irrelevant?
-    #         previous=_nan_like(new_accepted),  # irrelevant?
-    #         control=state.control,
-    #     )
-
     def _interpolate(self, *, state, t):
-        accepted_new, interpolated = self.strategy.interpolate_fn(
+        accepted, solution, previous = self.strategy.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
-
-        # Either one of those two...
-        # # new_previous = interpolated
-        # new_previous, _ = self.strategy.reset_at_checkpoint_fn(
-        #     accepted=interpolated, solution=interpolated, t1=t
-        # )
 
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             proposed=_nan_like(state.proposed),
-            accepted=accepted_new,  # holla! New! :)
-            solution=interpolated,  # holla! New! :)
-            previous=interpolated,  # holla! New! :)
+            accepted=accepted,  # holla! New! :)
+            solution=solution,  # holla! New! :)
+            previous=previous,  # holla! New! :)
             control=state.control,
         )
 

@@ -4,6 +4,7 @@ By construction (extrapolate-correct, not correct-extrapolate)
 the solution intervals are right-including, i.e. defined
 on the interval $(t_0, t_1]$.
 """
+import abc
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Generic, TypeVar
@@ -83,8 +84,7 @@ class Posterior(Generic[T]):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class DynamicFilter:
-    """Filter implementation with dynamic calibration (time-varying diffusion)."""
+class _StrategyCommon(abc.ABC):
 
     implementation: Any
 
@@ -96,6 +96,60 @@ class DynamicFilter:
     @classmethod
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
+
+    @abc.abstractmethod
+    def init_fn(self, *, taylor_coefficients, t0):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def step_fn(self, *, state, info_op, dt):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_fn(self, *, state):
+        raise NotImplementedError
+
+    @jax.jit
+    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
+
+        # Cases to switch between
+        branches = [
+            self._case_left_corner,
+            self._case_right_corner,
+            self._case_interpolate,
+        ]
+
+        # Aliases to make the below more readable
+        not_fn, and_fn = jnp.logical_not, jnp.logical_and
+
+        # Which case applies
+        is_left_corner = (s0.t - t) ** 2 <= 1e-12
+        is_right_corner = (s1.t - t) ** 2 <= 1e-12
+        is_in_between = and_fn(not_fn(is_left_corner), not_fn(is_right_corner))
+
+        index_as_array, *_ = jnp.where(
+            jnp.asarray([is_left_corner, is_right_corner, is_in_between]), size=1
+        )
+        index = jnp.reshape(index_as_array, ())
+        return jax.lax.switch(index, branches, s0, s1, t)
+
+    @abc.abstractmethod
+    def _case_left_corner(self, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _case_right_corner(self, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _case_interpolate(self, s0, s1, t):
+        raise NotImplementedError
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DynamicFilter(_StrategyCommon):
+    """Filter implementation with dynamic calibration (time-varying diffusion)."""
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
@@ -149,11 +203,24 @@ class DynamicFilter:
     def extract_fn(*, state):  # noqa: D102
         return state
 
-    @jax.jit
-    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
-        dt = t - s0.t
-        raise RuntimeError("Better interpolation in filter")
+    def _case_left_corner(self, s0, s1, t):  # s0.t == t
+        accepted = s1
+        solution = s0
+        previous = s0
+        return accepted, solution, previous
 
+    def _case_right_corner(self, s0, s1, t):  # s1.t == t
+        accepted = s1
+        solution = s1
+        previous = s1
+        return accepted, solution, previous
+
+    def _case_interpolate(self, s0, s1, t):
+
+        # A filter interpolates by extrapolating from the previous time-point
+        # to the in-between variable. That's it.
+
+        dt = t - s0.t
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         m_ext, *_ = self.implementation.extrapolate_mean(
@@ -170,39 +237,23 @@ class DynamicFilter:
         target_p = FilterOutput(
             t=t, u=sol, filtered=extrapolated, diffusion_sqrtm=s1.diffusion_sqrtm
         )
-        return s1, target_p
-
-    # @staticmethod
-    # def reset_at_checkpoint_fn(*, solution, accepted, t1):  # noqa: D102
-    #
-    #     sol = DynamicFilter._reset_t1(state=solution, t1=t1)
-    #     acc = DynamicFilter._reset_t1(state=accepted, t1=t1)
-    #     return acc, sol
-
-    # @staticmethod
-    # def _reset_t1(*, state, t1):
-    #     return FilterOutput(
-    #         t=t1,
-    #         u=state.u,
-    #         filtered=state.filtered,
-    #         diffusion_sqrtm=state.diffusion_sqrtm,
-    #     )
+        return s1, target_p, target_p
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class _DynamicSmootherCommon:
+class _DynamicSmootherCommon(_StrategyCommon):
+    @abc.abstractmethod
+    def _case_interpolate(self, s0, s1, t):
+        raise NotImplementedError
 
-    implementation: Any
+    @abc.abstractmethod
+    def _case_right_corner(self, s0, s1, t):
+        raise NotImplementedError
 
-    def tree_flatten(self):
-        children = (self.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+    @abc.abstractmethod
+    def step_fn(self, state, info_op, dt):
+        raise NotImplementedError
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
@@ -254,80 +305,37 @@ class _DynamicSmootherCommon:
             backward_model=state.backward_model,
         )
 
-    @jax.jit
-    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
-
-        # Cases to switch between
-        branches = [
-            self._case_left_corner,
-            self._case_right_corner,
-            self._case_interpolate,
-        ]
-
-        # Which case applies
-        is_left_corner = s0.t == t
-        is_right_corner = s1.t == t
-        is_in_between = jnp.logical_and(s0.t < t, t < s1.t)
-
-        index_as_array, *_ = jnp.where(
-            jnp.asarray([is_left_corner, is_right_corner, is_in_between]), size=1
-        )
-        index = jnp.reshape(index_as_array, ())
-        return jax.lax.switch(index, branches, s0, s1, t)
-
     def _case_left_corner(self, s0, s1, t):  # t == s0.t
+        print("Case left corner", s0.t, t, s1.t)
+        accepted = s1
+        solution = s0
+        previous = self._duplicate_with_unit_backward_model(s0, t)
+        return accepted, solution, previous
 
+    def _duplicate_with_unit_backward_model(self, s0, t):
         bw_transition0 = self.implementation.init_backward_transition()
         bw_noise0 = self.implementation.init_backward_noise(
             rv_proto=s0.backward_model.noise
         )
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
-        state0 = Posterior(
+        state1 = Posterior(
             t=t,
             u=s0.u,
             filtered=s0.filtered,
             diffusion_sqrtm=s0.diffusion_sqrtm,
             backward_model=bw_model,
         )
-
-        # Update the backward model only.
-        _, backward_model1 = self._interpolate_from_to_fn(
-            rv=s0.filtered, diffusion_sqrtm=s1.diffusion_sqrtm, t=s1.t, t0=t
-        )
-        state1 = Posterior(
-            t=s1.t,
-            u=s1.u,
-            filtered=s1.filtered,
-            diffusion_sqrtm=s1.diffusion_sqrtm,
-            backward_model=backward_model1,
-        )
-        return state1, state0
-
-    def _case_right_corner(self, s0, s1, t):  # s1.t == t
-
-        state0 = s1
-
-        bw_transition0 = self.implementation.init_backward_transition()
-        bw_noise0 = self.implementation.init_backward_noise(
-            rv_proto=s0.backward_model.noise
-        )
-        bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
-        state1 = Posterior(
-            t=t,
-            u=s1.u,
-            filtered=s1.filtered,
-            diffusion_sqrtm=s1.diffusion_sqrtm,
-            backward_model=bw_model,
-        )
-        return state1, state0
+        return state1
 
     def _interpolate_from_to_fn(self, rv, diffusion_sqrtm, t, t0):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
+
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
             rv.mean, p=p, p_inv=p_inv
         )
-        x = self.implementation.revert_markov_kernel(
+
+        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=rv.cov_sqrtm_lower,
             p=p,
@@ -336,9 +344,7 @@ class _DynamicSmootherCommon:
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )
-        extrapolated, (backward_noise, backward_op) = x
-
-        backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
+        backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model
 
 
@@ -365,7 +371,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
         error_estimate *= dt
 
-        x = self.implementation.revert_markov_kernel(
+        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=state.filtered.cov_sqrtm_lower,
             p=p,
@@ -374,8 +380,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )
-        extrapolated, (backward_noise, backward_op) = x
-        backward_model = BackwardModel(transition=backward_op, noise=backward_noise)
+        backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
 
         # Final observation
         corrected = self.implementation.final_correction(
@@ -394,7 +399,21 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
         return smoothing_solution, error_estimate
 
+    def _case_right_corner(self, s0, s1, t):  # s1.t == t
+        accepted = s1
+        solution = s1
+        previous = s1
+        return accepted, solution, previous
+
     def _case_interpolate(self, s0, s1, t):
+
+        # A smoother interpolates by reverting the Markov kernels between s0.t and t
+        # which gives an extrapolation and a backward transition;
+        # and by reverting the Markov kernels between t and s1.t
+        # which gives another extrapolation and a backward transition.
+        # The latter extrapolation is discarded in favour of s1.filtered,
+        # but the backward transition is kept.
+
         rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
 
         # Extrapolate from t0 to t, and from t to t1
@@ -407,39 +426,23 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
         # This is the new solution object at t.
         sol = self.implementation.extract_sol(rv=extrapolated0)
-        s0 = Posterior(
+        solution = Posterior(
             t=t,
             u=sol,
             filtered=extrapolated0,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model0,
         )
+        previous = solution
 
-        s1 = Posterior(
+        accepted = Posterior(
             t=s1.t,
             u=sol,
             filtered=s1.filtered,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model1,
         )
-        return s1, s0
-
-    # @staticmethod
-    # def reset_at_checkpoint_fn(*, solution, accepted, t1):  # noqa: D102
-    #     sol = DynamicSmoother._reset_t1(state=solution, t1=t1)
-    #     acc = DynamicSmoother._reset_t1(state=accepted, t1=t1)
-    #     return acc, sol
-    #
-    # @staticmethod
-    # def _reset_t1(*, state, t1):
-    #     return Posterior(
-    #         t=t1,  # new (better safe than sorry...)
-    #         u=state.u,
-    #         filtered=state.filtered,
-    #         diffusion_sqrtm=state.diffusion_sqrtm,
-    #         backward_model=state.backward_model,
-    #     )
-    #
+        return accepted, solution, previous
 
 
 @jax.tree_util.register_pytree_node_class
@@ -486,8 +489,6 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment,
             bw_init=state.backward_model,
-            # bw_state=state.backward_model,
-            # bw_init=bw_increment,
         )
         backward_model = BackwardModel(transition=gain, noise=noise)
 
@@ -503,74 +504,75 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
 
         return smoothing_solution, error_estimate
 
-    def _case_interpolate(self, s0, s1, t):  # noqa: D102
-        rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
+    def _case_right_corner(self, s0, s1, t):  # s1.t == t
+        print("Case right corner", s0.t, t, s1.t)
 
-        # The interpolated variable is the solution at the checkpoint,
-        # and we need to update the backward models by condensing the
-        # model from the previous checkpoint to t0 with the newly acquired
-        # model from t0 to t. This will imply a backward model from the
-        # previous checkpoint to the current checkpoint.
-        extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=s0.t
+        backward_model1 = s1.backward_model
+        noise0, g0 = self.implementation.condense_backward_models(
+            bw_init=s0.backward_model, bw_state=backward_model1
+        )
+        backward_model0 = BackwardModel(transition=g0, noise=noise0)
+        solution = Posterior(
+            t=s1.t,
+            u=s1.u,
+            filtered=s1.filtered,
+            backward_model=backward_model0,
+            diffusion_sqrtm=s1.diffusion_sqrtm,
+        )
+
+        accepted = self._duplicate_with_unit_backward_model(s1, t)
+        previous = accepted
+        return accepted, solution, previous
+
+    def _case_interpolate(self, s0, s1, t):  # noqa: D102
+        print("Case interpolate", s0.t, t, s1.t)
+
+        # A fixed-point smoother interpolates almost like a smoother.
+        # The key difference is that when interpolating from s0.t to t,
+        # the backward models in s0.t and the incoming model are condensed into one.
+        # The reasoning is that the previous model "knows how to get to the
+        # quantity of interest", and this is what we are interested in.
+        # The rest remains the same as for the smoother.
+
+        # Use the s1.diffusion as a diffusion over the interval.
+        # Filtering/smoothing solutions are right-including intervals.
+        diffusion_sqrtm = s1.diffusion_sqrtm
+
+        # From s0.t to t
+        extrapolated0, bw0 = self._interpolate_from_to_fn(
+            rv=s0.filtered, diffusion_sqrtm=diffusion_sqrtm, t=t, t0=s0.t
         )
         noise0, g0 = self.implementation.condense_backward_models(
-            bw_init=s0.backward_model, bw_state=backward_model0
+            bw_init=s0.backward_model, bw_state=bw0
         )
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
         sol = self.implementation.extract_sol(rv=extrapolated0)
-        s0 = Posterior(
+        solution = Posterior(
             t=t,
             u=sol,
             filtered=extrapolated0,
-            diffusion_sqrtm=diffsqrtm,
+            diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model0,
         )
+        previous = self._duplicate_with_unit_backward_model(solution, t)
 
-        # We update the backward model from t_interp to t_accep
-        # because the time-increment has changed.
-        # In the next iteration, we iterate from t_accep to the next
-        # checkpoint, and condense the backward models starting at the
-        # backward model from t_accep, which must know how to get back
-        # to the previous checkpoint.
-        extrapolated1, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=s1.t, t0=t
+        # From t to s1.t
+        _, backward_model1 = self._interpolate_from_to_fn(
+            rv=extrapolated0, diffusion_sqrtm=diffusion_sqrtm, t=s1.t, t0=t
         )
-        s1 = Posterior(
+        accepted = Posterior(
             t=s1.t,
-            u=sol,
+            u=s1.u,
             filtered=s1.filtered,
-            diffusion_sqrtm=diffsqrtm,
+            diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model1,
         )
-        return s1, s0
+        return accepted, solution, previous
 
-    # @jax.jit
-    # def reset_at_checkpoint_fn(self, *, solution, accepted, t1):  # noqa: D102
-    #     acc = self._reset_accepted(state=accepted, t1=t1)
-    #     sol = DynamicFixedPointSmoother._reset_at_t1(state=solution, t1=t1)
-    #     return acc, sol
-    #
-    # def _reset_accepted(self, *, state, t1):
-    #     bw_noise = self.implementation.init_backward_noise(
-    #         rv_proto=state.backward_model.noise
-    #     )
-    #     bw_transition = self.implementation.init_backward_transition()
-    #     bw_identity = BackwardModel(transition=bw_transition, noise=bw_noise)
-    #     return Posterior(
-    #         t=t1,
-    #         u=state.u,
-    #         filtered=state.filtered,
-    #         diffusion_sqrtm=state.diffusion_sqrtm,
-    #         backward_model=bw_identity,
-    #     )
-    #
-    # @staticmethod
-    # def _reset_at_t1(*, state, t1):
-    #     return Posterior(
-    #         t=t1,
-    #         u=state.u,
-    #         filtered=state.filtered,
-    #         diffusion_sqrtm=state.diffusion_sqrtm,
-    #         backward_model=state.backward_model,
-    #     )
+
+def _empty_like(tree):
+    return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)
+
+
+def _nan_like(tree):
+    return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)

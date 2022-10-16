@@ -10,7 +10,7 @@ from odefilter import ivpsolve, recipes
 @case
 @parametrize("n", [2])
 @parametrize("tol", [1e-2])
-def smoother_fixpt_smoother_pair_eks0(n, tol):
+def smoother_fixpt_smoother_pair_fixpt_eks0(n, tol):
     eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
     fixpt_eks0 = recipes.dynamic_isotropic_fixpt_eks0(
         num_derivatives=n, atol=1e-2 * tol, rtol=tol
@@ -48,7 +48,6 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
         solver=fixpt_eks[0],
         info_op=fixpt_eks[1],
     )
-
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol, atol=1e-2, rtol=1e-2)
 
 
