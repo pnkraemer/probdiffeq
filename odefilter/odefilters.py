@@ -153,10 +153,13 @@ class AdaptiveODEFilter:
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
-        enter_accept_reject_loop = state.accepted.t + self.numerical_zero < t1
+
+        # raise RuntimeError("put reset() behaviour into interpolate? Does this automatically do the correct thing?")
+
+        enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
-            enter_accept_reject_loop,
-            lambda s: self._accept_reject_loop(state0=s, info_op=info_op),
+            enter_rejection_loop,
+            lambda s: self._rejection_loop(state0=s, info_op=info_op),
             lambda s: s,
             state,
         )
@@ -164,8 +167,8 @@ class AdaptiveODEFilter:
         enter_reset = jnp.abs(state.accepted.t - t1) <= self.numerical_zero
         state = jax.lax.cond(
             enter_reset,
-            lambda s_: self._reset_at_checkpoint_fn(state=s_, t1=t1),
-            lambda s_: s_,
+            lambda s: self._reset_at_checkpoint_fn(state=s, t1=t1),
+            lambda s: s,
             state,
         )
 
@@ -173,11 +176,11 @@ class AdaptiveODEFilter:
         return jax.lax.cond(
             enter_interpolation,
             lambda s: self._interpolate(state=s, t=t1),
-            lambda x: x,
+            lambda s: s,
             state,
         )
 
-    def _accept_reject_loop(self, *, info_op, state0):
+    def _rejection_loop(self, *, info_op, state0):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
