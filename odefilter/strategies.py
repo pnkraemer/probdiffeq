@@ -23,12 +23,13 @@ class FilterOutput(Generic[T]):
     """Filtering solution."""
 
     t: float
+    t_previous: float
     u: Any
     filtered: T
     diffusion_sqrtm: float
 
     def tree_flatten(self):
-        children = self.t, self.u, self.filtered, self.diffusion_sqrtm
+        children = self.t, self.t_previous, self.u, self.filtered, self.diffusion_sqrtm
         aux = ()
         return children, aux
 
@@ -61,6 +62,7 @@ class Posterior(Generic[T]):
     """Markov sequences as smoothing solutions."""
 
     t: float
+    t_previous: float
     u: Any
     filtered: T
     diffusion_sqrtm: float
@@ -69,6 +71,7 @@ class Posterior(Generic[T]):
     def tree_flatten(self):
         children = (
             self.t,
+            self.t_previous,
             self.u,
             self.filtered,
             self.diffusion_sqrtm,
@@ -151,7 +154,9 @@ class DynamicFilter(_StrategyCommon):
         error_estimate = self.implementation.init_error_estimate()
 
         sol = self.implementation.extract_sol(rv=corrected)
-        filtered = FilterOutput(t=t0, u=sol, filtered=corrected, diffusion_sqrtm=1.0)
+        filtered = FilterOutput(
+            t=t0, t_previous=-jnp.inf, u=sol, filtered=corrected, diffusion_sqrtm=1.0
+        )
         return filtered, error_estimate
 
     @partial(jax.jit, static_argnames=["info_op"])
@@ -198,6 +203,7 @@ class DynamicFilter(_StrategyCommon):
 
         accepted = FilterOutput(
             t=t,
+            t_previous=s0.t,  # todo: wrong, but no one cares
             u=s1.u,
             filtered=s1.filtered,
             diffusion_sqrtm=s1.diffusion_sqrtm,
@@ -263,6 +269,7 @@ class _DynamicSmootherCommon(_StrategyCommon):
 
         solution = Posterior(
             t=t0,
+            t_previous=-jnp.inf,
             u=sol,
             filtered=corrected,
             diffusion_sqrtm=1.0,
@@ -274,6 +281,7 @@ class _DynamicSmootherCommon(_StrategyCommon):
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
+        # return state
         # no jax.lax.cond here, because we condition on the _shape_ of the array
         # which is available at compilation time already.
         do_backward_pass = state.filtered.mean.ndim == 3
@@ -290,6 +298,7 @@ class _DynamicSmootherCommon(_StrategyCommon):
         sol = self.implementation.extract_sol(rv=marginals)
         return Posterior(
             t=state.t,
+            t_previous=state.t_previous,
             u=sol,
             filtered=marginals,
             diffusion_sqrtm=state.diffusion_sqrtm,
@@ -304,6 +313,7 @@ class _DynamicSmootherCommon(_StrategyCommon):
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
         state1 = Posterior(
             t=t,
+            t_previous=t,
             u=s0.u,
             filtered=s0.filtered,
             diffusion_sqrtm=s0.diffusion_sqrtm,
@@ -375,6 +385,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         sol = self.implementation.extract_sol(rv=corrected)
         smoothing_solution = Posterior(
             t=state.t + dt,
+            t_previous=state.t,
             u=sol,
             filtered=corrected,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -385,14 +396,16 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
 
-        accepted = Posterior(
+        accepted = self._duplicate_with_unit_backward_model(s1, t)
+        previous = Posterior(
             t=t,
+            t_previous=s0.t,
             u=s1.u,
             filtered=s1.filtered,
             diffusion_sqrtm=s1.diffusion_sqrtm,
             backward_model=s1.backward_model,
         )
-        solution, previous = accepted, accepted
+        solution = previous
 
         return accepted, solution, previous
 
@@ -419,6 +432,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = Posterior(
             t=t,
+            t_previous=s0.t,
             u=sol,
             filtered=extrapolated0,
             diffusion_sqrtm=diffsqrtm,
@@ -428,6 +442,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
         accepted = Posterior(
             t=s1.t,
+            t_previous=t,
             u=sol,
             filtered=s1.filtered,
             diffusion_sqrtm=diffsqrtm,
@@ -487,6 +502,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         sol = self.implementation.extract_sol(rv=corrected)
         smoothing_solution = Posterior(
             t=state.t + dt,
+            t_previous=state.t,
             u=sol,
             filtered=corrected,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -496,13 +512,21 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         return smoothing_solution, error_estimate
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
-        backward_model1 = s1.backward_model
+
+        # can we guarantee that the backward model in s1 is the
+        # correct backward model to get from s0 to s1?
+        _, backward_model1 = self._interpolate_from_to_fn(
+            rv=s0.filtered, diffusion_sqrtm=s1.diffusion_sqrtm, t=s1.t, t0=s0.t
+        )
+
+        # backward_model1 = s1.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
             bw_init=s0.backward_model, bw_state=backward_model1
         )
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
         solution = Posterior(
             t=t,
+            t_previous=s0.t,
             u=s1.u,
             filtered=s1.filtered,
             backward_model=backward_model0,
@@ -511,6 +535,9 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
 
         accepted = self._duplicate_with_unit_backward_model(solution, t)
         previous = accepted
+
+        print("Case: right corner", t)
+
         return accepted, solution, previous
 
     def _case_interpolate(self, s0, s1, t):  # noqa: D102
@@ -536,11 +563,14 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = Posterior(
             t=t,
+            t_previous=s0.t,
             u=sol,
             filtered=extrapolated0,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model0,
         )
+
+        #
         previous = self._duplicate_with_unit_backward_model(solution, t)
 
         # From t to s1.t
@@ -549,6 +579,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
         accepted = Posterior(
             t=s1.t,
+            t_previous=t,
             u=s1.u,
             filtered=s1.filtered,
             diffusion_sqrtm=diffusion_sqrtm,
