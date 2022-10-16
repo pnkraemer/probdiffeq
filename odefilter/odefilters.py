@@ -149,7 +149,7 @@ class AdaptiveODEFilter:
     @partial(jax.jit, static_argnames=["info_op"])
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
-        enter_rejection_loop = state.accepted.t < t1
+        enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
             lambda s: self._rejection_loop(state0=s, info_op=info_op),
@@ -157,13 +157,14 @@ class AdaptiveODEFilter:
             state,
         )
 
-        enter_interpolation = state.accepted.t >= t1
-        return jax.lax.cond(
-            enter_interpolation,
+        state = jax.lax.cond(
+            state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
             lambda s: s,
             state,
         )
+
+        return state
 
     def _rejection_loop(self, *, info_op, state0):
         def cond_fn(x):
@@ -180,11 +181,10 @@ class AdaptiveODEFilter:
             return True, s
 
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
-
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=state_new.error_norm_proposed,
-            proposed=_nan_like(state_new.proposed),  # meaningless?
+            proposed=_inf_like(state_new.proposed),  # meaningless?
             accepted=state_new.proposed,  # holla! New! :)
             solution=state_new.proposed,  # Overwritten by interpolate() if necessary
             previous=state0.accepted,  # holla! New! :)
@@ -211,14 +211,13 @@ class AdaptiveODEFilter:
             error_order=self.error_order,
         )
         dt_proposed = state.dt_proposed * state_control.scale_factor
-
         return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
-            solution=_nan_like(state.solution),  # too early to accept :)
-            accepted=_nan_like(state.solution),  # too early to accept :)
-            previous=_nan_like(state.solution),  # too early to accept :)
+            solution=state.solution,  # too early to accept :)
+            accepted=state.solution,  # too early to accept :)
+            previous=state.solution,  # too early to accept :)
             control=state_control,  # new
         )
 
@@ -231,11 +230,10 @@ class AdaptiveODEFilter:
         accepted, solution, previous = self.strategy.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
-
         return AdaptiveODEFilterState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
-            proposed=_nan_like(state.proposed),
+            proposed=_inf_like(state.proposed),
             accepted=accepted,  # holla! New! :)
             solution=solution,  # holla! New! :)
             previous=previous,  # holla! New! :)
@@ -248,8 +246,12 @@ class AdaptiveODEFilter:
 
 
 def _empty_like(tree):
-    return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)
+    return jax.tree_util.tree_map(jnp.empty_like, tree)
 
 
 def _nan_like(tree):
     return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)
+
+
+def _inf_like(tree):
+    return jax.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)

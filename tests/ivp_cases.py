@@ -8,7 +8,7 @@ from pytest_cases import case
 @case
 def problem_lotka():
     f, u0, (t0, t1), f_args = ivps.lotka_volterra()
-    t1 = 0.05
+    t1 = 2.0
 
     @jax.jit
     def vf(_t, x, *p):

@@ -22,7 +22,6 @@ def smoother_fixpt_smoother_pair_eks0(n, tol):
     return eks0, fixpt_eks0
 
 
-@pytest.mark.skip
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
@@ -37,11 +36,7 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     # eks_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
-    ts = _grid(eks_sol.t, t0=t0, t1=t1, factor=5)
-    ts = ts[: ((len(ts) - 2) // 2)]
-    print(ts)
-    print()
-    print()
+    ts = _grid(eks_sol.t, t0=t0, t1=t1, factor=3)
     with jax.disable_jit():
         fixpt_eks_sol = ivpsolve.simulate_checkpoints(
             vf,
@@ -75,7 +70,7 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
         label="FixPtEKS",
     )
     plt.legend()
-    plt.ylim((-10, 10))
+    plt.ylim((-15, 15))
     plt.show()
 
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol, atol=1e-2, rtol=1e-2)

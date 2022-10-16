@@ -40,14 +40,33 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     eks_sol = ivpsolve.solve(
         vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
     )
-    fixpt_eks_sol = ivpsolve.simulate_checkpoints(
-        vf,
-        u0,
-        ts=eks_sol.t,
-        parameters=p,
-        solver=fixpt_eks[0],
-        info_op=fixpt_eks[1],
+    import jax
+
+    with jax.disable_jit():
+        fixpt_eks_sol = ivpsolve.simulate_checkpoints(
+            vf,
+            u0,
+            ts=eks_sol.t,
+            parameters=p,
+            solver=fixpt_eks[0],
+            info_op=fixpt_eks[1],
+        )
+    # print(fixpt_eks_sol.t - eks_sol.t)
+    # print(fixpt_eks_sol.u -eks_sol.u)
+    # print(fixpt_eks_sol.filtered.mean - eks_sol.filtered.mean)
+    # print(fixpt_eks_sol.backward_model.noise.mean - eks_sol.backward_model.noise.mean)
+    # print(fixpt_eks_sol.diffusion_sqrtm - eks_sol.diffusion_sqrtm)
+    # print()
+    # print(fixpt_eks_sol.filtered.cov_sqrtm_lower - eks_sol.filtered.cov_sqrtm_lower)
+
+    def cov(x):
+        return jnp.einsum("njk,nkl->njl", x, x)
+
+    print(
+        cov(fixpt_eks_sol.backward_model.noise.cov_sqrtm_lower)
+        - cov(eks_sol.backward_model.noise.cov_sqrtm_lower)
     )
+
     assert _tree_all_allclose(fixpt_eks_sol, eks_sol, atol=1e-2, rtol=1e-2)
 
 

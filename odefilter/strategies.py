@@ -114,28 +114,27 @@ class _StrategyCommon(abc.ABC):
 
         # Cases to switch between
         branches = [
-            self._case_left_corner,
+            # self._case_left_corner,  # todo: this should not be a valid case!
             self._case_right_corner,
             self._case_interpolate,
         ]
 
-        # Aliases to make the below more readable
-        not_fn, and_fn = jnp.logical_not, jnp.logical_and
-
         # Which case applies
-        is_left_corner = (s0.t - t) ** 2 <= 1e-12
-        is_right_corner = (s1.t - t) ** 2 <= 1e-12
-        is_in_between = and_fn(not_fn(is_left_corner), not_fn(is_right_corner))
+        # is_left_corner = (s0.t - t) ** 2 <= 1e-10
+        is_right_corner = (s1.t - t) ** 2 <= 1e-10
+        is_in_between = jnp.logical_not(is_right_corner)
+        # is_in_between = jnp.logical_not(jnp.logical_or(is_left_corner, is_right_corner))
 
         index_as_array, *_ = jnp.where(
-            jnp.asarray([is_left_corner, is_right_corner, is_in_between]), size=1
+            jnp.asarray([is_right_corner, is_in_between]), size=1
         )
         index = jnp.reshape(index_as_array, ())
         return jax.lax.switch(index, branches, s0, s1, t)
 
-    @abc.abstractmethod
-    def _case_left_corner(self, s0, s1, t):
-        raise NotImplementedError
+    #
+    # @abc.abstractmethod
+    # def _case_left_corner(self, s0, s1, t):
+    #     raise NotImplementedError
 
     @abc.abstractmethod
     def _case_right_corner(self, s0, s1, t):
@@ -203,16 +202,29 @@ class DynamicFilter(_StrategyCommon):
     def extract_fn(*, state):  # noqa: D102
         return state
 
-    def _case_left_corner(self, s0, s1, t):  # s0.t == t
-        accepted = s1
-        solution = s0
-        previous = s0
-        return accepted, solution, previous
+    #
+    # def _case_left_corner(self, s0, s1, t):  # s0.t == t
+    #     accepted = s1
+    #
+    #     solution = FilterOutput(
+    #         t=t,
+    #         u=s0.t,
+    #         filtered=s0.filtered,
+    #         diffusion_sqrtm=s0.diffusion_sqrtm,
+    #     )
+    #     previous = solution
+    #     return accepted, solution, previous
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
-        accepted = s1
-        solution = s1
-        previous = s1
+
+        accepted = FilterOutput(
+            t=t,
+            u=s1.u,
+            filtered=s1.filtered,
+            diffusion_sqrtm=s1.diffusion_sqrtm,
+        )
+        solution, previous = accepted, accepted
+
         return accepted, solution, previous
 
     def _case_interpolate(self, s0, s1, t):
@@ -305,12 +317,11 @@ class _DynamicSmootherCommon(_StrategyCommon):
             backward_model=state.backward_model,
         )
 
-    def _case_left_corner(self, s0, s1, t):  # t == s0.t
-        print("Case left corner", s0.t, t, s1.t)
-        accepted = s1
-        solution = s0
-        previous = self._duplicate_with_unit_backward_model(s0, t)
-        return accepted, solution, previous
+    # def _case_left_corner(self, s0, s1, t):  # t == s0.t
+    #     accepted = s1
+    #     solution = s0
+    #     previous = self._duplicate_with_unit_backward_model(s0, t)
+    #     return accepted, solution, previous
 
     def _duplicate_with_unit_backward_model(self, s0, t):
         bw_transition0 = self.implementation.init_backward_transition()
@@ -400,12 +411,20 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return smoothing_solution, error_estimate
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
-        accepted = s1
-        solution = s1
-        previous = s1
+
+        accepted = Posterior(
+            t=t,
+            u=s1.u,
+            filtered=s1.filtered,
+            diffusion_sqrtm=s1.diffusion_sqrtm,
+            backward_model=s1.backward_model,
+        )
+        solution, previous = accepted, accepted
+
         return accepted, solution, previous
 
     def _case_interpolate(self, s0, s1, t):
+        print("Entering pure interpolation")
 
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
@@ -505,7 +524,6 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         return smoothing_solution, error_estimate
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
-        print("Case right corner", s0.t, t, s1.t)
 
         backward_model1 = s1.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
@@ -513,7 +531,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
         solution = Posterior(
-            t=s1.t,
+            t=t,
             u=s1.u,
             filtered=s1.filtered,
             backward_model=backward_model0,
@@ -525,8 +543,6 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         return accepted, solution, previous
 
     def _case_interpolate(self, s0, s1, t):  # noqa: D102
-        print("Case interpolate", s0.t, t, s1.t)
-
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -568,11 +584,3 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             backward_model=backward_model1,
         )
         return accepted, solution, previous
-
-
-def _empty_like(tree):
-    return jax.tree_util.tree_map(jnp.nan * jnp.ones_like, tree)
-
-
-def _nan_like(tree):
-    return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)

@@ -55,7 +55,7 @@ class IsotropicImplementation:
 
     @staticmethod
     def init_error_estimate():  # noqa: D102
-        return jnp.nan * jnp.ones(())
+        return jnp.inf * jnp.ones(())
 
     def init_backward_transition(self):  # noqa: D102
         return jnp.eye(*self.a.shape)
@@ -194,5 +194,5 @@ class IsotropicImplementation:
         return IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def init_preconditioner(self):  # noqa: D102
-        empty = jnp.nan * jnp.ones((self.a.shape[0],))
+        empty = jnp.inf * jnp.ones((self.a.shape[0],))
         return empty, empty
