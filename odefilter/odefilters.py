@@ -156,14 +156,12 @@ class AdaptiveODEFilter:
             lambda s: s,
             state,
         )
-
         state = jax.lax.cond(
             state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
             lambda s: s,
             state,
         )
-
         return state
 
     def _rejection_loop(self, *, info_op, state0):

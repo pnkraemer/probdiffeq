@@ -36,7 +36,7 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
     # eks_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
-    ts = _grid(eks_sol.t, t0=t0, t1=t1, factor=3)
+    ts, t = _grid(eks_sol.t, t0=t0, t1=t1, factor=3)
     with jax.disable_jit():
         fixpt_eks_sol = ivpsolve.simulate_checkpoints(
             vf,
@@ -46,6 +46,9 @@ def test_smoothing_checkpoint_equals_solver_state(vf, u0, t0, t1, p, eks, fixpt_
             solver=fixpt_eks[0],
             info_op=fixpt_eks[1],
         )
+    assert t in ts
+    assert t in eks_sol.t
+
     assert jnp.allclose(fixpt_eks_sol.t, ts)
 
     import matplotlib.pyplot as plt
@@ -83,7 +86,7 @@ def _grid(t_old, *, t0, t1, factor=1):
     t_a = jnp.asarray([midpoint])
     t_b = jnp.linspace(t0, t1, num=factor * len(t_old), endpoint=True)
     ts = jnp.union1d(t_a, t_b, size=factor * len(t_old) + 1)
-    return ts
+    return ts, midpoint
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):

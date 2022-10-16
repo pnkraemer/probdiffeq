@@ -424,7 +424,6 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return accepted, solution, previous
 
     def _case_interpolate(self, s0, s1, t):
-        print("Entering pure interpolation")
 
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
@@ -524,7 +523,6 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         return smoothing_solution, error_estimate
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
-
         backward_model1 = s1.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
             bw_init=s0.backward_model, bw_state=backward_model1
@@ -538,7 +536,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             diffusion_sqrtm=s1.diffusion_sqrtm,
         )
 
-        accepted = self._duplicate_with_unit_backward_model(s1, t)
+        accepted = self._duplicate_with_unit_backward_model(solution, t)
         previous = accepted
         return accepted, solution, previous
 
