@@ -8,10 +8,6 @@ from dataclasses import dataclass
 class Implementation(abc.ABC):
     """Implementation interface."""
 
-    @classmethod
-    def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
-        raise NotImplementedError
-
     @abc.abstractmethod
     def init_corrected(self, *, taylor_coefficients):
         raise NotImplementedError
