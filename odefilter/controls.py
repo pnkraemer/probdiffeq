@@ -111,15 +111,15 @@ class _ProportionalIntegralCommon(AbstractControl):
         self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
 
-        scale_factor = self._scale_factor_proportional_integral(
-            error_norm=error_normalised,
-            error_contraction_rate=error_contraction_rate,
-            error_norm_previously_accepted=state.error_norm_previously_accepted,
-            safety=self.safety,
-            factor_min=self.factor_min,
-            factor_max=self.factor_max,
-            power_integral_unscaled=self.power_integral_unscaled,
-            power_proportional_unscaled=self.power_proportional_unscaled,
+        n1 = self.power_integral_unscaled / error_contraction_rate
+        n2 = self.power_proportional_unscaled / error_contraction_rate
+
+        a1 = (1.0 / error_normalised) ** n1
+        a2 = (state.error_norm_previously_accepted / error_normalised) ** n2
+        scale_factor_unclipped = self.safety * a1 * a2
+
+        scale_factor = jnp.maximum(
+            self.factor_min, jnp.minimum(scale_factor_unclipped, self.factor_max)
         )
         error_norm_previously_accepted = jnp.where(
             error_normalised <= 1.0,
@@ -172,17 +172,6 @@ class _IntegralCommon(AbstractControl):
     def init_fn(self):
         return ()
 
-    @staticmethod
-    def _scale_factor_integral_control(
-        *, error_norm, safety, error_contraction_rate, factor_min, factor_max
-    ):
-        scale_factor = safety * (error_norm ** (-1.0 / error_contraction_rate))
-
-        scale_factor_clipped = jnp.maximum(
-            factor_min, jnp.minimum(scale_factor, factor_max)
-        )
-        return scale_factor_clipped
-
     @abc.abstractmethod
     def clip_fn(self, *, state, dt, t1):
         raise NotImplementedError
@@ -190,12 +179,12 @@ class _IntegralCommon(AbstractControl):
     def control_fn(
         self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
-        scale_factor = self._scale_factor_integral_control(
-            error_norm=error_normalised,
-            error_contraction_rate=error_contraction_rate,
-            safety=self.safety,
-            factor_min=self.factor_min,
-            factor_max=self.factor_max,
+        scale_factor_unclipped = self.safety * (
+            error_normalised ** (-1.0 / error_contraction_rate)
+        )
+
+        scale_factor = jnp.maximum(
+            self.factor_min, jnp.minimum(scale_factor_unclipped, self.factor_max)
         )
         return scale_factor * dt_previous, ()
 
@@ -223,15 +212,3 @@ class ClippedIntegral(_IntegralCommon):
     @staticmethod
     def clip_fn(*, state, dt, t1):
         return jnp.minimum(dt, t1 - state.t)
-
-    def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous
-    ):
-        scale_factor = self._scale_factor_integral_control(
-            error_norm=error_normalised,
-            error_contraction_rate=error_contraction_rate,
-            safety=self.safety,
-            factor_min=self.factor_min,
-            factor_max=self.factor_max,
-        )
-        return scale_factor * dt_previous, ()
