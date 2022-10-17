@@ -21,7 +21,7 @@ def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver, **optio
         state0=state0,
         t1=t1,
         info_op=info,
-        solver=adaptive_solver,
+        adaptive_solver=adaptive_solver,
     )
     return adaptive_solver.extract_fn(state=solution)
 
@@ -32,14 +32,13 @@ def odefilter_checkpoints(info, taylor_coefficients, ts, solver, **options):
     _assert_not_scalar(taylor_coefficients)
 
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
-    print(adaptive_solver)
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
             info_op=info,
-            solver=adaptive_solver,
+            adaptive_solver=adaptive_solver,
         )
         return s_next, s_next
 
@@ -97,14 +96,14 @@ def _assert_not_scalar(x, /):
     assert jax.tree_util.tree_all(is_not_scalar)
 
 
-def _advance_ivp_solution_adaptively(info_op, t1, state0, solver):
+def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
         return s.solution.t < t1
 
     def body_fun(s):
-        state = solver.step_fn(state=s, info_op=info_op, t1=t1)
+        state = adaptive_solver.step_fn(state=s, info_op=info_op, t1=t1)
         return state
 
     sol = jax.lax.while_loop(

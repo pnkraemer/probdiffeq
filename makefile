@@ -35,6 +35,8 @@ clean:
 	rm -rf .pytest_cache
 	rm -rf *.egg-info
 	rm -rf dist site
+	rm -rf *.ipynb_checkpoints
+	rm -rf docs/benchmarks/__pycache__
 
 doc:
 	mkdocs build

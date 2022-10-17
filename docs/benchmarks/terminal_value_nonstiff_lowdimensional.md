@@ -33,6 +33,7 @@ from odefilter import ivpsolve, recipes
 
 # Nice-looking plots
 plt.rcParams.update(plot_config())
+
 # x64 precision
 config.update("jax_enable_x64", True)
 
@@ -52,7 +53,7 @@ print(f"odefilter version:\n\t{odefilter_version}")
 
 ```python
 # Make a problem
-f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
+f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
@@ -62,18 +63,24 @@ def vf(t, x, *p):
 
 # Compile
 vf(t0, u0, *f_args)
+
+ts = jnp.asarray([t0, t1])
+odeint_solution = jax.experimental.ode.odeint(
+    lambda u, t, *p: vf(t, u, *p), u0, ts, *f_args, atol=1e-12, rtol=1e-12
+)
+ys_reference = odeint_solution[-1, :]
 ```
 
 ## Internal solvers
 
 ```python
 @partial(jax.jit, static_argnames=("num_derivatives", "factory"))
-def benchmark(num_derivatives, abstol, reltol, factory):
-    ekf0, info_op = factory(num_derivatives=num_derivatives, rtol=reltol, atol=abstol)
-    return solve(solver=ekf0, info_op=info_op)
+def benchmark(*, num_derivatives, atol, rtol, factory):
+    ekf0, info_op = factory(num_derivatives=num_derivatives)
+    return solve(solver=ekf0, info_op=info_op, atol=atol, rtol=rtol)
 
 
-def solve(solver, info_op):
+def solve(*, solver, info_op, atol, rtol):
     solution = ivpsolve.simulate_terminal_values(
         vf,
         initial_values=(u0,),
@@ -82,15 +89,17 @@ def solve(solver, info_op):
         parameters=f_args,
         solver=solver,
         info_op=info_op,
+        atol=atol,
+        rtol=rtol,
     )
-    return jnp.linalg.norm(solution.u - u0) / jnp.sqrt(u0.size)
+    return jnp.linalg.norm(solution.u - ys_reference) / jnp.sqrt(u0.size)
 ```
 
 ```python
-tolerances = 0.1 ** jnp.arange(1.0, 13.0, step=2.0)
+tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
 
 
-def ekf1_factory(n, **kw):
+def ekf1_factory(n):
     return recipes.dynamic_ekf1(num_derivatives=n, ode_dimension=u0.shape[0])
 
 
@@ -109,7 +118,9 @@ for factory, label in tqdm(factories):
     for rtol in tolerances:
 
         def bench():
-            return benchmark(4, 1e-3 * rtol, rtol, factory)
+            return benchmark(
+                num_derivatives=4, factory=factory, atol=1e-3 * rtol, rtol=rtol
+            )
 
         t, error = time(bench)
 
@@ -120,6 +131,10 @@ for factory, label in tqdm(factories):
 ```
 
 ```python
+
+```
+
+```python
 fig, ax = plt.subplots(dpi=300)
 
 for solver in results:
@@ -127,7 +142,7 @@ for solver in results:
     ax.loglog(errors, times, label=solver)
 
 ax.grid("both")
-ax.set_title("Internal solvers [*_terminal_values(three_body_first_order())]")
+ax.set_title("Internal solvers [*_terminal_values(lotka_volterra())]")
 ax.set_xlabel("Precision [rel. RMSE]")
 ax.set_ylabel("Work [wall time, s]")
 ax.legend()

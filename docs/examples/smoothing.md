@@ -133,8 +133,8 @@ plt.plot(
     color="gray",
     label="FixPtEKS0(t=dense)",
 )
-plt.ylim((-30, 30))
-plt.xlim((8, 9))
+# plt.ylim((-30, 30))
+# plt.xlim((8, 9))
 plt.legend()
 plt.show()
 ```
