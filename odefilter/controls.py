@@ -18,12 +18,16 @@ class AbstractControl(abc.ABC):
 
     # todo: rename error_contraction_rate to error_contraction_rate
     @abc.abstractmethod
-    def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
+    def control_fn(
+        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
+    ):
         r"""Propose a time-step $\Delta t$.
 
-        A good time-step $\Delta t$ is as large as possible such that the normalised error
-        is smaller than 1. This is commonly a function of previous error estimates,
-        the current normalised error, and some expected local convergence rate / error order.
+        A good time-step $\Delta t$ is as large as possible
+        such that the normalised error is smaller than 1.
+        This is commonly a function of previous error estimates,
+        the current normalised error, and some expected error
+        contraction rate.
         """
         raise NotImplementedError
 
