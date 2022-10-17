@@ -48,6 +48,36 @@ class FilteringSolution(Generic[T]):
             diffusion_sqrtm=diffusion_sqrtm,
         )
 
+    def __len__(self):
+        """Length of a solution object.
+
+        Depends on the length of the underlying :attr:`t` attribute.
+        """
+        if jnp.ndim(self.t) < 1:
+            raise ValueError("Solution object not batched :(")
+        return self.t.shape[0]
+
+    def __getitem__(self, item):
+        """Access the `i`-th sub-solution."""
+        if jnp.ndim(self.t) < 1:
+            raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
+        if jnp.ndim(item) >= jnp.ndim(self.t):
+            raise ValueError(
+                f"Inapplicable shape :( {jnp.ndim(item), jnp.ndim(self.t)}"
+            )
+        return FilteringSolution(
+            t=self.t[item],
+            t_previous=self.t_previous[item],
+            u=self.u[item],
+            diffusion_sqrtm=self.diffusion_sqrtm[item],
+            marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
+        )
+
+    def __iter__(self):
+        """Iterate through the filtering solution."""
+        for i in range(self.t.shape[0]):
+            yield self[i]
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
