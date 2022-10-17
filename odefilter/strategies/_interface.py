@@ -24,7 +24,7 @@ class Strategy(abc.ABC):
         return cls(*children)
 
     @abc.abstractmethod
-    def init_fn(self, *, taylor_coefficients, t0):
+    def init_fn(self, *, taylor_coefficients, t0):  # -> state
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -32,7 +32,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_fn(self, *, state):
+    def extract_fn(self, *, state):  # -> solution
         raise NotImplementedError
 
     @jax.jit

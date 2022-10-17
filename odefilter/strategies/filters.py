@@ -15,23 +15,38 @@ T = TypeVar("T")
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class FilterOutput(Generic[T]):
+class FilteringSolution(Generic[T]):
     """Filtering solution."""
 
     t: float
     t_previous: float
+
     u: Any
-    filtered: T
+    marginals: T
+
     diffusion_sqrtm: float
 
     def tree_flatten(self):
-        children = self.t, self.t_previous, self.u, self.filtered, self.diffusion_sqrtm
+        children = (
+            self.t,
+            self.t_previous,
+            self.u,
+            self.marginals,
+            self.diffusion_sqrtm,
+        )
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+        t, t_previous, u, marginals, diffusion_sqrtm = children
+        return cls(
+            t=t,
+            t_previous=t_previous,
+            u=u,
+            marginals=marginals,
+            diffusion_sqrtm=diffusion_sqrtm,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -48,8 +63,8 @@ class DynamicFilter(_interface.Strategy):
         error_estimate = self.implementation.init_error_estimate()
 
         sol = self.implementation.extract_sol(rv=corrected)
-        filtered = FilterOutput(
-            t=t0, t_previous=-jnp.inf, u=sol, filtered=corrected, diffusion_sqrtm=1.0
+        filtered = FilteringSolution(
+            t=t0, t_previous=-jnp.inf, u=sol, marginals=corrected, diffusion_sqrtm=1.0
         )
         return filtered, error_estimate
 
@@ -60,7 +75,7 @@ class DynamicFilter(_interface.Strategy):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.filtered.mean, p=p, p_inv=p_inv
+            state.marginals.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -72,7 +87,7 @@ class DynamicFilter(_interface.Strategy):
         error_estimate *= dt
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
-            l0=state.filtered.cov_sqrtm_lower,
+            l0=state.marginals.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -84,11 +99,11 @@ class DynamicFilter(_interface.Strategy):
         )
         sol = self.implementation.extract_sol(rv=corrected)
 
-        filtered = FilterOutput(
+        filtered = FilteringSolution(
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
-            filtered=corrected,
+            marginals=corrected,
             diffusion_sqrtm=diffusion_sqrtm,
         )
         return filtered, error_estimate
@@ -99,11 +114,11 @@ class DynamicFilter(_interface.Strategy):
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
 
-        accepted = FilterOutput(
+        accepted = FilteringSolution(
             t=t,
             t_previous=s0.t,  # todo: wrong, but no one cares
             u=s1.u,
-            filtered=s1.filtered,
+            marginals=s1.marginals,
             diffusion_sqrtm=s1.diffusion_sqrtm,
         )
         solution, previous = accepted, accepted
@@ -119,21 +134,21 @@ class DynamicFilter(_interface.Strategy):
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         m_ext, *_ = self.implementation.extrapolate_mean(
-            s0.filtered.mean, p=p, p_inv=p_inv
+            s0.marginals.mean, p=p, p_inv=p_inv
         )
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
-            l0=s0.filtered.cov_sqrtm_lower,
+            l0=s0.marginals.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=s1.diffusion_sqrtm,  # right-including intervals
         )
         sol = self.implementation.extract_sol(rv=extrapolated)
-        target_p = FilterOutput(
+        target_p = FilteringSolution(
             t=t,
             t_previous=t,
             u=sol,
-            filtered=extrapolated,
+            marginals=extrapolated,
             diffusion_sqrtm=s1.diffusion_sqrtm,
         )
         return s1, target_p, target_p
