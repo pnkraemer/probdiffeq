@@ -8,7 +8,7 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
-from odefilter import controls, information, odefilters, strategies
+from odefilter import _adaptive, controls, information, strategies
 from odefilter.implementations import dense, isotropic
 
 _ATOL_DEFAULTS = 1e-6
@@ -26,7 +26,7 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFA
     )
     strategy = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
+    odefilter = _adaptive.AdaptiveODEFilter(
         strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
@@ -44,7 +44,7 @@ def dynamic_isotropic_eks0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFA
     )
     strategy = strategies.DynamicSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
+    odefilter = _adaptive.AdaptiveODEFilter(
         strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
@@ -64,7 +64,7 @@ def dynamic_isotropic_fixpt_eks0(
     )
     strategy = strategies.DynamicFixedPointSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
+    odefilter = _adaptive.AdaptiveODEFilter(
         strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
@@ -83,7 +83,7 @@ def dynamic_ekf1(
     )
     strategy = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
+    odefilter = _adaptive.AdaptiveODEFilter(
         strategy=strategy, control=control, atol=atol, rtol=rtol
     )
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)

@@ -75,8 +75,8 @@ nav:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"
         - "api_docs/taylor.md"
+        - "api_docs/odefilters.md"
     - Advanced API Documentation:
-        - "api_docs_advanced/odefilters.md"
         - "api_docs_advanced/strategies.md"
         - "api_docs_advanced/information.md"
         - "api_docs_advanced/controls.md"
