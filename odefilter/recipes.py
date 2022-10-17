@@ -8,14 +8,11 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
-from odefilter import controls, information, odefilters, strategies
+from odefilter import information, solvers
 from odefilter.implementations import dense, isotropic
 
-_ATOL_DEFAULTS = 1e-6
-_RTOL_DEFAULTS = 1e-3
 
-
-def dynamic_isotropic_ekf0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS):
+def dynamic_isotropic_ekf0(num_derivatives):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, dynamic calibration, and optimised for terminal-value simulation.
 
@@ -24,16 +21,12 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFA
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicFilter(implementation=implementation)
-    control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
-    )
+    solver = solvers.DynamicFilter(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
-    return odefilter, information_op
+    return solver, information_op
 
 
-def dynamic_isotropic_eks0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS):
+def dynamic_isotropic_eks0(num_derivatives):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 
@@ -42,18 +35,12 @@ def dynamic_isotropic_eks0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFA
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicSmoother(implementation=implementation)
-    control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
-    )
+    solver = solvers.DynamicSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
-    return odefilter, information_op
+    return solver, information_op
 
 
-def dynamic_isotropic_fixpt_eks0(
-    num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS
-):
+def dynamic_isotropic_fixpt_eks0(num_derivatives):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 
@@ -62,18 +49,12 @@ def dynamic_isotropic_fixpt_eks0(
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicFixedPointSmoother(implementation=implementation)
-    control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
-    )
+    solver = solvers.DynamicFixedPointSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
-    return odefilter, information_op
+    return solver, information_op
 
 
-def dynamic_ekf1(
-    num_derivatives, ode_dimension, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFAULTS
-):
+def dynamic_ekf1(num_derivatives, ode_dimension):
     """Construct the equivalent of a semi-implicit solver with dynamic calibration.
 
     Suitable for low-dimensional, stiff problems.
@@ -81,10 +62,6 @@ def dynamic_ekf1(
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = strategies.DynamicFilter(implementation=implementation)
-    control = controls.ProportionalIntegral()
-    odefilter = odefilters.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
-    )
+    solver = solvers.DynamicFilter(implementation=implementation)
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
-    return odefilter, information_op
+    return solver, information_op

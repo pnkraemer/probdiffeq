@@ -11,34 +11,47 @@ from odefilter import ivpsolve, recipes
 
 @case
 @parametrize("n", [2, 3])
-@parametrize("tol", [1e-1, 1e-3])
-def filter_smoother_pair_eks0(n, tol):
-    ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
+def filter_smoother_pair_eks0(n):
+    ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n)
+    eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n)
     return ekf0, eks0
 
 
 @case
 @parametrize("n", [2, 3])
-@parametrize("tol", [1e-1, 1e-3])
-def filter_smoother_pair_fixpt_eks0(n, tol):
-    ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    eks0 = recipes.dynamic_isotropic_fixpt_eks0(
-        num_derivatives=n, atol=1e-2 * tol, rtol=tol
-    )
+def filter_smoother_pair_fixpt_eks0(n):
+    ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n)
+    eks0 = recipes.dynamic_isotropic_fixpt_eks0(num_derivatives=n)
     return ekf0, eks0
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases("ekf, eks", cases=".", prefix="filter_smoother_pair_")
-def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks):
+@parametrize("tol", [1e-1, 1e-3])
+def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks, tol):
     """In simulate_terminal_values(), \
     every filter and smoother should yield the exact same result."""
     ekf_sol = ivpsolve.simulate_terminal_values(
-        vf, u0, t0=t0, t1=t1, parameters=p, solver=ekf[0], info_op=ekf[1]
+        vf,
+        u0,
+        t0=t0,
+        t1=t1,
+        parameters=p,
+        solver=ekf[0],
+        info_op=ekf[1],
+        atol=1e-2 * tol,
+        rtol=tol,
     )
     eks_sol = ivpsolve.simulate_terminal_values(
-        vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
+        vf,
+        u0,
+        t0=t0,
+        t1=t1,
+        parameters=p,
+        solver=eks[0],
+        info_op=eks[1],
+        atol=1e-2 * tol,
+        rtol=tol,
     )
 
     assert _tree_all_allclose(ekf_sol.t, eks_sol.t)

@@ -42,7 +42,7 @@ def vf(t, *ys):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=1, rtol=1e-1, atol=1e-1)
+ek0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -50,7 +50,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 %%time
 
 solution = ivpsolve.simulate_checkpoints(
-    vf, initial_values=(u0,), ts=ts, solver=ek0, info_op=info_op
+    vf, initial_values=(u0,), ts=ts, solver=ek0, info_op=info_op, rtol=1e-1, atol=1e-1
 )
 ```
 
@@ -80,9 +80,15 @@ for i, axes_cols in enumerate(axes_all.T):
 
     axes_cols[0].plot(solution.t, ms)
     for m in ms.T:
-        axes_cols[0].fill_between(solution.t, m - 3 * stds, m + 3 * stds, alpha=0.3)
+        axes_cols[0].fill_between(
+            solution.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3
+        )
 
     axes_cols[1].semilogy(solution.t, stds)
 
 plt.show()
+```
+
+```python
+
 ```

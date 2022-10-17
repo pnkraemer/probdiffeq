@@ -1,0 +1,3 @@
+# Inference strategies
+
+::: odefilter.solvers

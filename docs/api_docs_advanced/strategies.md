@@ -1,3 +1,0 @@
-# Inference strategies
-
-::: odefilter.strategies
