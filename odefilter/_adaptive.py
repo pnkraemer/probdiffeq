@@ -86,7 +86,7 @@ class AdaptiveODEFilterState(Generic[T]):
 class AdaptiveODEFilter:
     """Make an adaptive ODE filter."""
 
-    strategy: Any
+    solver: Any
 
     atol: float
     rtol: float
@@ -100,7 +100,7 @@ class AdaptiveODEFilter:
 
     def tree_flatten(self):
         children = (
-            self.strategy,
+            self.solver,
             self.atol,
             self.rtol,
             self.control,
@@ -111,10 +111,10 @@ class AdaptiveODEFilter:
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        strategy, atol, rtol, control, numerical_zero = children
+        solver, atol, rtol, control, numerical_zero = children
         norm_ord = aux
         return cls(
-            strategy=strategy,
+            solver=solver,
             atol=atol,
             rtol=rtol,
             control=control,
@@ -125,13 +125,13 @@ class AdaptiveODEFilter:
     @property
     def error_order(self):
         """Error order."""
-        return self.strategy.implementation.num_derivatives + 1
+        return self.solver.implementation.num_derivatives + 1
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise the IVP solver state."""
         # Initialise the components
-        posterior, error_estimate = self.strategy.init_fn(
+        posterior, error_estimate = self.solver.init_fn(
             taylor_coefficients=taylor_coefficients, t0=t0
         )
         state_control = self.control.init_fn()
@@ -209,7 +209,7 @@ class AdaptiveODEFilter:
     def _attempt_step_fn(self, *, state, info_op):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
-        posterior, error_estimate = self.strategy.step_fn(
+        posterior, error_estimate = self.solver.step_fn(
             state=state.accepted, info_op=info_op, dt=state.dt_proposed
         )
 
@@ -242,7 +242,7 @@ class AdaptiveODEFilter:
         return jnp.linalg.norm(error_relative, ord=norm_ord)
 
     def _interpolate(self, *, state, t):
-        accepted, solution, previous = self.strategy.interpolate_fn(
+        accepted, solution, previous = self.solver.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
         return AdaptiveODEFilterState(
@@ -257,7 +257,7 @@ class AdaptiveODEFilter:
 
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-        return self.strategy.extract_fn(state=state.solution)
+        return self.solver.extract_fn(state=state.solution)
 
 
 def _empty_like(tree):

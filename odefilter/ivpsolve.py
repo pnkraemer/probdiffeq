@@ -24,7 +24,7 @@ def simulate_terminal_values(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=lambda *x: vector_field(t0, *x, *parameters),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives,
+        num=solver.solver.implementation.num_derivatives,
     )
 
     info_op_curried = info_op(vector_field)
@@ -50,7 +50,7 @@ def simulate_checkpoints(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=lambda *x: vector_field(ts[0], *x, *parameters),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives,
+        num=solver.solver.implementation.num_derivatives,
     )
 
     info_op_curried = info_op(vector_field)
@@ -84,7 +84,7 @@ def solve(vector_field, initial_values, t0, t1, solver, info_op, parameters=()):
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=lambda *x: vector_field(t0, *x, *parameters),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives,
+        num=solver.solver.implementation.num_derivatives,
     )
 
     # todo: because of this line, the function recompiles

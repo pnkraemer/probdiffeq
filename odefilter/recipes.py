@@ -24,10 +24,10 @@ def dynamic_isotropic_ekf0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFA
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicFilter(implementation=implementation)
+    solver = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = _adaptive.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
+        solver=solver, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
@@ -42,10 +42,10 @@ def dynamic_isotropic_eks0(num_derivatives, atol=_ATOL_DEFAULTS, rtol=_RTOL_DEFA
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicSmoother(implementation=implementation)
+    solver = strategies.DynamicSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = _adaptive.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
+        solver=solver, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
@@ -62,10 +62,10 @@ def dynamic_isotropic_fixpt_eks0(
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = strategies.DynamicFixedPointSmoother(implementation=implementation)
+    solver = strategies.DynamicFixedPointSmoother(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = _adaptive.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
+        solver=solver, control=control, atol=atol, rtol=rtol
     )
     information_op = information.isotropic_ek0(ode_order=1)
     return odefilter, information_op
@@ -81,10 +81,10 @@ def dynamic_ekf1(
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = strategies.DynamicFilter(implementation=implementation)
+    solver = strategies.DynamicFilter(implementation=implementation)
     control = controls.ProportionalIntegral()
     odefilter = _adaptive.AdaptiveODEFilter(
-        strategy=strategy, control=control, atol=atol, rtol=rtol
+        solver=solver, control=control, atol=atol, rtol=rtol
     )
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return odefilter, information_op
