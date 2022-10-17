@@ -40,26 +40,47 @@ class Posterior(Generic[T]):
 
     t: float
     t_previous: float
+
     u: Any
-    filtered: T
-    diffusion_sqrtm: float
+    marginals: T
+    marginals_filtered: T
     backward_model: BackwardModel[T]
+
+    diffusion_sqrtm: float
 
     def tree_flatten(self):
         children = (
             self.t,
             self.t_previous,
             self.u,
-            self.filtered,
-            self.diffusion_sqrtm,
+            self.marginals,
+            self.marginals_filtered,
             self.backward_model,
+            self.diffusion_sqrtm,
         )
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+        (
+            t,
+            t_previous,
+            u,
+            marginals,
+            marginals_filtered,
+            backward_model,
+            diffusion_sqrtm,
+        ) = children
+        return cls(
+            t=t,
+            t_previous=t_previous,
+            u=u,
+            marginals=marginals,
+            marginals_filtered=marginals_filtered,
+            backward_model=backward_model,
+            diffusion_sqrtm=diffusion_sqrtm,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -77,6 +98,10 @@ class _DynamicSmootherCommon(_interface.Strategy):
     def step_fn(self, state, info_op, dt):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def init_fn(self, taylor_coefficients, t0):
+        raise NotImplementedError
+
     @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
         # todo: are we looping correctly?
@@ -85,14 +110,23 @@ class _DynamicSmootherCommon(_interface.Strategy):
 
         # no jax.lax.cond here, because we condition on the _shape_ of the array
         # which is available at compilation time already.
-        do_backward_pass = state.filtered.mean.ndim == 3
+        do_backward_pass = state.marginals_filtered.mean.ndim == 3
         if do_backward_pass:
             return self._smooth(state)
 
+        return Posterior(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals_filtered=state.marginals_filtered,
+            marginals=state.marginals_filtered,  # we are at the terminal state only
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=state.backward_model,
+        )
         return state
 
     def _smooth(self, state):
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.filtered)
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.marginals_filtered)
         marginals = self.implementation.marginalise_backwards(
             init=init, backward_model=state.backward_model
         )
@@ -101,7 +135,8 @@ class _DynamicSmootherCommon(_interface.Strategy):
             t=state.t,
             t_previous=state.t_previous,
             u=sol,
-            filtered=marginals,
+            marginals_filtered=state.marginals_filtered,
+            marginals=marginals,
             diffusion_sqrtm=state.diffusion_sqrtm,
             backward_model=state.backward_model,
         )
@@ -116,7 +151,8 @@ class _DynamicSmootherCommon(_interface.Strategy):
             t=t,
             t_previous=t,  # identity transition: this is what it does...
             u=s0.u,
-            filtered=s0.filtered,
+            marginals_filtered=s0.marginals_filtered,
+            marginals=s0.marginals,
             diffusion_sqrtm=s0.diffusion_sqrtm,
             backward_model=bw_model,
         )
@@ -167,7 +203,8 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t=t0,
             t_previous=-jnp.inf,
             u=sol,
-            filtered=corrected,
+            marginals_filtered=corrected,
+            marginals=None,
             diffusion_sqrtm=1.0,
             backward_model=backward_model,
         )
@@ -182,7 +219,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.filtered.mean, p=p, p_inv=p_inv
+            state.marginals_filtered.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -195,7 +232,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
 
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=state.filtered.cov_sqrtm_lower,
+            l0=state.marginals_filtered.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -215,7 +252,8 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
-            filtered=corrected,
+            marginals_filtered=corrected,
+            marginals=None,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model,
         )
@@ -229,7 +267,8 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t=t,
             t_previous=s0.t,
             u=s1.u,
-            filtered=s1.filtered,
+            marginals_filtered=s1.marginals_filtered,
+            marginals=None,
             diffusion_sqrtm=s1.diffusion_sqrtm,
             backward_model=s1.backward_model,
         )
@@ -243,10 +282,10 @@ class DynamicSmoother(_DynamicSmootherCommon):
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
         # which gives another extrapolation and a backward transition.
-        # The latter extrapolation is discarded in favour of s1.filtered,
+        # The latter extrapolation is discarded in favour of s1.marginals_filtered,
         # but the backward transition is kept.
 
-        rv0, diffsqrtm = s0.filtered, s1.diffusion_sqrtm
+        rv0, diffsqrtm = s0.marginals_filtered, s1.diffusion_sqrtm
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
@@ -262,7 +301,8 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t=t,
             t_previous=s0.t,
             u=sol,
-            filtered=extrapolated0,
+            marginals_filtered=extrapolated0,
+            marginals=None,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model0,
         )
@@ -272,7 +312,8 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t=s1.t,
             t_previous=t,
             u=sol,
-            filtered=s1.filtered,
+            marginals_filtered=s1.marginals_filtered,
+            marginals=None,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model1,
         )
@@ -303,7 +344,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             t=t0,
             t_previous=t0,
             u=sol,
-            filtered=corrected,
+            marginals_filtered=corrected,
+            marginals=None,
             diffusion_sqrtm=1.0,
             backward_model=backward_model,
         )
@@ -318,7 +360,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.filtered.mean, p=p, p_inv=p_inv
+            state.marginals_filtered.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -331,7 +373,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
 
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=state.filtered.cov_sqrtm_lower,
+            l0=state.marginals_filtered.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             diffusion_sqrtm=diffusion_sqrtm,
@@ -359,7 +401,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             t=state.t + dt,
             t_previous=state.t_previous,  # condensing the models...
             u=sol,
-            filtered=corrected,
+            marginals_filtered=corrected,
+            marginals=None,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model,
         )
@@ -369,9 +412,6 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        # _, backward_model1 = self._interpolate_from_to_fn(
-        #     rv=s0.filtered, diffusion_sqrtm=s1.diffusion_sqrtm, t=s1.t, t0=s0.t
-        # )
 
         backward_model1 = s1.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
@@ -382,7 +422,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             t=t,
             t_previous=s0.t_previous,  # condensed the model...
             u=s1.u,
-            filtered=s1.filtered,
+            marginals_filtered=s1.marginals_filtered,
+            marginals=None,
             backward_model=backward_model1,
             diffusion_sqrtm=s1.diffusion_sqrtm,
         )
@@ -406,7 +447,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
 
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
-            rv=s0.filtered, diffusion_sqrtm=diffusion_sqrtm, t=t, t0=s0.t
+            rv=s0.marginals_filtered, diffusion_sqrtm=diffusion_sqrtm, t=t, t0=s0.t
         )
         noise0, g0 = self.implementation.condense_backward_models(
             bw_init=s0.backward_model, bw_state=bw0
@@ -417,7 +458,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             t=t,
             t_previous=s0.t_previous,  # condensed the model...
             u=sol,
-            filtered=extrapolated0,
+            marginals_filtered=extrapolated0,
+            marginals=None,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model0,
         )
@@ -433,7 +475,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             t=s1.t,
             t_previous=t,  # new model! No condensing...
             u=s1.u,
-            filtered=s1.filtered,
+            marginals_filtered=s1.marginals_filtered,
+            marginals=None,
             diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model1,
         )

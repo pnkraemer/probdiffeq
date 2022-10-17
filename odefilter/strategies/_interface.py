@@ -23,8 +23,13 @@ class Strategy(abc.ABC):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
+    #
+    # @abc.abstractmethod
+    # def taylor_coefficients_to_solution(self, *, taylor_coefficients, t0):
+    #     raise NotImplementedError
+
     @abc.abstractmethod
-    def init_fn(self, *, taylor_coefficients, t0):
+    def init_fn(self, *, solution):  # -> state
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -32,7 +37,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_fn(self, *, state):
+    def extract_fn(self, *, state):  # -> solution
         raise NotImplementedError
 
     @jax.jit
