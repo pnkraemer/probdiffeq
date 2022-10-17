@@ -21,10 +21,16 @@ class AdaptiveODEFilterState(Generic[T]):
     error_norm_proposed: float
 
     control: Any  # must contain field "scale_factor".
-    """Controller."""
+    """Controller state."""
 
     # All sorts of solution objects.
-    # todo: sort according to previous <= solution <= accepted <= proposed
+    # previous.t <= solution.t <= accepted.t <= proposed.t
+
+    proposed: T
+    """The most recent proposal."""
+
+    accepted: T
+    """The most recent accepted state."""
 
     solution: T
     """The current best solution.
@@ -36,12 +42,6 @@ class AdaptiveODEFilterState(Generic[T]):
     (which has been the interpolation result).
     """
 
-    proposed: T
-    """The most recent proposal."""
-
-    accepted: T
-    """The most recent accepted state."""
-
     previous: T
     """The penultimate (2nd most recent) accepted state. Needed for interpolation.
     """
@@ -51,9 +51,9 @@ class AdaptiveODEFilterState(Generic[T]):
             self.dt_proposed,
             self.error_norm_proposed,
             self.control,
-            self.solution,
             self.proposed,
             self.accepted,
+            self.solution,
             self.previous,
         )
         aux = ()
@@ -61,7 +61,24 @@ class AdaptiveODEFilterState(Generic[T]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+        (
+            dt_proposed,
+            error_norm_proposed,
+            control,
+            proposed,
+            accepted,
+            solution,
+            previous,
+        ) = children
+        return cls(
+            dt_proposed=dt_proposed,
+            error_norm_proposed=error_norm_proposed,
+            control=control,
+            solution=solution,
+            proposed=proposed,
+            accepted=accepted,
+            previous=previous,
+        )
 
 
 @register_pytree_node_class
