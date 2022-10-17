@@ -1,4 +1,4 @@
-"""Initial value problem solvers."""
+"""ODE filter routines."""
 from functools import partial  # noqa: F401
 
 import jax.lax

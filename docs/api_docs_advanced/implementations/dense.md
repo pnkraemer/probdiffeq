@@ -1,3 +1,3 @@
-# Complete correlation structure
+# No factorisation
 
 ::: odefilter.implementations.dense

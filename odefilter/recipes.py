@@ -8,8 +8,9 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
-from odefilter import information, solvers
+from odefilter import information
 from odefilter.implementations import dense, isotropic
+from odefilter.strategies import filters, smoothers
 
 
 def dynamic_isotropic_ekf0(num_derivatives):
@@ -21,7 +22,7 @@ def dynamic_isotropic_ekf0(num_derivatives):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = solvers.DynamicFilter(implementation=implementation)
+    solver = filters.DynamicFilter(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
     return solver, information_op
 
@@ -35,7 +36,7 @@ def dynamic_isotropic_eks0(num_derivatives):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = solvers.DynamicSmoother(implementation=implementation)
+    solver = smoothers.DynamicSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
     return solver, information_op
 
@@ -49,7 +50,7 @@ def dynamic_isotropic_fixpt_eks0(num_derivatives):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = solvers.DynamicFixedPointSmoother(implementation=implementation)
+    solver = smoothers.DynamicFixedPointSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
     return solver, information_op
 
@@ -62,6 +63,6 @@ def dynamic_ekf1(num_derivatives, ode_dimension):
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    solver = solvers.DynamicFilter(implementation=implementation)
+    solver = filters.DynamicFilter(implementation=implementation)
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return solver, information_op

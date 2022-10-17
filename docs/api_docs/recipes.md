@@ -1,3 +1,2 @@
-# Solver recipes
-
+# ODE filter recipes
 ::: odefilter.recipes
