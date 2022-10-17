@@ -102,7 +102,6 @@ plt.show()
 # which is equivalent to
 
 # is the remainder a preconditioning issue?
-?preconditioner
 
 # what happens if we accept-reject and then overstep
 # very slightly and therefore immediately interpolate?
@@ -112,14 +111,14 @@ plt.show()
 ```python
 plt.plot(
     fixptsol.t,
-    fixptsol.filtered.mean[:, -1, :],
+    fixptsol.marginals.mean[:, -1, :],
     linestyle="None",
     marker="P",
     label="FixPtEKS0(t=EKS0.t)",
 )
 plt.plot(
     ek0sol.t,
-    ek0sol.filtered.mean[:, -1, :],
+    ek0sol.marginals.mean[:, -1, :],
     linestyle="None",
     marker="o",
     color="red",
@@ -127,7 +126,7 @@ plt.plot(
 )
 plt.plot(
     fixptsol2.t,
-    fixptsol2.filtered.mean[:, -1, :],
+    fixptsol2.marginals.mean[:, -1, :],
     linestyle="None",
     marker="^",
     color="gray",
@@ -140,66 +139,5 @@ plt.show()
 ```
 
 ```python
-print(ek0sol.filtered.mean)
+
 ```
-
-<!-- #region -->
-## The final lines should always coincide for:
-
-* t1=1e-2, 1e-1, 1e0, 1e1
-* num_derivatives=1, 4, 7
-* Denser and coarser evaluation grids than computation grids
-* jit and nojit (complete solve)
-* f32 and f64
-
-
-## Make sure that
-
-* The plots only use markers, not lines! (We are comparing checkpoints!)
-* The filter solutions are good
-
-
-## Corner cases for each step
-
-
-A, A') Attempt-step-loop / no loop
-
-B, B') Stepped exactly to final time / did not
-
-C, C') Overstepped - interpolate / did not
-
-
-
-* if A happens, only _either_ B or C or B'&C' can happen
-* if A does not happen, B cannot happen; but C must happen because otherwise, nothing happens
-* if in the previous step, B happened, A must happen in the next step
-* if in the previous step, A-B'-C' happens, A must happen in the next step
-
-Cases for a single step:
-
-1) A-B'-C'
-2) A-B-C'
-3) A-B'-C
-4) A'-B'-C
-
-Cases for a step-step combination:
-1-1,
-1-2,
-1-3,
-2-1,
-2-2,
-2-3,
-3-1,
-3-2,
-3-3,
-3-4,
-4-1,
-4-2,
-4-3,
-4-4,
-
-Impossible combinations:
-2-4,
-1-4,
-
-<!-- #endregion -->

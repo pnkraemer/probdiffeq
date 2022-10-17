@@ -57,7 +57,7 @@ solution = ivpsolve.simulate_checkpoints(
 Plot the solution
 
 ```python
-_, num_derivatives, _ = solution.filtered.mean.shape
+_, num_derivatives, _ = solution.marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -65,8 +65,8 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = solution.filtered.mean[:, i, :]
-    ls = solution.filtered.cov_sqrtm_lower[:, i, :]
+    ms = solution.marginals.mean[:, i, :]
+    ls = solution.marginals.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
