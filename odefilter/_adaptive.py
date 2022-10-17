@@ -171,7 +171,7 @@ class AdaptiveODEFilter:
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
-            lambda s: self._rejection_loop(state0=s, info_op=info_op),
+            lambda s: self._rejection_loop(state0=s, info_op=info_op, t1=t1),
             lambda s: s,
             state,
         )
@@ -183,14 +183,14 @@ class AdaptiveODEFilter:
         )
         return state
 
-    def _rejection_loop(self, *, info_op, state0):
+    def _rejection_loop(self, *, info_op, state0, t1):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
 
         def body_fn(x):
             _, s = x
-            s = self._attempt_step_fn(state=s, info_op=info_op)
+            s = self._attempt_step_fn(state=s, info_op=info_op, t1=t1)
             proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
 
@@ -208,7 +208,7 @@ class AdaptiveODEFilter:
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, info_op):
+    def _attempt_step_fn(self, *, state, info_op,t1):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         posterior, error_estimate = self.solver.step_fn(
@@ -222,12 +222,14 @@ class AdaptiveODEFilter:
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
-        state_control = self.control.control_fn(
+        dt_proposed, state_control = self.control.control_fn(
             state=state.control,
             error_normalised=error_normalised,
             error_order=self.error_order,
+            dt_previous=state.dt_proposed,
+            t=posterior.t,
+            t1=t1,
         )
-        dt_proposed = state.dt_proposed * state_control.scale_factor
         return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new

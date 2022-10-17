@@ -17,7 +17,7 @@ class AbstractControl(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def control_fn(self, *, state, error_normalised, error_order):
+    def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
         """Control a normalised error estimate."""
         raise NotImplementedError
 
@@ -25,7 +25,6 @@ class AbstractControl(abc.ABC):
 class PIState(NamedTuple):
     """Proportional-integral controller state."""
 
-    scale_factor: float
     error_norm_previously_accepted: float
 
 
@@ -57,9 +56,9 @@ class ProportionalIntegral(AbstractControl):
 
     def init_fn(self):
         """Initialise a controller state."""
-        return PIState(scale_factor=1.0, error_norm_previously_accepted=1.0)
+        return PIState(error_norm_previously_accepted=1.0)
 
-    def control_fn(self, *, state, error_normalised, error_order):
+    def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
         """Control a normalised error estimate."""
         scale_factor = self._scale_factor_proportional_integral(
             error_norm=error_normalised,
@@ -76,10 +75,10 @@ class ProportionalIntegral(AbstractControl):
             error_normalised,
             state.error_norm_previously_accepted,
         )
-        return PIState(
-            scale_factor=scale_factor,
-            error_norm_previously_accepted=error_norm_previously_accepted,
+        state = PIState(
+            error_norm_previously_accepted=error_norm_previously_accepted
         )
+        return scale_factor * dt_previous, state
 
     @staticmethod
     def _scale_factor_proportional_integral(
@@ -114,12 +113,6 @@ class ProportionalIntegral(AbstractControl):
         return scale_factor_clipped
 
 
-class IState(NamedTuple):
-    """Integral controller state."""
-
-    scale_factor: float
-
-
 class Integral(AbstractControl):
     """Integral control."""
 
@@ -129,9 +122,9 @@ class Integral(AbstractControl):
 
     def init_fn(self):
         """Initialise a controller state."""
-        return IState(scale_factor=1.0)
+        return ()
 
-    def control_fn(self, state, error_normalised, error_order):
+    def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
         """Control a normalised error estimate."""
         scale_factor = self._scale_factor_integral_control(
             error_norm=error_normalised,
@@ -140,7 +133,7 @@ class Integral(AbstractControl):
             factor_min=self.factor_min,
             factor_max=self.factor_max,
         )
-        return IState(scale_factor=scale_factor)
+        return scale_factor * dt_previous, ()
 
     @staticmethod
     def _scale_factor_integral_control(
