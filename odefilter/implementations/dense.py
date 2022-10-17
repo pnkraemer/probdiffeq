@@ -60,7 +60,7 @@ class DenseImplementation(_interface.Implementation):
         return MultivariateNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_error_estimate(self):  # noqa: D102
-        return jnp.inf * jnp.ones((self.ode_dimension,))
+        return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
@@ -77,9 +77,8 @@ class DenseImplementation(_interface.Implementation):
         return m_ext, m_ext_p, m0_p
 
     def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
-        l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(
-            p[:, None] * self.q_sqrtm_lower
-        )
+        linear_fn_vmap = jax.vmap(linear_fn, in_axes=1, out_axes=1)
+        l_obs_nonsquare = linear_fn_vmap(p[:, None] * self.q_sqrtm_lower)
         l_obs_raw = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
         diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)

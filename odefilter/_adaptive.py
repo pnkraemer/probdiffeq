@@ -12,6 +12,8 @@ from odefilter import controls
 
 T = TypeVar("T")
 """A generic ODE Filter state."""
+R = TypeVar("R")
+"""A generic ODE Filter strategy."""
 
 
 @register_pytree_node_class
@@ -76,22 +78,22 @@ class AdaptiveODEFilterState(Generic[T]):
             dt_proposed=dt_proposed,
             error_norm_proposed=error_norm_proposed,
             control=control,
-            solution=solution,
             proposed=proposed,
             accepted=accepted,
+            solution=solution,
             previous=previous,
         )
 
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class AdaptiveODEFilter:
+class AdaptiveODEFilter(Generic[R]):
     """Make an adaptive ODE filter."""
 
-    solver: Any
+    solver: R
 
-    atol: float = 1e-6
-    rtol: float = 1e-3
+    atol: float = 1e-4
+    rtol: float = 1e-2
 
     control: Any = controls.ProportionalIntegral()
     norm_ord: Union[int, str, None] = None

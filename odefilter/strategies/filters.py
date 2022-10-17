@@ -114,7 +114,8 @@ class DynamicFilter(_interface.Strategy):
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
-        error_estimate *= dt
+        error_estimate = error_estimate * dt
+
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
             l0=state.marginals.cov_sqrtm_lower,

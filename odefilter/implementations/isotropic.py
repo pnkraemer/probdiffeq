@@ -55,7 +55,7 @@ class IsotropicImplementation(_interface.Implementation):
 
     @staticmethod
     def init_error_estimate():  # noqa: D102
-        return jnp.inf * jnp.ones(())
+        return jnp.zeros(())  # the initialisation is error-free
 
     def init_backward_transition(self):  # noqa: D102
         return jnp.eye(*self.a.shape)

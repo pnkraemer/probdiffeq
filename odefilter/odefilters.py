@@ -76,9 +76,9 @@ def odefilter(info_op, taylor_coefficients, t0, t1, solver, **options):
 def _odefilter_generator(info_op, taylor_coefficients, t0, t1, adaptive_solver):
     """Generate an ODE filter solution iteratively."""
     _assert_not_scalar(taylor_coefficients)
-
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
     yield state
+
     while state.solution.t < t1:
         state = adaptive_solver.step_fn(state=state, info_op=info_op, t1=t1)
         yield state
