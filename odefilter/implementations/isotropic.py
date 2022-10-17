@@ -79,11 +79,13 @@ class IsotropicImplementation(_interface.Implementation):
         l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
 
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = _sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None])[0, 0]
-        res_white = m_obs / l_obs / jnp.sqrt(m_obs.size)
+        l_obs = jnp.reshape(_sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None]), ())
+        res_white = (m_obs / l_obs) / jnp.sqrt(m_obs.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
-        diffusion_sqrtm = _sqrtm.sqrtm_to_cholesky(R=res_white[:, None])[0, 0]
+        diffusion_sqrtm = jnp.reshape(
+            _sqrtm.sqrtm_to_cholesky(R=res_white[:, None]), ()
+        )
 
         error_estimate = diffusion_sqrtm * l_obs
         return diffusion_sqrtm, error_estimate
@@ -128,7 +130,7 @@ class IsotropicImplementation(_interface.Implementation):
     def final_correction(*, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = linear_fn(l_ext)  # shape (n,)
-        c_obs = jnp.dot(l_obs, l_obs)
+        c_obs = jnp.reshape(jnp.dot(l_obs, l_obs), ())
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]

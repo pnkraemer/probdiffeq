@@ -202,7 +202,7 @@ class AdaptiveODEFilter(Generic[R]):
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
         return AdaptiveODEFilterState(
             dt_proposed=state_new.dt_proposed,
-            error_norm_proposed=state_new.error_norm_proposed,
+            error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
             accepted=state_new.proposed,  # holla! New! :)
             solution=state_new.proposed,  # Overwritten by interpolate() if necessary
@@ -213,13 +213,21 @@ class AdaptiveODEFilter(Generic[R]):
     def _attempt_step_fn(self, *, state, info_op, t1):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
+        # Some controllers like to clip the terminal value instead of interpolating.
+        # This must happen _before_ the step.
+        dt = self.control.clip_fn(state=state.accepted, dt=state.dt_proposed, t1=t1)
+
+        # Perform the actual step.
         posterior, error_estimate = self.solver.step_fn(
-            state=state.accepted, info_op=info_op, dt=state.dt_proposed
+            state=state.accepted, info_op=info_op, dt=dt
         )
 
+        # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(
             error_estimate=error_estimate,
-            u=posterior.u,
+            u=jnp.abs(posterior.u),
+            # todo: allow a switch to
+            #  u=jnp.maximum(jnp.abs(posterior.u), jnp.abs(state.accepted.u)),
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
@@ -229,8 +237,6 @@ class AdaptiveODEFilter(Generic[R]):
             error_normalised=error_normalised,
             error_contraction_rate=self.error_contraction_rate,
             dt_previous=state.dt_proposed,
-            t=posterior.t,
-            t1=t1,
         )
         return AdaptiveODEFilterState(
             dt_proposed=dt_proposed,  # new
@@ -245,7 +251,8 @@ class AdaptiveODEFilter(Generic[R]):
     @staticmethod
     def _normalise_error(*, error_estimate, u, atol, rtol, norm_ord):
         error_relative = error_estimate / (atol + rtol * jnp.abs(u))
-        return jnp.linalg.norm(error_relative, ord=norm_ord)
+        dim = jnp.atleast_1d(u).size
+        return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
     def _interpolate(self, *, state, t):
         accepted, solution, previous = self.solver.interpolate_fn(

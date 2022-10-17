@@ -19,7 +19,7 @@ class AbstractControl(abc.ABC):
     # todo: rename error_contraction_rate to error_contraction_rate
     @abc.abstractmethod
     def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
+        self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
         r"""Propose a time-step $\Delta t$.
 
@@ -29,6 +29,10 @@ class AbstractControl(abc.ABC):
         the current normalised error, and some expected error
         contraction rate.
         """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def clip_fn(self, *, state, dt, t1):
         raise NotImplementedError
 
 
@@ -100,19 +104,11 @@ class _ProportionalIntegralCommon(AbstractControl):
         return scale_factor_clipped
 
     @abc.abstractmethod
-    def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
-    ):
+    def clip_fn(self, *, state, dt, t1):
         raise NotImplementedError
 
-
-@register_pytree_node_class
-@dataclass(frozen=True)
-class ProportionalIntegral(_ProportionalIntegralCommon):
-    """Proportional-integral (PI) controller."""
-
     def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
+        self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
 
         scale_factor = self._scale_factor_proportional_integral(
@@ -136,33 +132,24 @@ class ProportionalIntegral(_ProportionalIntegralCommon):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
+class ProportionalIntegral(_ProportionalIntegralCommon):
+    """Proportional-integral (PI) controller."""
+
+    def clip_fn(self, *, state, dt, t1):
+        return dt
+
+
+@register_pytree_node_class
+@dataclass(frozen=True)
 class ClippedProportionalIntegral(_ProportionalIntegralCommon):
     r"""Proportional-integral (PI) controller.
 
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
-    ):
-        scale_factor = self._scale_factor_proportional_integral(
-            error_norm=error_normalised,
-            error_contraction_rate=error_contraction_rate,
-            error_norm_previously_accepted=state.error_norm_previously_accepted,
-            safety=self.safety,
-            factor_min=self.factor_min,
-            factor_max=self.factor_max,
-            power_integral_unscaled=self.power_integral_unscaled,
-            power_proportional_unscaled=self.power_proportional_unscaled,
-        )
-        error_norm_previously_accepted = jnp.where(
-            error_normalised <= 1.0,
-            error_normalised,
-            state.error_norm_previously_accepted,
-        )
-        state = _PIState(error_norm_previously_accepted=error_norm_previously_accepted)
-        dt_proposed = jnp.minimum(scale_factor * dt_previous, t1 - t)
-        return dt_proposed, state
+    @staticmethod
+    def clip_fn(*, state, dt, t1):
+        return jnp.minimum(dt, t1 - state.t)
 
 
 @register_pytree_node_class
@@ -190,28 +177,18 @@ class _IntegralCommon(AbstractControl):
         *, error_norm, safety, error_contraction_rate, factor_min, factor_max
     ):
         scale_factor = safety * (error_norm ** (-1.0 / error_contraction_rate))
+
         scale_factor_clipped = jnp.maximum(
             factor_min, jnp.minimum(scale_factor, factor_max)
         )
         return scale_factor_clipped
 
     @abc.abstractmethod
-    def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
-    ):
+    def clip_fn(self, *, state, dt, t1):
         raise NotImplementedError
 
-
-@register_pytree_node_class
-@dataclass(frozen=True)
-class Integral(_IntegralCommon):
-    r"""Integral (I) controller.
-
-    Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
-    """
-
     def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
+        self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
         scale_factor = self._scale_factor_integral_control(
             error_norm=error_normalised,
@@ -225,14 +202,30 @@ class Integral(_IntegralCommon):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
+class Integral(_IntegralCommon):
+    r"""Integral (I) controller.
+
+    Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
+    """
+
+    def clip_fn(self, *, state, dt, t1):
+        return dt
+
+
+@register_pytree_node_class
+@dataclass(frozen=True)
 class ClippedIntegral(_IntegralCommon):
     r"""Integral (I) controller.
 
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
+    @staticmethod
+    def clip_fn(*, state, dt, t1):
+        return jnp.minimum(dt, t1 - state.t)
+
     def control_fn(
-        self, *, state, error_normalised, error_contraction_rate, dt_previous, t, t1
+        self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
         scale_factor = self._scale_factor_integral_control(
             error_norm=error_normalised,
@@ -241,5 +234,4 @@ class ClippedIntegral(_IntegralCommon):
             factor_min=self.factor_min,
             factor_max=self.factor_max,
         )
-        dt_proposed = jnp.minimum(scale_factor * dt_previous, t1 - t)
-        return dt_proposed, ()
+        return scale_factor * dt_previous, ()
