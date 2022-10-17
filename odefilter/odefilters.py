@@ -5,40 +5,45 @@ import jax.lax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter import _control_flow
+from odefilter import _adaptive, _control_flow
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver):
+def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver, **options):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
-    state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
+
+    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
         info_op=info,
-        solver=solver,
+        solver=adaptive_solver,
     )
-    return solver.extract_fn(state=solution)
+    return adaptive_solver.extract_fn(state=solution)
 
 
 @partial(jax.jit, static_argnums=[0])
-def odefilter_checkpoints(info, taylor_coefficients, ts, solver):
+def odefilter_checkpoints(info, taylor_coefficients, ts, solver, **options):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
+
+    adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
+    print(adaptive_solver)
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
             info_op=info,
-            solver=solver,
+            solver=adaptive_solver,
         )
         return s_next, s_next
 
-    state0 = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
+    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
@@ -46,30 +51,37 @@ def odefilter_checkpoints(info, taylor_coefficients, ts, solver):
         xs=ts[1:],
         reverse=False,
     )
-    return solver.extract_fn(state=solution)
+    return adaptive_solver.extract_fn(state=solution)
 
 
-def odefilter(info_op, taylor_coefficients, t0, t1, solver):
+def odefilter(info_op, taylor_coefficients, t0, t1, solver, **options):
     """Solve an initial value problem.
 
     !!! warning
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
+    adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
+
     generator = _odefilter_generator(
-        info_op, taylor_coefficients=taylor_coefficients, t0=t0, t1=t1, solver=solver
+        info_op,
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        t1=t1,
+        adaptive_solver=adaptive_solver,
     )
     forward_solution = _control_flow.tree_stack([sol for sol in generator])
-    return solver.extract_fn(state=forward_solution)
+    return adaptive_solver.extract_fn(state=forward_solution)
 
 
-def _odefilter_generator(info_op, taylor_coefficients, t0, t1, solver):
+def _odefilter_generator(info_op, taylor_coefficients, t0, t1, adaptive_solver):
     """Generate an ODE filter solution iteratively."""
     _assert_not_scalar(taylor_coefficients)
-    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+
+    state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
     yield state
     while state.solution.t < t1:
-        state = solver.step_fn(state=state, info_op=info_op, t1=t1)
+        state = adaptive_solver.step_fn(state=state, info_op=info_op, t1=t1)
         yield state
 
 

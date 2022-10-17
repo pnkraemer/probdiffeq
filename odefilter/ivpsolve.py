@@ -13,7 +13,7 @@ from odefilter import odefilters, taylor
 
 @partial(jax.jit, static_argnums=[0, 5])
 def simulate_terminal_values(
-    vector_field, initial_values, t0, t1, solver, info_op, parameters=()
+    vector_field, initial_values, t0, t1, solver, info_op, parameters=(), **options
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -24,7 +24,7 @@ def simulate_terminal_values(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=lambda *x: vector_field(t0, *x, *parameters),
         initial_values=initial_values,
-        num=solver.solver.implementation.num_derivatives,
+        num=solver.implementation.num_derivatives,
     )
 
     info_op_curried = info_op(vector_field)
@@ -34,12 +34,13 @@ def simulate_terminal_values(
         t0=t0,
         t1=t1,
         solver=solver,
+        **options,
     )
 
 
 @partial(jax.jit, static_argnums=[0, 4])
 def simulate_checkpoints(
-    vector_field, initial_values, ts, solver, info_op, parameters=()
+    vector_field, initial_values, ts, solver, info_op, parameters=(), **options
 ):
     """Solve an IVP and return the solution at checkpoints.
 
@@ -50,7 +51,7 @@ def simulate_checkpoints(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=lambda *x: vector_field(ts[0], *x, *parameters),
         initial_values=initial_values,
-        num=solver.solver.implementation.num_derivatives,
+        num=solver.implementation.num_derivatives,
     )
 
     info_op_curried = info_op(vector_field)
@@ -59,13 +60,16 @@ def simulate_checkpoints(
         taylor_coefficients=taylor_coefficients,
         ts=ts,
         solver=solver,
+        **options,
     )
 
 
 # Full solver routines
 
 
-def solve(vector_field, initial_values, t0, t1, solver, info_op, parameters=()):
+def solve(
+    vector_field, initial_values, t0, t1, solver, info_op, parameters=(), **options
+):
     """Solve an initial value problem.
 
     !!! warning
@@ -84,7 +88,7 @@ def solve(vector_field, initial_values, t0, t1, solver, info_op, parameters=()):
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=lambda *x: vector_field(t0, *x, *parameters),
         initial_values=initial_values,
-        num=solver.solver.implementation.num_derivatives,
+        num=solver.implementation.num_derivatives,
     )
 
     # todo: because of this line, the function recompiles
@@ -103,6 +107,7 @@ def solve(vector_field, initial_values, t0, t1, solver, info_op, parameters=()):
         t0=t0,
         t1=t1,
         solver=solver,
+        **options,
     )
 
 

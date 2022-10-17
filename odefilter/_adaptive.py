@@ -8,6 +8,8 @@ import jax.numpy as jnp
 import jax.tree_util
 from jax.tree_util import register_pytree_node_class
 
+from odefilter import controls
+
 T = TypeVar("T")
 """A generic ODE Filter state."""
 
@@ -23,7 +25,7 @@ class AdaptiveODEFilterState(Generic[T]):
     control: Any  # must contain field "scale_factor".
     """Controller state."""
 
-    # All sorts of solution objects.
+    # All sorts of solutions types.
     # previous.t <= solution.t <= accepted.t <= proposed.t
 
     proposed: T
@@ -88,10 +90,10 @@ class AdaptiveODEFilter:
 
     solver: Any
 
-    atol: float
-    rtol: float
+    atol: float = 1e-6
+    rtol: float = 1e-3
 
-    control: Any
+    control: Any = controls.ProportionalIntegral()
     norm_ord: Union[int, str, None] = None
 
     numerical_zero: float = 1e-10
