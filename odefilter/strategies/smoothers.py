@@ -104,15 +104,16 @@ class Posterior(Generic[T]):
             t_previous=self.t_previous[item],
             u=self.u[item],
             diffusion_sqrtm=self.diffusion_sqrtm[item],
-            marginals=jax.tree_util.tree_map(
-                lambda x: x[item], self.marginals
-            ),  # todo: make iterable
+            # todo: make iterable?
+            marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
+            # todo: make iterable?
             marginals_filtered=jax.tree_util.tree_map(
                 lambda x: x[item], self.marginals_filtered
-            ),  # todo: make iterable
+            ),
+            # todo: make iterable?
             backward_model=jax.tree_util.tree_map(
                 lambda x: x[item], self.backward_model
-            ),  # todo: make iterable
+            ),
         )
 
     def __iter__(self):
