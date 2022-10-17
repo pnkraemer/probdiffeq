@@ -8,7 +8,7 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
-from odefilter import information, strategies
+from odefilter import information, solvers
 from odefilter.implementations import dense, isotropic
 
 
@@ -21,7 +21,7 @@ def dynamic_isotropic_ekf0(num_derivatives):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = strategies.DynamicFilter(implementation=implementation)
+    solver = solvers.DynamicFilter(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
     return solver, information_op
 
@@ -35,7 +35,7 @@ def dynamic_isotropic_eks0(num_derivatives):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = strategies.DynamicSmoother(implementation=implementation)
+    solver = solvers.DynamicSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
     return solver, information_op
 
@@ -49,7 +49,7 @@ def dynamic_isotropic_fixpt_eks0(num_derivatives):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = strategies.DynamicFixedPointSmoother(implementation=implementation)
+    solver = solvers.DynamicFixedPointSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=1)
     return solver, information_op
 
@@ -62,6 +62,6 @@ def dynamic_ekf1(num_derivatives, ode_dimension):
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    solver = strategies.DynamicFilter(implementation=implementation)
+    solver = solvers.DynamicFilter(implementation=implementation)
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return solver, information_op
