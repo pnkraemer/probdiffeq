@@ -13,16 +13,21 @@ class AbstractControl(abc.ABC):
 
     @abc.abstractmethod
     def init_fn(self):
-        """Initialise a controller state."""
+        """Initialise the controller state."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
-        """Control a normalised error estimate."""
+        r"""Propose a time-step $\Delta t$.
+
+        A good time-step $\Delta t$ is as large as possible such that the normalised error
+        is smaller than 1. This is commonly a function of previous error estimates,
+        the current normalised error, and some expected local convergence rate / error order.
+        """
         raise NotImplementedError
 
 
-class PIState(NamedTuple):
+class _PIState(NamedTuple):
     """Proportional-integral controller state."""
 
     error_norm_previously_accepted: float
@@ -55,11 +60,9 @@ class ProportionalIntegral(AbstractControl):
         return cls(*children)
 
     def init_fn(self):
-        """Initialise a controller state."""
         return PIState(error_norm_previously_accepted=1.0)
 
     def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
-        """Control a normalised error estimate."""
         scale_factor = self._scale_factor_proportional_integral(
             error_norm=error_normalised,
             error_order=error_order,
@@ -121,11 +124,9 @@ class Integral(AbstractControl):
     factor_max: float = 10.0
 
     def init_fn(self):
-        """Initialise a controller state."""
         return ()
 
     def control_fn(self, *, state, error_normalised, error_order, dt_previous, t, t1):
-        """Control a normalised error estimate."""
         scale_factor = self._scale_factor_integral_control(
             error_norm=error_normalised,
             error_order=error_order,
@@ -139,7 +140,6 @@ class Integral(AbstractControl):
     def _scale_factor_integral_control(
         *, error_norm, safety, error_order, factor_min, factor_max
     ):
-        """Integral control."""
         scale_factor = safety * (error_norm ** (-1.0 / error_order))
         scale_factor_clipped = jnp.maximum(
             factor_min, jnp.minimum(scale_factor, factor_max)
