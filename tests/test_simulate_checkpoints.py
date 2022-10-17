@@ -15,12 +15,19 @@ def test_simulate_checkpoints(vf, u0, t0, t1, p, solver, info_op):
     ts = jnp.linspace(t0, t1, num=10)
 
     odeint_solution = odeint(
-        lambda y, t, *p: vf(t, y, *p), u0[0], ts, *p, atol=1e-6, rtol=1e-6
+        lambda y, t, *par: vf(t, y, *par), u0[0], ts, *p, atol=1e-6, rtol=1e-6
     )
     ts_reference, ys_reference = ts, odeint_solution
 
     solution = ivpsolve.simulate_checkpoints(
-        vf, u0, ts=ts, parameters=p, solver=solver, info_op=info_op
+        vf,
+        u0,
+        ts=ts,
+        parameters=p,
+        solver=solver,
+        info_op=info_op,
+        atol=1e-4,
+        rtol=1e-4,
     )
     assert jnp.allclose(solution.t, ts)
     assert jnp.allclose(solution.t, ts_reference)
