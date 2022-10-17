@@ -1,2 +1,3 @@
-# Isotropic correlation structure
+# Isotropic Kronecker factorisation
+
 ::: odefilter.implementations.isotropic

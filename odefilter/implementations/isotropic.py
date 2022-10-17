@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.tree_util
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, sqrtm
+from odefilter.implementations import _ibm, _interface, _sqrtm
 
 
 class IsotropicNormal(NamedTuple):
@@ -20,7 +20,7 @@ class IsotropicNormal(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicImplementation:
+class IsotropicImplementation(_interface.Implementation):
     """Handle isotropic covariances."""
 
     a: Any
@@ -79,11 +79,11 @@ class IsotropicImplementation:
         l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
 
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None])[0, 0]
+        l_obs = _sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None])[0, 0]
         res_white = m_obs / l_obs / jnp.sqrt(m_obs.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
-        diffusion_sqrtm = sqrtm.sqrtm_to_cholesky(R=res_white[:, None])[0, 0]
+        diffusion_sqrtm = _sqrtm.sqrtm_to_cholesky(R=res_white[:, None])[0, 0]
 
         error_estimate = diffusion_sqrtm * l_obs
         return diffusion_sqrtm, error_estimate
@@ -92,7 +92,7 @@ class IsotropicImplementation:
         self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
     ):
         l0_p = p_inv[:, None] * l0
-        l_ext_p = sqrtm.sum_of_sqrtm_factors(
+        l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
@@ -103,7 +103,7 @@ class IsotropicImplementation:
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
     ):
         l0_p = p_inv[:, None] * l0
-        r_ext_p, (r_bw_p, g_bw_p) = sqrtm.revert_gauss_markov_correlation(
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
             R_YX=(diffusion_sqrtm * self.q_sqrtm_lower).T,
@@ -151,7 +151,7 @@ class IsotropicImplementation:
 
         g = A @ C
         xi = A @ d + b
-        Xi = sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
         noise = IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
@@ -183,7 +183,7 @@ class IsotropicImplementation:
 
         # Apply transition
         m_new_p = linop @ m0_p + noise.mean
-        l_new_p = sqrtm.sum_of_sqrtm_factors(
+        l_new_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(linop @ l0_p).T, R2=noise.cov_sqrtm_lower.T
         ).T
 

@@ -40,7 +40,7 @@ markdown_extensions:
     - admonition
     - toc:
         permalink: "¤"  # Adds a clickable permalink to each section heading
-        toc_depth: 2  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
+        toc_depth: 3  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
 
 extra_javascript:
   - javascripts/mathjax.js
@@ -58,6 +58,7 @@ plugins:
                     show_signature_annotations: true
                     show_source: true
                     docstring_style: numpy
+                    members_order: source
                     show_root_heading: true
     - exclude:
         glob:
@@ -77,9 +78,11 @@ nav:
         - "api_docs/taylor.md"
         - "api_docs/odefilters.md"
     - Advanced API Documentation:
-        - "api_docs_advanced/solvers.md"
         - "api_docs_advanced/information.md"
         - "api_docs_advanced/controls.md"
+        - Inference strategies:
+          - "api_docs_advanced/strategies/filters.md"
+          - "api_docs_advanced/strategies/smoothers.md"
         - Solver implementations:
           - "api_docs_advanced/implementations/dense.md"
           - "api_docs_advanced/implementations/isotropic.md"

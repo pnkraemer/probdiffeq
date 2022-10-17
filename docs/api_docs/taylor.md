@@ -1,3 +1,2 @@
 # Taylor series
-
 ::: odefilter.taylor

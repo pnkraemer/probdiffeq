@@ -1,4 +1,4 @@
-# Solution routines
+# ODE solver routines
 
 There are many ways to skin the cat, and there are even more ways
 of stepping through time to solve an ODE.

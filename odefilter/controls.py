@@ -1,4 +1,4 @@
-"""Step-size selection."""
+"""Control algorithms."""
 
 import abc
 from dataclasses import dataclass

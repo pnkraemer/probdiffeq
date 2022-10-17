@@ -1,4 +1,4 @@
-"""Solve initial value problems."""
+"""ODE solver routines."""
 
 
 from functools import partial

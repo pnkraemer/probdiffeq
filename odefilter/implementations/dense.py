@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.tree_util import register_pytree_node_class
 
-from odefilter.implementations import _ibm, sqrtm
+from odefilter.implementations import _ibm, _interface, _sqrtm
 
 
 class MultivariateNormal(NamedTuple):
@@ -20,7 +20,7 @@ class MultivariateNormal(NamedTuple):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class DenseImplementation:
+class DenseImplementation(_interface.Implementation):
     """Handle dense covariances."""
 
     a: Any
@@ -80,7 +80,7 @@ class DenseImplementation:
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(
             p[:, None] * self.q_sqrtm_lower
         )
-        l_obs_raw = sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
+        l_obs_raw = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
         diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         error_estimate = diffusion_sqrtm * jnp.sqrt(
@@ -91,7 +91,7 @@ class DenseImplementation:
     def complete_extrapolation(  # noqa: D102
         self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
     ):
-        l_ext_p = sqrtm.sum_of_sqrtm_factors(
+        l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ (p_inv[:, None] * l0)).T,
             R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
         ).T
@@ -107,7 +107,7 @@ class DenseImplementation:
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(l_ext)
 
-        l_obs = sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
+        l_obs = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
         crosscov = l_ext @ l_obs_nonsquare.T
         gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
 
