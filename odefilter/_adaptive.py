@@ -125,7 +125,7 @@ class AdaptiveODEFilter:
         )
 
     @property
-    def error_order(self):
+    def error_contraction_rate(self):
         """Error order."""
         return self.solver.implementation.num_derivatives + 1
 
@@ -208,7 +208,7 @@ class AdaptiveODEFilter:
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, info_op,t1):
+    def _attempt_step_fn(self, *, state, info_op, t1):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         posterior, error_estimate = self.solver.step_fn(
@@ -225,7 +225,7 @@ class AdaptiveODEFilter:
         dt_proposed, state_control = self.control.control_fn(
             state=state.control,
             error_normalised=error_normalised,
-            error_order=self.error_order,
+            error_contraction_rate=self.error_contraction_rate,
             dt_previous=state.dt_proposed,
             t=posterior.t,
             t1=t1,

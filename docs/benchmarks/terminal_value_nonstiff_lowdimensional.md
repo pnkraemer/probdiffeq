@@ -29,7 +29,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 from tqdm import tqdm
 
-from odefilter import ivpsolve, recipes
+from odefilter import controls, ivpsolve, recipes
 
 # Nice-looking plots
 plt.rcParams.update(plot_config())
@@ -53,7 +53,7 @@ print(f"odefilter version:\n\t{odefilter_version}")
 
 ```python
 # Make a problem
-f, u0, (t0, t1), f_args = ivps.lotka_volterra()
+f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
@@ -81,6 +81,7 @@ def benchmark(*, num_derivatives, atol, rtol, factory):
 
 
 def solve(*, solver, info_op, atol, rtol):
+    controller = controls.ClippedProportionalIntegral()
     solution = ivpsolve.simulate_terminal_values(
         vf,
         initial_values=(u0,),
@@ -91,6 +92,7 @@ def solve(*, solver, info_op, atol, rtol):
         info_op=info_op,
         atol=atol,
         rtol=rtol,
+        control=controller,
     )
     return jnp.linalg.norm(solution.u - ys_reference) / jnp.sqrt(u0.size)
 ```
