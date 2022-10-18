@@ -25,3 +25,8 @@ def solver_dynamic_isotropic_ekf0():
 @case(tags=("terminal_value", "solve", "checkpoint"))
 def solver_dynamic_ekf1():
     return recipes.dynamic_ekf1(num_derivatives=3, ode_dimension=2)
+
+
+@case(tags=("terminal_value", "solve", "checkpoint"))
+def solver_ekf1():
+    return recipes.ekf1(num_derivatives=3, ode_dimension=2)

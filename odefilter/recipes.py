@@ -66,3 +66,16 @@ def dynamic_ekf1(*, ode_dimension, num_derivatives=4):
     solver = filters.DynamicFilter(implementation=implementation)
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return solver, information_op
+
+
+def ekf1(*, ode_dimension, num_derivatives=4):
+    """Construct the equivalent of a semi-implicit solver.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    solver = filters.Filter(implementation=implementation)
+    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
+    return solver, information_op

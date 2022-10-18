@@ -278,7 +278,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
 
         # Final observation
-        corrected = self.implementation.final_correction(
+        _, (corrected, _) = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 
@@ -420,7 +420,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         bw_increment = BackwardModel(transition=backward_op, noise=backward_noise)
 
         # Final observation
-        corrected = self.implementation.final_correction(
+        _, (corrected, _) = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 

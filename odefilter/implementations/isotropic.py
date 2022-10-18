@@ -135,7 +135,7 @@ class IsotropicImplementation(_interface.Implementation):
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return corrected
+        return None, (corrected, None)
 
     @staticmethod
     def extract_sol(*, rv):  # noqa: D102
