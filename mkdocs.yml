@@ -31,16 +31,16 @@ extra_css:
     - _static/custom.css
 
 markdown_extensions:
-    - pymdownx.arithmatex:  # Render LaTeX via MathJax
+    - pymdownx.arithmatex:
         generic: true
-    - pymdownx.superfences  # Seems to enable syntax highlighting when used with the Material theme.
-    - pymdownx.details  # Allowing hidden expandable regions denoted by ???
-    - pymdownx.snippets:  # Include one Markdown file into another
+    - pymdownx.superfences
+    - pymdownx.details
+    - pymdownx.snippets:
         base_path: docs
     - admonition
     - toc:
-        permalink: "¤"  # Adds a clickable permalink to each section heading
-        toc_depth: 3  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
+        permalink: "¤"
+        toc_depth: 3
 
 extra_javascript:
   - javascripts/mathjax.js

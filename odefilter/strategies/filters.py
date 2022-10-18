@@ -63,7 +63,9 @@ class FilteringSolution(Generic[T]):
         """Access the `i`-th sub-solution."""
         if jnp.ndim(self.t) < 1:
             raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
-        if jnp.ndim(item) > jnp.ndim(self.t):
+        if isinstance(item, tuple) and len(item) > jnp.ndim(
+            self.t
+        ):  # s[2, 3] forbidden
             raise ValueError(
                 f"Inapplicable shape :( {jnp.ndim(item), jnp.ndim(self.t)}"
             )

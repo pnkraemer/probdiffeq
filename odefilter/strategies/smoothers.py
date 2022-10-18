@@ -214,6 +214,14 @@ class _DynamicSmootherCommon(_interface.Strategy):
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model
 
+    # Not implemented yet:
+
+    def dense_output(self, *, t, state, state_previous):
+        raise NotImplementedError
+
+    def dense_output_searchsorted(self, *, ts, solution, **kwargs):
+        raise NotImplementedError
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
