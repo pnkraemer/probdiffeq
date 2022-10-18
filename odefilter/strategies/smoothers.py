@@ -2,7 +2,6 @@
 
 import abc
 from dataclasses import dataclass
-from functools import partial
 from typing import Any, Generic, TypeVar
 
 import jax
@@ -134,14 +133,13 @@ class _DynamicSmootherCommon(_interface.Strategy):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step_fn(self, state, info_op, dt):
+    def step_fn(self, state, info_op, dt, parameters):
         raise NotImplementedError
 
     @abc.abstractmethod
     def init_fn(self, taylor_coefficients, t0):
         raise NotImplementedError
 
-    @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
         # todo: are we looping correctly?
         #  what does the backward transition at time t say?
@@ -250,8 +248,8 @@ class DynamicSmoother(_DynamicSmootherCommon):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    @partial(jax.jit, static_argnames=["info_op"])
-    def step_fn(self, *, state, info_op, dt):
+    @jax.jit
+    def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -261,7 +259,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt)
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
@@ -391,8 +389,8 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    @partial(jax.jit, static_argnames=["info_op"])
-    def step_fn(self, *, state, info_op, dt):
+    @jax.jit
+    def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -402,7 +400,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt)
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p

@@ -1,6 +1,5 @@
 """Inference via filters."""
 from dataclasses import dataclass
-from functools import partial
 from typing import Any, Generic, TypeVar
 
 import jax
@@ -98,8 +97,8 @@ class DynamicFilter(_interface.Strategy):
         )
         return filtered, error_estimate
 
-    @partial(jax.jit, static_argnames=["info_op"])
-    def step_fn(self, *, state, info_op, dt):
+    @jax.jit
+    def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -109,7 +108,7 @@ class DynamicFilter(_interface.Strategy):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt)
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p

@@ -5,6 +5,7 @@ import functools
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util
 
 from odefilter import odefilters, taylor
 
@@ -23,15 +24,16 @@ def simulate_terminal_values(
     Thin wrapper around :func:`odefilter_terminal_values`.
     """
     _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(*x, t=t0, p=parameters),
+        vector_field=vector_field,
         initial_values=initial_values,
-        num=solver.implementation.num_derivatives,
+        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        t=t0,
+        parameters=parameters,
     )
-
-    info_op_curried = info_op(vector_field)
-    info_op_partial = functools.partial(info_op_curried, p=parameters)
+    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter_terminal_values(
         info_op_partial,
@@ -39,6 +41,7 @@ def simulate_terminal_values(
         t0=t0,
         t1=t1,
         solver=solver,
+        parameters=parameters,
         **options,
     )
 
@@ -52,21 +55,23 @@ def simulate_checkpoints(
     Thin wrapper around :func:`odefilter_checkpoints`.
     """
     _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(*x, t=ts[0], p=parameters),
+        vector_field=vector_field,
         initial_values=initial_values,
-        num=solver.implementation.num_derivatives,
+        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        t=ts[0],
+        parameters=parameters,
     )
-
-    info_op_curried = info_op(vector_field)
-    info_op_partial = functools.partial(info_op_curried, p=parameters)
+    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter_checkpoints(
         info_op_partial,
         taylor_coefficients=taylor_coefficients,
         ts=ts,
         solver=solver,
+        parameters=parameters,
         **options,
     )
 
@@ -91,30 +96,24 @@ def solve(
         the lower-level stuff must recompile... :(
     """
     _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(*x, t=t0, p=parameters),
+        vector_field=vector_field,
         initial_values=initial_values,
-        num=solver.implementation.num_derivatives,
+        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        t=t0,
+        parameters=parameters,
     )
+    info_op_partial = info_op(vector_field)
 
-    # todo: because of this line, the function recompiles
-    #  every single time it is called.
-    #  This is because odefilter() marks the info_op as static, and because
-    #  info_op() creates a new function every time it is called.
-    #  Is it sufficient to make information operators cache output?
-    info_op_curried = info_op(vector_field)
-
-    # todo: this lambda function below is newly created at every
-    #  call to solve() and therefore we recompile steps
-    #  every single time. This is strange.
-    info_op_partial = functools.partial(info_op_curried, p=parameters)
     return odefilters.odefilter(
         info_op_partial,
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
         solver=solver,
+        parameters=parameters,
         **options,
     )
 
@@ -127,5 +126,13 @@ def _assert_not_scalar(x, /):
 
     todo: allow scalar problems.
     """
-    is_not_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) > 0, x)
+    is_not_scalar = jax.tree_util.tree_map(lambda s: jnp.ndim(s) > 0, x)
     assert jax.tree_util.tree_all(is_not_scalar)
+
+
+def _assert_tuple(x, /):
+    """Verify the initial conditions a tuple of arrays.
+
+    todo: allow other containers.
+    """
+    assert isinstance(x, tuple)
