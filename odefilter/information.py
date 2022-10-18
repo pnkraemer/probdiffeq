@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 
 
+@functools.lru_cache(maxsize=None)
 def isotropic_ek0(*, ode_order=1):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
@@ -26,6 +27,7 @@ def isotropic_ek0(*, ode_order=1):
     return create_ek0_info_op_linearised
 
 
+@functools.lru_cache(maxsize=None)
 def ek1(*, ode_dimension, ode_order=1):
     """EK1 information."""
 
