@@ -63,7 +63,7 @@ class FilteringSolution(Generic[T]):
         """Access the `i`-th sub-solution."""
         if jnp.ndim(self.t) < 1:
             raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
-        if jnp.ndim(item) >= jnp.ndim(self.t):
+        if jnp.ndim(item) > jnp.ndim(self.t):
             raise ValueError(
                 f"Inapplicable shape :( {jnp.ndim(item), jnp.ndim(self.t)}"
             )
@@ -265,6 +265,20 @@ class Filter(_FilterCommon):
             num_data_points=state.num_data_points,
         )
 
-    def dense_output(self, *, t, state, state_previous):
+    def dense_output(self, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
+
+    def dense_output_searchsorted(self, *, ts, solution):
+        # todo: assert bounds work
+        dense_vmap = jax.vmap(self.dense_output)
+
+        indices_l = jnp.searchsorted(solution.t, ts, side="left")
+        indices_r = jnp.searchsorted(solution.t, ts, side="right")
+        assert jnp.all(indices_l == indices_r)  # No grid-points atm.
+
+        solution_left = solution[indices_l - 1]
+        solution_right = solution[indices_l]
+        return dense_vmap(solution_left, ts, solution_right)
+
+        return None

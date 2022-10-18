@@ -71,3 +71,10 @@ def test_dense_output(vf, u0, t0, t1, p):
     )
     assert not jnp.allclose(close_to_right.u, solution[0].u, atol=1e-3, rtol=1e-3)
     assert jnp.allclose(close_to_left.u, solution[0].u, atol=1e-3, rtol=1e-3)
+
+    ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
+    dense = solver.dense_output_searchsorted(ts=ts, solution=solution)
+    assert jnp.allclose(dense.t, ts)
+    # check we correctly landed in the first interval
+    assert jnp.allclose(dense.u[0], solution.u[0], atol=1e-3, rtol=1e-3)
+    assert not jnp.allclose(dense.u[0], solution.u[1], atol=1e-3, rtol=1e-3)

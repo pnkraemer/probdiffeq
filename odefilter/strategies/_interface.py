@@ -70,3 +70,7 @@ class Strategy(abc.ABC):
     @abc.abstractmethod
     def dense_output(self, *, t, state, state_previous):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def dense_output_searchsorted(self, *, ts, solution):
+        raise NotImplementedError
