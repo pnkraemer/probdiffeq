@@ -109,7 +109,7 @@ class DynamicFilter(_interface.Strategy):
         )
 
         # Linearise the differential equation.
-        m_obs, linear_fn = info_op(state.t + dt, m_ext)
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt)
 
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p

@@ -1,7 +1,7 @@
 """ODE solver routines."""
 
 
-from functools import partial
+import functools
 
 import jax
 import jax.numpy as jnp
@@ -10,8 +10,11 @@ from odefilter import odefilters, taylor
 
 # The high-level checkpoint-style routines
 
+# todo: call the argument "p" instead of "parameters"
+#  to match the signature of the vector field?
 
-@partial(jax.jit, static_argnums=[0, 5])
+
+@functools.partial(jax.jit, static_argnums=[0, 5])
 def simulate_terminal_values(
     vector_field, initial_values, t0, t1, solver, info_op, parameters=(), **options
 ):
@@ -22,14 +25,16 @@ def simulate_terminal_values(
     _assert_not_scalar(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(t0, *x, *parameters),
+        vector_field=lambda *x: vector_field(*x, t=t0, p=parameters),
         initial_values=initial_values,
         num=solver.implementation.num_derivatives,
     )
 
     info_op_curried = info_op(vector_field)
+    info_op_partial = functools.partial(info_op_curried, p=parameters)
+
     return odefilters.odefilter_terminal_values(
-        lambda t, *xs: info_op_curried(t, *xs, *parameters),
+        info_op_partial,
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
@@ -38,7 +43,7 @@ def simulate_terminal_values(
     )
 
 
-@partial(jax.jit, static_argnums=[0, 4])
+@functools.partial(jax.jit, static_argnums=[0, 4])
 def simulate_checkpoints(
     vector_field, initial_values, ts, solver, info_op, parameters=(), **options
 ):
@@ -49,14 +54,16 @@ def simulate_checkpoints(
     _assert_not_scalar(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(ts[0], *x, *parameters),
+        vector_field=lambda *x: vector_field(*x, t=ts[0], p=parameters),
         initial_values=initial_values,
         num=solver.implementation.num_derivatives,
     )
 
     info_op_curried = info_op(vector_field)
+    info_op_partial = functools.partial(info_op_curried, p=parameters)
+
     return odefilters.odefilter_checkpoints(
-        lambda t, *xs: info_op_curried(t, *xs, *parameters),
+        info_op_partial,
         taylor_coefficients=taylor_coefficients,
         ts=ts,
         solver=solver,
@@ -86,7 +93,7 @@ def solve(
     _assert_not_scalar(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(t0, *x, *parameters),
+        vector_field=lambda *x: vector_field(*x, t=t0, p=parameters),
         initial_values=initial_values,
         num=solver.implementation.num_derivatives,
     )
@@ -101,8 +108,9 @@ def solve(
     # todo: this lambda function below is newly created at every
     #  call to solve() and therefore we recompile steps
     #  every single time. This is strange.
+    info_op_partial = functools.partial(info_op_curried, p=parameters)
     return odefilters.odefilter(
-        lambda t, *xs: info_op_curried(t, *xs, *parameters),
+        info_op_partial,
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,

@@ -35,8 +35,8 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(t, *ys):
-    return f(*ys, *f_args)
+def vf(*ys, t, p):
+    return f(*ys, *p)
 ```
 
 Low resolution and short time-span to achieve large uncertainty and only few steps.
@@ -50,7 +50,14 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 %%time
 
 solution = ivpsolve.simulate_checkpoints(
-    vf, initial_values=(u0,), ts=ts, solver=ek0, info_op=info_op, rtol=1e-1, atol=1e-1
+    vf,
+    initial_values=(u0,),
+    ts=ts,
+    solver=ek0,
+    info_op=info_op,
+    rtol=1e-1,
+    atol=1e-1,
+    parameters=f_args,
 )
 ```
 
@@ -87,8 +94,4 @@ for i, axes_cols in enumerate(axes_all.T):
     axes_cols[1].semilogy(solution.t, stds)
 
 plt.show()
-```
-
-```python
-
 ```

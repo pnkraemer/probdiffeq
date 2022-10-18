@@ -16,7 +16,7 @@ from odefilter import ivpsolve
 )
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver, info_op):
     def func(y, t, *p):
-        return vf(t, y, *p)
+        return vf(y, t=t, p=p)
 
     odeint_solution = odeint(
         func, u0[0], jnp.asarray([t0, t1]), *p, atol=1e-6, rtol=1e-6

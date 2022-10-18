@@ -11,7 +11,7 @@ def problem_lotka():
     t1 = 2.0
 
     @jax.jit
-    def vf(_t, x, *p):
+    def vf(x, *, t, p):
         return f(x, *p)
 
     # Only very short time-intervals are sufficient for a unit test.

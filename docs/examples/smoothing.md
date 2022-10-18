@@ -33,8 +33,8 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 1e-1))
 
 
 @jax.jit
-def vf(t, *ys):
-    return f(*ys, *f_args)
+def vf(*ys, t, p):
+    return f(*ys, *p)
 
 
 num_derivatives = 3
@@ -46,7 +46,13 @@ ek0, info_op = recipes.dynamic_isotropic_eks0(num_derivatives=num_derivatives)
 
 ```python
 ek0sol = ivpsolve.solve(
-    vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek0, info_op=info_op
+    vf,
+    initial_values=(u0,),
+    t0=t0,
+    t1=t1,
+    solver=ek0,
+    info_op=info_op,
+    parameters=f_args,
 )
 ```
 
@@ -70,6 +76,7 @@ fixptsol = ivpsolve.simulate_checkpoints(
     ts=ek0sol.t,
     solver=fixpt_ek0,
     info_op=info_op,
+    parameters=f_args,
 )
 print()
 
@@ -79,6 +86,7 @@ fixptsol2 = ivpsolve.simulate_checkpoints(
     ts=jnp.linspace(t0, t1, num=200, endpoint=True),
     solver=fixpt_ek0,
     info_op=info_op,
+    parameters=f_args,
 )
 print()
 ```
@@ -93,19 +101,6 @@ plt.plot(fixptsol2.t, fixptsol2.u, **style, color="gray", label="FixPtEKS0(t=den
 plt.legend()
 # plt.ylim((-20, 30))
 plt.show()
-
-
-# two interpolations in a row are incorrect,
-# because they collapse the backward models.
-# this is incorrect. The solution is to not
-# collapse the backward models if we interpolated twice in a row,
-# which is equivalent to
-
-# is the remainder a preconditioning issue?
-
-# what happens if we accept-reject and then overstep
-# very slightly and therefore immediately interpolate?
-# Should this be possible?
 ```
 
 ```python

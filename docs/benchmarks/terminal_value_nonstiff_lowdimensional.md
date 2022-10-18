@@ -57,16 +57,16 @@ f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
-def vf(t, x, *p):
+def vf(x, *, t, p):
     return f(x, *p)
 
 
 # Compile
-vf(t0, u0, *f_args)
+vf(u0, t=t0, p=f_args)
 
 ts = jnp.asarray([t0, t1])
 odeint_solution = jax.experimental.ode.odeint(
-    lambda u, t, *p: vf(t, u, *p), u0, ts, *f_args, atol=1e-12, rtol=1e-12
+    lambda u, t, *p: vf(u, t=t, p=p), u0, ts, *f_args, atol=1e-12, rtol=1e-12
 )
 ys_reference = odeint_solution[-1, :]
 ```
@@ -81,6 +81,7 @@ def benchmark(*, num_derivatives, atol, rtol, factory):
 
 
 def solve(*, solver, info_op, atol, rtol):
+    # Terminal-value simulation likes clipped controls
     controller = controls.ClippedProportionalIntegral()
     solution = ivpsolve.simulate_terminal_values(
         vf,
@@ -98,7 +99,7 @@ def solve(*, solver, info_op, atol, rtol):
 ```
 
 ```python
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
+tolerances = 0.1 ** jnp.arange(2.0, 12.0, step=1.0)
 
 
 def ekf1_factory(n):
