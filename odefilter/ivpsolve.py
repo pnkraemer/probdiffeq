@@ -24,16 +24,16 @@ def simulate_terminal_values(
     Thin wrapper around :func:`odefilter_terminal_values`.
     """
     _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
 
-    taylor_coefficients = _taylor_coefficients(
-        initial_values=initial_values,
-        num=solver.implementation.num_derivatives,
-        parameters=parameters,
-        t0=t0,
+    taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vector_field,
+        initial_values=initial_values,
+        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        t=t0,
+        parameters=parameters,
     )
-
-    info_op_partial = _info_op_partial(info_op, parameters, vector_field)
+    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter_terminal_values(
         info_op_partial,
@@ -55,16 +55,16 @@ def simulate_checkpoints(
     Thin wrapper around :func:`odefilter_checkpoints`.
     """
     _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
 
-    taylor_coefficients = _taylor_coefficients(
-        initial_values=initial_values,
-        num=solver.implementation.num_derivatives,
-        parameters=parameters,
-        t0=ts[0],
+    taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vector_field,
+        initial_values=initial_values,
+        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        t=ts[0],
+        parameters=parameters,
     )
-
-    info_op_partial = _info_op_partial(info_op, parameters, vector_field)
+    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter_checkpoints(
         info_op_partial,
@@ -96,16 +96,17 @@ def solve(
         the lower-level stuff must recompile... :(
     """
     _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
 
-    taylor_coefficients = _taylor_coefficients(
-        initial_values=initial_values,
-        num=solver.implementation.num_derivatives,
-        parameters=parameters,
-        t0=t0,
+    taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vector_field,
+        initial_values=initial_values,
+        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        t=t0,
+        parameters=parameters,
     )
+    info_op_partial = info_op(vector_field)
 
-    info_op_partial = _info_op_partial(info_op, parameters, vector_field)
     return odefilters.odefilter(
         info_op_partial,
         taylor_coefficients=taylor_coefficients,
@@ -117,26 +118,6 @@ def solve(
     )
 
 
-def _info_op_partial(info_op, parameters, vector_field):
-    info_op_curried = info_op(vector_field)
-    return info_op_curried
-    # # Makes it a pytree, and no need to treat it as static on lower levels
-    # info_op_partial = jax.tree_util.Partial(info_op_curried, p=parameters)
-    # return info_op_partial
-
-
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def _taylor_coefficients(*, initial_values, num, parameters, t0, vector_field):
-    taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vector_field,
-        initial_values=initial_values,
-        num=num,
-        t=t0,
-        parameters=parameters,
-    )
-    return taylor_coefficients
-
-
 def _assert_not_scalar(x, /):
     """Verify the initial conditions are not scalar.
 
@@ -145,5 +126,13 @@ def _assert_not_scalar(x, /):
 
     todo: allow scalar problems.
     """
-    is_not_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) > 0, x)
+    is_not_scalar = jax.tree_util.tree_map(lambda s: jnp.ndim(s) > 0, x)
     assert jax.tree_util.tree_all(is_not_scalar)
+
+
+def _assert_tuple(x, /):
+    """Verify the initial conditions a tuple of arrays.
+
+    todo: allow other containers.
+    """
+    assert isinstance(x, tuple)
