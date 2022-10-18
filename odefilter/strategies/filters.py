@@ -236,7 +236,7 @@ class Filter(_FilterCommon):
 
         # Calibration of the global diffusion
         n = state.num_data_points
-        diffsqrtm = self.implementation.sqrt_sum(
+        diffsqrtm = self.implementation.sum_sqrt_scalars(
             n * state.diffusion_sqrtm, evidence_sqrtm
         )
         new_diffusion_sqrtm = jnp.reshape(diffsqrtm, ()) / jnp.sqrt(n + 1)
@@ -253,7 +253,7 @@ class Filter(_FilterCommon):
         return filtered, error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
-        marginals = self.implementation.scale_cov(
+        marginals = self.implementation.scale_covariance(
             rv=state.marginals, scale_sqrtm=state.diffusion_sqrtm
         )
         return FilteringSolution(

@@ -130,12 +130,17 @@ class IsotropicImplementation(_interface.Implementation):
     def final_correction(*, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = linear_fn(l_ext)  # shape (n,)
-        c_obs = jnp.reshape(jnp.dot(l_obs, l_obs), ())
+
+        l_obs_scalar = jnp.reshape(_sqrtm.sqrtm_to_cholesky(R=l_obs[:, None]), ())
+        c_obs = l_obs_scalar**2
+
+        observed = IsotropicNormal(mean=m_obs, cov_sqrtm_lower=l_obs_scalar)
+
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * m_obs[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return None, (corrected, None)
+        return observed, (corrected, g)
 
     @staticmethod
     def extract_sol(*, rv):  # noqa: D102
@@ -198,3 +203,20 @@ class IsotropicImplementation(_interface.Implementation):
     def init_preconditioner(self):  # noqa: D102
         empty = jnp.inf * jnp.ones((self.a.shape[0],))
         return empty, empty
+
+    def evidence_sqrtm(self, *, observed):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = m_obs / l_obs
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
+    @staticmethod
+    def scale_covariance(*, rv, scale_sqrtm):
+        if jnp.ndim(scale_sqrtm) == 0:
+            return IsotropicNormal(
+                mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
+            )
+        return IsotropicNormal(
+            mean=rv.mean,
+            cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
+        )

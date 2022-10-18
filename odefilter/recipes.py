@@ -79,3 +79,17 @@ def ekf1(*, ode_dimension, num_derivatives=4):
     solver = filters.Filter(implementation=implementation)
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=1)
     return solver, information_op
+
+
+def isotropic_ekf0(*, num_derivatives=4):
+    """Construct the equivalent of an explicit solver with an isotropic covariance \
+    structure, and optimised for terminal-value simulation.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives
+    )
+    solver = filters.Filter(implementation=implementation)
+    information_op = information.isotropic_ek0(ode_order=1)
+    return solver, information_op

@@ -149,13 +149,7 @@ class DenseImplementation(_interface.Implementation):
         )
 
     @staticmethod
-    def sqrt_sum(a, b):
-        R = jnp.asarray([[a], [b]])
-        diffsqrtm = _sqrtm.sqrtm_to_cholesky(R=R).T
-        return jnp.reshape(diffsqrtm, ())
-
-    @staticmethod
-    def scale_cov(*, rv, scale_sqrtm):
+    def scale_covariance(*, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return MultivariateNormal(
                 mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
