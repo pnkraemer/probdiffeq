@@ -20,11 +20,12 @@ def case_solver_pair_isotropic_ek0(num, atol, rtol, factor_min, factor_max, safe
         time_span=(0.0, 1.0), stiffness_constant=1.0
     )
 
+    # Tornadox
+
     @jax.jit
-    def vf(t, y):
+    def vf_tor(t, y):
         return f(y, *f_args)
 
-    # Tornadox
     solver = ek0.KroneckerEK0(
         initialization=init.TaylorMode(),
         num_derivatives=num,
@@ -35,16 +36,20 @@ def case_solver_pair_isotropic_ek0(num, atol, rtol, factor_min, factor_max, safe
             reltol=rtol,
         ),
     )
-    vdp = ivp.InitialValueProblem(f=vf, t0=t0, tmax=t1, y0=u0)
+    vdp = ivp.InitialValueProblem(f=vf_tor, t0=t0, tmax=t1, y0=u0)
     solution_tornadox = solver.solve(vdp)
 
     # ODE-filter
+    @jax.jit
+    def vf_ode(y, *, t, p):
+        return f(y, *p)
+
     ekf0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=num)
     controller = controls.ClippedIntegral(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )
     solution_odefilter = ivpsolve.solve(
-        vf,
+        vf_ode,
         initial_values=(u0,),
         t0=t0,
         t1=t1,
@@ -53,6 +58,7 @@ def case_solver_pair_isotropic_ek0(num, atol, rtol, factor_min, factor_max, safe
         atol=atol,
         rtol=rtol,
         control=controller,
+        parameters=f_args,
     )
     return solution_tornadox, solution_odefilter
 
