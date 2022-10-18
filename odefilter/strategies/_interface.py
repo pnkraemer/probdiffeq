@@ -66,3 +66,11 @@ class Strategy(abc.ABC):
     @abc.abstractmethod
     def _case_interpolate(self, s0, s1, t):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def dense_output(self, *, t, state, state_previous):
+        raise NotImplementedError
+
+    @abc.abstractmethod  # kwargs are for jax.numpy.searchsorted()
+    def dense_output_searchsorted(self, *, ts, solution, **kwargs):
+        raise NotImplementedError
