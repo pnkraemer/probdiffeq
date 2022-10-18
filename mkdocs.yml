@@ -71,6 +71,7 @@ nav:
         - "quickstart/transitioning_from_other_packages.md"
     - Examples:
         - "examples/posterior_uncertainties.md"
+        - "examples/second_order_problems.md"
         - "examples/smoothing.md"
         - "examples/solution_object.md"
     - API Documentation:
