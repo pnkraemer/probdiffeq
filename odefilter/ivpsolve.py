@@ -106,15 +106,9 @@ def solve(
 
     # todo: because of this line, the function recompiles
     #  every single time it is called.
-    #  This is because odefilter() marks the info_op as static, and because
-    #  info_op() creates a new function every time it is called.
-    #  Is it sufficient to make information operators cache output?
     info_op_curried = info_op(vector_field)
-
-    # todo: this lambda function below is newly created at every
-    #  call to solve() and therefore we recompile steps
-    #  every single time. This is strange.
     info_op_partial = functools.partial(info_op_curried, p=parameters)
+
     return odefilters.odefilter(
         info_op_partial,
         taylor_coefficients=taylor_coefficients,
