@@ -44,7 +44,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
 ```python
-%%timeit
+%%time
 
 solution = ivpsolve.simulate_checkpoints(
     vf_1,
@@ -79,7 +79,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
 ```python
-%%timeit
+%%time
 
 solution = ivpsolve.simulate_checkpoints(
     vf_2,
