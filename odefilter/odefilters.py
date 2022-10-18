@@ -7,9 +7,15 @@ import jax.tree_util
 
 from odefilter import _adaptive, _control_flow
 
+# todo: warn that taylor_coefficients might have
+#  to be recomputed when the parameters change.
+#  it is generally safer to use the ivpsolve.py methods.
+
 
 @jax.jit
-def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver, **options):
+def odefilter_terminal_values(
+    info, taylor_coefficients, t0, t1, solver, parameters, **options
+):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -22,12 +28,13 @@ def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver, **optio
         t1=t1,
         info_op=info,
         adaptive_solver=adaptive_solver,
+        parameters=parameters,
     )
     return adaptive_solver.extract_fn(state=solution)
 
 
 @jax.jit
-def odefilter_checkpoints(info, taylor_coefficients, ts, solver, **options):
+def odefilter_checkpoints(info, taylor_coefficients, ts, solver, parameters, **options):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -39,6 +46,7 @@ def odefilter_checkpoints(info, taylor_coefficients, ts, solver, **options):
             t1=t_next,
             info_op=info,
             adaptive_solver=adaptive_solver,
+            parameters=parameters,
         )
         return s_next, s_next
 
@@ -53,14 +61,16 @@ def odefilter_checkpoints(info, taylor_coefficients, ts, solver, **options):
     return adaptive_solver.extract_fn(state=solution)
 
 
-def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver):
+def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver, parameters):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
         return s.solution.t < t1
 
     def body_fun(s):
-        state = adaptive_solver.step_fn(state=s, info_op=info_op, t1=t1)
+        state = adaptive_solver.step_fn(
+            state=s, info_op=info_op, t1=t1, parameters=parameters
+        )
         return state
 
     sol = jax.lax.while_loop(
@@ -71,7 +81,7 @@ def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver):
     return sol
 
 
-def odefilter(info_op, taylor_coefficients, t0, t1, solver, **options):
+def odefilter(info_op, taylor_coefficients, t0, t1, solver, parameters, **options):
     """Solve an initial value problem.
 
     !!! warning
@@ -87,16 +97,19 @@ def odefilter(info_op, taylor_coefficients, t0, t1, solver, **options):
         state=state,
         t1=t1,
         adaptive_solver=adaptive_solver,
+        parameters=parameters,
     )
     forward_solution = _control_flow.tree_stack([sol for sol in generator])
     return adaptive_solver.extract_fn(state=forward_solution)
 
 
-def _odefilter_generator(info_op, state, t1, adaptive_solver):
+def _odefilter_generator(info_op, *, state, t1, adaptive_solver, parameters):
     """Generate an ODE filter solution iteratively."""
     while state.solution.t < t1:
         yield state
-        state = adaptive_solver.step_fn(state=state, info_op=info_op, t1=t1)
+        state = adaptive_solver.step_fn(
+            state=state, info_op=info_op, t1=t1, parameters=parameters
+        )
 
     yield state
 

@@ -35,20 +35,23 @@ import jax
 from jax.experimental.jet import jet
 
 
-@partial(jax.jit, static_argnames=["num"])
-def taylor_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int):
+@partial(jax.jit, static_argnames=["vector_field", "num"])
+def taylor_mode_fn(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
     """Taylor-mode AD."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+
     # Initial Taylor series (u_0, u_1, ..., u_k)
-    primals = vector_field(*initial_values)
+    primals = vf(*initial_values)
     taylor_coeffs = [*initial_values, primals]
     for _ in range(num - 1):
         series = _subsets(taylor_coeffs[1:], num_arguments)
-        primals, series_new = jet(vector_field, primals=initial_values, series=series)
+        primals, series_new = jet(vf, primals=initial_values, series=series)
         taylor_coeffs = [*initial_values, primals, *series_new]
-
     return taylor_coeffs
 
 
@@ -74,11 +77,15 @@ def _subsets(set, n):
     return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@partial(jax.jit, static_argnames=["num"])
-def forward_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int):
+@partial(jax.jit, static_argnames=["vector_field", "num"])
+def forward_mode_fn(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
     """Forward-mode AD."""
-    g_n, g_0 = vector_field, vector_field
-    taylor_coeffs = [*initial_values, vector_field(*initial_values)]
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+
+    g_n, g_0 = vf, vf
+    taylor_coeffs = [*initial_values, vf(*initial_values)]
     for _ in range(num - 1):
         g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
         taylor_coeffs = [*taylor_coeffs, g_n(*initial_values)]
@@ -101,4 +108,4 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         primals_out, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
-    return df
+    return jax.tree_util.Partial(df)

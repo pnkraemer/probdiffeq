@@ -168,12 +168,14 @@ class AdaptiveODEFilter(Generic[R]):
         return scale * norm_y0 / norm_dy0
 
     @jax.jit
-    def step_fn(self, state, info_op, t1):
+    def step_fn(self, state, info_op, t1, parameters):
         """Perform a step."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
-            lambda s: self._rejection_loop(state0=s, info_op=info_op, t1=t1),
+            lambda s: self._rejection_loop(
+                state0=s, info_op=info_op, t1=t1, parameters=parameters
+            ),
             lambda s: s,
             state,
         )
@@ -185,14 +187,16 @@ class AdaptiveODEFilter(Generic[R]):
         )
         return state
 
-    def _rejection_loop(self, *, info_op, state0, t1):
+    def _rejection_loop(self, *, info_op, state0, t1, parameters):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
 
         def body_fn(x):
             _, s = x
-            s = self._attempt_step_fn(state=s, info_op=info_op, t1=t1)
+            s = self._attempt_step_fn(
+                state=s, info_op=info_op, t1=t1, parameters=parameters
+            )
             proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
 
@@ -210,7 +214,7 @@ class AdaptiveODEFilter(Generic[R]):
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, info_op, t1):
+    def _attempt_step_fn(self, *, state, info_op, t1, parameters):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
@@ -219,7 +223,7 @@ class AdaptiveODEFilter(Generic[R]):
 
         # Perform the actual step.
         posterior, error_estimate = self.solver.step_fn(
-            state=state.accepted, info_op=info_op, dt=dt
+            state=state.accepted, info_op=info_op, dt=dt, parameters=parameters
         )
 
         # Normalise the error and propose a new step.
@@ -268,9 +272,9 @@ class AdaptiveODEFilter(Generic[R]):
             control=state.control,
         )
 
-    @jax.jit
     def extract_fn(self, *, state):  # noqa: D102
-        return self.solver.extract_fn(state=state.solution)
+        state = self.solver.extract_fn(state=state.solution)
+        return state
 
 
 def _empty_like(tree):

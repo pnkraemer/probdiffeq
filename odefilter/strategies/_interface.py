@@ -28,11 +28,16 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step_fn(self, *, state, info_op, dt):
+    def step_fn(self, *, state, info_op, dt, parameters):
         raise NotImplementedError
 
     @abc.abstractmethod
     def extract_fn(self, *, state):  # -> solution
+        # Don't jit the extract fun unless it is performance-critical!
+        # Why? Because it would recompile every time the ODE parameters
+        # change in solve(), provided the change is sufficient to change
+        # the number of time-steps taken.
+        # In the fully-jit-able functions, it is compiled automatically anyway.
         raise NotImplementedError
 
     @jax.jit
