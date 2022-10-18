@@ -24,10 +24,12 @@ def simulate_terminal_values(
     """
     _assert_not_scalar(initial_values)
 
-    taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(*x, t=t0, p=parameters),
+    taylor_coefficients = _taylor_coefficients(
         initial_values=initial_values,
         num=solver.implementation.num_derivatives,
+        parameters=parameters,
+        t0=t0,
+        vector_field=vector_field,
     )
 
     info_op_curried = info_op(vector_field)
@@ -53,10 +55,12 @@ def simulate_checkpoints(
     """
     _assert_not_scalar(initial_values)
 
-    taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(*x, t=ts[0], p=parameters),
+    taylor_coefficients = _taylor_coefficients(
         initial_values=initial_values,
         num=solver.implementation.num_derivatives,
+        parameters=parameters,
+        t0=ts[0],
+        vector_field=vector_field,
     )
 
     info_op_curried = info_op(vector_field)
@@ -92,10 +96,12 @@ def solve(
     """
     _assert_not_scalar(initial_values)
 
-    taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=lambda *x: vector_field(*x, t=t0, p=parameters),
+    taylor_coefficients = _taylor_coefficients(
         initial_values=initial_values,
         num=solver.implementation.num_derivatives,
+        parameters=parameters,
+        t0=t0,
+        vector_field=vector_field,
     )
 
     # todo: because of this line, the function recompiles
@@ -117,6 +123,15 @@ def solve(
         solver=solver,
         **options,
     )
+
+
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+def _taylor_coefficients(*, initial_values, num, parameters, t0, vector_field):
+    vf_t0 = functools.partial(vector_field, t=t0, p=parameters)
+    taylor_coefficients = taylor.taylor_mode_fn(
+        vector_field=vf_t0, initial_values=initial_values, num=num
+    )
+    return taylor_coefficients
 
 
 def _assert_not_scalar(x, /):
