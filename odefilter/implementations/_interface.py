@@ -3,6 +3,10 @@
 import abc
 from dataclasses import dataclass
 
+import jax.numpy as jnp
+
+from odefilter.implementations import _sqrtm
+
 
 @dataclass(frozen=True)
 class Implementation(abc.ABC):
@@ -57,3 +61,17 @@ class Implementation(abc.ABC):
     @abc.abstractmethod
     def init_backward_noise(self, rv_proto):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def evidence_sqrtm(self, *, observed):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def scale_covariance(self, *, rv, scale_sqrtm):
+        raise NotImplementedError
+
+    @staticmethod
+    def sum_sqrt_scalars(a, b):
+        R = jnp.asarray([[a], [b]])
+        diffsqrtm = _sqrtm.sqrtm_to_cholesky(R=R).T
+        return jnp.reshape(diffsqrtm, ())

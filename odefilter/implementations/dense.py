@@ -80,8 +80,11 @@ class DenseImplementation(_interface.Implementation):
         linear_fn_vmap = jax.vmap(linear_fn, in_axes=1, out_axes=1)
         l_obs_nonsquare = linear_fn_vmap(p[:, None] * self.q_sqrtm_lower)
         l_obs_raw = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
+
+        # todo: make this use evidence()
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
         diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+
         error_estimate = diffusion_sqrtm * jnp.sqrt(
             jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw)
         )
@@ -107,13 +110,22 @@ class DenseImplementation(_interface.Implementation):
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(l_ext)
 
         l_obs = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
+        observed = MultivariateNormal(mean=m_obs, cov_sqrtm_lower=l_obs)
+
         crosscov = l_ext @ l_obs_nonsquare.T
         gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
 
         m_cor = m_ext - gain @ m_obs
         l_cor = l_ext - gain @ l_obs_nonsquare
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return corrected
+        return observed, (corrected, gain)
+
+    @staticmethod
+    def evidence_sqrtm(*, observed):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, m_obs, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
 
     def extract_sol(self, *, rv):  # noqa: D102
         def proj(x):
@@ -134,4 +146,15 @@ class DenseImplementation(_interface.Implementation):
         return MultivariateNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+        )
+
+    @staticmethod
+    def scale_covariance(*, rv, scale_sqrtm):
+        if jnp.ndim(scale_sqrtm) == 0:
+            return MultivariateNormal(
+                mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
+            )
+        return MultivariateNormal(
+            mean=rv.mean,
+            cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
         )

@@ -24,6 +24,7 @@ test:
 example:
 	jupytext --sync docs/examples/*
 	jupytext --execute docs/examples/*
+	jupytext --sync docs/examples/*
     # No --execute for benchmarks (takes too long)
 	jupytext --sync docs/benchmarks/*
 

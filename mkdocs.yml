@@ -58,7 +58,7 @@ plugins:
                     show_signature_annotations: true
                     show_source: true
                     docstring_style: numpy
-                    members_order: source
+                    members_order: alphabetical
                     show_root_heading: true
     - exclude:
         glob:
