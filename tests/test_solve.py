@@ -4,7 +4,7 @@ import pytest
 from jax.experimental.ode import odeint
 from pytest_cases import parametrize_with_cases
 
-from odefilter import ivpsolve
+from odefilter import ivpsolve, recipes
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
@@ -38,3 +38,36 @@ def test_solve(vf, u0, t0, t1, p, solver, info_op):
         assert isinstance(sol, type(solution))
 
     assert i == len(solution) - 1
+
+
+@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
+def test_dense_output(vf, u0, t0, t1, p):
+    solver, info_op = recipes.ekf1(ode_dimension=u0[0].shape[0], num_derivatives=1)
+    solution = ivpsolve.solve(
+        vf,
+        u0,
+        t0=t0,
+        t1=t1,
+        parameters=p,
+        solver=solver,
+        info_op=info_op,
+        atol=1e-1,
+        rtol=1e-1,
+    )
+    midpoint = (solution[0].t + solution[1].t) / 2
+    dense = solver.dense_output(
+        t=midpoint, state=solution[1], state_previous=solution[0]
+    )
+
+    assert isinstance(dense, type(solution))
+
+    # Extrapolate from the left: close-to-left boundary must be similar,
+    # but close-to-right boundary must not be similar
+    close_to_left = solver.dense_output(
+        t=solution[0].t + 1e-4, state=solution[1], state_previous=solution[0]
+    )
+    close_to_right = solver.dense_output(
+        t=solution[1].t - 1e-4, state=solution[1], state_previous=solution[0]
+    )
+    assert not jnp.allclose(close_to_right.u, solution[0].u, atol=1e-3, rtol=1e-3)
+    assert jnp.allclose(close_to_left.u, solution[0].u, atol=1e-3, rtol=1e-3)

@@ -66,3 +66,7 @@ class Strategy(abc.ABC):
     @abc.abstractmethod
     def _case_interpolate(self, s0, s1, t):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def dense_output(self, *, t, state, state_previous):
+        raise NotImplementedError

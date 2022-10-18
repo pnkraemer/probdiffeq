@@ -264,3 +264,7 @@ class Filter(_FilterCommon):
             diffusion_sqrtm=state.diffusion_sqrtm,
             num_data_points=state.num_data_points,
         )
+
+    def dense_output(self, *, t, state, state_previous):
+        _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
+        return sol
