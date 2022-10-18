@@ -149,7 +149,6 @@ class _FilterCommon(_interface.Strategy):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
 
-    @jax.jit
     def dense_output_searchsorted(self, *, ts, solution):
         """Dense output for a whole grid via jax.numpy.searchsorted.
 
