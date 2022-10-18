@@ -35,7 +35,7 @@ import jax
 from jax.experimental.jet import jet
 
 
-@partial(jax.jit, static_argnames=("vector_field", "num"))
+@partial(jax.jit, static_argnames=["num"])
 def taylor_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int):
     """Taylor-mode AD."""
     # Number of positional arguments in f
@@ -74,7 +74,7 @@ def _subsets(set, n):
     return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@partial(jax.jit, static_argnames=("vector_field", "num"))
+@partial(jax.jit, static_argnames=["num"])
 def forward_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int):
     """Forward-mode AD."""
     g_n, g_0 = vector_field, vector_field

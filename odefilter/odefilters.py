@@ -8,7 +8,7 @@ import jax.tree_util
 from odefilter import _adaptive, _control_flow
 
 
-@partial(jax.jit, static_argnums=[0])
+@jax.jit
 def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver, **options):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
@@ -26,7 +26,7 @@ def odefilter_terminal_values(info, taylor_coefficients, t0, t1, solver, **optio
     return adaptive_solver.extract_fn(state=solution)
 
 
-@partial(jax.jit, static_argnums=[0])
+@jax.jit
 def odefilter_checkpoints(info, taylor_coefficients, ts, solver, **options):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)

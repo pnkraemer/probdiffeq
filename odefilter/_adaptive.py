@@ -167,7 +167,7 @@ class AdaptiveODEFilter(Generic[R]):
         norm_dy0 = jnp.linalg.norm(f0)
         return scale * norm_y0 / norm_dy0
 
-    @partial(jax.jit, static_argnames=["info_op"])
+    @jax.jit
     def step_fn(self, state, info_op, t1):
         """Perform a step."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1

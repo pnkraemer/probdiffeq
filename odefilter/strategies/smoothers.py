@@ -2,7 +2,6 @@
 
 import abc
 from dataclasses import dataclass
-from functools import partial
 from typing import Any, Generic, TypeVar
 
 import jax
@@ -250,7 +249,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    @partial(jax.jit, static_argnames=["info_op"])
+    @jax.jit
     def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
@@ -391,7 +390,7 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    @partial(jax.jit, static_argnames=["info_op"])
+    @jax.jit
     def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)

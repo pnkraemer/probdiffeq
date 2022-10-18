@@ -1,6 +1,5 @@
 """Inference via filters."""
 from dataclasses import dataclass
-from functools import partial
 from typing import Any, Generic, TypeVar
 
 import jax
@@ -98,7 +97,7 @@ class DynamicFilter(_interface.Strategy):
         )
         return filtered, error_estimate
 
-    @partial(jax.jit, static_argnames=["info_op"])
+    @jax.jit
     def step_fn(self, *, state, info_op, dt):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)

@@ -5,6 +5,7 @@ import functools
 
 import jax
 import jax.numpy as jnp
+import jax.tree_util
 
 from odefilter import odefilters, taylor
 
@@ -33,7 +34,7 @@ def simulate_terminal_values(
     )
 
     info_op_curried = info_op(vector_field)
-    info_op_partial = functools.partial(info_op_curried, p=parameters)
+    info_op_partial = jax.tree_util.Partial(info_op_curried, p=parameters)
 
     return odefilters.odefilter_terminal_values(
         info_op_partial,
@@ -64,7 +65,7 @@ def simulate_checkpoints(
     )
 
     info_op_curried = info_op(vector_field)
-    info_op_partial = functools.partial(info_op_curried, p=parameters)
+    info_op_partial = jax.tree_util.Partial(info_op_curried, p=parameters)
 
     return odefilters.odefilter_checkpoints(
         info_op_partial,
@@ -104,11 +105,7 @@ def solve(
         vector_field=vector_field,
     )
 
-    # todo: because of this line, the function recompiles
-    #  every single time it is called.
-    info_op_curried = info_op(vector_field)
-    info_op_partial = functools.partial(info_op_curried, p=parameters)
-
+    info_op_partial = _info_op_partial(info_op, parameters, vector_field)
     return odefilters.odefilter(
         info_op_partial,
         taylor_coefficients=taylor_coefficients,
@@ -119,9 +116,20 @@ def solve(
     )
 
 
+@functools.partial(jax.jit, static_argnames=["vector_field", "info_op"])
+def _info_op_partial(info_op, parameters, vector_field):
+    info_op_curried = info_op(vector_field)
+
+    # Makes it a pytree, and no need to treat it as static on lower levels
+    info_op_partial = jax.tree_util.Partial(info_op_curried, p=parameters)
+    return info_op_partial
+
+
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def _taylor_coefficients(*, initial_values, num, parameters, t0, vector_field):
-    vf_t0 = functools.partial(vector_field, t=t0, p=parameters)
+    # Makes it a pytree, and no need to treat it as static on lower levels
+    vf_t0 = jax.tree_util.Partial(vector_field, t=t0, p=parameters)
+
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vf_t0, initial_values=initial_values, num=num
     )
