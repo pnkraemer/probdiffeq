@@ -144,7 +144,7 @@ class _FilterCommon(_interface.Strategy):
         )
         return s1, target_p, target_p
 
-    def dense_output(self, state_previous, t, state):
+    def offgrid_marginals(self, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
 

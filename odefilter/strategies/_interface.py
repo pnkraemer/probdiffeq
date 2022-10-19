@@ -59,7 +59,7 @@ class Strategy(abc.ABC):
         index = jnp.reshape(index_as_array, ())
         return jax.lax.switch(index, branches, s0, s1, t)
 
-    def dense_output_searchsorted(self, *, ts, solution):
+    def offgrid_marginals_searchsorted(self, *, ts, solution):
         """Dense output for a whole grid via jax.numpy.searchsorted.
 
         !!! warning
@@ -83,8 +83,8 @@ class Strategy(abc.ABC):
         solution_right = solution[indices]
 
         # Vmap to the rescue :)
-        dense_vmap = jax.vmap(self.dense_output)
-        return dense_vmap(solution_left, ts, solution_right)
+        marginals_vmap = jax.vmap(self.offgrid_marginals)
+        return marginals_vmap(solution_left, ts, solution_right)
 
     @abc.abstractmethod
     def _case_right_corner(self, s0, s1, t):
@@ -95,5 +95,5 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def dense_output(self, *, t, state, state_previous):
+    def offgrid_marginals(self, *, t, state, state_previous):
         raise NotImplementedError
