@@ -19,9 +19,9 @@ def filter_smoother_pair_eks0(n):
 
 @case
 @parametrize("n", [2, 3])
-def filter_smoother_pair_fixpt_eks0(n):
+def filter_smoother_pair_fixedpt_eks0(n):
     ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n)
-    eks0 = recipes.dynamic_isotropic_fixpt_eks0(num_derivatives=n)
+    eks0 = recipes.dynamic_isotropic_fixedpt_eks0(num_derivatives=n)
     return ekf0, eks0
 
 

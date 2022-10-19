@@ -47,7 +47,7 @@ def dynamic_isotropic_eks0(*, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def dynamic_isotropic_fixpt_eks0(*, num_derivatives=4, ode_order=1):
+def dynamic_isotropic_fixedpt_eks0(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 

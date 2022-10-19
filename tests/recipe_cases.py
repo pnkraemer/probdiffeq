@@ -8,8 +8,8 @@ from odefilter import recipes
 
 
 @case(tags=["terminal_value", "checkpoint", "smoother"])
-def solver_dynamic_isotropic_fixpt_eks0():
-    return recipes.dynamic_isotropic_fixpt_eks0(num_derivatives=3)
+def solver_dynamic_isotropic_fixedpt_eks0():
+    return recipes.dynamic_isotropic_fixedpt_eks0(num_derivatives=3)
 
 
 @case(tags=["terminal_value", "solve", "smoother"])
