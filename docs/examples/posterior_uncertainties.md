@@ -106,7 +106,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_fixedpt_eks0(num_derivatives=1)
+ek0, info_op = recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 

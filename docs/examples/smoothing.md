@@ -115,20 +115,20 @@ If you know in advance that you like to have the solution at a pre-specified set
 use the simulate_checkpoints function together with a fixed-point smoother.
 
 ```python
-fixedpt_ek0, info_op = recipes.dynamic_isotropic_fixedpt_eks0(
+fixedpoint_ek0, info_op = recipes.dynamic_isotropic_fixedpoint_eks0(
     num_derivatives=num_derivatives
 )
-fixedptsol = ivpsolve.simulate_checkpoints(
+fixedpointsol = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),
     ts=ts_dense,  # reuse from above
-    solver=fixedpt_ek0,
+    solver=fixedpoint_ek0,
     info_op=info_op,
     parameters=f_args,
 )
 
 plt.subplots(figsize=(5, 3))
 plt.title("FixedPt-EKS0 solution")
-plt.plot(fixedptsol.t, fixedptsol.u, ".-")
+plt.plot(fixedpointsol.t, fixedpointsol.u, ".-")
 plt.show()
 ```
