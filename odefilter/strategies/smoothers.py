@@ -216,7 +216,7 @@ class _DynamicSmootherCommon(_interface.Strategy):
     # Not implemented yet:
 
     @abc.abstractmethod
-    def dense_output(self, *, t, state, state_previous):
+    def offgrid_marginals(self, *, t, state, state_previous):
         raise NotImplementedError
 
 
@@ -361,7 +361,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return accepted, solution, previous
 
     # todo: rename to dense_marginals?
-    def dense_output(self, state_previous, t, state):
+    def offgrid_marginals(self, state_previous, t, state):
         acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         sol_marginal = self.implementation.marginalise_model(
             init=acc.marginals,
@@ -543,5 +543,5 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
         )
         return accepted, solution, previous
 
-    def dense_output(self, *, t, state, state_previous):
+    def offgrid_marginals(self, *, t, state, state_previous):
         raise NotImplementedError

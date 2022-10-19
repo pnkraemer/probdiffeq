@@ -47,7 +47,7 @@ def test_solve(vf, u0, t0, t1, p, solver, info_op):
     prefix="solver_",
     has_tag=("solve", "filter"),
 )
-def test_dense_output_filter(vf, u0, t0, t1, p, solver, info_op):
+def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver, info_op):
     solution = ivpsolve.solve(
         vf,
         u0,
@@ -60,7 +60,7 @@ def test_dense_output_filter(vf, u0, t0, t1, p, solver, info_op):
         rtol=1e-1,
     )
     midpoint = (solution[0].t + solution[1].t) / 2
-    dense = solver.dense_output(
+    dense = solver.offgrid_marginals(
         t=midpoint, state=solution[1], state_previous=solution[0]
     )
 
@@ -68,10 +68,10 @@ def test_dense_output_filter(vf, u0, t0, t1, p, solver, info_op):
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary must not be similar
-    close_to_left = solver.dense_output(
+    close_to_left = solver.offgrid_marginals(
         t=solution[0].t + 1e-4, state=solution[1], state_previous=solution[0]
     )
-    close_to_right = solver.dense_output(
+    close_to_right = solver.offgrid_marginals(
         t=solution[1].t - 1e-4, state=solution[1], state_previous=solution[0]
     )
     assert jnp.allclose(close_to_left.u, solution[0].u, atol=1e-3, rtol=1e-3)
@@ -80,7 +80,7 @@ def test_dense_output_filter(vf, u0, t0, t1, p, solver, info_op):
     # Repeat the same but interpolating via *_searchsorted:
     # check we correctly landed in the first interval
     ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
-    dense = solver.dense_output_searchsorted(ts=ts, solution=solution)
+    dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
     assert jnp.allclose(dense.t, ts)
     assert jnp.allclose(dense.u[0], solution.u[0], atol=1e-3, rtol=1e-3)
     assert not jnp.allclose(dense.u[0], solution.u[1], atol=1e-3, rtol=1e-3)
@@ -94,7 +94,7 @@ def test_dense_output_filter(vf, u0, t0, t1, p, solver, info_op):
     prefix="solver_",
     has_tag=("solve", "smoother"),
 )
-def test_dense_output_smoother(vf, u0, t0, t1, p, solver, info_op):
+def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
     solution = ivpsolve.solve(
         vf,
         u0,
@@ -107,7 +107,7 @@ def test_dense_output_smoother(vf, u0, t0, t1, p, solver, info_op):
         rtol=1e-1,
     )
     midpoint = (solution[0].t + solution[1].t) / 2
-    dense = solver.dense_output(
+    dense = solver.offgrid_marginals(
         t=midpoint, state=solution[1], state_previous=solution[0]
     )
 
@@ -115,10 +115,10 @@ def test_dense_output_smoother(vf, u0, t0, t1, p, solver, info_op):
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary must not be similar
-    close_to_left = solver.dense_output(
+    close_to_left = solver.offgrid_marginals(
         t=solution[0].t + 1e-4, state=solution[1], state_previous=solution[0]
     )
-    close_to_right = solver.dense_output(
+    close_to_right = solver.offgrid_marginals(
         t=solution[1].t - 1e-4, state=solution[1], state_previous=solution[0]
     )
     assert jnp.allclose(close_to_right.u, solution[0].u, atol=1e-3, rtol=1e-3)
@@ -127,7 +127,7 @@ def test_dense_output_smoother(vf, u0, t0, t1, p, solver, info_op):
     # Repeat the same but interpolating via *_searchsorted:
     # check we correctly landed in the first interval
     ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
-    dense = solver.dense_output_searchsorted(ts=ts, solution=solution)
+    dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
     assert jnp.allclose(dense.t, ts)
     assert jnp.allclose(dense.u[0], solution.u[0], atol=1e-3, rtol=1e-3)
     assert jnp.allclose(dense.u[0], solution.u[1], atol=1e-3, rtol=1e-3)
