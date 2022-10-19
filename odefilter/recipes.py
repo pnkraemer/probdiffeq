@@ -10,7 +10,7 @@ but until you do so, use one of ours.
 """
 from odefilter import information
 from odefilter.implementations import dense, isotropic
-from odefilter.strategies import filters, smoothers
+from odefilter.strategies import filters, fixedpoint, smoothers
 
 
 def dynamic_isotropic_ekf0(*, num_derivatives=4, ode_order=1):
@@ -59,7 +59,7 @@ def dynamic_isotropic_fixedpoint_eks0(*, num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = smoothers.DynamicFixedPointSmoother(implementation=implementation)
+    solver = fixedpoint.DynamicFixedPointSmoother(implementation=implementation)
     information_op = information.isotropic_ek0(ode_order=ode_order)
     return solver, information_op
 
