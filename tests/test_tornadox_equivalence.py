@@ -162,18 +162,5 @@ def case_solver_pair_dynamic_ekf1(num, atol, rtol, factor_min, factor_max, safet
 )
 def test_outputs_equal(solution_tornadox, solution_odefilter):
 
-    # Compare t, mean, cov_sqrtm @ cov_sqrtm.T.
-    # They should be _identical_ (up to machine precision).
-    #
-    # @jax.vmap
-    # def cov(x):
-    #     return x @ x.T
-    #
-    # d = solution_odefilter.u.shape[1]
-    #
-    # @jax.vmap
-    # def kroncov(x):
-    #     return jnp.kron(jnp.eye(d), x @ x.T)
-
     for sol_tornadox, sol_odefilter in zip(solution_tornadox, solution_odefilter):
         assert jnp.allclose(sol_tornadox, sol_odefilter)

@@ -235,9 +235,6 @@ class AdaptiveODEFilter(Generic[R]):
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(
             error_estimate=error_estimate,
-            # u=jnp.abs(posterior.u),
-            # todo: allow a switch to
-            # u=jnp.maximum(jnp.abs(posterior.u), jnp.abs(state.accepted.u)),
             u=self.reference_state_fn(posterior.u, state.accepted.u),
             atol=self.atol,
             rtol=self.rtol,
