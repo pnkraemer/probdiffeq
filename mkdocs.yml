@@ -62,7 +62,11 @@ plugins:
                     show_root_heading: true
     - exclude:
         glob:
-          - "examples/*.ipynb"
+          - "examples/*.md"
+    - mkdocs-jupyter:
+        include: ["examples/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
+        ignore: ["benchmarks/*.ipynb"]
+
 
 nav:
     - index.md
@@ -70,10 +74,10 @@ nav:
         - "quickstart/quickstart.md"
         - "quickstart/transitioning_from_other_packages.md"
     - Examples:
-        - "examples/posterior_uncertainties.md"
-        - "examples/second_order_problems.md"
-        - "examples/smoothing.md"
-        - "examples/solution_object.md"
+        - "examples/posterior_uncertainties.ipynb"
+        - "examples/second_order_problems.ipynb"
+        - "examples/smoothing.ipynb"
+        - "examples/solution_object.ipynb"
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/recipes.md"
