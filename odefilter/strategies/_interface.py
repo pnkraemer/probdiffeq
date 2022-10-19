@@ -83,8 +83,8 @@ class Strategy(abc.ABC):
         solution_right = solution[indices]
 
         # Vmap to the rescue :)
-        dense_vmap = jax.vmap(self.offgrid_marginals)
-        return dense_vmap(solution_left, ts, solution_right)
+        marginals_vmap = jax.vmap(self.offgrid_marginals)
+        return marginals_vmap(solution_left, ts, solution_right)
 
     @abc.abstractmethod
     def _case_right_corner(self, s0, s1, t):
