@@ -63,7 +63,7 @@ solution = ivpsolve.simulate_checkpoints(
 
 Plot the solution
 
-```python
+```python tags=[]
 _, num_derivatives, _ = solution.marginals.mean.shape
 
 
@@ -94,4 +94,8 @@ for i, axes_cols in enumerate(axes_all.T):
     axes_cols[1].semilogy(solution.t, stds)
 
 plt.show()
+```
+
+```python
+
 ```

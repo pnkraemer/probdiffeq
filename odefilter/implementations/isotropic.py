@@ -166,10 +166,13 @@ class IsotropicImplementation(_interface.Implementation):
     @staticmethod
     def marginalise_backwards(*, init, backward_model):
         """Compute marginals of a markov sequence."""
+        # todo: the backward_model is a too high-level data structure.
+        #  This function should operate on transition and noise,
+        #  just like the marginalise_model() below.
 
         def body_fun(carry, x):
             linop, noise = x.transition, x.noise
-            out = IsotropicImplementation.marginalise_model_isotropic(
+            out = IsotropicImplementation.marginalise_model(
                 init=carry, linop=linop, noise=noise
             )
             return out, out
@@ -182,8 +185,10 @@ class IsotropicImplementation(_interface.Implementation):
         return rvs
 
     @staticmethod
-    def marginalise_model_isotropic(*, init, linop, noise):
+    def marginalise_model(*, init, linop, noise):
         """Marginalise the output of a linear model."""
+        # todo: add preconditioner?
+
         # Pull into preconditioned space
         m0_p = init.mean
         l0_p = init.cov_sqrtm_lower

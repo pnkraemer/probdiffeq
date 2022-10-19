@@ -59,6 +59,33 @@ class Strategy(abc.ABC):
         index = jnp.reshape(index_as_array, ())
         return jax.lax.switch(index, branches, s0, s1, t)
 
+    def dense_output_searchsorted(self, *, ts, solution):
+        """Dense output for a whole grid via jax.numpy.searchsorted.
+
+        !!! warning
+            The elements in ts and the elements in the solution grid must be disjoint.
+            Otherwise, anything can happen and the solution will be incorrect.
+            We do not check for this case! (Because we want to jit!)
+
+        !!! warning
+            The elements in ts must be strictly in (t0, t1).
+            Again there is no check and anything can happen if you don't follow
+            this rule.
+        """
+        # todo: support "method" argument.
+
+        # side="left" and side="right" are equivalent
+        # because we _assume_ that the point sets are disjoint.
+        indices = jnp.searchsorted(solution.t, ts)
+
+        # Solution slicing to the rescue
+        solution_left = solution[indices - 1]
+        solution_right = solution[indices]
+
+        # Vmap to the rescue :)
+        dense_vmap = jax.vmap(self.dense_output)
+        return dense_vmap(solution_left, ts, solution_right)
+
     @abc.abstractmethod
     def _case_right_corner(self, s0, s1, t):
         raise NotImplementedError
@@ -69,8 +96,4 @@ class Strategy(abc.ABC):
 
     @abc.abstractmethod
     def dense_output(self, *, t, state, state_previous):
-        raise NotImplementedError
-
-    @abc.abstractmethod  # kwargs are for jax.numpy.searchsorted()
-    def dense_output_searchsorted(self, *, ts, solution, **kwargs):
         raise NotImplementedError

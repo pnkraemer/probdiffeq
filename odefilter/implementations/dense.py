@@ -54,6 +54,10 @@ class DenseImplementation(_interface.Implementation):
 
     def init_corrected(self, *, taylor_coefficients):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
+        if taylor_coefficients[0].shape[0] != self.ode_dimension:
+            msg = "The solver's ODE dimension does not match the initial condition."
+            raise ValueError(msg)
+
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)

@@ -4,7 +4,7 @@ import pytest
 from jax.experimental.ode import odeint
 from pytest_cases import parametrize_with_cases
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
@@ -41,8 +41,10 @@ def test_solve(vf, u0, t0, t1, p, solver, info_op):
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
-def test_dense_output(vf, u0, t0, t1, p):
-    solver, info_op = recipes.ekf1(ode_dimension=u0[0].shape[0], num_derivatives=1)
+@parametrize_with_cases(
+    "solver, info_op", cases=".recipe_cases", prefix="solver_", has_tag=("solve",)
+)
+def test_dense_output(vf, u0, t0, t1, p, solver, info_op):
     solution = ivpsolve.solve(
         vf,
         u0,
@@ -63,6 +65,7 @@ def test_dense_output(vf, u0, t0, t1, p):
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary must not be similar
+    # todo: this only applies to the filter! The smoother must be close to both!
     close_to_left = solver.dense_output(
         t=solution[0].t + 1e-4, state=solution[1], state_previous=solution[0]
     )
