@@ -1,9 +1,8 @@
-"""Inference via smoothing."""
+"""Inference via fixed-point smoothing."""
 
 from dataclasses import dataclass
 
 import jax
-import jax.numpy as jnp
 import jax.tree_util
 
 from odefilter.strategies import _smoother_common, markov
@@ -11,7 +10,7 @@ from odefilter.strategies import _smoother_common, markov
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
+class DynamicFixedPointSmoother(_smoother_common.DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
     @jax.jit
@@ -31,7 +30,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
 
         solution = markov.Posterior(
             t=t0,
-            t_previous=-jnp.inf,
+            t_previous=t0,
             u=sol,
             marginals_filtered=corrected,
             marginals=None,
@@ -60,7 +59,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
         )
         error_estimate *= dt
 
-        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
+        x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=state.marginals_filtered.cov_sqrtm_lower,
             p=p,
@@ -69,18 +68,28 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )
-        backward_model = markov.BackwardModel(transition=bw_op, noise=bw_noise)
+        extrapolated, (backward_noise, backward_op) = x
+        bw_increment = markov.BackwardModel(
+            transition=backward_op, noise=backward_noise
+        )
 
         # Final observation
         _, (corrected, _) = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 
+        # Condense backward models
+        noise, gain = self.implementation.condense_backward_models(
+            bw_state=bw_increment,
+            bw_init=state.backward_model,
+        )
+        backward_model = markov.BackwardModel(transition=gain, noise=noise)
+
         # Return solution
         sol = self.implementation.extract_sol(rv=corrected)
         smoothing_solution = markov.Posterior(
             t=state.t + dt,
-            t_previous=state.t,
+            t_previous=state.t_previous,  # condensing the models...
             u=sol,
             marginals_filtered=corrected,
             marginals=None,
@@ -91,77 +100,77 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
         return smoothing_solution, error_estimate
 
     def _case_right_corner(self, s0, s1, t):  # s1.t == t
+        # can we guarantee that the backward model in s1 is the
+        # correct backward model to get from s0 to s1?
 
-        accepted = self._duplicate_with_unit_backward_model(s1, t)
-        previous = markov.Posterior(
+        backward_model1 = s1.backward_model
+        noise0, g0 = self.implementation.condense_backward_models(
+            bw_init=s0.backward_model, bw_state=backward_model1
+        )
+        backward_model1 = markov.BackwardModel(transition=g0, noise=noise0)
+        solution = markov.Posterior(
             t=t,
-            t_previous=s0.t,
+            t_previous=s0.t_previous,  # condensed the model...
             u=s1.u,
             marginals_filtered=s1.marginals_filtered,
             marginals=None,
+            backward_model=backward_model1,
             diffusion_sqrtm=s1.diffusion_sqrtm,
-            backward_model=s1.backward_model,
         )
-        solution = previous
+
+        accepted = self._duplicate_with_unit_backward_model(solution, t)
+        previous = accepted
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, s0, s1, t):
-        # A smoother interpolates by reverting the Markov kernels between s0.t and t
-        # which gives an extrapolation and a backward transition;
-        # and by reverting the Markov kernels between t and s1.t
-        # which gives another extrapolation and a backward transition.
-        # The latter extrapolation is discarded in favour of s1.marginals_filtered,
-        # but the backward transition is kept.
+    def _case_interpolate(self, s0, s1, t):  # noqa: D102
+        # A fixed-point smoother interpolates almost like a smoother.
+        # The key difference is that when interpolating from s0.t to t,
+        # the backward models in s0.t and the incoming model are condensed into one.
+        # The reasoning is that the previous model "knows how to get to the
+        # quantity of interest", and this is what we are interested in.
+        # The rest remains the same as for the smoother.
 
-        rv0, diffsqrtm = s0.marginals_filtered, s1.diffusion_sqrtm
+        # Use the s1.diffusion as a diffusion over the interval.
+        # Filtering/smoothing solutions are right-including intervals.
+        diffusion_sqrtm = s1.diffusion_sqrtm
 
-        # Extrapolate from t0 to t, and from t to t1
-        extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=s0.t
+        # From s0.t to t
+        extrapolated0, bw0 = self._interpolate_from_to_fn(
+            rv=s0.marginals_filtered, diffusion_sqrtm=diffusion_sqrtm, t=t, t0=s0.t
         )
-        _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=s1.t, t0=t
+        noise0, g0 = self.implementation.condense_backward_models(
+            bw_init=s0.backward_model, bw_state=bw0
         )
-
-        # This is the new solution object at t.
+        backward_model0 = markov.BackwardModel(transition=g0, noise=noise0)
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = markov.Posterior(
             t=t,
-            t_previous=s0.t,
+            t_previous=s0.t_previous,  # condensed the model...
             u=sol,
             marginals_filtered=extrapolated0,
-            marginals=None,  # todo: fill this value here already?
-            diffusion_sqrtm=diffsqrtm,
+            marginals=None,
+            diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model0,
         )
-        previous = solution
 
+        # new model! no condensing...
+        previous = self._duplicate_with_unit_backward_model(solution, t)
+
+        # From t to s1.t
+        extra1, backward_model1 = self._interpolate_from_to_fn(
+            rv=extrapolated0, diffusion_sqrtm=diffusion_sqrtm, t=s1.t, t0=t
+        )
         accepted = markov.Posterior(
             t=s1.t,
-            t_previous=t,
+            t_previous=t,  # new model! No condensing...
             u=s1.u,
             marginals_filtered=s1.marginals_filtered,
-            marginals=s1.marginals,
-            diffusion_sqrtm=diffsqrtm,
+            marginals=None,
+            diffusion_sqrtm=diffusion_sqrtm,
             backward_model=backward_model1,
         )
         return accepted, solution, previous
 
-    def offgrid_marginals(self, state_previous, t, state):
-        acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
-        sol_marginal = self.implementation.marginalise_model(
-            init=acc.marginals,
-            linop=acc.backward_model.transition,
-            noise=acc.backward_model.noise,
-        )
-        u = self.implementation.extract_sol(rv=sol_marginal)
-        return markov.Posterior(
-            t=t,
-            t_previous=state_previous.t,
-            marginals_filtered=sol.marginals_filtered,
-            marginals=sol_marginal,
-            diffusion_sqrtm=acc.diffusion_sqrtm,
-            u=u,
-            backward_model=sol.backward_model,
-        )
+    def offgrid_marginals(self, *, t, state, state_previous):
+        raise NotImplementedError
