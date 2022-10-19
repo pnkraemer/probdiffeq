@@ -89,12 +89,10 @@ and many more options.
 Look at this:
 
 ```python tags=[]
-ts = jnp.linspace(t0+1e-4, t1-1e-3, num=400, endpoint=True)
+ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
 dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 
-fig, ax = plt.subplots(
-    nrows=2, sharex=True, tight_layout=True
-)
+fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 
 for i in [0, 1, 2]:  # ["S", "I", "R"]
     ms = dense.marginals.mean[:, i]

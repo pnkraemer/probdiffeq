@@ -265,9 +265,13 @@ class Filter(_FilterCommon):
         return filtered, error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
-        diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
-            state.diffusion_sqrtm
-        )
+
+        if state.diffusion_sqrtm.ndim == 1:
+            diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
+                state.diffusion_sqrtm
+            )
+        else:
+            diffusion_sqrtm = state.diffusion_sqrtm
         marginals = self.implementation.scale_covariance(
             rv=state.marginals, scale_sqrtm=diffusion_sqrtm
         )
