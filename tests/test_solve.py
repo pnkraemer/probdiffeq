@@ -65,6 +65,7 @@ def test_dense_output(vf, u0, t0, t1, p, solver, info_op):
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary must not be similar
+    # todo: this only applies to the filter! The smoother must be close to both!
     close_to_left = solver.dense_output(
         t=solution[0].t + 1e-4, state=solution[1], state_previous=solution[0]
     )

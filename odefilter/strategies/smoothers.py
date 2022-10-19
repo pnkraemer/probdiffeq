@@ -343,7 +343,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t_previous=s0.t,
             u=sol,
             marginals_filtered=extrapolated0,
-            marginals=None,  # todo: fill this value?
+            marginals=None,  # todo: fill this value here already?
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model0,
         )
@@ -352,7 +352,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         accepted = Posterior(
             t=s1.t,
             t_previous=t,
-            u=sol,
+            u=s1.u,
             marginals_filtered=s1.marginals_filtered,
             marginals=s1.marginals,
             diffusion_sqrtm=diffsqrtm,
@@ -360,6 +360,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
         return accepted, solution, previous
 
+    # todo: rename to dense_marginals?
     def dense_output(self, state_previous, t, state):
         acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         sol_marginal = self.implementation.marginalise_model(
@@ -379,6 +380,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
 
 
+# todo: move to separate file? fixedpt.py? Also: "FixedPoint" or "FixPoint"?
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):

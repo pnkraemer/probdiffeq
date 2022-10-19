@@ -187,6 +187,8 @@ class IsotropicImplementation(_interface.Implementation):
     @staticmethod
     def marginalise_model(*, init, linop, noise):
         """Marginalise the output of a linear model."""
+        # todo: add preconditioner?
+
         # Pull into preconditioned space
         m0_p = init.mean
         l0_p = init.cov_sqrtm_lower
