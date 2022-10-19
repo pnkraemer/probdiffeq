@@ -78,7 +78,7 @@ plt.show()
 # Dense output
 
 ts = jnp.linspace(t0 + 1e-3, t1 - 1e-3, num=100)
-dense = solver.dense_output_searchsorted(ts=ts, solution=solution)
+dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 
 plt.plot(dense.t, dense.u)
 plt.show()
@@ -148,7 +148,7 @@ solution_small = solution[1:3]
 ts = jnp.linspace(solution_small.t[0] + 1e-4, solution_small.t[-1] - 1e-4)
 
 with jax.disable_jit():
-    dense = solver.dense_output_searchsorted(ts=ts, solution=solution_small)
+    dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution_small)
 
 
 _, num_derivatives, _ = dense.marginals.mean.shape
