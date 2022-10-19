@@ -15,7 +15,8 @@ jupyter:
 
 # Exploring the solution object
 
-TBD.
+ODE filters are probabilistic numerical algorithms, which means they compute probability distributions over possible solutions instead of simple point estimates.
+A probabilistic description is much richer than a non-probabilistic description, so the solution objects returned by the ODE filter are a lot of fun.
 
 ```python tags=[]
 import jax
@@ -34,7 +35,7 @@ config.update("jax_enable_x64", True)
 
 ```python tags=[]
 # Make a problem
-f, u0, (t0, t1), f_args = ivps.sir(time_span=(0.0, 50.0))
+f, u0, (t0, t1), f_args = ivps.sir()
 
 
 @jax.jit
@@ -43,7 +44,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver, info_op = recipes.dynamic_isotropic_eks0(num_derivatives=2)
+solver, info_op = recipes.ekf1(ode_dimension=3, num_derivatives=2)
 ```
 
 ```python tags=[]
@@ -61,162 +62,54 @@ solution = ivpsolve.solve(
 )
 ```
 
-```python tags=[]
-# Look at the solution
-print(len(solution))
-print()
-# print(solution[-1])
-```
+We can access elements of the solution.
 
 ```python tags=[]
-# Plot the solution
+print(len(solution))
+print(solution[-1])
+```
+
+We can plot an estimate of the solution.
+
+```python tags=[]
 plt.plot(solution.t, solution.u, ".-")
 plt.show()
 ```
 
-```python tags=[]
-# Dense output
+But we can also look at the underlying distribution.
+For starters, maybe we want to compute the marginal distribution over the solution away from
+the grid points. This is similar to dense output, but waaaay cooler: there is not _one_ way of dense output with
+probabilistic solvers, but there are
 
-ts = jnp.linspace(t0 + 1e-3, t1 - 1e-3, num=100)
+* marginals on off-grid points (most similar to traditional dense output)
+* joint distributions on grid points and away from the grid points
+* joint samples from the posterior
+
+and many more options.
+Look at this:
+
+```python tags=[]
+ts = jnp.linspace(t0+1e-4, t1-1e-3, num=400, endpoint=True)
 dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 
-plt.plot(dense.t, dense.u)
-plt.show()
-```
-
-```python
-_, num_derivatives, _ = dense.marginals.mean.shape
-
-
-fig, axes_all = plt.subplots(
-    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True
+fig, ax = plt.subplots(
+    nrows=2, sharex=True, tight_layout=True
 )
 
-for i, axes_cols in enumerate(axes_all.T):
-    ms = dense.marginals_filtered.mean[:, i, :]
-    ls = dense.marginals_filtered.cov_sqrtm_lower[:, i, :]
-    stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
-
-    if i == 1:
-        axes_cols[0].set_title(f"{i}st time-derivative")
-    elif i == 2:
-        axes_cols[0].set_title(f"{i}nd time-derivative")
-    elif i == 3:
-        axes_cols[0].set_title(f"{i}rd time-derivative")
-    else:
-        axes_cols[0].set_title(f"{i}th time-derivative")
-
-    axes_cols[0].plot(dense.t, ms)
-    for m in ms.T:
-        axes_cols[0].fill_between(dense.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
-
-    axes_cols[1].semilogy(dense.t, stds)
-
-plt.show()
-```
-
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
-```python
-solution_small = solution[0:3]
-ts = jnp.linspace(solution_small.t[0] + 1e-4, solution_small.t[-1] - 1e-4)
-
-with jax.disable_jit():
-    dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution_small)
-
-
-_, num_derivatives, _ = dense.marginals.mean.shape
-
-
-fig, axes_all = plt.subplots(
-    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
-)
-
-for i, axes_cols in enumerate(axes_all.T):
-    ms = dense.marginals.mean[:, i, :]
+for i in [0, 1, 2]:  # ["S", "I", "R"]
+    ms = dense.marginals.mean[:, i]
     ls = dense.marginals.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
-    if i == 1:
-        axes_cols[0].set_title(f"{i}st time-derivative")
-    elif i == 2:
-        axes_cols[0].set_title(f"{i}nd time-derivative")
-    elif i == 3:
-        axes_cols[0].set_title(f"{i}rd time-derivative")
-    else:
-        axes_cols[0].set_title(f"{i}th time-derivative")
+    ax[0].plot(dense.t, ms)
+    ax[0].fill_between(dense.t, ms - 1.96 * stds, ms + 1.96 * stds, alpha=0.3)
+    ax[0].set_ylabel("Posterior credible intervals")
 
-    axes_cols[0].plot(dense.t, ms)
-    for m in ms.T:
-        axes_cols[0].fill_between(dense.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
+    ax[1].semilogy(dense.t, stds)
+    ax[1].set_ylabel("Standard deviation")
 
-    axes_cols[1].semilogy(dense.t, stds)
-
+ax[1].set_xlabel("Time")
 plt.show()
 ```
 
-```python
-plt.plot(
-    dense.t,
-    dense.marginals_filtered.mean[:, -2, :],
-    ".",
-    color="salmon",
-    label="Filtered",
-)
-plt.plot(
-    dense.t,
-    dense.marginals.mean[:, -2, :],
-    ".",
-    color="darkslategray",
-    label="Smoothed",
-)
-plt.plot(
-    solution_small.t,
-    solution_small.marginals_filtered.mean[:, -2, :],
-    "P",
-    color="salmon",
-    label="Filtered",
-)
-plt.plot(
-    solution_small.t,
-    solution_small.marginals.mean[:, -2, :],
-    "X",
-    color="darkslategray",
-    label="Smoothed",
-)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-plt.legend(by_label.values(), by_label.keys())
-plt.show()
-```
-
-```python
-
-```
+Stay tuned for more.
