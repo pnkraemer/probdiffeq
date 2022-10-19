@@ -144,7 +144,7 @@ plt.show()
 ```
 
 ```python
-solution_small = solution[1:3]
+solution_small = solution[0:3]
 ts = jnp.linspace(solution_small.t[0] + 1e-4, solution_small.t[-1] - 1e-4)
 
 with jax.disable_jit():
