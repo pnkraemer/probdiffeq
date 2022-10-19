@@ -1,4 +1,5 @@
 """Inference via filters."""
+import abc
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
@@ -147,6 +148,14 @@ class _FilterCommon(_interface.Strategy):
     def offgrid_marginals(self, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
+
+    @abc.abstractmethod
+    def step_fn(self, *, state, info_op, dt, parameters):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_fn(self, *, state):
+        raise NotImplementedError
 
 
 @jax.tree_util.register_pytree_node_class
