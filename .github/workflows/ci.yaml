@@ -61,7 +61,8 @@ jobs:
         python-version: "3.x"
     - uses: actions/checkout@v2
     - name: Install dependencies
-      run:
+      run: |
+        sudo apt-get install pandoc
         pip install .[doc]
     - name: Build the HTML docs
       run:

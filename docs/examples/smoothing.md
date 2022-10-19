@@ -15,6 +15,10 @@ jupyter:
 
 # Smooooooothing
 
+There are many ways to skin the cat, and there are even more options to use smoothing for ODE filtering.
+Here is how.
+
+
 ```python
 import jax
 import jax.numpy as jnp
@@ -29,7 +33,7 @@ backend.select("jax")
 ```
 
 ```python
-f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 1e-1))
+f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 10.0))
 
 
 @jax.jit
@@ -37,14 +41,34 @@ def vf(*ys, t, p):
     return f(*ys, *p)
 
 
-num_derivatives = 3
+num_derivatives = 2
 ```
+
+## Terminal-value simulation
+
+If you are interested in the terminal value of the ODE solution, you can use filters and smoothers interchangeably.
+But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient.
+
+```python
+ek0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=num_derivatives)
+ek0sol = ivpsolve.simulate_terminal_values(
+    vf,
+    initial_values=(u0,),
+    t0=t0,
+    t1=t1,
+    solver=ek0,
+    info_op=info_op,
+    parameters=f_args,
+)
+print(ek0sol.t, ek0sol.u)
+```
+
+## Traditional simulation
+
+If you are used to calling traditional solve() methods, use one of the conventional smoothers (i.e. not the fixed-point smoothers).
 
 ```python
 ek0, info_op = recipes.dynamic_isotropic_eks0(num_derivatives=num_derivatives)
-```
-
-```python
 ek0sol = ivpsolve.solve(
     vf,
     initial_values=(u0,),
@@ -54,87 +78,57 @@ ek0sol = ivpsolve.solve(
     info_op=info_op,
     parameters=f_args,
 )
-```
 
-```python
-plt.title(len(ek0sol.t))
+plt.subplots(figsize=(5, 3))
+plt.title("EKS0 solution")
 plt.plot(ek0sol.t, ek0sol.u, "o-")
 plt.show()
 ```
+
+If you like, compute the solution on a dense grid after solving.
+
+```python
+ts_dense = jnp.linspace(
+    t0 + 1e-4, t1 - 1e-4, num=500, endpoint=True
+)  # must be off-grid
+dense = ek0.offgrid_marginals_searchsorted(ts=ts_dense, solution=ek0sol)
+
+ts_coarse = jnp.linspace(
+    t0 + 1e-4, t1 - 1e-4, num=25, endpoint=True
+)  # must be off-grid
+coarse = ek0.offgrid_marginals_searchsorted(ts=ts_coarse, solution=ek0sol)
+
+fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
+
+
+ax1.set_title("EKS0 solution (dense)")
+ax1.plot(dense.t, dense.u, ".")
+
+ax2.set_title("EKS0 solution (coarse)")
+ax2.plot(coarse.t, coarse.u, ".")
+plt.show()
+```
+
+## Checkpoint simulation
+
+If you know in advance that you like to have the solution at a pre-specified set of points only,
+use the simulate_checkpoints function together with a fixed-point smoother.
 
 ```python
 fixedpt_ek0, info_op = recipes.dynamic_isotropic_fixedpt_eks0(
     num_derivatives=num_derivatives
 )
-```
-
-```python
-print()
 fixedptsol = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),
-    ts=ek0sol.t,
+    ts=ts_dense,  # reuse from above
     solver=fixedpt_ek0,
     info_op=info_op,
     parameters=f_args,
 )
-print()
 
-fixedptsol2 = ivpsolve.simulate_checkpoints(
-    vf,
-    initial_values=(u0,),
-    ts=jnp.linspace(t0, t1, num=200, endpoint=True),
-    solver=fixedpt_ek0,
-    info_op=info_op,
-    parameters=f_args,
-)
-print()
-```
-
-```python
-plt.title(len(fixedptsol.t))
-
-style = {"linestyle": "None", "marker": "x"}
-plt.plot(fixedptsol.t, fixedptsol.u, **style, label="FixPtEKS0(t=EKS0.t)")
-plt.plot(ek0sol.t, ek0sol.u, **style, color="red", linewidth=3, label="EKS0")
-plt.plot(
-    fixedptsol2.t, fixedptsol2.u, **style, color="gray", label="FixPtEKS0(t=dense)"
-)
-plt.legend()
-# plt.ylim((-20, 30))
+plt.subplots(figsize=(5, 3))
+plt.title("FixedPt-EKS0 solution")
+plt.plot(fixedptsol.t, fixedptsol.u, ".-")
 plt.show()
-```
-
-```python
-plt.plot(
-    fixedptsol.t,
-    fixedptsol.marginals.mean[:, -1, :],
-    linestyle="None",
-    marker="P",
-    label="FixPtEKS0(t=EKS0.t)",
-)
-plt.plot(
-    ek0sol.t,
-    ek0sol.marginals.mean[:, -1, :],
-    linestyle="None",
-    marker="o",
-    color="red",
-    label="EKS0",
-)
-plt.plot(
-    fixedptsol2.t,
-    fixedptsol2.marginals.mean[:, -1, :],
-    linestyle="None",
-    marker="^",
-    color="gray",
-    label="FixPtEKS0(t=dense)",
-)
-# plt.ylim((-30, 30))
-# plt.xlim((8, 9))
-plt.legend()
-plt.show()
-```
-
-```python
-
 ```
