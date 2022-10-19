@@ -378,7 +378,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
 
 
-# todo: move to separate file? fixedpt.py?
+# todo: move to separate file? fixedpoint.py?
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):
