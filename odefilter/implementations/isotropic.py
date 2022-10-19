@@ -79,12 +79,12 @@ class IsotropicImplementation(_interface.Implementation):
         l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
 
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = jnp.reshape(_sqrtm.sqrtm_to_cholesky(R=l_obs_raw[:, None]), ())
+        l_obs = jnp.reshape(_sqrtm.sqrtm_to_upper_triangular(R=l_obs_raw[:, None]), ())
         res_white = (m_obs / l_obs) / jnp.sqrt(m_obs.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
         diffusion_sqrtm = jnp.reshape(
-            _sqrtm.sqrtm_to_cholesky(R=res_white[:, None]), ()
+            _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
         )
 
         error_estimate = diffusion_sqrtm * l_obs
@@ -131,7 +131,9 @@ class IsotropicImplementation(_interface.Implementation):
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = linear_fn(l_ext)  # shape (n,)
 
-        l_obs_scalar = jnp.reshape(_sqrtm.sqrtm_to_cholesky(R=l_obs[:, None]), ())
+        l_obs_scalar = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
+        )
         c_obs = l_obs_scalar**2
 
         observed = IsotropicNormal(mean=m_obs, cov_sqrtm_lower=l_obs_scalar)

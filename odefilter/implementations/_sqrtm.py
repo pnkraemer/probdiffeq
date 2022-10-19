@@ -107,36 +107,29 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     d = R_X_F.shape[1]
 
     # ~R_{Y}
-    R1 = R[:d, :d]
-    R_Y = _make_diagonal_positive(R=R1)
+    R_Y = R[:d, :d]
 
     # something like the cross-covariance
     R12 = R[:d, d:]
     G = jsp.linalg.solve_triangular(R_Y.T, R12.T, lower=True).T
-    # G = R12 @ jnp.linalg.inv(R_Y)
+    # tornadox does: G = jax.scipy.linalg.solve_triangular(R_Y, R12, lower=False).T
+    # my thesis says: G = R12 @ jnp.linalg.inv(R_Y)
 
     # ~R_{X \mid Y}
-    R3 = R[d:, d:]
-    R_XY = _make_diagonal_positive(R=R3)
+    R_XY = R[d:, d:]
     return R_Y, (R_XY, G)
 
 
 def sum_of_sqrtm_factors(*, R1, R2):
     r"""Compute the matrix square root $R^\top R = R_1^\top R_1 + R_2^\top R_2$."""
     R = jnp.vstack((R1, R2))
-    chol = sqrtm_to_cholesky(R=R)
+    uppertri = sqrtm_to_upper_triangular(R=R)
     if jnp.ndim(R1) == 0:
-        return jnp.reshape(chol, ())
-    return chol
+        return jnp.reshape(uppertri, ())
+    return uppertri
 
 
-def sqrtm_to_cholesky(*, R):
+def sqrtm_to_upper_triangular(*, R):
     """Transform a right matrix square root to a Cholesky factor."""
     upper_sqrtm = jnp.linalg.qr(R, mode="r")
-    return _make_diagonal_positive(R=upper_sqrtm)
-
-
-def _make_diagonal_positive(*, R):
-    s = jnp.sign(jnp.diag(R))
-    x = jnp.where(s == 0, 1, s)
-    return x[..., None] * R
+    return upper_sqrtm

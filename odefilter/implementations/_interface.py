@@ -73,5 +73,5 @@ class Implementation(abc.ABC):
     @staticmethod
     def sum_sqrt_scalars(a, b):
         R = jnp.asarray([[a], [b]])
-        diffsqrtm = _sqrtm.sqrtm_to_cholesky(R=R).T
+        diffsqrtm = _sqrtm.sqrtm_to_upper_triangular(R=R).T
         return jnp.reshape(diffsqrtm, ())

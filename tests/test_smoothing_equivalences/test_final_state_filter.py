@@ -1,12 +1,12 @@
 """There are too many ways to smooth. We assert they all do the same."""
 
+# todo: reuse solve() calls with default smoothers.
+import jax
 import jax.numpy as jnp
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
 
 from odefilter import ivpsolve, recipes
-
-# todo: reuse solve() calls with default smoothers.
 
 
 @case
@@ -54,9 +54,16 @@ def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks, tol):
         rtol=tol,
     )
 
+    @jax.vmap
+    def cov(x):
+        return x @ x.T
+
     assert _tree_all_allclose(ekf_sol.t, eks_sol.t)
     assert _tree_all_allclose(ekf_sol.u, eks_sol.u)
-    assert _tree_all_allclose(ekf_sol.marginals, eks_sol.marginals)
+    assert _tree_all_allclose(ekf_sol.marginals.mean, eks_sol.marginals.mean)
+    assert _tree_all_allclose(
+        cov(ekf_sol.marginals.cov_sqrtm_lower), cov(eks_sol.marginals.cov_sqrtm_lower)
+    )
     assert _tree_all_allclose(ekf_sol.diffusion_sqrtm, eks_sol.diffusion_sqrtm)
 
 
