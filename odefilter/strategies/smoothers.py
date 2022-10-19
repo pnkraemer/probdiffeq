@@ -94,10 +94,9 @@ class Posterior(Generic[T]):
         """Access the `i`-th sub-solution."""
         if jnp.ndim(self.t) < 1:
             raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
-        if jnp.ndim(item) >= jnp.ndim(self.t):
-            raise ValueError(
-                f"Inapplicable shape :( {jnp.ndim(item), jnp.ndim(self.t)}"
-            )
+        if isinstance(item, tuple) and len(item) > jnp.ndim(self.t):
+            # s[2, 3] forbidden
+            raise ValueError(f"Inapplicable shape: {item, jnp.shape(self.t)}")
         return Posterior(
             t=self.t[item],
             t_previous=self.t_previous[item],
@@ -147,7 +146,7 @@ class _DynamicSmootherCommon(_interface.Strategy):
 
         # no jax.lax.cond here, because we condition on the _shape_ of the array
         # which is available at compilation time already.
-        do_backward_pass = state.marginals_filtered.mean.ndim == 3
+        do_backward_pass = state.t.ndim == 1
         if do_backward_pass:
             return self._smooth(state)
 
@@ -216,10 +215,8 @@ class _DynamicSmootherCommon(_interface.Strategy):
 
     # Not implemented yet:
 
+    @abc.abstractmethod
     def dense_output(self, *, t, state, state_previous):
-        raise NotImplementedError
-
-    def dense_output_searchsorted(self, *, ts, solution, **kwargs):
         raise NotImplementedError
 
 
@@ -346,7 +343,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t_previous=s0.t,
             u=sol,
             marginals_filtered=extrapolated0,
-            marginals=None,
+            marginals=None,  # todo: fill this value?
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model0,
         )
@@ -357,11 +354,29 @@ class DynamicSmoother(_DynamicSmootherCommon):
             t_previous=t,
             u=sol,
             marginals_filtered=s1.marginals_filtered,
-            marginals=None,
+            marginals=s1.marginals,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model1,
         )
         return accepted, solution, previous
+
+    def dense_output(self, state_previous, t, state):
+        acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
+        sol_marginal = self.implementation.marginalise_model(
+            init=acc.marginals,
+            linop=acc.backward_model.transition,
+            noise=acc.backward_model.noise,
+        )
+        u = self.implementation.extract_sol(rv=sol_marginal)
+        return Posterior(
+            t=t,
+            t_previous=state_previous.t,
+            marginals_filtered=sol.marginals_filtered,
+            marginals=sol_marginal,
+            diffusion_sqrtm=acc.diffusion_sqrtm,
+            u=u,
+            backward_model=sol.backward_model,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -525,3 +540,6 @@ class DynamicFixedPointSmoother(_DynamicSmootherCommon):
             backward_model=backward_model1,
         )
         return accepted, solution, previous
+
+    def dense_output(self, *, t, state, state_previous):
+        raise NotImplementedError
