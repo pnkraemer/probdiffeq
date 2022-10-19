@@ -1,4 +1,5 @@
 """Inference via filters."""
+import abc
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
@@ -98,7 +99,7 @@ class _FilterCommon(_interface.Strategy):
             t_previous=-jnp.inf,
             u=sol,
             marginals=corrected,
-            diffusion_sqrtm=1.0,
+            diffusion_sqrtm=1.0,  # ?
             num_data_points=1.0,  # todo: make this an int
         )
         return filtered, error_estimate
@@ -147,6 +148,14 @@ class _FilterCommon(_interface.Strategy):
     def offgrid_marginals(self, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
+
+    @abc.abstractmethod
+    def step_fn(self, *, state, info_op, dt, parameters):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_fn(self, *, state):
+        raise NotImplementedError
 
 
 @jax.tree_util.register_pytree_node_class
@@ -240,7 +249,7 @@ class Filter(_FilterCommon):
         # Calibration of the global diffusion
         n = state.num_data_points
         diffsqrtm = self.implementation.sum_sqrt_scalars(
-            n * state.diffusion_sqrtm, evidence_sqrtm
+            jnp.sqrt(n) * state.diffusion_sqrtm, evidence_sqrtm
         )
         new_diffusion_sqrtm = jnp.reshape(diffsqrtm, ()) / jnp.sqrt(n + 1)
         sol = self.implementation.extract_sol(rv=corrected)
@@ -256,14 +265,21 @@ class Filter(_FilterCommon):
         return filtered, error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
+
+        if state.diffusion_sqrtm.ndim == 1:
+            diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
+                state.diffusion_sqrtm
+            )
+        else:
+            diffusion_sqrtm = state.diffusion_sqrtm
         marginals = self.implementation.scale_covariance(
-            rv=state.marginals, scale_sqrtm=state.diffusion_sqrtm
+            rv=state.marginals, scale_sqrtm=diffusion_sqrtm
         )
         return FilteringSolution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,
-            diffusion_sqrtm=state.diffusion_sqrtm,
+            diffusion_sqrtm=diffusion_sqrtm,
             num_data_points=state.num_data_points,
         )
