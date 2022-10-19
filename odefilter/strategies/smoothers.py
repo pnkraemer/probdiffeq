@@ -318,7 +318,6 @@ class DynamicSmoother(_DynamicSmootherCommon):
         return accepted, solution, previous
 
     def _case_interpolate(self, s0, s1, t):
-
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -360,7 +359,6 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
         return accepted, solution, previous
 
-    # todo: rename to dense_marginals?
     def offgrid_marginals(self, state_previous, t, state):
         acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         sol_marginal = self.implementation.marginalise_model(
@@ -380,7 +378,7 @@ class DynamicSmoother(_DynamicSmootherCommon):
         )
 
 
-# todo: move to separate file? fixedpt.py? Also: "FixedPoint" or "FixPoint"?
+# todo: move to separate file? fixedpt.py?
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFixedPointSmoother(_DynamicSmootherCommon):

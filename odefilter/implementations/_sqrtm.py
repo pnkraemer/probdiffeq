@@ -97,26 +97,27 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
     """
+    d_out, d_in = R_X_F.T.shape
+
     R = jnp.block(
         [
-            [R_YX, jnp.zeros_like(R_X_F.T)],
+            [R_YX, jnp.zeros((d_out, d_in))],
             [R_X_F, R_X],
         ]
     )
     R = jnp.linalg.qr(R, mode="r")
-    d = R_X_F.shape[1]
 
     # ~R_{Y}
-    R_Y = R[:d, :d]
+    R_Y = R[:d_out, :d_out]
 
     # something like the cross-covariance
-    R12 = R[:d, d:]
-    G = jsp.linalg.solve_triangular(R_Y.T, R12.T, lower=True).T
-    # tornadox does: G = jax.scipy.linalg.solve_triangular(R_Y, R12, lower=False).T
-    # my thesis says: G = R12 @ jnp.linalg.inv(R_Y)
+    R12 = R[:d_out, d_out:]
+
+    # Implements G = R12.T @ jnp.linalg.inv(R_Y.T) in clever:
+    G = jsp.linalg.solve_triangular(R_Y, R12, lower=False).T
 
     # ~R_{X \mid Y}
-    R_XY = R[d:, d:]
+    R_XY = R[d_out:, d_out:]
     return R_Y, (R_XY, G)
 
 

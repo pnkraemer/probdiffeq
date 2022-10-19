@@ -42,7 +42,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=1)
+ek0, info_op = recipes.dynamic_isotropic_fixedpt_eks0(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -68,7 +68,12 @@ _, num_derivatives, _ = solution.marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
-    nrows=2, ncols=num_derivatives, sharex=True, sharey="row", tight_layout=True
+    nrows=2,
+    ncols=num_derivatives,
+    sharex=True,
+    sharey="row",
+    tight_layout=True,
+    figsize=(8, 5),
 )
 
 for i, axes_cols in enumerate(axes_all.T):
