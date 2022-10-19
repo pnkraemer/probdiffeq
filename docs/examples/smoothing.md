@@ -63,28 +63,28 @@ plt.show()
 ```
 
 ```python
-fixpt_ek0, info_op = recipes.dynamic_isotropic_fixpt_eks0(
+fixedpt_ek0, info_op = recipes.dynamic_isotropic_fixedpt_eks0(
     num_derivatives=num_derivatives
 )
 ```
 
 ```python
 print()
-fixptsol = ivpsolve.simulate_checkpoints(
+fixedptsol = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),
     ts=ek0sol.t,
-    solver=fixpt_ek0,
+    solver=fixedpt_ek0,
     info_op=info_op,
     parameters=f_args,
 )
 print()
 
-fixptsol2 = ivpsolve.simulate_checkpoints(
+fixedptsol2 = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),
     ts=jnp.linspace(t0, t1, num=200, endpoint=True),
-    solver=fixpt_ek0,
+    solver=fixedpt_ek0,
     info_op=info_op,
     parameters=f_args,
 )
@@ -92,12 +92,14 @@ print()
 ```
 
 ```python
-plt.title(len(fixptsol.t))
+plt.title(len(fixedptsol.t))
 
 style = {"linestyle": "None", "marker": "x"}
-plt.plot(fixptsol.t, fixptsol.u, **style, label="FixPtEKS0(t=EKS0.t)")
+plt.plot(fixedptsol.t, fixedptsol.u, **style, label="FixPtEKS0(t=EKS0.t)")
 plt.plot(ek0sol.t, ek0sol.u, **style, color="red", linewidth=3, label="EKS0")
-plt.plot(fixptsol2.t, fixptsol2.u, **style, color="gray", label="FixPtEKS0(t=dense)")
+plt.plot(
+    fixedptsol2.t, fixedptsol2.u, **style, color="gray", label="FixPtEKS0(t=dense)"
+)
 plt.legend()
 # plt.ylim((-20, 30))
 plt.show()
@@ -105,8 +107,8 @@ plt.show()
 
 ```python
 plt.plot(
-    fixptsol.t,
-    fixptsol.marginals.mean[:, -1, :],
+    fixedptsol.t,
+    fixedptsol.marginals.mean[:, -1, :],
     linestyle="None",
     marker="P",
     label="FixPtEKS0(t=EKS0.t)",
@@ -120,8 +122,8 @@ plt.plot(
     label="EKS0",
 )
 plt.plot(
-    fixptsol2.t,
-    fixptsol2.marginals.mean[:, -1, :],
+    fixedptsol2.t,
+    fixedptsol2.marginals.mean[:, -1, :],
     linestyle="None",
     marker="^",
     color="gray",

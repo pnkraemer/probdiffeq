@@ -14,21 +14,21 @@ from odefilter import ivpsolve, recipes
 @case
 @parametrize("n", [2])
 @parametrize("tol", [1e-2])
-def smoother_fixpt_smoother_pair_eks0(n, tol):
+def smoother_fixedpt_smoother_pair_eks0(n, tol):
     eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    fixpt_eks0 = recipes.dynamic_isotropic_fixpt_eks0(
+    fixedpt_eks0 = recipes.dynamic_isotropic_fixedpt_eks0(
         num_derivatives=n, atol=1e-2 * tol, rtol=tol
     )
-    return eks0, fixpt_eks0
+    return eks0, fixedpt_eks0
 
 
 @pytest.mark.skip
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "eks, fixpt_eks", cases=".", prefix="smoother_fixpt_smoother_pair_"
+    "eks, fixedpt_eks", cases=".", prefix="smoother_fixedpt_smoother_pair_"
 )
 def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
-    vf, u0, t0, t1, p, eks, fixpt_eks
+    vf, u0, t0, t1, p, eks, fixedpt_eks
 ):
     """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""
@@ -41,7 +41,7 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
     with jax.disable_jit():
         ts, t = _grid(eks_sol.t, t0=t0, t1=t1, factor=5)
         print("From here one......")
-        fixpt_eks_sol = ivpsolve.simulate_checkpoints(
+        fixedpt_eks_sol = ivpsolve.simulate_checkpoints(
             vf,
             u0,
             ts=jnp.linspace(t0, t1, num=35),
@@ -49,12 +49,12 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
             # ts=ts,
             # ts=jnp.asarray([t0,t-0.01, t, t1- 0.01]),
             parameters=p,
-            solver=fixpt_eks[0],
-            info_op=fixpt_eks[1],
+            solver=fixedpt_eks[0],
+            info_op=fixedpt_eks[1],
         )
     assert t in ts
     assert t in eks_sol.t
-    # print(fixpt_eks_sol.t_previous)
+    # print(fixedpt_eks_sol.t_previous)
 
     import matplotlib.pyplot as plt
 
@@ -69,8 +69,8 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
     )
     plt.axvline(t)
     plt.plot(
-        fixpt_eks_sol.t,
-        fixpt_eks_sol.filtered.mean[:, :, -1],
+        fixedpt_eks_sol.t,
+        fixedpt_eks_sol.filtered.mean[:, :, -1],
         # linestyle="None",
         linewidth=0.1,
         marker="o",
@@ -83,11 +83,11 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
     plt.show()
 
     idx_eks, *_ = jnp.where(eks_sol.t[:, None] == jnp.asarray([t0, t, t1]))
-    idx_fixpt, *_ = jnp.where(fixpt_eks_sol.t[:, None] == jnp.asarray([t0, t, t1]))
+    idx_fixedpt, *_ = jnp.where(fixedpt_eks_sol.t[:, None] == jnp.asarray([t0, t, t1]))
 
-    print(fixpt_eks_sol.u[idx_fixpt], eks_sol.u[idx_eks])
-    assert jnp.allclose(fixpt_eks_sol.t[idx_fixpt], eks_sol.t[idx_eks])
-    assert jnp.allclose(fixpt_eks_sol.u[idx_fixpt], eks_sol.u[idx_eks])
+    print(fixedpt_eks_sol.u[idx_fixedpt], eks_sol.u[idx_eks])
+    assert jnp.allclose(fixedpt_eks_sol.t[idx_fixedpt], eks_sol.t[idx_eks])
+    assert jnp.allclose(fixedpt_eks_sol.u[idx_fixedpt], eks_sol.u[idx_eks])
 
     assert False
 
