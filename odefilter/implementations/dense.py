@@ -83,9 +83,9 @@ class DenseImplementation(_interface.Implementation):
     def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
         linear_fn_vmap = jax.vmap(linear_fn, in_axes=1, out_axes=1)
         l_obs_nonsquare = linear_fn_vmap(p[:, None] * self.q_sqrtm_lower)
-        l_obs_raw = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
 
-        # todo: make this use evidence()
+        # todo: make this call self.evidence()
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
         diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
 
@@ -113,7 +113,7 @@ class DenseImplementation(_interface.Implementation):
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(l_ext)
 
-        l_obs = _sqrtm.sqrtm_to_cholesky(R=l_obs_nonsquare.T).T
+        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
         observed = MultivariateNormal(mean=m_obs, cov_sqrtm_lower=l_obs)
 
         crosscov = l_ext @ l_obs_nonsquare.T

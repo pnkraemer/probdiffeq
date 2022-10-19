@@ -1,7 +1,7 @@
 """Adaptive solvers."""
 from dataclasses import dataclass
 from functools import partial  # noqa: F401
-from typing import Any, Generic, TypeVar, Union
+from typing import Any, Callable, Generic, TypeVar, Union
 
 import jax.lax
 import jax.numpy as jnp
@@ -85,6 +85,10 @@ class AdaptiveODEFilterState(Generic[T]):
         )
 
 
+def _reference_state_fn_max_abs(sol, sol_previous):
+    return jnp.maximum(jnp.abs(sol), jnp.abs(sol_previous))
+
+
 @register_pytree_node_class
 @dataclass(frozen=True)
 class AdaptiveODEFilter(Generic[R]):
@@ -102,6 +106,8 @@ class AdaptiveODEFilter(Generic[R]):
     """Assume we reached the checkpoint if the distance of the current \
      state to the checkpoint is smaller than this value."""
 
+    reference_state_fn: Callable[[Any, Any], Any] = _reference_state_fn_max_abs
+
     def tree_flatten(self):
         children = (
             self.solver,
@@ -110,13 +116,13 @@ class AdaptiveODEFilter(Generic[R]):
             self.control,
             self.numerical_zero,
         )
-        aux = self.norm_ord
+        aux = self.norm_ord, self.reference_state_fn
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         solver, atol, rtol, control, numerical_zero = children
-        norm_ord = aux
+        norm_ord, reference_state_fn = aux
         return cls(
             solver=solver,
             atol=atol,
@@ -124,6 +130,7 @@ class AdaptiveODEFilter(Generic[R]):
             control=control,
             numerical_zero=numerical_zero,
             norm_ord=norm_ord,
+            reference_state_fn=reference_state_fn,
         )
 
     @property
@@ -225,13 +232,13 @@ class AdaptiveODEFilter(Generic[R]):
         posterior, error_estimate = self.solver.step_fn(
             state=state.accepted, info_op=info_op, dt=dt, parameters=parameters
         )
-
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(
             error_estimate=error_estimate,
-            u=jnp.abs(posterior.u),
+            # u=jnp.abs(posterior.u),
             # todo: allow a switch to
-            #  u=jnp.maximum(jnp.abs(posterior.u), jnp.abs(state.accepted.u)),
+            # u=jnp.maximum(jnp.abs(posterior.u), jnp.abs(state.accepted.u)),
+            u=self.reference_state_fn(posterior.u, state.accepted.u),
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,

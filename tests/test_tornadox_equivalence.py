@@ -9,11 +9,9 @@ from tornadox import ek0, ek1, init, ivp, step
 
 from odefilter import controls, ivpsolve, recipes
 
-# todo: write the EKF1 test. It is also possible already!
-
 
 @pytest_cases.case
-def case_solver_pair_isotropic_ek0(num, atol, rtol, factor_min, factor_max, safety):
+def case_solver_pair_isotropic_ekf0(num, atol, rtol, factor_min, factor_max, safety):
 
     # van-der-Pol as a setup. We really don't want stiffness here.
     f, u0, (t0, t1), f_args = ivps.van_der_pol_first_order(
@@ -59,21 +57,41 @@ def case_solver_pair_isotropic_ek0(num, atol, rtol, factor_min, factor_max, safe
         rtol=rtol,
         control=controller,
         parameters=f_args,
+        reference_state_fn=lambda x, y: jnp.abs(x),
     )
-    return solution_tornadox, solution_odefilter
+
+    @jax.vmap
+    def cov(x):
+        return x @ x.T
+
+    d = u0.shape[0]
+
+    @jax.vmap
+    def kroncov(x):
+        return jnp.kron(jnp.eye(d), x @ x.T)
+
+    output_tornadox = (
+        solution_tornadox.t,
+        (solution_tornadox.mean),
+        cov(solution_tornadox.cov_sqrtm),
+    )
+    solution_odefilter = (
+        solution_odefilter.t,
+        solution_odefilter.marginals.mean,
+        kroncov(solution_odefilter.marginals.cov_sqrtm_lower),
+    )
+    return output_tornadox, solution_odefilter
 
 
-@pytest.mark.skip  # skip, until the ReferenceEK1 in tornadox works again...
 @pytest_cases.case
-def case_solver_pair_dynamic_ek1(num, atol, rtol, factor_min, factor_max, safety):
+def case_solver_pair_dynamic_ekf1(num, atol, rtol, factor_min, factor_max, safety):
 
-    # van-der-Pol as a setup. We really don't want stiffness here.
     f, u0, (t0, t1), f_args = ivps.van_der_pol_first_order(
-        time_span=(0.0, 1.0), stiffness_constant=1.0
+        time_span=(0.0, 1.0), stiffness_constant=4.0
     )
 
     @jax.jit
-    def vf(_, y):
+    def vf_tor(t, y):
         return f(y, *f_args)
 
     # Tornadox
@@ -88,17 +106,21 @@ def case_solver_pair_dynamic_ek1(num, atol, rtol, factor_min, factor_max, safety
         ),
     )
     vdp = ivp.InitialValueProblem(
-        f=vf, t0=t0, tmax=t1, y0=u0, df=jax.jit(jax.jacfwd(vf, argnums=1))
+        f=vf_tor, t0=t0, tmax=t1, y0=u0, df=jax.jit(jax.jacfwd(vf_tor, argnums=1))
     )
     solution_tornadox = solver.solve(vdp)
 
     # ODE-filter
+    @jax.jit
+    def vf_ode(y, *, t, p):
+        return f(y, *p)
+
     ekf1, info_op = recipes.dynamic_ekf1(ode_dimension=2, num_derivatives=num)
     controller = controls.ClippedIntegral(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )
     solution_odefilter = ivpsolve.solve(
-        vf,
+        vf_ode,
         initial_values=(u0,),
         t0=t0,
         t1=t1,
@@ -107,12 +129,33 @@ def case_solver_pair_dynamic_ek1(num, atol, rtol, factor_min, factor_max, safety
         atol=atol,
         rtol=rtol,
         control=controller,
+        parameters=f_args,
+        reference_state_fn=lambda x, y: jnp.maximum(jnp.abs(x), jnp.abs(y)),
     )
-    return solution_tornadox, solution_odefilter
+
+    @jax.vmap
+    def cov(x):
+        return x @ x.T
+
+    @jax.vmap
+    def kronmean(x):
+        return jnp.reshape(x, (-1,), order="F")
+
+    output_tornadox = (
+        solution_tornadox.t,
+        kronmean(solution_tornadox.mean),
+        cov(solution_tornadox.cov_sqrtm),
+    )
+    solution_odefilter = (
+        solution_odefilter.t,
+        solution_odefilter.marginals.mean,
+        cov(solution_odefilter.marginals.cov_sqrtm_lower),
+    )
+    return output_tornadox, solution_odefilter
 
 
 @pytest.mark.parametrize("num", [4])
-@pytest.mark.parametrize("atol, rtol", [(1e-4, 1e-6)])
+@pytest.mark.parametrize("atol, rtol", [(1e-3, 1e-5)])
 @pytest.mark.parametrize("factor_min, factor_max, safety", [(0.2, 10.0, 0.95)])
 @pytest_cases.parametrize_with_cases(
     "solution_tornadox, solution_odefilter", cases=".", prefix="case_solver_pair_"
@@ -121,20 +164,16 @@ def test_outputs_equal(solution_tornadox, solution_odefilter):
 
     # Compare t, mean, cov_sqrtm @ cov_sqrtm.T.
     # They should be _identical_ (up to machine precision).
+    #
+    # @jax.vmap
+    # def cov(x):
+    #     return x @ x.T
+    #
+    # d = solution_odefilter.u.shape[1]
+    #
+    # @jax.vmap
+    # def kroncov(x):
+    #     return jnp.kron(jnp.eye(d), x @ x.T)
 
-    @jax.vmap
-    def cov(x):
-        return x @ x.T
-
-    d = solution_odefilter.u.shape[1]
-
-    @jax.vmap
-    def kroncov(x):
-        return jnp.kron(jnp.eye(d), x @ x.T)
-
-    assert jnp.allclose(solution_tornadox.t, solution_odefilter.t)
-    assert jnp.allclose(solution_tornadox.mean, solution_odefilter.marginals.mean)
-    assert jnp.allclose(
-        cov(solution_tornadox.cov_sqrtm),
-        kroncov(solution_odefilter.marginals.cov_sqrtm_lower),
-    )
+    for sol_tornadox, sol_odefilter in zip(solution_tornadox, solution_odefilter):
+        assert jnp.allclose(sol_tornadox, sol_odefilter)
