@@ -57,7 +57,7 @@ class DynamicFixedPointSmoother(_smoother_common.DynamicSmootherCommon):
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
-        error_estimate *= dt
+        error_estimate = dt * diffusion_sqrtm * error_estimate
 
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
