@@ -53,8 +53,7 @@ class IsotropicImplementation(_interface.Implementation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return IsotropicNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
-    @staticmethod
-    def init_error_estimate():  # noqa: D102
+    def init_error_estimate(self):  # noqa: D102
         return jnp.zeros(())  # the initialisation is error-free
 
     def init_backward_transition(self):  # noqa: D102
@@ -126,8 +125,7 @@ class IsotropicImplementation(_interface.Implementation):
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    @staticmethod
-    def final_correction(*, extrapolated, linear_fn, m_obs):  # noqa: D102
+    def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = linear_fn(l_ext)  # shape (n,)
 
@@ -144,13 +142,11 @@ class IsotropicImplementation(_interface.Implementation):
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
 
-    @staticmethod
-    def extract_sol(*, rv):  # noqa: D102
+    def extract_sol(self, *, rv):  # noqa: D102
         m = rv.mean[..., 0, :]
         return m
 
-    @staticmethod
-    def condense_backward_models(*, bw_init, bw_state):  # noqa: D102
+    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
 
         A = bw_init.transition
         (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
@@ -170,9 +166,7 @@ class IsotropicImplementation(_interface.Implementation):
 
         def body_fun(carry, x):
             op, noi = x
-            out = IsotropicImplementation.marginalise_model(
-                init=carry, linop=op, noise=noi
-            )
+            out = self.marginalise_model(init=carry, linop=op, noise=noi)
             return out, out
 
         # Initial condition does not matter
@@ -182,8 +176,7 @@ class IsotropicImplementation(_interface.Implementation):
         )
         return rvs
 
-    @staticmethod
-    def marginalise_model(*, init, linop, noise):
+    def marginalise_model(self, *, init, linop, noise):
         """Marginalise the output of a linear model."""
         # todo: add preconditioner?
 
@@ -213,8 +206,7 @@ class IsotropicImplementation(_interface.Implementation):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    @staticmethod
-    def scale_covariance(*, rv, scale_sqrtm):
+    def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return IsotropicNormal(
                 mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower

@@ -147,8 +147,7 @@ class ClippedProportionalIntegral(_ProportionalIntegralCommon):
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    @staticmethod
-    def clip_fn(*, state, dt, t1):
+    def clip_fn(self, *, state, dt, t1):
         return jnp.minimum(dt, t1 - state.t)
 
 
@@ -209,6 +208,5 @@ class ClippedIntegral(_IntegralCommon):
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    @staticmethod
-    def clip_fn(*, state, dt, t1):
+    def clip_fn(self, *, state, dt, t1):
         return jnp.minimum(dt, t1 - state.t)

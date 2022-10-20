@@ -90,9 +90,9 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
 
         return smoothing_solution, error_estimate
 
-    def _case_right_corner(self, s0, s1, t):  # s1.t == t
+    def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
 
-        accepted = self._duplicate_with_unit_backward_model(s1, t)
+        accepted = self._duplicate_with_unit_backward_model(state=s1, t=t)
         previous = markov.Posterior(
             t=t,
             t_previous=s0.t,
@@ -106,7 +106,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, s0, s1, t):
+    def _case_interpolate(self, *, s0, s1, t):
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -148,7 +148,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
         )
         return accepted, solution, previous
 
-    def offgrid_marginals(self, state_previous, t, state):
+    def offgrid_marginals(self, *, state_previous, t, state):
         acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         sol_marginal = self.implementation.marginalise_model(
             init=acc.marginals,

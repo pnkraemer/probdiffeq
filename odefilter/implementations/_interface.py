@@ -59,7 +59,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_backward_noise(self, rv_proto):
+    def init_backward_noise(self, *, rv_proto):
         raise NotImplementedError
 
     @abc.abstractmethod
