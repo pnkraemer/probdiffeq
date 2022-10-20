@@ -129,43 +129,46 @@ def workprecision(*, solve_fns, tols, **kwargs):
 
 ```python
 d = u0.shape[0]
+
+_ekf1_3 = prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d))
+_ekf1_3_dynamic = prepare(recipes.dynamic_ekf1(num_derivatives=3, ode_dimension=d))
+_ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
+_ekf1_5_dynamic = prepare(recipes.dynamic_ekf1(num_derivatives=5, ode_dimension=d))
+_eks1_5_dynamic = prepare(recipes.dynamic_eks1(num_derivatives=5, ode_dimension=d))
+_ekf1_8 = prepare(recipes.ekf1(num_derivatives=8, ode_dimension=d))
+_ekf1_8_dynamic = prepare(recipes.dynamic_ekf1(num_derivatives=8, ode_dimension=d))
+_ekf0_3_isotropic = prepare(recipes.isotropic_ekf0(num_derivatives=3))
+_ekf0_3_isotropic_dynamic = prepare(recipes.dynamic_isotropic_ekf0(num_derivatives=3))
+_ekf0_5_isotropic = prepare(recipes.isotropic_ekf0(num_derivatives=5))
+_eks0_5_isotropic_dynamic = prepare(recipes.dynamic_isotropic_eks0(num_derivatives=5))
+_ekf0_5_isotropic_dynamic_fixpt = prepare(
+    recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=5)
+)
+
 solve_fns = [
     # EK1
-    (prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d)), f"EKF1({3})"),
-    (prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d)), f"EKF1({5})"),
-    (
-        prepare(recipes.dynamic_ekf1(num_derivatives=5, ode_dimension=d)),
-        f"Dynamic EKF1({5})",
-    ),
-    (
-        prepare(recipes.dynamic_eks1(num_derivatives=5, ode_dimension=d)),
-        f"Dynamic EKS1({5})",
-    ),
-    (prepare(recipes.ekf1(num_derivatives=8, ode_dimension=d)), f"EKF1({8})"),
+    (_ekf1_3, f"EKF1({3})"),
+    (_ekf1_3_dynamic, f"Dynamic EKF1({3})"),
+    (_ekf1_5, f"EKF1({5})"),
+    (_ekf1_5_dynamic, f"Dynamic EKF1({5})"),
+    (_eks1_5_dynamic, f"Dynamic EKS1({5})"),
+    (_ekf1_8, f"EKF1({8})"),
+    (_ekf1_8_dynamic, f"Dynamic EKF1({8})"),
     # EK0
-    (prepare(recipes.isotropic_ekf0(num_derivatives=3)), f"Isotropic EKF0({3})"),
-    (
-        prepare(recipes.dynamic_isotropic_ekf0(num_derivatives=3)),
-        f"Dynamic Isotropic EKF0({3})",
-    ),
-    (prepare(recipes.isotropic_ekf0(num_derivatives=5)), f"Isotropic EKF0({5})"),
-    (
-        prepare(recipes.dynamic_isotropic_eks0(num_derivatives=5)),
-        f"Dynamic Isotropic EKS0({5})",
-    ),
-    (
-        prepare(recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=5)),
-        f"Dynamic Isotropic FixPt-EKS0({5})",
-    ),
+    (_ekf0_3_isotropic, f"Isotropic EKF0({3})"),
+    (_ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({5})"),
+    (_ekf0_5_isotropic, f"Isotropic EKF0({5})"),
+    (_eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
+    (_ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
 ]
 ```
 
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 12.0, step=1.0)
+tolerances = 0.1 ** jnp.arange(2.0, 11.0, step=2.)
 
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=1, repeat=5)
+results = workprecision(solve_fns=solve_fns, tols=tolerances, number=5, repeat=5)
 ```
 
 ```python
@@ -189,7 +192,7 @@ If these results show one thing, then the fact that it is worth building a speci
 for simulate_terminal_values(). The smoothing-based solvers compute extra factors that are just not needed for terminal-value simulation, and the extra factors turn out to be quite expensive. Every smoother was slower than its filtering-equivalent.
 
 We can observe more:
-* Dynamic calibration seems to perform at most as good as non-dynamic calibration.
+* Dynamic calibration seems to perform at most as good as non-dynamic calibration. (Except for low order, low-precision EKF1, where the dynamic calibration seems to help. But even with the dynamic calibration is the low-order EKF1 one of the slowest solvers.)
 * Low precision is best achieved with an isotropic EKF0(3). High precision is best achieved with an EKF1(8). The middle ground is better covered by an isotropic EKF0(5) than an EKF1(5).
 
 
