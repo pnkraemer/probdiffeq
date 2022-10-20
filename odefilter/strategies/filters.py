@@ -157,6 +157,10 @@ class _FilterCommon(_interface.Strategy):
     def extract_fn(self, *, state):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def extract_terminal_value_fn(self, *, state):
+        raise NotImplementedError
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
@@ -206,6 +210,9 @@ class DynamicFilter(_FilterCommon):
         return filtered, error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
+        return state
+
+    def extract_terminal_value_fn(self, *, state):  # noqa: D102
         return state
 
 
@@ -264,13 +271,23 @@ class Filter(_FilterCommon):
         return filtered, error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
+        diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
+            state.diffusion_sqrtm
+        )
+        marginals = self.implementation.scale_covariance(
+            rv=state.marginals, scale_sqrtm=diffusion_sqrtm
+        )
+        return FilteringSolution(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals=marginals,
+            diffusion_sqrtm=diffusion_sqrtm,
+            num_data_points=state.num_data_points,
+        )
 
-        if state.diffusion_sqrtm.ndim == 1:
-            diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
-                state.diffusion_sqrtm
-            )
-        else:
-            diffusion_sqrtm = state.diffusion_sqrtm
+    def extract_terminal_value_fn(self, *, state):
+        diffusion_sqrtm = state.diffusion_sqrtm
         marginals = self.implementation.scale_covariance(
             rv=state.marginals, scale_sqrtm=diffusion_sqrtm
         )

@@ -280,6 +280,10 @@ class AdaptiveODEFilter(Generic[R]):
         state = self.solver.extract_fn(state=state.solution)
         return state
 
+    def extract_terminal_value_fn(self, *, state):  # noqa: D102
+        state = self.solver.extract_terminal_value_fn(state=state.solution)
+        return state
+
 
 def _empty_like(tree):
     return jax.tree_util.tree_map(jnp.empty_like, tree)

@@ -32,23 +32,6 @@ class DynamicSmootherCommon(_interface.Strategy):
         raise NotImplementedError
 
     def extract_fn(self, *, state):  # noqa: D102
-        # no jax.lax.cond here, because we condition on the _shape_ of the array
-        # which is available at compilation time already.
-        do_backward_pass = state.t.ndim == 1
-        if do_backward_pass:
-            return self._smooth(state)
-
-        return markov.Posterior(
-            t=state.t,
-            t_previous=state.t_previous,
-            u=state.u,
-            marginals_filtered=state.marginals_filtered,
-            marginals=state.marginals_filtered,  # we are at the terminal state only
-            diffusion_sqrtm=state.diffusion_sqrtm,
-            backward_model=state.backward_model,
-        )
-
-    def _smooth(self, state):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.marginals_filtered)
         marginals = self.implementation.marginalise_backwards(
             init=init,
@@ -62,6 +45,17 @@ class DynamicSmootherCommon(_interface.Strategy):
             u=sol,
             marginals_filtered=state.marginals_filtered,
             marginals=marginals,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=state.backward_model,
+        )
+
+    def extract_terminal_value_fn(self, *, state):  # noqa: D102
+        return markov.Posterior(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals_filtered=state.marginals_filtered,
+            marginals=state.marginals_filtered,  # we are at the terminal state only
             diffusion_sqrtm=state.diffusion_sqrtm,
             backward_model=state.backward_model,
         )
