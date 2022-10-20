@@ -29,7 +29,7 @@ def most_recent_commit(*, abbrev=21):
     )
 
 
-def time(fn, /, *, number=10, repeat=10):
+def time(fn, /, *, number=5, repeat=5):
     res = fn()
     t = min(timeit.repeat(fn, number=number, repeat=repeat)) / number
     return t, res

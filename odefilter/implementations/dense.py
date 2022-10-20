@@ -90,9 +90,7 @@ class DenseImplementation(_interface.Implementation):
         res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
         diffusion_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
 
-        error_estimate = diffusion_sqrtm * jnp.sqrt(
-            jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw)
-        )
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return diffusion_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
