@@ -71,7 +71,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginalise_backwards(self, *, init, backward_model):
+    def marginalise_backwards(self, *, init, linop, noise):
         raise NotImplementedError
 
     @abc.abstractmethod

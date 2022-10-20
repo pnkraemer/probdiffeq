@@ -182,14 +182,14 @@ class DenseImplementation(_interface.Implementation):
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
         )
 
-    def marginalise_backwards(self, *, init, backward_model):
+    def marginalise_backwards(self, *, init, linop, noise):
         def body_fun(carry, x):
-            linop, noise = x.transition, x.noise
-            out = self.marginalise_model(init=carry, linop=linop, noise=noise)
+            op, noi = x
+            out = self.marginalise_model(init=carry, linop=op, noise=noi)
             return out, out
 
         # Initial condition does not matter
-        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], backward_model)
+        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
 
         _, rvs = _control_flow.scan_with_init(
             f=body_fun, init=init, xs=bw_models, reverse=True

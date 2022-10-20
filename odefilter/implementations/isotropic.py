@@ -165,22 +165,18 @@ class IsotropicImplementation(_interface.Implementation):
         noise = IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    @staticmethod
-    def marginalise_backwards(*, init, backward_model):
+    def marginalise_backwards(self, *, init, linop, noise):
         """Compute marginals of a markov sequence."""
-        # todo: the backward_model is a too high-level data structure.
-        #  This function should operate on transition and noise,
-        #  just like the marginalise_model() below.
 
         def body_fun(carry, x):
-            linop, noise = x.transition, x.noise
+            op, noi = x
             out = IsotropicImplementation.marginalise_model(
-                init=carry, linop=linop, noise=noise
+                init=carry, linop=op, noise=noi
             )
             return out, out
 
         # Initial condition does not matter
-        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], backward_model)
+        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
         _, rvs = _control_flow.scan_with_init(
             f=body_fun, init=init, xs=bw_models, reverse=True
         )

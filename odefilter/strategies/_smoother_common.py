@@ -55,7 +55,9 @@ class DynamicSmootherCommon(_interface.Strategy):
     def _smooth(self, state):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.marginals_filtered)
         marginals = self.implementation.marginalise_backwards(
-            init=init, backward_model=state.backward_model
+            init=init,
+            linop=state.backward_model.transition,
+            noise=state.backward_model.noise,
         )
         sol = self.implementation.extract_sol(rv=marginals)
         return markov.Posterior(
