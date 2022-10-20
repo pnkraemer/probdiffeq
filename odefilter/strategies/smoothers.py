@@ -163,9 +163,8 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
             marginals=sol_marginal,
             diffusion_sqrtm=acc.diffusion_sqrtm,
             u=u,
-            backward_model=_nan_like(
-                sol.backward_model
-            ),  # the values would be meaningless
+            # the values would be meaningless:
+            backward_model=_nan_like(sol.backward_model),
         )
 
 
