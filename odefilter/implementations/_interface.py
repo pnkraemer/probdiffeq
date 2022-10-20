@@ -70,6 +70,14 @@ class Implementation(abc.ABC):
     def scale_covariance(self, *, rv, scale_sqrtm):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def marginalise_backwards(self, *, init, backward_model):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginalise_model(self, *, init, linop, noise):
+        raise NotImplementedError
+
     @staticmethod
     def sum_sqrt_scalars(a, b):
         R = jnp.asarray([[a], [b]])

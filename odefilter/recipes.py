@@ -65,7 +65,8 @@ def dynamic_isotropic_fixedpoint_eks0(*, num_derivatives=4, ode_order=1):
 
 
 def dynamic_ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
-    """Construct the equivalent of a semi-implicit solver with dynamic calibration.
+    """Construct the equivalent of a semi-implicit solver with \
+     dynamic calibration, and optimised for terminal-value simulation.
 
     Suitable for low-dimensional, stiff problems.
     """
@@ -76,6 +77,22 @@ def dynamic_ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     solver = filters.DynamicFilter(implementation=implementation)
+    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    return solver, information_op
+
+
+def dynamic_eks1(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of a semi-implicit solver with dynamic calibration.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    solver = smoothers.DynamicSmoother(implementation=implementation)
     information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
