@@ -32,10 +32,6 @@ class DynamicSmootherCommon(_interface.Strategy):
         raise NotImplementedError
 
     def extract_fn(self, *, state):  # noqa: D102
-        # todo: are we looping correctly?
-        #  what does the backward transition at time t say?
-        #  How to get from t to the previous t, right?
-
         # no jax.lax.cond here, because we condition on the _shape_ of the array
         # which is available at compilation time already.
         do_backward_pass = state.t.ndim == 1

@@ -131,7 +131,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
             t_previous=s0.t,
             u=sol,
             marginals_filtered=extrapolated0,
-            marginals=None,  # todo: fill this value here already?
+            marginals=None,
             diffusion_sqrtm=diffsqrtm,
             backward_model=backward_model0,
         )
