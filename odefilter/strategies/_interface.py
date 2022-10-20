@@ -45,8 +45,8 @@ class Strategy(abc.ABC):
 
         # Cases to switch between
         branches = [
-            self._case_right_corner,
-            self._case_interpolate,
+            lambda s0, s1, t: self._case_right_corner(s0=s0, s1=s1, t=t),
+            lambda s0, s1, t: self._case_interpolate(s0=s0, s1=s1, t=t),
         ]
 
         # Which case applies
@@ -82,16 +82,19 @@ class Strategy(abc.ABC):
         solution_left = solution[indices - 1]
         solution_right = solution[indices]
 
-        # Vmap to the rescue :)
-        marginals_vmap = jax.vmap(self.offgrid_marginals)
+        # Vmap to the rescue :) It does not like kw-only arguments, though.
+        def offgrid_no_kw(sprev, t, s):
+            return self.offgrid_marginals(t=t, state=s, state_previous=sprev)
+
+        marginals_vmap = jax.vmap(offgrid_no_kw)
         return marginals_vmap(solution_left, ts, solution_right)
 
     @abc.abstractmethod
-    def _case_right_corner(self, s0, s1, t):
+    def _case_right_corner(self, *, s0, s1, t):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _case_interpolate(self, s0, s1, t):
+    def _case_interpolate(self, *, s0, s1, t):
         raise NotImplementedError
 
     @abc.abstractmethod

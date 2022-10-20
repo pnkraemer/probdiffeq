@@ -99,7 +99,7 @@ class DynamicFixedPointSmoother(_smoother_common.DynamicSmootherCommon):
 
         return smoothing_solution, error_estimate
 
-    def _case_right_corner(self, s0, s1, t):  # s1.t == t
+    def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
 
@@ -118,12 +118,12 @@ class DynamicFixedPointSmoother(_smoother_common.DynamicSmootherCommon):
             diffusion_sqrtm=s1.diffusion_sqrtm,
         )
 
-        accepted = self._duplicate_with_unit_backward_model(solution, t)
+        accepted = self._duplicate_with_unit_backward_model(state=solution, t=t)
         previous = accepted
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, s0, s1, t):  # noqa: D102
+    def _case_interpolate(self, *, s0, s1, t):  # noqa: D102
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -155,10 +155,10 @@ class DynamicFixedPointSmoother(_smoother_common.DynamicSmootherCommon):
         )
 
         # new model! no condensing...
-        previous = self._duplicate_with_unit_backward_model(solution, t)
+        previous = self._duplicate_with_unit_backward_model(state=solution, t=t)
 
         # From t to s1.t
-        extra1, backward_model1 = self._interpolate_from_to_fn(
+        _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, diffusion_sqrtm=diffusion_sqrtm, t=s1.t, t0=t
         )
         accepted = markov.Posterior(

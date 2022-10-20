@@ -104,7 +104,7 @@ class _FilterCommon(_interface.Strategy):
         )
         return filtered, error_estimate
 
-    def _case_right_corner(self, s0, s1, t):  # s1.t == t
+    def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
         accepted = FilteringSolution(
             t=t,
             t_previous=s0.t,  # todo: wrong, but no one cares
@@ -117,7 +117,7 @@ class _FilterCommon(_interface.Strategy):
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, s0, s1, t):
+    def _case_interpolate(self, *, s0, s1, t):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
 
@@ -145,7 +145,7 @@ class _FilterCommon(_interface.Strategy):
         )
         return s1, target_p, target_p
 
-    def offgrid_marginals(self, state_previous, t, state):
+    def offgrid_marginals(self, *, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
 
@@ -169,7 +169,7 @@ class DynamicFilter(_FilterCommon):
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+        m_ext, _, _ = self.implementation.extrapolate_mean(
             state.marginals.mean, p=p, p_inv=p_inv
         )
 
@@ -205,8 +205,7 @@ class DynamicFilter(_FilterCommon):
         )
         return filtered, error_estimate
 
-    @staticmethod
-    def extract_fn(*, state):  # noqa: D102
+    def extract_fn(self, *, state):  # noqa: D102
         return state
 
 
@@ -220,7 +219,7 @@ class Filter(_FilterCommon):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
         # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+        m_ext, _, _ = self.implementation.extrapolate_mean(
             state.marginals.mean, p=p, p_inv=p_inv
         )
 

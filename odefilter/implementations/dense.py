@@ -145,8 +145,7 @@ class DenseImplementation(_interface.Implementation):
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
-    @staticmethod
-    def evidence_sqrtm(*, observed):
+    def evidence_sqrtm(self, *, observed):
         m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = jsp.linalg.solve_triangular(l_obs.T, m_obs, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
@@ -165,14 +164,13 @@ class DenseImplementation(_interface.Implementation):
         k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
 
-    def init_backward_noise(self, rv_proto):  # noqa: D102
+    def init_backward_noise(self, *, rv_proto):  # noqa: D102
         return MultivariateNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
-    @staticmethod
-    def scale_covariance(*, rv, scale_sqrtm):
+    def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return MultivariateNormal(
                 mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
@@ -182,14 +180,14 @@ class DenseImplementation(_interface.Implementation):
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
         )
 
-    def marginalise_backwards(self, *, init, backward_model):
+    def marginalise_backwards(self, *, init, linop, noise):
         def body_fun(carry, x):
-            linop, noise = x.transition, x.noise
-            out = self.marginalise_model(init=carry, linop=linop, noise=noise)
+            op, noi = x
+            out = self.marginalise_model(init=carry, linop=op, noise=noi)
             return out, out
 
         # Initial condition does not matter
-        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], backward_model)
+        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
 
         _, rvs = _control_flow.scan_with_init(
             f=body_fun, init=init, xs=bw_models, reverse=True

@@ -148,7 +148,7 @@ class AdaptiveODEFilter(Generic[R]):
         state_control = self.control.init_fn()
 
         # Initialise (prototypes for) proposed values
-        u0, f0, *_ = taylor_coefficients
+        u0, *_ = taylor_coefficients
         error_norm_proposed = self._normalise_error(
             error_estimate=error_estimate,
             u=u0,

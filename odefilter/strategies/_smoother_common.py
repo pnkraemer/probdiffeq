@@ -16,19 +16,19 @@ class DynamicSmootherCommon(_interface.Strategy):
     """Common functionality for smoother-style algorithms."""
 
     @abc.abstractmethod
-    def _case_interpolate(self, s0, s1, t):
+    def _case_interpolate(self, *, s0, s1, t):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _case_right_corner(self, s0, s1, t):
+    def _case_right_corner(self, *, s0, s1, t):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step_fn(self, state, info_op, dt, parameters):
+    def step_fn(self, *, state, info_op, dt, parameters):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_fn(self, taylor_coefficients, t0):
+    def init_fn(self, *, taylor_coefficients, t0):
         raise NotImplementedError
 
     def extract_fn(self, *, state):  # noqa: D102
@@ -55,7 +55,9 @@ class DynamicSmootherCommon(_interface.Strategy):
     def _smooth(self, state):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.marginals_filtered)
         marginals = self.implementation.marginalise_backwards(
-            init=init, backward_model=state.backward_model
+            init=init,
+            linop=state.backward_model.transition,
+            noise=state.backward_model.noise,
         )
         sol = self.implementation.extract_sol(rv=marginals)
         return markov.Posterior(
@@ -68,24 +70,24 @@ class DynamicSmootherCommon(_interface.Strategy):
             backward_model=state.backward_model,
         )
 
-    def _duplicate_with_unit_backward_model(self, s0, t):
+    def _duplicate_with_unit_backward_model(self, *, state, t):
         bw_transition0 = self.implementation.init_backward_transition()
         bw_noise0 = self.implementation.init_backward_noise(
-            rv_proto=s0.backward_model.noise
+            rv_proto=state.backward_model.noise
         )
         bw_model = markov.BackwardModel(transition=bw_transition0, noise=bw_noise0)
         state1 = markov.Posterior(
             t=t,
             t_previous=t,  # identity transition: this is what it does...
-            u=s0.u,
-            marginals_filtered=s0.marginals_filtered,
-            marginals=s0.marginals,
-            diffusion_sqrtm=s0.diffusion_sqrtm,
+            u=state.u,
+            marginals_filtered=state.marginals_filtered,
+            marginals=state.marginals,
+            diffusion_sqrtm=state.diffusion_sqrtm,
             backward_model=bw_model,
         )
         return state1
 
-    def _interpolate_from_to_fn(self, rv, diffusion_sqrtm, t, t0):
+    def _interpolate_from_to_fn(self, *, rv, diffusion_sqrtm, t, t0):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
