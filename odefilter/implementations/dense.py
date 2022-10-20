@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.tree_util import register_pytree_node_class
 
+from odefilter import _control_flow
 from odefilter.implementations import _ibm, _interface, _sqrtm
 
 
@@ -107,7 +108,27 @@ class DenseImplementation(_interface.Implementation):
     def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
     ):
-        raise NotImplementedError
+        l0_p = p_inv[:, None] * l0
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
+            R_X_F=(self.a @ l0_p).T,
+            R_X=l0_p.T,
+            R_YX=(diffusion_sqrtm * self.q_sqrtm_lower).T,
+        )
+        l_ext_p, l_bw_p = r_ext_p.T, r_bw_p.T
+        m_bw_p = m0_p - g_bw_p @ m_ext_p
+
+        # Un-apply the pre-conditioner.
+        # The backward models remains preconditioned, because
+        # we do backward passes in preconditioner-space.
+        l_ext = p[:, None] * l_ext_p
+        m_bw = p * m_bw_p
+        l_bw = p[:, None] * l_bw_p
+        g_bw = p[:, None] * g_bw_p * p_inv[None, :]
+
+        backward_op = g_bw
+        backward_noise = MultivariateNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        extrapolated = MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return extrapolated, (backward_noise, backward_op)
 
     def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
@@ -132,18 +153,16 @@ class DenseImplementation(_interface.Implementation):
         return evidence_sqrtm
 
     def extract_sol(self, *, rv):  # noqa: D102
-        def proj(x):
-            return jnp.reshape(x, (-1, self.ode_dimension), order="F")[0]
-
-        m = proj(rv.mean)
-        return m
+        if rv.mean.ndim == 1:
+            return rv.mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
+        return jax.vmap(self.extract_sol)(rv=rv)
 
     def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones((self.num_derivatives * self.ode_dimension,))
+        empty = jnp.inf * jnp.ones(((self.num_derivatives + 1) * self.ode_dimension,))
         return empty, empty
 
     def init_backward_transition(self):  # noqa: D102
-        k = self.num_derivatives * self.ode_dimension
+        k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
 
     def init_backward_noise(self, rv_proto):  # noqa: D102
@@ -162,3 +181,36 @@ class DenseImplementation(_interface.Implementation):
             mean=rv.mean,
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
         )
+
+    def marginalise_backwards(self, *, init, backward_model):
+        def body_fun(carry, x):
+            linop, noise = x.transition, x.noise
+            out = self.marginalise_model(init=carry, linop=linop, noise=noise)
+            return out, out
+
+        # Initial condition does not matter
+        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], backward_model)
+
+        _, rvs = _control_flow.scan_with_init(
+            f=body_fun, init=init, xs=bw_models, reverse=True
+        )
+        return rvs
+
+    def marginalise_model(self, *, init, linop, noise):
+        # todo: add preconditioner?
+
+        # Pull into preconditioned space
+        m0_p = init.mean
+        l0_p = init.cov_sqrtm_lower
+
+        # Apply transition
+        m_new_p = linop @ m0_p + noise.mean
+        l_new_p = _sqrtm.sum_of_sqrtm_factors(
+            R1=(linop @ l0_p).T, R2=noise.cov_sqrtm_lower.T
+        ).T
+
+        # Push back into non-preconditioned space
+        m_new = m_new_p
+        l_new = l_new_p
+
+        return MultivariateNormal(mean=m_new, cov_sqrtm_lower=l_new)

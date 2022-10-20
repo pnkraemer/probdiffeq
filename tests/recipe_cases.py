@@ -32,6 +32,11 @@ def solver_dynamic_ekf1():
     return recipes.dynamic_ekf1(num_derivatives=3, ode_dimension=2)
 
 
+@case(tags=["terminal_value", "solve", "smoother"])
+def solver_dynamic_eks1():
+    return recipes.dynamic_eks1(num_derivatives=3, ode_dimension=2)
+
+
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ekf1():
     return recipes.ekf1(num_derivatives=3, ode_dimension=2)
