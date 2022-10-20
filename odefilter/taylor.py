@@ -105,7 +105,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         vals = (*args, fun_0(*args))
         primals_in, tangents_in = vals[:-1], vals[1:]
 
-        primals_out, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
+        _, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
     return jax.tree_util.Partial(df)

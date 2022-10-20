@@ -158,7 +158,7 @@ class DynamicFixedPointSmoother(_smoother_common.DynamicSmootherCommon):
         previous = self._duplicate_with_unit_backward_model(solution, t)
 
         # From t to s1.t
-        extra1, backward_model1 = self._interpolate_from_to_fn(
+        _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, diffusion_sqrtm=diffusion_sqrtm, t=s1.t, t0=t
         )
         accepted = markov.Posterior(

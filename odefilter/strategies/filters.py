@@ -169,7 +169,7 @@ class DynamicFilter(_FilterCommon):
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+        m_ext, _, _ = self.implementation.extrapolate_mean(
             state.marginals.mean, p=p, p_inv=p_inv
         )
 
@@ -220,7 +220,7 @@ class Filter(_FilterCommon):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
         # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+        m_ext, _, _ = self.implementation.extrapolate_mean(
             state.marginals.mean, p=p, p_inv=p_inv
         )
 
