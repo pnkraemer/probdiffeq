@@ -86,7 +86,7 @@ class IsotropicImplementation(_interface.Implementation):
             _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
         )
 
-        error_estimate = diffusion_sqrtm * l_obs
+        error_estimate = l_obs
         return diffusion_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
