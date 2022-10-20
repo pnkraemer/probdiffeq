@@ -1,10 +1,7 @@
 """There are too many ways to smooth. We assert they all do the same."""
 
-from functools import partial
-
 import jax
 import jax.numpy as jnp
-import pytest
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
 
@@ -13,95 +10,58 @@ from odefilter import ivpsolve, recipes
 
 @case
 @parametrize("n", [2])
-@parametrize("tol", [1e-2])
-def smoother_fixedpoint_smoother_pair_eks0(n, tol):
-    eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n, atol=1e-2 * tol, rtol=tol)
-    fixedpoint_eks0 = recipes.dynamic_isotropic_fixedpoint_eks0(
-        num_derivatives=n, atol=1e-2 * tol, rtol=tol
-    )
+def smoother_fixedpoint_smoother_pair_eks0(n):
+    eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n)
+    fixedpoint_eks0 = recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=n)
     return eks0, fixedpoint_eks0
 
 
-@pytest.mark.skip
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixedpoint_eks", cases=".", prefix="smoother_fixedpoint_smoother_pair_"
 )
+@parametrize("k", [1, 3])  # k * N // 2 off-grid points
 def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
-    vf, u0, t0, t1, p, eks, fixedpoint_eks
+    vf, u0, t0, t1, p, eks, fixedpoint_eks, k
 ):
     """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""
     # eks_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
+
+    args = (vf, u0)
+    kwargs = {"parameters": p, "atol": 1e-1, "rtol": 1e-1}
     eks_sol = ivpsolve.solve(
-        vf, u0, t0=t0, t1=t1, parameters=p, solver=eks[0], info_op=eks[1]
+        *args, t0=t0, t1=t1, solver=eks[0], info_op=eks[1], **kwargs
     )
-    with jax.disable_jit():
-        ts, t = _grid(eks_sol.t, t0=t0, t1=t1, factor=5)
-        print("From here one......")
-        fixedpoint_eks_sol = ivpsolve.simulate_checkpoints(
-            vf,
-            u0,
-            ts=jnp.linspace(t0, t1, num=35),
-            # ts=jnp.linspace(t0, t1, num=len(eks_sol.t) * 3),
-            # ts=ts,
-            # ts=jnp.asarray([t0,t-0.01, t, t1- 0.01]),
-            parameters=p,
-            solver=fixedpoint_eks[0],
-            info_op=fixedpoint_eks[1],
-        )
-    assert t in ts
-    assert t in eks_sol.t
-    # print(fixedpoint_eks_sol.t_previous)
+    ts = jnp.linspace(t0, t1, num=k * len(eks_sol.t) // 2)
+    dense = eks[0].offgrid_marginals_searchsorted(ts=ts[1:-1], solution=eks_sol)
 
-    import matplotlib.pyplot as plt
-
-    plt.plot(
-        eks_sol.t,
-        eks_sol.filtered.mean[:, :, -1],
-        linestyle="None",
-        marker="X",
-        markersize=8,
-        color="k",
-        label="EKS",
+    fp_eks_sol = ivpsolve.simulate_checkpoints(
+        *args, ts=ts, solver=fixedpoint_eks[0], info_op=fixedpoint_eks[1], **kwargs
     )
-    plt.axvline(t)
-    plt.plot(
-        fixedpoint_eks_sol.t,
-        fixedpoint_eks_sol.filtered.mean[:, :, -1],
-        # linestyle="None",
-        linewidth=0.1,
-        marker="o",
-        markersize=12,
-        alpha=0.5,
-        label="FixPtEKS",
-    )
-    # plt.ylim((-8, -2))
-    plt.legend()
-    plt.show()
+    fixedpoint_eks_sol = fp_eks_sol[1:-1]  # reference is defined only on the interior
 
-    idx_eks, *_ = jnp.where(eks_sol.t[:, None] == jnp.asarray([t0, t, t1]))
-    idx_fixedpoint, *_ = jnp.where(
-        fixedpoint_eks_sol.t[:, None] == jnp.asarray([t0, t, t1])
-    )
+    # Compare all attributes for equality,
+    # except for the covariance matrix square roots
+    # which are equal modulo orthogonal transformation
+    # (they are equal in square, though).
+    # The backward models are not expected to be equal.
+    assert jnp.allclose(fixedpoint_eks_sol.t, dense.t)
+    assert jnp.allclose(fixedpoint_eks_sol.u, dense.u)
+    assert jnp.allclose(fixedpoint_eks_sol.marginals.mean, dense.marginals.mean)
+    assert jnp.allclose(fixedpoint_eks_sol.diffusion_sqrtm, dense.diffusion_sqrtm)
 
-    print(fixedpoint_eks_sol.u[idx_fixedpoint], eks_sol.u[idx_eks])
-    assert jnp.allclose(fixedpoint_eks_sol.t[idx_fixedpoint], eks_sol.t[idx_eks])
-    assert jnp.allclose(fixedpoint_eks_sol.u[idx_fixedpoint], eks_sol.u[idx_eks])
+    # covariances are equal, but cov_sqrtm_lower might not be
 
-    assert False
+    @jax.vmap
+    def cov(x):
+        return x @ x.T
 
-
-# jit to reduce potential floating-point inconsistencies
-@partial(jax.jit, static_argnames=["factor"])
-def _grid(t_old, *, t0, t1, factor=1):
-    midpoint = t_old[len(t_old) // 2]
-    t_a = jnp.asarray([midpoint])
-    t_b = jnp.linspace(t0, t1, num=factor * len(t_old), endpoint=True)
-    ts = jnp.union1d(t_a, t_b, size=factor * len(t_old) + 1)
-    return ts, midpoint
+    l0 = fixedpoint_eks_sol.marginals.cov_sqrtm_lower
+    l1 = dense.marginals.cov_sqrtm_lower
+    assert jnp.allclose(cov(l0), cov(l1))
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
