@@ -90,7 +90,6 @@ nav:
           - "api_docs_advanced/strategies/filters.md"
           - "api_docs_advanced/strategies/smoothers.md"
           - "api_docs_advanced/strategies/fixedpoint.md"
-          - "api_docs_advanced/strategies/markov.md"
         - Solver implementations:
           - "api_docs_advanced/implementations/dense.md"
           - "api_docs_advanced/implementations/isotropic.md"

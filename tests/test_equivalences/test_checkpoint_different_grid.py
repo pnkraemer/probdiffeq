@@ -51,7 +51,7 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
     assert jnp.allclose(fixedpoint_eks_sol.t, dense.t)
     assert jnp.allclose(fixedpoint_eks_sol.u, dense.u)
     assert jnp.allclose(fixedpoint_eks_sol.marginals.mean, dense.marginals.mean)
-    assert jnp.allclose(fixedpoint_eks_sol.diffusion_sqrtm, dense.diffusion_sqrtm)
+    assert jnp.allclose(fixedpoint_eks_sol.output_scale_sqrtm, dense.output_scale_sqrtm)
 
     # covariances are equal, but cov_sqrtm_lower might not be
 

@@ -64,7 +64,7 @@ def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks, tol):
     assert _tree_all_allclose(
         cov(ekf_sol.marginals.cov_sqrtm_lower), cov(eks_sol.marginals.cov_sqrtm_lower)
     )
-    assert _tree_all_allclose(ekf_sol.diffusion_sqrtm, eks_sol.diffusion_sqrtm)
+    assert _tree_all_allclose(ekf_sol.output_scale_sqrtm, eks_sol.output_scale_sqrtm)
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):

@@ -43,7 +43,7 @@ class Posterior(Generic[T]):
     marginals_filtered: T
     backward_model: BackwardModel[T]
 
-    diffusion_sqrtm: float
+    output_scale_sqrtm: float
 
     def tree_flatten(self):
         children = (
@@ -53,7 +53,7 @@ class Posterior(Generic[T]):
             self.marginals,
             self.marginals_filtered,
             self.backward_model,
-            self.diffusion_sqrtm,
+            self.output_scale_sqrtm,
         )
         aux = ()
         return children, aux
@@ -67,7 +67,7 @@ class Posterior(Generic[T]):
             marginals,
             marginals_filtered,
             backward_model,
-            diffusion_sqrtm,
+            output_scale_sqrtm,
         ) = children
         return cls(
             t=t,
@@ -76,7 +76,7 @@ class Posterior(Generic[T]):
             marginals=marginals,
             marginals_filtered=marginals_filtered,
             backward_model=backward_model,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
 
     def __len__(self):
@@ -99,7 +99,7 @@ class Posterior(Generic[T]):
             t=self.t[item],
             t_previous=self.t_previous[item],
             u=self.u[item],
-            diffusion_sqrtm=self.diffusion_sqrtm[item],
+            output_scale_sqrtm=self.output_scale_sqrtm[item],
             # todo: make iterable?
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
             # todo: make iterable?
