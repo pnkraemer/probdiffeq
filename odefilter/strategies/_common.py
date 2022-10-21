@@ -198,7 +198,6 @@ class Strategy(abc.ABC):
             this rule.
         """
         # todo: support "method" argument.
-        # todo: return _only_ the marginals
 
         # side="left" and side="right" are equivalent
         # because we _assume_ that the point sets are disjoint.
