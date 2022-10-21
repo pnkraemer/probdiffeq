@@ -97,6 +97,22 @@ def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
+def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of a semi-implicit solver with dynamic calibration.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    solver = fixedpoint.DynamicFixedPointSmoother(implementation=implementation)
+    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    return solver, information_op
+
+
 def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver.
 

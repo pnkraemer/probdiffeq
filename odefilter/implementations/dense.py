@@ -128,6 +128,21 @@ class DenseImplementation(_interface.Implementation):
         extrapolated = MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
+    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
+
+        A = bw_init.transition
+        (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
+
+        C = bw_state.transition
+        (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return noise, g
+
     def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(l_ext)

@@ -51,6 +51,10 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def init_preconditioner(self):
         raise NotImplementedError
 
