@@ -40,6 +40,10 @@ class Strategy(abc.ABC):
         # In the fully-jit-able functions, it is compiled automatically anyway.
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def extract_terminal_value_fn(self, *, state):  # -> solution
+        raise NotImplementedError
+
     @jax.jit
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
 

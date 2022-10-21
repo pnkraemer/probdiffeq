@@ -30,7 +30,7 @@ def odefilter_terminal_values(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    return adaptive_solver.extract_fn(state=solution)
+    return adaptive_solver.extract_terminal_value_fn(state=solution)
 
 
 @jax.jit

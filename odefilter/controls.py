@@ -16,7 +16,6 @@ class AbstractControl(abc.ABC):
         """Initialise the controller state."""
         raise NotImplementedError
 
-    # todo: rename error_contraction_rate to error_contraction_rate
     @abc.abstractmethod
     def control_fn(
         self, *, state, error_normalised, error_contraction_rate, dt_previous
