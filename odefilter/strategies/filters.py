@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter.strategies import _interface
+from odefilter.strategies import _common
 
 T = TypeVar("T")
 """A type-variable to alias appropriate Normal-like random variables."""
@@ -84,7 +84,7 @@ class FilteringSolution(Generic[T]):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class _FilterCommon(_interface.Strategy):
+class _FilterCommon(_common.Strategy):
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
