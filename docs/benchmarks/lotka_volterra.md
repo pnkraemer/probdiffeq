@@ -131,18 +131,18 @@ def workprecision(*, solve_fns, tols, **kwargs):
 d = u0.shape[0]
 
 _ekf1_3 = prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d))
-_ekf1_3_dynamic = prepare(recipes.dynamic_ekf1(num_derivatives=3, ode_dimension=d))
+_ekf1_3_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=3, ode_dimension=d))
 _ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
-_ekf1_5_dynamic = prepare(recipes.dynamic_ekf1(num_derivatives=5, ode_dimension=d))
-_eks1_5_dynamic = prepare(recipes.dynamic_eks1(num_derivatives=5, ode_dimension=d))
+_ekf1_5_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=5, ode_dimension=d))
+_eks1_5_dynamic = prepare(recipes.eks1_dynamic(num_derivatives=5, ode_dimension=d))
 _ekf1_8 = prepare(recipes.ekf1(num_derivatives=8, ode_dimension=d))
-_ekf1_8_dynamic = prepare(recipes.dynamic_ekf1(num_derivatives=8, ode_dimension=d))
-_ekf0_3_isotropic = prepare(recipes.isotropic_ekf0(num_derivatives=3))
-_ekf0_3_isotropic_dynamic = prepare(recipes.dynamic_isotropic_ekf0(num_derivatives=3))
-_ekf0_5_isotropic = prepare(recipes.isotropic_ekf0(num_derivatives=5))
-_eks0_5_isotropic_dynamic = prepare(recipes.dynamic_isotropic_eks0(num_derivatives=5))
+_ekf1_8_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=8, ode_dimension=d))
+_ekf0_3_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=3))
+_ekf0_3_isotropic_dynamic = prepare(recipes.ekf0_isotropic_dynamic(num_derivatives=3))
+_ekf0_5_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=5))
+_eks0_5_isotropic_dynamic = prepare(recipes.eks0_isotropic_dynamic(num_derivatives=5))
 _ekf0_5_isotropic_dynamic_fixpt = prepare(
-    recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=5)
+    recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=5)
 )
 
 solve_fns = [

@@ -50,7 +50,7 @@ If you are interested in the terminal value of the ODE solution, you can use fil
 But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient.
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=num_derivatives)
+ek0, info_op = recipes.ekf0_isotropic_dynamic(num_derivatives=num_derivatives)
 ek0sol = ivpsolve.simulate_terminal_values(
     vf,
     initial_values=(u0,),
@@ -68,7 +68,7 @@ print(ek0sol.t, ek0sol.u)
 If you are used to calling traditional solve() methods, use one of the conventional smoothers (i.e. not the fixed-point smoothers).
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_eks0(num_derivatives=num_derivatives)
+ek0, info_op = recipes.eks0_isotropic_dynamic(num_derivatives=num_derivatives)
 ek0sol = ivpsolve.solve(
     vf,
     initial_values=(u0,),
@@ -115,7 +115,7 @@ If you know in advance that you like to have the solution at a pre-specified set
 use the simulate_checkpoints function together with a fixed-point smoother.
 
 ```python
-fixedpoint_ek0, info_op = recipes.dynamic_isotropic_fixedpoint_eks0(
+fixedpoint_ek0, info_op = recipes.eks0_isotropic_dynamic_fixedpoint(
     num_derivatives=num_derivatives
 )
 fixedpointsol = ivpsolve.simulate_checkpoints(
