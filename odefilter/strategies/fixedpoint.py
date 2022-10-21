@@ -28,14 +28,16 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         )
         sol = self.implementation.extract_sol(rv=corrected)
 
+        posterior = _markov.MarkovSequence(
+            init=corrected, backward_model=backward_model
+        )
         solution = _markov.Posterior(
             t=t0,
             t_previous=t0,
             u=sol,
-            marginals_filtered=corrected,
+            posterior=posterior,
             marginals=None,
             output_scale_sqrtm=1.0,
-            backward_model=backward_model,
         )
 
         error_estimate = self.implementation.init_error_estimate()
@@ -49,7 +51,7 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
 
         # Extrapolate the mean
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.marginals_filtered.mean, p=p, p_inv=p_inv
+            state.posterior.init.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation and estimate error.
@@ -60,9 +62,9 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         error_estimate = dt * output_scale_sqrtm * error_estimate
 
         # Complete extrapolation and condense backward models
-        extrapolated, backward_model = self._complete_extrapolation(
-            bw_model_previous=state.backward_model,
-            l0=state.marginals_filtered.cov_sqrtm_lower,
+        extrapolated = self._complete_extrapolation(
+            bw_model_previous=state.posterior.backward_model,
+            l0=state.posterior.init.cov_sqrtm_lower,
             m0_p=m0_p,
             m_ext=m_ext,
             m_ext_p=m_ext_p,
@@ -72,23 +74,31 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         )
 
         # Final observation
-        _, (corrected, _) = self.implementation.final_correction(
+        _, (corrected, _) = self._final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 
         # Extract and return solution
-        sol = self.implementation.extract_sol(rv=corrected)
+        sol = self.implementation.extract_sol(rv=corrected.init)
         smoothing_solution = _markov.Posterior(
             t=state.t + dt,
             t_previous=state.t_previous,  # condensing the models...
             u=sol,
-            marginals_filtered=corrected,
+            posterior=corrected,
             marginals=None,
             output_scale_sqrtm=output_scale_sqrtm,
-            backward_model=backward_model,
         )
 
         return smoothing_solution, error_estimate
+
+    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
+        a, (corrected, b) = self.implementation.final_correction(
+            extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
+        )
+        corrected_seq = _markov.MarkovSequence(
+            init=corrected, backward_model=extrapolated.backward_model
+        )
+        return a, (corrected_seq, b)
 
     def _complete_extrapolation(
         self,
@@ -120,24 +130,26 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
             bw_init=bw_model_previous,
         )
         backward_model = _markov.BackwardModel(transition=gain, noise=noise)
-        return extrapolated, backward_model
+        return _markov.MarkovSequence(init=extrapolated, backward_model=backward_model)
 
     def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
 
-        backward_model1 = s1.backward_model
+        backward_model1 = s1.posterior.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
-            bw_init=s0.backward_model, bw_state=backward_model1
+            bw_init=s0.posterior.backward_model, bw_state=backward_model1
         )
         backward_model1 = _markov.BackwardModel(transition=g0, noise=noise0)
+        posterior1 = _markov.MarkovSequence(
+            init=s1.posterior.init, backward_model=backward_model1
+        )
         solution = _markov.Posterior(
             t=t,
             t_previous=s0.t_previous,  # condensed the model...
             u=s1.u,
-            marginals_filtered=s1.marginals_filtered,
+            posterior=posterior1,
             marginals=None,
-            backward_model=backward_model1,
             output_scale_sqrtm=s1.output_scale_sqrtm,
         )
 
@@ -160,24 +172,26 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
 
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
-            rv=s0.marginals_filtered,
+            rv=s0.posterior.init,
             output_scale_sqrtm=output_scale_sqrtm,
             t=t,
             t0=s0.t,
         )
         noise0, g0 = self.implementation.condense_backward_models(
-            bw_init=s0.backward_model, bw_state=bw0
+            bw_init=s0.posterior.backward_model, bw_state=bw0
         )
         backward_model0 = _markov.BackwardModel(transition=g0, noise=noise0)
+        posterior0 = _markov.MarkovSequence(
+            init=extrapolated0, backward_model=backward_model0
+        )
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = _markov.Posterior(
             t=t,
             t_previous=s0.t_previous,  # condensed the model...
             u=sol,
-            marginals_filtered=extrapolated0,
+            posterior=posterior0,
             marginals=None,
             output_scale_sqrtm=output_scale_sqrtm,
-            backward_model=backward_model0,
         )
 
         # new model! no condensing...
@@ -187,14 +201,16 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale_sqrtm=output_scale_sqrtm, t=s1.t, t0=t
         )
+        posterior1 = _markov.MarkovSequence(
+            init=s1.posterior.init, backward_model=backward_model1
+        )
         accepted = _markov.Posterior(
             t=s1.t,
             t_previous=t,  # new model! No condensing...
             u=s1.u,
-            marginals_filtered=s1.marginals_filtered,
+            posterior=posterior1,
             marginals=None,
             output_scale_sqrtm=output_scale_sqrtm,
-            backward_model=backward_model1,
         )
         return accepted, solution, previous
 

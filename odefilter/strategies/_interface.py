@@ -130,21 +130,20 @@ class DynamicSmootherCommon(Strategy):
         raise NotImplementedError
 
     def extract_fn(self, *, state):  # noqa: D102
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.marginals_filtered)
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.posterior.init)
         marginals = self.implementation.marginalise_backwards(
             init=init,
-            linop=state.backward_model.transition,
-            noise=state.backward_model.noise,
+            linop=state.posterior.backward_model.transition,
+            noise=state.posterior.backward_model.noise,
         )
         sol = self.implementation.extract_sol(rv=marginals)
         return _markov.Posterior(
             t=state.t,
             t_previous=state.t_previous,
             u=sol,
-            marginals_filtered=state.marginals_filtered,
+            posterior=state.posterior,
             marginals=marginals,
             output_scale_sqrtm=state.output_scale_sqrtm,
-            backward_model=state.backward_model,
         )
 
     def extract_terminal_value_fn(self, *, state):  # noqa: D102
@@ -152,26 +151,27 @@ class DynamicSmootherCommon(Strategy):
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
-            marginals_filtered=state.marginals_filtered,
-            marginals=state.marginals_filtered,  # we are at the terminal state only
+            posterior=state.posterior,
+            marginals=state.posterior.init,  # we are at the terminal state only
             output_scale_sqrtm=state.output_scale_sqrtm,
-            backward_model=state.backward_model,
         )
 
     def _duplicate_with_unit_backward_model(self, *, state, t):
         bw_transition0 = self.implementation.init_backward_transition()
         bw_noise0 = self.implementation.init_backward_noise(
-            rv_proto=state.backward_model.noise
+            rv_proto=state.posterior.backward_model.noise
         )
         bw_model = _markov.BackwardModel(transition=bw_transition0, noise=bw_noise0)
+        posterior = _markov.MarkovSequence(
+            init=state.posterior.init, backward_model=bw_model
+        )
         state1 = _markov.Posterior(
             t=t,
             t_previous=t,  # identity transition: this is what it does...
             u=state.u,
-            marginals_filtered=state.marginals_filtered,
+            posterior=posterior,
             marginals=state.marginals,
             output_scale_sqrtm=state.output_scale_sqrtm,
-            backward_model=bw_model,
         )
         return state1
 

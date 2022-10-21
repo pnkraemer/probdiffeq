@@ -65,8 +65,8 @@ def test_smoothing_checkpoint_equals_solver_state(
         fixedpoint_eks_sol.marginals.mean, eks_sol.marginals.mean, **tols
     )
     assert jnp.allclose(
-        fixedpoint_eks_sol.backward_model.noise.mean,
-        eks_sol.backward_model.noise.mean,
+        fixedpoint_eks_sol.posterior.backward_model.noise.mean,
+        eks_sol.posterior.backward_model.noise.mean,
         **tols
     )
     assert jnp.allclose(
@@ -82,6 +82,6 @@ def test_smoothing_checkpoint_equals_solver_state(
     l1 = eks_sol.marginals.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1), **tols)
 
-    l0 = fixedpoint_eks_sol.backward_model.noise.cov_sqrtm_lower
-    l1 = eks_sol.backward_model.noise.cov_sqrtm_lower
+    l0 = fixedpoint_eks_sol.posterior.backward_model.noise.cov_sqrtm_lower
+    l1 = eks_sol.posterior.backward_model.noise.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1), **tols)

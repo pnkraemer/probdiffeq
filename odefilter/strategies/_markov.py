@@ -32,16 +32,38 @@ class BackwardModel(Generic[T]):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
+class MarkovSequence(Generic[T]):
+    """Markov sequence."""
+
+    init: T
+    backward_model: BackwardModel[T]
+
+    def tree_flatten(self):
+        children = (self.init, self.backward_model)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        init, backward_model = children
+        return cls(init=init, backward_model=backward_model)
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
 class Posterior(Generic[T]):
-    """Markov sequences as smoothing solutions."""
+    """Inferred solutions."""
 
     t: float
     t_previous: float
 
     u: Any
     marginals: T
-    marginals_filtered: T
-    backward_model: BackwardModel[T]
+
+    # todo: merge into posterior: MarkovSequence
+    posterior: MarkovSequence[T]
+    # marginals_filtered: T
+    # backward_model: BackwardModel[T]
 
     output_scale_sqrtm: float
 
@@ -51,8 +73,7 @@ class Posterior(Generic[T]):
             self.t_previous,
             self.u,
             self.marginals,
-            self.marginals_filtered,
-            self.backward_model,
+            self.posterior,
             self.output_scale_sqrtm,
         )
         aux = ()
@@ -60,22 +81,13 @@ class Posterior(Generic[T]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (
-            t,
-            t_previous,
-            u,
-            marginals,
-            marginals_filtered,
-            backward_model,
-            output_scale_sqrtm,
-        ) = children
+        t, t_previous, u, marginals, posterior, output_scale_sqrtm = children
         return cls(
             t=t,
             t_previous=t_previous,
             u=u,
             marginals=marginals,
-            marginals_filtered=marginals_filtered,
-            backward_model=backward_model,
+            posterior=posterior,
             output_scale_sqrtm=output_scale_sqrtm,
         )
 
@@ -103,13 +115,7 @@ class Posterior(Generic[T]):
             # todo: make iterable?
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
             # todo: make iterable?
-            marginals_filtered=jax.tree_util.tree_map(
-                lambda x: x[item], self.marginals_filtered
-            ),
-            # todo: make iterable?
-            backward_model=jax.tree_util.tree_map(
-                lambda x: x[item], self.backward_model
-            ),
+            posterior=jax.tree_util.tree_map(lambda x: x[item], self.posterior),
         )
 
     def __iter__(self):
