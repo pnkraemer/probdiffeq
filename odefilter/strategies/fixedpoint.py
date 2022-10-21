@@ -44,6 +44,7 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
     @jax.jit
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
+        # Assemble preconditioner
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean
@@ -51,14 +52,14 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
             state.marginals_filtered.mean, p=p, p_inv=p_inv
         )
 
-        # Linearise the differential equation.
+        # Linearise the differential equation and estimate error.
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-
         diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
         error_estimate = dt * diffusion_sqrtm * error_estimate
 
+        # Complete extrapolation and condense backward models
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=state.marginals_filtered.cov_sqrtm_lower,
@@ -72,20 +73,18 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         bw_increment = _markov.BackwardModel(
             transition=backward_op, noise=backward_noise
         )
-
-        # Final observation
-        _, (corrected, _) = self.implementation.final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
-        )
-
-        # Condense backward models
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment,
             bw_init=state.backward_model,
         )
         backward_model = _markov.BackwardModel(transition=gain, noise=noise)
 
-        # Return solution
+        # Final observation
+        _, (corrected, _) = self.implementation.final_correction(
+            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+        )
+
+        # Extract and return solution
         sol = self.implementation.extract_sol(rv=corrected)
         smoothing_solution = _markov.Posterior(
             t=state.t + dt,

@@ -250,16 +250,14 @@ class Filter(_FilterCommon):
         observed, (corrected, _) = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-        evidence_sqrtm = self.implementation.evidence_sqrtm(observed=observed)
 
         # Calibration of the global diffusion
-        n = state.num_data_points
-        diffsqrtm = self.implementation.sum_sqrt_scalars(
-            jnp.sqrt(n) * state.diffusion_sqrtm, evidence_sqrtm
+        new_diffusion_sqrtm = self._update_diffusion_sqrtm(
+            diffsqrtm=state.diffusion_sqrtm, n=state.num_data_points, obs=observed
         )
-        new_diffusion_sqrtm = jnp.reshape(diffsqrtm, ()) / jnp.sqrt(n + 1)
-        sol = self.implementation.extract_sol(rv=corrected)
 
+        # Extract and return solution
+        sol = self.implementation.extract_sol(rv=corrected)
         filtered = FilteringSolution(
             t=state.t + dt,
             t_previous=state.t,
@@ -269,6 +267,14 @@ class Filter(_FilterCommon):
             num_data_points=jnp.add(state.num_data_points, 1),
         )
         return filtered, error_estimate
+
+    def _update_diffusion_sqrtm(self, *, diffsqrtm, n, obs):
+        evidence_sqrtm = self.implementation.evidence_sqrtm(observed=obs)
+        diffsqrtm_new = self.implementation.sum_sqrt_scalars(
+            jnp.sqrt(n) * diffsqrtm, evidence_sqrtm
+        )
+        new_diffusion_sqrtm = jnp.reshape(diffsqrtm_new, ()) / jnp.sqrt(n + 1)
+        return new_diffusion_sqrtm
 
     def extract_fn(self, *, state):  # noqa: D102
         diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
