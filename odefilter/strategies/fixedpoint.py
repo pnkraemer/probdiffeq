@@ -38,6 +38,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
             posterior=posterior,
             marginals=None,
             output_scale_sqrtm=1.0,
+            num_data_points=1.0,
         )
 
         error_estimate = self.implementation.init_error_estimate()
@@ -87,6 +88,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
             posterior=corrected,
             marginals=None,
             output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=state.num_data_points + 1.0,
         )
 
         return smoothing_solution, error_estimate
@@ -151,6 +153,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
             posterior=posterior1,
             marginals=None,
             output_scale_sqrtm=s1.output_scale_sqrtm,
+            num_data_points=s1.num_data_points,
         )
 
         accepted = self._duplicate_with_unit_backward_model(state=solution, t=t)
@@ -192,6 +195,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
             posterior=posterior0,
             marginals=None,
             output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=s1.num_data_points,
         )
 
         # new model! no condensing...
@@ -211,6 +215,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
             posterior=posterior1,
             marginals=None,
             output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=s1.num_data_points,
         )
         return accepted, solution, previous
 

@@ -25,7 +25,7 @@ class FilteringSolution(Generic[T]):
     marginals: T
 
     output_scale_sqrtm: float
-    num_data_points: int
+    num_data_points: float  # todo: make int
 
     def tree_flatten(self):
         children = (

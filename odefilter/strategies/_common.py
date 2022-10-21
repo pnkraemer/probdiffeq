@@ -63,7 +63,12 @@ class Solution(Generic[T]):
     output_scale_sqrtm: float
 
     # todo: either marginals or posterior are plenty?
+    #  I think the posterior should be the only one, but
+    #  then, interpolate() and offgrid_marginals() should only return marginals.
+    #  Otherwise, this doesn't really work.
     posterior: MarkovSequence[T]
+
+    num_data_points: float  # todo: make int
 
     def tree_flatten(self):
         children = (
@@ -73,13 +78,14 @@ class Solution(Generic[T]):
             self.marginals,
             self.posterior,
             self.output_scale_sqrtm,
+            self.num_data_points,
         )
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        t, t_previous, u, marginals, posterior, output_scale_sqrtm = children
+        t, t_previous, u, marginals, posterior, output_scale_sqrtm, n = children
         return cls(
             t=t,
             t_previous=t_previous,
@@ -87,6 +93,7 @@ class Solution(Generic[T]):
             marginals=marginals,
             posterior=posterior,
             output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=n,
         )
 
     def __len__(self):
@@ -114,6 +121,7 @@ class Solution(Generic[T]):
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
             # todo: make iterable?
             posterior=jax.tree_util.tree_map(lambda x: x[item], self.posterior),
+            num_data_points=self.num_data_points[item],
         )
 
     def __iter__(self):
@@ -257,6 +265,7 @@ class DynamicSmootherCommon(Strategy):
             posterior=state.posterior,
             marginals=marginals,
             output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
         )
 
     def extract_terminal_value_fn(self, *, state):  # noqa: D102
@@ -267,6 +276,7 @@ class DynamicSmootherCommon(Strategy):
             posterior=state.posterior,
             marginals=state.posterior.init,  # we are at the terminal state only
             output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
         )
 
     def _duplicate_with_unit_backward_model(self, *, state, t):
@@ -283,6 +293,7 @@ class DynamicSmootherCommon(Strategy):
             posterior=posterior,
             marginals=state.marginals,
             output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
         )
         return state1
 
@@ -304,7 +315,7 @@ class DynamicSmootherCommon(Strategy):
             m_ext_p=m_ext_p,
         )
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
-        return extrapolated, backward_model
+        return extrapolated, backward_model  # should this return a MarkovSequence?
 
     # Not implemented yet:
 
