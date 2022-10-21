@@ -45,7 +45,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=1)
+ek0, info_op = recipes.ekf0_isotropic_dynamic(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -106,7 +106,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0, info_op = recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=1)
+ek0, info_op = recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 

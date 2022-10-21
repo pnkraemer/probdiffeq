@@ -13,7 +13,7 @@ from odefilter.implementations import dense, isotropic
 from odefilter.strategies import filters, fixedpoint, smoothers
 
 
-def dynamic_isotropic_ekf0(*, num_derivatives=4, ode_order=1):
+def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, dynamic calibration, and optimised for terminal-value simulation.
 
@@ -30,7 +30,7 @@ def dynamic_isotropic_ekf0(*, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def dynamic_isotropic_eks0(*, num_derivatives=4, ode_order=1):
+def eks0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 
@@ -47,7 +47,7 @@ def dynamic_isotropic_eks0(*, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def dynamic_isotropic_fixedpoint_eks0(*, num_derivatives=4, ode_order=1):
+def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure and dynamic calibration.
 
@@ -64,7 +64,7 @@ def dynamic_isotropic_fixedpoint_eks0(*, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def dynamic_ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
+def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver with \
      dynamic calibration, and optimised for terminal-value simulation.
 
@@ -81,7 +81,7 @@ def dynamic_ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def dynamic_eks1(*, ode_dimension, num_derivatives=4, ode_order=1):
+def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver with dynamic calibration.
 
     Suitable for low-dimensional, stiff problems.
@@ -113,7 +113,7 @@ def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def isotropic_ekf0(*, num_derivatives=4, ode_order=1):
+def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, and optimised for terminal-value simulation.
 
