@@ -60,24 +60,16 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         error_estimate = dt * diffusion_sqrtm * error_estimate
 
         # Complete extrapolation and condense backward models
-        x = self.implementation.revert_markov_kernel(
-            m_ext=m_ext,
+        extrapolated, backward_model = self._complete_extrapolation(
+            bw_model_previous=state.backward_model,
             l0=state.marginals_filtered.cov_sqrtm_lower,
+            m0_p=m0_p,
+            m_ext=m_ext,
+            m_ext_p=m_ext_p,
+            output_scale_sqrtm=diffusion_sqrtm,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=diffusion_sqrtm,
-            m0_p=m0_p,
-            m_ext_p=m_ext_p,
         )
-        extrapolated, (backward_noise, backward_op) = x
-        bw_increment = _markov.BackwardModel(
-            transition=backward_op, noise=backward_noise
-        )
-        noise, gain = self.implementation.condense_backward_models(
-            bw_state=bw_increment,
-            bw_init=state.backward_model,
-        )
-        backward_model = _markov.BackwardModel(transition=gain, noise=noise)
 
         # Final observation
         _, (corrected, _) = self.implementation.final_correction(
@@ -97,6 +89,38 @@ class DynamicFixedPointSmoother(_interface.DynamicSmootherCommon):
         )
 
         return smoothing_solution, error_estimate
+
+    def _complete_extrapolation(
+        self,
+        *,
+        bw_model_previous,
+        l0,
+        m0_p,
+        m_ext,
+        m_ext_p,
+        output_scale_sqrtm,
+        p,
+        p_inv
+    ):
+        x = self.implementation.revert_markov_kernel(
+            m_ext=m_ext,
+            l0=l0,
+            p=p,
+            p_inv=p_inv,
+            diffusion_sqrtm=output_scale_sqrtm,
+            m0_p=m0_p,
+            m_ext_p=m_ext_p,
+        )
+        extrapolated, (backward_noise, backward_op) = x
+        bw_increment = _markov.BackwardModel(
+            transition=backward_op, noise=backward_noise
+        )
+        noise, gain = self.implementation.condense_backward_models(
+            bw_state=bw_increment,
+            bw_init=bw_model_previous,
+        )
+        backward_model = _markov.BackwardModel(transition=gain, noise=noise)
+        return extrapolated, backward_model
 
     def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
         # can we guarantee that the backward model in s1 is the

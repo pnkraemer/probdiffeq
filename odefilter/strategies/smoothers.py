@@ -60,16 +60,15 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
         )
         error_estimate = dt * diffusion_sqrtm * error_estimate
 
-        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            m_ext=m_ext,
-            l0=state.marginals_filtered.cov_sqrtm_lower,
-            p=p,
-            p_inv=p_inv,
+        extrapolated, backward_model = self._complete_extrapolation(
             diffusion_sqrtm=diffusion_sqrtm,
             m0_p=m0_p,
+            m_ext=m_ext,
             m_ext_p=m_ext_p,
+            p=p,
+            p_inv=p_inv,
+            l0=state.marginals_filtered.cov_sqrtm_lower,
         )
-        backward_model = _markov.BackwardModel(transition=bw_op, noise=bw_noise)
 
         # Final observation
         _, (corrected, _) = self.implementation.final_correction(
@@ -89,6 +88,21 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
         )
 
         return smoothing_solution, error_estimate
+
+    def _complete_extrapolation(
+        self, *, diffusion_sqrtm, m0_p, m_ext, m_ext_p, p, p_inv, l0
+    ):
+        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
+            m_ext=m_ext,
+            l0=l0,
+            p=p,
+            p_inv=p_inv,
+            diffusion_sqrtm=diffusion_sqrtm,
+            m0_p=m0_p,
+            m_ext_p=m_ext_p,
+        )
+        backward_model = _markov.BackwardModel(transition=bw_op, noise=bw_noise)
+        return extrapolated, backward_model
 
     def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
 
