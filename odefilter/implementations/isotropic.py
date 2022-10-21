@@ -1,5 +1,6 @@
 """State-space models with isotropic covariance structure."""
 
+import functools
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -9,6 +10,29 @@ import jax.tree_util
 
 from odefilter import _control_flow
 from odefilter.implementations import _ibm, _interface, _sqrtm
+
+
+@functools.lru_cache(maxsize=None)
+def ek0(*, ode_order=1):
+    """EK0-linearise an ODE assuming a linearisation-point with\
+     isotropic Kronecker structure."""
+
+    @functools.lru_cache(maxsize=None)
+    def create_ek0_info_op_linearised(f):
+        """Create a "linearize()" implementation according to what\
+         the EK0 does to the ODE residual."""
+
+        @jax.jit
+        def jvp(x, *, t, p):
+            return x[ode_order]
+
+        def info_op(x, *, t, p):
+            bias = x[ode_order, ...] - f(*x[:ode_order, ...], t=t, p=p)
+            return bias, jax.tree_util.Partial(jvp, t=t, p=p)
+
+        return jax.tree_util.Partial(info_op)
+
+    return create_ek0_info_op_linearised
 
 
 class IsotropicNormal(NamedTuple):

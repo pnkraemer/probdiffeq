@@ -1,5 +1,6 @@
 """State-space models with dense covariance structure   ."""
 
+import functools
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -10,6 +11,27 @@ from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
 from odefilter.implementations import _ibm, _interface, _sqrtm
+
+
+@functools.lru_cache(maxsize=None)
+def ek1(*, ode_dimension, ode_order=1):
+    """EK1 information."""
+
+    @functools.lru_cache(maxsize=None)
+    def create_ek1_info_op_linearised(f):
+        @jax.jit
+        def residual(x, *, t, p):
+            x_reshaped = jnp.reshape(x, (-1, ode_dimension), order="F")
+            return x_reshaped[ode_order, ...] - f(
+                *x_reshaped[:ode_order, ...], t=t, p=p
+            )
+
+        def info_op(x, *, t, p):
+            return jax.linearize(jax.tree_util.Partial(residual, t=t, p=p), x)
+
+        return jax.tree_util.Partial(info_op)
+
+    return create_ek1_info_op_linearised
 
 
 class MultivariateNormal(NamedTuple):
