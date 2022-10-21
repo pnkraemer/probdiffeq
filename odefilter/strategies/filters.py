@@ -1,90 +1,17 @@
 """Inference via filters."""
 import abc
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter.strategies import _interface
-
-T = TypeVar("T")
-"""A type-variable to alias appropriate Normal-like random variables."""
+from odefilter.strategies import _common
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class FilteringSolution(Generic[T]):
-    """Filtering solution."""
-
-    t: float
-    t_previous: float
-
-    u: Any
-    marginals: T
-
-    output_scale_sqrtm: float
-    num_data_points: int
-
-    def tree_flatten(self):
-        children = (
-            self.t,
-            self.t_previous,
-            self.u,
-            self.marginals,
-            self.output_scale_sqrtm,
-            self.num_data_points,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        t, t_previous, u, marginals, output_scale_sqrtm, num_data_points = children
-        return cls(
-            t=t,
-            t_previous=t_previous,
-            u=u,
-            marginals=marginals,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=num_data_points,
-        )
-
-    def __len__(self):
-        """Length of a solution object.
-
-        Depends on the length of the underlying :attr:`t` attribute.
-        """
-        if jnp.ndim(self.t) < 1:
-            raise ValueError("Solution object not batched :(")
-        return self.t.shape[0]
-
-    def __getitem__(self, item):
-        """Access the `i`-th sub-solution."""
-        if jnp.ndim(self.t) < 1:
-            raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
-        if isinstance(item, tuple) and len(item) > jnp.ndim(self.t):
-            # s[2, 3] forbidden
-            raise ValueError(f"Inapplicable shape: {item, jnp.shape(self.t)}")
-        return FilteringSolution(
-            t=self.t[item],
-            t_previous=self.t_previous[item],
-            u=self.u[item],
-            output_scale_sqrtm=self.output_scale_sqrtm[item],
-            num_data_points=self.num_data_points[item],
-            marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
-        )
-
-    def __iter__(self):
-        """Iterate through the filtering solution."""
-        for i in range(self.t.shape[0]):
-            yield self[i]
-
-
-@jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
-class _FilterCommon(_interface.Strategy):
+class _FilterCommon(_common.Strategy):
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
@@ -94,22 +21,24 @@ class _FilterCommon(_interface.Strategy):
         error_estimate = self.implementation.init_error_estimate()
 
         sol = self.implementation.extract_sol(rv=corrected)
-        filtered = FilteringSolution(
+        filtered = _common.Solution(
             t=t0,
             t_previous=-jnp.inf,
             u=sol,
             marginals=corrected,
+            posterior=corrected,
             output_scale_sqrtm=1.0,  # ?
             num_data_points=1.0,  # todo: make this an int
         )
         return filtered, error_estimate
 
     def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
-        accepted = FilteringSolution(
+        accepted = _common.Solution(
             t=t,
             t_previous=s0.t,  # todo: wrong, but no one cares
             u=s1.u,
             marginals=s1.marginals,
+            posterior=s1.posterior,
             output_scale_sqrtm=s1.output_scale_sqrtm,
             num_data_points=s1.num_data_points,
         )
@@ -135,11 +64,12 @@ class _FilterCommon(_interface.Strategy):
             output_scale_sqrtm=s1.output_scale_sqrtm,  # right-including intervals
         )
         sol = self.implementation.extract_sol(rv=extrapolated)
-        target_p = FilteringSolution(
+        target_p = _common.Solution(
             t=t,
             t_previous=t,
             u=sol,
             marginals=extrapolated,
+            posterior=extrapolated,
             output_scale_sqrtm=s1.output_scale_sqrtm,
             num_data_points=s1.num_data_points,
         )
@@ -147,7 +77,7 @@ class _FilterCommon(_interface.Strategy):
 
     def offgrid_marginals(self, *, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
-        return sol
+        return sol.u, sol.marginals
 
     def _complete_extrapolation(self, *, output_scale_sqrtm, l0, m_ext, p, p_inv):
         extrapolated = self.implementation.complete_extrapolation(
@@ -209,11 +139,12 @@ class DynamicFilter(_FilterCommon):
         )
         sol = self.implementation.extract_sol(rv=corrected)
 
-        filtered = FilteringSolution(
+        filtered = _common.Solution(
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
             marginals=corrected,
+            posterior=corrected,
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points + 1,
         )
@@ -268,11 +199,12 @@ class Filter(_FilterCommon):
 
         # Extract and return solution
         sol = self.implementation.extract_sol(rv=corrected)
-        filtered = FilteringSolution(
+        filtered = _common.Solution(
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
             marginals=corrected,
+            posterior=corrected,
             output_scale_sqrtm=new_output_scale_sqrtm,
             num_data_points=jnp.add(state.num_data_points, 1),
         )
@@ -293,11 +225,12 @@ class Filter(_FilterCommon):
         marginals = self.implementation.scale_covariance(
             rv=state.marginals, scale_sqrtm=output_scale_sqrtm
         )
-        return FilteringSolution(
+        return _common.Solution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,
+            posterior=marginals,
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points,
         )
@@ -307,11 +240,12 @@ class Filter(_FilterCommon):
         marginals = self.implementation.scale_covariance(
             rv=state.marginals, scale_sqrtm=output_scale_sqrtm
         )
-        return FilteringSolution(
+        return _common.Solution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,
+            posterior=marginals,
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points,
         )

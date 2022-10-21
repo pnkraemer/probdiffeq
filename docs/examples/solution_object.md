@@ -90,20 +90,20 @@ Look at this:
 
 ```python tags=[]
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
-dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
+_, dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 
 fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 
 for i in [0, 1, 2]:  # ["S", "I", "R"]
-    ms = dense.marginals.mean[:, i]
-    ls = dense.marginals.cov_sqrtm_lower[:, i, :]
+    ms = dense.mean[:, i]
+    ls = dense.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
-    ax[0].plot(dense.t, ms)
-    ax[0].fill_between(dense.t, ms - 1.96 * stds, ms + 1.96 * stds, alpha=0.3)
+    ax[0].plot(ts, ms)
+    ax[0].fill_between(ts, ms - 1.96 * stds, ms + 1.96 * stds, alpha=0.3)
     ax[0].set_ylabel("Posterior credible intervals")
 
-    ax[1].semilogy(dense.t, stds)
+    ax[1].semilogy(ts, stds)
     ax[1].set_ylabel("Standard deviation")
 
 ax[1].set_xlabel("Time")
