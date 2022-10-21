@@ -8,7 +8,6 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
-from odefilter import information
 from odefilter.implementations import dense, isotropic
 from odefilter.strategies import filters, fixedpoint, smoothers
 
@@ -26,7 +25,7 @@ def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     solver = filters.DynamicFilter(implementation=implementation)
-    information_op = information.isotropic_ek0(ode_order=ode_order)
+    information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
 
@@ -43,7 +42,7 @@ def eks0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     solver = smoothers.DynamicSmoother(implementation=implementation)
-    information_op = information.isotropic_ek0(ode_order=ode_order)
+    information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
 
@@ -60,7 +59,7 @@ def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     solver = fixedpoint.DynamicFixedPointSmoother(implementation=implementation)
-    information_op = information.isotropic_ek0(ode_order=ode_order)
+    information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
 
@@ -77,7 +76,7 @@ def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     solver = filters.DynamicFilter(implementation=implementation)
-    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
 
@@ -93,7 +92,7 @@ def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     solver = smoothers.DynamicSmoother(implementation=implementation)
-    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
 
@@ -109,7 +108,7 @@ def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     solver = fixedpoint.DynamicFixedPointSmoother(implementation=implementation)
-    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
 
@@ -125,7 +124,7 @@ def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     solver = filters.Filter(implementation=implementation)
-    information_op = information.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
 
@@ -142,7 +141,7 @@ def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     solver = filters.Filter(implementation=implementation)
-    information_op = information.isotropic_ek0(ode_order=ode_order)
+    information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
 
