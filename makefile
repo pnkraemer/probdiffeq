@@ -14,6 +14,7 @@ lint:
 	black --check --diff .
 	flake8
 	pylint odefilter/ --disable=all --enable=arguments-differ,unused-variable
+	pylint tests/ --disable=all --enable=arguments-differ,unused-variable
 	nbqa isort --check --diff .
 	nbqa black --check --diff .
 	nbqa flake8 docs/
