@@ -111,6 +111,14 @@ class _FilterCommon(_common.Strategy):
         )
         return extrapolated
 
+    def _extract_sol(self, x, /):
+        return self.implementation.extract_sol(rv=x)
+
+    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
+        return self.implementation.final_correction(
+            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+        )
+
 
 # Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
 #  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
@@ -121,41 +129,9 @@ class DynamicFilter(_FilterCommon):
 
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-
-        m_ext, cache = self._extrapolate_mean(
-            posterior=state.posterior, p=p, p_inv=p_inv
+        return self._step_fn_dynamic(
+            state=state, info_op=info_op, dt=dt, parameters=parameters
         )
-
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
-
-        extrapolated = self._complete_extrapolation(
-            m_ext,
-            cache,
-            posterior_previous=state.posterior,
-            output_scale_sqrtm=output_scale_sqrtm,
-            p=p,
-            p_inv=p_inv,
-        )
-
-        # Final observation
-        _, (corrected, _) = self.implementation.final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
-        )
-
-        # Return solution
-        sol = self.implementation.extract_sol(rv=corrected)
-        filtered = _common.Solution(
-            t=state.t + dt,
-            t_previous=state.t,
-            u=sol,
-            marginals=None,
-            posterior=corrected,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=state.num_data_points + 1,
-        )
-        return filtered, dt * error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
         return _common.Solution(

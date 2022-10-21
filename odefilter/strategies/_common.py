@@ -170,6 +170,14 @@ class Strategy(abc.ABC):
     def offgrid_marginals(self, *, t, state, state_previous):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
+        raise NotImplementedError  # for dynamic filters/smoothers
+
+    @abc.abstractmethod
+    def _extract_sol(self, x, /):
+        raise NotImplementedError  # for dynamic filters/smoothers
+
     # Implementations
 
     def tree_flatten(self):
@@ -238,6 +246,45 @@ class Strategy(abc.ABC):
         error_estimate = error_estimate * output_scale_sqrtm
         return error_estimate, output_scale_sqrtm
 
+    # todo: this should be its own solver eventually?!
+    def _step_fn_dynamic(self, *, state, info_op, dt, parameters):
+        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
+
+        m_ext, cache = self._extrapolate_mean(
+            posterior=state.posterior, p=p, p_inv=p_inv
+        )
+
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
+        error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
+
+        extrapolated = self._complete_extrapolation(
+            m_ext,
+            cache,
+            posterior_previous=state.posterior,
+            output_scale_sqrtm=output_scale_sqrtm,
+            p=p,
+            p_inv=p_inv,
+        )
+
+        # Final observation
+        _, (corrected, _) = self._final_correction(
+            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+        )
+
+        # Return solution
+        sol = self._extract_sol(corrected)
+        smoothing_solution = Solution(
+            t=state.t + dt,
+            t_previous=state.t,
+            u=sol,
+            posterior=corrected,
+            marginals=None,
+            output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=state.num_data_points + 1,
+        )
+
+        return smoothing_solution, dt * error_estimate
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
@@ -295,47 +342,11 @@ class DynamicSmootherCommon(Strategy):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    # Dynamic stuff
-
-    # todo: this (essentially) coincides with DynamicFilter.step_fn
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-
-        m_ext, cache = self._extrapolate_mean(
-            posterior=state.posterior, p=p, p_inv=p_inv
+        return self._step_fn_dynamic(
+            state=state, info_op=info_op, dt=dt, parameters=parameters
         )
-
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
-
-        extrapolated = self._complete_extrapolation(
-            m_ext,
-            cache,
-            posterior_previous=state.posterior,
-            output_scale_sqrtm=output_scale_sqrtm,
-            p=p,
-            p_inv=p_inv,
-        )
-
-        # Final observation
-        _, (corrected, _) = self._final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
-        )
-
-        # Return solution
-        sol = self.implementation.extract_sol(rv=corrected.init)
-        smoothing_solution = Solution(
-            t=state.t + dt,
-            t_previous=state.t,
-            u=sol,
-            posterior=corrected,
-            marginals=None,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=state.num_data_points + 1,
-        )
-
-        return smoothing_solution, dt * error_estimate
 
     def _extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
@@ -352,6 +363,9 @@ class DynamicSmootherCommon(Strategy):
             init=corrected, backward_model=extrapolated.backward_model
         )
         return a, (corrected_seq, b)
+
+    def _extract_sol(self, x, /):
+        return self.implementation.extract_sol(rv=x.init)
 
     # Smoother stuff
 
