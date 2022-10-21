@@ -90,7 +90,7 @@ Look at this:
 
 ```python tags=[]
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
-dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
+_, dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 
 fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 
