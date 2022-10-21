@@ -8,6 +8,9 @@ import jax.tree_util
 from odefilter.strategies import _common
 
 
+# Todo: this is kind of the templatefor fixed-point-smoothers,
+#  isn't it? If I call complete_extrapolation
+#  with output_scale=1., then this bad boy becomes non-dynamic.
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):

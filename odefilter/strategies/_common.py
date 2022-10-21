@@ -135,14 +135,7 @@ class Strategy(abc.ABC):
 
     implementation: Any
 
-    def tree_flatten(self):
-        children = (self.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+    # Abstract methods
 
     @abc.abstractmethod
     def init_fn(self, *, taylor_coefficients, t0):  # -> state
@@ -165,7 +158,29 @@ class Strategy(abc.ABC):
     def extract_terminal_value_fn(self, *, state):  # -> solution
         raise NotImplementedError
 
-    @jax.jit
+    @abc.abstractmethod
+    def _case_right_corner(self, *, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _case_interpolate(self, *, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def offgrid_marginals(self, *, t, state, state_previous):
+        raise NotImplementedError
+
+    # Implementations
+
+    def tree_flatten(self):
+        children = (self.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        return cls(*children)
+
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
 
         # Cases to switch between
@@ -214,24 +229,14 @@ class Strategy(abc.ABC):
         marginals_vmap = jax.vmap(offgrid_no_kw)
         return marginals_vmap(solution_left, ts, solution_right)
 
-    @abc.abstractmethod
-    def _case_right_corner(self, *, s0, s1, t):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def _case_interpolate(self, *, s0, s1, t):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def offgrid_marginals(self, *, t, state, state_previous):
-        raise NotImplementedError
-
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicSmootherCommon(Strategy):
     """Common functionality for smoother-style algorithms."""
 
+    # Inherited abstract methods
+
     @abc.abstractmethod
     def _case_interpolate(self, *, s0, s1, t):
         raise NotImplementedError
@@ -240,7 +245,19 @@ class DynamicSmootherCommon(Strategy):
     def _case_right_corner(self, *, s0, s1, t):
         raise NotImplementedError
 
-    @jax.jit
+    @abc.abstractmethod
+    def offgrid_marginals(self, *, t, state, state_previous):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _complete_extrapolation(
+        self, m_ext, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+    ):
+        raise NotImplementedError
+
+    # Implementations
+
+    # smoother stuff
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
         corrected = self.implementation.init_corrected(
@@ -269,7 +286,7 @@ class DynamicSmootherCommon(Strategy):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    @jax.jit
+    # Dynamic stuff
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
@@ -315,6 +332,13 @@ class DynamicSmootherCommon(Strategy):
 
         return smoothing_solution, error_estimate
 
+    def _extrapolate_mean(self, *, posterior, p_inv, p):
+        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+            posterior.init.mean, p=p, p_inv=p_inv
+        )
+        return m_ext, (m_ext_p, m0_p)
+
+    # Smoother stuff
     def _final_correction(self, *, extrapolated, linear_fn, m_obs):
         a, (corrected, b) = self.implementation.final_correction(
             extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
@@ -323,6 +347,8 @@ class DynamicSmootherCommon(Strategy):
             init=corrected, backward_model=extrapolated.backward_model
         )
         return a, (corrected_seq, b)
+
+    # Smoother stuff
 
     def extract_fn(self, *, state):  # noqa: D102
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.posterior.init)
@@ -342,6 +368,8 @@ class DynamicSmootherCommon(Strategy):
             num_data_points=state.num_data_points,
         )
 
+    # smoother stuff
+
     def extract_terminal_value_fn(self, *, state):  # noqa: D102
         return Solution(
             t=state.t,
@@ -352,6 +380,8 @@ class DynamicSmootherCommon(Strategy):
             output_scale_sqrtm=state.output_scale_sqrtm,
             num_data_points=state.num_data_points,
         )
+
+    # Auxiliary routines that are the same among all subclasses
 
     def _duplicate_with_unit_backward_model(self, *, state, t):
         bw_transition0 = self.implementation.init_backward_transition()
@@ -390,13 +420,3 @@ class DynamicSmootherCommon(Strategy):
         )
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model  # should this return a MarkovSequence?
-
-    def _extrapolate_mean(self, *, posterior, p_inv, p):
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            posterior.init.mean, p=p, p_inv=p_inv
-        )
-        return m_ext, (m_ext_p, m0_p)
-
-    @abc.abstractmethod
-    def offgrid_marginals(self, *, t, state, state_previous):
-        raise NotImplementedError
