@@ -70,7 +70,7 @@ def test_smoothing_checkpoint_equals_solver_state(
         **tols
     )
     assert jnp.allclose(
-        fixedpoint_eks_sol.diffusion_sqrtm, eks_sol.diffusion_sqrtm, **tols
+        fixedpoint_eks_sol.output_scale_sqrtm, eks_sol.output_scale_sqrtm, **tols
     )
 
     # covariances are equal, but cov_sqrtm_lower might not be

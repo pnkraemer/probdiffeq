@@ -12,7 +12,7 @@ from odefilter.strategies import _interface, _markov
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicSmoother(_interface.DynamicSmootherCommon):
-    """Smoother implementation with dynamic calibration (time-varying diffusion)."""
+    """Smoother implementation with dynamic calibration (time-varying output-scale)."""
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
@@ -35,7 +35,7 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
             u=sol,
             marginals_filtered=corrected,
             marginals=None,
-            diffusion_sqrtm=1.0,
+            output_scale_sqrtm=1.0,
             backward_model=backward_model,
         )
 
@@ -55,13 +55,13 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
         # Linearise the differential equation.
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
 
-        diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
+        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
-        error_estimate = dt * diffusion_sqrtm * error_estimate
+        error_estimate = dt * output_scale_sqrtm * error_estimate
 
         extrapolated, backward_model = self._complete_extrapolation(
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             m0_p=m0_p,
             m_ext=m_ext,
             m_ext_p=m_ext_p,
@@ -83,21 +83,21 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
             u=sol,
             marginals_filtered=corrected,
             marginals=None,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             backward_model=backward_model,
         )
 
         return smoothing_solution, error_estimate
 
     def _complete_extrapolation(
-        self, *, diffusion_sqrtm, m0_p, m_ext, m_ext_p, p, p_inv, l0
+        self, *, output_scale_sqrtm, m0_p, m_ext, m_ext_p, p, p_inv, l0
     ):
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=l0,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )
@@ -113,7 +113,7 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
             u=s1.u,
             marginals_filtered=s1.marginals_filtered,
             marginals=None,
-            diffusion_sqrtm=s1.diffusion_sqrtm,
+            output_scale_sqrtm=s1.output_scale_sqrtm,
             backward_model=s1.backward_model,
         )
         solution = previous
@@ -128,14 +128,14 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
         # The latter extrapolation is discarded in favour of s1.marginals_filtered,
         # but the backward transition is kept.
 
-        rv0, diffsqrtm = s0.marginals_filtered, s1.diffusion_sqrtm
+        rv0, diffsqrtm = s0.marginals_filtered, s1.output_scale_sqrtm
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=rv0, diffusion_sqrtm=diffsqrtm, t=t, t0=s0.t
+            rv=rv0, output_scale_sqrtm=diffsqrtm, t=t, t0=s0.t
         )
         _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, diffusion_sqrtm=diffsqrtm, t=s1.t, t0=t
+            rv=extrapolated0, output_scale_sqrtm=diffsqrtm, t=s1.t, t0=t
         )
 
         # This is the new solution object at t.
@@ -146,7 +146,7 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
             u=sol,
             marginals_filtered=extrapolated0,
             marginals=None,
-            diffusion_sqrtm=diffsqrtm,
+            output_scale_sqrtm=diffsqrtm,
             backward_model=backward_model0,
         )
         previous = solution
@@ -157,7 +157,7 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
             u=s1.u,
             marginals_filtered=s1.marginals_filtered,
             marginals=s1.marginals,
-            diffusion_sqrtm=diffsqrtm,
+            output_scale_sqrtm=diffsqrtm,
             backward_model=backward_model1,
         )
         return accepted, solution, previous
@@ -175,7 +175,7 @@ class DynamicSmoother(_interface.DynamicSmootherCommon):
             t_previous=state_previous.t,
             marginals_filtered=sol.marginals_filtered,
             marginals=sol_marginal,
-            diffusion_sqrtm=acc.diffusion_sqrtm,
+            output_scale_sqrtm=acc.output_scale_sqrtm,
             u=u,
             # the values would be meaningless:
             backward_model=_nan_like(sol.backward_model),

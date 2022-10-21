@@ -143,7 +143,7 @@ class DynamicSmootherCommon(Strategy):
             u=sol,
             marginals_filtered=state.marginals_filtered,
             marginals=marginals,
-            diffusion_sqrtm=state.diffusion_sqrtm,
+            output_scale_sqrtm=state.output_scale_sqrtm,
             backward_model=state.backward_model,
         )
 
@@ -154,7 +154,7 @@ class DynamicSmootherCommon(Strategy):
             u=state.u,
             marginals_filtered=state.marginals_filtered,
             marginals=state.marginals_filtered,  # we are at the terminal state only
-            diffusion_sqrtm=state.diffusion_sqrtm,
+            output_scale_sqrtm=state.output_scale_sqrtm,
             backward_model=state.backward_model,
         )
 
@@ -170,12 +170,12 @@ class DynamicSmootherCommon(Strategy):
             u=state.u,
             marginals_filtered=state.marginals_filtered,
             marginals=state.marginals,
-            diffusion_sqrtm=state.diffusion_sqrtm,
+            output_scale_sqrtm=state.output_scale_sqrtm,
             backward_model=bw_model,
         )
         return state1
 
-    def _interpolate_from_to_fn(self, *, rv, diffusion_sqrtm, t, t0):
+    def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
@@ -188,7 +188,7 @@ class DynamicSmootherCommon(Strategy):
             l0=rv.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )

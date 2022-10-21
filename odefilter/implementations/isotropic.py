@@ -82,32 +82,32 @@ class IsotropicImplementation(_interface.Implementation):
         res_white = (m_obs / l_obs) / jnp.sqrt(m_obs.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
-        diffusion_sqrtm = jnp.reshape(
+        output_scale_sqrtm = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
         )
 
         error_estimate = l_obs
-        return diffusion_sqrtm, error_estimate
+        return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
-        self, *, m_ext, l0, p_inv, p, diffusion_sqrtm
+        self, *, m_ext, l0, p_inv, p, output_scale_sqrtm
     ):
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
-            R2=(diffusion_sqrtm * self.q_sqrtm_lower).T,
+            R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
         return IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, m_ext, l0, p, p_inv, diffusion_sqrtm, m0_p, m_ext_p
+        self, *, m_ext, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
-            R_YX=(diffusion_sqrtm * self.q_sqrtm_lower).T,
+            R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         )
         l_ext_p, l_bw_p = r_ext_p.T, r_bw_p.T
         m_bw_p = m0_p - g_bw_p @ m_ext_p

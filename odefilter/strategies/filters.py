@@ -24,7 +24,7 @@ class FilteringSolution(Generic[T]):
     u: Any
     marginals: T
 
-    diffusion_sqrtm: float
+    output_scale_sqrtm: float
     num_data_points: int
 
     def tree_flatten(self):
@@ -33,7 +33,7 @@ class FilteringSolution(Generic[T]):
             self.t_previous,
             self.u,
             self.marginals,
-            self.diffusion_sqrtm,
+            self.output_scale_sqrtm,
             self.num_data_points,
         )
         aux = ()
@@ -41,13 +41,13 @@ class FilteringSolution(Generic[T]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        t, t_previous, u, marginals, diffusion_sqrtm, num_data_points = children
+        t, t_previous, u, marginals, output_scale_sqrtm, num_data_points = children
         return cls(
             t=t,
             t_previous=t_previous,
             u=u,
             marginals=marginals,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=num_data_points,
         )
 
@@ -71,7 +71,7 @@ class FilteringSolution(Generic[T]):
             t=self.t[item],
             t_previous=self.t_previous[item],
             u=self.u[item],
-            diffusion_sqrtm=self.diffusion_sqrtm[item],
+            output_scale_sqrtm=self.output_scale_sqrtm[item],
             num_data_points=self.num_data_points[item],
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
         )
@@ -99,7 +99,7 @@ class _FilterCommon(_interface.Strategy):
             t_previous=-jnp.inf,
             u=sol,
             marginals=corrected,
-            diffusion_sqrtm=1.0,  # ?
+            output_scale_sqrtm=1.0,  # ?
             num_data_points=1.0,  # todo: make this an int
         )
         return filtered, error_estimate
@@ -110,7 +110,7 @@ class _FilterCommon(_interface.Strategy):
             t_previous=s0.t,  # todo: wrong, but no one cares
             u=s1.u,
             marginals=s1.marginals,
-            diffusion_sqrtm=s1.diffusion_sqrtm,
+            output_scale_sqrtm=s1.output_scale_sqrtm,
             num_data_points=s1.num_data_points,
         )
         solution, previous = accepted, accepted
@@ -132,7 +132,7 @@ class _FilterCommon(_interface.Strategy):
             l0=s0.marginals.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=s1.diffusion_sqrtm,  # right-including intervals
+            output_scale_sqrtm=s1.output_scale_sqrtm,  # right-including intervals
         )
         sol = self.implementation.extract_sol(rv=extrapolated)
         target_p = FilteringSolution(
@@ -140,7 +140,7 @@ class _FilterCommon(_interface.Strategy):
             t_previous=t,
             u=sol,
             marginals=extrapolated,
-            diffusion_sqrtm=s1.diffusion_sqrtm,
+            output_scale_sqrtm=s1.output_scale_sqrtm,
             num_data_points=s1.num_data_points,
         )
         return s1, target_p, target_p
@@ -149,13 +149,13 @@ class _FilterCommon(_interface.Strategy):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
 
-    def _complete_extrapolation(self, *, diffusion_sqrtm, l0, m_ext, p, p_inv):
+    def _complete_extrapolation(self, *, output_scale_sqrtm, l0, m_ext, p, p_inv):
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
             l0=l0,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
         return extrapolated
 
@@ -175,7 +175,7 @@ class _FilterCommon(_interface.Strategy):
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFilter(_FilterCommon):
-    """Filter implementation (time-constant diffusion)."""
+    """Filter implementation (time-constant output-scale)."""
 
     @jax.jit
     def step_fn(self, *, state, info_op, dt, parameters):
@@ -190,13 +190,13 @@ class DynamicFilter(_FilterCommon):
         # Linearise the differential equation.
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
 
-        diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
+        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
-        error_estimate = error_estimate * dt * diffusion_sqrtm
+        error_estimate = error_estimate * dt * output_scale_sqrtm
 
         extrapolated = self._complete_extrapolation(
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             l0=state.marginals.cov_sqrtm_lower,
             m_ext=m_ext,
             p=p,
@@ -214,7 +214,7 @@ class DynamicFilter(_FilterCommon):
             t_previous=state.t,
             u=sol,
             marginals=corrected,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points + 1,
         )
         return filtered, error_estimate
@@ -229,7 +229,7 @@ class DynamicFilter(_FilterCommon):
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class Filter(_FilterCommon):
-    """Filter implementation with dynamic calibration (time-varying diffusion)."""
+    """Filter implementation with dynamic calibration (time-varying output-scale)."""
 
     @jax.jit
     def step_fn(self, *, state, info_op, dt, parameters):
@@ -243,13 +243,13 @@ class Filter(_FilterCommon):
         # Linearise the differential equation.
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
 
-        diffusion_sqrtm, error_estimate = self.implementation.estimate_error(
+        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
-        error_estimate = error_estimate * dt * diffusion_sqrtm
+        error_estimate = error_estimate * dt * output_scale_sqrtm
 
         extrapolated = self._complete_extrapolation(
-            diffusion_sqrtm=1.0,
+            output_scale_sqrtm=1.0,
             l0=state.marginals.cov_sqrtm_lower,
             m_ext=m_ext,
             p=p,
@@ -261,9 +261,9 @@ class Filter(_FilterCommon):
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 
-        # Calibration of the global diffusion
-        new_diffusion_sqrtm = self._update_diffusion_sqrtm(
-            diffsqrtm=state.diffusion_sqrtm, n=state.num_data_points, obs=observed
+        # Calibration of the global output-scale
+        new_output_scale_sqrtm = self._update_output_scale_sqrtm(
+            diffsqrtm=state.output_scale_sqrtm, n=state.num_data_points, obs=observed
         )
 
         # Extract and return solution
@@ -273,45 +273,45 @@ class Filter(_FilterCommon):
             t_previous=state.t,
             u=sol,
             marginals=corrected,
-            diffusion_sqrtm=new_diffusion_sqrtm,
+            output_scale_sqrtm=new_output_scale_sqrtm,
             num_data_points=jnp.add(state.num_data_points, 1),
         )
         return filtered, error_estimate
 
-    def _update_diffusion_sqrtm(self, *, diffsqrtm, n, obs):
+    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
         evidence_sqrtm = self.implementation.evidence_sqrtm(observed=obs)
         diffsqrtm_new = self.implementation.sum_sqrt_scalars(
             jnp.sqrt(n) * diffsqrtm, evidence_sqrtm
         )
-        new_diffusion_sqrtm = jnp.reshape(diffsqrtm_new, ()) / jnp.sqrt(n + 1)
-        return new_diffusion_sqrtm
+        new_output_scale_sqrtm = jnp.reshape(diffsqrtm_new, ()) / jnp.sqrt(n + 1)
+        return new_output_scale_sqrtm
 
     def extract_fn(self, *, state):  # noqa: D102
-        diffusion_sqrtm = state.diffusion_sqrtm[-1] * jnp.ones_like(
-            state.diffusion_sqrtm
+        output_scale_sqrtm = state.output_scale_sqrtm[-1] * jnp.ones_like(
+            state.output_scale_sqrtm
         )
         marginals = self.implementation.scale_covariance(
-            rv=state.marginals, scale_sqrtm=diffusion_sqrtm
+            rv=state.marginals, scale_sqrtm=output_scale_sqrtm
         )
         return FilteringSolution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points,
         )
 
     def extract_terminal_value_fn(self, *, state):
-        diffusion_sqrtm = state.diffusion_sqrtm
+        output_scale_sqrtm = state.output_scale_sqrtm
         marginals = self.implementation.scale_covariance(
-            rv=state.marginals, scale_sqrtm=diffusion_sqrtm
+            rv=state.marginals, scale_sqrtm=output_scale_sqrtm
         )
         return FilteringSolution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,
-            diffusion_sqrtm=diffusion_sqrtm,
+            output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points,
         )
