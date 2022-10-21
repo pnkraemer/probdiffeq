@@ -12,7 +12,22 @@ from odefilter.strategies import _common
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class _FilterCommon(_common.Strategy):
-    @jax.jit
+
+    # Interfaces
+    @abc.abstractmethod
+    def step_fn(self, *, state, info_op, dt, parameters):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_fn(self, *, state):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_terminal_value_fn(self, *, state):
+        raise NotImplementedError
+
+    # Implementations
+
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
         corrected = self.implementation.init_corrected(
@@ -96,25 +111,6 @@ class _FilterCommon(_common.Strategy):
         )
         return extrapolated
 
-    def _estimate_error(self, linear_fn, m_obs, p):
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
-        )
-        error_estimate = error_estimate * output_scale_sqrtm
-        return error_estimate, output_scale_sqrtm
-
-    @abc.abstractmethod
-    def step_fn(self, *, state, info_op, dt, parameters):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_fn(self, *, state):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_terminal_value_fn(self, *, state):
-        raise NotImplementedError
-
 
 # Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
 #  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
@@ -125,21 +121,20 @@ class DynamicFilter(_FilterCommon):
 
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
-        t_new = state.t + dt
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         m_ext, cache = self._extrapolate_mean(
-            posterior=state.posterior, p_inv=p_inv, p=p
+            posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        m_obs, linear_fn = info_op(x=m_ext, t=t_new, p=parameters)
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
         error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
 
         extrapolated = self._complete_extrapolation(
             m_ext,
             cache,
-            output_scale_sqrtm=output_scale_sqrtm,
             posterior_previous=state.posterior,
+            output_scale_sqrtm=output_scale_sqrtm,
             p=p,
             p_inv=p_inv,
         )
@@ -148,12 +143,14 @@ class DynamicFilter(_FilterCommon):
         _, (corrected, _) = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-        sol = self.implementation.extract_sol(rv=corrected)
 
+        # Return solution
+        sol = self.implementation.extract_sol(rv=corrected)
         filtered = _common.Solution(
-            t=t_new,
+            t=state.t + dt,
             t_previous=state.t,
             u=sol,
+            # todo: with marginals=None, step_fn equals DynaSmootherCmn.step_fn()
             marginals=corrected,
             posterior=corrected,
             output_scale_sqrtm=output_scale_sqrtm,

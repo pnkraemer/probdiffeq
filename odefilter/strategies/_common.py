@@ -229,6 +229,15 @@ class Strategy(abc.ABC):
         marginals_vmap = jax.vmap(offgrid_no_kw)
         return marginals_vmap(solution_left, ts, solution_right)
 
+    # Functions that are shared by all subclasses
+
+    def _estimate_error(self, linear_fn, m_obs, p):
+        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
+            linear_fn=linear_fn, m_obs=m_obs, p=p
+        )
+        error_estimate = error_estimate * output_scale_sqrtm
+        return error_estimate, output_scale_sqrtm
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
@@ -287,22 +296,18 @@ class DynamicSmootherCommon(Strategy):
         return solution, error_estimate
 
     # Dynamic stuff
+
+    # todo: this (essentially) coincides with DynamicFilter.step_fn
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        # Extrapolate the mean
         m_ext, cache = self._extrapolate_mean(
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        # Linearise the differential equation.
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
-        )
-        error_estimate = dt * output_scale_sqrtm * error_estimate
+        error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
 
         extrapolated = self._complete_extrapolation(
             m_ext,
@@ -330,7 +335,7 @@ class DynamicSmootherCommon(Strategy):
             num_data_points=state.num_data_points + 1,
         )
 
-        return smoothing_solution, error_estimate
+        return smoothing_solution, dt * error_estimate
 
     def _extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
