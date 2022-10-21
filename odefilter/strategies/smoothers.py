@@ -182,23 +182,14 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         return accepted, solution, previous
 
     def offgrid_marginals(self, *, state_previous, t, state):
-        acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
+        acc, _sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         sol_marginal = self.implementation.marginalise_model(
             init=acc.marginals,
             linop=acc.posterior.backward_model.transition,
             noise=acc.posterior.backward_model.noise,
         )
         u = self.implementation.extract_sol(rv=sol_marginal)
-        return _common.Solution(
-            t=t,
-            t_previous=state_previous.t,
-            # the values would be meaningless:
-            posterior=_nan_like(sol.posterior),
-            marginals=sol_marginal,
-            output_scale_sqrtm=acc.output_scale_sqrtm,
-            u=u,
-            num_data_points=state.num_data_points,
-        )
+        return u, sol_marginal
 
 
 def _nan_like(*args):

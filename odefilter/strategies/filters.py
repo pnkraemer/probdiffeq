@@ -147,7 +147,7 @@ class _FilterCommon(_common.Strategy):
 
     def offgrid_marginals(self, *, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
-        return sol
+        return sol.u, sol.marginals
 
     def _complete_extrapolation(self, *, output_scale_sqrtm, l0, m_ext, p, p_inv):
         extrapolated = self.implementation.complete_extrapolation(

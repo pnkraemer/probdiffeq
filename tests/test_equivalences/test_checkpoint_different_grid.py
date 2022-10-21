@@ -36,7 +36,7 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
         *args, t0=t0, t1=t1, solver=eks[0], info_op=eks[1], **kwargs
     )
     ts = jnp.linspace(t0, t1, num=k * len(eks_sol.t) // 2)
-    dense = eks[0].offgrid_marginals_searchsorted(ts=ts[1:-1], solution=eks_sol)
+    u, dense = eks[0].offgrid_marginals_searchsorted(ts=ts[1:-1], solution=eks_sol)
 
     fp_eks_sol = ivpsolve.simulate_checkpoints(
         *args, ts=ts, solver=fixedpoint_eks[0], info_op=fixedpoint_eks[1], **kwargs
@@ -48,10 +48,9 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
     # which are equal modulo orthogonal transformation
     # (they are equal in square, though).
     # The backward models are not expected to be equal.
-    assert jnp.allclose(fixedpoint_eks_sol.t, dense.t)
-    assert jnp.allclose(fixedpoint_eks_sol.u, dense.u)
-    assert jnp.allclose(fixedpoint_eks_sol.marginals.mean, dense.marginals.mean)
-    assert jnp.allclose(fixedpoint_eks_sol.output_scale_sqrtm, dense.output_scale_sqrtm)
+    assert jnp.allclose(fixedpoint_eks_sol.t, ts[1:-1])
+    assert jnp.allclose(fixedpoint_eks_sol.u, u)
+    assert jnp.allclose(fixedpoint_eks_sol.marginals.mean, dense.mean)
 
     # covariances are equal, but cov_sqrtm_lower might not be
 
@@ -60,7 +59,7 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
         return x @ x.T
 
     l0 = fixedpoint_eks_sol.marginals.cov_sqrtm_lower
-    l1 = dense.marginals.cov_sqrtm_lower
+    l1 = dense.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1))
 
 
