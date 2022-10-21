@@ -45,52 +45,6 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         error_estimate = self.implementation.init_error_estimate()
         return solution, error_estimate
 
-    @jax.jit
-    def step_fn(self, *, state, info_op, dt, parameters):
-        """Step."""
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-
-        # Extrapolate the mean
-        m_ext, cache = self._extrapolate_mean(
-            posterior=state.posterior, p=p, p_inv=p_inv
-        )
-
-        # Linearise the differential equation.
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
-        )
-        error_estimate = dt * output_scale_sqrtm * error_estimate
-
-        extrapolated = self._complete_extrapolation(
-            m_ext,
-            cache,
-            output_scale_sqrtm=output_scale_sqrtm,
-            p=p,
-            p_inv=p_inv,
-            posterior_previous=state.posterior,
-        )
-
-        # Final observation
-        _, (corrected, _) = self._final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
-        )
-
-        # Return solution
-        sol = self.implementation.extract_sol(rv=corrected.init)
-        smoothing_solution = _common.Solution(
-            t=state.t + dt,
-            t_previous=state.t,
-            u=sol,
-            posterior=corrected,
-            marginals=None,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=state.num_data_points + 1,
-        )
-
-        return smoothing_solution, error_estimate
-
     def _final_correction(self, *, extrapolated, linear_fn, m_obs):
         a, (corrected, b) = self.implementation.final_correction(
             extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
