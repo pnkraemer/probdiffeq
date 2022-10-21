@@ -40,7 +40,7 @@ class _FilterCommon(_common.Strategy):
             t=t0,
             t_previous=-jnp.inf,
             u=sol,
-            marginals=corrected,
+            marginals=None,
             posterior=corrected,
             output_scale_sqrtm=1.0,  # ?
             num_data_points=1.0,  # todo: make this an int
@@ -82,7 +82,7 @@ class _FilterCommon(_common.Strategy):
             t=t,
             t_previous=t,
             u=sol,
-            marginals=extrapolated,
+            marginals=None,  # todo: what should happen here???
             posterior=extrapolated,
             output_scale_sqrtm=s1.output_scale_sqrtm,
             num_data_points=s1.num_data_points,
@@ -91,7 +91,7 @@ class _FilterCommon(_common.Strategy):
 
     def offgrid_marginals(self, *, state_previous, t, state):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
-        return sol.u, sol.marginals
+        return sol.u, sol.posterior
 
     def _extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, *_ = self.implementation.extrapolate_mean(
@@ -150,8 +150,7 @@ class DynamicFilter(_FilterCommon):
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
-            # todo: with marginals=None, step_fn equals DynaSmootherCmn.step_fn()
-            marginals=corrected,
+            marginals=None,
             posterior=corrected,
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points + 1,
@@ -159,10 +158,18 @@ class DynamicFilter(_FilterCommon):
         return filtered, dt * error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
-        return state
+        return _common.Solution(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals=state.posterior,  # new!
+            posterior=state.posterior,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
 
     def extract_terminal_value_fn(self, *, state):  # noqa: D102
-        return state
+        return self.extract_fn(state=state)
 
 
 # Todo: In its current form, wouldn't this be a template for a DynamicSolver()?
@@ -209,7 +216,7 @@ class Filter(_FilterCommon):
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
-            marginals=corrected,
+            marginals=None,
             posterior=corrected,
             output_scale_sqrtm=new_output_scale_sqrtm,
             num_data_points=n + 1,
@@ -238,7 +245,7 @@ class Filter(_FilterCommon):
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
-            marginals=marginals,
+            marginals=marginals,  # new!
             posterior=marginals,
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points,
@@ -253,7 +260,7 @@ class Filter(_FilterCommon):
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
-            marginals=marginals,
+            marginals=marginals,  # new!
             posterior=marginals,
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points,
