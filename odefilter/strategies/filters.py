@@ -53,12 +53,11 @@ class _FilterCommon(_common.Strategy):
         dt = t - s0.t
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, *_ = self.implementation.extrapolate_mean(
-            s0.marginals.mean, p=p, p_inv=p_inv
-        )
-        extrapolated = self.implementation.complete_extrapolation(
-            m_ext=m_ext,
-            l0=s0.posterior.cov_sqrtm_lower,
+        m_ext, cache = self._extrapolate_mean(state=s0, p=p, p_inv=p_inv)
+        extrapolated = self._complete_extrapolation(
+            m_ext,
+            cache,
+            posterior_previous=s0.posterior,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=s1.output_scale_sqrtm,  # right-including intervals
@@ -79,8 +78,16 @@ class _FilterCommon(_common.Strategy):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol.u, sol.marginals
 
+    # todo: shouldn't this operate on the mean as an input?
+    #  or at least on the posterior?
+    def _extrapolate_mean(self, *, state, p_inv, p):
+        m_ext, *_ = self.implementation.extrapolate_mean(
+            state.posterior.mean, p=p, p_inv=p_inv
+        )
+        return m_ext, ()
+
     def _complete_extrapolation(
-        self, *, output_scale_sqrtm, posterior_previous, m_ext, p, p_inv
+        self, m_ext, _cache, *, output_scale_sqrtm, posterior_previous, p, p_inv
     ):
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
@@ -90,6 +97,13 @@ class _FilterCommon(_common.Strategy):
             output_scale_sqrtm=output_scale_sqrtm,
         )
         return extrapolated
+
+    def _estimate_error(self, linear_fn, m_obs, p):
+        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
+            linear_fn=linear_fn, m_obs=m_obs, p=p
+        )
+        error_estimate = error_estimate * output_scale_sqrtm
+        return error_estimate, output_scale_sqrtm
 
     @abc.abstractmethod
     def step_fn(self, *, state, info_op, dt, parameters):
@@ -104,33 +118,28 @@ class _FilterCommon(_common.Strategy):
         raise NotImplementedError
 
 
+# Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
+#  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFilter(_FilterCommon):
     """Filter implementation (time-constant output-scale)."""
 
-    @jax.jit
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
+        t_new = state.t + dt
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        # Extrapolate the mean
-        m_ext, _, _ = self.implementation.extrapolate_mean(
-            state.posterior.mean, p=p, p_inv=p_inv
-        )
+        m_ext, cache = self._extrapolate_mean(state=state, p_inv=p_inv, p=p)
 
-        # Linearise the differential equation.
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
-        )
-        error_estimate = error_estimate * dt * output_scale_sqrtm
+        m_obs, linear_fn = info_op(x=m_ext, t=t_new, p=parameters)
+        error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
 
         extrapolated = self._complete_extrapolation(
+            m_ext,
+            cache,
             output_scale_sqrtm=output_scale_sqrtm,
             posterior_previous=state.posterior,
-            m_ext=m_ext,
             p=p,
             p_inv=p_inv,
         )
@@ -142,7 +151,7 @@ class DynamicFilter(_FilterCommon):
         sol = self.implementation.extract_sol(rv=corrected)
 
         filtered = _common.Solution(
-            t=state.t + dt,
+            t=t_new,
             t_previous=state.t,
             u=sol,
             marginals=corrected,
@@ -150,7 +159,7 @@ class DynamicFilter(_FilterCommon):
             output_scale_sqrtm=output_scale_sqrtm,
             num_data_points=state.num_data_points + 1,
         )
-        return filtered, error_estimate
+        return filtered, dt * error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
         return state
@@ -159,44 +168,40 @@ class DynamicFilter(_FilterCommon):
         return state
 
 
+# Todo: In its current form, wouldn't this be a template for a DynamicSolver()?
+#  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class Filter(_FilterCommon):
     """Filter implementation with dynamic calibration (time-varying output-scale)."""
 
-    @jax.jit
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
+        # Pre-error-estimate steps
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-        # Extrapolate the mean
-        m_ext, _, _ = self.implementation.extrapolate_mean(
-            state.posterior.mean, p=p, p_inv=p_inv
-        )
+        m_ext, cache = self._extrapolate_mean(state=state, p_inv=p_inv, p=p)
 
-        # Linearise the differential equation.
+        # Linearise and estimate error
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
+        error_estimate, _ = self._estimate_error(linear_fn, m_obs, p)
 
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
-        )
-        error_estimate = error_estimate * dt * output_scale_sqrtm
-
+        # Post-error-estimate steps
         extrapolated = self._complete_extrapolation(
+            m_ext,
+            cache,
             output_scale_sqrtm=1.0,
             posterior_previous=state.posterior,
-            m_ext=m_ext,
             p=p,
             p_inv=p_inv,
-        )
+        )  # This is the only filter/smoother consideration!
 
-        # Final observation
+        # Complete step (incl. calibration!)
+        output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-
-        # Calibration of the global output-scale
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
-            diffsqrtm=state.output_scale_sqrtm, n=state.num_data_points, obs=observed
+            diffsqrtm=output_scale_sqrtm, n=n, obs=observed
         )
 
         # Extract and return solution
@@ -208,9 +213,9 @@ class Filter(_FilterCommon):
             marginals=corrected,
             posterior=corrected,
             output_scale_sqrtm=new_output_scale_sqrtm,
-            num_data_points=jnp.add(state.num_data_points, 1),
+            num_data_points=n + 1,
         )
-        return filtered, error_estimate
+        return filtered, dt * error_estimate
 
     def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
         evidence_sqrtm = self.implementation.evidence_sqrtm(observed=obs)
@@ -224,6 +229,9 @@ class Filter(_FilterCommon):
         output_scale_sqrtm = state.output_scale_sqrtm[-1] * jnp.ones_like(
             state.output_scale_sqrtm
         )
+
+        # This would be different for different filters/smoothers, I suppose.
+        # todo: this does not scale the marginal! Currently it is incorrect!
         marginals = self.implementation.scale_covariance(
             rv=state.posterior, scale_sqrtm=output_scale_sqrtm
         )
