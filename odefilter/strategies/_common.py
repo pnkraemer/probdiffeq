@@ -58,14 +58,13 @@ class Solution(Generic[T]):
     t_previous: float
 
     u: Any
-    marginals: T
 
     output_scale_sqrtm: float
 
     # todo: either marginals or posterior are plenty?
-    #  I think the posterior should be the only one, but
-    #  then, interpolate() and offgrid_marginals() should only return marginals.
-    #  Otherwise, this doesn't really work.
+    #  But what should the extract_fn do with smoothing?
+    #  Which value should be filled if these go?
+    marginals: T
     posterior: MarkovSequence[T]
 
     num_data_points: float  # todo: make int
