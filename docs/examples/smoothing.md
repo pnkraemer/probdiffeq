@@ -91,21 +91,21 @@ If you like, compute the solution on a dense grid after solving.
 ts_dense = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=500, endpoint=True
 )  # must be off-grid
-dense = ek0.offgrid_marginals_searchsorted(ts=ts_dense, solution=ek0sol)
+_, dense = ek0.offgrid_marginals_searchsorted(ts=ts_dense, solution=ek0sol)
 
 ts_coarse = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=25, endpoint=True
 )  # must be off-grid
-coarse = ek0.offgrid_marginals_searchsorted(ts=ts_coarse, solution=ek0sol)
+_, coarse = ek0.offgrid_marginals_searchsorted(ts=ts_coarse, solution=ek0sol)
 
 fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
 
 ax1.set_title("EKS0 solution (dense)")
-ax1.plot(dense.t, dense.u, ".")
+ax1.plot(ts_dense, dense.u, ".")
 
 ax2.set_title("EKS0 solution (coarse)")
-ax2.plot(coarse.t, coarse.u, ".")
+ax2.plot(ts_coarse, coarse.u, ".")
 plt.show()
 ```
 
