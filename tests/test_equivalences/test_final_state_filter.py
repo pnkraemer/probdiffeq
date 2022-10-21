@@ -12,16 +12,16 @@ from odefilter import ivpsolve, recipes
 @case
 @parametrize("n", [2, 3])
 def filter_smoother_pair_eks0(n):
-    ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n)
-    eks0 = recipes.dynamic_isotropic_eks0(num_derivatives=n)
+    ekf0 = recipes.ekf0_isotropic_dynamic(num_derivatives=n)
+    eks0 = recipes.eks0_isotropic_dynamic(num_derivatives=n)
     return ekf0, eks0
 
 
 @case
 @parametrize("n", [2, 3])
 def filter_smoother_pair_fixedpoint_eks0(n):
-    ekf0 = recipes.dynamic_isotropic_ekf0(num_derivatives=n)
-    eks0 = recipes.dynamic_isotropic_fixedpoint_eks0(num_derivatives=n)
+    ekf0 = recipes.ekf0_isotropic_dynamic(num_derivatives=n)
+    eks0 = recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=n)
     return ekf0, eks0
 
 

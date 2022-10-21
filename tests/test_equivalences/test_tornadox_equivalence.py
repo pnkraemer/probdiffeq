@@ -42,7 +42,7 @@ def case_solver_pair_isotropic_ekf0(num, atol, rtol, factor_min, factor_max, saf
     def vf_ode(y, *, t, p):
         return f(y, *p)
 
-    ekf0, info_op = recipes.dynamic_isotropic_ekf0(num_derivatives=num)
+    ekf0, info_op = recipes.ekf0_isotropic_dynamic(num_derivatives=num)
     controller = controls.ClippedIntegral(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )
@@ -115,7 +115,7 @@ def case_solver_pair_dynamic_ekf1(num, atol, rtol, factor_min, factor_max, safet
     def vf_ode(y, *, t, p):
         return f(y, *p)
 
-    ekf1, info_op = recipes.dynamic_ekf1(ode_dimension=2, num_derivatives=num)
+    ekf1, info_op = recipes.ekf1_dynamic(ode_dimension=2, num_derivatives=num)
     controller = controls.ClippedIntegral(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )
