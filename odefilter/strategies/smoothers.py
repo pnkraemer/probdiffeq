@@ -6,12 +6,12 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter.strategies import _smoother_common, markov
+from odefilter.strategies import _interface, _markov
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
+class DynamicSmoother(_interface.DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying diffusion)."""
 
     @jax.jit
@@ -23,13 +23,13 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
 
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
-        backward_model = markov.BackwardModel(
+        backward_model = _markov.BackwardModel(
             transition=backward_transition,
             noise=backward_noise,
         )
         sol = self.implementation.extract_sol(rv=corrected)
 
-        solution = markov.Posterior(
+        solution = _markov.Posterior(
             t=t0,
             t_previous=-jnp.inf,
             u=sol,
@@ -69,7 +69,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )
-        backward_model = markov.BackwardModel(transition=bw_op, noise=bw_noise)
+        backward_model = _markov.BackwardModel(transition=bw_op, noise=bw_noise)
 
         # Final observation
         _, (corrected, _) = self.implementation.final_correction(
@@ -78,7 +78,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
 
         # Return solution
         sol = self.implementation.extract_sol(rv=corrected)
-        smoothing_solution = markov.Posterior(
+        smoothing_solution = _markov.Posterior(
             t=state.t + dt,
             t_previous=state.t,
             u=sol,
@@ -93,7 +93,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
     def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
 
         accepted = self._duplicate_with_unit_backward_model(state=s1, t=t)
-        previous = markov.Posterior(
+        previous = _markov.Posterior(
             t=t,
             t_previous=s0.t,
             u=s1.u,
@@ -126,7 +126,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
 
         # This is the new solution object at t.
         sol = self.implementation.extract_sol(rv=extrapolated0)
-        solution = markov.Posterior(
+        solution = _markov.Posterior(
             t=t,
             t_previous=s0.t,
             u=sol,
@@ -137,7 +137,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
         )
         previous = solution
 
-        accepted = markov.Posterior(
+        accepted = _markov.Posterior(
             t=s1.t,
             t_previous=t,
             u=s1.u,
@@ -156,7 +156,7 @@ class DynamicSmoother(_smoother_common.DynamicSmootherCommon):
             noise=acc.backward_model.noise,
         )
         u = self.implementation.extract_sol(rv=sol_marginal)
-        return markov.Posterior(
+        return _markov.Posterior(
             t=t,
             t_previous=state_previous.t,
             marginals_filtered=sol.marginals_filtered,

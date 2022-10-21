@@ -7,6 +7,8 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
+from odefilter.strategies import _markov
+
 
 @dataclass(frozen=True)
 class Strategy(abc.ABC):
@@ -100,6 +102,100 @@ class Strategy(abc.ABC):
     @abc.abstractmethod
     def _case_interpolate(self, *, s0, s1, t):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def offgrid_marginals(self, *, t, state, state_previous):
+        raise NotImplementedError
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DynamicSmootherCommon(Strategy):
+    """Common functionality for smoother-style algorithms."""
+
+    @abc.abstractmethod
+    def _case_interpolate(self, *, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _case_right_corner(self, *, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def step_fn(self, *, state, info_op, dt, parameters):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init_fn(self, *, taylor_coefficients, t0):
+        raise NotImplementedError
+
+    def extract_fn(self, *, state):  # noqa: D102
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.marginals_filtered)
+        marginals = self.implementation.marginalise_backwards(
+            init=init,
+            linop=state.backward_model.transition,
+            noise=state.backward_model.noise,
+        )
+        sol = self.implementation.extract_sol(rv=marginals)
+        return _markov.Posterior(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=sol,
+            marginals_filtered=state.marginals_filtered,
+            marginals=marginals,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=state.backward_model,
+        )
+
+    def extract_terminal_value_fn(self, *, state):  # noqa: D102
+        return _markov.Posterior(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals_filtered=state.marginals_filtered,
+            marginals=state.marginals_filtered,  # we are at the terminal state only
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=state.backward_model,
+        )
+
+    def _duplicate_with_unit_backward_model(self, *, state, t):
+        bw_transition0 = self.implementation.init_backward_transition()
+        bw_noise0 = self.implementation.init_backward_noise(
+            rv_proto=state.backward_model.noise
+        )
+        bw_model = _markov.BackwardModel(transition=bw_transition0, noise=bw_noise0)
+        state1 = _markov.Posterior(
+            t=t,
+            t_previous=t,  # identity transition: this is what it does...
+            u=state.u,
+            marginals_filtered=state.marginals_filtered,
+            marginals=state.marginals,
+            diffusion_sqrtm=state.diffusion_sqrtm,
+            backward_model=bw_model,
+        )
+        return state1
+
+    def _interpolate_from_to_fn(self, *, rv, diffusion_sqrtm, t, t0):
+        dt = t - t0
+        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
+
+        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+            rv.mean, p=p, p_inv=p_inv
+        )
+
+        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
+            m_ext=m_ext,
+            l0=rv.cov_sqrtm_lower,
+            p=p,
+            p_inv=p_inv,
+            diffusion_sqrtm=diffusion_sqrtm,
+            m0_p=m0_p,
+            m_ext_p=m_ext_p,
+        )
+        backward_model = _markov.BackwardModel(transition=bw_op, noise=bw_noise)
+        return extrapolated, backward_model
+
+    # Not implemented yet:
 
     @abc.abstractmethod
     def offgrid_marginals(self, *, t, state, state_previous):
