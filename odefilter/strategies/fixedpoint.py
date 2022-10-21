@@ -8,115 +8,21 @@ import jax.tree_util
 from odefilter.strategies import _common
 
 
+# Todo: this is kind of the templatefor fixed-point-smoothers,
+#  isn't it? If I call complete_extrapolation
+#  with output_scale=1., then this bad boy becomes non-dynamic.
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
 class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying output-scale)."""
 
-    @jax.jit
-    def init_fn(self, *, taylor_coefficients, t0):
-        """Initialise."""
-        corrected = self.implementation.init_corrected(
-            taylor_coefficients=taylor_coefficients
-        )
-
-        backward_transition = self.implementation.init_backward_transition()
-        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
-        backward_model = _common.BackwardModel(
-            transition=backward_transition,
-            noise=backward_noise,
-        )
-        sol = self.implementation.extract_sol(rv=corrected)
-
-        posterior = _common.MarkovSequence(
-            init=corrected, backward_model=backward_model
-        )
-        solution = _common.Solution(
-            t=t0,
-            t_previous=t0,
-            u=sol,
-            posterior=posterior,
-            marginals=None,
-            output_scale_sqrtm=1.0,
-            num_data_points=1.0,
-        )
-
-        error_estimate = self.implementation.init_error_estimate()
-        return solution, error_estimate
-
-    @jax.jit
-    def step_fn(self, *, state, info_op, dt, parameters):
-        """Step."""
-        # Assemble preconditioner
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-
-        # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.posterior.init.mean, p=p, p_inv=p_inv
-        )
-
-        # Linearise the differential equation and estimate error.
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
-        )
-        error_estimate = dt * output_scale_sqrtm * error_estimate
-
-        # Complete extrapolation and condense backward models
-        extrapolated = self._complete_extrapolation(
-            bw_model_previous=state.posterior.backward_model,
-            l0=state.posterior.init.cov_sqrtm_lower,
-            m0_p=m0_p,
-            m_ext=m_ext,
-            m_ext_p=m_ext_p,
-            output_scale_sqrtm=output_scale_sqrtm,
-            p=p,
-            p_inv=p_inv,
-        )
-
-        # Final observation
-        _, (corrected, _) = self._final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
-        )
-
-        # Extract and return solution
-        sol = self.implementation.extract_sol(rv=corrected.init)
-        smoothing_solution = _common.Solution(
-            t=state.t + dt,
-            t_previous=state.t_previous,  # condensing the models...
-            u=sol,
-            posterior=corrected,
-            marginals=None,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=state.num_data_points + 1.0,
-        )
-
-        return smoothing_solution, error_estimate
-
-    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
-        a, (corrected, b) = self.implementation.final_correction(
-            extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
-        )
-        corrected_seq = _common.MarkovSequence(
-            init=corrected, backward_model=extrapolated.backward_model
-        )
-        return a, (corrected_seq, b)
-
     def _complete_extrapolation(
-        self,
-        *,
-        bw_model_previous,
-        l0,
-        m0_p,
-        m_ext,
-        m_ext_p,
-        output_scale_sqrtm,
-        p,
-        p_inv
+        self, m_ext, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
     ):
+        m_ext_p, m0_p = cache
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=l0,
+            l0=posterior_previous.init.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -129,7 +35,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
         )
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment,
-            bw_init=bw_model_previous,
+            bw_init=posterior_previous.backward_model,
         )
         backward_model = _common.BackwardModel(transition=gain, noise=noise)
         return _common.MarkovSequence(init=extrapolated, backward_model=backward_model)
