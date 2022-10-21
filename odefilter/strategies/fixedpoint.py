@@ -13,46 +13,6 @@ from odefilter.strategies import _common
 class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying output-scale)."""
 
-    @jax.jit
-    def init_fn(self, *, taylor_coefficients, t0):
-        """Initialise."""
-        corrected = self.implementation.init_corrected(
-            taylor_coefficients=taylor_coefficients
-        )
-
-        backward_transition = self.implementation.init_backward_transition()
-        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
-        backward_model = _common.BackwardModel(
-            transition=backward_transition,
-            noise=backward_noise,
-        )
-        sol = self.implementation.extract_sol(rv=corrected)
-
-        posterior = _common.MarkovSequence(
-            init=corrected, backward_model=backward_model
-        )
-        solution = _common.Solution(
-            t=t0,
-            t_previous=t0,
-            u=sol,
-            posterior=posterior,
-            marginals=None,
-            output_scale_sqrtm=1.0,
-            num_data_points=1.0,
-        )
-
-        error_estimate = self.implementation.init_error_estimate()
-        return solution, error_estimate
-
-    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
-        a, (corrected, b) = self.implementation.final_correction(
-            extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
-        )
-        corrected_seq = _common.MarkovSequence(
-            init=corrected, backward_model=extrapolated.backward_model
-        )
-        return a, (corrected_seq, b)
-
     def _complete_extrapolation(
         self, m_ext, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
     ):

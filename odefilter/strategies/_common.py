@@ -240,9 +240,34 @@ class DynamicSmootherCommon(Strategy):
     def _case_right_corner(self, *, s0, s1, t):
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
-        raise NotImplementedError
+        """Initialise."""
+        corrected = self.implementation.init_corrected(
+            taylor_coefficients=taylor_coefficients
+        )
+
+        backward_transition = self.implementation.init_backward_transition()
+        backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
+        backward_model = BackwardModel(
+            transition=backward_transition,
+            noise=backward_noise,
+        )
+        sol = self.implementation.extract_sol(rv=corrected)
+
+        posterior = MarkovSequence(init=corrected, backward_model=backward_model)
+        solution = Solution(
+            t=t0,
+            t_previous=t0,
+            u=sol,
+            posterior=posterior,
+            marginals=None,
+            output_scale_sqrtm=1.0,
+            num_data_points=1.0,
+        )
+
+        error_estimate = self.implementation.init_error_estimate()
+        return solution, error_estimate
 
     @jax.jit
     def step_fn(self, *, state, info_op, dt, parameters):
@@ -289,6 +314,15 @@ class DynamicSmootherCommon(Strategy):
         )
 
         return smoothing_solution, error_estimate
+
+    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
+        a, (corrected, b) = self.implementation.final_correction(
+            extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
+        )
+        corrected_seq = MarkovSequence(
+            init=corrected, backward_model=extrapolated.backward_model
+        )
+        return a, (corrected_seq, b)
 
     def extract_fn(self, *, state):  # noqa: D102
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.posterior.init)
@@ -362,8 +396,6 @@ class DynamicSmootherCommon(Strategy):
             posterior.init.mean, p=p, p_inv=p_inv
         )
         return m_ext, (m_ext_p, m0_p)
-
-    # Not implemented yet:
 
     @abc.abstractmethod
     def offgrid_marginals(self, *, t, state, state_previous):
