@@ -28,24 +28,8 @@ class _FilterCommon(_common.Strategy):
 
     # Implementations
 
-    def init_fn(self, *, taylor_coefficients, t0):
-        """Initialise."""
-        corrected = self.implementation.init_corrected(
-            taylor_coefficients=taylor_coefficients
-        )
-        error_estimate = self.implementation.init_error_estimate()
-
-        sol = self.implementation.extract_sol(rv=corrected)
-        filtered = _common.Solution(
-            t=t0,
-            t_previous=-jnp.inf,
-            u=sol,
-            marginals=None,
-            posterior=corrected,
-            output_scale_sqrtm=1.0,  # ?
-            num_data_points=1.0,  # todo: make this an int
-        )
-        return filtered, error_estimate
+    def _init_posterior(self, *, corrected):
+        return corrected
 
     def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
         accepted = _common.Solution(

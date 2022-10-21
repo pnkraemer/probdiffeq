@@ -138,10 +138,6 @@ class Strategy(abc.ABC):
     # Abstract methods
 
     @abc.abstractmethod
-    def init_fn(self, *, taylor_coefficients, t0):  # -> state
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def step_fn(self, *, state, info_op, dt, parameters):
         raise NotImplementedError
 
@@ -175,6 +171,10 @@ class Strategy(abc.ABC):
         raise NotImplementedError  # for dynamic filters/smoothers
 
     @abc.abstractmethod
+    def _init_posterior(self, *, corrected):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def _extract_sol(self, x, /):
         raise NotImplementedError  # for dynamic filters/smoothers
 
@@ -188,6 +188,28 @@ class Strategy(abc.ABC):
     @classmethod
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
+
+    def init_fn(self, *, taylor_coefficients, t0):
+        """Initialise."""
+        corrected = self.implementation.init_corrected(
+            taylor_coefficients=taylor_coefficients
+        )
+
+        posterior = self._init_posterior(corrected=corrected)
+        sol = self._extract_sol(posterior)
+
+        solution = Solution(
+            t=t0,
+            t_previous=t0,
+            u=sol,
+            posterior=posterior,
+            marginals=None,
+            output_scale_sqrtm=1.0,
+            num_data_points=1.0,
+        )
+
+        error_estimate = self.implementation.init_error_estimate()
+        return solution, error_estimate
 
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
 
@@ -313,34 +335,15 @@ class DynamicSmootherCommon(Strategy):
 
     # Implementations
 
-    # smoother stuff
-    def init_fn(self, *, taylor_coefficients, t0):
-        """Initialise."""
-        corrected = self.implementation.init_corrected(
-            taylor_coefficients=taylor_coefficients
-        )
-
+    def _init_posterior(self, *, corrected):
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
         backward_model = BackwardModel(
             transition=backward_transition,
             noise=backward_noise,
         )
-        sol = self.implementation.extract_sol(rv=corrected)
-
         posterior = MarkovSequence(init=corrected, backward_model=backward_model)
-        solution = Solution(
-            t=t0,
-            t_previous=t0,
-            u=sol,
-            posterior=posterior,
-            marginals=None,
-            output_scale_sqrtm=1.0,
-            num_data_points=1.0,
-        )
-
-        error_estimate = self.implementation.init_error_estimate()
-        return solution, error_estimate
+        return posterior
 
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
