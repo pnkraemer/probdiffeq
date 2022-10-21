@@ -95,8 +95,8 @@ _, dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 
 for i in [0, 1, 2]:  # ["S", "I", "R"]
-    ms = dense.marginals.mean[:, i]
-    ls = dense.marginals.cov_sqrtm_lower[:, i, :]
+    ms = dense.mean[:, i]
+    ls = dense.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     ax[0].plot(ts, ms)
