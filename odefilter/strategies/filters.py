@@ -149,6 +149,16 @@ class _FilterCommon(_interface.Strategy):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol
 
+    def _complete_extrapolation(self, *, diffusion_sqrtm, l0, m_ext, p, p_inv):
+        extrapolated = self.implementation.complete_extrapolation(
+            m_ext=m_ext,
+            l0=l0,
+            p=p,
+            p_inv=p_inv,
+            diffusion_sqrtm=diffusion_sqrtm,
+        )
+        return extrapolated
+
     @abc.abstractmethod
     def step_fn(self, *, state, info_op, dt, parameters):
         raise NotImplementedError
@@ -185,12 +195,12 @@ class DynamicFilter(_FilterCommon):
         )
         error_estimate = error_estimate * dt * diffusion_sqrtm
 
-        extrapolated = self.implementation.complete_extrapolation(
-            m_ext=m_ext,
+        extrapolated = self._complete_extrapolation(
+            diffusion_sqrtm=diffusion_sqrtm,
             l0=state.marginals.cov_sqrtm_lower,
+            m_ext=m_ext,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=diffusion_sqrtm,
         )
 
         # Final observation
@@ -238,12 +248,12 @@ class Filter(_FilterCommon):
         )
         error_estimate = error_estimate * dt * diffusion_sqrtm
 
-        extrapolated = self.implementation.complete_extrapolation(
-            m_ext=m_ext,
+        extrapolated = self._complete_extrapolation(
+            diffusion_sqrtm=1.0,
             l0=state.marginals.cov_sqrtm_lower,
+            m_ext=m_ext,
             p=p,
             p_inv=p_inv,
-            diffusion_sqrtm=1.0,
         )
 
         # Final observation
