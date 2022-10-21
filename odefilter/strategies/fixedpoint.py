@@ -51,8 +51,8 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.posterior.init.mean, p=p, p_inv=p_inv
+        m_ext, cache = self._extrapolate_mean(
+            posterior=state.posterior, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation and estimate error.
@@ -64,10 +64,9 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
 
         # Complete extrapolation and condense backward models
         extrapolated = self._complete_extrapolation(
+            m_ext,
+            cache,
             posterior_previous=state.posterior,
-            m0_p=m0_p,
-            m_ext=m_ext,
-            m_ext_p=m_ext_p,
             output_scale_sqrtm=output_scale_sqrtm,
             p=p,
             p_inv=p_inv,
@@ -102,8 +101,9 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
         return a, (corrected_seq, b)
 
     def _complete_extrapolation(
-        self, *, posterior_previous, m0_p, m_ext, m_ext_p, output_scale_sqrtm, p, p_inv
+        self, m_ext, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
     ):
+        m_ext_p, m0_p = cache
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=posterior_previous.init.cov_sqrtm_lower,

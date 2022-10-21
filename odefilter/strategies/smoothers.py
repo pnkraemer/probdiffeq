@@ -51,8 +51,8 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
         # Extrapolate the mean
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
-            state.posterior.init.mean, p=p, p_inv=p_inv
+        m_ext, cache = self._extrapolate_mean(
+            posterior=state.posterior, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -64,10 +64,9 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         error_estimate = dt * output_scale_sqrtm * error_estimate
 
         extrapolated = self._complete_extrapolation(
+            m_ext,
+            cache,
             output_scale_sqrtm=output_scale_sqrtm,
-            m0_p=m0_p,
-            m_ext=m_ext,
-            m_ext_p=m_ext_p,
             p=p,
             p_inv=p_inv,
             posterior_previous=state.posterior,
@@ -102,8 +101,9 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         return a, (corrected_seq, b)
 
     def _complete_extrapolation(
-        self, *, output_scale_sqrtm, m0_p, m_ext, m_ext_p, p, p_inv, posterior_previous
+        self, m_ext, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
     ):
+        m_ext_p, m0_p = cache
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=posterior_previous.init.cov_sqrtm_lower,

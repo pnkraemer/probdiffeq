@@ -53,7 +53,7 @@ class _FilterCommon(_common.Strategy):
         dt = t - s0.t
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self._extrapolate_mean(state=s0, p=p, p_inv=p_inv)
+        m_ext, cache = self._extrapolate_mean(posterior=s0.posterior, p=p, p_inv=p_inv)
         extrapolated = self._complete_extrapolation(
             m_ext,
             cache,
@@ -78,11 +78,9 @@ class _FilterCommon(_common.Strategy):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol.u, sol.marginals
 
-    # todo: shouldn't this operate on the mean as an input?
-    #  or at least on the posterior?
-    def _extrapolate_mean(self, *, state, p_inv, p):
+    def _extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, *_ = self.implementation.extrapolate_mean(
-            state.posterior.mean, p=p, p_inv=p_inv
+            posterior.mean, p=p, p_inv=p_inv
         )
         return m_ext, ()
 
@@ -130,7 +128,9 @@ class DynamicFilter(_FilterCommon):
         t_new = state.t + dt
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self._extrapolate_mean(state=state, p_inv=p_inv, p=p)
+        m_ext, cache = self._extrapolate_mean(
+            posterior=state.posterior, p_inv=p_inv, p=p
+        )
 
         m_obs, linear_fn = info_op(x=m_ext, t=t_new, p=parameters)
         error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
@@ -179,7 +179,9 @@ class Filter(_FilterCommon):
         """Step."""
         # Pre-error-estimate steps
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-        m_ext, cache = self._extrapolate_mean(state=state, p_inv=p_inv, p=p)
+        m_ext, cache = self._extrapolate_mean(
+            posterior=state.posterior, p_inv=p_inv, p=p
+        )
 
         # Linearise and estimate error
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)

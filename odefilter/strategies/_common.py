@@ -305,15 +305,21 @@ class DynamicSmootherCommon(Strategy):
 
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
+            m_ext_p=m_ext_p,
+            m0_p=m0_p,
             l0=rv.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
-            m0_p=m0_p,
-            m_ext_p=m_ext_p,
         )
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model  # should this return a MarkovSequence?
+
+    def _extrapolate_mean(self, *, posterior, p_inv, p):
+        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+            posterior.init.mean, p=p, p_inv=p_inv
+        )
+        return m_ext, (m_ext_p, m0_p)
 
     # Not implemented yet:
 
