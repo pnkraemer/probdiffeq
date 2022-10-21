@@ -58,7 +58,7 @@ class _FilterCommon(_common.Strategy):
         )
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
-            l0=s0.marginals.cov_sqrtm_lower,
+            l0=s0.posterior.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=s1.output_scale_sqrtm,  # right-including intervals
@@ -79,10 +79,12 @@ class _FilterCommon(_common.Strategy):
         _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
         return sol.u, sol.marginals
 
-    def _complete_extrapolation(self, *, output_scale_sqrtm, l0, m_ext, p, p_inv):
+    def _complete_extrapolation(
+        self, *, output_scale_sqrtm, posterior_previous, m_ext, p, p_inv
+    ):
         extrapolated = self.implementation.complete_extrapolation(
             m_ext=m_ext,
-            l0=l0,
+            l0=posterior_previous.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -114,7 +116,7 @@ class DynamicFilter(_FilterCommon):
 
         # Extrapolate the mean
         m_ext, _, _ = self.implementation.extrapolate_mean(
-            state.marginals.mean, p=p, p_inv=p_inv
+            state.posterior.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -127,7 +129,7 @@ class DynamicFilter(_FilterCommon):
 
         extrapolated = self._complete_extrapolation(
             output_scale_sqrtm=output_scale_sqrtm,
-            l0=state.marginals.cov_sqrtm_lower,
+            posterior_previous=state.posterior,
             m_ext=m_ext,
             p=p,
             p_inv=p_inv,
@@ -168,7 +170,7 @@ class Filter(_FilterCommon):
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
         # Extrapolate the mean
         m_ext, _, _ = self.implementation.extrapolate_mean(
-            state.marginals.mean, p=p, p_inv=p_inv
+            state.posterior.mean, p=p, p_inv=p_inv
         )
 
         # Linearise the differential equation.
@@ -181,7 +183,7 @@ class Filter(_FilterCommon):
 
         extrapolated = self._complete_extrapolation(
             output_scale_sqrtm=1.0,
-            l0=state.marginals.cov_sqrtm_lower,
+            posterior_previous=state.posterior,
             m_ext=m_ext,
             p=p,
             p_inv=p_inv,
@@ -223,7 +225,7 @@ class Filter(_FilterCommon):
             state.output_scale_sqrtm
         )
         marginals = self.implementation.scale_covariance(
-            rv=state.marginals, scale_sqrtm=output_scale_sqrtm
+            rv=state.posterior, scale_sqrtm=output_scale_sqrtm
         )
         return _common.Solution(
             t=state.t,
@@ -238,7 +240,7 @@ class Filter(_FilterCommon):
     def extract_terminal_value_fn(self, *, state):
         output_scale_sqrtm = state.output_scale_sqrtm
         marginals = self.implementation.scale_covariance(
-            rv=state.marginals, scale_sqrtm=output_scale_sqrtm
+            rv=state.posterior, scale_sqrtm=output_scale_sqrtm
         )
         return _common.Solution(
             t=state.t,

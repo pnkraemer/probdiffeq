@@ -70,7 +70,7 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
             m_ext_p=m_ext_p,
             p=p,
             p_inv=p_inv,
-            l0=state.posterior.init.cov_sqrtm_lower,
+            posterior_previous=state.posterior,
         )
 
         # Final observation
@@ -102,11 +102,11 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         return a, (corrected_seq, b)
 
     def _complete_extrapolation(
-        self, *, output_scale_sqrtm, m0_p, m_ext, m_ext_p, p, p_inv, l0
+        self, *, output_scale_sqrtm, m0_p, m_ext, m_ext_p, p, p_inv, posterior_previous
     ):
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=l0,
+            l0=posterior_previous.init.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,

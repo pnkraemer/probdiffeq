@@ -64,8 +64,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
 
         # Complete extrapolation and condense backward models
         extrapolated = self._complete_extrapolation(
-            bw_model_previous=state.posterior.backward_model,
-            l0=state.posterior.init.cov_sqrtm_lower,
+            posterior_previous=state.posterior,
             m0_p=m0_p,
             m_ext=m_ext,
             m_ext_p=m_ext_p,
@@ -103,20 +102,11 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
         return a, (corrected_seq, b)
 
     def _complete_extrapolation(
-        self,
-        *,
-        bw_model_previous,
-        l0,
-        m0_p,
-        m_ext,
-        m_ext_p,
-        output_scale_sqrtm,
-        p,
-        p_inv
+        self, *, posterior_previous, m0_p, m_ext, m_ext_p, output_scale_sqrtm, p, p_inv
     ):
         x = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
-            l0=l0,
+            l0=posterior_previous.init.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -129,7 +119,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
         )
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment,
-            bw_init=bw_model_previous,
+            bw_init=posterior_previous.backward_model,
         )
         backward_model = _common.BackwardModel(transition=gain, noise=noise)
         return _common.MarkovSequence(init=extrapolated, backward_model=backward_model)
