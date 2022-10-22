@@ -1,8 +1,7 @@
 """Inference interface."""
 
 import abc
-from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -13,12 +12,12 @@ T = TypeVar("T")
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class BackwardModel(Generic[T]):
     """Backward model for backward-Gauss--Markov process representations."""
 
-    transition: Any
-    noise: T
+    def __init__(self, *, transition: Any, noise: T):
+        self.transition = transition
+        self.noise = noise
 
     def tree_flatten(self):
         children = self.transition, self.noise
@@ -27,16 +26,17 @@ class BackwardModel(Generic[T]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class MarkovSequence(Generic[T]):
     """Markov sequence."""
 
-    init: T
-    backward_model: BackwardModel[T]
+    def __init__(self, *, init: T, backward_model: BackwardModel[T]):
+        self.init = init
+        self.backward_model = backward_model
 
     def tree_flatten(self):
         children = (self.init, self.backward_model)
@@ -50,24 +50,27 @@ class MarkovSequence(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class Solution(Generic[T]):
     """Inferred solutions."""
 
-    t: float
-    t_previous: float
-
-    u: Any
-
-    output_scale_sqrtm: float
-
-    # todo: either marginals or posterior are plenty?
-    #  But what should the extract_fn do with smoothing?
-    #  Which value should be filled if these go?
-    marginals: T
-    posterior: MarkovSequence[T]
-
-    num_data_points: float  # todo: make int
+    def __init__(
+        self,
+        *,
+        t,
+        t_previous,
+        u,
+        output_scale_sqrtm,
+        marginals: T,
+        posterior: Union[T, MarkovSequence[T]],
+        num_data_points: float,
+    ):
+        self.t = t
+        self.t_previous = t_previous
+        self.u = u
+        self.output_scale_sqrtm = output_scale_sqrtm
+        self.marginals = marginals
+        self.posterior = posterior
+        self.num_data_points = num_data_points
 
     def tree_flatten(self):
         children = (
@@ -129,11 +132,12 @@ class Solution(Generic[T]):
             yield self[i]
 
 
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    implementation: Any
+    def __init__(self, *, implementation):
+        self.implementation = implementation
 
     # Abstract methods
 
@@ -187,7 +191,8 @@ class Strategy(abc.ABC):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+        (implementation,) = children
+        return cls(implementation=implementation)
 
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise."""
@@ -308,8 +313,7 @@ class Strategy(abc.ABC):
         return smoothing_solution, dt * error_estimate
 
 
-@jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class  # is this necessary?
 class DynamicSmootherCommon(Strategy):
     """Common functionality for smoother-style algorithms."""
 

@@ -1,6 +1,5 @@
 """Inference via filters."""
 import abc
-from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
@@ -10,7 +9,6 @@ from odefilter.strategies import _common
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class _FilterCommon(_common.Strategy):
 
     # Interfaces
@@ -107,7 +105,6 @@ class _FilterCommon(_common.Strategy):
 # Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
 #  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class DynamicFilter(_FilterCommon):
     """Filter implementation (time-constant output-scale)."""
 
@@ -135,7 +132,6 @@ class DynamicFilter(_FilterCommon):
 # Todo: In its current form, wouldn't this be a template for a DynamicSolver()?
 #  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class Filter(_FilterCommon):
     """Filter implementation with dynamic calibration (time-varying output-scale)."""
 

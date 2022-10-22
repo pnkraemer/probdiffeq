@@ -1,6 +1,5 @@
 """Inference via smoothing."""
 
-from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
@@ -14,7 +13,6 @@ from odefilter.strategies import _common
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
 class DynamicSmoother(_common.DynamicSmootherCommon):
     """Smoother implementation with dynamic calibration (time-varying output-scale)."""
 
