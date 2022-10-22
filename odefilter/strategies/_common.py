@@ -334,7 +334,7 @@ class NonDynamicSolver(Solver):
             posterior_previous=state.posterior,
             p=p,
             p_inv=p_inv,
-        )  # This is the only filter/smoother consideration!
+        )
 
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
@@ -471,66 +471,16 @@ class Strategy(abc.ABC):
         return cls(implementation=implementation)
 
 
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-
-
-@jax.tree_util.register_pytree_node_class  # is this necessary?
-class DynamicSmootherCommon(DynamicSolver):
-    """Common functionality for smoother-style algorithms."""
+class SmootherStrategyCommon(Strategy):
 
     # Inherited abstract methods
 
     @abc.abstractmethod
-    def _case_interpolate(self, *, s0, s1, t):
+    def case_interpolate(self, *, s0, s1, t):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _case_right_corner(self, *, s0, s1, t):
+    def case_right_corner(self, *, s0, s1, t):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -538,14 +488,12 @@ class DynamicSmootherCommon(DynamicSolver):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _complete_extrapolation(
+    def complete_extrapolation(
         self, m_ext, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
     ):
         raise NotImplementedError
 
-    # Implementations
-
-    def _init_posterior(self, *, corrected):
+    def init_posterior(self, *, corrected):
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
         backward_model = BackwardModel(
@@ -555,20 +503,13 @@ class DynamicSmootherCommon(DynamicSolver):
         posterior = MarkovSequence(init=corrected, backward_model=backward_model)
         return posterior
 
-    def step_fn(self, *, state, info_op, dt, parameters):
-        """Step."""
-        return self._step_fn_dynamic(
-            state=state, info_op=info_op, dt=dt, parameters=parameters
-        )
-
-    def _extrapolate_mean(self, *, posterior, p_inv, p):
+    def extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
             posterior.init.mean, p=p, p_inv=p_inv
         )
         return m_ext, (m_ext_p, m0_p)
 
-    # Smoother stuff
-    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
+    def final_correction(self, *, extrapolated, linear_fn, m_obs):
         a, (corrected, b) = self.implementation.final_correction(
             extrapolated=extrapolated.init, linear_fn=linear_fn, m_obs=m_obs
         )
@@ -577,41 +518,37 @@ class DynamicSmootherCommon(DynamicSolver):
         )
         return a, (corrected_seq, b)
 
-    def _extract_sol(self, x, /):
+    def extract_sol(self, x, /):
         return self.implementation.extract_sol(rv=x.init)
 
-    # Smoother stuff
+    def marginals_terminal_value(self, *, posterior):
+        return posterior.init
 
-    def extract_fn(self, *, state):  # noqa: D102
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], state.posterior.init)
+    def marginals(self, *, posterior):
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
         marginals = self.implementation.marginalise_backwards(
             init=init,
-            linop=state.posterior.backward_model.transition,
-            noise=state.posterior.backward_model.noise,
+            linop=posterior.backward_model.transition,
+            noise=posterior.backward_model.noise,
         )
-        sol = self.implementation.extract_sol(rv=marginals)
-        return Solution(
-            t=state.t,
-            t_previous=state.t_previous,
-            u=sol,
-            posterior=state.posterior,
-            marginals=marginals,
-            output_scale_sqrtm=state.output_scale_sqrtm,
-            num_data_points=state.num_data_points,
+        return marginals
+
+    def scale_marginals(self, marginals, output_scale_sqrtm):
+        return self.implementation.scale_covariance(
+            rv=marginals, scale_sqrtm=output_scale_sqrtm
         )
 
-    # smoother stuff
-
-    def extract_terminal_value_fn(self, *, state):  # noqa: D102
-        return Solution(
-            t=state.t,
-            t_previous=state.t_previous,
-            u=state.u,
-            posterior=state.posterior,
-            marginals=state.posterior.init,  # we are at the terminal state only
-            output_scale_sqrtm=state.output_scale_sqrtm,
-            num_data_points=state.num_data_points,
+    def scale_posterior(self, posterior, output_scale_sqrtm):
+        init = self.implementation.scale_covariance(
+            rv=posterior.init, scale_sqrtm=output_scale_sqrtm
         )
+        noise = self.implementation.scale_covariance(
+            rv=posterior.backward_model.noise, scale_sqrtm=output_scale_sqrtm
+        )
+        bw_model = BackwardModel(
+            transition=posterior.backward_model.transition, noise=noise
+        )
+        return MarkovSequence(init=init, backward_model=bw_model)
 
     # Auxiliary routines that are the same among all subclasses
 
@@ -652,3 +589,8 @@ class DynamicSmootherCommon(DynamicSolver):
         )
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model  # should this return a MarkovSequence?
+
+
+@jax.tree_util.register_pytree_node_class  # is this necessary?
+class DynamicSmootherCommon(DynamicSolver):
+    """Common functionality for smoother-style algorithms."""

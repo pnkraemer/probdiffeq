@@ -102,8 +102,6 @@ class FilterStrategy(_common.Strategy):
         )
 
 
-# Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
-#  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
 @jax.tree_util.register_pytree_node_class
 class DynamicFilter(_common.DynamicSolver):
     """Filter implementation (time-constant output-scale)."""

@@ -7,14 +7,28 @@ import jax.tree_util
 from odefilter.strategies import _common
 
 
-# Todo: this is kind of the templatefor fixed-point-smoothers,
-#  isn't it? If I call complete_extrapolation
-#  with output_scale=1., then this bad boy becomes non-dynamic.
 @jax.tree_util.register_pytree_node_class
-class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
-    """Smoother implementation with dynamic calibration (time-varying output-scale)."""
+class DynamicFixedPointSmoother(_common.DynamicSolver):
+    """Filter implementation (time-constant output-scale)."""
 
-    def _complete_extrapolation(
+    def __init__(self, *, implementation):
+        strategy = FixedPointSmootherStrategy(implementation=implementation)
+        super().__init__(strategy=strategy)
+
+    def tree_flatten(self):
+        children = (self.strategy.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (implementation,) = children
+        return cls(implementation=implementation)
+
+
+@jax.tree_util.register_pytree_node_class
+class FixedPointSmootherStrategy(_common.SmootherStrategyCommon):
+    def complete_extrapolation(
         self, m_ext, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
     ):
         m_ext_p, m0_p = cache
@@ -38,7 +52,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
         backward_model = _common.BackwardModel(transition=gain, noise=noise)
         return _common.MarkovSequence(init=extrapolated, backward_model=backward_model)
 
-    def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
+    def case_right_corner(self, *, s0, s1, t):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
 
@@ -65,7 +79,7 @@ class DynamicFixedPointSmoother(_common.DynamicSmootherCommon):
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, *, s0, s1, t):  # noqa: D102
+    def case_interpolate(self, *, s0, s1, t):  # noqa: D102
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
