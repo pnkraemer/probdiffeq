@@ -20,7 +20,7 @@ def smoother_fixedpoint_smoother_pair_eks0(n):
 @parametrize_with_cases(
     "eks, fixedpoint_eks", cases=".", prefix="smoother_fixedpoint_smoother_pair_"
 )
-@parametrize("k", [2, 5])  # k * N // 2 off-grid points
+@parametrize("k", [1, 3])  # k * N // 2 off-grid points
 def test_smoothing_checkpoint_equals_solver_state(
     vf, u0, t0, t1, p, eks, fixedpoint_eks, k
 ):
