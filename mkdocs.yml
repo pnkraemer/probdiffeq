@@ -85,10 +85,10 @@ nav:
     - Advanced API Documentation:
         - "api_docs_advanced/odefilters.md"
         - "api_docs_advanced/controls.md"
+        - "api_docs_advanced/solvers.md"
         - Inference strategies:
           - "api_docs_advanced/strategies/filters.md"
           - "api_docs_advanced/strategies/smoothers.md"
-          - "api_docs_advanced/strategies/fixedpoint.md"
         - Solver implementations:
           - "api_docs_advanced/implementations/dense.md"
           - "api_docs_advanced/implementations/isotropic.md"

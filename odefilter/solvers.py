@@ -94,7 +94,7 @@ class Solution(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-class Solver(abc.ABC):
+class _Solver(abc.ABC):
     """Inference strategy interface."""
 
     def __init__(self, *, strategy):
@@ -206,7 +206,7 @@ class Solver(abc.ABC):
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class DynamicSolver(Solver):
+class DynamicSolver(_Solver):
     """Dynamic calibration."""
 
     def step_fn(self, *, state, info_op, dt, parameters):
@@ -278,7 +278,7 @@ class DynamicSolver(Solver):
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class NonDynamicSolver(Solver):
+class NonDynamicSolver(_Solver):
     """Standard calibration. Nothing dynamic."""
 
     def step_fn(self, *, state, info_op, dt, parameters):
