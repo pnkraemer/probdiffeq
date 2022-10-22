@@ -6,7 +6,7 @@ from typing import Any, Generic, TypeVar
 import jax
 import jax.tree_util
 
-from odefilter.strategies import _solver, _strategy
+from odefilter.strategies import _strategy, solvers
 
 # todo: nothing in here should operate on "Solution"-types!
 
@@ -167,7 +167,7 @@ class _SmootherStrategyCommon(_strategy.Strategy):
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
 
         posterior = MarkovSequence(init=state.posterior.init, backward_model=bw_model)
-        state1 = _solver.Solution(
+        state1 = solvers.Solution(
             t=t,
             t_previous=t,  # identity transition: this is what it does...
             u=state.u,
@@ -201,7 +201,7 @@ class SmootherStrategy(_SmootherStrategyCommon):
 
     def case_right_corner(self, *, s0, s1, t):  # s1.t == t
         accepted = self._duplicate_with_unit_backward_model(state=s1, t=t)
-        previous = _solver.Solution(
+        previous = solvers.Solution(
             t=t,
             t_previous=s0.t,
             u=s1.u,
@@ -239,7 +239,7 @@ class SmootherStrategy(_SmootherStrategyCommon):
 
         # This is the new solution object at t.
         sol = self.implementation.extract_sol(rv=extrapolated0)
-        solution = _solver.Solution(
+        solution = solvers.Solution(
             t=t,
             t_previous=s0.t,
             u=sol,
@@ -254,7 +254,7 @@ class SmootherStrategy(_SmootherStrategyCommon):
         # does not condense.
         previous = solution
 
-        accepted = _solver.Solution(
+        accepted = solvers.Solution(
             t=s1.t,
             t_previous=t,
             u=s1.u,
@@ -277,7 +277,7 @@ class SmootherStrategy(_SmootherStrategyCommon):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicSmoother(_solver.DynamicSolver):
+class DynamicSmoother(solvers.DynamicSolver):
     """Filter implementation (time-constant output-scale)."""
 
     def __init__(self, *, implementation):
@@ -334,7 +334,7 @@ class FixedPointSmootherStrategy(_SmootherStrategyCommon):
         posterior1 = MarkovSequence(
             init=s1.posterior.init, backward_model=backward_model1
         )
-        solution = _solver.Solution(
+        solution = solvers.Solution(
             t=t,
             t_previous=s0.t_previous,  # condensed the model...
             u=s1.u,
@@ -374,7 +374,7 @@ class FixedPointSmootherStrategy(_SmootherStrategyCommon):
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
         posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
         sol = self.implementation.extract_sol(rv=extrapolated0)
-        solution = _solver.Solution(
+        solution = solvers.Solution(
             t=t,
             t_previous=s0.t_previous,  # condensed the model...
             u=sol,
@@ -394,7 +394,7 @@ class FixedPointSmootherStrategy(_SmootherStrategyCommon):
         posterior1 = MarkovSequence(
             init=s1.posterior.init, backward_model=backward_model1
         )
-        accepted = _solver.Solution(
+        accepted = solvers.Solution(
             t=s1.t,
             t_previous=t,  # new model! No condensing...
             u=s1.u,
@@ -410,7 +410,7 @@ class FixedPointSmootherStrategy(_SmootherStrategyCommon):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicFixedPointSmoother(_solver.DynamicSolver):
+class DynamicFixedPointSmoother(solvers.DynamicSolver):
     """Filter implementation (time-constant output-scale)."""
 
     def __init__(self, *, implementation):
