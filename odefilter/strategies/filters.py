@@ -65,6 +65,16 @@ class FilterStrategy(_common.Strategy):
     def marginals_terminal_value(self, *, posterior):
         return posterior
 
+    def scale_marginals(self, marginals, output_scale_sqrtm):
+        return self.implementation.scale_covariance(
+            rv=marginals, scale_sqrtm=output_scale_sqrtm
+        )
+
+    def scale_posterior(self, posterior, output_scale_sqrtm):
+        return self.implementation.scale_covariance(
+            rv=posterior, scale_sqrtm=output_scale_sqrtm
+        )
+
     def extract_sol(self, x, /):
         return self.implementation.extract_sol(rv=x)
 
@@ -90,29 +100,6 @@ class FilterStrategy(_common.Strategy):
         return self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-
-
-# @jax.tree_util.register_pytree_node_class
-# class _FilterCommon(_common.Solver):
-#
-#     def _extrapolate_mean(self, *, posterior, p_inv, p):
-#         m_ext, *_ = self.implementation.extrapolate_mean(
-#             posterior.mean, p=p, p_inv=p_inv
-#         )
-#         return m_ext, ()
-#
-#     def _complete_extrapolation(
-#         self, m_ext, _cache, *, output_scale_sqrtm, posterior_previous, p, p_inv
-#     ):
-#         extrapolated = self.implementation.complete_extrapolation(
-#             m_ext=m_ext,
-#             l0=posterior_previous.cov_sqrtm_lower,
-#             p=p,
-#             p_inv=p_inv,
-#             output_scale_sqrtm=output_scale_sqrtm,
-#         )
-#         return extrapolated
-#
 
 
 # Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
@@ -153,10 +140,3 @@ class Filter(_common.NonDynamicSolver):
     def tree_unflatten(cls, _aux, children):
         (implementation,) = children
         return cls(implementation=implementation)
-
-
-# Todo: In its current form, wouldn't this be a template for a DynamicSolver()?
-#  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
-# @jax.tree_util.register_pytree_node_class
-class __Filter:
-    """Filter implementation with dynamic calibration (time-varying output-scale)."""

@@ -367,23 +367,26 @@ class NonDynamicSolver(Solver):
         return new_output_scale_sqrtm
 
     def extract_fn(self, *, state):  # noqa: D102
-        output_scale_sqrtm = state.output_scale_sqrtm[-1] * jnp.ones_like(
-            state.output_scale_sqrtm
-        )
 
-        # This would be different for different filters/smoothers, I suppose.
-        # todo: this does not scale the marginal! Currently it is incorrect!
-        # todo: let the strategy compute the marginals!
-        marginals = self.strategy.implementation.scale_covariance(
-            rv=state.posterior, scale_sqrtm=output_scale_sqrtm
-        )
+        marginals = self.strategy.marginals(posterior=state.posterior)
+        s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
+
+        marginals = self.strategy.scale_marginals(marginals, s)
+        posterior = self.strategy.scale_posterior(state.posterior, s)
+
+        # # This would be different for different filters/smoothers, I suppose.
+        # # todo: this does not scale the marginal! Currently it is incorrect!
+        # # todo: let the strategy compute the marginals!
+        # marginals = self.strategy.implementation.scale_covariance(
+        #     rv=state.posterior, scale_sqrtm=output_scale_sqrtm
+        # )
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,  # new!
-            posterior=marginals,
-            output_scale_sqrtm=output_scale_sqrtm,
+            posterior=posterior,  # new!
+            output_scale_sqrtm=s,  # new!
             num_data_points=state.num_data_points,
         )
 
@@ -418,7 +421,7 @@ class Strategy(abc.ABC):
 
     @abc.abstractmethod
     def extract_sol(self, x, /):
-        raise NotImplementedError  # for dynamic filters/smoothers
+        raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(self, *, s0, s1, t):
@@ -429,11 +432,11 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginals(self, *, posterior):
+    def marginals(self, *, posterior):  # todo: rename to marginalise?
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginals_terminal_value(self, *, posterior):
+    def marginals_terminal_value(self, *, posterior):  # todo: rename to marginalise?
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -454,32 +457,13 @@ class Strategy(abc.ABC):
     def final_correction(self, *, extrapolated, linear_fn, m_obs):
         raise NotImplementedErro
 
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
+    @abc.abstractmethod
+    def scale_marginals(self, marginals, output_scale_sqrtm):
+        raise NotImplementedError
 
-    # Implementations
+    @abc.abstractmethod
+    def scale_posterior(self, posterior, output_scale_sqrtm):
+        raise NotImplementedError
 
     def tree_flatten(self):
         children = (self.implementation,)
@@ -490,10 +474,6 @@ class Strategy(abc.ABC):
     def tree_unflatten(cls, _aux, children):
         (implementation,) = children
         return cls(implementation=implementation)
-
-    # Functions that are shared by all subclasses
-
-    # todo: this should be its own solver eventually?!
 
 
 #
