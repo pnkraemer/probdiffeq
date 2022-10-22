@@ -74,8 +74,11 @@ class FilterStrategy(_common.Strategy):
             rv=posterior, scale_sqrtm=output_scale_sqrtm
         )
 
-    def extract_sol(self, *, posterior):
+    def extract_sol_terminal_value(self, *, posterior):
         return self.implementation.extract_sol(rv=posterior)
+
+    def extract_sol_from_marginals(self, *, marginals):
+        return self.implementation.extract_sol(rv=marginals)
 
     def extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, *_ = self.implementation.extrapolate_mean(

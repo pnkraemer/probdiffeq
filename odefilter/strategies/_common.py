@@ -159,7 +159,7 @@ class Solver(abc.ABC):
         )
 
         posterior = self.strategy.init_posterior(corrected=corrected)
-        sol = self.strategy.extract_sol(posterior)
+        sol = self.strategy.extract_sol_terminal_value(posterior=posterior)
 
         solution = Solution(
             t=t0,
@@ -183,7 +183,7 @@ class Solver(abc.ABC):
         ]
 
         # Which case applies
-        is_right_corner = (s1.t - t) ** 2 <= 1e-10
+        is_right_corner = (s1.t - t) ** 2 <= 1e-10  # todo: magic constant?
         is_in_between = jnp.logical_not(is_right_corner)
 
         index_as_array, *_ = jnp.where(
@@ -216,10 +216,10 @@ class Solver(abc.ABC):
         solution_right = solution[indices]
 
         # Vmap to the rescue :) It does not like kw-only arguments, though.
-        def offgrid_no_kw(sprev, t, s):
+        @jax.vmap
+        def marginals_vmap(sprev, t, s):
             return self.strategy.offgrid_marginals(t=t, state=s, state_previous=sprev)
 
-        marginals_vmap = jax.vmap(offgrid_no_kw)
         return marginals_vmap(solution_left, ts, solution_right)
 
     def offgrid_marginals(self, **kwargs):
@@ -237,18 +237,17 @@ class Solver(abc.ABC):
         return cls(strategy=strategy)
 
     def _estimate_error(self, linear_fn, m_obs, p):
-        (
-            output_scale_sqrtm,
-            error_estimate,
-        ) = self.strategy.implementation.estimate_error(
+        scale_sqrtm, error_est = self.strategy.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
-        error_estimate = error_estimate * output_scale_sqrtm
-        return error_estimate, output_scale_sqrtm
+        error_est = error_est * scale_sqrtm
+        return error_est, scale_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
 class DynamicSolver(Solver):
+    """Dynamic calibration."""
+
     def step_fn(self, *, state, info_op, dt, parameters):
         p, p_inv = self.strategy.implementation.assemble_preconditioner(dt=dt)
 
@@ -274,7 +273,7 @@ class DynamicSolver(Solver):
         )
 
         # Return solution
-        sol = self.strategy.extract_sol(corrected)
+        sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
         smoothing_solution = Solution(
             t=state.t + dt,
             t_previous=state.t,
@@ -288,11 +287,14 @@ class DynamicSolver(Solver):
         return smoothing_solution, dt * error_estimate
 
     def extract_fn(self, *, state):  # noqa: D102
+
         marginals = self.strategy.marginals(posterior=state.posterior)
+        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
-            u=state.u,
+            u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -301,10 +303,12 @@ class DynamicSolver(Solver):
 
     def extract_terminal_value_fn(self, *, state):  # noqa: D102
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
-            u=state.u,
+            u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -314,6 +318,8 @@ class DynamicSolver(Solver):
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
 class NonDynamicSolver(Solver):
+    """Standard calibration. Nothing dynamic."""
+
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         # Pre-error-estimate steps
@@ -346,7 +352,7 @@ class NonDynamicSolver(Solver):
         )
 
         # Extract and return solution
-        sol = self.strategy.extract_sol(corrected)
+        sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
         filtered = Solution(
             t=state.t + dt,
             t_previous=state.t,
@@ -360,24 +366,21 @@ class NonDynamicSolver(Solver):
 
     def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
         evidence_sqrtm = self.strategy.implementation.evidence_sqrtm(observed=obs)
-        diffsqrtm_new = self.strategy.implementation.sum_sqrt_scalars(
-            jnp.sqrt(n) * diffsqrtm, evidence_sqrtm
-        )
-        new_output_scale_sqrtm = jnp.reshape(diffsqrtm_new, ()) / jnp.sqrt(n + 1)
-        return new_output_scale_sqrtm
+        return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):  # noqa: D102
 
         marginals = self.strategy.marginals(posterior=state.posterior)
         s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
 
-        marginals = self.strategy.scale_marginals(marginals, s)
-        posterior = self.strategy.scale_posterior(state.posterior, s)
+        marginals = self.strategy.scale_marginals(marginals, output_scale_sqrtm=s)
+        posterior = self.strategy.scale_posterior(state.posterior, output_scale_sqrtm=s)
 
+        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
-            u=state.u,
+            u=u,
             marginals=marginals,  # new!
             posterior=posterior,  # new!
             output_scale_sqrtm=s,  # new!
@@ -385,17 +388,17 @@ class NonDynamicSolver(Solver):
         )
 
     def extract_terminal_value_fn(self, *, state):
-
-        marginals = self.strategy.marginals(posterior=state.posterior)
+        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         s = state.output_scale_sqrtm
 
-        marginals = self.strategy.scale_marginals(marginals, s)
-        posterior = self.strategy.scale_posterior(state.posterior, s)
+        marginals = self.strategy.scale_marginals(marginals, output_scale_sqrtm=s)
+        posterior = self.strategy.scale_posterior(state.posterior, output_scale_sqrtm=s)
 
+        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
-            u=state.u,
+            u=u,
             marginals=marginals,  # new!
             posterior=posterior,  # new!
             output_scale_sqrtm=s,  # new!
@@ -415,7 +418,11 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_sol(self, x, /):
+    def extract_sol_terminal_value(self, *, posterior):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_sol_from_marginals(self, *, marginals):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -453,11 +460,11 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_marginals(self, marginals, output_scale_sqrtm):
+    def scale_marginals(self, marginals, *, output_scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_posterior(self, posterior, output_scale_sqrtm):
+    def scale_posterior(self, posterior, *, output_scale_sqrtm):
         raise NotImplementedError
 
     def tree_flatten(self):
@@ -472,6 +479,7 @@ class Strategy(abc.ABC):
 
 
 class SmootherStrategyCommon(Strategy):
+    """Common functionality for smoothers."""
 
     # Inherited abstract methods
 
@@ -518,8 +526,11 @@ class SmootherStrategyCommon(Strategy):
         )
         return a, (corrected_seq, b)
 
-    def extract_sol(self, x, /):
-        return self.implementation.extract_sol(rv=x.init)
+    def extract_sol_terminal_value(self, *, posterior):
+        return self.implementation.extract_sol(rv=posterior.init)
+
+    def extract_sol_from_marginals(self, *, marginals):
+        return self.implementation.extract_sol(rv=marginals)
 
     def marginals_terminal_value(self, *, posterior):
         return posterior.init
@@ -533,42 +544,25 @@ class SmootherStrategyCommon(Strategy):
         )
         return marginals
 
-    def scale_marginals(self, marginals, output_scale_sqrtm):
+    def scale_marginals(self, marginals, *, output_scale_sqrtm):
         return self.implementation.scale_covariance(
             rv=marginals, scale_sqrtm=output_scale_sqrtm
         )
 
-    def scale_posterior(self, posterior, output_scale_sqrtm):
+    def scale_posterior(self, posterior, *, output_scale_sqrtm):
         init = self.implementation.scale_covariance(
             rv=posterior.init, scale_sqrtm=output_scale_sqrtm
         )
         noise = self.implementation.scale_covariance(
             rv=posterior.backward_model.noise, scale_sqrtm=output_scale_sqrtm
         )
+
         bw_model = BackwardModel(
             transition=posterior.backward_model.transition, noise=noise
         )
         return MarkovSequence(init=init, backward_model=bw_model)
 
     # Auxiliary routines that are the same among all subclasses
-
-    def _duplicate_with_unit_backward_model(self, *, state, t):
-        bw_transition0 = self.implementation.init_backward_transition()
-        bw_noise0 = self.implementation.init_backward_noise(
-            rv_proto=state.posterior.backward_model.noise
-        )
-        bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
-        posterior = MarkovSequence(init=state.posterior.init, backward_model=bw_model)
-        state1 = Solution(
-            t=t,
-            t_previous=t,  # identity transition: this is what it does...
-            u=state.u,
-            posterior=posterior,
-            marginals=state.marginals,
-            output_scale_sqrtm=state.output_scale_sqrtm,
-            num_data_points=state.num_data_points,
-        )
-        return state1
 
     def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
@@ -590,7 +584,21 @@ class SmootherStrategyCommon(Strategy):
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model  # should this return a MarkovSequence?
 
+    def _duplicate_with_unit_backward_model(self, *, state, t):
+        bw_transition0 = self.implementation.init_backward_transition()
+        bw_noise0 = self.implementation.init_backward_noise(
+            rv_proto=state.posterior.backward_model.noise
+        )
+        bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
 
-@jax.tree_util.register_pytree_node_class  # is this necessary?
-class DynamicSmootherCommon(DynamicSolver):
-    """Common functionality for smoother-style algorithms."""
+        posterior = MarkovSequence(init=state.posterior.init, backward_model=bw_model)
+        state1 = Solution(
+            t=t,
+            t_previous=t,  # identity transition: this is what it does...
+            u=state.u,
+            posterior=posterior,
+            marginals=state.marginals,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+        return state1

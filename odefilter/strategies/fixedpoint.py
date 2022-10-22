@@ -8,31 +8,14 @@ from odefilter.strategies import _common
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicFixedPointSmoother(_common.DynamicSolver):
-    """Filter implementation (time-constant output-scale)."""
-
-    def __init__(self, *, implementation):
-        strategy = FixedPointSmootherStrategy(implementation=implementation)
-        super().__init__(strategy=strategy)
-
-    def tree_flatten(self):
-        children = (self.strategy.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
-
-
-@jax.tree_util.register_pytree_node_class
 class FixedPointSmootherStrategy(_common.SmootherStrategyCommon):
+    """Fixed-point smoother."""
+
     def complete_extrapolation(
         self, m_ext, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
     ):
         m_ext_p, m0_p = cache
-        x = self.implementation.revert_markov_kernel(
+        extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             m_ext=m_ext,
             l0=posterior_previous.init.cov_sqrtm_lower,
             p=p,
@@ -41,21 +24,20 @@ class FixedPointSmootherStrategy(_common.SmootherStrategyCommon):
             m0_p=m0_p,
             m_ext_p=m_ext_p,
         )
-        extrapolated, (backward_noise, backward_op) = x
-        bw_increment = _common.BackwardModel(
-            transition=backward_op, noise=backward_noise
-        )
+        bw_increment = _common.BackwardModel(transition=bw_op, noise=bw_noise)
+
         noise, gain = self.implementation.condense_backward_models(
             bw_state=bw_increment,
             bw_init=posterior_previous.backward_model,
         )
         backward_model = _common.BackwardModel(transition=gain, noise=noise)
+
         return _common.MarkovSequence(init=extrapolated, backward_model=backward_model)
 
     def case_right_corner(self, *, s0, s1, t):  # s1.t == t
+
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-
         backward_model1 = s1.posterior.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
             bw_init=s0.posterior.backward_model, bw_state=backward_model1
@@ -116,7 +98,7 @@ class FixedPointSmootherStrategy(_common.SmootherStrategyCommon):
             num_data_points=s1.num_data_points,
         )
 
-        # new model! no condensing...
+        # This is what we interpolate from next.
         previous = self._duplicate_with_unit_backward_model(state=solution, t=t)
 
         # From t to s1.t
@@ -139,3 +121,22 @@ class FixedPointSmootherStrategy(_common.SmootherStrategyCommon):
 
     def offgrid_marginals(self, *, t, state, state_previous):
         raise NotImplementedError
+
+
+@jax.tree_util.register_pytree_node_class
+class DynamicFixedPointSmoother(_common.DynamicSolver):
+    """Filter implementation (time-constant output-scale)."""
+
+    def __init__(self, *, implementation):
+        strategy = FixedPointSmootherStrategy(implementation=implementation)
+        super().__init__(strategy=strategy)
+
+    def tree_flatten(self):
+        children = (self.strategy.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (implementation,) = children
+        return cls(implementation=implementation)

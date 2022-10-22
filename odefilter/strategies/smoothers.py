@@ -2,21 +2,16 @@
 
 
 import jax
-import jax.numpy as jnp
 import jax.tree_util
 
 from odefilter.strategies import _common
 
-# Todo: this is kind of the templatefor (non-fixed-point) smoothers,
-#  isn't it? If I call complete_extrapolation
-#  with output_scale=1., then this bad boy becomes non-dynamic.
-
 
 @jax.tree_util.register_pytree_node_class
-class DynamicSmoother(_common.DynamicSmootherCommon):
-    """Smoother implementation with dynamic calibration (time-varying output-scale)."""
+class SmootherStrategy(_common.SmootherStrategyCommon):
+    """Smoother."""
 
-    def _complete_extrapolation(
+    def complete_extrapolation(
         self, m_ext, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
     ):
         m_ext_p, m0_p = cache
@@ -32,8 +27,7 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         backward_model = _common.BackwardModel(transition=bw_op, noise=bw_noise)
         return _common.MarkovSequence(init=extrapolated, backward_model=backward_model)
 
-    def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
-
+    def case_right_corner(self, *, s0, s1, t):  # s1.t == t
         accepted = self._duplicate_with_unit_backward_model(state=s1, t=t)
         previous = _common.Solution(
             t=t,
@@ -48,7 +42,7 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, *, s0, s1, t):
+    def case_interpolate(self, *, s0, s1, t):
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -84,6 +78,10 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
             output_scale_sqrtm=diffsqrtm,
             num_data_points=s1.num_data_points,
         )
+
+        # This is what we will interpolate from next.
+        # The backward model needs no resetting, because the smoother
+        # does not condense.
         previous = solution
 
         accepted = _common.Solution(
@@ -98,19 +96,30 @@ class DynamicSmoother(_common.DynamicSmootherCommon):
         return accepted, solution, previous
 
     def offgrid_marginals(self, *, state_previous, t, state):
-        acc, _sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
-        sol_marginal = self.implementation.marginalise_model(
+        acc, _sol, _prev = self.case_interpolate(t=t, s1=state, s0=state_previous)
+        marginals = self.implementation.marginalise_model(
             init=acc.marginals,
             linop=acc.posterior.backward_model.transition,
             noise=acc.posterior.backward_model.noise,
         )
-        u = self.implementation.extract_sol(rv=sol_marginal)
-        return u, sol_marginal
+        u = self.extract_sol_from_marginals(marginals=marginals)
+        return u, marginals
 
 
-def _nan_like(*args):
-    return jax.tree_util.tree_map(_nan_like_array, *args)
+@jax.tree_util.register_pytree_node_class
+class DynamicSmoother(_common.DynamicSolver):
+    """Filter implementation (time-constant output-scale)."""
 
+    def __init__(self, *, implementation):
+        strategy = SmootherStrategy(implementation=implementation)
+        super().__init__(strategy=strategy)
 
-def _nan_like_array(*args):
-    return jnp.nan * jnp.ones_like(*args)
+    def tree_flatten(self):
+        children = (self.strategy.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (implementation,) = children
+        return cls(implementation=implementation)
