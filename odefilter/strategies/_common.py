@@ -374,12 +374,6 @@ class NonDynamicSolver(Solver):
         marginals = self.strategy.scale_marginals(marginals, s)
         posterior = self.strategy.scale_posterior(state.posterior, s)
 
-        # # This would be different for different filters/smoothers, I suppose.
-        # # todo: this does not scale the marginal! Currently it is incorrect!
-        # # todo: let the strategy compute the marginals!
-        # marginals = self.strategy.implementation.scale_covariance(
-        #     rv=state.posterior, scale_sqrtm=output_scale_sqrtm
-        # )
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
@@ -392,18 +386,19 @@ class NonDynamicSolver(Solver):
 
     def extract_terminal_value_fn(self, *, state):
 
-        # todo: let the strategy compute the marginals!
-        output_scale_sqrtm = state.output_scale_sqrtm
-        marginals = self.strategy.implementation.scale_covariance(
-            rv=state.posterior, scale_sqrtm=output_scale_sqrtm
-        )
+        marginals = self.strategy.marginals(posterior=state.posterior)
+        s = state.output_scale_sqrtm
+
+        marginals = self.strategy.scale_marginals(marginals, s)
+        posterior = self.strategy.scale_posterior(state.posterior, s)
+
         return Solution(
             t=state.t,
             t_previous=state.t_previous,
             u=state.u,
             marginals=marginals,  # new!
-            posterior=marginals,
-            output_scale_sqrtm=output_scale_sqrtm,
+            posterior=posterior,  # new!
+            output_scale_sqrtm=s,  # new!
             num_data_points=state.num_data_points,
         )
 
@@ -445,7 +440,7 @@ class Strategy(abc.ABC):
 
     @abc.abstractmethod
     def extrapolate_mean(self, *, posterior, p_inv, p):
-        raise NotImplementedErro
+        raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
@@ -455,7 +450,7 @@ class Strategy(abc.ABC):
 
     @abc.abstractmethod
     def final_correction(self, *, extrapolated, linear_fn, m_obs):
-        raise NotImplementedErro
+        raise NotImplementedError
 
     @abc.abstractmethod
     def scale_marginals(self, marginals, output_scale_sqrtm):
