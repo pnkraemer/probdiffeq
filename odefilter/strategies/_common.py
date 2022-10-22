@@ -312,6 +312,99 @@ class DynamicSolver(Solver):
         )
 
 
+@jax.tree_util.register_pytree_node_class  # is this necessary?
+class NonDynamicSolver(Solver):
+    def step_fn(self, *, state, info_op, dt, parameters):
+        """Step."""
+        # Pre-error-estimate steps
+        p, p_inv = self.strategy.implementation.assemble_preconditioner(dt=dt)
+        m_ext, cache = self.strategy.extrapolate_mean(
+            posterior=state.posterior, p_inv=p_inv, p=p
+        )
+
+        # Linearise and estimate error
+        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
+        error_estimate, _ = self._estimate_error(linear_fn, m_obs, p)
+
+        # Post-error-estimate steps
+        extrapolated = self.strategy.complete_extrapolation(
+            m_ext,
+            cache,
+            output_scale_sqrtm=1.0,
+            posterior_previous=state.posterior,
+            p=p,
+            p_inv=p_inv,
+        )  # This is the only filter/smoother consideration!
+
+        # Complete step (incl. calibration!)
+        output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
+        observed, (corrected, _) = self.strategy.final_correction(
+            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+        )
+        new_output_scale_sqrtm = self._update_output_scale_sqrtm(
+            diffsqrtm=output_scale_sqrtm, n=n, obs=observed
+        )
+
+        # Extract and return solution
+        sol = self.strategy.extract_sol(corrected)
+        filtered = Solution(
+            t=state.t + dt,
+            t_previous=state.t,
+            u=sol,
+            marginals=None,
+            posterior=corrected,
+            output_scale_sqrtm=new_output_scale_sqrtm,
+            num_data_points=n + 1,
+        )
+        return filtered, dt * error_estimate
+
+    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
+        evidence_sqrtm = self.strategy.implementation.evidence_sqrtm(observed=obs)
+        diffsqrtm_new = self.strategy.implementation.sum_sqrt_scalars(
+            jnp.sqrt(n) * diffsqrtm, evidence_sqrtm
+        )
+        new_output_scale_sqrtm = jnp.reshape(diffsqrtm_new, ()) / jnp.sqrt(n + 1)
+        return new_output_scale_sqrtm
+
+    def extract_fn(self, *, state):  # noqa: D102
+        output_scale_sqrtm = state.output_scale_sqrtm[-1] * jnp.ones_like(
+            state.output_scale_sqrtm
+        )
+
+        # This would be different for different filters/smoothers, I suppose.
+        # todo: this does not scale the marginal! Currently it is incorrect!
+        # todo: let the strategy compute the marginals!
+        marginals = self.strategy.implementation.scale_covariance(
+            rv=state.posterior, scale_sqrtm=output_scale_sqrtm
+        )
+        return Solution(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals=marginals,  # new!
+            posterior=marginals,
+            output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+
+    def extract_terminal_value_fn(self, *, state):
+
+        # todo: let the strategy compute the marginals!
+        output_scale_sqrtm = state.output_scale_sqrtm
+        marginals = self.strategy.implementation.scale_covariance(
+            rv=state.posterior, scale_sqrtm=output_scale_sqrtm
+        )
+        return Solution(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals=marginals,  # new!
+            posterior=marginals,
+            output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+
+
 @jax.tree_util.register_pytree_node_class
 class Strategy(abc.ABC):
     """Inference strategy interface."""
