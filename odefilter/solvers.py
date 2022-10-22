@@ -18,7 +18,6 @@ class Solution(Generic[T]):
         self,
         *,
         t: float,
-        t_previous: float,
         u: float,
         output_scale_sqrtm: float,
         marginals: T,
@@ -26,7 +25,6 @@ class Solution(Generic[T]):
         num_data_points: float,
     ):
         self.t = t
-        self.t_previous = t_previous
         self.u = u
         self.output_scale_sqrtm = output_scale_sqrtm
         self.marginals = marginals
@@ -36,7 +34,6 @@ class Solution(Generic[T]):
     def tree_flatten(self):
         children = (
             self.t,
-            self.t_previous,
             self.u,
             self.marginals,
             self.posterior,
@@ -48,10 +45,9 @@ class Solution(Generic[T]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        t, t_previous, u, marginals, posterior, output_scale_sqrtm, n = children
+        t, u, marginals, posterior, output_scale_sqrtm, n = children
         return cls(
             t=t,
-            t_previous=t_previous,
             u=u,
             marginals=marginals,
             posterior=posterior,
@@ -77,7 +73,6 @@ class Solution(Generic[T]):
             raise ValueError(f"Inapplicable shape: {item, jnp.shape(self.t)}")
         return Solution(
             t=self.t[item],
-            t_previous=self.t_previous[item],
             u=self.u[item],
             output_scale_sqrtm=self.output_scale_sqrtm[item],
             # todo: make iterable?
@@ -124,7 +119,6 @@ class _Solver(abc.ABC):
 
         solution = Solution(
             t=t0,
-            t_previous=t0,
             u=sol,
             posterior=posterior,
             marginals=None,
@@ -237,7 +231,6 @@ class DynamicSolver(_Solver):
         sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
         smoothing_solution = Solution(
             t=state.t + dt,
-            t_previous=state.t,
             u=sol,
             posterior=corrected,
             marginals=None,
@@ -254,7 +247,6 @@ class DynamicSolver(_Solver):
 
         return Solution(
             t=state.t,
-            t_previous=state.t_previous,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
@@ -268,7 +260,6 @@ class DynamicSolver(_Solver):
 
         return Solution(
             t=state.t,
-            t_previous=state.t_previous,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
@@ -316,7 +307,6 @@ class NonDynamicSolver(_Solver):
         sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
         filtered = Solution(
             t=state.t + dt,
-            t_previous=state.t,
             u=sol,
             marginals=None,
             posterior=corrected,
@@ -340,7 +330,6 @@ class NonDynamicSolver(_Solver):
         u = self.strategy.extract_sol_from_marginals(marginals=marginals)
         return Solution(
             t=state.t,
-            t_previous=state.t_previous,
             u=u,
             marginals=marginals,  # new!
             posterior=posterior,  # new!
@@ -358,7 +347,6 @@ class NonDynamicSolver(_Solver):
         u = self.strategy.extract_sol_from_marginals(marginals=marginals)
         return Solution(
             t=state.t,
-            t_previous=state.t_previous,
             u=u,
             marginals=marginals,  # new!
             posterior=posterior,  # new!

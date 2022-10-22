@@ -18,7 +18,6 @@ class Filter(_strategy.Strategy):
     def case_right_corner(self, *, s0, s1, t):  # s1.t == t
         accepted = solvers.Solution(
             t=t,
-            t_previous=s0.t,  # todo: wrong, but no one cares
             u=s1.u,
             marginals=s1.marginals,
             posterior=s1.posterior,
@@ -48,7 +47,6 @@ class Filter(_strategy.Strategy):
         sol = self.implementation.extract_sol(rv=extrapolated)
         target_p = solvers.Solution(
             t=t,
-            t_previous=t,
             u=sol,
             marginals=None,  # todo: what should happen here???
             posterior=extrapolated,

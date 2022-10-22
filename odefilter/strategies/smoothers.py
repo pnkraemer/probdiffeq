@@ -170,7 +170,6 @@ class _SmootherCommon(_strategy.Strategy):
         posterior = MarkovSequence(init=state.posterior.init, backward_model=bw_model)
         state1 = solvers.Solution(
             t=t,
-            t_previous=t,  # identity transition: this is what it does...
             u=state.u,
             posterior=posterior,
             marginals=state.marginals,
@@ -204,7 +203,6 @@ class Smoother(_SmootherCommon):
         accepted = self._duplicate_with_unit_backward_model(state=s1, t=t)
         previous = solvers.Solution(
             t=t,
-            t_previous=s0.t,
             u=s1.u,
             posterior=s1.posterior,
             marginals=None,
@@ -242,7 +240,6 @@ class Smoother(_SmootherCommon):
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = solvers.Solution(
             t=t,
-            t_previous=s0.t,
             u=sol,
             posterior=posterior0,
             marginals=None,
@@ -257,7 +254,6 @@ class Smoother(_SmootherCommon):
 
         accepted = solvers.Solution(
             t=s1.t,
-            t_previous=t,
             u=s1.u,
             posterior=posterior1,
             marginals=s1.marginals,
@@ -318,7 +314,6 @@ class FixedPointSmoother(_SmootherCommon):
         )
         solution = solvers.Solution(
             t=t,
-            t_previous=s0.t_previous,  # condensed the model...
             u=s1.u,
             posterior=posterior1,
             marginals=None,
@@ -358,7 +353,6 @@ class FixedPointSmoother(_SmootherCommon):
         sol = self.implementation.extract_sol(rv=extrapolated0)
         solution = solvers.Solution(
             t=t,
-            t_previous=s0.t_previous,  # condensed the model...
             u=sol,
             posterior=posterior0,
             marginals=None,
@@ -378,7 +372,6 @@ class FixedPointSmoother(_SmootherCommon):
         )
         accepted = solvers.Solution(
             t=s1.t,
-            t_previous=t,  # new model! No condensing...
             u=s1.u,
             posterior=posterior1,
             marginals=None,
