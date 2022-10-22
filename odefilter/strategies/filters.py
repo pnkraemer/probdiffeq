@@ -2,7 +2,8 @@
 import jax
 import jax.tree_util
 
-from odefilter.strategies import _strategy, solvers
+from odefilter import solvers  # todo: this import sucks
+from odefilter.strategies import _strategy
 
 # todo: nothing in here should operate on "Solution"-types!
 

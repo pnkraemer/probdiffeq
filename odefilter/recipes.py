@@ -8,8 +8,9 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
+from odefilter import solvers
 from odefilter.implementations import dense, isotropic
-from odefilter.strategies import filters, smoothers, solvers
+from odefilter.strategies import filters, smoothers
 
 
 def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
