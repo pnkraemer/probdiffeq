@@ -9,7 +9,7 @@ from odefilter.strategies import _common
 
 
 @jax.tree_util.register_pytree_node_class
-class _FilterCommon(_common.Strategy):
+class _FilterCommon(_common.Solver):
 
     # Interfaces
     @abc.abstractmethod

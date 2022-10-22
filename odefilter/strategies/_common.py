@@ -56,10 +56,10 @@ class Solution(Generic[T]):
     def __init__(
         self,
         *,
-        t,
-        t_previous,
-        u,
-        output_scale_sqrtm,
+        t: float,
+        t_previous: float,
+        u: float,
+        output_scale_sqrtm: float,
         marginals: T,
         posterior: Union[T, MarkovSequence[T]],
         num_data_points: float,
@@ -133,7 +133,7 @@ class Solution(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(abc.ABC):
+class Solver(abc.ABC):
     """Inference strategy interface."""
 
     def __init__(self, *, implementation):
@@ -314,7 +314,7 @@ class Strategy(abc.ABC):
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class DynamicSmootherCommon(Strategy):
+class DynamicSmootherCommon(Solver):
     """Common functionality for smoother-style algorithms."""
 
     # Inherited abstract methods
