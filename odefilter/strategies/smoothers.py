@@ -166,15 +166,6 @@ class _SmootherCommon(_strategy.Strategy):
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
 
         return MarkovSequence(init=posterior.init, backward_model=bw_model)
-        # state1 = solvers.Solution(
-        #     t=t,
-        #     u=state.u,
-        #     posterior=posterior,
-        #     marginals=state.marginals,
-        #     output_scale_sqrtm=state.output_scale_sqrtm,
-        #     num_data_points=state.num_data_points,
-        # )
-        # return state1
 
 
 @jax.tree_util.register_pytree_node_class
