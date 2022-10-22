@@ -2,20 +2,20 @@
 import jax
 import jax.tree_util
 
-from odefilter.strategies import _common
+from odefilter.strategies import _solver, _strategy
 
 # todo: nothing in here should operate on "Solution"-types!
 
 
 @jax.tree_util.register_pytree_node_class
-class FilterStrategy(_common.Strategy):
+class FilterStrategy(_strategy.Strategy):
     """Filter."""
 
     def init_posterior(self, *, corrected):
         return corrected
 
     def case_right_corner(self, *, s0, s1, t):  # s1.t == t
-        accepted = _common.Solution(
+        accepted = _solver.Solution(
             t=t,
             t_previous=s0.t,  # todo: wrong, but no one cares
             u=s1.u,
@@ -45,7 +45,7 @@ class FilterStrategy(_common.Strategy):
             output_scale_sqrtm=s1.output_scale_sqrtm,  # right-including intervals
         )
         sol = self.implementation.extract_sol(rv=extrapolated)
-        target_p = _common.Solution(
+        target_p = _solver.Solution(
             t=t,
             t_previous=t,
             u=sol,
@@ -107,7 +107,7 @@ class FilterStrategy(_common.Strategy):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicFilter(_common.DynamicSolver):
+class DynamicFilter(_solver.DynamicSolver):
     """Filter implementation (time-constant output-scale)."""
 
     def __init__(self, *, implementation):
@@ -126,7 +126,7 @@ class DynamicFilter(_common.DynamicSolver):
 
 
 @jax.tree_util.register_pytree_node_class
-class Filter(_common.NonDynamicSolver):
+class Filter(_solver.NonDynamicSolver):
     """Filter implementation (time-constant output-scale)."""
 
     def __init__(self, *, implementation):
