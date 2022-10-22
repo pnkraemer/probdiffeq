@@ -8,6 +8,9 @@ import jax.tree_util
 
 from odefilter.strategies import _common
 
+# todo: nothing in here should operate on "Solution"-types!
+
+
 T = TypeVar("T")
 """A type-variable to alias appropriate Normal-like random variables."""
 

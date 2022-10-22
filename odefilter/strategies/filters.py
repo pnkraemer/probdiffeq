@@ -4,6 +4,8 @@ import jax.tree_util
 
 from odefilter.strategies import _common
 
+# todo: nothing in here should operate on "Solution"-types!
+
 
 @jax.tree_util.register_pytree_node_class
 class FilterStrategy(_common.Strategy):
