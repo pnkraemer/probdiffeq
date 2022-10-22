@@ -9,27 +9,11 @@ from odefilter.strategies import _common
 
 
 @jax.tree_util.register_pytree_node_class
-class _FilterCommon(_common.Solver):
-
-    # Interfaces
-    @abc.abstractmethod
-    def step_fn(self, *, state, info_op, dt, parameters):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_fn(self, *, state):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_terminal_value_fn(self, *, state):
-        raise NotImplementedError
-
-    # Implementations
-
-    def _init_posterior(self, *, corrected):
+class FilterStrategy(_common.Strategy):
+    def init_posterior(self, *, corrected):
         return corrected
 
-    def _case_right_corner(self, *, s0, s1, t):  # s1.t == t
+    def case_right_corner(self, *, s0, s1, t):  # s1.t == t
         accepted = _common.Solution(
             t=t,
             t_previous=s0.t,  # todo: wrong, but no one cares
@@ -43,15 +27,15 @@ class _FilterCommon(_common.Solver):
 
         return accepted, solution, previous
 
-    def _case_interpolate(self, *, s0, s1, t):
+    def case_interpolate(self, *, s0, s1, t):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
 
         dt = t - s0.t
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self._extrapolate_mean(posterior=s0.posterior, p=p, p_inv=p_inv)
-        extrapolated = self._complete_extrapolation(
+        m_ext, cache = self.extrapolate_mean(posterior=s0.posterior, p=p, p_inv=p_inv)
+        extrapolated = self.complete_extrapolation(
             m_ext,
             cache,
             posterior_previous=s0.posterior,
@@ -72,16 +56,25 @@ class _FilterCommon(_common.Solver):
         return s1, target_p, target_p
 
     def offgrid_marginals(self, *, state_previous, t, state):
-        _acc, sol, _prev = self._case_interpolate(t=t, s1=state, s0=state_previous)
+        _acc, sol, _prev = self.case_interpolate(t=t, s1=state, s0=state_previous)
         return sol.u, sol.posterior
 
-    def _extrapolate_mean(self, *, posterior, p_inv, p):
+    def marginals(self, *, posterior):
+        return posterior
+
+    def marginals_terminal_value(self, *, posterior):
+        return posterior
+
+    def extract_sol(self, x, /):
+        return self.implementation.extract_sol(rv=x)
+
+    def extrapolate_mean(self, *, posterior, p_inv, p):
         m_ext, *_ = self.implementation.extrapolate_mean(
             posterior.mean, p=p, p_inv=p_inv
         )
         return m_ext, ()
 
-    def _complete_extrapolation(
+    def complete_extrapolation(
         self, m_ext, _cache, *, output_scale_sqrtm, posterior_previous, p, p_inv
     ):
         extrapolated = self.implementation.complete_extrapolation(
@@ -93,46 +86,60 @@ class _FilterCommon(_common.Solver):
         )
         return extrapolated
 
-    def _extract_sol(self, x, /):
-        return self.implementation.extract_sol(rv=x)
-
-    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
+    def final_correction(self, *, extrapolated, linear_fn, m_obs):
         return self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 
 
+# @jax.tree_util.register_pytree_node_class
+# class _FilterCommon(_common.Solver):
+#
+#     def _extrapolate_mean(self, *, posterior, p_inv, p):
+#         m_ext, *_ = self.implementation.extrapolate_mean(
+#             posterior.mean, p=p, p_inv=p_inv
+#         )
+#         return m_ext, ()
+#
+#     def _complete_extrapolation(
+#         self, m_ext, _cache, *, output_scale_sqrtm, posterior_previous, p, p_inv
+#     ):
+#         extrapolated = self.implementation.complete_extrapolation(
+#             m_ext=m_ext,
+#             l0=posterior_previous.cov_sqrtm_lower,
+#             p=p,
+#             p_inv=p_inv,
+#             output_scale_sqrtm=output_scale_sqrtm,
+#         )
+#         return extrapolated
+#
+
+
 # Todo: In its current form, wouldn't this be a template for a NonDynamicSolver()?
 #  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
 @jax.tree_util.register_pytree_node_class
-class DynamicFilter(_FilterCommon):
+class DynamicFilter(_common.DynamicSolver):
     """Filter implementation (time-constant output-scale)."""
 
-    def step_fn(self, *, state, info_op, dt, parameters):
-        """Step."""
-        return self._step_fn_dynamic(
-            state=state, info_op=info_op, dt=dt, parameters=parameters
-        )
+    def __init__(self, *, implementation):
+        strategy = FilterStrategy(implementation=implementation)
+        super().__init__(strategy=strategy)
 
-    def extract_fn(self, *, state):  # noqa: D102
-        return _common.Solution(
-            t=state.t,
-            t_previous=state.t_previous,
-            u=state.u,
-            marginals=state.posterior,  # new!
-            posterior=state.posterior,
-            output_scale_sqrtm=state.output_scale_sqrtm,
-            num_data_points=state.num_data_points,
-        )
+    def tree_flatten(self):
+        children = (self.strategy.implementation,)
+        aux = ()
+        return children, aux
 
-    def extract_terminal_value_fn(self, *, state):  # noqa: D102
-        return self.extract_fn(state=state)
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (implementation,) = children
+        return cls(implementation=implementation)
 
 
 # Todo: In its current form, wouldn't this be a template for a DynamicSolver()?
 #  All the "filter" information is hidden in _complete_extrapolation(), isn't it?
-@jax.tree_util.register_pytree_node_class
-class Filter(_FilterCommon):
+# @jax.tree_util.register_pytree_node_class
+class Filter:
     """Filter implementation with dynamic calibration (time-varying output-scale)."""
 
     def step_fn(self, *, state, info_op, dt, parameters):

@@ -136,8 +136,8 @@ class Solution(Generic[T]):
 class Solver(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, implementation):
-        self.implementation = implementation
+    def __init__(self, *, strategy):
+        self.strategy = strategy
 
     # Abstract methods
 
@@ -146,62 +146,20 @@ class Solver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_fn(self, *, state):  # -> solution
-        # Don't jit the extract fun unless it is performance-critical!
-        # Why? Because it would recompile every time the ODE parameters
-        # change in solve(), provided the change is sufficient to change
-        # the number of time-steps taken.
-        # In the fully-jit-able functions, it is compiled automatically anyway.
+    def extract_fn(self, *, state):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_terminal_value_fn(self, *, state):  # -> solution
+    def extract_terminal_value_fn(self, *, state):
         raise NotImplementedError
-
-    @abc.abstractmethod
-    def _case_right_corner(self, *, s0, s1, t):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def _case_interpolate(self, *, s0, s1, t):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def offgrid_marginals(self, *, t, state, state_previous):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def _final_correction(self, *, extrapolated, linear_fn, m_obs):
-        raise NotImplementedError  # for dynamic filters/smoothers
-
-    @abc.abstractmethod
-    def _init_posterior(self, *, corrected):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def _extract_sol(self, x, /):
-        raise NotImplementedError  # for dynamic filters/smoothers
-
-    # Implementations
-
-    def tree_flatten(self):
-        children = (self.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
 
     def init_fn(self, *, taylor_coefficients, t0):
-        """Initialise."""
-        corrected = self.implementation.init_corrected(
+        corrected = self.strategy.implementation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
 
-        posterior = self._init_posterior(corrected=corrected)
-        sol = self._extract_sol(posterior)
+        posterior = self.strategy.init_posterior(corrected=corrected)
+        sol = self.strategy.extract_sol(posterior)
 
         solution = Solution(
             t=t0,
@@ -213,15 +171,15 @@ class Solver(abc.ABC):
             num_data_points=1.0,
         )
 
-        error_estimate = self.implementation.init_error_estimate()
+        error_estimate = self.strategy.implementation.init_error_estimate()
         return solution, error_estimate
 
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
 
         # Cases to switch between
         branches = [
-            lambda s0_, s1_, t_: self._case_right_corner(s0=s0_, s1=s1_, t=t_),
-            lambda s0_, s1_, t_: self._case_interpolate(s0=s0_, s1=s1_, t=t_),
+            lambda s0_, s1_, t_: self.strategy.case_right_corner(s0=s0_, s1=s1_, t=t_),
+            lambda s0_, s1_, t_: self.strategy.case_interpolate(s0=s0_, s1=s1_, t=t_),
         ]
 
         # Which case applies
@@ -259,32 +217,49 @@ class Solver(abc.ABC):
 
         # Vmap to the rescue :) It does not like kw-only arguments, though.
         def offgrid_no_kw(sprev, t, s):
-            return self.offgrid_marginals(t=t, state=s, state_previous=sprev)
+            return self.strategy.offgrid_marginals(t=t, state=s, state_previous=sprev)
 
         marginals_vmap = jax.vmap(offgrid_no_kw)
         return marginals_vmap(solution_left, ts, solution_right)
 
-    # Functions that are shared by all subclasses
+    def offgrid_marginals(self, **kwargs):
+        # todo: this is only temporary!! Remove soon.
+        return self.strategy.offgrid_marginals(**kwargs)
+
+    def tree_flatten(self):
+        children = (self.strategy,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (strategy,) = children
+        return cls(strategy=strategy)
 
     def _estimate_error(self, linear_fn, m_obs, p):
-        output_scale_sqrtm, error_estimate = self.implementation.estimate_error(
+        (
+            output_scale_sqrtm,
+            error_estimate,
+        ) = self.strategy.implementation.estimate_error(
             linear_fn=linear_fn, m_obs=m_obs, p=p
         )
         error_estimate = error_estimate * output_scale_sqrtm
         return error_estimate, output_scale_sqrtm
 
-    # todo: this should be its own solver eventually?!
-    def _step_fn_dynamic(self, *, state, info_op, dt, parameters):
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self._extrapolate_mean(
+@jax.tree_util.register_pytree_node_class  # is this necessary?
+class DynamicSolver(Solver):
+    def step_fn(self, *, state, info_op, dt, parameters):
+        p, p_inv = self.strategy.implementation.assemble_preconditioner(dt=dt)
+
+        m_ext, cache = self.strategy.extrapolate_mean(
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
         m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
         error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
 
-        extrapolated = self._complete_extrapolation(
+        extrapolated = self.strategy.complete_extrapolation(
             m_ext,
             cache,
             posterior_previous=state.posterior,
@@ -294,12 +269,12 @@ class Solver(abc.ABC):
         )
 
         # Final observation
-        _, (corrected, _) = self._final_correction(
+        _, (corrected, _) = self.strategy.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
 
         # Return solution
-        sol = self._extract_sol(corrected)
+        sol = self.strategy.extract_sol(corrected)
         smoothing_solution = Solution(
             t=state.t + dt,
             t_previous=state.t,
@@ -312,9 +287,172 @@ class Solver(abc.ABC):
 
         return smoothing_solution, dt * error_estimate
 
+    def extract_fn(self, *, state):  # noqa: D102
+        marginals = self.strategy.marginals(posterior=state.posterior)
+        return Solution(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals=marginals,  # new!
+            posterior=state.posterior,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+
+    def extract_terminal_value_fn(self, *, state):  # noqa: D102
+        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        return Solution(
+            t=state.t,
+            t_previous=state.t_previous,
+            u=state.u,
+            marginals=marginals,  # new!
+            posterior=state.posterior,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+class Strategy(abc.ABC):
+    """Inference strategy interface."""
+
+    def __init__(self, *, implementation):
+        self.implementation = implementation
+
+    @abc.abstractmethod
+    def init_posterior(self, *, corrected):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_sol(self, x, /):
+        raise NotImplementedError  # for dynamic filters/smoothers
+
+    @abc.abstractmethod
+    def case_right_corner(self, *, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def case_interpolate(self, *, s0, s1, t):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginals(self, *, posterior):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginals_terminal_value(self, *, posterior):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def offgrid_marginals(self, *, t, state, state_previous):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extrapolate_mean(self, *, posterior, p_inv, p):
+        raise NotImplementedErro
+
+    @abc.abstractmethod
+    def complete_extrapolation(
+        self, m_ext, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+    ):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def final_correction(self, *, extrapolated, linear_fn, m_obs):
+        raise NotImplementedErro
+
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+
+    # Implementations
+
+    def tree_flatten(self):
+        children = (self.implementation,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (implementation,) = children
+        return cls(implementation=implementation)
+
+    # Functions that are shared by all subclasses
+
+    # todo: this should be its own solver eventually?!
+
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class DynamicSmootherCommon(Solver):
+class DynamicSmootherCommon(DynamicSolver):
     """Common functionality for smoother-style algorithms."""
 
     # Inherited abstract methods
