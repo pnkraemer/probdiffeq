@@ -130,12 +130,29 @@ class _Solver(abc.ABC):
         return solution, error_estimate
 
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
+        def interpolate(s0_, s1_, t_):
+            return self.strategy.case_interpolate(
+                p0=s0_.posterior,
+                rv1=self.strategy.marginals_terminal_value(posterior=s1.posterior),
+                t=t_,
+                t0=s0_.t,
+                t1=s1_.t,
+                scale_sqrtm=s1.output_scale_sqrtm,
+            )
+
+        def right_corner(s0_, s1_, t_):
+            # todo: are all these arguments needed?
+            return self.strategy.case_right_corner(
+                p0=s0_.posterior,
+                p1=s1_.posterior,
+                t=t_,
+                t0=s0_.t,
+                t1=s1_.t,
+                scale_sqrtm=s1.output_scale_sqrtm,
+            )
 
         # Cases to switch between
-        branches = [
-            lambda s0_, s1_, t_: self.strategy.case_right_corner(s0=s0_, s1=s1_, t=t_),
-            lambda s0_, s1_, t_: self.strategy.case_interpolate(s0=s0_, s1=s1_, t=t_),
-        ]
+        branches = [right_corner, interpolate]
 
         # Which case applies
         is_right_corner = (s1.t - t) ** 2 <= 1e-10  # todo: magic constant?
@@ -145,7 +162,23 @@ class _Solver(abc.ABC):
             jnp.asarray([is_right_corner, is_in_between]), size=1
         )
         index = jnp.reshape(index_as_array, ())
-        return jax.lax.switch(index, branches, s0, s1, t)
+        acc, sol, prev = jax.lax.switch(index, branches, s0, s1, t)
+
+        previous = self._posterior_to_state(prev, t, s1)
+        solution = self._posterior_to_state(sol, t, s1)
+        accepted = self._posterior_to_state(acc, jnp.maximum(s1.t, t), s1)
+
+        return accepted, solution, previous
+
+    def _posterior_to_state(self, posterior, t, state):
+        return Solution(
+            t=t,
+            u=self.strategy.extract_sol_terminal_value(posterior=posterior),
+            posterior=posterior,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            marginals=None,
+            num_data_points=state.num_data_points,
+        )
 
     def offgrid_marginals_searchsorted(self, *, ts, solution):
         """Dense output for a whole grid via jax.numpy.searchsorted.
@@ -173,13 +206,19 @@ class _Solver(abc.ABC):
         # Vmap to the rescue :) It does not like kw-only arguments, though.
         @jax.vmap
         def marginals_vmap(sprev, t, s):
-            return self.strategy.offgrid_marginals(t=t, state=s, state_previous=sprev)
+            return self.offgrid_marginals(t=t, state=s, state_previous=sprev)
 
         return marginals_vmap(solution_left, ts, solution_right)
 
-    def offgrid_marginals(self, **kwargs):
-        # todo: this is only temporary!! Remove soon.
-        return self.strategy.offgrid_marginals(**kwargs)
+    def offgrid_marginals(self, *, state, t, state_previous):
+        return self.strategy.offgrid_marginals(
+            marginals=state.marginals,
+            posterior_previous=state_previous.posterior,
+            t=t,
+            t0=state_previous.t,
+            t1=state.t,
+            scale_sqrtm=state.output_scale_sqrtm,
+        )
 
     def tree_flatten(self):
         children = (self.strategy,)

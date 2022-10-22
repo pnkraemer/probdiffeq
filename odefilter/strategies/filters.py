@@ -2,10 +2,7 @@
 import jax
 import jax.tree_util
 
-from odefilter import solvers  # todo: this import sucks
 from odefilter.strategies import _strategy
-
-# todo: nothing in here should operate on "Solution"-types!
 
 
 @jax.tree_util.register_pytree_node_class
@@ -15,49 +12,40 @@ class Filter(_strategy.Strategy):
     def init_posterior(self, *, corrected):
         return corrected
 
-    def case_right_corner(self, *, s0, s1, t):  # s1.t == t
-        accepted = solvers.Solution(
-            t=t,
-            u=s1.u,
-            marginals=s1.marginals,
-            posterior=s1.posterior,
-            output_scale_sqrtm=s1.output_scale_sqrtm,
-            num_data_points=s1.num_data_points,
-        )
-        solution, previous = accepted, accepted
+    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
+        return p1, p1, p1
 
-        return accepted, solution, previous
-
-    def case_interpolate(self, *, s0, s1, t):
+    def case_interpolate(self, *, p0, rv1, t0, t, t1, scale_sqrtm):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
 
-        dt = t - s0.t
+        dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self.extrapolate_mean(posterior=s0.posterior, p=p, p_inv=p_inv)
+        m_ext, cache = self.extrapolate_mean(posterior=p0, p=p, p_inv=p_inv)
         extrapolated = self.complete_extrapolation(
             m_ext,
             cache,
-            posterior_previous=s0.posterior,
+            posterior_previous=p0,
             p=p,
             p_inv=p_inv,
-            output_scale_sqrtm=s1.output_scale_sqrtm,  # right-including intervals
+            output_scale_sqrtm=scale_sqrtm,  # right-including intervals
         )
-        sol = self.implementation.extract_sol(rv=extrapolated)
-        target_p = solvers.Solution(
-            t=t,
-            u=sol,
-            marginals=None,  # todo: what should happen here???
-            posterior=extrapolated,
-            output_scale_sqrtm=s1.output_scale_sqrtm,
-            num_data_points=s1.num_data_points,
-        )
-        return s1, target_p, target_p
+        return rv1, extrapolated, extrapolated
 
-    def offgrid_marginals(self, *, state_previous, t, state):
-        _acc, sol, _prev = self.case_interpolate(t=t, s1=state, s0=state_previous)
-        return sol.u, sol.posterior
+    def offgrid_marginals(
+        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
+    ):
+        _acc, sol, _prev = self.case_interpolate(
+            t=t,
+            rv1=marginals,
+            p0=posterior_previous,
+            t0=t0,
+            t1=t1,
+            scale_sqrtm=scale_sqrtm,
+        )
+        u = self.extract_sol_terminal_value(posterior=sol)
+        return u, sol
 
     def marginals(self, *, posterior):
         return posterior

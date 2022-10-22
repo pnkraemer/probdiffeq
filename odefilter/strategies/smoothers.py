@@ -6,11 +6,7 @@ from typing import Any, Generic, TypeVar
 import jax
 import jax.tree_util
 
-from odefilter import solvers  # todo: this import sucks
 from odefilter.strategies import _strategy
-
-# todo: nothing in here should operate on "Solution"-types!
-
 
 T = TypeVar("T")
 """A type-variable to alias appropriate Normal-like random variables."""
@@ -60,15 +56,17 @@ class _SmootherCommon(_strategy.Strategy):
     # Inherited abstract methods
 
     @abc.abstractmethod
-    def case_interpolate(self, *, s0, s1, t):
+    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_right_corner(self, *, s0, s1, t):
+    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def offgrid_marginals(self, *, t, state, state_previous):
+    def offgrid_marginals(
+        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -160,23 +158,23 @@ class _SmootherCommon(_strategy.Strategy):
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model  # should this return a MarkovSequence?
 
-    def _duplicate_with_unit_backward_model(self, *, state, t):
+    def _duplicate_with_unit_backward_model(self, *, posterior):
         bw_transition0 = self.implementation.init_backward_transition()
         bw_noise0 = self.implementation.init_backward_noise(
-            rv_proto=state.posterior.backward_model.noise
+            rv_proto=posterior.backward_model.noise
         )
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
 
-        posterior = MarkovSequence(init=state.posterior.init, backward_model=bw_model)
-        state1 = solvers.Solution(
-            t=t,
-            u=state.u,
-            posterior=posterior,
-            marginals=state.marginals,
-            output_scale_sqrtm=state.output_scale_sqrtm,
-            num_data_points=state.num_data_points,
-        )
-        return state1
+        return MarkovSequence(init=posterior.init, backward_model=bw_model)
+        # state1 = solvers.Solution(
+        #     t=t,
+        #     u=state.u,
+        #     posterior=posterior,
+        #     marginals=state.marginals,
+        #     output_scale_sqrtm=state.output_scale_sqrtm,
+        #     num_data_points=state.num_data_points,
+        # )
+        # return state1
 
 
 @jax.tree_util.register_pytree_node_class
@@ -199,21 +197,14 @@ class Smoother(_SmootherCommon):
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return MarkovSequence(init=extrapolated, backward_model=backward_model)
 
-    def case_right_corner(self, *, s0, s1, t):  # s1.t == t
-        accepted = self._duplicate_with_unit_backward_model(state=s1, t=t)
-        previous = solvers.Solution(
-            t=t,
-            u=s1.u,
-            posterior=s1.posterior,
-            marginals=None,
-            output_scale_sqrtm=s1.output_scale_sqrtm,
-            num_data_points=s1.num_data_points,
-        )
-        solution = previous
+    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
 
-        return accepted, solution, previous
+        # todo: is this duplication unnecessary?
+        accepted = self._duplicate_with_unit_backward_model(posterior=p1)
 
-    def case_interpolate(self, *, s0, s1, t):
+        return accepted, p1, p1
+
+    def case_interpolate(self, *, p0, rv1, t0, t1, t, scale_sqrtm):
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -221,56 +212,41 @@ class Smoother(_SmootherCommon):
         # The latter extrapolation is discarded in favour of s1.marginals_filtered,
         # but the backward transition is kept.
 
-        rv0, diffsqrtm = s0.posterior.init, s1.output_scale_sqrtm
+        # rv0, diffsqrtm = p0.init, s1.output_scale_sqrtm
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=rv0, output_scale_sqrtm=diffsqrtm, t=t, t0=s0.t
+            rv=p0.init, output_scale_sqrtm=scale_sqrtm, t=t, t0=t0
         )
         posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
         _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, output_scale_sqrtm=diffsqrtm, t=s1.t, t0=t
+            rv=extrapolated0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
         )
-        posterior1 = MarkovSequence(
-            init=s1.posterior.init, backward_model=backward_model1
-        )
+        posterior1 = MarkovSequence(init=rv1, backward_model=backward_model1)
 
-        # This is the new solution object at t.
-        sol = self.implementation.extract_sol(rv=extrapolated0)
-        solution = solvers.Solution(
+        return posterior1, posterior0, posterior0
+
+    def offgrid_marginals(
+        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
+    ):
+        acc, _sol, _prev = self.case_interpolate(
             t=t,
-            u=sol,
-            posterior=posterior0,
-            marginals=None,
-            output_scale_sqrtm=diffsqrtm,
-            num_data_points=s1.num_data_points,
+            rv1=marginals,
+            p0=posterior_previous,
+            t0=t0,
+            t1=t1,
+            scale_sqrtm=scale_sqrtm,
         )
-
-        # This is what we will interpolate from next.
-        # The backward model needs no resetting, because the smoother
-        # does not condense.
-        previous = solution
-
-        accepted = solvers.Solution(
-            t=s1.t,
-            u=s1.u,
-            posterior=posterior1,
-            marginals=s1.marginals,
-            output_scale_sqrtm=diffsqrtm,
-            num_data_points=s1.num_data_points,
+        # todo: what to do here? We need to smooth from the marginals,
+        # but we only get the posterior. Right?
+        marginals_t = self.implementation.marginalise_model(
+            init=marginals,
+            linop=acc.backward_model.transition,
+            noise=acc.backward_model.noise,
         )
-        return accepted, solution, previous
-
-    def offgrid_marginals(self, *, state_previous, t, state):
-        acc, _sol, _prev = self.case_interpolate(t=t, s1=state, s0=state_previous)
-        marginals = self.implementation.marginalise_model(
-            init=acc.marginals,
-            linop=acc.posterior.backward_model.transition,
-            noise=acc.posterior.backward_model.noise,
-        )
-        u = self.extract_sol_from_marginals(marginals=marginals)
-        return u, marginals
+        u = self.extract_sol_from_marginals(marginals=marginals_t)
+        return u, marginals_t
 
 
 @jax.tree_util.register_pytree_node_class
@@ -300,33 +276,22 @@ class FixedPointSmoother(_SmootherCommon):
 
         return MarkovSequence(init=extrapolated, backward_model=backward_model)
 
-    def case_right_corner(self, *, s0, s1, t):  # s1.t == t
+    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
 
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        backward_model1 = s1.posterior.backward_model
         noise0, g0 = self.implementation.condense_backward_models(
-            bw_init=s0.posterior.backward_model, bw_state=backward_model1
+            bw_init=p0.backward_model, bw_state=p1.backward_model
         )
         backward_model1 = BackwardModel(transition=g0, noise=noise0)
-        posterior1 = MarkovSequence(
-            init=s1.posterior.init, backward_model=backward_model1
-        )
-        solution = solvers.Solution(
-            t=t,
-            u=s1.u,
-            posterior=posterior1,
-            marginals=None,
-            output_scale_sqrtm=s1.output_scale_sqrtm,
-            num_data_points=s1.num_data_points,
-        )
 
-        accepted = self._duplicate_with_unit_backward_model(state=solution, t=t)
+        solution = MarkovSequence(init=p1.init, backward_model=backward_model1)
+        accepted = self._duplicate_with_unit_backward_model(posterior=solution)
         previous = accepted
 
         return accepted, solution, previous
 
-    def case_interpolate(self, *, s0, s1, t):  # noqa: D102
+    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -334,51 +299,28 @@ class FixedPointSmoother(_SmootherCommon):
         # quantity of interest", and this is what we are interested in.
         # The rest remains the same as for the smoother.
 
-        # Use the s1.output-scale as a output-scale over the interval.
-        # Filtering/smoothing solutions are right-including intervals.
-        output_scale_sqrtm = s1.output_scale_sqrtm
-
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
-            rv=s0.posterior.init,
-            output_scale_sqrtm=output_scale_sqrtm,
+            rv=p0.init,
+            output_scale_sqrtm=scale_sqrtm,
             t=t,
-            t0=s0.t,
+            t0=t0,
         )
         noise0, g0 = self.implementation.condense_backward_models(
-            bw_init=s0.posterior.backward_model, bw_state=bw0
+            bw_init=p0.backward_model, bw_state=bw0
         )
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
-        posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
-        sol = self.implementation.extract_sol(rv=extrapolated0)
-        solution = solvers.Solution(
-            t=t,
-            u=sol,
-            posterior=posterior0,
-            marginals=None,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=s1.num_data_points,
-        )
+        solution = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
-        # This is what we interpolate from next.
-        previous = self._duplicate_with_unit_backward_model(state=solution, t=t)
+        previous = self._duplicate_with_unit_backward_model(posterior=solution)
 
-        # From t to s1.t
         _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, output_scale_sqrtm=output_scale_sqrtm, t=s1.t, t0=t
+            rv=extrapolated0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
         )
-        posterior1 = MarkovSequence(
-            init=s1.posterior.init, backward_model=backward_model1
-        )
-        accepted = solvers.Solution(
-            t=s1.t,
-            u=s1.u,
-            posterior=posterior1,
-            marginals=None,
-            output_scale_sqrtm=output_scale_sqrtm,
-            num_data_points=s1.num_data_points,
-        )
+        accepted = MarkovSequence(init=rv1, backward_model=backward_model1)
         return accepted, solution, previous
 
-    def offgrid_marginals(self, *, t, state, state_previous):
+    def offgrid_marginals(
+        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
+    ):
         raise NotImplementedError

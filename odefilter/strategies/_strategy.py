@@ -26,11 +26,11 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_right_corner(self, *, s0, s1, t):
+    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_interpolate(self, *, s0, s1, t):
+    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -42,7 +42,9 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def offgrid_marginals(self, *, t, state, state_previous):
+    def offgrid_marginals(
+        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
