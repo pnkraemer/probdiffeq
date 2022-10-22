@@ -9,7 +9,7 @@ but until you do so, use one of ours.
 
 """
 from odefilter.implementations import dense, isotropic
-from odefilter.strategies import filters, smoothers
+from odefilter.strategies import filters, smoothers, solvers
 
 
 def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
@@ -24,7 +24,8 @@ def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = filters.DynamicFilter(implementation=implementation)
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
     information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
@@ -41,7 +42,8 @@ def eks0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = smoothers.DynamicSmoother(implementation=implementation)
+    strategy = smoothers.Smoother(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
     information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
@@ -58,7 +60,8 @@ def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = smoothers.DynamicFixedPointSmoother(implementation=implementation)
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
     information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
@@ -75,7 +78,8 @@ def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    solver = filters.DynamicFilter(implementation=implementation)
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
     information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
@@ -91,7 +95,8 @@ def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    solver = smoothers.DynamicSmoother(implementation=implementation)
+    strategy = smoothers.Smoother(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
     information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
@@ -107,7 +112,8 @@ def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    solver = smoothers.DynamicFixedPointSmoother(implementation=implementation)
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
     information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
@@ -123,7 +129,8 @@ def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    solver = filters.Filter(implementation=implementation)
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
     information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
@@ -140,7 +147,8 @@ def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicImplementation.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    solver = filters.Filter(implementation=implementation)
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
     information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 

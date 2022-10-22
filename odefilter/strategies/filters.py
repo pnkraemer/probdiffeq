@@ -8,7 +8,7 @@ from odefilter.strategies import _strategy, solvers
 
 
 @jax.tree_util.register_pytree_node_class
-class FilterStrategy(_strategy.Strategy):
+class Filter(_strategy.Strategy):
     """Filter."""
 
     def init_posterior(self, *, corrected):
@@ -104,41 +104,3 @@ class FilterStrategy(_strategy.Strategy):
         return self.implementation.final_correction(
             extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
         )
-
-
-@jax.tree_util.register_pytree_node_class
-class DynamicFilter(solvers.DynamicSolver):
-    """Filter implementation (time-constant output-scale)."""
-
-    def __init__(self, *, implementation):
-        strategy = FilterStrategy(implementation=implementation)
-        super().__init__(strategy=strategy)
-
-    def tree_flatten(self):
-        children = (self.strategy.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
-
-
-@jax.tree_util.register_pytree_node_class
-class Filter(solvers.NonDynamicSolver):
-    """Filter implementation (time-constant output-scale)."""
-
-    def __init__(self, *, implementation):
-        strategy = FilterStrategy(implementation=implementation)
-        super().__init__(strategy=strategy)
-
-    def tree_flatten(self):
-        children = (self.strategy.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)

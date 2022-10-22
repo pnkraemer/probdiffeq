@@ -53,7 +53,7 @@ class MarkovSequence(Generic[T]):
         return cls(init=init, backward_model=backward_model)
 
 
-class _SmootherStrategyCommon(_strategy.Strategy):
+class _SmootherCommon(_strategy.Strategy):
     """Common functionality for smoothers."""
 
     # Inherited abstract methods
@@ -180,7 +180,7 @@ class _SmootherStrategyCommon(_strategy.Strategy):
 
 
 @jax.tree_util.register_pytree_node_class
-class SmootherStrategy(_SmootherStrategyCommon):
+class Smoother(_SmootherCommon):
     """Smoother."""
 
     def complete_extrapolation(
@@ -277,26 +277,7 @@ class SmootherStrategy(_SmootherStrategyCommon):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicSmoother(solvers.DynamicSolver):
-    """Filter implementation (time-constant output-scale)."""
-
-    def __init__(self, *, implementation):
-        strategy = SmootherStrategy(implementation=implementation)
-        super().__init__(strategy=strategy)
-
-    def tree_flatten(self):
-        children = (self.strategy.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
-
-
-@jax.tree_util.register_pytree_node_class
-class FixedPointSmootherStrategy(_SmootherStrategyCommon):
+class FixedPointSmoother(_SmootherCommon):
     """Fixed-point smoother."""
 
     def complete_extrapolation(
@@ -407,22 +388,3 @@ class FixedPointSmootherStrategy(_SmootherStrategyCommon):
 
     def offgrid_marginals(self, *, t, state, state_previous):
         raise NotImplementedError
-
-
-@jax.tree_util.register_pytree_node_class
-class DynamicFixedPointSmoother(solvers.DynamicSolver):
-    """Filter implementation (time-constant output-scale)."""
-
-    def __init__(self, *, implementation):
-        strategy = FixedPointSmootherStrategy(implementation=implementation)
-        super().__init__(strategy=strategy)
-
-    def tree_flatten(self):
-        children = (self.strategy.implementation,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
