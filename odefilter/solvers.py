@@ -1,6 +1,7 @@
 """Inference interface."""
 
 import abc
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import jax
@@ -11,25 +12,16 @@ T = TypeVar("T")
 
 
 @jax.tree_util.register_pytree_node_class
+@dataclass
 class Solution(Generic[T]):
     """Inferred solutions."""
 
-    def __init__(
-        self,
-        *,
-        t: float,
-        u: float,
-        output_scale_sqrtm: float,
-        marginals: T,
-        posterior: Any,
-        num_data_points: float,
-    ):
-        self.t = t
-        self.u = u
-        self.output_scale_sqrtm = output_scale_sqrtm
-        self.marginals = marginals
-        self.posterior = posterior
-        self.num_data_points = num_data_points
+    t: float
+    u: float
+    output_scale_sqrtm: float
+    marginals: T
+    posterior: Any
+    num_data_points: float
 
     def tree_flatten(self):
         children = (
@@ -108,6 +100,9 @@ class _Solver(abc.ABC):
     @abc.abstractmethod
     def extract_terminal_value_fn(self, *, state):
         raise NotImplementedError
+
+    def sample(self, key, *, solution, shape=()):
+        return self.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
     def init_fn(self, *, taylor_coefficients, t0):
         corrected = self.strategy.implementation.init_corrected(

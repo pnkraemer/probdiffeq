@@ -48,6 +48,10 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def sample(self, key, *, posterior, shape):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def extrapolate_mean(self, *, posterior, p_inv, p):
         raise NotImplementedError
 
@@ -78,3 +82,7 @@ class Strategy(abc.ABC):
     def tree_unflatten(cls, _aux, children):
         (implementation,) = children
         return cls(implementation=implementation)
+
+    def _base_samples(self, key, *, shape):
+        base_samples = jax.random.normal(key=key, shape=shape)
+        return base_samples

@@ -77,3 +77,12 @@ class Implementation(abc.ABC):
     @abc.abstractmethod
     def marginalise_model(self, *, init, linop, noise):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def sample_backwards(self, init, linop, noise, base_samples):
+        raise NotImplementedError
+
+    # todo: make the extract_*_from_* functions use this one?
+    @abc.abstractmethod
+    def extract_mean_from_marginals(self, mean):
+        raise NotImplementedError

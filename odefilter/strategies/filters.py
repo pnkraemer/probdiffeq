@@ -47,6 +47,9 @@ class Filter(_strategy.Strategy):
         u = self.extract_sol_terminal_value(posterior=sol)
         return u, sol
 
+    def sample(self, key, *, posterior, shape):
+        raise NotImplementedError
+
     def marginals(self, *, posterior):
         return posterior
 
