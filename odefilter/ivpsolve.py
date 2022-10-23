@@ -29,7 +29,7 @@ def simulate_terminal_values(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vector_field,
         initial_values=initial_values,
-        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
@@ -60,7 +60,7 @@ def simulate_checkpoints(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vector_field,
         initial_values=initial_values,
-        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
         t=ts[0],
         parameters=parameters,
     )
@@ -101,7 +101,7 @@ def solve(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=vector_field,
         initial_values=initial_values,
-        num=solver.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )

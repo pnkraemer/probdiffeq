@@ -21,7 +21,7 @@ def smoother_fixedpoint_smoother_pair_eks0(n):
     "eks, fixedpoint_eks", cases=".", prefix="smoother_fixedpoint_smoother_pair_"
 )
 @parametrize("k", [1, 3])  # k * N // 2 off-grid points
-def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
+def test_smoothing_checkpoint_equals_solver_state(
     vf, u0, t0, t1, p, eks, fixedpoint_eks, k
 ):
     """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid\
@@ -43,6 +43,7 @@ def test_smoothing_checkpoint_equals_solver_state_smaller_grid(
     )
     fixedpoint_eks_sol = fp_eks_sol[1:-1]  # reference is defined only on the interior
 
+    print(fixedpoint_eks_sol.u, u, fixedpoint_eks_sol.u - u)
     # Compare all attributes for equality,
     # except for the covariance matrix square roots
     # which are equal modulo orthogonal transformation

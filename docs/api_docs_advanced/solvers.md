@@ -1,0 +1,3 @@
+# Solver types
+
+::: odefilter.solvers
