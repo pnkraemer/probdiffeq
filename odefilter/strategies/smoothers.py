@@ -91,9 +91,12 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return m_ext, (m_ext_p, m0_p)
 
-    def final_correction(self, *, extrapolated, cache_obs, m_obs):
+    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
         a, (corrected, b) = self.implementation.final_correction(
-            extrapolated=extrapolated.init, cache_obs=cache_obs, m_obs=m_obs
+            info_op=info_op,
+            extrapolated=extrapolated.init,
+            cache_obs=cache_obs,
+            m_obs=m_obs,
         )
         corrected_seq = MarkovSequence(
             init=corrected, backward_model=extrapolated.backward_model

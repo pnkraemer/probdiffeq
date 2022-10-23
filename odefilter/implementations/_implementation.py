@@ -25,7 +25,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def estimate_error(self, *, cache_obs, m_obs, p):
+    def estimate_error(self, *, info_op, cache_obs, m_obs, p):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -39,7 +39,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def final_correction(self, *, extrapolated, cache_obs, m_obs):
+    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
         raise NotImplementedError
 
     @abc.abstractmethod

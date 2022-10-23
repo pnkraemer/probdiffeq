@@ -10,6 +10,8 @@ import jax.tree_util
 
 T = TypeVar("T")
 
+# todo: no method in here should call self.strategy.implementation.
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass
@@ -225,9 +227,11 @@ class _Solver(abc.ABC):
         (strategy,) = children
         return cls(strategy=strategy)
 
-    def _estimate_error(self, cache_obs, m_obs, p):
+    def _estimate_error(self, *, info_op, cache_obs, m_obs, p):
+
+        # todo: one sho
         scale_sqrtm, error_est = self.strategy.implementation.estimate_error(
-            cache_obs=cache_obs, m_obs=m_obs, p=p
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )
         error_est = error_est * scale_sqrtm
         return error_est, scale_sqrtm
@@ -244,8 +248,10 @@ class DynamicSolver(_Solver):
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        m_obs, cache_obs = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        error_estimate, output_scale_sqrtm = self._estimate_error(cache_obs, m_obs, p)
+        m_obs, cache_obs = info_op.linearise(x=m_ext, t=state.t + dt, p=parameters)
+        error_estimate, output_scale_sqrtm = self._estimate_error(
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        )
 
         extrapolated = self.strategy.complete_extrapolation(
             m_ext,
@@ -258,7 +264,7 @@ class DynamicSolver(_Solver):
 
         # Final observation
         _, (corrected, _) = self.strategy.final_correction(
-            extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )
 
         # Return solution
