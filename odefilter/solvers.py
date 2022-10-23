@@ -321,8 +321,10 @@ class NonDynamicSolver(_Solver):
         )
 
         # Linearise and estimate error
-        m_obs, cache_obs = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        error_estimate, _ = self._estimate_error(cache_obs, m_obs, p)
+        m_obs, cache_obs = info_op.linearise(x=m_ext, t=state.t + dt, p=parameters)
+        error_estimate, _ = self._estimate_error(
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
@@ -337,7 +339,7 @@ class NonDynamicSolver(_Solver):
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.strategy.final_correction(
-            extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
             diffsqrtm=output_scale_sqrtm, n=n, obs=observed

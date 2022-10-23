@@ -8,6 +8,8 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
+import jax.tree_util
+
 from odefilter import solvers
 from odefilter.implementations import dense, isotropic
 from odefilter.strategies import filters, smoothers
@@ -27,7 +29,7 @@ def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
     )
     strategy = filters.Filter(implementation=implementation)
     solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
+    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
@@ -45,7 +47,7 @@ def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     )
     strategy = filters.Filter(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
+    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
@@ -63,7 +65,7 @@ def eks0_isotropic(*, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.Smoother(implementation=implementation)
     solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
+    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
@@ -81,7 +83,7 @@ def eks0_isotropic_fixedpoint(*, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
+    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
@@ -99,7 +101,7 @@ def eks0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.Smoother(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
+    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
@@ -117,7 +119,7 @@ def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
+    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 

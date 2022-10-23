@@ -7,6 +7,8 @@ from jax.tree_util import register_pytree_node_class
 
 @register_pytree_node_class
 class Information(abc.ABC):
+    """Interface for information operators."""
+
     def __init__(self, f, /, *, ode_order):
         self.f = f
         self.ode_order = ode_order
@@ -26,5 +28,5 @@ class Information(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cov(self, *, cache_obs, cov_sqrtm_lower):
+    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         raise NotImplementedError
