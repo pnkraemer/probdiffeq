@@ -22,14 +22,14 @@ def solver_eks0_isotropic():
     return recipes.eks0_isotropic(num_derivatives=3)
 
 
-@case(tags=["terminal_value", "checkpoint", "smoother"])
-def solver_eks0_isotropic_fixedpoint():
-    return recipes.eks0_isotropic_fixedpoint(num_derivatives=3)
-
-
 @case(tags=["terminal_value", "solve", "smoother"])
 def solver_eks0_isotropic_dynamic():
     return recipes.eks0_isotropic_dynamic(num_derivatives=3)
+
+
+@case(tags=["terminal_value", "checkpoint", "smoother"])
+def solver_eks0_isotropic_fixedpoint():
+    return recipes.eks0_isotropic_fixedpoint(num_derivatives=3)
 
 
 @case(tags=["terminal_value", "checkpoint", "smoother"])
@@ -48,8 +48,18 @@ def solver_ekf1_dynamic():
 
 
 @case(tags=["terminal_value", "solve", "smoother"])
+def solver_eks1():
+    return recipes.eks1(num_derivatives=3, ode_dimension=2)
+
+
+@case(tags=["terminal_value", "solve", "smoother"])
 def solver_eks1_dynamic():
     return recipes.eks1_dynamic(num_derivatives=3, ode_dimension=2)
+
+
+@case(tags=["terminal_value", "checkpoint", "smoother"])
+def solver_eks1_fixedpoint():
+    return recipes.eks1_fixedpoint(num_derivatives=3, ode_dimension=2)
 
 
 @case(tags=["terminal_value", "checkpoint", "smoother"])
