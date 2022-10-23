@@ -101,7 +101,7 @@ class _Solver(abc.ABC):
     def extract_terminal_value_fn(self, *, state):
         raise NotImplementedError
 
-    def sample(self, key, *, solution, shape):
+    def sample(self, key, *, solution, shape=()):
         return self.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
     def init_fn(self, *, taylor_coefficients, t0):

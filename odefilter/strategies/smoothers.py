@@ -130,14 +130,11 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
     def transform_base_samples(self, posterior, base_samples):
-        # If shape == (), compute a sample
         if base_samples.ndim == posterior.backward_model.noise.mean.ndim:
             return self._sample_one(posterior, base_samples)
 
-        # Otherwise, vmap and repeat
-        return jax.vmap(self.transform_base_samples, in_axes=(None, 0))(
-            posterior, base_samples
-        )
+        transform_vmap = jax.vmap(self.transform_base_samples, in_axes=(None, 0))
+        return transform_vmap(posterior, base_samples)
 
     def _sample_one(self, posterior, base_samples):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
