@@ -24,7 +24,7 @@ class Information(abc.ABC):
         return cls(f, ode_order=ode_order)
 
     @abc.abstractmethod
-    def linearise(self, x, /, *, t, p):
+    def linearize(self, x, /, *, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod

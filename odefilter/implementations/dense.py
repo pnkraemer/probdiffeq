@@ -1,6 +1,5 @@
 """State-space models with dense covariance structure   ."""
 
-import functools
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -9,29 +8,40 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.tree_util import register_pytree_node_class
 
-from odefilter import _control_flow
+from odefilter import _control_flow, _information
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
-@functools.lru_cache(maxsize=None)
-def ek1(*, ode_dimension, ode_order=1):
-    """EK1 information."""
+@register_pytree_node_class
+class EK1(_information.Information):
+    """EK1-linearise an ODE."""
 
-    @functools.lru_cache(maxsize=None)
-    def create_ek1_info_op_linearised(f):
-        @jax.jit
-        def residual(x, *, t, p):
-            x_reshaped = jnp.reshape(x, (-1, ode_dimension), order="F")
-            return x_reshaped[ode_order, ...] - f(
-                *x_reshaped[:ode_order, ...], t=t, p=p
-            )
+    def __init__(self, f, /, *, ode_order, ode_dimension):
+        super().__init__(f, ode_order=ode_order)
+        self.ode_dimension = ode_dimension
 
-        def info_op(x, *, t, p):
-            return jax.linearize(jax.tree_util.Partial(residual, t=t, p=p), x)
+    def tree_flatten(self):
+        children = ()
+        aux = self.f, self.ode_order, self.ode_dimension
+        return children, aux
 
-        return jax.tree_util.Partial(info_op)
+    @classmethod
+    def tree_unflatten(cls, aux, _children):
+        f, ode_order, ode_dimension = aux
+        return cls(f, ode_order=ode_order, ode_dimension=ode_dimension)
 
-    return create_ek1_info_op_linearised
+    def linearize(self, x, /, *, t, p):
+        return jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x)
+
+    def _residual(self, x, *, t, p):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+
+        x1 = x_reshaped[self.ode_order, ...]
+        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
+        return x1 - fx0
+
+    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+        return jax.vmap(cache_obs, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
 
 class MultivariateNormal(NamedTuple):
@@ -103,9 +113,10 @@ class DenseImplementation(_implementation.Implementation):
         m_ext = p * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, cache_obs, m_obs, p):  # noqa: D102
-        cache_obs_vmap = jax.vmap(cache_obs, in_axes=1, out_axes=1)
-        l_obs_nonsquare = cache_obs_vmap(p[:, None] * self.q_sqrtm_lower)
+    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
+        l_obs_nonsquare = info_op.cov_sqrtm_lower(
+            cache_obs=cache_obs, cov_sqrtm_lower=p[:, None] * self.q_sqrtm_lower
+        )
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
 
         # todo: make this call self.evidence()
@@ -165,9 +176,14 @@ class DenseImplementation(_implementation.Implementation):
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    def final_correction(self, *, extrapolated, cache_obs, m_obs):  # noqa: D102
+    def final_correction(
+        self, *, info_op, extrapolated, cache_obs, m_obs
+    ):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs_nonsquare = jax.vmap(cache_obs, in_axes=1, out_axes=1)(l_ext)
+
+        l_obs_nonsquare = info_op.cov_sqrtm_lower(
+            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
+        )
 
         l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
         observed = MultivariateNormal(mean=m_obs, cov_sqrtm_lower=l_obs)

@@ -248,7 +248,7 @@ class DynamicSolver(_Solver):
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        m_obs, cache_obs = info_op.linearise(x=m_ext, t=state.t + dt, p=parameters)
+        m_obs, cache_obs = info_op.linearize(m_ext, t=state.t + dt, p=parameters)
         error_estimate, output_scale_sqrtm = self._estimate_error(
             info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )
@@ -321,7 +321,7 @@ class NonDynamicSolver(_Solver):
         )
 
         # Linearise and estimate error
-        m_obs, cache_obs = info_op.linearise(x=m_ext, t=state.t + dt, p=parameters)
+        m_obs, cache_obs = info_op.linearize(m_ext, t=state.t + dt, p=parameters)
         error_estimate, _ = self._estimate_error(
             info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )

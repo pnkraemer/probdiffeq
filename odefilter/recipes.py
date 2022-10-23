@@ -136,7 +136,10 @@ def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = filters.Filter(implementation=implementation)
     solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+
+    information_op = jax.tree_util.Partial(
+        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    )
     return solver, information_op
 
 
@@ -154,7 +157,9 @@ def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = filters.Filter(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = jax.tree_util.Partial(
+        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    )
     return solver, information_op
 
 
@@ -171,7 +176,9 @@ def eks1(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.Smoother(implementation=implementation)
     solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = jax.tree_util.Partial(
+        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    )
     return solver, information_op
 
 
@@ -188,7 +195,9 @@ def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.Smoother(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = jax.tree_util.Partial(
+        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    )
     return solver, information_op
 
 
@@ -205,7 +214,9 @@ def eks1_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = jax.tree_util.Partial(
+        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    )
     return solver, information_op
 
 
@@ -222,7 +233,9 @@ def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    information_op = jax.tree_util.Partial(
+        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    )
     return solver, information_op
 
 

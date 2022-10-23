@@ -17,7 +17,7 @@ class EK0(_information.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def linearise(self, x, *, t, p):
+    def linearize(self, x, /, *, t, p):
         bias = x[self.ode_order, ...] - self.f(*x[: self.ode_order, ...], t=t, p=p)
         return bias, ()
 
