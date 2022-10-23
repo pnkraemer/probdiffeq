@@ -103,9 +103,9 @@ class DenseImplementation(_implementation.Implementation):
         m_ext = p * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
-        linear_fn_vmap = jax.vmap(linear_fn, in_axes=1, out_axes=1)
-        l_obs_nonsquare = linear_fn_vmap(p[:, None] * self.q_sqrtm_lower)
+    def estimate_error(self, *, cache_obs, m_obs, p):  # noqa: D102
+        cache_obs_vmap = jax.vmap(cache_obs, in_axes=1, out_axes=1)
+        l_obs_nonsquare = cache_obs_vmap(p[:, None] * self.q_sqrtm_lower)
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
 
         # todo: make this call self.evidence()
@@ -165,9 +165,9 @@ class DenseImplementation(_implementation.Implementation):
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
+    def final_correction(self, *, extrapolated, cache_obs, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs_nonsquare = jax.vmap(linear_fn, in_axes=1, out_axes=1)(l_ext)
+        l_obs_nonsquare = jax.vmap(cache_obs, in_axes=1, out_axes=1)(l_ext)
 
         l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
         observed = MultivariateNormal(mean=m_obs, cov_sqrtm_lower=l_obs)

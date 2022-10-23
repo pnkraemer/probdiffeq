@@ -225,9 +225,9 @@ class _Solver(abc.ABC):
         (strategy,) = children
         return cls(strategy=strategy)
 
-    def _estimate_error(self, linear_fn, m_obs, p):
+    def _estimate_error(self, cache_obs, m_obs, p):
         scale_sqrtm, error_est = self.strategy.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
+            cache_obs=cache_obs, m_obs=m_obs, p=p
         )
         error_est = error_est * scale_sqrtm
         return error_est, scale_sqrtm
@@ -258,7 +258,7 @@ class DynamicSolver(_Solver):
 
         # Final observation
         _, (corrected, _) = self.strategy.final_correction(
-            extrapolated=extrapolated, linear_fn=cache_obs, m_obs=m_obs
+            extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )
 
         # Return solution
@@ -331,7 +331,7 @@ class NonDynamicSolver(_Solver):
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.strategy.final_correction(
-            extrapolated=extrapolated, linear_fn=cache_obs, m_obs=m_obs
+            extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
             diffsqrtm=output_scale_sqrtm, n=n, obs=observed

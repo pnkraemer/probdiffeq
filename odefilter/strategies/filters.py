@@ -90,7 +90,7 @@ class Filter(_strategy.Strategy):
         )
         return extrapolated
 
-    def final_correction(self, *, extrapolated, linear_fn, m_obs):
+    def final_correction(self, *, extrapolated, cache_obs, m_obs):
         return self.implementation.final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+            extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )

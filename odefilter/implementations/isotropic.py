@@ -98,8 +98,8 @@ class IsotropicImplementation(_implementation.Implementation):
         m_ext = p[:, None] * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
-        l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
+    def estimate_error(self, *, cache_obs, m_obs, p):  # noqa: D102
+        l_obs_raw = cache_obs(p[:, None] * self.q_sqrtm_lower)
 
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
         l_obs = jnp.reshape(_sqrtm.sqrtm_to_upper_triangular(R=l_obs_raw[:, None]), ())
@@ -149,9 +149,9 @@ class IsotropicImplementation(_implementation.Implementation):
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
+    def final_correction(self, *, extrapolated, cache_obs, m_obs):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = linear_fn(l_ext)  # shape (n,)
+        l_obs = cache_obs(l_ext)  # shape (n,)
 
         l_obs_scalar = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
