@@ -1,38 +1,28 @@
 """State-space models with isotropic covariance structure."""
 
-import functools
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util
+from jax.tree_util import register_pytree_node_class
 
-from odefilter import _control_flow
+from odefilter import _control_flow, _information
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
-@functools.lru_cache(maxsize=None)
-def ek0(*, ode_order=1):
+@register_pytree_node_class
+class EK0(_information.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    @functools.lru_cache(maxsize=None)
-    def create_ek0_info_op_linearised(f):
-        """Create a "linearize()" implementation according to what\
-         the EK0 does to the ODE residual."""
+    def linearize(self, x, /, *, t, p):
+        bias = x[self.ode_order, ...] - self.f(*x[: self.ode_order, ...], t=t, p=p)
+        return bias, ()
 
-        @jax.jit
-        def jvp(x, *, t, p):
-            return x[ode_order]
-
-        def info_op(x, *, t, p):
-            bias = x[ode_order, ...] - f(*x[:ode_order, ...], t=t, p=p)
-            return bias, jax.tree_util.Partial(jvp, t=t, p=p)
-
-        return jax.tree_util.Partial(info_op)
-
-    return create_ek0_info_op_linearised
+    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+        return cov_sqrtm_lower[self.ode_order, ...]
 
 
 class IsotropicNormal(NamedTuple):
@@ -98,8 +88,11 @@ class IsotropicImplementation(_implementation.Implementation):
         m_ext = p[:, None] * m_ext_p
         return m_ext, m_ext_p, m0_p
 
-    def estimate_error(self, *, linear_fn, m_obs, p):  # noqa: D102
-        l_obs_raw = linear_fn(p[:, None] * self.q_sqrtm_lower)
+    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
+        # todo: the info op should return the reshaped version?
+        l_obs_raw = info_op.cov_sqrtm_lower(
+            cache_obs=cache_obs, cov_sqrtm_lower=p[:, None] * self.q_sqrtm_lower
+        )
 
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
         l_obs = jnp.reshape(_sqrtm.sqrtm_to_upper_triangular(R=l_obs_raw[:, None]), ())
@@ -149,9 +142,13 @@ class IsotropicImplementation(_implementation.Implementation):
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def final_correction(self, *, extrapolated, linear_fn, m_obs):  # noqa: D102
+    def final_correction(
+        self, *, info_op, extrapolated, cache_obs, m_obs
+    ):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = linear_fn(l_ext)  # shape (n,)
+        l_obs = info_op.cov_sqrtm_lower(
+            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
+        )  # shape (n,)
 
         l_obs_scalar = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()

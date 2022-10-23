@@ -10,6 +10,8 @@ import jax.tree_util
 
 T = TypeVar("T")
 
+# todo: no method in here should call self.strategy.implementation.
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass
@@ -225,9 +227,11 @@ class _Solver(abc.ABC):
         (strategy,) = children
         return cls(strategy=strategy)
 
-    def _estimate_error(self, linear_fn, m_obs, p):
+    def _estimate_error(self, *, info_op, cache_obs, m_obs, p):
+
+        # todo: one sho
         scale_sqrtm, error_est = self.strategy.implementation.estimate_error(
-            linear_fn=linear_fn, m_obs=m_obs, p=p
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )
         error_est = error_est * scale_sqrtm
         return error_est, scale_sqrtm
@@ -240,16 +244,18 @@ class DynamicSolver(_Solver):
     def step_fn(self, *, state, info_op, dt, parameters):
         p, p_inv = self.strategy.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self.strategy.extrapolate_mean(
+        m_ext, cache_ext = self.strategy.extrapolate_mean(
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        error_estimate, output_scale_sqrtm = self._estimate_error(linear_fn, m_obs, p)
+        m_obs, cache_obs = info_op.linearize(m_ext, t=state.t + dt, p=parameters)
+        error_estimate, output_scale_sqrtm = self._estimate_error(
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        )
 
         extrapolated = self.strategy.complete_extrapolation(
             m_ext,
-            cache,
+            cache_ext,
             posterior_previous=state.posterior,
             output_scale_sqrtm=output_scale_sqrtm,
             p=p,
@@ -258,7 +264,7 @@ class DynamicSolver(_Solver):
 
         # Final observation
         _, (corrected, _) = self.strategy.final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )
 
         # Return solution
@@ -310,18 +316,20 @@ class NonDynamicSolver(_Solver):
         """Step."""
         # Pre-error-estimate steps
         p, p_inv = self.strategy.implementation.assemble_preconditioner(dt=dt)
-        m_ext, cache = self.strategy.extrapolate_mean(
+        m_ext, cache_ext = self.strategy.extrapolate_mean(
             posterior=state.posterior, p_inv=p_inv, p=p
         )
 
         # Linearise and estimate error
-        m_obs, linear_fn = info_op(x=m_ext, t=state.t + dt, p=parameters)
-        error_estimate, _ = self._estimate_error(linear_fn, m_obs, p)
+        m_obs, cache_obs = info_op.linearize(m_ext, t=state.t + dt, p=parameters)
+        error_estimate, _ = self._estimate_error(
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
             m_ext,
-            cache,
+            cache_ext,
             output_scale_sqrtm=1.0,
             posterior_previous=state.posterior,
             p=p,
@@ -331,7 +339,7 @@ class NonDynamicSolver(_Solver):
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.strategy.final_correction(
-            extrapolated=extrapolated, linear_fn=linear_fn, m_obs=m_obs
+            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
             diffsqrtm=output_scale_sqrtm, n=n, obs=observed
