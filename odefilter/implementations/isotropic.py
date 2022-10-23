@@ -229,8 +229,8 @@ class IsotropicImplementation(_interface.Implementation):
         linop_sample, noise_ = jax.tree_util.tree_map(
             lambda x: x[1:, ...], (linop, noise)
         )
-        noise_sample = self.transform_samples(noise_, base_samples[..., :-1, :, :])
-        init_sample = self.transform_samples(init, base_samples[..., -1, :, :])
+        noise_sample = self._transform_samples(noise_, base_samples[..., :-1, :, :])
+        init_sample = self._transform_samples(init, base_samples[..., -1, :, :])
 
         # todo: should we use an associative scan here?
         _, samples = _control_flow.scan_with_init(
@@ -239,7 +239,7 @@ class IsotropicImplementation(_interface.Implementation):
         return samples
 
     # automatically batched because of numpy's broadcasting rules?
-    def transform_samples(self, rvs, base):
+    def _transform_samples(self, rvs, base):
         return rvs.mean + rvs.cov_sqrtm_lower @ base
 
     def extract_mean_from_marginals(self, mean):

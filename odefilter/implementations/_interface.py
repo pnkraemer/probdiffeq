@@ -84,10 +84,6 @@ class Implementation(abc.ABC):
     def sample_backwards(self, init, linop, noise, base_samples):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def transform_samples(self, rvs, base):
-        raise NotImplementedError
-
     # todo: make the extract_*_from_* functions use this one?
     @abc.abstractmethod
     def extract_mean_from_marginals(self, mean):
