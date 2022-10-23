@@ -48,6 +48,7 @@ class Filter(_strategy.Strategy):
         return u, sol
 
     def sample(self, key, *, posterior, shape):
+        # todo: this is incorrect!!
         # A filter samples on the grid by sampling i.i.d values from the marginals.
         sample_shape = posterior.mean.shape
         base_samples = self._base_samples(key, shape=shape + sample_shape)

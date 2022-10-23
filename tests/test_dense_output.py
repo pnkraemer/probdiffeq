@@ -93,7 +93,7 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
     prefix="solver_",
     has_tag=["checkpoint"],
 )
-@parametrize("shape", [(3,)])
+@parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_grid_samples(vf, u0, t0, t1, p, solver, info_op, shape):
     ts = jnp.linspace(t0, t1, num=20, endpoint=True)
     solution = ivpsolve.simulate_checkpoints(

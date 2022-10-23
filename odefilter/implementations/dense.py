@@ -248,7 +248,6 @@ class DenseImplementation(_interface.Implementation):
 
         return MultivariateNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
-    @functools.partial(jax.vmap, in_axes=(None, None, None, None, 0))
     def sample_backwards(self, init, linop, noise, base_samples):
         def body_fun(carry, x):
             op, noi = x
