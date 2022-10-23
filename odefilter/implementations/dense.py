@@ -10,7 +10,7 @@ import jax.scipy as jsp
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _interface, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
 @functools.lru_cache(maxsize=None)
@@ -43,7 +43,7 @@ class MultivariateNormal(NamedTuple):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class DenseImplementation(_interface.Implementation):
+class DenseImplementation(_implementation.Implementation):
     """Handle dense covariances."""
 
     a: Any

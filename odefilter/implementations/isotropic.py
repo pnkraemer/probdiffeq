@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax.tree_util
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _interface, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
 @functools.lru_cache(maxsize=None)
@@ -44,7 +44,7 @@ class IsotropicNormal(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicImplementation(_interface.Implementation):
+class IsotropicImplementation(_implementation.Implementation):
     """Handle isotropic covariances."""
 
     a: Any

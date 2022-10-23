@@ -3,8 +3,6 @@
 import abc
 from dataclasses import dataclass
 
-# todo: rename file to _implementation
-
 
 @dataclass(frozen=True)
 class Implementation(abc.ABC):
