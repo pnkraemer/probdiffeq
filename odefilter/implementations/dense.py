@@ -247,3 +247,32 @@ class DenseImplementation(_interface.Implementation):
         l_new = l_new_p
 
         return MultivariateNormal(mean=m_new, cov_sqrtm_lower=l_new)
+
+    @functools.partial(jax.vmap, in_axes=(None, None, None, None, 0))
+    def sample_backwards(self, init, linop, noise, base_samples):
+        def body_fun(carry, x):
+            op, noi = x
+            out = op @ carry + noi
+            return out, out
+
+        linop_sample, noise_ = jax.tree_util.tree_map(
+            lambda x: x[1:, ...], (linop, noise)
+        )
+        noise_sample = self.transform_samples(noise_, base_samples[..., :-1, :])
+        init_sample = self.transform_samples(init, base_samples[..., -1, :])
+
+        # todo: should we use an associative scan here?
+        _, samples = _control_flow.scan_with_init(
+            f=body_fun, init=init_sample, xs=(linop_sample, noise_sample), reverse=True
+        )
+        return samples
+
+    # automatically batched because of numpy's broadcasting rules?
+    def transform_samples(self, rvs, base):
+        m, l_sqrtm = rvs.mean, rvs.cov_sqrtm_lower
+        return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
+
+    def extract_mean_from_marginals(self, mean):
+        if mean.ndim == 1:
+            return mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
+        return jax.vmap(self.extract_mean_from_marginals)(mean)

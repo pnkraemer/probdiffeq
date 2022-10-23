@@ -118,6 +118,24 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return marginals
 
+    def sample(self, key, *, posterior, shape):
+        # A smoother samples on the grid by sampling i.i.d values
+        # from the terminal RV x_N and the backward noises z_(1:N)
+        # and then combining them backwards as
+        # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
+
+        sample_shape = posterior.backward_model.noise.mean.shape
+        base_samples = self._base_samples(key, shape=shape + sample_shape)
+
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
+        noise = posterior.backward_model.noise
+
+        samples = self.implementation.sample_backwards(
+            init, posterior.backward_model.transition, noise, base_samples
+        )
+        u = self.implementation.extract_mean_from_marginals(samples)
+        return u, samples
+
     def scale_marginals(self, marginals, *, output_scale_sqrtm):
         return self.implementation.scale_covariance(
             rv=marginals, scale_sqrtm=output_scale_sqrtm

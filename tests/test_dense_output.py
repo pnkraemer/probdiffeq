@@ -1,6 +1,7 @@
 """Tests for IVP solvers."""
 import jax.numpy as jnp
-from pytest_cases import parametrize_with_cases
+import jax.random
+from pytest_cases import parametrize, parametrize_with_cases
 
 from odefilter import controls, ivpsolve
 
@@ -83,3 +84,30 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
     u, _ = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
     assert jnp.allclose(u[0], solution.u[0], atol=1e-3, rtol=1e-3)
     assert jnp.allclose(u[-1], solution.u[-1], atol=1e-3, rtol=1e-3)
+
+
+@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
+@parametrize_with_cases(
+    "solver, info_op",
+    cases=".recipe_cases",
+    prefix="solver_",
+    has_tag=["checkpoint"],
+)
+@parametrize("shape", [(3,)])
+def test_grid_samples(vf, u0, t0, t1, p, solver, info_op, shape):
+    ts = jnp.linspace(t0, t1, num=20, endpoint=True)
+    solution = ivpsolve.simulate_checkpoints(
+        vf,
+        u0,
+        ts=ts,
+        parameters=p,
+        solver=solver,
+        info_op=info_op,
+        atol=1e-1,
+        rtol=1e-1,
+    )
+    key = jax.random.PRNGKey(seed=15)
+
+    u, samples = solver.sample(key, solution=solution, shape=shape)
+    assert u.shape == shape + solution.u.shape
+    assert samples.shape == shape + solution.marginals.mean.shape
