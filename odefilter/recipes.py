@@ -13,6 +13,24 @@ from odefilter.implementations import dense, isotropic
 from odefilter.strategies import filters, smoothers
 
 
+def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with an isotropic covariance \
+    structure, and optimised for terminal-value simulation.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = isotropic.ek0(ode_order=ode_order)
+    return solver, information_op
+
+
 def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, dynamic calibration, and optimised for terminal-value simulation.
@@ -27,6 +45,42 @@ def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     )
     strategy = filters.Filter(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
+    information_op = isotropic.ek0(ode_order=ode_order)
+    return solver, information_op
+
+
+def eks0_isotropic(*, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with an isotropic covariance \
+    structure.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives
+    )
+    strategy = smoothers.Smoother(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = isotropic.ek0(ode_order=ode_order)
+    return solver, information_op
+
+
+def eks0_isotropic_fixedpoint(*, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with an isotropic covariance \
+    structure.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives
+    )
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
     information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
@@ -67,6 +121,23 @@ def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
+def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of a semi-implicit solver.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    return solver, information_op
+
+
 def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver with \
      dynamic calibration, and optimised for terminal-value simulation.
@@ -81,6 +152,23 @@ def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     )
     strategy = filters.Filter(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    return solver, information_op
+
+
+def eks1(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of a semi-implicit solver.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = smoothers.Smoother(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
     information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
     return solver, information_op
 
@@ -102,6 +190,23 @@ def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
+def eks1_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of a semi-implicit solver.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
+    return solver, information_op
+
+
 def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver with dynamic calibration.
 
@@ -116,41 +221,6 @@ def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     solver = solvers.DynamicSolver(strategy=strategy)
     information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
-    return solver, information_op
-
-
-def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
-    """Construct the equivalent of a semi-implicit solver.
-
-    Suitable for low-dimensional, stiff problems.
-    """
-    _assert_num_derivatives_sufficiently_large(
-        num_derivatives=num_derivatives, ode_order=ode_order
-    )
-    implementation = dense.DenseImplementation.from_num_derivatives(
-        num_derivatives=num_derivatives, ode_dimension=ode_dimension
-    )
-    strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = dense.ek1(ode_dimension=ode_dimension, ode_order=ode_order)
-    return solver, information_op
-
-
-def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
-    """Construct the equivalent of an explicit solver with an isotropic covariance \
-    structure, and optimised for terminal-value simulation.
-
-    Suitable for high-dimensional, non-stiff problems.
-    """
-    _assert_num_derivatives_sufficiently_large(
-        num_derivatives=num_derivatives, ode_order=ode_order
-    )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
-    strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
-    information_op = isotropic.ek0(ode_order=ode_order)
     return solver, information_op
 
 
