@@ -18,6 +18,7 @@ jupyter:
 ```python
 import jax
 import jax.numpy as jnp
+import jax.random
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
@@ -45,7 +46,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0, info_op = recipes.ekf0_isotropic_dynamic(num_derivatives=1)
+ek0, info_op = recipes.ekf0_isotropic(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -106,7 +107,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0, info_op = recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=1)
+ek0, info_op = recipes.eks0_isotropic_fixedpoint(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -126,6 +127,11 @@ solution = ivpsolve.simulate_checkpoints(
 ```
 
 ```python
+key = jax.random.PRNGKey(seed=1)
+u, samples = ek0.sample(key, solution=solution, shape=(2,))
+```
+
+```python
 _, num_derivatives, _ = solution.marginals.mean.shape
 
 
@@ -139,6 +145,7 @@ fig, axes_all = plt.subplots(
 
 for i, axes_cols in enumerate(axes_all.T):
     ms = solution.marginals.mean[:, i, :]
+    samps = samples[..., i, :]
     ls = solution.marginals.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
@@ -152,6 +159,9 @@ for i, axes_cols in enumerate(axes_all.T):
         axes_cols[0].set_title(f"{i}th time-derivative")
 
     axes_cols[0].plot(solution.t, ms)
+    for s in samps:
+        axes_cols[0].plot(solution.t, s[..., 0], color="C0", linewidth=0.35)
+        axes_cols[0].plot(solution.t, s[..., 1], color="C1", linewidth=0.35)
     for m in ms.T:
         axes_cols[0].fill_between(
             solution.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3

@@ -91,7 +91,7 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
     "solver, info_op",
     cases=".recipe_cases",
     prefix="solver_",
-    has_tag=["checkpoint"],
+    has_tag=["checkpoint", "smoother"],
 )
 @parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_grid_samples(vf, u0, t0, t1, p, solver, info_op, shape):
@@ -111,3 +111,8 @@ def test_grid_samples(vf, u0, t0, t1, p, solver, info_op, shape):
     u, samples = solver.sample(key, solution=solution, shape=shape)
     assert u.shape == shape + solution.u.shape
     assert samples.shape == shape + solution.marginals.mean.shape
+
+    # Todo: test values of the samples by checking a chi2 statistic
+    #  in terms of the joint posterior. But this requires a joint_posterior()
+    #  method, which is only future work I guess. So far we use the eye-test
+    #  in the notebooks, which looks good.
