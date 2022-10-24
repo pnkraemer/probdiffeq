@@ -14,59 +14,56 @@
 
 ## Features include
 
-
-### Markov process machinery
-- [ ] Dense output
-- [ ] Sample from posterior
-- [ ] Extrapolation
-- [ ] Continuous-time process (for dense output)
-- [ ] Discrete-time process (for no dense output)
-- [ ] Simple Kalman filtering (for bridge priors, maybe for inverse problems)
-
-
 ### Initial value problem solvers
-- [ ] EK0 (36 solvers!)
-  - [ ] Kronecker vs. diagonal
-  - [ ] Dense output vs terminal value vs checkpoint
-  - [ ] first-order problem vs second-order problem vs general (Kronecker-structure-preserving) information operator
-  - [ ] time-constant diffusion vs time-varying diffusion
-- [ ] EK1
-  - [ ] Full vs. diagonal
-  - [ ] Dense output vs terminal value vs checkpoint
-  - [ ] first-order problem vs second-order problem vs general (Kronecker-structure-preserving) information operator
-  - [ ] time-constant diffusion vs time-varying diffusion
-- [ ] UK1
-  - [ ] Full vs. diagonal
-  - [ ] Dense output vs terminal value vs checkpoint
-  - [ ] first-order problem vs second-order problem vs general (Kronecker-structure-preserving) information operator
-  - [ ] time-constant diffusion vs time-varying diffusion
-- [ ] Error estimation, adaptive steps
-- [ ] Autodiff initialisation
-- [ ] Second-order problems
-- [ ] Mass-matrix problems
-- [ ] Build a solver from an information operator
-- [ ] Build a Kronecker solver from an information operator
-- [ ] Build a batch solver from an information operator
-- [ ] Evaluate model-fit 
-- [ ] General priors (and stacked state-space models!)
+- [x] Stable implementation
+- [x] Error estimation and step-size adaptation
+- [x] EK0 (Think: explicit solvers)
+- [x] EK1 (Think: semi-implicit solvers w/ Jacobians)
+- [ ] UK1 (Think: semi-implicit solvers w/out Jacobians)
+- [x] Global calibration
+- [x] Dynamic calibration
+- [x] First-order problems
+- [x] Higher-order problems
+- [ ] Mass-matrix problems 
+- [ ] Implicit differential equations
+- [x] Custom information operators
+- [x] Terminal-value simulation
+- [x] Global simulation (the traditional ``solve()`` method)
+- [x] Checkpointing
+- [ ] Discrete forward-mode differentiation
+- [ ] Discrete reverse-mode differentiation
+- [ ] Continuous forward-mode differentiation
+- [ ] Continuous reverse-mode differentiation
+- [x] Autodiff initialisation
+- [ ] Non-autodiff initialisation
+- [ ] Model fit evaluation
 - [ ] Discrete event handling
 - [ ] Continuous event handling
-- [ ] Evaluate-extrapolate-correct solvers
-- [ ] Extrapolate-evaluate-correct solvers
-- [ ] TBC
+- [ ] Physics-enhanced regression
+
 
 ### Boundary value problem solvers
 - [ ] Separable boundary conditions
 - [ ] Non-separable boundary conditions
 - [ ] Bridge priors
 - [ ] Higher-order problems
-- [ ] Gauss--Newton
-- [ ] Levenberg-Marquardt
-- [ ] ADMM
+- [ ] Backends:
+  - [ ] Gauss--Newton
+  - [ ] Levenberg-Marquardt
+  - [ ] ADMM
 - [ ] Error estimation
 - [ ] Mesh refinement
-- 
 
+
+### State-space model machinery
+- [ ] State-space model factorisations:
+  - [x] Kronecker state-space models
+  - [ ] Diagonal state-space models
+  - [x] Dense state-space models (no factorisation)
+- [ ] Dense output:
+  - [x] Offgrid-marginalisation
+  - [x] Posterior sampling
+  - [ ] Joint distributions
 
 
 ## Installation
@@ -87,6 +84,7 @@ Read more about installing this package [here](https://odefilter.readthedocs.io/
 ## Similar projects
 
 * ProbNum
+* Tornadox
 * ProbNumDiffEq.jl
 * Tornadox
 
