@@ -20,8 +20,9 @@
 - [x] EK0 (Think: explicit solvers)
 - [x] EK1 (Think: semi-implicit solvers w/ Jacobians)
 - [ ] UK1 (Think: semi-implicit solvers w/out Jacobians)
-- [x] Global calibration
-- [x] Dynamic calibration
+- [x] Global (automatic) calibration
+- [x] Dynamic (automatic) calibration
+- [ ] No automatic calibration
 - [x] First-order problems
 - [x] Higher-order problems
 - [ ] Mass-matrix problems 
