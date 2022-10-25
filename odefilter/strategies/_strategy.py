@@ -14,7 +14,7 @@ class Strategy(abc.ABC):
         self.implementation = implementation
 
     @abc.abstractmethod
-    def init_posterior(self, *, corrected):
+    def init_posterior(self, *, taylor_coefficients):
         raise NotImplementedError
 
     @abc.abstractmethod

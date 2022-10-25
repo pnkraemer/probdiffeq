@@ -107,11 +107,9 @@ class _Solver(abc.ABC):
         return self.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
     def init_fn(self, *, taylor_coefficients, t0):
-        corrected = self.strategy.implementation.init_corrected(
+        posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
         )
-
-        posterior = self.strategy.init_posterior(corrected=corrected)
         sol = self.strategy.extract_sol_terminal_value(posterior=posterior)
         scale_sqrtm = self.strategy.implementation.init_output_scale_sqrtm()
         solution = Solution(

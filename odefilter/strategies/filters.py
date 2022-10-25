@@ -9,8 +9,10 @@ from odefilter.strategies import _strategy
 class Filter(_strategy.Strategy):
     """Filter."""
 
-    def init_posterior(self, *, corrected):
-        return corrected
+    def init_posterior(self, *, taylor_coefficients):
+        return self.implementation.init_corrected(
+            taylor_coefficients=taylor_coefficients
+        )
 
     def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
         return p1, p1, p1
