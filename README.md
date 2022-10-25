@@ -30,7 +30,7 @@
 - [ ] State-space model factorizations:
   - [x] Isotropic state-space models
   - [ ] Kronecker state-space models
-  - [ ] Diagonal state-space models
+  - [x] Diagonal state-space models
   - [x] Dense state-space models (no factorization)
 - [x] First-order problems
 - [x] Higher-order problems
