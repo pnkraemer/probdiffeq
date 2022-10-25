@@ -12,6 +12,13 @@ from odefilter import _control_flow
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
+class MultivariateNormal(NamedTuple):
+    """Random variable with a normal distribution."""
+
+    mean: Any  # (k,) shape
+    cov_sqrtm_lower: Any  # (k,k) shape
+
+
 @register_pytree_node_class
 class EK1(_implementation.Information):
     """EK1-linearise an ODE."""
@@ -30,8 +37,8 @@ class EK1(_implementation.Information):
         f, ode_order, ode_dimension = aux
         return cls(f, ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def linearize(self, x, /, *, t, p):
-        return jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x)
+    def linearize(self, x: MultivariateNormal, /, *, t, p):
+        return jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
 
     def _residual(self, x, *, t, p):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
@@ -42,13 +49,6 @@ class EK1(_implementation.Information):
 
     def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         return jax.vmap(cache_obs, in_axes=1, out_axes=1)(cov_sqrtm_lower)
-
-
-class MultivariateNormal(NamedTuple):
-    """Random variable with a normal distribution."""
-
-    mean: Any  # (k,) shape
-    cov_sqrtm_lower: Any  # (k,k) shape
 
 
 @register_pytree_node_class
@@ -111,7 +111,8 @@ class DenseImplementation(_implementation.Implementation):
         m0_p = p_inv * m0
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
-        return m_ext, m_ext_p, m0_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        return MultivariateNormal(m_ext, q_sqrtm), m_ext_p, m0_p
 
     def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
         l_obs_nonsquare = info_op.cov_sqrtm_lower(
@@ -127,8 +128,9 @@ class DenseImplementation(_implementation.Implementation):
         return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
-        self, *, m_ext, l0, p_inv, p, output_scale_sqrtm
+        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
     ):
+        m_ext = ext_for_lin.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ (p_inv[:, None] * l0)).T,
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
@@ -137,8 +139,9 @@ class DenseImplementation(_implementation.Implementation):
         return MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, m_ext, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
+        m_ext = ext_for_lin.mean
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
