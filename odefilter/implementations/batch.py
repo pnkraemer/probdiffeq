@@ -6,14 +6,14 @@ import jax
 import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class
 
-from odefilter import _control_flow, _information
+from odefilter import _control_flow
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 # todo: reconsider naming!
 
 
 @register_pytree_node_class
-class EK0(_information.Information):
+class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
@@ -105,6 +105,7 @@ class BatchImplementation(_implementation.Implementation):
         noise = BatchedNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
+    # todo: move to information?
     def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
         l_obs_nonsquare = info_op.cov_sqrtm_lower(
             cache_obs=cache_obs, cov_sqrtm_lower=p[..., None] * self.q_sqrtm_lower
@@ -122,6 +123,7 @@ class BatchImplementation(_implementation.Implementation):
         error_estimate = l_obs  # (d,)
         return output_scale_sqrtm, error_estimate
 
+    # todo: move to information?
     def evidence_sqrtm(self, *, observed):
         m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 
@@ -142,6 +144,7 @@ class BatchImplementation(_implementation.Implementation):
         m_ext = p * m_ext_p
         return m_ext, m_ext_p, m0_p
 
+    # todo: move to information?
     def final_correction(
         self, *, info_op, extrapolated, cache_obs, m_obs
     ):  # noqa: D102
