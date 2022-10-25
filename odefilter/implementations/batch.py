@@ -234,12 +234,14 @@ class BatchImplementation(_implementation.Implementation):
     def revert_markov_kernel(  # noqa: D102
         self, *, m_ext, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
-
+        # (d, k, 1) * (d, k, k) = (d, k, k)
         l0_p = p_inv[..., None] * l0
+
         r_ext_p, (r_bw_p, g_bw_p) = jax.vmap(_sqrtm.revert_gauss_markov_correlation)(
             R_X_F=_transpose(self.a @ l0_p),
             R_X=_transpose(l0_p),
-            R_YX=_transpose(output_scale_sqrtm * self.q_sqrtm_lower),
+            # transpose((d, 1, 1) * (d, k, k)) = tranpose((d,k,k)) = (d, k, k)
+            R_YX=_transpose(output_scale_sqrtm[..., None, None] * self.q_sqrtm_lower),
         )
         l_ext_p, l_bw_p = _transpose(r_ext_p), _transpose(r_bw_p)
         m_bw_p = m0_p - (g_bw_p @ m_ext_p[..., None])[..., 0]

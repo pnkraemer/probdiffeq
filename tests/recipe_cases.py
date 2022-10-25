@@ -47,12 +47,12 @@ def solver_ekf0_batch_dynamic():
     return recipes.ekf0_batch_dynamic(ode_dimension=2, num_derivatives=3)
 
 
+@case(tags=["terminal_value", "solve", "smoother"])
+def solver_eks0_batch():
+    return recipes.eks0_batch(ode_dimension=2, num_derivatives=3)
+
+
 # todo: make these into batch solvers
-
-# @case(tags=["terminal_value", "solve", "smoother"])
-# def solver_eks0_isotropic():
-#     return recipes.eks0_isotropic(num_derivatives=3)
-
 
 # @case(tags=["terminal_value", "solve", "smoother"])
 # def solver_eks0_isotropic_dynamic():
