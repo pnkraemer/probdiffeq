@@ -221,6 +221,9 @@ class DenseImplementation(_implementation.Implementation):
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
+    def init_output_scale_sqrtm(self):
+        return 1.0
+
     def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return MultivariateNormal(

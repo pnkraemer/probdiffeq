@@ -79,6 +79,9 @@ class IsotropicImplementation(_implementation.Implementation):
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
+    def init_output_scale_sqrtm(self):
+        return 1.0
+
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 

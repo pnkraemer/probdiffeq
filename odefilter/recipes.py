@@ -15,7 +15,7 @@ from odefilter.implementations import batch, dense, isotropic
 from odefilter.strategies import filters, smoothers
 
 
-def ekf0_batch(*, num_derivatives=4, ode_dimension, ode_order=1):
+def ekf0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with a block-diagonal covariance \
     structure, and optimised for terminal-value simulation.
 
