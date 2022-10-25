@@ -8,12 +8,12 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jax.tree_util import register_pytree_node_class
 
-from odefilter import _control_flow, _information
+from odefilter import _control_flow
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
 @register_pytree_node_class
-class EK1(_information.Information):
+class EK1(_implementation.Information):
     """EK1-linearise an ODE."""
 
     def __init__(self, f, /, *, ode_order, ode_dimension):

@@ -75,7 +75,10 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init_posterior(self, *, corrected):
+    def init_posterior(self, *, taylor_coefficients):
+        corrected = self.implementation.init_corrected(
+            taylor_coefficients=taylor_coefficients
+        )
         backward_transition = self.implementation.init_backward_transition()
         backward_noise = self.implementation.init_backward_noise(rv_proto=corrected)
         backward_model = BackwardModel(

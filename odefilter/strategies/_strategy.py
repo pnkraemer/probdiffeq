@@ -14,7 +14,7 @@ class Strategy(abc.ABC):
         self.implementation = implementation
 
     @abc.abstractmethod
-    def init_posterior(self, *, corrected):
+    def init_posterior(self, *, taylor_coefficients):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -86,3 +86,20 @@ class Strategy(abc.ABC):
     def _base_samples(self, key, *, shape):
         base_samples = jax.random.normal(key=key, shape=shape)
         return base_samples
+
+    def init_error_estimate(self):
+        return self.implementation.init_error_estimate()
+
+    def init_output_scale_sqrtm(self):
+        return self.implementation.init_output_scale_sqrtm()
+
+    def estimate_error(self, *, info_op, cache_obs, m_obs, p):
+        return self.implementation.estimate_error(
+            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        )
+
+    def assemble_preconditioner(self, *, dt):
+        return self.implementation.assemble_preconditioner(dt=dt)
+
+    def evidence_sqrtm(self, *, observed):
+        return self.implementation.evidence_sqrtm(observed=observed)

@@ -8,12 +8,12 @@ import jax.numpy as jnp
 import jax.tree_util
 from jax.tree_util import register_pytree_node_class
 
-from odefilter import _control_flow, _information
+from odefilter import _control_flow
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
 @register_pytree_node_class
-class EK0(_information.Information):
+class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
