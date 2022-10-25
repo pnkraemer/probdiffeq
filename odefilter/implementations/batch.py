@@ -138,7 +138,7 @@ class BatchImplementation(_implementation.Implementation):
     def extract_sol(self, *, rv):  # noqa: D102
         return self.extract_mean_from_marginals(mean=rv.mean)
 
-    def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv * m0  # (d, k)
         m_ext_p = (self.a @ m0_p[..., None])[..., 0]  # (d, k)
         m_ext = p * m_ext_p

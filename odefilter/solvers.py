@@ -240,7 +240,7 @@ class DynamicSolver(_Solver):
     def step_fn(self, *, state, info_op, dt, parameters):
         p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
 
-        m_ext, cache_ext = self.strategy.extrapolate_mean(
+        m_ext, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
@@ -312,7 +312,7 @@ class NonDynamicSolver(_Solver):
         """Step."""
         # Pre-error-estimate steps
         p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
-        m_ext, cache_ext = self.strategy.extrapolate_mean(
+        m_ext, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, p_inv=p_inv, p=p
         )
 

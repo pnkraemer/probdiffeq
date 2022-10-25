@@ -54,7 +54,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extrapolate_mean(self, m0, /, *, p, p_inv):
+    def begin_extrapolation(self, m0, /, *, p, p_inv):
         raise NotImplementedError
 
     @abc.abstractmethod

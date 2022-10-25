@@ -52,7 +52,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extrapolate_mean(self, *, posterior, p_inv, p):
+    def begin_extrapolation(self, *, posterior, p_inv, p):
         raise NotImplementedError
 
     @abc.abstractmethod

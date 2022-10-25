@@ -85,7 +85,7 @@ class IsotropicImplementation(_implementation.Implementation):
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
-    def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p

@@ -88,8 +88,8 @@ class _SmootherCommon(_strategy.Strategy):
         posterior = MarkovSequence(init=corrected, backward_model=backward_model)
         return posterior
 
-    def extrapolate_mean(self, *, posterior, p_inv, p):
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+    def begin_extrapolation(self, *, posterior, p_inv, p):
+        m_ext, m_ext_p, m0_p = self.implementation.begin_extrapolation(
             posterior.init.mean, p=p, p_inv=p_inv
         )
         return m_ext, (m_ext_p, m0_p)
@@ -175,7 +175,7 @@ class _SmootherCommon(_strategy.Strategy):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, m_ext_p, m0_p = self.implementation.extrapolate_mean(
+        m_ext, m_ext_p, m0_p = self.implementation.begin_extrapolation(
             rv.mean, p=p, p_inv=p_inv
         )
 

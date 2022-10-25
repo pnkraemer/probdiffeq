@@ -107,7 +107,7 @@ class DenseImplementation(_implementation.Implementation):
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
 
-    def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv * m0
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p

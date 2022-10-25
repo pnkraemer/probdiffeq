@@ -24,7 +24,7 @@ class Filter(_strategy.Strategy):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        m_ext, cache = self.extrapolate_mean(posterior=p0, p=p, p_inv=p_inv)
+        m_ext, cache = self.begin_extrapolation(posterior=p0, p=p, p_inv=p_inv)
         extrapolated = self.complete_extrapolation(
             m_ext,
             cache,
@@ -74,8 +74,8 @@ class Filter(_strategy.Strategy):
     def extract_sol_from_marginals(self, *, marginals):
         return self.implementation.extract_sol(rv=marginals)
 
-    def extrapolate_mean(self, *, posterior, p_inv, p):
-        m_ext, *_ = self.implementation.extrapolate_mean(
+    def begin_extrapolation(self, *, posterior, p_inv, p):
+        m_ext, *_ = self.implementation.begin_extrapolation(
             posterior.mean, p=p, p_inv=p_inv
         )
         return m_ext, ()
