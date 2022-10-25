@@ -226,8 +226,6 @@ class _Solver(abc.ABC):
         return cls(strategy=strategy)
 
     def _estimate_error(self, *, info_op, cache_obs, m_obs, p):
-
-        # todo: one sho
         scale_sqrtm, error_est = self.strategy.estimate_error(
             info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )
