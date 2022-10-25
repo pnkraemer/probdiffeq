@@ -240,17 +240,17 @@ class DynamicSolver(_Solver):
     def step_fn(self, *, state, info_op, dt, parameters):
         p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
 
-        ext, cache_ext = self.strategy.begin_extrapolation(
+        ext_for_lin, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        m_obs, cache_obs = info_op.linearize(ext, t=state.t + dt, p=parameters)
+        m_obs, cache_obs = info_op.linearize(ext_for_lin, t=state.t + dt, p=parameters)
         error_estimate, output_scale_sqrtm = self._estimate_error(
             info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )
 
         extrapolated = self.strategy.complete_extrapolation(
-            ext,
+            ext_for_lin,
             cache_ext,
             posterior_previous=state.posterior,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -312,19 +312,19 @@ class NonDynamicSolver(_Solver):
         """Step."""
         # Pre-error-estimate steps
         p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
-        ext, cache_ext = self.strategy.begin_extrapolation(
+        ext_for_lin, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, p_inv=p_inv, p=p
         )
 
         # Linearise and estimate error
-        m_obs, cache_obs = info_op.linearize(ext, t=state.t + dt, p=parameters)
+        m_obs, cache_obs = info_op.linearize(ext_for_lin, t=state.t + dt, p=parameters)
         error_estimate, _ = self._estimate_error(
             info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
         )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
-            ext,
+            ext_for_lin,
             cache_ext,
             output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
             posterior_previous=state.posterior,
