@@ -16,17 +16,27 @@
 
 ### Initial value problem solvers
 - [x] Stable implementation
+- [ ] Fixed-steps
 - [x] Error estimation and step-size adaptation
+- [x] I-control
+- [x] PI-control
+- [ ] PID-control
 - [x] EK0 (Think: explicit solvers)
 - [x] EK1 (Think: semi-implicit solvers w/ Jacobians)
-- [ ] UK1 (Think: semi-implicit solvers w/out Jacobians)
+- [ ] UK1 (Think: semi-implicit solvers w/o Jacobians)
 - [x] Global (automatic) calibration
 - [x] Dynamic (automatic) calibration
 - [ ] No automatic calibration
+- [ ] State-space model factorizations:
+  - [x] Isotropic state-space models
+  - [ ] Kronecker state-space models
+  - [x] Diagonal state-space models
+  - [x] Dense state-space models (no factorization)
 - [x] First-order problems
 - [x] Higher-order problems
 - [ ] Mass-matrix problems 
 - [ ] Implicit differential equations
+- [ ] Manifold updates (think: energy conservation)
 - [x] Custom information operators
 - [x] Terminal-value simulation
 - [x] Global simulation (the traditional ``solve()`` method)
@@ -41,6 +51,10 @@
 - [ ] Discrete event handling
 - [ ] Continuous event handling
 - [ ] Physics-enhanced regression
+- [ ] Dense output:
+  - [x] Offgrid-marginalisation
+  - [x] Posterior sampling
+  - [ ] Joint distributions
 
 
 ### Boundary value problem solvers
@@ -49,22 +63,31 @@
 - [ ] Bridge priors
 - [ ] Higher-order problems
 - [ ] Backends:
-  - [ ] Gauss--Newton
+  - [ ] Gauss-Newton
   - [ ] Levenberg-Marquardt
   - [ ] ADMM
 - [ ] Error estimation
 - [ ] Mesh refinement
 
 
-### State-space model machinery
-- [ ] State-space model factorisations:
-  - [x] Kronecker state-space models
-  - [ ] Diagonal state-space models
-  - [x] Dense state-space models (no factorisation)
-- [ ] Dense output:
-  - [x] Offgrid-marginalisation
-  - [x] Posterior sampling
-  - [ ] Joint distributions
+### Tutorials
+- [x] Getting started
+- [x] Different solve() versions
+- [x] Posterior uncertainties
+- [x] Different ways of smoothing
+- [x] Exploring the solution object
+- [ ] Custom information operators
+- [ ] Physics-enhanced regression
+- [ ] Probabilistic numerical method of lines
+- [ ] TBC...
+
+### Benchmarks
+- [ ] Lotka-Volterra
+- [ ] Pleiades
+- [ ] Stiff van-der-Pol
+- [ ] 100-dimensional linear ODE
+- [ ] 1000-dimensional linear ODE?
+- [ ] HIRES
 
 
 ## Installation

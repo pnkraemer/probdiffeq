@@ -11,8 +11,116 @@ but until you do so, use one of ours.
 import jax.tree_util
 
 from odefilter import solvers
-from odefilter.implementations import dense, isotropic
+from odefilter.implementations import batch, dense, isotropic
 from odefilter.strategies import filters, smoothers
+
+
+def ekf0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure, and optimised for terminal-value simulation.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
+
+
+def ekf0_batch_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure, dynamic calibration, and optimised for terminal-value simulation.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
+
+
+def eks0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = smoothers.Smoother(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
+
+
+def eks0_batch_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure and dynamic calibration.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = smoothers.Smoother(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
+
+
+def eks0_batch_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
+
+
+def eks0_batch_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure and dynamic calibration.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
 
 
 def ekf0_isotropic(*, num_derivatives=4, ode_order=1):

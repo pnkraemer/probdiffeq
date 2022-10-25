@@ -3,6 +3,7 @@ odefilter/_version.py
 
 # IDE stuff
 .idea/
+.vscode/
 
 # Notebooks are synced with jupytext.
 # Only the *.md conversion is version-controlled.

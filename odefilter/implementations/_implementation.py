@@ -13,6 +13,10 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def init_output_scale_sqrtm(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def init_error_estimate(self):
         raise NotImplementedError
 

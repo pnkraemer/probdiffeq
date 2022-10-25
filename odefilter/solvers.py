@@ -113,13 +113,13 @@ class _Solver(abc.ABC):
 
         posterior = self.strategy.init_posterior(corrected=corrected)
         sol = self.strategy.extract_sol_terminal_value(posterior=posterior)
-
+        scale_sqrtm = self.strategy.implementation.init_output_scale_sqrtm()
         solution = Solution(
             t=t0,
             u=sol,
             posterior=posterior,
             marginals=None,
-            output_scale_sqrtm=1.0,
+            output_scale_sqrtm=scale_sqrtm,
             num_data_points=1.0,
         )
 
@@ -330,7 +330,7 @@ class NonDynamicSolver(_Solver):
         extrapolated = self.strategy.complete_extrapolation(
             m_ext,
             cache_ext,
-            output_scale_sqrtm=1.0,
+            output_scale_sqrtm=self.strategy.implementation.init_output_scale_sqrtm(),
             posterior_previous=state.posterior,
             p=p,
             p_inv=p_inv,
