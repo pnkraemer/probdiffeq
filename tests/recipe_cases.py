@@ -38,6 +38,38 @@ def solver_eks0_isotropic_dynamic_fixedpoint():
 
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
+def solver_ekf0_batch():
+    return recipes.ekf0_batch(num_derivatives=3, ode_dimension=2)
+
+
+# todo: make these into batch solvers
+
+# @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
+# def solver_ekf0_isotropic_dynamic():
+#     return recipes.ekf0_isotropic_dynamic(num_derivatives=3)
+
+
+# @case(tags=["terminal_value", "solve", "smoother"])
+# def solver_eks0_isotropic():
+#     return recipes.eks0_isotropic(num_derivatives=3)
+
+
+# @case(tags=["terminal_value", "solve", "smoother"])
+# def solver_eks0_isotropic_dynamic():
+#     return recipes.eks0_isotropic_dynamic(num_derivatives=3)
+
+
+# @case(tags=["terminal_value", "checkpoint", "smoother"])
+# def solver_eks0_isotropic_fixedpoint():
+#     return recipes.eks0_isotropic_fixedpoint(num_derivatives=3)
+
+
+# @case(tags=["terminal_value", "checkpoint", "smoother"])
+# def solver_eks0_isotropic_dynamic_fixedpoint():
+#     return recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=3)
+
+
+@case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ekf1():
     return recipes.ekf1(num_derivatives=3, ode_dimension=2)
 
