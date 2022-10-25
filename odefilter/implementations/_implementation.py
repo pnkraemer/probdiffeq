@@ -54,7 +54,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extrapolate_mean(self, m0, /, *, p, p_inv):
+    def begin_extrapolation(self, m0, /, *, p, p_inv):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -62,12 +62,12 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_extrapolation(self, *, m_ext, l0, p_inv, p, output_scale_sqrtm):
+    def complete_extrapolation(self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
     def revert_markov_kernel(
-        self, *, m_ext, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
         raise NotImplementedError
 

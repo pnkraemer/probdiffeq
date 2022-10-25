@@ -12,24 +12,25 @@ from odefilter import _control_flow
 from odefilter.implementations import _ibm, _implementation, _sqrtm
 
 
-@register_pytree_node_class
-class EK0(_implementation.Information):
-    """EK0-linearise an ODE assuming a linearisation-point with\
-     isotropic Kronecker structure."""
-
-    def linearize(self, x, /, *, t, p):
-        bias = x[self.ode_order, ...] - self.f(*x[: self.ode_order, ...], t=t, p=p)
-        return bias, ()
-
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
-        return cov_sqrtm_lower[self.ode_order, ...]
-
-
 class IsotropicNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
     mean: Any  # (n, d) shape
     cov_sqrtm_lower: Any  # (n,n) shape
+
+
+@register_pytree_node_class
+class EK0(_implementation.Information):
+    """EK0-linearise an ODE assuming a linearisation-point with\
+     isotropic Kronecker structure."""
+
+    def linearize(self, x: IsotropicNormal, /, *, t, p):
+        m = x.mean
+        bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
+        return bias, ()
+
+    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+        return cov_sqrtm_lower[self.ode_order, ...]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -85,11 +86,12 @@ class IsotropicImplementation(_implementation.Implementation):
     def assemble_preconditioner(self, *, dt):  # noqa: D102
         return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
-    def extrapolate_mean(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
-        return m_ext, m_ext_p, m0_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        return IsotropicNormal(m_ext, q_sqrtm), m_ext_p, m0_p
 
     def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
         # todo: the info op should return the reshaped version?
@@ -110,8 +112,9 @@ class IsotropicImplementation(_implementation.Implementation):
         return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
-        self, *, m_ext, l0, p_inv, p, output_scale_sqrtm
+        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
     ):
+        m_ext = ext_for_lin.mean
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
@@ -121,8 +124,9 @@ class IsotropicImplementation(_implementation.Implementation):
         return IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, m_ext, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
+        m_ext = ext_for_lin.mean
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
