@@ -57,12 +57,12 @@ def solver_eks0_batch_dynamic():
     return recipes.eks0_batch_dynamic(ode_dimension=2, num_derivatives=3)
 
 
+@case(tags=["terminal_value", "checkpoint", "smoother"])
+def solver_eks0_batch_fixedpoint():
+    return recipes.eks0_batch_fixedpoint(ode_dimension=2, num_derivatives=3)
+
+
 # todo: make these into batch solvers
-
-
-# @case(tags=["terminal_value", "checkpoint", "smoother"])
-# def solver_eks0_isotropic_fixedpoint():
-#     return recipes.eks0_isotropic_fixedpoint(num_derivatives=3)
 
 
 # @case(tags=["terminal_value", "checkpoint", "smoother"])

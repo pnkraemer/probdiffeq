@@ -277,6 +277,11 @@ class BatchImplementation(_implementation.Implementation):
         )
         return samples
 
+    # automatically batched because of numpy's broadcasting rules?
+    def _transform_samples(self, rvs, base):
+        # (d,k) + ((d,k,k) @ (d,k,1))[..., 0] = (d,k)
+        return rvs.mean + (rvs.cov_sqrtm_lower @ base[..., None])[..., 0]
+
     def scale_covariance(self, *, rv, scale_sqrtm):
         # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
         if jnp.ndim(scale_sqrtm) == 1:
