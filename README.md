@@ -23,10 +23,14 @@
 - [x] Global (automatic) calibration
 - [x] Dynamic (automatic) calibration
 - [ ] No automatic calibration
+- [x] Isotropic factorisation in the state-space model
+- [ ] Kronecker factorisation in the state-space model
+- [ ] Batch-diagonal factorisation in the state-space model
 - [x] First-order problems
 - [x] Higher-order problems
 - [ ] Mass-matrix problems 
 - [ ] Implicit differential equations
+- [ ] Manifold updates (think: energy conservation)
 - [x] Custom information operators
 - [x] Terminal-value simulation
 - [x] Global simulation (the traditional ``solve()`` method)
