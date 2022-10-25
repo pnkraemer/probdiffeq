@@ -33,6 +33,24 @@ def ekf0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
+def ekf0_batch_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of an explicit solver with a block-diagonal covariance \
+    structure, dynamic calibration, and optimised for terminal-value simulation.
+
+    Suitable for high-dimensional, non-stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = batch.BatchImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.DynamicSolver(strategy=strategy)
+    information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
+    return solver, information_op
+
+
 def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, and optimised for terminal-value simulation.
