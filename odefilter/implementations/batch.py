@@ -118,9 +118,8 @@ class BatchImplementation(_implementation.Implementation):
         output_scale_sqrtm = self.evidence_sqrtm(
             observed=BatchedNormal(mean=m_obs, cov_sqrtm_lower=l_obs)
         )  # (d,)
-        # print("output_scale_sqrtm", output_scale_sqrtm.shape)
 
-        error_estimate = l_obs
+        error_estimate = l_obs  # (d,)
         return output_scale_sqrtm, error_estimate
 
     def evidence_sqrtm(self, *, observed):
