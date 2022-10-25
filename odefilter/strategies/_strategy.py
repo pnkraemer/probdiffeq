@@ -57,7 +57,7 @@ class Strategy(abc.ABC):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, m_ext, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+        self, ext_for_lin, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
     ):
         raise NotImplementedError
 

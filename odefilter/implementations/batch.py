@@ -12,25 +12,27 @@ from odefilter.implementations import _ibm, _implementation, _sqrtm
 # todo: reconsider naming!
 
 
-@register_pytree_node_class
-class EK0(_implementation.Information):
-    """EK0-linearise an ODE assuming a linearisation-point with\
-     isotropic Kronecker structure."""
-
-    def linearize(self, x, /, *, t, p):
-        # x has shape (d, n)
-        bias = x[..., self.ode_order] - self.f(*(x[..., : self.ode_order]).T, t=t, p=p)
-        return bias, ()
-
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
-        return cov_sqrtm_lower[:, self.ode_order, ...]
-
-
 class BatchedNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
     mean: Any  # (d, k) shape
     cov_sqrtm_lower: Any  # (d, k, k) shape
+
+
+@register_pytree_node_class
+class EK0(_implementation.Information):
+    """EK0-linearise an ODE assuming a linearisation-point with\
+     isotropic Kronecker structure."""
+
+    def linearize(self, x: BatchedNormal, /, *, t, p):
+        m = x.mean
+
+        # m has shape (d, n)
+        bias = m[..., self.ode_order] - self.f(*(m[..., : self.ode_order]).T, t=t, p=p)
+        return bias, ()
+
+    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+        return cov_sqrtm_lower[:, self.ode_order, ...]
 
 
 @register_pytree_node_class
@@ -75,8 +77,9 @@ class BatchImplementation(_implementation.Implementation):
         return p, p_inv
 
     def complete_extrapolation(  # noqa: D102
-        self, *, m_ext, l0, p_inv, p, output_scale_sqrtm
+        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
     ):
+        m_ext = ext_for_lin.mean
         r_ext_p = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
             R1=_transpose(self.a @ (p_inv[..., None] * l0)),
             R2=_transpose(output_scale_sqrtm[:, None, None] * self.q_sqrtm_lower),
@@ -142,7 +145,9 @@ class BatchImplementation(_implementation.Implementation):
         m0_p = p_inv * m0  # (d, k)
         m_ext_p = (self.a @ m0_p[..., None])[..., 0]  # (d, k)
         m_ext = p * m_ext_p
-        return m_ext, m_ext_p, m0_p
+
+        q_ext = p[..., None] * self.q_sqrtm_lower
+        return BatchedNormal(m_ext, q_ext), m_ext_p, m0_p
 
     # todo: move to information?
     def final_correction(
@@ -151,7 +156,6 @@ class BatchImplementation(_implementation.Implementation):
 
         # (d, k), (d, k, k)
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-
         l_obs_nonsquare = info_op.cov_sqrtm_lower(
             cache_obs=cache_obs, cov_sqrtm_lower=l_ext
         )  # (d, k)
@@ -234,8 +238,10 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, m_ext, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
+        m_ext = ext_for_lin.mean
+
         # (d, k, 1) * (d, k, k) = (d, k, k)
         l0_p = p_inv[..., None] * l0
 
