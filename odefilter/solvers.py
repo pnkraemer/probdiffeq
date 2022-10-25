@@ -111,7 +111,10 @@ class _Solver(abc.ABC):
             taylor_coefficients=taylor_coefficients
         )
         sol = self.strategy.extract_sol_terminal_value(posterior=posterior)
-        scale_sqrtm = self.strategy.implementation.init_output_scale_sqrtm()
+
+        scale_sqrtm = self.strategy.init_output_scale_sqrtm()
+        error_estimate = self.strategy.init_error_estimate()
+
         solution = Solution(
             t=t0,
             u=sol,
@@ -121,7 +124,6 @@ class _Solver(abc.ABC):
             num_data_points=1.0,
         )
 
-        error_estimate = self.strategy.implementation.init_error_estimate()
         return solution, error_estimate
 
     def interpolate_fn(self, *, s0, s1, t):  # noqa: D102

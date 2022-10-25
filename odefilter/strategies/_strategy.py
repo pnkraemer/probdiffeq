@@ -86,3 +86,9 @@ class Strategy(abc.ABC):
     def _base_samples(self, key, *, shape):
         base_samples = jax.random.normal(key=key, shape=shape)
         return base_samples
+
+    def init_error_estimate(self):
+        return self.implementation.init_error_estimate()
+
+    def init_output_scale_sqrtm(self):
+        return self.implementation.init_output_scale_sqrtm()
