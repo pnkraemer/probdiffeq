@@ -242,11 +242,11 @@ class DynamicSolver(_Solver):
             posterior=state.posterior, p=p, p_inv=p_inv
         )
 
-        m_obs, cache_obs = info_op.linearize(
+        obs_pt, cache_obs = info_op.linearize(
             linearisation_pt, t=state.t + dt, p=parameters
         )
         error_estimate, output_scale_sqrtm = self._estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+            info_op=info_op, cache_obs=cache_obs, obs_pt=obs_pt
         )
 
         extrapolated = self.strategy.complete_extrapolation(
@@ -260,7 +260,10 @@ class DynamicSolver(_Solver):
 
         # Final observation
         _, (corrected, _) = self.strategy.final_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+            info_op=info_op,
+            extrapolated=extrapolated,
+            cache_obs=cache_obs,
+            obs_pt=obs_pt,
         )
 
         # Return solution
@@ -317,11 +320,11 @@ class NonDynamicSolver(_Solver):
         )
 
         # Linearise and estimate error
-        m_obs, cache_obs = info_op.linearize(
+        obs_pt, cache_obs = info_op.linearize(
             linearisation_pt, t=state.t + dt, p=parameters
         )
         error_estimate, _ = self._estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+            info_op=info_op, cache_obs=cache_obs, obs_pt=obs_pt, p=p
         )
 
         # Post-error-estimate steps
@@ -337,7 +340,10 @@ class NonDynamicSolver(_Solver):
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.strategy.final_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+            info_op=info_op,
+            extrapolated=extrapolated,
+            cache_obs=cache_obs,
+            obs_pt=obs_pt,
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
             diffsqrtm=output_scale_sqrtm, n=n, obs=observed

@@ -93,7 +93,7 @@ class IsotropicImplementation(_implementation.Implementation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         return IsotropicNormal(m_ext, q_sqrtm), m_ext_p, m0_p
 
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
+    def estimate_error(self, *, info_op, cache_obs, obs_pt, p):  # noqa: D102
         # todo: the info op should return the reshaped version?
         l_obs_raw = info_op.cov_sqrtm_lower(
             cache_obs=cache_obs, cov_sqrtm_lower=p[:, None] * self.q_sqrtm_lower
@@ -101,7 +101,7 @@ class IsotropicImplementation(_implementation.Implementation):
 
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
         l_obs = jnp.reshape(_sqrtm.sqrtm_to_upper_triangular(R=l_obs_raw[:, None]), ())
-        res_white = (m_obs / l_obs) / jnp.sqrt(m_obs.size)
+        res_white = (obs_pt / l_obs) / jnp.sqrt(obs_pt.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
         output_scale_sqrtm = jnp.reshape(
@@ -150,7 +150,7 @@ class IsotropicImplementation(_implementation.Implementation):
         return extrapolated, (backward_noise, backward_op)
 
     def final_correction(
-        self, *, info_op, extrapolated, cache_obs, m_obs
+        self, *, info_op, extrapolated, cache_obs, obs_pt
     ):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = info_op.cov_sqrtm_lower(
@@ -162,10 +162,10 @@ class IsotropicImplementation(_implementation.Implementation):
         )
         c_obs = l_obs_scalar**2
 
-        observed = IsotropicNormal(mean=m_obs, cov_sqrtm_lower=l_obs_scalar)
+        observed = IsotropicNormal(mean=obs_pt, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
-        m_cor = m_ext - g[:, None] * m_obs[None, :]
+        m_cor = m_ext - g[:, None] * obs_pt[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
@@ -250,8 +250,8 @@ class IsotropicImplementation(_implementation.Implementation):
         return mean[..., 0, :]
 
     def evidence_sqrtm(self, *, observed):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = m_obs / l_obs
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = obs_pt / l_obs
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 

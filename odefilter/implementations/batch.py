@@ -109,7 +109,7 @@ class BatchImplementation(_implementation.Implementation):
         return noise, g
 
     # todo: move to information?
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
+    def estimate_error(self, *, info_op, cache_obs, obs_pt, p):  # noqa: D102
         l_obs_nonsquare = info_op.cov_sqrtm_lower(
             cache_obs=cache_obs, cov_sqrtm_lower=p[..., None] * self.q_sqrtm_lower
         )  # (d, k)
@@ -120,7 +120,7 @@ class BatchImplementation(_implementation.Implementation):
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
         output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchedNormal(mean=m_obs, cov_sqrtm_lower=l_obs)
+            observed=BatchedNormal(mean=obs_pt, cov_sqrtm_lower=l_obs)
         )  # (d,)
 
         error_estimate = l_obs  # (d,)
@@ -128,9 +128,9 @@ class BatchImplementation(_implementation.Implementation):
 
     # todo: move to information?
     def evidence_sqrtm(self, *, observed):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 
-        res_white = m_obs / l_obs  # (d, )
+        res_white = obs_pt / l_obs  # (d, )
         evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
 
         return evidence_sqrtm
@@ -151,7 +151,7 @@ class BatchImplementation(_implementation.Implementation):
 
     # todo: move to information?
     def final_correction(
-        self, *, info_op, extrapolated, cache_obs, m_obs
+        self, *, info_op, extrapolated, cache_obs, obs_pt
     ):  # noqa: D102
 
         # (d, k), (d, k, k)
@@ -165,14 +165,14 @@ class BatchImplementation(_implementation.Implementation):
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = BatchedNormal(mean=m_obs, cov_sqrtm_lower=l_obs_scalar)
+        observed = BatchedNormal(mean=obs_pt, cov_sqrtm_lower=l_obs_scalar)
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
 
         gain = crosscov / (l_obs_scalar[..., None]) ** 2  # (d, k)
 
-        m_cor = m_ext - (gain * m_obs[..., None])  # (d, k)
+        m_cor = m_ext - (gain * obs_pt[..., None])  # (d, k)
         l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
 
         corrected = BatchedNormal(mean=m_cor, cov_sqrtm_lower=l_cor)

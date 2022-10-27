@@ -101,12 +101,12 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return linearisation_pt, (m_ext_p, m0_p)
 
-    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
+    def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
         a, (corrected, b) = self.implementation.final_correction(
             info_op=info_op,
             extrapolated=extrapolated.init,
             cache_obs=cache_obs,
-            m_obs=m_obs,
+            obs_pt=obs_pt,
         )
         corrected_seq = MarkovSequence(
             init=corrected, backward_model=extrapolated.backward_model

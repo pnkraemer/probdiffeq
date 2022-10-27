@@ -101,7 +101,10 @@ class Filter(_strategy.Strategy):
         )
         return extrapolated
 
-    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
+    def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
         return self.implementation.final_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+            info_op=info_op,
+            extrapolated=extrapolated,
+            cache_obs=cache_obs,
+            obs_pt=obs_pt,
         )
