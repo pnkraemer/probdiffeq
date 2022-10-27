@@ -71,7 +71,14 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+        self,
+        linearisation_pt,
+        cache,
+        *,
+        output_scale_sqrtm,
+        p,
+        p_inv,
+        posterior_previous
     ):
         raise NotImplementedError
 
@@ -89,10 +96,10 @@ class _SmootherCommon(_strategy.Strategy):
         return posterior
 
     def begin_extrapolation(self, *, posterior, p_inv, p):
-        ext_for_lin, m_ext_p, m0_p = self.implementation.begin_extrapolation(
+        linearisation_pt, m_ext_p, m0_p = self.implementation.begin_extrapolation(
             posterior.init.mean, p=p, p_inv=p_inv
         )
-        return ext_for_lin, (m_ext_p, m0_p)
+        return linearisation_pt, (m_ext_p, m0_p)
 
     def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
         a, (corrected, b) = self.implementation.final_correction(
@@ -175,12 +182,12 @@ class _SmootherCommon(_strategy.Strategy):
         dt = t - t0
         p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
 
-        ext_for_lin, m_ext_p, m0_p = self.implementation.begin_extrapolation(
+        linearisation_pt, m_ext_p, m0_p = self.implementation.begin_extrapolation(
             rv.mean, p=p, p_inv=p_inv
         )
 
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            ext_for_lin=ext_for_lin,
+            linearisation_pt=linearisation_pt,
             m_ext_p=m_ext_p,
             m0_p=m0_p,
             l0=rv.cov_sqrtm_lower,
@@ -206,11 +213,18 @@ class Smoother(_SmootherCommon):
     """Smoother."""
 
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+        self,
+        linearisation_pt,
+        cache,
+        *,
+        output_scale_sqrtm,
+        p,
+        p_inv,
+        posterior_previous
     ):
         m_ext_p, m0_p = cache
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            ext_for_lin=ext_for_lin,
+            linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,
@@ -278,11 +292,18 @@ class FixedPointSmoother(_SmootherCommon):
     """Fixed-point smoother."""
 
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
+        self,
+        linearisation_pt,
+        cache,
+        *,
+        posterior_previous,
+        output_scale_sqrtm,
+        p,
+        p_inv
     ):
         m_ext_p, m0_p = cache
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            ext_for_lin=ext_for_lin,
+            linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
             p=p,
             p_inv=p_inv,

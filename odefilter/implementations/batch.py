@@ -77,9 +77,9 @@ class BatchImplementation(_implementation.Implementation):
         return p, p_inv
 
     def complete_extrapolation(  # noqa: D102
-        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, p_inv, p, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        m_ext = linearisation_pt.mean
         r_ext_p = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
             R1=_transpose(self.a @ (p_inv[..., None] * l0)),
             R2=_transpose(output_scale_sqrtm[:, None, None] * self.q_sqrtm_lower),
@@ -234,9 +234,9 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
-        m_ext = ext_for_lin.mean
+        m_ext = linearisation_pt.mean
 
         # (d, k, 1) * (d, k, k) = (d, k, k)
         l0_p = p_inv[..., None] * l0

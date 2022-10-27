@@ -112,9 +112,9 @@ class IsotropicImplementation(_implementation.Implementation):
         return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
-        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, p_inv, p, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        m_ext = linearisation_pt.mean
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
@@ -124,9 +124,9 @@ class IsotropicImplementation(_implementation.Implementation):
         return IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
     ):
-        m_ext = ext_for_lin.mean
+        m_ext = linearisation_pt.mean
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
