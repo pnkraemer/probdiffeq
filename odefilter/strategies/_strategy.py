@@ -100,10 +100,8 @@ class Strategy(abc.ABC):
     def init_output_scale_sqrtm(self):
         return self.implementation.init_output_scale_sqrtm()
 
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):
-        return self.implementation.estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
-        )
+    def estimate_error(self, **kwargs):
+        return self.implementation.estimate_error(**kwargs)
 
     def assemble_preconditioner(self, *, dt):
         return self.implementation.assemble_preconditioner(dt=dt)

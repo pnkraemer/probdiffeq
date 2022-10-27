@@ -225,10 +225,8 @@ class _Solver(abc.ABC):
         (strategy,) = children
         return cls(strategy=strategy)
 
-    def _estimate_error(self, *, info_op, cache_obs, m_obs, p):
-        scale_sqrtm, error_est = self.strategy.estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
-        )
+    def _estimate_error(self, **kwargs):
+        scale_sqrtm, error_est = self.strategy.estimate_error(**kwargs)
         error_est = error_est * scale_sqrtm
         return error_est, scale_sqrtm
 
