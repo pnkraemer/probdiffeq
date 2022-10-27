@@ -285,13 +285,5 @@ class AdaptiveODEFilter(Generic[R]):
         return state
 
 
-def _empty_like(tree):
-    return jax.tree_util.tree_map(jnp.empty_like, tree)
-
-
-def _nan_like(tree):
-    return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)
-
-
 def _inf_like(tree):
     return jax.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)

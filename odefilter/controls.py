@@ -70,38 +70,6 @@ class _ProportionalIntegralCommon(AbstractControl):
     def init_fn(self):
         return _PIState(error_norm_previously_accepted=1.0)
 
-    @staticmethod
-    def _scale_factor_proportional_integral(
-        *,
-        error_norm,
-        error_norm_previously_accepted,
-        error_contraction_rate,
-        safety,
-        factor_min,
-        factor_max,
-        power_integral_unscaled,
-        power_proportional_unscaled,
-    ):
-        """Proportional-integral control.
-
-        Proportional-integral control simplifies to integral control
-        when the parameters are chosen as
-
-            `power_integral_unscaled=1`,
-            `power_proportional_unscaled=0`.
-        """
-        n1 = power_integral_unscaled / error_contraction_rate
-        n2 = power_proportional_unscaled / error_contraction_rate
-
-        a1 = (1.0 / error_norm) ** n1
-        a2 = (error_norm_previously_accepted / error_norm) ** n2
-        scale_factor = safety * a1 * a2
-
-        scale_factor_clipped = jnp.maximum(
-            factor_min, jnp.minimum(scale_factor, factor_max)
-        )
-        return scale_factor_clipped
-
     @abc.abstractmethod
     def clip_fn(self, *, state, dt, t1):
         raise NotImplementedError

@@ -84,10 +84,6 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_preconditioner(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def init_backward_transition(self):
         raise NotImplementedError
 

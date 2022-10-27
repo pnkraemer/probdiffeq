@@ -199,10 +199,6 @@ class BatchImplementation(_implementation.Implementation):
     def init_output_scale_sqrtm(self):
         return jnp.ones((self.ode_dimension,))
 
-    def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones((self.ode_dimension, self.num_derivatives + 1))
-        return empty, empty
-
     def marginalise_backwards(self, *, init, linop, noise):
         def body_fun(carry, x):
             op, noi = x

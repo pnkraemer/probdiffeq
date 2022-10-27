@@ -249,10 +249,6 @@ class IsotropicImplementation(_implementation.Implementation):
     def extract_mean_from_marginals(self, mean):
         return mean[..., 0, :]
 
-    def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones((self.a.shape[0],))
-        return empty, empty
-
     def evidence_sqrtm(self, *, observed):
         m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = m_obs / l_obs

@@ -210,10 +210,6 @@ class DenseImplementation(_implementation.Implementation):
             return rv.mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
         return jax.vmap(self.extract_sol)(rv=rv)
 
-    def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones(((self.num_derivatives + 1) * self.ode_dimension,))
-        return empty, empty
-
     def init_backward_transition(self):  # noqa: D102
         k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
