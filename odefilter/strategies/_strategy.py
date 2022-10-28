@@ -52,17 +52,17 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, *, posterior, p_inv, p):
+    def begin_extrapolation(self, *, posterior, dt):
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
+    def complete_correction(self, *, info_op, extrapolated, cache_obs):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -93,13 +93,5 @@ class Strategy(abc.ABC):
     def init_output_scale_sqrtm(self):
         return self.implementation.init_output_scale_sqrtm()
 
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):
-        return self.implementation.estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
-        )
-
-    def assemble_preconditioner(self, *, dt):
-        return self.implementation.assemble_preconditioner(dt=dt)
-
-    def evidence_sqrtm(self, *, observed):
-        return self.implementation.evidence_sqrtm(observed=observed)
+    def begin_correction(self, linearisation_pt, *, info_op, t, p):
+        return info_op.begin_correction(linearisation_pt, t=t, p=p)

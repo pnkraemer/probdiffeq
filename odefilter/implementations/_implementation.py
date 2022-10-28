@@ -25,11 +25,15 @@ class Information(abc.ABC):
         return cls(f, ode_order=ode_order)
 
     @abc.abstractmethod
-    def linearize(self, x, /, *, t, p):
+    def begin_correction(self, x, /, *, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+    def complete_correction(self, *, extrapolated, cache):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def evidence_sqrtm(self, *, observed):
         raise NotImplementedError
 
 
@@ -50,29 +54,17 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def assemble_preconditioner(self, *, dt):
+    def begin_extrapolation(self, m0, /, *, dt):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, m0, /, *, p, p_inv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_extrapolation(self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def revert_markov_kernel(
-        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+    def complete_extrapolation(
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
+    def revert_markov_kernel(self, *, linearisation_pt, l0, cache, output_scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -84,19 +76,11 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_preconditioner(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def init_backward_transition(self):
         raise NotImplementedError
 
     @abc.abstractmethod
     def init_backward_noise(self, *, rv_proto):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def evidence_sqrtm(self, *, observed):
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -37,8 +37,37 @@ class EK1(_implementation.Information):
         f, ode_order, ode_dimension = aux
         return cls(f, ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def linearize(self, x: MultivariateNormal, /, *, t, p):
-        return jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
+    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
+        b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
+
+        cov_sqrtm_lower = self._cov_sqrtm_lower(
+            cache=(b, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
+        )
+
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        output_scale_sqrtm = self.evidence_sqrtm(
+            observed=MultivariateNormal(b, l_obs_raw)
+        )
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
+
+    def complete_correction(self, *, extrapolated, cache):  # noqa: D102
+        b, _ = cache
+
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+
+        l_obs_nonsquare = self._cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
+
+        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
+        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
+
+        crosscov = l_ext @ l_obs_nonsquare.T
+        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
+
+        m_cor = m_ext - gain @ b
+        l_cor = l_ext - gain @ l_obs_nonsquare
+        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        return observed, (corrected, gain)
 
     def _residual(self, x, *, t, p):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
@@ -47,8 +76,15 @@ class EK1(_implementation.Information):
         fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
-        return jax.vmap(cache_obs, in_axes=1, out_axes=1)(cov_sqrtm_lower)
+    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+        _, fn = cache
+        return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
+
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
 
 
 @register_pytree_node_class
@@ -99,7 +135,15 @@ class DenseImplementation(_implementation.Implementation):
     def init_error_estimate(self):  # noqa: D102
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
-    def assemble_preconditioner(self, *, dt):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):  # noqa: D102
+        p, p_inv = self._assemble_preconditioner(dt=dt)
+        m0_p = p_inv * m0
+        m_ext_p = self.a @ m0_p
+        m_ext = p * m_ext_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        return MultivariateNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+
+    def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -107,30 +151,11 @@ class DenseImplementation(_implementation.Implementation):
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
 
-    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
-        m0_p = p_inv * m0
-        m_ext_p = self.a @ m0_p
-        m_ext = p * m_ext_p
-        q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return MultivariateNormal(m_ext, q_sqrtm), m_ext_p, m0_p
-
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=p[:, None] * self.q_sqrtm_lower
-        )
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
-
-        # todo: make this call self.evidence()
-        res_white = jsp.linalg.solve_triangular(l_obs_raw.T, m_obs, lower=False)
-        output_scale_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return output_scale_sqrtm, error_estimate
-
     def complete_extrapolation(  # noqa: D102
-        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        _, _, p, p_inv = cache
+        m_ext = linearisation_pt.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ (p_inv[:, None] * l0)).T,
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
@@ -139,9 +164,11 @@ class DenseImplementation(_implementation.Implementation):
         return MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, cache, l0, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        m_ext_p, m0_p, p, p_inv = cache
+        m_ext = linearisation_pt.mean
+
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
@@ -179,40 +206,10 @@ class DenseImplementation(_implementation.Implementation):
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    def final_correction(
-        self, *, info_op, extrapolated, cache_obs, m_obs
-    ):  # noqa: D102
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
-        )
-
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
-        observed = MultivariateNormal(mean=m_obs, cov_sqrtm_lower=l_obs)
-
-        crosscov = l_ext @ l_obs_nonsquare.T
-        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
-
-        m_cor = m_ext - gain @ m_obs
-        l_cor = l_ext - gain @ l_obs_nonsquare
-        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, gain)
-
-    def evidence_sqrtm(self, *, observed):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, m_obs, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
-
     def extract_sol(self, *, rv):  # noqa: D102
         if rv.mean.ndim == 1:
             return rv.mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
         return jax.vmap(self.extract_sol)(rv=rv)
-
-    def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones(((self.num_derivatives + 1) * self.ode_dimension,))
-        return empty, empty
 
     def init_backward_transition(self):  # noqa: D102
         k = (self.num_derivatives + 1) * self.ode_dimension

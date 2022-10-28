@@ -24,15 +24,65 @@ class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def linearize(self, x: BatchedNormal, /, *, t, p):
+    def begin_correction(self, x: BatchedNormal, /, *, t, p):
         m = x.mean
 
         # m has shape (d, n)
         bias = m[..., self.ode_order] - self.f(*(m[..., : self.ode_order]).T, t=t, p=p)
-        return bias, ()
+        l_obs_nonsquare = self._cov_sqrtm_lower(
+            cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
+        )
 
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+        l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
+
+        # (d, 1, 1)
+        l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
+        l_obs = l_obs_raw[..., 0, 0]  # (d,)
+
+        output_scale_sqrtm = self.evidence_sqrtm(
+            observed=BatchedNormal(mean=bias, cov_sqrtm_lower=l_obs)
+        )  # (d,)
+
+        error_estimate = l_obs  # (d,)
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
+
+    def complete_correction(self, *, extrapolated, cache):
+        (bias,) = cache
+
+        # (d, k), (d, k, k)
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+        l_obs_nonsquare = self._cov_sqrtm_lower(
+            cache=(), cov_sqrtm_lower=l_ext
+        )  # (d, k)
+
+        # (d, 1, 1)
+        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare[..., None])
+        l_obs_scalar = l_obs[..., 0, 0]  # (d,)
+
+        # (d,), (d,)
+        observed = BatchedNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+
+        # (d, k)
+        crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
+
+        gain = crosscov / (l_obs_scalar[..., None]) ** 2  # (d, k)
+
+        m_cor = m_ext - (gain * bias[..., None])  # (d, k)
+        l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
+
+        corrected = BatchedNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        return observed, (corrected, gain)
+
+    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
+
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
+
+        res_white = obs_pt / l_obs  # (d, )
+        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
+
+        return evidence_sqrtm
 
 
 @register_pytree_node_class
@@ -68,7 +118,7 @@ class BatchImplementation(_implementation.Implementation):
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
-    def assemble_preconditioner(self, *, dt):  # noqa: D102
+    def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -76,10 +126,11 @@ class BatchImplementation(_implementation.Implementation):
         p_inv = jnp.stack([p_inv] * self.ode_dimension)
         return p, p_inv
 
-    def complete_extrapolation(  # noqa: D102
-        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
+    def complete_extrapolation(
+        self, *, linearisation_pt, cache, l0, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        *_, p, p_inv = cache
+        m_ext = linearisation_pt.mean
         r_ext_p = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
             R1=_transpose(self.a @ (p_inv[..., None] * l0)),
             R2=_transpose(output_scale_sqrtm[:, None, None] * self.q_sqrtm_lower),
@@ -108,76 +159,23 @@ class BatchImplementation(_implementation.Implementation):
         noise = BatchedNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    # todo: move to information?
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=p[..., None] * self.q_sqrtm_lower
-        )  # (d, k)
-        l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
-
-        # (d, 1, 1)
-        l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
-        l_obs = l_obs_raw[..., 0, 0]  # (d,)
-
-        output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchedNormal(mean=m_obs, cov_sqrtm_lower=l_obs)
-        )  # (d,)
-
-        error_estimate = l_obs  # (d,)
-        return output_scale_sqrtm, error_estimate
-
-    # todo: move to information?
-    def evidence_sqrtm(self, *, observed):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
-
-        res_white = m_obs / l_obs  # (d, )
-        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
-
-        return evidence_sqrtm
-
     def extract_mean_from_marginals(self, mean):
         return mean[..., 0]
 
     def extract_sol(self, *, rv):  # noqa: D102
         return self.extract_mean_from_marginals(mean=rv.mean)
 
-    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):
+
+        p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * m0  # (d, k)
         m_ext_p = (self.a @ m0_p[..., None])[..., 0]  # (d, k)
         m_ext = p * m_ext_p
 
         q_ext = p[..., None] * self.q_sqrtm_lower
-        return BatchedNormal(m_ext, q_ext), m_ext_p, m0_p
+        return BatchedNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
-    # todo: move to information?
-    def final_correction(
-        self, *, info_op, extrapolated, cache_obs, m_obs
-    ):  # noqa: D102
-
-        # (d, k), (d, k, k)
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
-        )  # (d, k)
-
-        # (d, 1, 1)
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare[..., None])
-        l_obs_scalar = l_obs[..., 0, 0]  # (d,)
-
-        # (d,), (d,)
-        observed = BatchedNormal(mean=m_obs, cov_sqrtm_lower=l_obs_scalar)
-
-        # (d, k)
-        crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
-
-        gain = crosscov / (l_obs_scalar[..., None]) ** 2  # (d, k)
-
-        m_cor = m_ext - (gain * m_obs[..., None])  # (d, k)
-        l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
-
-        corrected = BatchedNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, gain)
-
+    # todo: make into init_backward_model?
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
         return BatchedNormal(
             mean=jnp.zeros_like(rv_proto.mean),
@@ -193,15 +191,13 @@ class BatchImplementation(_implementation.Implementation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return BatchedNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
 
+    # todo: move to information?
     def init_error_estimate(self):  # noqa: D102
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
+    # todo: move to information?
     def init_output_scale_sqrtm(self):
         return jnp.ones((self.ode_dimension,))
-
-    def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones((self.ode_dimension, self.num_derivatives + 1))
-        return empty, empty
 
     def marginalise_backwards(self, *, init, linop, noise):
         def body_fun(carry, x):
@@ -238,9 +234,10 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, l0, output_scale_sqrtm, cache
     ):
-        m_ext = ext_for_lin.mean
+        m_ext_p, m0_p, p, p_inv = cache
+        m_ext = linearisation_pt.mean
 
         # (d, k, 1) * (d, k, k) = (d, k, k)
         l0_p = p_inv[..., None] * l0

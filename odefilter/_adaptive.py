@@ -1,6 +1,5 @@
 """Adaptive solvers."""
 from dataclasses import dataclass
-from functools import partial  # noqa: F401
 from typing import Any, Callable, Generic, TypeVar, Union
 
 import jax.lax
@@ -283,14 +282,6 @@ class AdaptiveODEFilter(Generic[R]):
     def extract_terminal_value_fn(self, *, state):  # noqa: D102
         state = self.solver.extract_terminal_value_fn(state=state.solution)
         return state
-
-
-def _empty_like(tree):
-    return jax.tree_util.tree_map(jnp.empty_like, tree)
-
-
-def _nan_like(tree):
-    return jax.tree_map(lambda x: jnp.nan * jnp.ones_like(x), tree)
 
 
 def _inf_like(tree):

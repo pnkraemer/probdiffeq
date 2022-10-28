@@ -225,12 +225,10 @@ class _Solver(abc.ABC):
         (strategy,) = children
         return cls(strategy=strategy)
 
-    def _estimate_error(self, *, info_op, cache_obs, m_obs, p):
-        scale_sqrtm, error_est = self.strategy.estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
-        )
-        error_est = error_est * scale_sqrtm
-        return error_est, scale_sqrtm
+    # def _estimate_error(self, *, info_op, **kwargs):
+    #     scale_sqrtm, error_est = self.strategy.estimate_error(**kwargs)
+    #     error_est = error_est * scale_sqrtm
+    #     return error_est, scale_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
@@ -238,29 +236,24 @@ class DynamicSolver(_Solver):
     """Dynamic calibration."""
 
     def step_fn(self, *, state, info_op, dt, parameters):
-        p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
-
-        ext_for_lin, cache_ext = self.strategy.begin_extrapolation(
-            posterior=state.posterior, p=p, p_inv=p_inv
+        # p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
+        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+            posterior=state.posterior, dt=dt
         )
-
-        m_obs, cache_obs = info_op.linearize(ext_for_lin, t=state.t + dt, p=parameters)
-        error_estimate, output_scale_sqrtm = self._estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        error, scale_sqrtm, cache_obs = self.strategy.begin_correction(
+            linearisation_pt, info_op=info_op, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
-            ext_for_lin,
+            linearisation_pt,
             cache_ext,
             posterior_previous=state.posterior,
-            output_scale_sqrtm=output_scale_sqrtm,
-            p=p,
-            p_inv=p_inv,
+            output_scale_sqrtm=scale_sqrtm,
         )
 
         # Final observation
-        _, (corrected, _) = self.strategy.final_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+        _, (corrected, _) = self.strategy.complete_correction(
+            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs
         )
 
         # Return solution
@@ -270,11 +263,11 @@ class DynamicSolver(_Solver):
             u=sol,
             posterior=corrected,
             marginals=None,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale_sqrtm=scale_sqrtm,
             num_data_points=state.num_data_points + 1,
         )
 
-        return smoothing_solution, dt * error_estimate
+        return smoothing_solution, dt * error
 
     def extract_fn(self, *, state):  # noqa: D102
 
@@ -311,34 +304,32 @@ class NonDynamicSolver(_Solver):
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         # Pre-error-estimate steps
-        p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
-        ext_for_lin, cache_ext = self.strategy.begin_extrapolation(
-            posterior=state.posterior, p_inv=p_inv, p=p
+        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+            posterior=state.posterior, dt=dt
         )
 
         # Linearise and estimate error
-        m_obs, cache_obs = info_op.linearize(ext_for_lin, t=state.t + dt, p=parameters)
-        error_estimate, _ = self._estimate_error(
-            info_op=info_op, cache_obs=cache_obs, m_obs=m_obs, p=p
+        error, _, cache_obs = self.strategy.begin_correction(
+            linearisation_pt, info_op=info_op, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
-            ext_for_lin,
+            linearisation_pt,
             cache_ext,
             output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
             posterior_previous=state.posterior,
-            p=p,
-            p_inv=p_inv,
         )
 
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
-        observed, (corrected, _) = self.strategy.final_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
+        observed, (corrected, _) = self.strategy.complete_correction(
+            info_op=info_op,
+            extrapolated=extrapolated,
+            cache_obs=cache_obs,
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
-            diffsqrtm=output_scale_sqrtm, n=n, obs=observed
+            info_op=info_op, diffsqrtm=output_scale_sqrtm, n=n, obs=observed
         )
 
         # Extract and return solution
@@ -351,10 +342,10 @@ class NonDynamicSolver(_Solver):
             output_scale_sqrtm=new_output_scale_sqrtm,
             num_data_points=n + 1,
         )
-        return filtered, dt * error_estimate
+        return filtered, dt * error
 
-    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
-        evidence_sqrtm = self.strategy.evidence_sqrtm(observed=obs)
+    def _update_output_scale_sqrtm(self, *, info_op, diffsqrtm, n, obs):
+        evidence_sqrtm = info_op.evidence_sqrtm(observed=obs)
         return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):  # noqa: D102

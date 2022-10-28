@@ -71,7 +71,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
         raise NotImplementedError
 
@@ -88,18 +88,12 @@ class _SmootherCommon(_strategy.Strategy):
         posterior = MarkovSequence(init=corrected, backward_model=backward_model)
         return posterior
 
-    def begin_extrapolation(self, *, posterior, p_inv, p):
-        ext_for_lin, m_ext_p, m0_p = self.implementation.begin_extrapolation(
-            posterior.init.mean, p=p, p_inv=p_inv
-        )
-        return ext_for_lin, (m_ext_p, m0_p)
+    def begin_extrapolation(self, *, posterior, dt):
+        return self.implementation.begin_extrapolation(posterior.init.mean, dt=dt)
 
-    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
-        a, (corrected, b) = self.implementation.final_correction(
-            info_op=info_op,
-            extrapolated=extrapolated.init,
-            cache_obs=cache_obs,
-            m_obs=m_obs,
+    def complete_correction(self, *, info_op, extrapolated, cache_obs):
+        a, (corrected, b) = info_op.complete_correction(
+            extrapolated=extrapolated.init, cache=cache_obs
         )
         corrected_seq = MarkovSequence(
             init=corrected, backward_model=extrapolated.backward_model
@@ -173,20 +167,14 @@ class _SmootherCommon(_strategy.Strategy):
 
     def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-
-        ext_for_lin, m_ext_p, m0_p = self.implementation.begin_extrapolation(
-            rv.mean, p=p, p_inv=p_inv
+        linearisation_pt, cache = self.implementation.begin_extrapolation(
+            rv.mean, dt=dt
         )
-
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            ext_for_lin=ext_for_lin,
-            m_ext_p=m_ext_p,
-            m0_p=m0_p,
+            linearisation_pt=linearisation_pt,
             l0=rv.cov_sqrtm_lower,
-            p=p,
-            p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
+            cache=cache,
         )
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return extrapolated, backward_model  # should this return a MarkovSequence?
@@ -206,17 +194,13 @@ class Smoother(_SmootherCommon):
     """Smoother."""
 
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, output_scale_sqrtm, p, p_inv, posterior_previous
+        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
-        m_ext_p, m0_p = cache
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            ext_for_lin=ext_for_lin,
+            linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
-            p=p,
-            p_inv=p_inv,
+            cache=cache,
             output_scale_sqrtm=output_scale_sqrtm,
-            m0_p=m0_p,
-            m_ext_p=m_ext_p,
         )
         backward_model = BackwardModel(transition=bw_op, noise=bw_noise)
         return MarkovSequence(init=extrapolated, backward_model=backward_model)
@@ -278,17 +262,13 @@ class FixedPointSmoother(_SmootherCommon):
     """Fixed-point smoother."""
 
     def complete_extrapolation(
-        self, ext_for_lin, cache, *, posterior_previous, output_scale_sqrtm, p, p_inv
+        self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm
     ):
-        m_ext_p, m0_p = cache
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
-            ext_for_lin=ext_for_lin,
+            linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
-            p=p,
-            p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
-            m0_p=m0_p,
-            m_ext_p=m_ext_p,
+            cache=cache,
         )
         bw_increment = BackwardModel(transition=bw_op, noise=bw_noise)
 

@@ -24,13 +24,54 @@ class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def linearize(self, x: IsotropicNormal, /, *, t, p):
+    def begin_correction(self, x: IsotropicNormal, /, *, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
-        return bias, ()
 
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+        cov_sqrtm_lower = self._cov_sqrtm_lower(
+            cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
+        )
+
+        l_obs = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None]), ()
+        )
+        res_white = (bias / l_obs) / jnp.sqrt(bias.size)
+
+        # jnp.sqrt(\|res_white\|^2/d) without forming the square
+        output_scale_sqrtm = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
+        )
+
+        error_estimate = l_obs
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
+
+    def complete_correction(self, *, extrapolated, cache):
+        (bias,) = cache
+
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+        l_obs = self._cov_sqrtm_lower(cache=(), cov_sqrtm_lower=l_ext)
+
+        l_obs_scalar = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
+        )
+        c_obs = l_obs_scalar**2
+
+        observed = IsotropicNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+
+        g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
+        m_cor = m_ext - g[:, None] * bias[None, :]
+        l_cor = l_ext - g[:, None] * l_obs[None, :]
+        corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        return observed, (corrected, g)
+
+    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[self.ode_order, ...]
+
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = obs_pt / l_obs
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
@@ -83,38 +124,23 @@ class IsotropicImplementation(_implementation.Implementation):
     def init_output_scale_sqrtm(self):
         return 1.0
 
-    def assemble_preconditioner(self, *, dt):  # noqa: D102
-        return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
-
-    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):  # noqa: D102
+        p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return IsotropicNormal(m_ext, q_sqrtm), m_ext_p, m0_p
+        return IsotropicNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
-    def estimate_error(self, *, info_op, cache_obs, m_obs, p):  # noqa: D102
-        # todo: the info op should return the reshaped version?
-        l_obs_raw = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=p[:, None] * self.q_sqrtm_lower
-        )
-
-        # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = jnp.reshape(_sqrtm.sqrtm_to_upper_triangular(R=l_obs_raw[:, None]), ())
-        res_white = (m_obs / l_obs) / jnp.sqrt(m_obs.size)
-
-        # jnp.sqrt(\|res_white\|^2/d) without forming the square
-        output_scale_sqrtm = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
-        )
-
-        error_estimate = l_obs
-        return output_scale_sqrtm, error_estimate
+    def _assemble_preconditioner(self, *, dt):  # noqa: D102
+        return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
     def complete_extrapolation(  # noqa: D102
-        self, *, ext_for_lin, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        _, _, p, p_inv = cache
+        m_ext = linearisation_pt.mean
+
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
@@ -124,9 +150,11 @@ class IsotropicImplementation(_implementation.Implementation):
         return IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, ext_for_lin, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
-        m_ext = ext_for_lin.mean
+        m_ext_p, m0_p, p, p_inv = cache
+        m_ext = linearisation_pt.mean
+
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
@@ -148,27 +176,6 @@ class IsotropicImplementation(_implementation.Implementation):
         backward_noise = IsotropicNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
-
-    def final_correction(
-        self, *, info_op, extrapolated, cache_obs, m_obs
-    ):  # noqa: D102
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
-        )  # shape (n,)
-
-        l_obs_scalar = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
-        )
-        c_obs = l_obs_scalar**2
-
-        observed = IsotropicNormal(mean=m_obs, cov_sqrtm_lower=l_obs_scalar)
-
-        g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
-        m_cor = m_ext - g[:, None] * m_obs[None, :]
-        l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, g)
 
     def extract_sol(self, *, rv):  # noqa: D102
         m = rv.mean[..., 0, :]
@@ -248,16 +255,6 @@ class IsotropicImplementation(_implementation.Implementation):
 
     def extract_mean_from_marginals(self, mean):
         return mean[..., 0, :]
-
-    def init_preconditioner(self):  # noqa: D102
-        empty = jnp.inf * jnp.ones((self.a.shape[0],))
-        return empty, empty
-
-    def evidence_sqrtm(self, *, observed):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = m_obs / l_obs
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
 
     def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:

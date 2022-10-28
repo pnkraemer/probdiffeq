@@ -43,7 +43,6 @@ def test_smoothing_checkpoint_equals_solver_state(
     )
     fixedpoint_eks_sol = fp_eks_sol[1:-1]  # reference is defined only on the interior
 
-    print(fixedpoint_eks_sol.u, u, fixedpoint_eks_sol.u - u)
     # Compare all attributes for equality,
     # except for the covariance matrix square roots
     # which are equal modulo orthogonal transformation

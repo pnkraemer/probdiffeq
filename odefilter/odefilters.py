@@ -1,5 +1,4 @@
 """ODE filter routines."""
-from functools import partial  # noqa: F401
 
 import jax.lax
 import jax.numpy as jnp
@@ -99,7 +98,7 @@ def odefilter(info_op, taylor_coefficients, t0, t1, solver, parameters, **option
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    forward_solution = _control_flow.tree_stack([sol for sol in generator])
+    forward_solution = _control_flow.tree_stack(list(generator))
     return adaptive_solver.extract_fn(state=forward_solution)
 
 

@@ -22,16 +22,12 @@ class Filter(_strategy.Strategy):
         # to the in-between variable. That's it.
 
         dt = t - t0
-        p, p_inv = self.implementation.assemble_preconditioner(dt=dt)
-
-        ext_for_lin, cache = self.begin_extrapolation(posterior=p0, p=p, p_inv=p_inv)
+        linearisation_pt, cache = self.begin_extrapolation(posterior=p0, dt=dt)
         extrapolated = self.complete_extrapolation(
-            ext_for_lin,
+            linearisation_pt,
             cache,
             posterior_previous=p0,
-            p=p,
-            p_inv=p_inv,
-            output_scale_sqrtm=scale_sqrtm,  # right-including intervals
+            output_scale_sqrtm=scale_sqrtm,
         )
         return rv1, extrapolated, extrapolated
 
@@ -74,25 +70,18 @@ class Filter(_strategy.Strategy):
     def extract_sol_from_marginals(self, *, marginals):
         return self.implementation.extract_sol(rv=marginals)
 
-    def begin_extrapolation(self, *, posterior, p_inv, p):
-        ext_for_lin, *_ = self.implementation.begin_extrapolation(
-            posterior.mean, p=p, p_inv=p_inv
-        )
-        return ext_for_lin, ()
+    def begin_extrapolation(self, *, posterior, dt):
+        return self.implementation.begin_extrapolation(posterior.mean, dt=dt)
 
     def complete_extrapolation(
-        self, ext_for_lin, _cache, *, output_scale_sqrtm, posterior_previous, p, p_inv
+        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
-        extrapolated = self.implementation.complete_extrapolation(
-            ext_for_lin=ext_for_lin,
+        return self.implementation.complete_extrapolation(
+            linearisation_pt=linearisation_pt,
+            cache=cache,
             l0=posterior_previous.cov_sqrtm_lower,
-            p=p,
-            p_inv=p_inv,
             output_scale_sqrtm=output_scale_sqrtm,
         )
-        return extrapolated
 
-    def final_correction(self, *, info_op, extrapolated, cache_obs, m_obs):
-        return self.implementation.final_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs, m_obs=m_obs
-        )
+    def complete_correction(self, *, info_op, extrapolated, cache_obs):
+        return info_op.complete_correction(extrapolated=extrapolated, cache=cache_obs)
