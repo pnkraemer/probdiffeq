@@ -106,8 +106,12 @@ class CK1(_DenseInformationCommon):
         self.sigma_weights_sqrtm = sigma_weights_sqrtm
 
     @classmethod
-    def from_spherical_cubature(cls, f, /, ode_order, ode_dimension, num_derivatives):
-        k = ode_dimension * (num_derivatives + 1)  # todo: make more efficient!
+    def from_spherical_cubature_integration(
+        cls, f, /, ode_order, ode_dimension, num_derivatives
+    ):
+        # todo: make more efficient!
+        #  the number of derivatives in the prior should _not_ be relevant
+        k = ode_dimension * (num_derivatives + 1)
         rule = _spherical_cubature_params(dim=ode_order * k)
         return cls(
             f,
@@ -136,49 +140,48 @@ class CK1(_DenseInformationCommon):
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
         vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
-
-        b, _, fx_normed = self._sigma_point_linearize(
-            rv=x, vmapped_residual=vmapped_residual
-        )
+        b, _, fx_normed = self._linearize(x, vmap_res=vmapped_residual)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
-
-        output_scale_sqrtm = self.evidence_sqrtm(
-            observed=MultivariateNormal(b, l_obs_raw)
-        )
+        obs = MultivariateNormal(b, l_obs_raw)
+        output_scale_sqrtm = self.evidence_sqrtm(observed=obs)
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return (
-            output_scale_sqrtm * error_estimate,
-            output_scale_sqrtm,
-            (vmapped_residual,),
-        )
+
+        cache = (vmapped_residual,)
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, *, extrapolated, cache):
-        # Re-linearise at the actual extrapolation
         (vmapped_residual,) = cache
-        b, x_normed, fx_normed = self._sigma_point_linearize(
-            rv=extrapolated, vmapped_residual=vmapped_residual
+        b, x_normed, fx_normed = self._linearize(
+            extrapolated, vmap_res=vmapped_residual
         )
 
-        d = self.ode_dimension
-        r_obs, (r_cor, gain) = _sqrtm.revert_gauss_markov_correlation(
-            R_X_F=fx_normed, R_X=x_normed, R_YX=jnp.zeros((d, d))
-        )
-        observed = MultivariateNormal(b, r_obs.T)
+        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
+        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
+
+        crosscov = x_normed.T @ fx_normed
+        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
 
         m_cor = extrapolated.mean - gain @ b
-        corrected = MultivariateNormal(m_cor, r_cor.T)
+
+        l_cor = _sqrtm.sqrtm_to_upper_triangular(R=x_normed - fx_normed @ gain.T).T
+        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
-    def _sigma_point_linearize(self, *, rv, vmapped_residual):
+    def _linearize(self, rv, *, vmap_res):
         m, l_sqrtm = rv.mean, rv.cov_sqrtm_lower
+
         x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
         x_normed = x_centered * self.sigma_weights_sqrtm[:, None]
         sigma_points = m[None, :] + x_centered
-        fx = vmapped_residual(sigma_points)
+
+        # k = self.ode_dimension * (self.ode_order + 2)
+        fx = vmap_res(sigma_points)
         b = self.sigma_weights_sqrtm**2 @ fx
+
         fx_centered = fx - b[None, :]
         fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+
         return b, x_normed, fx_normed
 
 
