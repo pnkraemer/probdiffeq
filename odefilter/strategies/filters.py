@@ -85,7 +85,7 @@ class Filter(_strategy.Strategy):
 
     def complete_correction(self, *, info_op, extrapolated, cache_obs):
         # todo: no need to split obs_pt and cache_obs
-        obs_pt, *cache_obs = cache_obs
+        obs_pt, *_ = cache_obs
         return self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated,
