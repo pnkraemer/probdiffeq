@@ -168,15 +168,14 @@ class _SmootherCommon(_strategy.Strategy):
 
     # Auxiliary routines that are the same among all subclasses
 
-    # todo: make this act on RV, not on posterior
-    def _interpolate_from_to_fn(self, *, posterior, output_scale_sqrtm, t, t0):
+    def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
         linearisation_pt, cache = self.implementation.begin_extrapolation(
-            posterior.init.mean, dt=dt
+            rv.mean, dt=dt
         )
         extrapolated, (bw_noise, bw_op) = self.implementation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
-            l0=posterior.init.cov_sqrtm_lower,
+            l0=rv.cov_sqrtm_lower,
             output_scale_sqrtm=output_scale_sqrtm,
             cache=cache,
         )
@@ -228,12 +227,12 @@ class Smoother(_SmootherCommon):
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            posterior=p0, output_scale_sqrtm=scale_sqrtm, t=t, t0=t0
+            rv=p0.init, output_scale_sqrtm=scale_sqrtm, t=t, t0=t0
         )
         posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
         _, backward_model1 = self._interpolate_from_to_fn(
-            posterior=posterior0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
+            rv=extrapolated0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
         )
         posterior1 = MarkovSequence(init=rv1, backward_model=backward_model1)
 
@@ -309,7 +308,7 @@ class FixedPointSmoother(_SmootherCommon):
 
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
-            posterior=p0,
+            rv=p0.init,
             output_scale_sqrtm=scale_sqrtm,
             t=t,
             t0=t0,
@@ -323,7 +322,7 @@ class FixedPointSmoother(_SmootherCommon):
         previous = self._duplicate_with_unit_backward_model(posterior=solution)
 
         _, backward_model1 = self._interpolate_from_to_fn(
-            posterior=solution, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
+            rv=extrapolated0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
         )
         accepted = MarkovSequence(init=rv1, backward_model=backward_model1)
         return accepted, solution, previous

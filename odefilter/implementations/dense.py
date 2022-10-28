@@ -41,7 +41,9 @@ class EK1(_implementation.Information):
         b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
         obs_pt = MultivariateNormal(
             mean=b,
-            cov_sqrtm_lower=self.cov_sqrtm_lower(fn, cov_sqrtm_lower=x.cov_sqrtm_lower),
+            cov_sqrtm_lower=self.cov_sqrtm_lower(
+                cache_obs=fn, cov_sqrtm_lower=x.cov_sqrtm_lower
+            ),
         )
         return obs_pt, fn
 
