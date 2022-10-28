@@ -160,13 +160,13 @@ class IsotropicImplementation(_implementation.Implementation):
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def complete_correction(
-        self, *, info_op, extrapolated, cache_obs, obs_pt
-    ):  # noqa: D102
+    def complete_correction(self, *, info_op, extrapolated, cache_obs):
+        obs_pt, *remaining_cache = cache_obs
+
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
-        )  # shape (n,)
+            cache_obs=remaining_cache, cov_sqrtm_lower=l_ext
+        )
 
         l_obs_scalar = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()

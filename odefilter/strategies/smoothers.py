@@ -92,12 +92,10 @@ class _SmootherCommon(_strategy.Strategy):
         return self.implementation.begin_extrapolation(posterior.init.mean, dt=dt)
 
     def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        obs_pt, *_ = cache_obs
         a, (corrected, b) = self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated.init,
             cache_obs=cache_obs,
-            obs_pt=obs_pt,
         )
         corrected_seq = MarkovSequence(
             init=corrected, backward_model=extrapolated.backward_model
