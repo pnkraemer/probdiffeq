@@ -50,6 +50,12 @@ class EK0(_implementation.Information):
         error_estimate = l_obs
         return output_scale_sqrtm, error_estimate
 
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = obs_pt / l_obs
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
@@ -253,12 +259,6 @@ class IsotropicImplementation(_implementation.Implementation):
 
     def extract_mean_from_marginals(self, mean):
         return mean[..., 0, :]
-
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = obs_pt / l_obs
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
 
     def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
