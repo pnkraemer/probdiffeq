@@ -29,7 +29,10 @@ class EK0(_implementation.Information):
 
         # m has shape (d, n)
         bias = m[..., self.ode_order] - self.f(*(m[..., : self.ode_order]).T, t=t, p=p)
-        return bias, ()
+        l_obs_nonsquare = self.cov_sqrtm_lower(
+            cache_obs=(), cov_sqrtm_lower=x.cov_sqrtm_lower
+        )
+        return BatchedNormal(bias, l_obs_nonsquare), ()
 
     def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
@@ -109,18 +112,15 @@ class BatchImplementation(_implementation.Implementation):
         return noise, g
 
     # todo: move to information?
-    def estimate_error(self, *, info_op, cache_obs, obs_pt, p):  # noqa: D102
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=p[..., None] * self.q_sqrtm_lower
-        )  # (d, k)
-        l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
+    def estimate_error(self, *, info_op, cache_obs, obs_pt):  # noqa: D102
+        l_obs_nonsquare_1 = obs_pt.cov_sqrtm_lower[..., None]  # (d, k, 1)
 
         # (d, 1, 1)
         l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
         output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchedNormal(mean=obs_pt, cov_sqrtm_lower=l_obs)
+            observed=BatchedNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs)
         )  # (d,)
 
         error_estimate = l_obs  # (d,)
@@ -150,9 +150,7 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(m_ext, q_ext), m_ext_p, m0_p
 
     # todo: move to information?
-    def final_correction(
-        self, *, info_op, extrapolated, cache_obs, obs_pt
-    ):  # noqa: D102
+    def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
 
         # (d, k), (d, k, k)
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
@@ -165,14 +163,14 @@ class BatchImplementation(_implementation.Implementation):
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = BatchedNormal(mean=obs_pt, cov_sqrtm_lower=l_obs_scalar)
+        observed = BatchedNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs_scalar)
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
 
         gain = crosscov / (l_obs_scalar[..., None]) ** 2  # (d, k)
 
-        m_cor = m_ext - (gain * obs_pt[..., None])  # (d, k)
+        m_cor = m_ext - (gain * obs_pt.mean[..., None])  # (d, k)
         l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
 
         corrected = BatchedNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
