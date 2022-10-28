@@ -190,7 +190,7 @@ class DenseImplementation(_implementation.Implementation):
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    def final_correction(
+    def complete_correction(
         self, *, info_op, extrapolated, cache_obs, obs_pt
     ):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower

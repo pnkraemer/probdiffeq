@@ -256,7 +256,7 @@ class DynamicSolver(_Solver):
         )
 
         # Final observation
-        _, (corrected, _) = self.strategy.final_correction(
+        _, (corrected, _) = self.strategy.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated,
             cache_obs=cache_obs,
@@ -333,7 +333,7 @@ class NonDynamicSolver(_Solver):
 
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
-        observed, (corrected, _) = self.strategy.final_correction(
+        observed, (corrected, _) = self.strategy.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated,
             cache_obs=cache_obs,

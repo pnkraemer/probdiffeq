@@ -91,8 +91,8 @@ class _SmootherCommon(_strategy.Strategy):
     def begin_extrapolation(self, *, posterior, dt):
         return self.implementation.begin_extrapolation(posterior.init.mean, dt=dt)
 
-    def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
-        a, (corrected, b) = self.implementation.final_correction(
+    def complete_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
+        a, (corrected, b) = self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated.init,
             cache_obs=cache_obs,

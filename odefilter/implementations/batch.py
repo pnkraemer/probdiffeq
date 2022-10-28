@@ -153,7 +153,7 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
     # todo: move to information?
-    def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
+    def complete_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
 
         # (d, k), (d, k, k)
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower

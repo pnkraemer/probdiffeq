@@ -83,8 +83,8 @@ class Filter(_strategy.Strategy):
             output_scale_sqrtm=output_scale_sqrtm,
         )
 
-    def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
-        return self.implementation.final_correction(
+    def complete_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
+        return self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated,
             cache_obs=cache_obs,

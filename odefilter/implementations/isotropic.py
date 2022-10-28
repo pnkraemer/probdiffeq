@@ -154,7 +154,7 @@ class IsotropicImplementation(_implementation.Implementation):
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def final_correction(
+    def complete_correction(
         self, *, info_op, extrapolated, cache_obs, obs_pt
     ):  # noqa: D102
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
