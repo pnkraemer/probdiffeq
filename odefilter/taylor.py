@@ -55,7 +55,7 @@ def taylor_mode_fn(
     return taylor_coeffs
 
 
-def _subsets(set, n):
+def _subsets(x, /, n):
     """Compute specific subsets until exhausted.
 
     See example below.
@@ -74,7 +74,7 @@ def _subsets(set, n):
     def mask(i):
         return None if i == 0 else i
 
-    return [set[mask(k) : mask(k + 1 - n)] for k in range(n)]
+    return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
 @partial(jax.jit, static_argnames=["vector_field", "num"])

@@ -1,6 +1,5 @@
 """Adaptive solvers."""
 from dataclasses import dataclass
-from functools import partial  # noqa: F401
 from typing import Any, Callable, Generic, TypeVar, Union
 
 import jax.lax

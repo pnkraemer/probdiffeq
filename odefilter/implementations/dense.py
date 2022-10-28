@@ -52,7 +52,7 @@ class EK1(_implementation.Information):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
     def complete_correction(self, *, extrapolated, cache):  # noqa: D102
-        b, fn = cache
+        b, _ = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
 
