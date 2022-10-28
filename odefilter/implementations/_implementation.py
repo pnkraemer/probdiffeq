@@ -25,15 +25,11 @@ class Information(abc.ABC):
         return cls(f, ode_order=ode_order)
 
     @abc.abstractmethod
-    def linearize(self, x, /, *, t, p):
+    def begin_correction(self, x, /, *, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
     def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def estimate_error(self, *, cache, obs_pt):
         raise NotImplementedError
 
     @abc.abstractmethod

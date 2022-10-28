@@ -37,16 +37,19 @@ class EK1(_implementation.Information):
         f, ode_order, ode_dimension = aux
         return cls(f, ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def linearize(self, x: MultivariateNormal, /, *, t, p):
+    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
         b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
-        obs_pt = MultivariateNormal(
-            mean=b,
-            # todo: this call to cache is hacky
-            cov_sqrtm_lower=self.cov_sqrtm_lower(
-                cache=(None, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
-            ),
+
+        cov_sqrtm_lower = self.cov_sqrtm_lower(
+            cache=(b, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
-        return obs_pt, (fn,)
+
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        output_scale_sqrtm = self.evidence_sqrtm(
+            observed=MultivariateNormal(b, l_obs_raw)
+        )
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
     def _residual(self, x, *, t, p):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
@@ -58,16 +61,6 @@ class EK1(_implementation.Information):
     def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
-
-    def estimate_error(self, *, cache, obs_pt):  # noqa: D102
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower.T).T
-
-        # todo: make this call self.evidence()
-        res_white = jsp.linalg.solve_triangular(l_obs_raw.T, obs_pt.mean, lower=False)
-        output_scale_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return output_scale_sqrtm, error_estimate
 
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
@@ -196,19 +189,19 @@ class DenseImplementation(_implementation.Implementation):
         return noise, g
 
     def complete_correction(self, *, info_op, extrapolated, cache):  # noqa: D102
-        obs_pt, *_ = cache
+        b, fn = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
 
         l_obs_nonsquare = info_op.cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
 
         l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
-        observed = MultivariateNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs)
+        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
 
         crosscov = l_ext @ l_obs_nonsquare.T
         gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
 
-        m_cor = m_ext - gain @ obs_pt.mean
+        m_cor = m_ext - gain @ b
         l_cor = l_ext - gain @ l_obs_nonsquare
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)

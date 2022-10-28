@@ -93,9 +93,8 @@ class Strategy(abc.ABC):
     def init_output_scale_sqrtm(self):
         return self.implementation.init_output_scale_sqrtm()
 
-    # this stuff should move to the info op...
-
     def begin_correction(self, linearisation_pt, *, info_op, t, p):
-        obs_pt, cache_obs = info_op.linearize(linearisation_pt, t=t, p=p)
-        scale_sqrtm, error = info_op.estimate_error(cache=cache_obs, obs_pt=obs_pt)
-        return error * scale_sqrtm, scale_sqrtm, (obs_pt, *cache_obs)
+        return info_op.begin_correction(linearisation_pt, t=t, p=p)
+        # obs_pt, cache_obs = info_op.linearize(linearisation_pt, t=t, p=p)
+        # scale_sqrtm, error = info_op.estimate_error(cache=cache_obs, obs_pt=obs_pt)
+        # return error * scale_sqrtm, scale_sqrtm, (obs_pt, *cache_obs)

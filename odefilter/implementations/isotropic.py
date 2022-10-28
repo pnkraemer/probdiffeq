@@ -24,23 +24,18 @@ class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def linearize(self, x: IsotropicNormal, /, *, t, p):
+    def begin_correction(self, x: IsotropicNormal, /, *, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
 
-        cov = self.cov_sqrtm_lower(cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower)
-        x = IsotropicNormal(bias, cov)
-        return x, ()
-
-    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
-        return cov_sqrtm_lower[self.ode_order, ...]
-
-    def estimate_error(self, *, cache, obs_pt):
-        # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower[:, None]), ()
+        cov_sqrtm_lower = self.cov_sqrtm_lower(
+            cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
-        res_white = (obs_pt.mean / l_obs) / jnp.sqrt(obs_pt.mean.size)
+
+        l_obs = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None]), ()
+        )
+        res_white = (bias / l_obs) / jnp.sqrt(bias.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
         output_scale_sqrtm = jnp.reshape(
@@ -48,7 +43,10 @@ class EK0(_implementation.Information):
         )
 
         error_estimate = l_obs
-        return output_scale_sqrtm, error_estimate
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
+
+    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+        return cov_sqrtm_lower[self.ode_order, ...]
 
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
@@ -161,20 +159,20 @@ class IsotropicImplementation(_implementation.Implementation):
         return extrapolated, (backward_noise, backward_op)
 
     def complete_correction(self, *, info_op, extrapolated, cache):
-        obs_pt, *remaining_cache = cache
+        (bias,) = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = info_op.cov_sqrtm_lower(cache=remaining_cache, cov_sqrtm_lower=l_ext)
+        l_obs = info_op.cov_sqrtm_lower(cache=(), cov_sqrtm_lower=l_ext)
 
         l_obs_scalar = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
         )
         c_obs = l_obs_scalar**2
 
-        observed = IsotropicNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs_scalar)
+        observed = IsotropicNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
-        m_cor = m_ext - g[:, None] * obs_pt.mean[None, :]
+        m_cor = m_ext - g[:, None] * bias[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)

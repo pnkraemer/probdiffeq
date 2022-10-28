@@ -24,7 +24,7 @@ class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def linearize(self, x: BatchedNormal, /, *, t, p):
+    def begin_correction(self, x: BatchedNormal, /, *, t, p):
         m = x.mean
 
         # m has shape (d, n)
@@ -32,24 +32,22 @@ class EK0(_implementation.Information):
         l_obs_nonsquare = self.cov_sqrtm_lower(
             cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
-        return BatchedNormal(bias, l_obs_nonsquare), ()
 
-    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
-        return cov_sqrtm_lower[:, self.ode_order, ...]
-
-    def estimate_error(self, *, cache, obs_pt):  # noqa: D102
-        l_obs_nonsquare_1 = obs_pt.cov_sqrtm_lower[..., None]  # (d, k, 1)
+        l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
 
         # (d, 1, 1)
         l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
         output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchedNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs)
+            observed=BatchedNormal(mean=bias, cov_sqrtm_lower=l_obs)
         )  # (d,)
 
         error_estimate = l_obs  # (d,)
-        return output_scale_sqrtm, error_estimate
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
+
+    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+        return cov_sqrtm_lower[:, self.ode_order, ...]
 
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
@@ -151,12 +149,12 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
     def complete_correction(self, *, info_op, extrapolated, cache):
-        obs_pt, *remaining_cache = cache
+        (bias,) = cache
 
         # (d, k), (d, k, k)
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache=remaining_cache, cov_sqrtm_lower=l_ext
+            cache=(), cov_sqrtm_lower=l_ext
         )  # (d, k)
 
         # (d, 1, 1)
@@ -164,14 +162,14 @@ class BatchImplementation(_implementation.Implementation):
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = BatchedNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs_scalar)
+        observed = BatchedNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
 
         gain = crosscov / (l_obs_scalar[..., None]) ** 2  # (d, k)
 
-        m_cor = m_ext - (gain * obs_pt.mean[..., None])  # (d, k)
+        m_cor = m_ext - (gain * bias[..., None])  # (d, k)
         l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
 
         corrected = BatchedNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
