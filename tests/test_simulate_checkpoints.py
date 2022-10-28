@@ -18,7 +18,6 @@ def test_simulate_checkpoints(vf, u0, t0, t1, p, solver, info_op):
         lambda y, t, *par: vf(y, t=t, p=par), u0[0], ts, *p, atol=1e-6, rtol=1e-6
     )
     ts_reference, ys_reference = ts, odeint_solution
-
     solution = ivpsolve.simulate_checkpoints(
         vf,
         u0,

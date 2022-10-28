@@ -19,9 +19,24 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Any  # (k,k) shape
 
 
+class _DenseInformationCommon(_implementation.Information):
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
+    def _residual(self, x, *, t, p):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+
+        x1 = x_reshaped[self.ode_order, ...]
+        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
+        return x1 - fx0
+
+
 @register_pytree_node_class
-class EK1(_implementation.Information):
-    """EK1-linearise an ODE."""
+class EK1(_DenseInformationCommon):
+    """Extended Kalman filter information."""
 
     def __init__(self, f, /, *, ode_order, ode_dimension):
         super().__init__(f, ode_order=ode_order)
@@ -51,7 +66,7 @@ class EK1(_implementation.Information):
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
-    def complete_correction(self, *, extrapolated, cache):  # noqa: D102
+    def complete_correction(self, *, extrapolated, cache):
         b, _ = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
@@ -69,22 +84,117 @@ class EK1(_implementation.Information):
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
-    def _residual(self, x, *, t, p):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
-
-        x1 = x_reshaped[self.ode_order, ...]
-        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
-        return x1 - fx0
-
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
+
+@register_pytree_node_class
+class CK1(_DenseInformationCommon):
+    """Cubature Kalman filter information."""
+
+    def __init__(
+        self, f, /, *, sigma_weights_sqrtm, unit_sigma_points, ode_order, ode_dimension
+    ):
+        if ode_order > 1:
+            raise ValueError
+
+        super().__init__(f, ode_order=ode_order)
+        self.ode_dimension = ode_dimension
+
+        self.unit_sigma_points = unit_sigma_points
+        self.sigma_weights_sqrtm = sigma_weights_sqrtm
+
+    @classmethod
+    def from_spherical_cubature(cls, f, /, ode_order, ode_dimension, num_derivatives):
+        k = ode_dimension * (num_derivatives + 1)  # todo: make more efficient!
+        rule = _spherical_cubature_params(dim=ode_order * k)
+        return cls(
+            f,
+            ode_order=ode_order,
+            ode_dimension=ode_dimension,
+            unit_sigma_points=rule.points,
+            sigma_weights_sqrtm=rule.weights_sqrtm,
+        )
+
+    def tree_flatten(self):
+        children = (self.unit_sigma_points, self.sigma_weights_sqrtm)
+        aux = self.f, self.ode_order, self.ode_dimension
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        pts, weights_sqrtm = children
+        f, ode_order, ode_dimension = aux
+        return cls(
+            f,
+            ode_order=ode_order,
+            ode_dimension=ode_dimension,
+            unit_sigma_points=pts,
+            sigma_weights_sqrtm=weights_sqrtm,
+        )
+
+    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
+
+        m, l_sqrtm = x.mean, x.cov_sqrtm_lower
+
+        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
+        sigma_points = m[None, :] + x_centered
+
+        vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
+        fx = vmapped_residual(sigma_points)
+        b = self.sigma_weights_sqrtm**2 @ fx
+        fx_centered = fx - b[None, :]
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
+
+        output_scale_sqrtm = self.evidence_sqrtm(
+            observed=MultivariateNormal(b, l_obs_raw)
+        )
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        return (
+            output_scale_sqrtm * error_estimate,
+            output_scale_sqrtm,
+            (vmapped_residual,),
+        )
+
+    def complete_correction(self, *, extrapolated, cache):
+        # Re-linearise at the actual extrapolation
+        m, l_sqrtm = extrapolated.mean, extrapolated.cov_sqrtm_lower
+
+        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
+        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]
+        sigma_points = m[None, :] + x_centered
+
+        (vmapped_residual,) = cache
+        fx = vmapped_residual(sigma_points)
+        b = self.sigma_weights_sqrtm**2 @ fx
+
+        fx_centered = fx - b[None, :]
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+
+        d = self.ode_dimension
+        r_obs, (r_cor, gain) = _sqrtm.revert_gauss_markov_correlation(
+            R_X_F=fx_normed, R_X=x_normed, R_YX=jnp.zeros((d, d))
+        )
+        observed = MultivariateNormal(b, r_obs.T)
+
+        m_cor = extrapolated.mean - gain @ b
+        corrected = MultivariateNormal(m_cor, r_cor.T)
+        return observed, (corrected, gain)
+
+
+class _PositiveCubatureRule(NamedTuple):
+    points: Any
+    weights_sqrtm: Any
+
+
+def _spherical_cubature_params(*, dim):
+    eye_d = jnp.eye(dim) * jnp.sqrt(dim)
+    pts = jnp.vstack((eye_d, -1 * eye_d))
+    weights_sqrtm = jnp.sqrt(jnp.ones((2 * dim,)) / (2 * dim))
+    return _PositiveCubatureRule(points=pts, weights_sqrtm=weights_sqrtm)
 
 
 @register_pytree_node_class

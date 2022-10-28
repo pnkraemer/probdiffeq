@@ -131,12 +131,15 @@ def workprecision(*, solve_fns, tols, **kwargs):
 d = u0.shape[0]
 
 _ekf1_3 = prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d))
+_ckf1_3 = prepare(recipes.ckf1(num_derivatives=3, ode_dimension=d))
 _ekf1_3_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=3, ode_dimension=d))
 _ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
+_ckf1_5 = prepare(recipes.ckf1(num_derivatives=5, ode_dimension=d))
 _ekf1_5_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=5, ode_dimension=d))
 _eks1_5_dynamic = prepare(recipes.eks1_dynamic(num_derivatives=5, ode_dimension=d))
-_ekf1_8 = prepare(recipes.ekf1(num_derivatives=8, ode_dimension=d))
-_ekf1_8_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=8, ode_dimension=d))
+_ekf1_7 = prepare(recipes.ekf1(num_derivatives=7, ode_dimension=d))
+_ckf1_7 = prepare(recipes.ckf1(num_derivatives=7, ode_dimension=d))
+_ekf1_7_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=7, ode_dimension=d))
 _ekf0_3_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=3))
 _ekf0_3_isotropic_dynamic = prepare(recipes.ekf0_isotropic_dynamic(num_derivatives=3))
 _ekf0_5_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=5))
@@ -148,27 +151,30 @@ _ekf0_5_isotropic_dynamic_fixpt = prepare(
 solve_fns = [
     # EK1
     (_ekf1_3, f"EKF1({3})"),
-    (_ekf1_3_dynamic, f"Dynamic EKF1({3})"),
+    (_ckf1_3, f"CKF1({3})"),
+    # (_ekf1_3_dynamic, f"Dynamic EKF1({3})"),
     (_ekf1_5, f"EKF1({5})"),
-    (_ekf1_5_dynamic, f"Dynamic EKF1({5})"),
-    (_eks1_5_dynamic, f"Dynamic EKS1({5})"),
-    (_ekf1_8, f"EKF1({8})"),
-    (_ekf1_8_dynamic, f"Dynamic EKF1({8})"),
-    # EK0
-    (_ekf0_3_isotropic, f"Isotropic EKF0({3})"),
-    (_ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({5})"),
-    (_ekf0_5_isotropic, f"Isotropic EKF0({5})"),
-    (_eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
-    (_ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
+    (_ckf1_5, f"CKF1({5})"),
+    # (_ekf1_5_dynamic, f"Dynamic EKF1({5})"),
+    # (_eks1_5_dynamic, f"Dynamic EKS1({5})"),
+    (_ekf1_7, f"EKF1({7})"),
+    (_ckf1_7, f"CKF1({7})"),
+    # (_ekf1_8_dynamic, f"Dynamic EKF1({8})"),
+    # # EK0
+    # (_ekf0_3_isotropic, f"Isotropic EKF0({3})"),
+    # (_ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({5})"),
+    # (_ekf0_5_isotropic, f"Isotropic EKF0({5})"),
+    # (_eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
+    # (_ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
 ]
 ```
 
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(2.0, 11.0, step=2.0)
+tolerances = 0.1 ** jnp.arange(2.0, 11.0, step=1.0)
 
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=5, repeat=5)
+results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
 ```
 
 ```python
