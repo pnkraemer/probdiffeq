@@ -236,10 +236,9 @@ class DynamicSolver(_Solver):
     """Dynamic calibration."""
 
     def step_fn(self, *, state, info_op, dt, parameters):
-        p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
-
+        # p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
-            posterior=state.posterior, p=p, p_inv=p_inv
+            posterior=state.posterior, dt=dt
         )
 
         obs_pt, cache_obs = info_op.linearize(
@@ -254,8 +253,6 @@ class DynamicSolver(_Solver):
             cache_ext,
             posterior_previous=state.posterior,
             output_scale_sqrtm=output_scale_sqrtm,
-            p=p,
-            p_inv=p_inv,
         )
 
         # Final observation
@@ -314,9 +311,8 @@ class NonDynamicSolver(_Solver):
     def step_fn(self, *, state, info_op, dt, parameters):
         """Step."""
         # Pre-error-estimate steps
-        p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
-            posterior=state.posterior, p_inv=p_inv, p=p
+            posterior=state.posterior, dt=dt
         )
 
         # Linearise and estimate error
@@ -333,8 +329,6 @@ class NonDynamicSolver(_Solver):
             cache_ext,
             output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
             posterior_previous=state.posterior,
-            p=p,
-            p_inv=p_inv,
         )
 
         # Complete step (incl. calibration!)

@@ -50,11 +50,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def assemble_preconditioner(self, *, dt):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def begin_extrapolation(self, m0, /, *, p, p_inv):
+    def begin_extrapolation(self, m0, /, *, dt):
         raise NotImplementedError
 
     @abc.abstractmethod

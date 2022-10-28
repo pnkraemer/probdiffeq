@@ -52,7 +52,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, *, posterior, p_inv, p):
+    def begin_extrapolation(self, *, posterior, dt):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -100,11 +100,9 @@ class Strategy(abc.ABC):
     def init_output_scale_sqrtm(self):
         return self.implementation.init_output_scale_sqrtm()
 
+    # this stuff should move to the info op...
     def estimate_error(self, **kwargs):
         return self.implementation.estimate_error(**kwargs)
-
-    def assemble_preconditioner(self, *, dt):
-        return self.implementation.assemble_preconditioner(dt=dt)
 
     def evidence_sqrtm(self, *, observed):
         return self.implementation.evidence_sqrtm(observed=observed)

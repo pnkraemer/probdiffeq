@@ -71,7 +71,7 @@ class BatchImplementation(_implementation.Implementation):
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
-    def assemble_preconditioner(self, *, dt):  # noqa: D102
+    def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -79,9 +79,10 @@ class BatchImplementation(_implementation.Implementation):
         p_inv = jnp.stack([p_inv] * self.ode_dimension)
         return p, p_inv
 
-    def complete_extrapolation(  # noqa: D102
-        self, *, linearisation_pt, l0, p_inv, p, output_scale_sqrtm
+    def complete_extrapolation(
+        self, *, linearisation_pt, cache, l0, output_scale_sqrtm
     ):
+        *_, p, p_inv = cache
         m_ext = linearisation_pt.mean
         r_ext_p = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
             R1=_transpose(self.a @ (p_inv[..., None] * l0)),
@@ -141,13 +142,15 @@ class BatchImplementation(_implementation.Implementation):
     def extract_sol(self, *, rv):  # noqa: D102
         return self.extract_mean_from_marginals(mean=rv.mean)
 
-    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):
+
+        p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * m0  # (d, k)
         m_ext_p = (self.a @ m0_p[..., None])[..., 0]  # (d, k)
         m_ext = p * m_ext_p
 
         q_ext = p[..., None] * self.q_sqrtm_lower
-        return BatchedNormal(m_ext, q_ext), m_ext_p, m0_p
+        return BatchedNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
     # todo: move to information?
     def final_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
@@ -232,8 +235,9 @@ class BatchImplementation(_implementation.Implementation):
         return BatchedNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, linearisation_pt, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, l0, output_scale_sqrtm, cache
     ):
+        m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
         # (d, k, 1) * (d, k, k) = (d, k, k)
