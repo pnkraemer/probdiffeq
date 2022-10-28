@@ -97,8 +97,8 @@ def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
     """
-    d_out, d_in = R_X_F.T.shape
-
+    d_out = R_YX.shape[0]
+    d_in = R_X.shape[1]
     R = jnp.block(
         [
             [R_YX, jnp.zeros((d_out, d_in))],

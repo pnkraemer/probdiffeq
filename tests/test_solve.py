@@ -21,6 +21,7 @@ def test_solve(vf, u0, t0, t1, p, solver, info_op):
     solution = ivpsolve.solve(
         vf, u0, t0=t0, t1=t1, parameters=p, solver=solver, info_op=info_op
     )
+
     assert jnp.allclose(solution.t[-1], ts_reference[-1])
     assert jnp.allclose(solution.u[-1], ys_reference[-1], atol=1e-3, rtol=1e-3)
 

@@ -231,6 +231,29 @@ def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
+def ckf1(*, ode_dimension, num_derivatives=4, ode_order=1):
+    """Construct the equivalent of a semi-implicit solver that does not use Jacobians.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.DenseImplementation.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = solvers.NonDynamicSolver(strategy=strategy)
+
+    information_op = jax.tree_util.Partial(
+        dense.CK1.from_spherical_cubature,
+        ode_dimension=ode_dimension,
+        ode_order=ode_order,
+        num_derivatives=num_derivatives,
+    )
+    return solver, information_op
+
+
 def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver.
 
