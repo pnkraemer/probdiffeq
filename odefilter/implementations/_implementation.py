@@ -72,7 +72,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, info_op, extrapolated, cache, obs_pt):
+    def complete_correction(self, *, info_op, extrapolated, cache):
         raise NotImplementedError
 
     @abc.abstractmethod
