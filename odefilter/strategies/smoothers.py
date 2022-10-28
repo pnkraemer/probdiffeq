@@ -175,6 +175,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     # Auxiliary routines that are the same among all subclasses
 
+    # todo: make this act on RV, not on posterior
     def _interpolate_from_to_fn(self, *, posterior, output_scale_sqrtm, t, t0):
         dt = t - t0
         linearisation_pt, cache = self.implementation.begin_extrapolation(

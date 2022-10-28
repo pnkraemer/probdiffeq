@@ -104,20 +104,21 @@ class DenseImplementation(_implementation.Implementation):
     def init_error_estimate(self):  # noqa: D102
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
-    def assemble_preconditioner(self, *, dt):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):  # noqa: D102
+        p, p_inv = self._assemble_preconditioner(dt=dt)
+        m0_p = p_inv * m0
+        m_ext_p = self.a @ m0_p
+        m_ext = p * m_ext_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        return MultivariateNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+
+    def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
         p = jnp.tile(p, self.ode_dimension)
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
-
-    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
-        m0_p = p_inv * m0
-        m_ext_p = self.a @ m0_p
-        m_ext = p * m_ext_p
-        q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return MultivariateNormal(m_ext, q_sqrtm), m_ext_p, m0_p
 
     def estimate_error(self, *, info_op, cache_obs, obs_pt):  # noqa: D102
         # l_obs_nonsquare = info_op.cov_sqrtm_lower(
@@ -133,8 +134,9 @@ class DenseImplementation(_implementation.Implementation):
         return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
-        self, *, linearisation_pt, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
+        _, _, p, p_inv = cache
         m_ext = linearisation_pt.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ (p_inv[:, None] * l0)).T,
@@ -144,9 +146,11 @@ class DenseImplementation(_implementation.Implementation):
         return MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, linearisation_pt, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, cache, l0, output_scale_sqrtm
     ):
+        m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
+
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,

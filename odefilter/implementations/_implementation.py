@@ -64,9 +64,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def revert_markov_kernel(
-        self, *, linearisation_pt, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
-    ):
+    def revert_markov_kernel(self, *, linearisation_pt, l0, cache, output_scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
