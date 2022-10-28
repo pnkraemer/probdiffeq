@@ -28,7 +28,7 @@ class EK0(_implementation.Information):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
 
-        cov_sqrtm_lower = self.cov_sqrtm_lower(
+        cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
 
@@ -45,7 +45,26 @@ class EK0(_implementation.Information):
         error_estimate = l_obs
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
-    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+    def complete_correction(self, *, extrapolated, cache):
+        (bias,) = cache
+
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+        l_obs = self._cov_sqrtm_lower(cache=(), cov_sqrtm_lower=l_ext)
+
+        l_obs_scalar = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
+        )
+        c_obs = l_obs_scalar**2
+
+        observed = IsotropicNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+
+        g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
+        m_cor = m_ext - g[:, None] * bias[None, :]
+        l_cor = l_ext - g[:, None] * l_obs[None, :]
+        corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        return observed, (corrected, g)
+
+    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[self.ode_order, ...]
 
     def evidence_sqrtm(self, *, observed):
@@ -157,25 +176,6 @@ class IsotropicImplementation(_implementation.Implementation):
         backward_noise = IsotropicNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
-
-    def complete_correction(self, *, info_op, extrapolated, cache):
-        (bias,) = cache
-
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = info_op.cov_sqrtm_lower(cache=(), cov_sqrtm_lower=l_ext)
-
-        l_obs_scalar = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
-        )
-        c_obs = l_obs_scalar**2
-
-        observed = IsotropicNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
-
-        g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
-        m_cor = m_ext - g[:, None] * bias[None, :]
-        l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, g)
 
     def extract_sol(self, *, rv):  # noqa: D102
         m = rv.mean[..., 0, :]

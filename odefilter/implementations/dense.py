@@ -40,7 +40,7 @@ class EK1(_implementation.Information):
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
         b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
 
-        cov_sqrtm_lower = self.cov_sqrtm_lower(
+        cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(b, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
 
@@ -51,6 +51,24 @@ class EK1(_implementation.Information):
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
+    def complete_correction(self, *, extrapolated, cache):  # noqa: D102
+        b, fn = cache
+
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+
+        l_obs_nonsquare = self._cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
+
+        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
+        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
+
+        crosscov = l_ext @ l_obs_nonsquare.T
+        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
+
+        m_cor = m_ext - gain @ b
+        l_cor = l_ext - gain @ l_obs_nonsquare
+        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        return observed, (corrected, gain)
+
     def _residual(self, x, *, t, p):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
 
@@ -58,7 +76,7 @@ class EK1(_implementation.Information):
         fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
-    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
@@ -187,24 +205,6 @@ class DenseImplementation(_implementation.Implementation):
 
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
-
-    def complete_correction(self, *, info_op, extrapolated, cache):  # noqa: D102
-        b, fn = cache
-
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
-
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
-        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
-
-        crosscov = l_ext @ l_obs_nonsquare.T
-        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
-
-        m_cor = m_ext - gain @ b
-        l_cor = l_ext - gain @ l_obs_nonsquare
-        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, gain)
 
     def extract_sol(self, *, rv):  # noqa: D102
         if rv.mean.ndim == 1:

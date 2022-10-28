@@ -29,7 +29,7 @@ class Information(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+    def complete_correction(self, *, extrapolated, cache):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -65,10 +65,6 @@ class Implementation(abc.ABC):
 
     @abc.abstractmethod
     def revert_markov_kernel(self, *, linearisation_pt, l0, cache, output_scale_sqrtm):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_correction(self, *, info_op, extrapolated, cache):
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -84,8 +84,4 @@ class Filter(_strategy.Strategy):
         )
 
     def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        return self.implementation.complete_correction(
-            info_op=info_op,
-            extrapolated=extrapolated,
-            cache=cache_obs,
-        )
+        return info_op.complete_correction(extrapolated=extrapolated, cache=cache_obs)
