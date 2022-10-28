@@ -153,9 +153,6 @@ class CK1(_DenseInformationCommon):
             observed=MultivariateNormal(b, l_obs_raw)
         )
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        print(error_estimate)
-        print(output_scale_sqrtm)
-        print()
         return (
             output_scale_sqrtm * error_estimate,
             output_scale_sqrtm,
@@ -194,7 +191,7 @@ class _PositiveCubatureRule(NamedTuple):
 
 
 def _spherical_cubature_params(*, dim):
-    eye_d = jnp.eye(dim)
+    eye_d = jnp.eye(dim) * jnp.sqrt(dim)
     pts = jnp.vstack((eye_d, -1 * eye_d))
     weights_sqrtm = jnp.sqrt(jnp.ones((2 * dim,)) / (2 * dim))
     return _PositiveCubatureRule(points=pts, weights_sqrtm=weights_sqrtm)
