@@ -324,7 +324,7 @@ class NonDynamicSolver(_Solver):
             linearisation_pt, t=state.t + dt, p=parameters
         )
         error_estimate, _ = self._estimate_error(
-            info_op=info_op, cache_obs=cache_obs, obs_pt=obs_pt, p=p
+            info_op=info_op, cache_obs=cache_obs, obs_pt=obs_pt
         )
 
         # Post-error-estimate steps
