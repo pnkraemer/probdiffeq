@@ -139,22 +139,21 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-        vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
-        b, _, fx_normed = self._linearize(x, vmap_res=vmapped_residual)
+        # vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
+        vmapped_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
+        b, _, fx_normed = self._linearize(x, vmap_f=vmapped_f)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
         obs = MultivariateNormal(b, l_obs_raw)
         output_scale_sqrtm = self.evidence_sqrtm(observed=obs)
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
 
-        cache = (vmapped_residual,)
+        cache = (vmapped_f,)
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, *, extrapolated, cache):
-        (vmapped_residual,) = cache
-        b, x_normed, fx_normed = self._linearize(
-            extrapolated, vmap_res=vmapped_residual
-        )
+        (vmapped_f,) = cache
+        b, x_normed, fx_normed = self._linearize(extrapolated, vmap_f=vmapped_f)
 
         l_obs = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
         observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
@@ -168,7 +167,7 @@ class CK1(_DenseInformationCommon):
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
-    def _linearize(self, rv, *, vmap_res):
+    def _linearize(self, rv, *, vmap_f):
         m, l_sqrtm = rv.mean, rv.cov_sqrtm_lower
 
         x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
@@ -176,13 +175,21 @@ class CK1(_DenseInformationCommon):
         sigma_points = m[None, :] + x_centered
 
         # k = self.ode_dimension * (self.ode_order + 2)
-        fx = vmap_res(sigma_points)
+        e1v = jax.vmap(self._e1)
+        e0v = jax.vmap(self._e0)
+        fx = e1v(sigma_points) - vmap_f(e0v(sigma_points))
         b = self.sigma_weights_sqrtm**2 @ fx
 
         fx_centered = fx - b[None, :]
         fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
 
         return b, x_normed, fx_normed
+
+    def _e1(self, x):
+        return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
+
+    def _e0(self, x):
+        return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
 
 
 class _PositiveCubatureRule(NamedTuple):
