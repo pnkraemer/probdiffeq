@@ -135,17 +135,11 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-
-        m, l_sqrtm = x.mean, x.cov_sqrtm_lower
-
-        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
-        sigma_points = m[None, :] + x_centered
-
         vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
-        fx = vmapped_residual(sigma_points)
-        b = self.sigma_weights_sqrtm**2 @ fx
-        fx_centered = fx - b[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+
+        b, _, fx_normed = self._sigma_point_linearize(
+            rv=x, vmapped_residual=vmapped_residual
+        )
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
 
@@ -161,18 +155,10 @@ class CK1(_DenseInformationCommon):
 
     def complete_correction(self, *, extrapolated, cache):
         # Re-linearise at the actual extrapolation
-        m, l_sqrtm = extrapolated.mean, extrapolated.cov_sqrtm_lower
-
-        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
-        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]
-        sigma_points = m[None, :] + x_centered
-
         (vmapped_residual,) = cache
-        fx = vmapped_residual(sigma_points)
-        b = self.sigma_weights_sqrtm**2 @ fx
-
-        fx_centered = fx - b[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        b, x_normed, fx_normed = self._sigma_point_linearize(
+            rv=extrapolated, vmapped_residual=vmapped_residual
+        )
 
         d = self.ode_dimension
         r_obs, (r_cor, gain) = _sqrtm.revert_gauss_markov_correlation(
@@ -183,6 +169,17 @@ class CK1(_DenseInformationCommon):
         m_cor = extrapolated.mean - gain @ b
         corrected = MultivariateNormal(m_cor, r_cor.T)
         return observed, (corrected, gain)
+
+    def _sigma_point_linearize(self, *, rv, vmapped_residual):
+        m, l_sqrtm = rv.mean, rv.cov_sqrtm_lower
+        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
+        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]
+        sigma_points = m[None, :] + x_centered
+        fx = vmapped_residual(sigma_points)
+        b = self.sigma_weights_sqrtm**2 @ fx
+        fx_centered = fx - b[None, :]
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        return b, x_normed, fx_normed
 
 
 class _PositiveCubatureRule(NamedTuple):
