@@ -36,6 +36,10 @@ class Information(abc.ABC):
     def estimate_error(self, *, cache_obs, obs_pt):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def evidence_sqrtm(self, *, observed):
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class Implementation(abc.ABC):
@@ -85,10 +89,6 @@ class Implementation(abc.ABC):
 
     @abc.abstractmethod
     def init_backward_noise(self, *, rv_proto):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def evidence_sqrtm(self, *, observed):
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -309,11 +309,8 @@ class NonDynamicSolver(_Solver):
         )
 
         # Linearise and estimate error
-        obs_pt, cache_obs = info_op.linearize(
-            linearisation_pt, t=state.t + dt, p=parameters
-        )
-        error_estimate, _ = self._estimate_error(
-            info_op=info_op, cache_obs=cache_obs, obs_pt=obs_pt
+        error, _, cache_obs = self.strategy.begin_correction(
+            linearisation_pt, info_op=info_op, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
@@ -330,10 +327,9 @@ class NonDynamicSolver(_Solver):
             info_op=info_op,
             extrapolated=extrapolated,
             cache_obs=cache_obs,
-            obs_pt=obs_pt,
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
-            diffsqrtm=output_scale_sqrtm, n=n, obs=observed
+            info_op=info_op, diffsqrtm=output_scale_sqrtm, n=n, obs=observed
         )
 
         # Extract and return solution
@@ -346,10 +342,10 @@ class NonDynamicSolver(_Solver):
             output_scale_sqrtm=new_output_scale_sqrtm,
             num_data_points=n + 1,
         )
-        return filtered, dt * error_estimate
+        return filtered, dt * error
 
-    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
-        evidence_sqrtm = self.strategy.evidence_sqrtm(observed=obs)
+    def _update_output_scale_sqrtm(self, *, info_op, diffsqrtm, n, obs):
+        evidence_sqrtm = info_op.evidence_sqrtm(observed=obs)
         return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):  # noqa: D102

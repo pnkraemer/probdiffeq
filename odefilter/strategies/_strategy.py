@@ -97,8 +97,5 @@ class Strategy(abc.ABC):
 
     def begin_correction(self, linearisation_pt, *, info_op, t, p):
         obs_pt, cache_obs = info_op.linearize(linearisation_pt, t=t, p=p)
-        error, scale_sqrtm = info_op.estimate_error(cache_obs=cache_obs, obs_pt=obs_pt)
+        scale_sqrtm, error = info_op.estimate_error(cache_obs=cache_obs, obs_pt=obs_pt)
         return error * scale_sqrtm, scale_sqrtm, (obs_pt, *cache_obs)
-
-    def evidence_sqrtm(self, *, observed):
-        return self.implementation.evidence_sqrtm(observed=observed)

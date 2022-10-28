@@ -37,6 +37,28 @@ class EK0(_implementation.Information):
     def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
+    def estimate_error(self, *, cache_obs, obs_pt):  # noqa: D102
+        l_obs_nonsquare_1 = obs_pt.cov_sqrtm_lower[..., None]  # (d, k, 1)
+
+        # (d, 1, 1)
+        l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
+        l_obs = l_obs_raw[..., 0, 0]  # (d,)
+
+        output_scale_sqrtm = self.evidence_sqrtm(
+            observed=BatchedNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs)
+        )  # (d,)
+
+        error_estimate = l_obs  # (d,)
+        return output_scale_sqrtm, error_estimate
+
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
+
+        res_white = obs_pt / l_obs  # (d, )
+        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
+
+        return evidence_sqrtm
+
 
 @register_pytree_node_class
 @dataclass(frozen=True)
@@ -111,30 +133,6 @@ class BatchImplementation(_implementation.Implementation):
 
         noise = BatchedNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
-
-    # todo: move to information?
-    def estimate_error(self, *, info_op, cache_obs, obs_pt):  # noqa: D102
-        l_obs_nonsquare_1 = obs_pt.cov_sqrtm_lower[..., None]  # (d, k, 1)
-
-        # (d, 1, 1)
-        l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
-        l_obs = l_obs_raw[..., 0, 0]  # (d,)
-
-        output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchedNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs)
-        )  # (d,)
-
-        error_estimate = l_obs  # (d,)
-        return output_scale_sqrtm, error_estimate
-
-    # todo: move to information?
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
-
-        res_white = obs_pt / l_obs  # (d, )
-        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
-
-        return evidence_sqrtm
 
     def extract_mean_from_marginals(self, mean):
         return mean[..., 0]

@@ -161,6 +161,5 @@ def case_solver_pair_dynamic_ekf1(num, atol, rtol, factor_min, factor_max, safet
     "solution_tornadox, solution_odefilter", cases=".", prefix="case_solver_pair_"
 )
 def test_outputs_equal(solution_tornadox, solution_odefilter):
-
     for sol_tornadox, sol_odefilter in zip(solution_tornadox, solution_odefilter):
         assert jnp.allclose(sol_tornadox, sol_odefilter)
