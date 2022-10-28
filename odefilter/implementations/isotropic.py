@@ -35,6 +35,21 @@ class EK0(_implementation.Information):
     def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         return cov_sqrtm_lower[self.ode_order, ...]
 
+    def estimate_error(self, *, cache_obs, obs_pt):
+        # jnp.sqrt(l_obs.T @ l_obs) without forming the square
+        l_obs = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower[:, None]), ()
+        )
+        res_white = (obs_pt.mean / l_obs) / jnp.sqrt(obs_pt.mean.size)
+
+        # jnp.sqrt(\|res_white\|^2/d) without forming the square
+        output_scale_sqrtm = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
+        )
+
+        error_estimate = l_obs
+        return output_scale_sqrtm, error_estimate
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
@@ -96,21 +111,6 @@ class IsotropicImplementation(_implementation.Implementation):
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
         return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
-
-    def estimate_error(self, *, info_op, cache_obs, obs_pt):  # noqa: D102
-        # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower[:, None]), ()
-        )
-        res_white = (obs_pt.mean / l_obs) / jnp.sqrt(obs_pt.mean.size)
-
-        # jnp.sqrt(\|res_white\|^2/d) without forming the square
-        output_scale_sqrtm = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
-        )
-
-        error_estimate = l_obs
-        return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
         self, *, linearisation_pt, l0, cache, output_scale_sqrtm
