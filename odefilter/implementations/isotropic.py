@@ -86,15 +86,16 @@ class IsotropicImplementation(_implementation.Implementation):
     def init_output_scale_sqrtm(self):
         return 1.0
 
-    def assemble_preconditioner(self, *, dt):  # noqa: D102
-        return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
-
-    def begin_extrapolation(self, m0, /, *, p, p_inv):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):  # noqa: D102
+        p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return IsotropicNormal(m_ext, q_sqrtm), m_ext_p, m0_p
+        return IsotropicNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+
+    def _assemble_preconditioner(self, *, dt):  # noqa: D102
+        return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
 
     def estimate_error(self, *, info_op, cache_obs, obs_pt):  # noqa: D102
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
@@ -112,9 +113,11 @@ class IsotropicImplementation(_implementation.Implementation):
         return output_scale_sqrtm, error_estimate
 
     def complete_extrapolation(  # noqa: D102
-        self, *, linearisation_pt, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
+        _, _, p, p_inv = cache
         m_ext = linearisation_pt.mean
+
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
@@ -124,9 +127,11 @@ class IsotropicImplementation(_implementation.Implementation):
         return IsotropicNormal(m_ext, l_ext)
 
     def revert_markov_kernel(  # noqa: D102
-        self, *, linearisation_pt, l0, p, p_inv, output_scale_sqrtm, m0_p, m_ext_p
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
+        m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
+
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=(self.a @ l0_p).T,
