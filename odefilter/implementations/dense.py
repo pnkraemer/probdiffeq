@@ -41,9 +41,9 @@ class EK1(_implementation.Information):
         b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
         obs_pt = MultivariateNormal(
             mean=b,
-            # todo: this call to cache_obs is hacky
+            # todo: this call to cache is hacky
             cov_sqrtm_lower=self.cov_sqrtm_lower(
-                cache_obs=(None, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
+                cache=(None, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
             ),
         )
         return obs_pt, (fn,)
@@ -55,11 +55,11 @@ class EK1(_implementation.Information):
         fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
-        _, fn = cache_obs
+    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+        _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
-    def estimate_error(self, *, cache_obs, obs_pt):  # noqa: D102
+    def estimate_error(self, *, cache, obs_pt):  # noqa: D102
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower.T).T
 
         # todo: make this call self.evidence()
@@ -195,14 +195,12 @@ class DenseImplementation(_implementation.Implementation):
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    def complete_correction(self, *, info_op, extrapolated, cache_obs):  # noqa: D102
-        obs_pt, *_ = cache_obs
+    def complete_correction(self, *, info_op, extrapolated, cache):  # noqa: D102
+        obs_pt, *_ = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
 
-        l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=l_ext
-        )
+        l_obs_nonsquare = info_op.cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
 
         l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
         observed = MultivariateNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs)

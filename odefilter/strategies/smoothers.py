@@ -95,7 +95,7 @@ class _SmootherCommon(_strategy.Strategy):
         a, (corrected, b) = self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated.init,
-            cache_obs=cache_obs,
+            cache=cache_obs,
         )
         corrected_seq = MarkovSequence(
             init=corrected, backward_model=extrapolated.backward_model

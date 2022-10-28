@@ -28,14 +28,14 @@ class EK0(_implementation.Information):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
 
-        cov = self.cov_sqrtm_lower(cache_obs=(), cov_sqrtm_lower=x.cov_sqrtm_lower)
+        cov = self.cov_sqrtm_lower(cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower)
         x = IsotropicNormal(bias, cov)
         return x, ()
 
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[self.ode_order, ...]
 
-    def estimate_error(self, *, cache_obs, obs_pt):
+    def estimate_error(self, *, cache, obs_pt):
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
         l_obs = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower[:, None]), ()
@@ -160,13 +160,11 @@ class IsotropicImplementation(_implementation.Implementation):
         extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        obs_pt, *remaining_cache = cache_obs
+    def complete_correction(self, *, info_op, extrapolated, cache):
+        obs_pt, *remaining_cache = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = info_op.cov_sqrtm_lower(
-            cache_obs=remaining_cache, cov_sqrtm_lower=l_ext
-        )
+        l_obs = info_op.cov_sqrtm_lower(cache=remaining_cache, cov_sqrtm_lower=l_ext)
 
         l_obs_scalar = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()

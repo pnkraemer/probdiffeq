@@ -30,14 +30,14 @@ class EK0(_implementation.Information):
         # m has shape (d, n)
         bias = m[..., self.ode_order] - self.f(*(m[..., : self.ode_order]).T, t=t, p=p)
         l_obs_nonsquare = self.cov_sqrtm_lower(
-            cache_obs=(), cov_sqrtm_lower=x.cov_sqrtm_lower
+            cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
         return BatchedNormal(bias, l_obs_nonsquare), ()
 
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
-    def estimate_error(self, *, cache_obs, obs_pt):  # noqa: D102
+    def estimate_error(self, *, cache, obs_pt):  # noqa: D102
         l_obs_nonsquare_1 = obs_pt.cov_sqrtm_lower[..., None]  # (d, k, 1)
 
         # (d, 1, 1)
@@ -150,13 +150,13 @@ class BatchImplementation(_implementation.Implementation):
         q_ext = p[..., None] * self.q_sqrtm_lower
         return BatchedNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
-    def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        obs_pt, *remaining_cache = cache_obs
+    def complete_correction(self, *, info_op, extrapolated, cache):
+        obs_pt, *remaining_cache = cache
 
         # (d, k), (d, k, k)
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
         l_obs_nonsquare = info_op.cov_sqrtm_lower(
-            cache_obs=remaining_cache, cov_sqrtm_lower=l_ext
+            cache=remaining_cache, cov_sqrtm_lower=l_ext
         )  # (d, k)
 
         # (d, 1, 1)

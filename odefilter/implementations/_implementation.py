@@ -29,11 +29,11 @@ class Information(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
+    def cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def estimate_error(self, *, cache_obs, obs_pt):
+    def estimate_error(self, *, cache, obs_pt):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -72,7 +72,7 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
+    def complete_correction(self, *, info_op, extrapolated, cache, obs_pt):
         raise NotImplementedError
 
     @abc.abstractmethod
