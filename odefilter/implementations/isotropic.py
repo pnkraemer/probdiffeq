@@ -27,7 +27,10 @@ class EK0(_implementation.Information):
     def linearize(self, x: IsotropicNormal, /, *, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
-        return bias, ()
+
+        cov = self.cov_sqrtm_lower(cache_obs=(), cov_sqrtm_lower=x.cov_sqrtm_lower)
+        x = IsotropicNormal(bias, cov)
+        return x, ()
 
     def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         return cov_sqrtm_lower[self.ode_order, ...]
@@ -93,15 +96,12 @@ class IsotropicImplementation(_implementation.Implementation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         return IsotropicNormal(m_ext, q_sqrtm), m_ext_p, m0_p
 
-    def estimate_error(self, *, info_op, cache_obs, obs_pt, p):  # noqa: D102
-        # todo: the info op should return the reshaped version?
-        l_obs_raw = info_op.cov_sqrtm_lower(
-            cache_obs=cache_obs, cov_sqrtm_lower=p[:, None] * self.q_sqrtm_lower
-        )
-
+    def estimate_error(self, *, info_op, cache_obs, obs_pt):  # noqa: D102
         # jnp.sqrt(l_obs.T @ l_obs) without forming the square
-        l_obs = jnp.reshape(_sqrtm.sqrtm_to_upper_triangular(R=l_obs_raw[:, None]), ())
-        res_white = (obs_pt / l_obs) / jnp.sqrt(obs_pt.size)
+        l_obs = jnp.reshape(
+            _sqrtm.sqrtm_to_upper_triangular(R=obs_pt.cov_sqrtm_lower[:, None]), ()
+        )
+        res_white = (obs_pt.mean / l_obs) / jnp.sqrt(obs_pt.mean.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
         output_scale_sqrtm = jnp.reshape(
@@ -162,10 +162,10 @@ class IsotropicImplementation(_implementation.Implementation):
         )
         c_obs = l_obs_scalar**2
 
-        observed = IsotropicNormal(mean=obs_pt, cov_sqrtm_lower=l_obs_scalar)
+        observed = IsotropicNormal(mean=obs_pt.mean, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
-        m_cor = m_ext - g[:, None] * obs_pt[None, :]
+        m_cor = m_ext - g[:, None] * obs_pt.mean[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
