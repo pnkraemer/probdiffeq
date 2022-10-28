@@ -54,12 +54,12 @@ class Implementation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def estimate_error(self, *, info_op, cache_obs, obs_pt, p):
+    def estimate_error(self, *, info_op, cache_obs, obs_pt):
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, *, linearisation_pt, l0, p_inv, p, output_scale_sqrtm
+        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
         raise NotImplementedError
 

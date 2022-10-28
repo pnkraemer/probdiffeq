@@ -52,7 +52,7 @@ class EK1(_implementation.Information):
         fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
-    def cov_sqrtm_lower(self, cache_obs, *, cov_sqrtm_lower):
+    def cov_sqrtm_lower(self, *, cache_obs, cov_sqrtm_lower):
         return jax.vmap(cache_obs, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
 
