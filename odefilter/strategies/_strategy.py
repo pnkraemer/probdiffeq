@@ -62,7 +62,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, info_op, extrapolated, cache_obs, obs_pt):
+    def complete_correction(self, *, info_op, extrapolated, cache_obs):
         raise NotImplementedError
 
     @abc.abstractmethod

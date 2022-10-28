@@ -84,10 +84,11 @@ class Filter(_strategy.Strategy):
         )
 
     def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        obs_pt, *cache = cache_obs
+        # todo: no need to split obs_pt and cache_obs
+        obs_pt, *cache_obs = cache_obs
         return self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated,
-            cache_obs=cache_obs,
+            cache_obs=cache_obs,  # which cache are we calling here???
             obs_pt=obs_pt,
         )

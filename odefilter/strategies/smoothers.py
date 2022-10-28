@@ -92,7 +92,7 @@ class _SmootherCommon(_strategy.Strategy):
         return self.implementation.begin_extrapolation(posterior.init.mean, dt=dt)
 
     def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        obs_pt, *cache = cache_obs
+        obs_pt, *_ = cache_obs
         a, (corrected, b) = self.implementation.complete_correction(
             info_op=info_op,
             extrapolated=extrapolated.init,
