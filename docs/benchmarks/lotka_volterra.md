@@ -49,6 +49,8 @@ commit = most_recent_commit(abbrev=6)
 
 print(f"Most recent commit:\n\t{commit}")
 print(f"odefilter version:\n\t{odefilter_version}")
+print()
+jax.print_environment_info()
 ```
 
 This is the problem:
@@ -155,24 +157,23 @@ solve_fns = [
     # (_ekf1_3_dynamic, f"Dynamic EKF1({3})"),
     (_ekf1_5, f"EKF1({5})"),
     (_ckf1_5, f"CKF1({5})"),
-    # (_ekf1_5_dynamic, f"Dynamic EKF1({5})"),
-    # (_eks1_5_dynamic, f"Dynamic EKS1({5})"),
+    (_ekf1_5_dynamic, f"Dynamic EKF1({5})"),
+    (_eks1_5_dynamic, f"Dynamic EKS1({5})"),
     (_ekf1_7, f"EKF1({7})"),
-    (_ckf1_7, f"CKF1({7})"),
-    # (_ekf1_8_dynamic, f"Dynamic EKF1({8})"),
+    # (_ckf1_7, f"CKF1({7})"),
     # # EK0
-    # (_ekf0_3_isotropic, f"Isotropic EKF0({3})"),
-    # (_ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({5})"),
-    # (_ekf0_5_isotropic, f"Isotropic EKF0({5})"),
-    # (_eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
-    # (_ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
+    (_ekf0_3_isotropic, f"Isotropic EKF0({3})"),
+    (_ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({3})"),
+    (_ekf0_5_isotropic, f"Isotropic EKF0({5})"),
+    (_eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
+    (_ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
 ]
 ```
 
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 10.0, step=2.0)
+tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
 
 results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
 ```
@@ -200,6 +201,7 @@ for simulate_terminal_values(). The smoothing-based solvers compute extra factor
 We can observe more:
 * Dynamic calibration seems to perform at most as good as non-dynamic calibration. (Except for low order, low-precision EKF1, where the dynamic calibration seems to help. But even with the dynamic calibration is the low-order EKF1 one of the slowest solvers.)
 * Low precision is best achieved with an isotropic EKF0(3). High precision is best achieved with an EKF1(8). The middle ground is better covered by an isotropic EKF0(5) than an EKF1(5).
+* The cubature filters are more expensive than the extended filters (because cubature-linearisation costs more than Taylor-linearisation)
 
 
 

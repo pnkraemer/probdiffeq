@@ -63,9 +63,9 @@ plugins:
     - exclude:
         glob:
           - "examples/*.md"
+          - "benchmarks/lotka_volterra.md"
     - mkdocs-jupyter:
-        include: ["examples/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
-        ignore: ["benchmarks/*.ipynb"]
+        include: ["examples/*.ipynb", "benchmarks/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
 
 
 nav:
@@ -97,4 +97,4 @@ nav:
         - "dev_docs/on_the_edges.md"
     - Benchmarks:
         - "benchmarks/insights.md"
-        - "benchmarks/lotka_volterra.md"
+        - "benchmarks/lotka_volterra.ipynb"
