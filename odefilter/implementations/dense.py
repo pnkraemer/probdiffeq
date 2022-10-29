@@ -134,6 +134,7 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
+        # todo: bring down the number of QR decompositions
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
@@ -144,7 +145,6 @@ class CK1(_DenseInformationCommon):
         # 1. x -> (e0x, e1x)
         R_X = x.cov_sqrtm_lower.T
         r_marg1_x = _sqrtm.sqrtm_to_upper_triangular(R=e0v(R_X.T).T)
-        r_marg1_y = _sqrtm.sqrtm_to_upper_triangular(R=e1v(R_X.T).T)
         m_marg1_x, m_marg1_y = self._e0(x.mean), self._e1(x.mean)
 
         # 2. (x, y) -> (f(x), y)
@@ -154,11 +154,10 @@ class CK1(_DenseInformationCommon):
         m_marg2 = self.sigma_weights_sqrtm**2 @ fx
         fx_centered = fx - m_marg2[None, :]
         fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
-        r_marg2 = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed)
 
         # 3. (x, y) -> y - x (last one)
         m_marg = m_marg1_y - m_marg2
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=r_marg1_y, R2=r_marg2).T
+        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=e1v(R_X.T).T, R2=fx_normed).T
 
         # Summarise
         marginals = MultivariateNormal(m_marg, l_marg)
@@ -179,6 +178,8 @@ class CK1(_DenseInformationCommon):
         # This uses the fewest sigma-points possible, and ultimately should
         # lead to the fastest, most stable implementation.
 
+        # todo: bring down the number of QR decompositions
+
         # 1. x -> (e0x, e1x)
         marg1, (bw1, gain1) = self._step_1(x=extrapolated, cache=cache)
 
@@ -194,22 +195,6 @@ class CK1(_DenseInformationCommon):
         )
         marginals = marg3
         return marginals, (bw_noise, bw_transition)
-
-    @staticmethod
-    def _condense_three_backward_models(*, bw1, bw2, bw3, gain1, gain2, gain3):
-        bw_transition = gain1 @ gain2 @ gain3
-
-        bw_noise_mean = gain1 @ (gain2 @ bw3.mean + bw2.mean) + bw1.mean
-
-        x = _sqrtm.sum_of_sqrtm_factors(
-            R1=bw3.cov_sqrtm_lower.T @ gain2.T, R2=bw2.cov_sqrtm_lower.T
-        )
-        bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(
-            R1=x @ gain1.T, R2=bw1.cov_sqrtm_lower.T
-        )
-
-        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm.T)
-        return bw_noise, bw_transition
 
     def _step_1(self, *, x, cache):
         (vmap_f, e0v, e1v) = cache
@@ -281,6 +266,22 @@ class CK1(_DenseInformationCommon):
         backward_noise = MultivariateNormal(m_bw, r_bw3.T)
 
         return marginals, (backward_noise, gain3)
+
+    @staticmethod
+    def _condense_three_backward_models(*, bw1, bw2, bw3, gain1, gain2, gain3):
+        bw_transition = gain1 @ gain2 @ gain3
+
+        bw_noise_mean = gain1 @ (gain2 @ bw3.mean + bw2.mean) + bw1.mean
+
+        x = _sqrtm.sum_of_sqrtm_factors(
+            R1=bw3.cov_sqrtm_lower.T @ gain2.T, R2=bw2.cov_sqrtm_lower.T
+        )
+        bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(
+            R1=x @ gain1.T, R2=bw1.cov_sqrtm_lower.T
+        )
+
+        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm.T)
+        return bw_noise, bw_transition
 
     def _e1(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
