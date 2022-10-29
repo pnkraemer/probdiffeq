@@ -27,3 +27,24 @@ def test_revert_kernel():
     assert jnp.allclose(cov(extra), S)
     assert jnp.allclose(g, K)
     assert jnp.allclose(cov(bw_noise), C1)
+
+
+def test_revert_kernel_noisefree():
+
+    C = jnp.arange(9.0).reshape((3, 3))
+    H = jnp.arange(1.0, 7.0).reshape((2, 3))
+
+    S = H @ C @ C.T @ H.T
+    K = C @ C.T @ H.T @ jnp.linalg.inv(S)
+    C1 = C @ C.T - K @ S @ K.T
+
+    extra, (bw_noise, g) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+        R_X_F=C.T @ H.T, R_X=C.T
+    )
+
+    def cov(x):
+        return x.T @ x
+
+    assert jnp.allclose(cov(extra), S)
+    assert jnp.allclose(g, K)
+    assert jnp.allclose(cov(bw_noise), C1)

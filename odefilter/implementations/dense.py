@@ -73,14 +73,13 @@ class EK1(_DenseInformationCommon):
 
         l_obs_nonsquare = self._cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
 
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
-        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
-
-        crosscov = l_ext @ l_obs_nonsquare.T
-        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
+        r_obs, (r_cor, gain) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+            R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
+        )
+        l_obs, l_cor = r_obs.T, r_cor.T
 
         m_cor = m_ext - gain @ b
-        l_cor = l_ext - gain @ l_obs_nonsquare
+        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
@@ -165,10 +164,10 @@ class CK1(_DenseInformationCommon):
         x = extrapolated
         R_X = x.cov_sqrtm_lower.T  # (n, n)
         R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
-        R_YX = jnp.zeros((2 * self.ode_dimension, 2 * self.ode_dimension))  # (2*d, 2*d)
-        r_marg1, (r_bw1, gain1) = _sqrtm.revert_gauss_markov_correlation(
-            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX
-        )  # (2*d, 2*d), (n, n), (n, 2*d)
+        # (2*d, 2*d), (n, n), (n, 2*d)
+        r_marg1, (r_bw1, gain1) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+            R_X_F=R_X_F, R_X=R_X
+        )
         m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
         m_bw1 = x.mean - gain1 @ m_marg1
 
@@ -185,10 +184,10 @@ class CK1(_DenseInformationCommon):
         fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]  # (S, d)
         R_X_F = fx_normed  # (S, d)
         R_X = x_normed  # (S, 2*d)
-        R_YX = jnp.zeros((self.ode_dimension, self.ode_dimension))  # (d, d)
-        marginals2, (r_bw2, gain2) = _sqrtm.revert_gauss_markov_correlation(
-            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX
-        )  # (d, d), (2*d, 2*d), (2*d, d)
+        # (d, d), (2*d, 2*d), (2*d, d)
+        marginals2, (r_bw2, gain2) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+            R_X_F=R_X_F, R_X=R_X
+        )
         m_marg2 = b
         m_bw2 = m_marg1 - gain2 @ m_marg2
 

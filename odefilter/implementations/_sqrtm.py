@@ -24,6 +24,16 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 
 
+def revert_gauss_markov_correlation_noisefree(*, R_X_F, R_X):
+    """Like revert_gauss_markov_correlation, but without observation noise."""
+    assert R_X_F.shape[1] <= R_X_F.shape[0]
+    r_marg = sqrtm_to_upper_triangular(R=R_X_F)
+    crosscov = R_X.T @ R_X_F
+    gain = jsp.linalg.cho_solve((r_marg.T, True), crosscov.T).T
+    r_cor = R_X - R_X_F @ gain.T
+    return r_marg, (r_cor, gain)
+
+
 # rename: reparametrise_conditional_correlation?
 def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
