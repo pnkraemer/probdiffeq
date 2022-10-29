@@ -24,8 +24,8 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 
 
-def revert_gauss_markov_correlation_noisefree(*, R_X_F, R_X):
-    """Like revert_gauss_markov_correlation, but without observation noise."""
+def revert_conditional_noisefree(*, R_X_F, R_X):
+    """Like revert_conditional, but without observation noise."""
     assert R_X_F.shape[1] <= R_X_F.shape[0]
     r_marg = sqrtm_to_upper_triangular(R=R_X_F)
     crosscov = R_X.T @ R_X_F
@@ -35,7 +35,7 @@ def revert_gauss_markov_correlation_noisefree(*, R_X_F, R_X):
 
 
 # rename: reparametrise_conditional_correlation?
-def revert_gauss_markov_correlation(*, R_X_F, R_X, R_YX):
+def revert_conditional(*, R_X_F, R_X, R_YX):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
 
     What does this mean? Assume we have two normally-distributed random variables,

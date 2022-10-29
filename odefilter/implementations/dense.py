@@ -73,7 +73,7 @@ class EK1(_DenseInformationCommon):
 
         l_obs_nonsquare = self._cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
 
-        r_obs, (r_cor, gain) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
         )
         l_obs, l_cor = r_obs.T, r_cor.T
@@ -165,7 +165,7 @@ class CK1(_DenseInformationCommon):
         R_X = x.cov_sqrtm_lower.T  # (n, n)
         R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
         # (2*d, 2*d), (n, n), (n, 2*d)
-        r_marg1, (r_bw1, gain1) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+        r_marg1, (r_bw1, gain1) = _sqrtm.revert_conditional_noisefree(
             R_X_F=R_X_F, R_X=R_X
         )
         m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
@@ -185,7 +185,7 @@ class CK1(_DenseInformationCommon):
         R_X_F = fx_normed  # (S, d)
         R_X = x_normed  # (S, 2*d)
         # (d, d), (2*d, 2*d), (2*d, d)
-        marginals2, (r_bw2, gain2) = _sqrtm.revert_gauss_markov_correlation_noisefree(
+        marginals2, (r_bw2, gain2) = _sqrtm.revert_conditional_noisefree(
             R_X_F=R_X_F, R_X=R_X
         )
         m_marg2 = b
@@ -304,7 +304,7 @@ class DenseImplementation(_implementation.Implementation):
         m_ext = linearisation_pt.mean
 
         l0_p = p_inv[:, None] * l0
-        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
             R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,

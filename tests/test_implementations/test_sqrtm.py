@@ -17,9 +17,7 @@ def test_revert_kernel():
     K = C @ C.T @ H.T @ jnp.linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
-    extra, (bw_noise, g) = _sqrtm.revert_gauss_markov_correlation(
-        R_X_F=C.T @ H.T, R_X=C.T, R_YX=X.T
-    )
+    extra, (bw_noise, g) = _sqrtm.revert_conditional(R_X_F=C.T @ H.T, R_X=C.T, R_YX=X.T)
 
     def cov(x):
         return x.T @ x
@@ -38,9 +36,7 @@ def test_revert_kernel_noisefree():
     K = C @ C.T @ H.T @ jnp.linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
-    extra, (bw_noise, g) = _sqrtm.revert_gauss_markov_correlation_noisefree(
-        R_X_F=C.T @ H.T, R_X=C.T
-    )
+    extra, (bw_noise, g) = _sqrtm.revert_conditional_noisefree(R_X_F=C.T @ H.T, R_X=C.T)
 
     def cov(x):
         return x.T @ x
