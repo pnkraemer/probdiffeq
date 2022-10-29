@@ -166,7 +166,6 @@ class CK1(_DenseInformationCommon):
         R_X = x.cov_sqrtm_lower.T  # (n, n)
         R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
         R_YX = jnp.zeros((2 * self.ode_dimension, 2 * self.ode_dimension))  # (2*d, 2*d)
-        print(R_X.shape, R_X_F.shape, R_YX.shape)
         r_marg1, (r_bw1, gain1) = _sqrtm.revert_gauss_markov_correlation(
             R_X_F=R_X_F, R_X=R_X, R_YX=R_YX
         )  # (2*d, 2*d), (n, n), (n, 2*d)
