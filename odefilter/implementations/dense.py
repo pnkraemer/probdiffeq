@@ -134,7 +134,6 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-        # Getting it down to 2*d sigma points...
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
@@ -239,16 +238,13 @@ class CK1(_DenseInformationCommon):
         m_bw2 = jnp.hstack((m_bw2_x, jnp.zeros_like(m_bw2_x)))
         r_bw2 = jsp.linalg.block_diag(r_bw2_x, jnp.zeros_like(r_bw2_x))
 
-        # marginal: H := crosscov @ Pinv; multiply the original cov
+        # marginal: H := crosscov @ P_inv; multiply the original cov
         # with (H, I) from left and right
         # Eq. (9) in https://arxiv.org/abs/2102.00514
-        H = (
-            jnp.linalg.inv(r_marg1_x.T @ r_marg1_x)
-            @ gain2_x
-            @ (r_marg2_x.T @ r_marg2_x)
-        )
+        crosscov = gain2_x @ (r_marg2_x.T @ r_marg2_x)
+        H = jsp.linalg.cho_solve((r_marg1_x.T, True), crosscov).T
         HH = jsp.linalg.block_diag(H, jnp.eye(*H.shape))
-        r_marg2 = marg1.cov_sqrtm_lower.T @ HH  # todo: what about the transpose?!
+        r_marg2 = marg1.cov_sqrtm_lower.T @ HH.T
         m_marg2_full = jnp.hstack((m_marg2, m_marg1_y))
 
         marginals = MultivariateNormal(m_marg2_full, r_marg2.T)
