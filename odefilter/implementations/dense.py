@@ -170,10 +170,14 @@ class CK1(_DenseInformationCommon):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, *, extrapolated, cache):
-        # This is the cubature filter, optimised to quadrature-linearise
-        # only the operator (x, y) -> y - f(x)
-        # We can use even fewer sigma-points, but that is future work.
-        (vmap_f, e0v, e1v) = cache
+        # The correction step for the cubature Kalman filter implementation
+        # is quite complicated. The reason is that the observation model
+        # is x -> e1(x) - f(e0(x)), i.e., a composition of a linear/nonlinear/linear
+        # model, and that we _only_ want to cubature-linearise the nonlinearity.
+        # So what we do is that we compute marginals, gains, and posteriors
+        # for each of the three transitions and merge them in the end.
+        # This uses the fewest sigma-points possible, and ultimately should
+        # lead to the fastest, most stable implementation.
 
         # 1. x -> (e0x, e1x)
         marg1, (bw1, gain1) = self._step_1(x=extrapolated, cache=cache)
@@ -184,19 +188,28 @@ class CK1(_DenseInformationCommon):
         # 3. (x, y) -> y - x
         marg3, (bw3, gain3) = self._step_3(marg2=marg2, cache=cache)
 
-        # Condense backward models
+        # Summarise and return
+        bw_noise, bw_transition = self._condense_three_backward_models(
+            bw1=bw1, bw2=bw2, bw3=bw3, gain1=gain1, gain2=gain2, gain3=gain3
+        )
+        marginals = marg3
+        return marginals, (bw_noise, bw_transition)
+
+    @staticmethod
+    def _condense_three_backward_models(*, bw1, bw2, bw3, gain1, gain2, gain3):
         bw_transition = gain1 @ gain2 @ gain3
+
         bw_noise_mean = gain1 @ (gain2 @ bw3.mean + bw2.mean) + bw1.mean
+
         x = _sqrtm.sum_of_sqrtm_factors(
             R1=bw3.cov_sqrtm_lower.T @ gain2.T, R2=bw2.cov_sqrtm_lower.T
         )
         bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(
             R1=x @ gain1.T, R2=bw1.cov_sqrtm_lower.T
         )
-        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm.T)
 
-        marginals = marg3
-        return marginals, (bw_noise, bw_transition)
+        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm.T)
+        return bw_noise, bw_transition
 
     def _step_1(self, *, x, cache):
         (vmap_f, e0v, e1v) = cache
