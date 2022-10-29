@@ -111,7 +111,7 @@ class CK1(_DenseInformationCommon):
     ):
         # todo: make more efficient!
         #  the number of derivatives in the prior should _not_ be relevant
-        k = ode_dimension * (num_derivatives + 1)
+        k = ode_dimension * 2
         rule = _spherical_cubature_params(dim=ode_order * k)
         return cls(
             f,
@@ -139,51 +139,70 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-        # vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
-        vmapped_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
-        b, _, fx_normed = self._linearize(x, vmap_f=vmapped_f)
+        # Getting it down to 2*d sigma points...
 
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
-        obs = MultivariateNormal(b, l_obs_raw)
-        output_scale_sqrtm = self.evidence_sqrtm(observed=obs)
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        # Vmap relevant functions
+        vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
+        cache = (vmap_f,)
 
-        cache = (vmapped_f,)
+        marginals, _ = self.complete_correction(cache=cache, extrapolated=x)
+        output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
+        error_estimate = jnp.sqrt(
+            jnp.einsum("nj,nj->n", marginals.cov_sqrtm_lower, marginals.cov_sqrtm_lower)
+        )
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, *, extrapolated, cache):
-        (vmapped_f,) = cache
-        b, x_normed, fx_normed = self._linearize(extrapolated, vmap_f=vmapped_f)
+        # This is the cubature filter, optimised to quadrature-linearise
+        # only the operator (x, y) -> y - f(x)
+        # We can use even fewer sigma-points, but that is future work.
 
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
-        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
+        (vmap_f,) = cache
+        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)  # cov
+        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)  # cov
 
-        crosscov = x_normed.T @ fx_normed
-        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
+        # 1. x -> (E0x, E1x)
+        x = extrapolated
+        R_X = x.cov_sqrtm_lower.T  # (n, n)
+        R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
+        R_YX = jnp.zeros((2 * self.ode_dimension, 2 * self.ode_dimension))  # (2*d, 2*d)
+        print(R_X.shape, R_X_F.shape, R_YX.shape)
+        r_marg1, (r_bw1, gain1) = _sqrtm.revert_gauss_markov_correlation(
+            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX
+        )  # (2*d, 2*d), (n, n), (n, 2*d)
+        m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
+        m_bw1 = x.mean - gain1 @ m_marg1
 
-        m_cor = extrapolated.mean - gain @ b
+        # 2. (x,y) -> (y - f(x))
+        x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
+        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]  # (S, 2*d)
+        sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
+        s0, s1 = jnp.split(
+            sigma_points, indices_or_sections=2, axis=1
+        )  # (S, d), (S, d)
+        fx = s1 - vmap_f(s0)  # (S, d)
+        b = self.sigma_weights_sqrtm**2 @ fx  # (S,) @ (S, d) = (d,)
+        fx_centered = fx - b[None, :]  # (S, d) - (1, d) = (S, d)
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]  # (S, d)
+        R_X_F = fx_normed  # (S, d)
+        R_X = x_normed  # (S, 2*d)
+        R_YX = jnp.zeros((self.ode_dimension, self.ode_dimension))  # (d, d)
+        marginals2, (r_bw2, gain2) = _sqrtm.revert_gauss_markov_correlation(
+            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX
+        )  # (d, d), (2*d, 2*d), (2*d, d)
+        m_marg2 = b
+        m_bw2 = m_marg1 - gain2 @ m_marg2
 
-        l_cor = _sqrtm.sqrtm_to_upper_triangular(R=x_normed - fx_normed @ gain.T).T
-        corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, gain)
+        # Condense models
+        marginal_mean, marginal_cov_sqrtm = b, marginals2
+        bw_transition = gain1 @ gain2
+        bw_noise_mean = gain1 @ m_bw2 + m_bw1
+        bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(R1=r_bw2 @ gain1.T, R2=r_bw1).T
 
-    def _linearize(self, rv, *, vmap_f):
-        m, l_sqrtm = rv.mean, rv.cov_sqrtm_lower
-
-        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
-        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]
-        sigma_points = m[None, :] + x_centered
-
-        # k = self.ode_dimension * (self.ode_order + 2)
-        e1v = jax.vmap(self._e1)
-        e0v = jax.vmap(self._e0)
-        fx = e1v(sigma_points) - vmap_f(e0v(sigma_points))
-        b = self.sigma_weights_sqrtm**2 @ fx
-
-        fx_centered = fx - b[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
-
-        return b, x_normed, fx_normed
+        # Return values
+        marginals = MultivariateNormal(marginal_mean, marginal_cov_sqrtm)
+        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm)
+        return marginals, (bw_noise, bw_transition)
 
     def _e1(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
@@ -308,18 +327,15 @@ class DenseImplementation(_implementation.Implementation):
         extrapolated = MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
-
+    # todo: this must not operate on the backward model data structure
+    def condense_backward_models(self, *, bw_init, bw_state):
         A = bw_init.transition
         (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
-
         C = bw_state.transition
         (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
-
         g = A @ C
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
-
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
