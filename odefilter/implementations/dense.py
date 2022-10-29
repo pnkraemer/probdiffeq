@@ -153,11 +153,11 @@ class CK1(_DenseInformationCommon):
         fx = vmap_f(sigma_points)
         m_marg2 = self.sigma_weights_sqrtm**2 @ fx
         fx_centered = fx - m_marg2[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        fx_centered_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
 
         # 3. (x, y) -> y - x (last one)
         m_marg = m_marg1_y - m_marg2
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=e1v(R_X.T).T, R2=fx_normed).T
+        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=e1v(R_X.T).T, R2=fx_centered_normed).T
 
         # Summarise
         marginals = MultivariateNormal(m_marg, l_marg)
@@ -181,13 +181,13 @@ class CK1(_DenseInformationCommon):
         # todo: bring down the number of QR decompositions
 
         # 1. x -> (e0x, e1x)
-        marg1, (bw1, gain1) = self._step_1(x=extrapolated, cache=cache)
+        marg1, (bw1, gain1), cache_new = self._step_1(x=extrapolated, cache=cache)
 
         # 2. (x, y) -> (f(x), y)
-        marg2, (bw2, gain2) = self._step_2(x=extrapolated, marg1=marg1, cache=cache)
+        marg2, (bw2, gain2) = self._step_2(x=extrapolated, marg1=marg1, cache=cache_new)
 
         # 3. (x, y) -> y - x
-        marg3, (bw3, gain3) = self._step_3(marg2=marg2, cache=cache)
+        marg3, (bw3, gain3) = self._step_3(marg2=marg2)
 
         # Summarise and return
         bw_noise, bw_transition = self._condense_three_backward_models(
@@ -199,73 +199,77 @@ class CK1(_DenseInformationCommon):
     def _step_1(self, *, x, cache):
         (vmap_f, e0v, e1v) = cache
 
-        R_X = x.cov_sqrtm_lower.T  # (n, n)
-        R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
-        r_marg1, (r_bw1, gain1) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=R_X_F, R_X=R_X
-        )  # (2*d, 2*d), (n, n), (n, 2*d)
-        m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
-        m_bw1 = x.mean - gain1 @ m_marg1
+        r_x = x.cov_sqrtm_lower.T
+        r_x0, r_x1 = e0v(r_x.T).T, e1v(r_x.T).T
+        r_x_f = jnp.hstack((r_x0, r_x1))
+        r_marg, (r_bw, gain) = _sqrtm.revert_conditional_noisefree(R_X_F=r_x_f, R_X=r_x)
 
-        marginals = MultivariateNormal(m_marg1, r_marg1.T)
-        backward_noise = MultivariateNormal(m_bw1, r_bw1.T)
-        return marginals, (backward_noise, gain1)
+        m_marg = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))
+        m_bw = x.mean - gain @ m_marg
+
+        marginals = MultivariateNormal(m_marg, r_marg.T)
+        backward_noise = MultivariateNormal(m_bw, r_bw.T)
+
+        new_cache = (vmap_f, r_x0, r_x1)
+        return marginals, (backward_noise, gain), new_cache
 
     def _step_2(self, *, x, marg1, cache):
 
-        (vmap_f, e0v, e1v) = cache
+        (vmap_f, r_x0, r_x1) = cache
 
-        R_X = x.cov_sqrtm_lower.T
+        # Create sigma-points (redo the select-from-x0 bit)
+        m_x0 = self._e0(x.mean)
+        r_x0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_x0)
+        pts_centered = self.unit_sigma_points @ r_x0_square
+        pts = m_x0[None, :] + pts_centered
 
-        r_marg1_x = _sqrtm.sqrtm_to_upper_triangular(R=e0v(R_X.T).T)
-        m_marg1_x = self._e0(x.mean)
-        m_marg1_y = self._e1(x.mean)
-        x_centered = self.unit_sigma_points @ r_marg1_x
-        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]  # (S, 2*d)
-        sigma_points = m_marg1_x[None, :] + x_centered
-        fx = vmap_f(sigma_points)
-        m_marg2 = self.sigma_weights_sqrtm**2 @ fx
-        fx_centered = fx - m_marg2[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
-        r_marg2_x, (r_bw2_x, gain2_x) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=fx_normed, R_X=x_normed
+        # Evaluate the vector-field
+        fx = vmap_f(pts)
+        fx_mean = self.sigma_weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None, :]
+
+        # Revert the transition
+        pts_centered_normed = pts_centered * self.sigma_weights_sqrtm[:, None]
+        fx_centered_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        r_marg_x, (r_bw_x, gain_x) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=fx_centered_normed, R_X=pts_centered_normed
         )
-        m_bw2_x = m_marg1_x - gain2_x @ m_marg2
+        m_bw_x = m_x0 - gain_x @ fx_mean
 
-        gain2 = jsp.linalg.block_diag(gain2_x, jnp.eye(*gain2_x.shape))
-        m_bw2 = jnp.hstack((m_bw2_x, jnp.zeros_like(m_bw2_x)))
-        r_bw2 = jsp.linalg.block_diag(r_bw2_x, jnp.zeros_like(r_bw2_x))
+        # Embed the backward model into an identity model
+        gain = jsp.linalg.block_diag(gain_x, jnp.eye(*gain_x.shape))
+        r_bw = jsp.linalg.block_diag(r_bw_x, jnp.zeros_like(r_bw_x))
+        m_bw = jnp.hstack((m_bw_x, jnp.zeros_like(m_bw_x)))
 
-        # marginal: H := crosscov @ P_inv; multiply the original cov
-        # with (H, I) from left and right
+        # Compute the "joint marginal".
+        # To this end, compute the linearisation matrix H as in
         # Eq. (9) in https://arxiv.org/abs/2102.00514
-        crosscov = gain2_x @ (r_marg2_x.T @ r_marg2_x)
-        H = jsp.linalg.cho_solve((r_marg1_x.T, True), crosscov).T
-        HH = jsp.linalg.block_diag(H, jnp.eye(*H.shape))
-        r_marg2 = marg1.cov_sqrtm_lower.T @ HH.T
-        m_marg2_full = jnp.hstack((m_marg2, m_marg1_y))
+        # and multiply the "original" marginal by blockdiag(H, I)
+        cross_cov = gain_x @ (r_marg_x.T @ r_marg_x)  # hacky...
+        H_x = jsp.linalg.cho_solve((r_x0_square.T, True), cross_cov).T
+        H = jsp.linalg.block_diag(H_x, jnp.eye(*H_x.shape))
+        r_marg = marg1.cov_sqrtm_lower.T @ H.T
+        m_x1 = self._e1(x.mean)
+        m_marg = jnp.hstack((fx_mean, m_x1))
 
-        marginals = MultivariateNormal(m_marg2_full, r_marg2.T)
-        backward_noise = MultivariateNormal(m_bw2, r_bw2.T)
+        # Summarise and return values
+        marginals = MultivariateNormal(m_marg, r_marg.T)
+        backward_noise = MultivariateNormal(m_bw, r_bw.T)
+        return marginals, (backward_noise, gain)
 
-        return marginals, (backward_noise, gain2)
-
-    def _step_3(self, *, marg2, cache):
+    def _step_3(self, *, marg2):
 
         m0, m1 = jnp.split(marg2.mean, indices_or_sections=2, axis=0)
         r0, r1 = jnp.split(marg2.cov_sqrtm_lower.T, indices_or_sections=2, axis=1)
 
-        mean = m1 - m0
-        R_X_F = r1 - r0
-        r_marg, (r_bw3, gain3) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=R_X_F, R_X=marg2.cov_sqrtm_lower.T
-        )
-        m_bw = marg2.mean - gain3 @ mean
+        m, r_x_f, r_x = m1 - m0, r1 - r0, marg2.cov_sqrtm_lower.T
+        r_marg, (r_bw, gain) = _sqrtm.revert_conditional_noisefree(R_X_F=r_x_f, R_X=r_x)
+        m_bw = marg2.mean - gain @ m
 
-        marginals = MultivariateNormal(mean, r_marg.T)
-        backward_noise = MultivariateNormal(m_bw, r_bw3.T)
+        marginals = MultivariateNormal(m, r_marg.T)
+        backward_noise = MultivariateNormal(m_bw, r_bw.T)
 
-        return marginals, (backward_noise, gain3)
+        return marginals, (backward_noise, gain)
 
     @staticmethod
     def _condense_three_backward_models(*, bw1, bw2, bw3, gain1, gain2, gain3):
