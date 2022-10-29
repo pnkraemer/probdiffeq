@@ -1,11 +1,12 @@
 """State-space models with dense covariance structure   ."""
 
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
+from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
@@ -15,8 +16,8 @@ from odefilter.implementations import _ibm, _implementation, _sqrtm
 class MultivariateNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
-    mean: Any  # (k,) shape
-    cov_sqrtm_lower: Any  # (k,k) shape
+    mean: Array  # (k,) shape
+    cov_sqrtm_lower: Array  # (k,k) shape
 
 
 class _DenseInformationCommon(_implementation.Information):
@@ -105,11 +106,8 @@ class CK1(_DenseInformationCommon):
         self.sigma_weights_sqrtm = sigma_weights_sqrtm
 
     @classmethod
-    def from_spherical_cubature_integration(
-        cls, f, /, ode_order, ode_dimension, num_derivatives
-    ):
+    def from_spherical_cubature_integration(cls, f, /, ode_order, ode_dimension):
         # todo: make more efficient!
-        #  the number of derivatives in the prior should _not_ be relevant
         k = ode_dimension * 2
         rule = _spherical_cubature_params(dim=ode_order * k)
         return cls(
@@ -152,7 +150,7 @@ class CK1(_DenseInformationCommon):
         r_marg1 = _sqrtm.sqrtm_to_upper_triangular(R=R_X_F)  # (2*d, 2*d)
         m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
 
-        # 2. (x,y) -> (y - f(x))
+        # 2. (x,y) -> (y - f(x))  todo: split into two maps
         x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
         sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
         s0, s1 = jnp.split(sigma_points, indices_or_sections=2, axis=1)  # (S, d)^2
@@ -187,7 +185,7 @@ class CK1(_DenseInformationCommon):
         m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
         m_bw1 = x.mean - gain1 @ m_marg1
 
-        # 2. (x,y) -> (y - f(x))
+        # 2. (x,y) -> (y - f(x))  todo: split into two maps
         x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
         x_normed = x_centered * self.sigma_weights_sqrtm[:, None]  # (S, 2*d)
         sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
@@ -225,8 +223,8 @@ class CK1(_DenseInformationCommon):
 class _PositiveCubatureRule(NamedTuple):
     """Cubature rule with positive weights."""
 
-    points: Any
-    weights_sqrtm: Any
+    points: Array
+    weights_sqrtm: Array
 
 
 def _spherical_cubature_params(*, dim):
@@ -241,8 +239,8 @@ def _spherical_cubature_params(*, dim):
 class DenseImplementation(_implementation.Implementation):
     """Handle dense covariances."""
 
-    a: Any
-    q_sqrtm_lower: Any
+    a: Array
+    q_sqrtm_lower: Array
 
     num_derivatives: int
     ode_dimension: int

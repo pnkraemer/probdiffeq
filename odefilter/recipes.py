@@ -249,7 +249,6 @@ def ckf1(*, ode_dimension, num_derivatives=4, ode_order=1):
         dense.CK1.from_spherical_cubature_integration,
         ode_dimension=ode_dimension,
         ode_order=ode_order,
-        num_derivatives=num_derivatives,
     )
     return solver, information_op
 
