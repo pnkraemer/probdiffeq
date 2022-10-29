@@ -134,7 +134,6 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-        # todo: bring down the number of QR decompositions
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
@@ -179,6 +178,9 @@ class CK1(_DenseInformationCommon):
         # lead to the fastest, most stable implementation.
 
         # todo: bring down the number of QR decompositions
+        #  (I am certain we can bring it down quite drastically, probably two overall:
+        #  one for the qr(R E0^T) which is used for sigma-points,
+        #  and one to compute the gains.
 
         # 1. x -> (e0x, e1x)
         marg1, (bw1, gain1), cache_new = self._step_1(x=extrapolated, cache=cache)
@@ -215,7 +217,7 @@ class CK1(_DenseInformationCommon):
 
     def _step_2(self, *, x, marg1, cache):
 
-        (vmap_f, r_x0, r_x1) = cache
+        (vmap_f, r_x0, _) = cache
 
         # Create sigma-points (redo the select-from-x0 bit)
         m_x0 = self._e0(x.mean)
