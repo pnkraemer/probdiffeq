@@ -73,14 +73,13 @@ class EK1(_DenseInformationCommon):
 
         l_obs_nonsquare = self._cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
 
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare.T).T
-        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
-
-        crosscov = l_ext @ l_obs_nonsquare.T
-        gain = jsp.linalg.cho_solve((l_obs, True), crosscov.T).T
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
+        )
+        l_obs, l_cor = r_obs.T, r_cor.T
 
         m_cor = m_ext - gain @ b
-        l_cor = l_ext - gain @ l_obs_nonsquare
+        observed = MultivariateNormal(mean=b, cov_sqrtm_lower=l_obs)
         corrected = MultivariateNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
@@ -106,8 +105,12 @@ class CK1(_DenseInformationCommon):
         self.sigma_weights_sqrtm = sigma_weights_sqrtm
 
     @classmethod
-    def from_spherical_cubature(cls, f, /, ode_order, ode_dimension, num_derivatives):
-        k = ode_dimension * (num_derivatives + 1)  # todo: make more efficient!
+    def from_spherical_cubature_integration(
+        cls, f, /, ode_order, ode_dimension, num_derivatives
+    ):
+        # todo: make more efficient!
+        #  the number of derivatives in the prior should _not_ be relevant
+        k = ode_dimension * 2
         rule = _spherical_cubature_params(dim=ode_order * k)
         return cls(
             f,
@@ -135,57 +138,93 @@ class CK1(_DenseInformationCommon):
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
+        # Getting it down to 2*d sigma points...
 
-        m, l_sqrtm = x.mean, x.cov_sqrtm_lower
+        # Vmap relevant functions
+        vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
+        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
+        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
+        cache = (vmap_f, e0v, e1v)
 
-        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
-        sigma_points = m[None, :] + x_centered
+        # 1. x -> (e0x, e1x)
+        R_X = x.cov_sqrtm_lower.T  # (n, n)
+        R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
+        r_marg1 = _sqrtm.sqrtm_to_upper_triangular(R=R_X_F)  # (2*d, 2*d)
+        m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
 
-        vmapped_residual = jax.vmap(jax.tree_util.Partial(self._residual, t=t, p=p))
-        fx = vmapped_residual(sigma_points)
-        b = self.sigma_weights_sqrtm**2 @ fx
-        fx_centered = fx - b[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        # 2. (x,y) -> (y - f(x))
+        x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
+        sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
+        s0, s1 = jnp.split(sigma_points, indices_or_sections=2, axis=1)  # (S, d)^2
+        fx = s1 - vmap_f(s0)  # (S, d)
+        b = self.sigma_weights_sqrtm**2 @ fx  # (S,) @ (S, d) = (d,)
+        fx_centered = fx - b[None, :]  # (S, d) - (1, d) = (S, d)
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]  # (S, d)
+        l_marg2 = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed)
 
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed).T
+        # Summarise
+        marginals = MultivariateNormal(b, l_marg2)
+        output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
 
-        output_scale_sqrtm = self.evidence_sqrtm(
-            observed=MultivariateNormal(b, l_obs_raw)
-        )
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return (
-            output_scale_sqrtm * error_estimate,
-            output_scale_sqrtm,
-            (vmapped_residual,),
-        )
+        # Compute error estimate
+        l_obs = marginals.cov_sqrtm_lower
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, *, extrapolated, cache):
-        # Re-linearise at the actual extrapolation
-        m, l_sqrtm = extrapolated.mean, extrapolated.cov_sqrtm_lower
+        # This is the cubature filter, optimised to quadrature-linearise
+        # only the operator (x, y) -> y - f(x)
+        # We can use even fewer sigma-points, but that is future work.
+        (vmap_f, e0v, e1v) = cache
 
-        x_centered = (l_sqrtm @ self.unit_sigma_points.T).T
-        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]
-        sigma_points = m[None, :] + x_centered
+        # 1. x -> (e0x, e1x)
+        x = extrapolated
+        R_X = x.cov_sqrtm_lower.T  # (n, n)
+        R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
+        r_marg1, (r_bw1, gain1) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=R_X_F, R_X=R_X
+        )  # (2*d, 2*d), (n, n), (n, 2*d)
+        m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
+        m_bw1 = x.mean - gain1 @ m_marg1
 
-        (vmapped_residual,) = cache
-        fx = vmapped_residual(sigma_points)
-        b = self.sigma_weights_sqrtm**2 @ fx
+        # 2. (x,y) -> (y - f(x))
+        x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
+        x_normed = x_centered * self.sigma_weights_sqrtm[:, None]  # (S, 2*d)
+        sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
+        s0, s1 = jnp.split(sigma_points, indices_or_sections=2, axis=1)  # (S, d)^2
+        fx = s1 - vmap_f(s0)  # (S, d)
+        b = self.sigma_weights_sqrtm**2 @ fx  # (S,) @ (S, d) = (d,)
+        fx_centered = fx - b[None, :]  # (S, d) - (1, d) = (S, d)
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]  # (S, d)
+        R_X_F = fx_normed  # (S, d)
+        R_X = x_normed  # (S, 2*d)
+        r_marg2, (r_bw2, gain2) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=R_X_F, R_X=R_X
+        )  # (d, d), (2*d, 2*d), (2*d, d)
+        m_marg2 = b
+        m_bw2 = m_marg1 - gain2 @ m_marg2
 
-        fx_centered = fx - b[None, :]
-        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        # Condense models
+        marginal_mean, marginal_cov_sqrtm = b, r_marg2.T  # why does the .T not matter??
+        bw_transition = gain1 @ gain2
+        bw_noise_mean = gain1 @ m_bw2 + m_bw1
+        bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(R1=r_bw2 @ gain1.T, R2=r_bw1).T
 
-        d = self.ode_dimension
-        r_obs, (r_cor, gain) = _sqrtm.revert_gauss_markov_correlation(
-            R_X_F=fx_normed, R_X=x_normed, R_YX=jnp.zeros((d, d))
-        )
-        observed = MultivariateNormal(b, r_obs.T)
+        # Return values
+        marginals = MultivariateNormal(marginal_mean, marginal_cov_sqrtm)
+        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm)
+        return marginals, (bw_noise, bw_transition)
 
-        m_cor = extrapolated.mean - gain @ b
-        corrected = MultivariateNormal(m_cor, r_cor.T)
-        return observed, (corrected, gain)
+    def _e1(self, x):
+        return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
+
+    def _e0(self, x):
+        return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
 
 
 class _PositiveCubatureRule(NamedTuple):
+    """Cubature rule with positive weights."""
+
     points: Any
     weights_sqrtm: Any
 
@@ -193,7 +232,7 @@ class _PositiveCubatureRule(NamedTuple):
 def _spherical_cubature_params(*, dim):
     eye_d = jnp.eye(dim) * jnp.sqrt(dim)
     pts = jnp.vstack((eye_d, -1 * eye_d))
-    weights_sqrtm = jnp.sqrt(jnp.ones((2 * dim,)) / (2 * dim))
+    weights_sqrtm = jnp.ones((2 * dim,)) / jnp.sqrt(2.0 * dim)
     return _PositiveCubatureRule(points=pts, weights_sqrtm=weights_sqrtm)
 
 
@@ -280,7 +319,7 @@ class DenseImplementation(_implementation.Implementation):
         m_ext = linearisation_pt.mean
 
         l0_p = p_inv[:, None] * l0
-        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_gauss_markov_correlation(
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
             R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,
@@ -301,18 +340,15 @@ class DenseImplementation(_implementation.Implementation):
         extrapolated = MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
-
+    # todo: this must not operate on the backward model data structure
+    def condense_backward_models(self, *, bw_init, bw_state):
         A = bw_init.transition
         (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
-
         C = bw_state.transition
         (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
-
         g = A @ C
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
-
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 

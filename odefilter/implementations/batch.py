@@ -242,7 +242,7 @@ class BatchImplementation(_implementation.Implementation):
         # (d, k, 1) * (d, k, k) = (d, k, k)
         l0_p = p_inv[..., None] * l0
 
-        r_ext_p, (r_bw_p, g_bw_p) = jax.vmap(_sqrtm.revert_gauss_markov_correlation)(
+        r_ext_p, (r_bw_p, g_bw_p) = jax.vmap(_sqrtm.revert_conditional)(
             R_X_F=_transpose(self.a @ l0_p),
             R_X=_transpose(l0_p),
             # transpose((d, 1, 1) * (d, k, k)) = tranpose((d,k,k)) = (d, k, k)

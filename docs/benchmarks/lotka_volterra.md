@@ -172,7 +172,7 @@ solve_fns = [
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(2.0, 11.0, step=1.0)
+tolerances = 0.1 ** jnp.arange(1.0, 10.0, step=2.0)
 
 results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
 ```
