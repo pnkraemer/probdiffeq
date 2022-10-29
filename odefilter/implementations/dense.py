@@ -144,11 +144,13 @@ class CK1(_DenseInformationCommon):
         vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
         cache = (vmap_f,)
 
+        # Compute observed random variable
         marginals, _ = self.complete_correction(cache=cache, extrapolated=x)
         output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
-        error_estimate = jnp.sqrt(
-            jnp.einsum("nj,nj->n", marginals.cov_sqrtm_lower, marginals.cov_sqrtm_lower)
-        )
+
+        # Compute error estimate
+        l_obs = marginals.cov_sqrtm_lower
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, *, extrapolated, cache):
@@ -157,17 +159,16 @@ class CK1(_DenseInformationCommon):
         # We can use even fewer sigma-points, but that is future work.
 
         (vmap_f,) = cache
-        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)  # cov
-        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)  # cov
+        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
+        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
 
-        # 1. x -> (E0x, E1x)
+        # 1. x -> (e0x, e1x)
         x = extrapolated
         R_X = x.cov_sqrtm_lower.T  # (n, n)
         R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
-        # (2*d, 2*d), (n, n), (n, 2*d)
         r_marg1, (r_bw1, gain1) = _sqrtm.revert_conditional_noisefree(
             R_X_F=R_X_F, R_X=R_X
-        )
+        )  # (2*d, 2*d), (n, n), (n, 2*d)
         m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
         m_bw1 = x.mean - gain1 @ m_marg1
 
@@ -175,24 +176,21 @@ class CK1(_DenseInformationCommon):
         x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
         x_normed = x_centered * self.sigma_weights_sqrtm[:, None]  # (S, 2*d)
         sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
-        s0, s1 = jnp.split(
-            sigma_points, indices_or_sections=2, axis=1
-        )  # (S, d), (S, d)
+        s0, s1 = jnp.split(sigma_points, indices_or_sections=2, axis=1)  # (S, d)^2
         fx = s1 - vmap_f(s0)  # (S, d)
         b = self.sigma_weights_sqrtm**2 @ fx  # (S,) @ (S, d) = (d,)
         fx_centered = fx - b[None, :]  # (S, d) - (1, d) = (S, d)
         fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]  # (S, d)
         R_X_F = fx_normed  # (S, d)
         R_X = x_normed  # (S, 2*d)
-        # (d, d), (2*d, 2*d), (2*d, d)
-        marginals2, (r_bw2, gain2) = _sqrtm.revert_conditional_noisefree(
+        r_marg2, (r_bw2, gain2) = _sqrtm.revert_conditional_noisefree(
             R_X_F=R_X_F, R_X=R_X
-        )
+        )  # (d, d), (2*d, 2*d), (2*d, d)
         m_marg2 = b
         m_bw2 = m_marg1 - gain2 @ m_marg2
 
         # Condense models
-        marginal_mean, marginal_cov_sqrtm = b, marginals2
+        marginal_mean, marginal_cov_sqrtm = b, r_marg2.T  # why does the .T not matter??
         bw_transition = gain1 @ gain2
         bw_noise_mean = gain1 @ m_bw2 + m_bw1
         bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(R1=r_bw2 @ gain1.T, R2=r_bw1).T
@@ -210,6 +208,8 @@ class CK1(_DenseInformationCommon):
 
 
 class _PositiveCubatureRule(NamedTuple):
+    """Cubature rule with positive weights."""
+
     points: Any
     weights_sqrtm: Any
 
@@ -217,7 +217,7 @@ class _PositiveCubatureRule(NamedTuple):
 def _spherical_cubature_params(*, dim):
     eye_d = jnp.eye(dim) * jnp.sqrt(dim)
     pts = jnp.vstack((eye_d, -1 * eye_d))
-    weights_sqrtm = jnp.sqrt(jnp.ones((2 * dim,)) / (2 * dim))
+    weights_sqrtm = jnp.ones((2 * dim,)) / jnp.sqrt(2.0 * dim)
     return _PositiveCubatureRule(points=pts, weights_sqrtm=weights_sqrtm)
 
 
