@@ -142,10 +142,28 @@ class CK1(_DenseInformationCommon):
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
-        cache = (vmap_f,)
+        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
+        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
+        cache = (vmap_f, e0v, e1v)
 
-        # Compute observed random variable
-        marginals, _ = self.complete_correction(cache=cache, extrapolated=x)
+        # 1. x -> (e0x, e1x)
+        R_X = x.cov_sqrtm_lower.T  # (n, n)
+        R_X_F = jnp.hstack((e0v(R_X.T).T, e1v(R_X.T).T))  # (n, 2*d)
+        r_marg1 = _sqrtm.sqrtm_to_upper_triangular(R=R_X_F)  # (2*d, 2*d)
+        m_marg1 = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))  # (2*d,)
+
+        # 2. (x,y) -> (y - f(x))
+        x_centered = self.unit_sigma_points @ r_marg1  # (S, 2*d)
+        sigma_points = m_marg1[None, :] + x_centered  # (1, 2*d) + (S, 2*d) = (S, 2*d)
+        s0, s1 = jnp.split(sigma_points, indices_or_sections=2, axis=1)  # (S, d)^2
+        fx = s1 - vmap_f(s0)  # (S, d)
+        b = self.sigma_weights_sqrtm**2 @ fx  # (S,) @ (S, d) = (d,)
+        fx_centered = fx - b[None, :]  # (S, d) - (1, d) = (S, d)
+        fx_normed = fx_centered * self.sigma_weights_sqrtm[:, None]  # (S, d)
+        l_marg2 = _sqrtm.sqrtm_to_upper_triangular(R=fx_normed)
+
+        # Summarise
+        marginals = MultivariateNormal(b, l_marg2)
         output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
 
         # Compute error estimate
@@ -157,10 +175,7 @@ class CK1(_DenseInformationCommon):
         # This is the cubature filter, optimised to quadrature-linearise
         # only the operator (x, y) -> y - f(x)
         # We can use even fewer sigma-points, but that is future work.
-
-        (vmap_f,) = cache
-        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
-        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
+        (vmap_f, e0v, e1v) = cache
 
         # 1. x -> (e0x, e1x)
         x = extrapolated
