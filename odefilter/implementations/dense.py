@@ -321,6 +321,11 @@ class DenseImplementation(_implementation.Implementation):
     num_derivatives: int
     ode_dimension: int
 
+    def __repr__(self):
+        """Print a string representation of the class."""
+        input = f"n={self.num_derivatives}, d={self.ode_dimension}"
+        return f"{self.__class__.__name__}({input})"
+
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
         aux = self.num_derivatives, self.ode_dimension

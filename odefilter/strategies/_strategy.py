@@ -1,17 +1,19 @@
 """Inference interface."""
 
 import abc
+from dataclasses import dataclass
+from typing import Any
 
 import jax
 import jax.tree_util
 
 
 @jax.tree_util.register_pytree_node_class
+@dataclass
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, implementation):
-        self.implementation = implementation
+    implementation: Any
 
     @abc.abstractmethod
     def init_posterior(self, *, taylor_coefficients):

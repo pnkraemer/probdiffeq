@@ -358,6 +358,7 @@ def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
+
     implementation = dense.DenseImplementation.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )

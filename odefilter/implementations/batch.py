@@ -93,6 +93,11 @@ class BatchImplementation(_implementation.Implementation):
     a: Any
     q_sqrtm_lower: Any
 
+    def __repr__(self):
+        """Print a string representation of the class."""
+        input = f"n={self.num_derivatives}, d={self.ode_dimension}"
+        return f"{self.__class__.__name__}({input})"
+
     @property
     def num_derivatives(self):
         return self.a.shape[1] - 1

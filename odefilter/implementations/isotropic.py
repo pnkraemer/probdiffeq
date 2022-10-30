@@ -24,6 +24,10 @@ class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
+    def __repr__(self):
+        """Print a string representation of the class."""
+        return f"{self.__class__.__name__}(n={self.num_derivatives})"
+
     def begin_correction(self, x: IsotropicNormal, /, *, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
