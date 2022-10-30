@@ -28,7 +28,7 @@ def ekf0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -64,7 +64,7 @@ def eks0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -100,7 +100,7 @@ def eks0_batch_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -136,7 +136,7 @@ def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -172,7 +172,7 @@ def eks0_isotropic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -190,7 +190,7 @@ def eks0_isotropic_fixedpoint(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -243,7 +243,7 @@ def ckf1(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
 
     information_op = jax.tree_util.Partial(
         dense.CK1.from_spherical_cubature_integration,
@@ -265,7 +265,7 @@ def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
 
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
@@ -305,7 +305,7 @@ def eks1(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
     )
@@ -343,7 +343,7 @@ def eks1_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
     )
