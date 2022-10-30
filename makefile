@@ -10,15 +10,19 @@ format:
 	jupytext --sync docs/benchmarks/*
 
 lint:
+	# The fail-fast linters
 	isort --check --diff .
 	black --check --diff .
 	flake8
-	pylint odefilter/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
-	pylint tests/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
+	# Apply the basics to the notebooks
 	nbqa isort --check --diff .
 	nbqa black --check --diff .
 	nbqa flake8 docs/
-
+	# Opt-in for specific pylint checks that flake8 can't detect
+	pylint odefilter/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
+	pylint tests/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
+	# A very soft mypy check to detect obvious problems
+	mypy odefilter
 test:
 	pytest -n auto -x -v
 	python -m doctest odefilter/*.py
@@ -27,7 +31,7 @@ example:
 	jupytext --sync docs/examples/*
 	jupytext --execute docs/examples/*
 	jupytext --sync docs/examples/*
-    # No --execute for benchmarks (takes too long)
+	# No --execute for benchmarks (takes too long)
 	jupytext --sync docs/benchmarks/*
 
 pre-commit:

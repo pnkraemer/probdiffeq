@@ -323,8 +323,8 @@ class IBM(_implementation.Implementation):
 
     def __repr__(self):
         """Print a string representation of the class."""
-        input = f"n={self.num_derivatives}, d={self.ode_dimension}"
-        return f"{self.__class__.__name__}({input})"
+        n_and_d = f"n={self.num_derivatives}, d={self.ode_dimension}"
+        return f"{self.__class__.__name__}({n_and_d})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
