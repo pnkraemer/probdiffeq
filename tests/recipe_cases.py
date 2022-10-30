@@ -78,6 +78,11 @@ def solver_ckf1():
 
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
+def solver_ukf1():
+    return recipes.ukf1(num_derivatives=3, ode_dimension=2)
+
+
+@case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ekf1_dynamic():
     return recipes.ekf1_dynamic(num_derivatives=3, ode_dimension=2)
 
