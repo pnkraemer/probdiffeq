@@ -10,7 +10,7 @@ but until you do so, use one of ours.
 """
 import jax.tree_util
 
-from odefilter import solvers
+from odefilter import _cubature, solvers
 from odefilter.implementations import batch, dense, isotropic
 from odefilter.strategies import filters, smoothers
 
@@ -246,7 +246,8 @@ def ckf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     solver = solvers.Solver(strategy=strategy)
 
     information_op = jax.tree_util.Partial(
-        dense.CK1.from_spherical_cubature_integration,
+        dense.CK1,
+        cubature=_cubature.SCI.from_dimension(dim=ode_dimension),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )

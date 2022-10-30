@@ -102,11 +102,6 @@ class CK1(_DenseInformationCommon):
 
         self.cubature = cubature
 
-    @classmethod
-    def from_spherical_cubature_integration(cls, f, /, ode_order, ode_dimension):
-        rule = _spherical_cubature_params(dim=ode_order * ode_dimension)
-        return cls(f, ode_order=ode_order, ode_dimension=ode_dimension, cubature=rule)
-
     def tree_flatten(self):
         children = (self.cubature,)
         aux = self.f, self.ode_order, self.ode_dimension
@@ -281,20 +276,6 @@ class CK1(_DenseInformationCommon):
 
     def _e0(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
-
-
-class _PositiveCubatureRule(NamedTuple):
-    """Cubature rule with positive weights."""
-
-    points: Array
-    weights_sqrtm: Array
-
-
-def _spherical_cubature_params(*, dim):
-    eye_d = jnp.eye(dim) * jnp.sqrt(dim)
-    pts = jnp.vstack((eye_d, -1 * eye_d))
-    weights_sqrtm = jnp.ones((2 * dim,)) / jnp.sqrt(2.0 * dim)
-    return _PositiveCubatureRule(points=pts, weights_sqrtm=weights_sqrtm)
 
 
 @register_pytree_node_class
