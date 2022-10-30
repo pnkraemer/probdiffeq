@@ -10,7 +10,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
 
 
 class MultivariateNormal(NamedTuple):
@@ -20,7 +20,7 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Array  # (k,k) shape
 
 
-class _DenseInformationCommon(_implementation.Information):
+class _DenseInformationCommon(_information.Information):
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)

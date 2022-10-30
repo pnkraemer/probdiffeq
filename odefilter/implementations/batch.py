@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
 
 # todo: reconsider naming!
 
@@ -20,7 +20,7 @@ class BatchedNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class EK0(_implementation.Information):
+class EK0(_information.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
