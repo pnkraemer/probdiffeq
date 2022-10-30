@@ -24,10 +24,6 @@ class EK0(_implementation.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def __repr__(self):
-        """Print a string representation of the class."""
-        return f"{self.__class__.__name__}(n={self.num_derivatives})"
-
     def begin_correction(self, x: IsotropicNormal, /, *, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
@@ -80,11 +76,15 @@ class EK0(_implementation.Information):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicImplementation(_implementation.Implementation):
+class IsotropicIBM(_implementation.Implementation):
     """Handle isotropic covariances."""
 
     a: Any
     q_sqrtm_lower: Any
+
+    def __repr__(self):
+        """Print a string representation of the class."""
+        return f"{self.__class__.__name__}(n={self.num_derivatives})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower

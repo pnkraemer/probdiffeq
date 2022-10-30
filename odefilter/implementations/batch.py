@@ -87,7 +87,7 @@ class EK0(_implementation.Information):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class BatchImplementation(_implementation.Implementation):
+class BatchIBM(_implementation.Implementation):
     """Handle block-diagonal covariances."""
 
     a: Any

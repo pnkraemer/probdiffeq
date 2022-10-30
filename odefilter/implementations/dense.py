@@ -312,7 +312,7 @@ def _spherical_cubature_params(*, dim):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class DenseImplementation(_implementation.Implementation):
+class IBM(_implementation.Implementation):
     """Handle dense covariances."""
 
     a: Array
