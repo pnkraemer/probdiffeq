@@ -24,11 +24,11 @@ def ekf0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchImplementation.from_num_derivatives(
+    implementation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -42,7 +42,7 @@ def ekf0_batch_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchImplementation.from_num_derivatives(
+    implementation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
@@ -60,11 +60,11 @@ def eks0_batch(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchImplementation.from_num_derivatives(
+    implementation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -78,7 +78,7 @@ def eks0_batch_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchImplementation.from_num_derivatives(
+    implementation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.Smoother(implementation=implementation)
@@ -96,11 +96,11 @@ def eks0_batch_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchImplementation.from_num_derivatives(
+    implementation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -114,7 +114,7 @@ def eks0_batch_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchImplementation.from_num_derivatives(
+    implementation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
@@ -132,11 +132,11 @@ def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -150,7 +150,7 @@ def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = filters.Filter(implementation=implementation)
@@ -168,11 +168,11 @@ def eks0_isotropic(*, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -186,11 +186,11 @@ def eks0_isotropic_fixedpoint(*, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -204,7 +204,7 @@ def eks0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = smoothers.Smoother(implementation=implementation)
@@ -222,7 +222,7 @@ def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicImplementation.from_num_derivatives(
+    implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
@@ -239,11 +239,11 @@ def ckf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
 
     information_op = jax.tree_util.Partial(
         dense.CK1.from_spherical_cubature_integration,
@@ -261,11 +261,11 @@ def ekf1(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
 
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
@@ -282,7 +282,7 @@ def ekf1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = filters.Filter(implementation=implementation)
@@ -301,11 +301,11 @@ def eks1(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
     )
@@ -320,7 +320,7 @@ def eks1_dynamic(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.Smoother(implementation=implementation)
@@ -339,11 +339,11 @@ def eks1_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.NonDynamicSolver(strategy=strategy)
+    solver = solvers.Solver(strategy=strategy)
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
     )
@@ -358,7 +358,8 @@ def eks1_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.DenseImplementation.from_num_derivatives(
+
+    implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)

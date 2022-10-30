@@ -10,7 +10,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
 
 
 class MultivariateNormal(NamedTuple):
@@ -20,7 +20,7 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Array  # (k,k) shape
 
 
-class _DenseInformationCommon(_implementation.Information):
+class _DenseInformationCommon(_information.Information):
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
@@ -312,7 +312,7 @@ def _spherical_cubature_params(*, dim):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class DenseImplementation(_implementation.Implementation):
+class IBM(_implementation.Implementation):
     """Handle dense covariances."""
 
     a: Array
@@ -320,6 +320,11 @@ class DenseImplementation(_implementation.Implementation):
 
     num_derivatives: int
     ode_dimension: int
+
+    def __repr__(self):
+        """Print a string representation of the class."""
+        n_and_d = f"n={self.num_derivatives}, d={self.ode_dimension}"
+        return f"{self.__class__.__name__}({n_and_d})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower

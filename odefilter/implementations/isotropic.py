@@ -9,7 +9,7 @@ import jax.tree_util
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
 
 
 class IsotropicNormal(NamedTuple):
@@ -20,7 +20,7 @@ class IsotropicNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class EK0(_implementation.Information):
+class EK0(_information.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
@@ -76,11 +76,15 @@ class EK0(_implementation.Information):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicImplementation(_implementation.Implementation):
+class IsotropicIBM(_implementation.Implementation):
     """Handle isotropic covariances."""
 
     a: Any
     q_sqrtm_lower: Any
+
+    def __repr__(self):
+        """Print a string representation of the class."""
+        return f"{self.__class__.__name__}(n={self.num_derivatives})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower

@@ -81,11 +81,11 @@ class Solution(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
+@dataclass
 class _Solver(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, strategy):
-        self.strategy = strategy
+    strategy: Any
 
     # Abstract methods
 
@@ -225,11 +225,6 @@ class _Solver(abc.ABC):
         (strategy,) = children
         return cls(strategy=strategy)
 
-    # def _estimate_error(self, *, info_op, **kwargs):
-    #     scale_sqrtm, error_est = self.strategy.estimate_error(**kwargs)
-    #     error_est = error_est * scale_sqrtm
-    #     return error_est, scale_sqrtm
-
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
 class DynamicSolver(_Solver):
@@ -298,7 +293,7 @@ class DynamicSolver(_Solver):
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class NonDynamicSolver(_Solver):
+class Solver(_Solver):
     """Standard calibration. Nothing dynamic."""
 
     def step_fn(self, *, state, info_op, dt, parameters):

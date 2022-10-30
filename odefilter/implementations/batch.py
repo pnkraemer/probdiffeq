@@ -1,30 +1,36 @@
 """Batch-style implementations."""
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Tuple
 
 import jax
 import jax.numpy as jnp
+from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _sqrtm
+from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
 
 # todo: reconsider naming!
 
 
-class BatchedNormal(NamedTuple):
+class _BatchNormal(NamedTuple):
     """Random variable with a normal distribution."""
 
     mean: Any  # (d, k) shape
     cov_sqrtm_lower: Any  # (d, k, k) shape
 
 
+_CType = Tuple[Array]
+
+
 @register_pytree_node_class
-class EK0(_implementation.Information):
+class EK0(_information.Information[_BatchNormal, _CType]):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def begin_correction(self, x: BatchedNormal, /, *, t, p):
+    def begin_correction(
+        self, x: _BatchNormal, /, *, t, p
+    ) -> Tuple[Array, float, _CType]:
         m = x.mean
 
         # m has shape (d, n)
@@ -40,13 +46,13 @@ class EK0(_implementation.Information):
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
         output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchedNormal(mean=bias, cov_sqrtm_lower=l_obs)
+            observed=_BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
         )  # (d,)
 
         error_estimate = l_obs  # (d,)
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
-    def complete_correction(self, *, extrapolated, cache):
+    def complete_correction(self, *, extrapolated: _BatchNormal, cache: _CType):
         (bias,) = cache
 
         # (d, k), (d, k, k)
@@ -60,7 +66,7 @@ class EK0(_implementation.Information):
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = BatchedNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = _BatchNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
@@ -70,13 +76,13 @@ class EK0(_implementation.Information):
         m_cor = m_ext - (gain * bias[..., None])  # (d, k)
         l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
 
-        corrected = BatchedNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = _BatchNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
-    def evidence_sqrtm(self, *, observed):
+    def evidence_sqrtm(self, *, observed: _BatchNormal) -> float:
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 
         res_white = obs_pt / l_obs  # (d, )
@@ -87,11 +93,16 @@ class EK0(_implementation.Information):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class BatchImplementation(_implementation.Implementation):
+class BatchIBM(_implementation.Implementation):
     """Handle block-diagonal covariances."""
 
     a: Any
     q_sqrtm_lower: Any
+
+    def __repr__(self):
+        """Print a string representation of the class."""
+        n_and_d = f"n={self.num_derivatives}, d={self.ode_dimension}"
+        return f"{self.__class__.__name__}({n_and_d})"
 
     @property
     def num_derivatives(self):
@@ -137,7 +148,7 @@ class BatchImplementation(_implementation.Implementation):
         )
         l_ext_p = _transpose(r_ext_p)
         l_ext = p[..., None] * l_ext_p
-        return BatchedNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return _BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
 
@@ -156,7 +167,7 @@ class BatchImplementation(_implementation.Implementation):
         )
         Xi = _transpose(Xi_r)
 
-        noise = BatchedNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = _BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
     def extract_mean_from_marginals(self, mean):
@@ -173,11 +184,11 @@ class BatchImplementation(_implementation.Implementation):
         m_ext = p * m_ext_p
 
         q_ext = p[..., None] * self.q_sqrtm_lower
-        return BatchedNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
+        return _BatchNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
     # todo: make into init_backward_model?
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
-        return BatchedNormal(
+        return _BatchNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
@@ -189,7 +200,7 @@ class BatchImplementation(_implementation.Implementation):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_matrix = jnp.vstack(taylor_coefficients).T
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return BatchedNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _BatchNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     # todo: move to information?
     def init_error_estimate(self):  # noqa: D102
@@ -231,7 +242,7 @@ class BatchImplementation(_implementation.Implementation):
         m_new = m_new_p
         l_new = l_new_p
 
-        return BatchedNormal(mean=m_new, cov_sqrtm_lower=l_new)
+        return _BatchNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, linearisation_pt, l0, output_scale_sqrtm, cache
@@ -260,8 +271,8 @@ class BatchImplementation(_implementation.Implementation):
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
         backward_op = g_bw
-        backward_noise = BatchedNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        extrapolated = BatchedNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = _BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        extrapolated = _BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
     def sample_backwards(self, init, linop, noise, base_samples):
@@ -290,13 +301,13 @@ class BatchImplementation(_implementation.Implementation):
     def scale_covariance(self, *, rv, scale_sqrtm):
         # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
         if jnp.ndim(scale_sqrtm) == 1:
-            return BatchedNormal(
+            return _BatchNormal(
                 mean=rv.mean,
                 cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
             )
 
         # Time series: (N, d, 1, 1) * (N, d, k, k) -> (N, d, k, k)
-        return BatchedNormal(
+        return _BatchNormal(
             mean=rv.mean,
             cov_sqrtm_lower=scale_sqrtm[..., None, None] * rv.cov_sqrtm_lower,
         )
