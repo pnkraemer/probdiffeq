@@ -93,44 +93,31 @@ class EK1(_DenseInformationCommon):
 class CK1(_DenseInformationCommon):
     """Cubature Kalman filter information."""
 
-    def __init__(
-        self, f, /, *, sigma_weights_sqrtm, unit_sigma_points, ode_order, ode_dimension
-    ):
+    def __init__(self, f, /, *, cubature, ode_order, ode_dimension):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(f, ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
-        self.unit_sigma_points = unit_sigma_points
-        self.sigma_weights_sqrtm = sigma_weights_sqrtm
+        self.cubature = cubature
 
     @classmethod
     def from_spherical_cubature_integration(cls, f, /, ode_order, ode_dimension):
         rule = _spherical_cubature_params(dim=ode_order * ode_dimension)
-        return cls(
-            f,
-            ode_order=ode_order,
-            ode_dimension=ode_dimension,
-            unit_sigma_points=rule.points,
-            sigma_weights_sqrtm=rule.weights_sqrtm,
-        )
+        return cls(f, ode_order=ode_order, ode_dimension=ode_dimension, cubature=rule)
 
     def tree_flatten(self):
-        children = (self.unit_sigma_points, self.sigma_weights_sqrtm)
+        children = (self.cubature,)
         aux = self.f, self.ode_order, self.ode_dimension
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        pts, weights_sqrtm = children
+        (cubature,) = children
         f, ode_order, ode_dimension = aux
         return cls(
-            f,
-            ode_order=ode_order,
-            ode_dimension=ode_dimension,
-            unit_sigma_points=pts,
-            sigma_weights_sqrtm=weights_sqrtm,
+            f, ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature
         )
 
     def begin_correction(self, x: MultivariateNormal, /, *, t, p):
@@ -147,12 +134,12 @@ class CK1(_DenseInformationCommon):
         m_marg1_x, m_marg1_y = self._e0(x.mean), self._e1(x.mean)
 
         # 2. (x, y) -> (f(x), y)
-        x_centered = self.unit_sigma_points @ r_marg1_x
+        x_centered = self.cubature.points @ r_marg1_x
         sigma_points = m_marg1_x[None, :] + x_centered
         fx = vmap_f(sigma_points)
-        m_marg2 = self.sigma_weights_sqrtm**2 @ fx
+        m_marg2 = self.cubature.weights_sqrtm**2 @ fx
         fx_centered = fx - m_marg2[None, :]
-        fx_centered_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
 
         # 3. (x, y) -> y - x (last one)
         m_marg = m_marg1_y - m_marg2
@@ -222,17 +209,17 @@ class CK1(_DenseInformationCommon):
         # Create sigma-points (redo the select-from-x0 bit)
         m_x0 = self._e0(x.mean)
         r_x0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_x0)
-        pts_centered = self.unit_sigma_points @ r_x0_square
+        pts_centered = self.cubature.points @ r_x0_square
         pts = m_x0[None, :] + pts_centered
 
         # Evaluate the vector-field
         fx = vmap_f(pts)
-        fx_mean = self.sigma_weights_sqrtm**2 @ fx
+        fx_mean = self.cubature.weights_sqrtm**2 @ fx
         fx_centered = fx - fx_mean[None, :]
 
         # Revert the transition
-        pts_centered_normed = pts_centered * self.sigma_weights_sqrtm[:, None]
-        fx_centered_normed = fx_centered * self.sigma_weights_sqrtm[:, None]
+        pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
+        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
         r_marg_x, (r_bw_x, gain_x) = _sqrtm.revert_conditional_noisefree(
             R_X_F=fx_centered_normed, R_X=pts_centered_normed
         )
