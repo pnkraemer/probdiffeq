@@ -9,8 +9,10 @@ from odefilter import ivpsolve, recipes
 @case
 @parametrize("n", [2])
 def smoother_fixedpoint_smoother_pair_fixedpoint_eks0(n):
-    eks0 = recipes.eks0_isotropic_dynamic(num_derivatives=n)
-    fixedpoint_eks0 = recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=n)
+    eks0 = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
+    fixedpoint_eks0 = recipes.eks0_isotropic_fixedpoint(
+        calibration="dynamic", num_derivatives=n
+    )
     return eks0, fixedpoint_eks0
 
 
@@ -20,8 +22,8 @@ def smoother_fixedpoint_smoother_pair_two_eks0(n, tol):
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
-    eks0a = recipes.eks0_isotropic_dynamic(num_derivatives=n)
-    eks0b = recipes.eks0_isotropic_dynamic(num_derivatives=n)
+    eks0a = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
+    eks0b = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
     return eks0a, eks0b
 
 
