@@ -171,6 +171,29 @@ def ukf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, r=1.0):
     return solver, information_op
 
 
+def ghkf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, degree=1):
+    """Construct the equivalent of a semi-implicit solver that does not use Jacobians.
+
+    Suitable for low-dimensional, stiff problems.
+    """
+    _assert_num_derivatives_sufficiently_large(
+        num_derivatives=num_derivatives, ode_order=ode_order
+    )
+    implementation = dense.IBM.from_num_derivatives(
+        num_derivatives=num_derivatives, ode_dimension=ode_dimension
+    )
+    strategy = filters.Filter(implementation=implementation)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
+
+    information_op = jax.tree_util.Partial(
+        dense.CK1,
+        cubature=_cubature.GaussHermite.from_params(degree=degree, dim=ode_dimension),
+        ode_dimension=ode_dimension,
+        ode_order=ode_order,
+    )
+    return solver, information_op
+
+
 def ekf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     """Construct the equivalent of a semi-implicit solver.
 

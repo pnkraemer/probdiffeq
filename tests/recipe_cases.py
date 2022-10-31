@@ -76,6 +76,16 @@ def solver_ukf1(calibration, n):
     return recipes.ukf1(ode_dimension=2, num_derivatives=n, calibration=calibration)
 
 
+@case(tags=["terminal_value", "solve", "checkpoint", "filter"])
+@parametrize("calibration", ["dynamic", "mle"])
+@parametrize("n", [3])
+@parametrize("degree", [5])
+def solver_ghkf1(calibration, n, degree):
+    return recipes.ghkf1(
+        ode_dimension=2, num_derivatives=n, calibration=calibration, degree=degree
+    )
+
+
 @case(tags=["terminal_value", "solve", "smoother"])
 @parametrize("calibration", ["dynamic", "mle"])
 @parametrize("n", [3])
