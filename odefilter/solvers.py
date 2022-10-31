@@ -293,7 +293,7 @@ class DynamicSolver(_Solver):
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class Solver(_Solver):
+class MLESolver(_Solver):
     """Standard calibration. Nothing dynamic."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):

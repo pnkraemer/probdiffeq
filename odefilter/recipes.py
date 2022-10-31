@@ -246,7 +246,7 @@ def eks1_fixedpoint(
     return solver
 
 
-_calibration_to_solver = {"mle": solvers.Solver, "dynamic": solvers.DynamicSolver}
+_calibration_to_solver = {"mle": solvers.MLESolver, "dynamic": solvers.DynamicSolver}
 
 
 def _assert_num_derivatives_sufficiently_large(*, num_derivatives, ode_order):
