@@ -8,22 +8,14 @@ from odefilter import controls, ivpsolve
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver, info_op",
+    "solver",
     cases=".recipe_cases",
     prefix="solver_",
     has_tag=("solve", "filter"),
 )
-def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver, info_op):
+def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver):
     solution = ivpsolve.solve(
-        vf,
-        u0,
-        t0=t0,
-        t1=t1,
-        parameters=p,
-        solver=solver,
-        info_op=info_op,
-        atol=1e-1,
-        rtol=1e-1,
+        vf, u0, t0=t0, t1=t1, parameters=p, solver=solver, atol=1e-1, rtol=1e-1
     )
 
     # Extrapolate from the left: close-to-left boundary must be similar,
@@ -47,12 +39,12 @@ def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver, info_op):
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver, info_op",
+    "solver",
     cases=".recipe_cases",
     prefix="solver_",
     has_tag=("solve", "smoother"),
 )
-def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
+def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver):
 
     solution = ivpsolve.solve(
         vf,
@@ -61,7 +53,6 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
         t1=t1,
         parameters=p,
         solver=solver,
-        info_op=info_op,
         atol=1e-1,
         rtol=1e-1,
         control=controls.ClippedIntegral(),
@@ -88,23 +79,16 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver, info_op):
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver, info_op",
+    "solver",
     cases=".recipe_cases",
     prefix="solver_",
     has_tag=["checkpoint", "smoother"],
 )
 @parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_grid_samples(vf, u0, t0, t1, p, solver, info_op, shape):
+def test_grid_samples(vf, u0, t0, t1, p, solver, shape):
     ts = jnp.linspace(t0, t1, num=20, endpoint=True)
     solution = ivpsolve.simulate_checkpoints(
-        vf,
-        u0,
-        ts=ts,
-        parameters=p,
-        solver=solver,
-        info_op=info_op,
-        atol=1e-1,
-        rtol=1e-1,
+        vf, u0, ts=ts, parameters=p, solver=solver, atol=1e-1, rtol=1e-1
     )
     key = jax.random.PRNGKey(seed=15)
 

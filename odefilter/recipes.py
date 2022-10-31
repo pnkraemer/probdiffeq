@@ -101,10 +101,11 @@ def eks0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = smoothers.Smoother(implementation=implementation)
+    strategy = smoothers.Smoother(
+        implementation=implementation, information=isotropic.EK0(ode_order=ode_order)
+    )
     solver = _calibration_to_solver[calibration](strategy=strategy)
-    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
-    return solver, information_op
+    return solver
 
 
 def eks0_isotropic_fixedpoint(*, calibration="mle", num_derivatives=4, ode_order=1):
