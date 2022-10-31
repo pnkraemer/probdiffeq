@@ -35,14 +35,14 @@ class SphericalCubatureIntegration(_PositiveCubatureRule):
     """Spherical cubature integration."""
 
     @classmethod
-    def from_params(cls, *, dim):
-        """Construct an SCI rule from the dimension of a random variable.
+    def from_params(cls, *, ode_dimension):
+        """Construct an SCI rule from the ode_dimensionension of a random variable.
 
-        The number of cubature points is _higher_ than ``dim``.
+        The number of cubature points is _higher_ than ``ode_dimension``.
         """
-        eye_d = jnp.eye(dim) * jnp.sqrt(dim)
+        eye_d = jnp.eye(ode_dimension) * jnp.sqrt(ode_dimension)
         pts = jnp.vstack((eye_d, -1 * eye_d))
-        weights_sqrtm = jnp.ones((2 * dim,)) / jnp.sqrt(2.0 * dim)
+        weights_sqrtm = jnp.ones((2 * ode_dimension,)) / jnp.sqrt(2.0 * ode_dimension)
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
 
@@ -53,17 +53,19 @@ class UnscentedTransform(_PositiveCubatureRule):
 
     # todo: more parameters...
     @classmethod
-    def from_params(cls, *, dim, r=1.0):
+    def from_params(cls, *, ode_dimension, r=1.0):
         """Construct an unscented transform from parameters.
 
-        The number of cubature points is _higher_ than ``dim``.
+        The number of cubature points is _higher_ than ``ode_dimension``.
         """
-        eye_d = jnp.eye(dim) * jnp.sqrt(dim + r)
-        zeros = jnp.zeros((1, dim))
+        eye_d = jnp.eye(ode_dimension) * jnp.sqrt(ode_dimension + r)
+        zeros = jnp.zeros((1, ode_dimension))
         pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
 
-        weights_sqrtm1 = jnp.ones((dim,)) / jnp.sqrt(2.0 * (dim + r))
-        weights_sqrtm2 = jnp.sqrt(r / (dim + r))
+        weights_sqrtm1 = jnp.ones((ode_dimension,)) / jnp.sqrt(
+            2.0 * (ode_dimension + r)
+        )
+        weights_sqrtm2 = jnp.sqrt(r / (ode_dimension + r))
         weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
@@ -74,10 +76,10 @@ class GaussHermite(_PositiveCubatureRule):
     """Gauss-Hermite cubature."""
 
     @classmethod
-    def from_params(cls, *, dim, degree=5):
-        """Construct an Gauss-Hermite cubature rule.
+    def from_params(cls, *, ode_dimension, degree=5):
+        """Construct a Gauss-Hermite cubature rule.
 
-        The number of cubature points is dim**degree.
+        The number of cubature points is ode_dimension**degree.
         """
         # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
         pts, weights, sum_of_weights = scipy.special.roots_hermitenorm(
@@ -90,8 +92,10 @@ class GaussHermite(_PositiveCubatureRule):
         weights_sqrtm = jnp.sqrt(jnp.asarray(weights))
 
         # Build a tensor grid and return class
-        tensor_pts = _tensor_points(pts, dim=dim)
-        tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, dim=dim)
+        tensor_pts = _tensor_points(pts, ode_dimension=ode_dimension)
+        tensor_weights_sqrtm = _tensor_weights(
+            weights_sqrtm, ode_dimension=ode_dimension
+        )
         return cls(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
 
 
@@ -100,7 +104,7 @@ def _tensor_weights(*args, **kwargs):
     return jnp.prod(mesh, axis=1)
 
 
-def _tensor_points(x, /, *, dim):
-    x_mesh = jnp.meshgrid(*([x] * dim))
+def _tensor_points(x, /, *, ode_dimension):
+    x_mesh = jnp.meshgrid(*([x] * ode_dimension))
     y_mesh = tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
     return jnp.vstack(y_mesh).T
