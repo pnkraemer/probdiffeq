@@ -24,9 +24,11 @@ class EK0(_information.Information):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
-    def begin_correction(self, x: IsotropicNormal, /, *, t, p):
+    def begin_correction(self, x: IsotropicNormal, /, *, vector_field, t, p):
         m = x.mean
-        bias = m[self.ode_order, ...] - self.f(*m[: self.ode_order, ...], t=t, p=p)
+        bias = m[self.ode_order, ...] - vector_field(
+            *m[: self.ode_order, ...], t=t, p=p
+        )
 
         cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower

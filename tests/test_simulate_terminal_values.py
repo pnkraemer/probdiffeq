@@ -9,12 +9,12 @@ from odefilter import ivpsolve
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver, info_op",
+    "solver",
     cases=".recipe_cases",
     prefix="solver_",
     has_tag=("terminal_value",),
 )
-def test_simulate_terminal_values(vf, u0, t0, t1, p, solver, info_op):
+def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     def func(y, t, *p):
         return vf(y, t=t, p=p)
 
@@ -24,7 +24,7 @@ def test_simulate_terminal_values(vf, u0, t0, t1, p, solver, info_op):
     ys_reference = odeint_solution[-1, :]
 
     solution = ivpsolve.simulate_terminal_values(
-        vf, u0, t0=t0, t1=t1, parameters=p, solver=solver, info_op=info_op
+        vf, u0, t0=t0, t1=t1, parameters=p, solver=solver
     )
 
     assert solution.t == t1
