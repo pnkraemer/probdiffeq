@@ -203,6 +203,8 @@ class CK1(_DenseInformationCommon):
         # because the implementation below avoids sqrt-down-dates
         pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
         fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
+        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
+        #  (but would it still be valid?)
         _, (r_Om, H) = _sqrtm.revert_conditional_noisefree(
             R_X_F=pts_centered_normed, R_X=fx_centered_normed
         )
