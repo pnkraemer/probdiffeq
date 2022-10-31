@@ -31,6 +31,12 @@ def revert_conditional_noisefree(*, R_X_F, R_X):
     crosscov = R_X.T @ R_X_F
     gain = jsp.linalg.cho_solve((r_marg.T, True), crosscov.T).T
     r_cor = R_X - R_X_F @ gain.T
+
+    # todo: only with this line is the output equivalent to the other function
+    #  I don't like the double-QR decomposition --
+    #  it feels that we don't save any computation here...
+    if r_cor.shape[0] != r_cor.shape[1]:
+        r_cor = sqrtm_to_upper_triangular(R=r_cor)
     return r_marg, (r_cor, gain)
 
 
