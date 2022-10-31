@@ -83,10 +83,10 @@ def ekf0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    strategy = filters.Filter(implementation=implementation)
+    information = isotropic.EK0(ode_order=ode_order)
+    strategy = filters.Filter(implementation=implementation, information=information)
     solver = _calibration_to_solver[calibration](strategy=strategy)
-    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
-    return solver, information_op
+    return solver
 
 
 def eks0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
@@ -101,8 +101,9 @@ def eks0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     implementation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
+    information = isotropic.EK0(ode_order=ode_order)
     strategy = smoothers.Smoother(
-        implementation=implementation, information=isotropic.EK0(ode_order=ode_order)
+        implementation=implementation, information=information
     )
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver

@@ -83,7 +83,7 @@ class Filter(_strategy.Strategy):
             output_scale_sqrtm=output_scale_sqrtm,
         )
 
-    def complete_correction(self, *, vector_field, extrapolated, cache_obs):
-        return vector_field.complete_correction(
+    def complete_correction(self, *, extrapolated, cache_obs):
+        return self.information.complete_correction(
             extrapolated=extrapolated, cache=cache_obs
         )
