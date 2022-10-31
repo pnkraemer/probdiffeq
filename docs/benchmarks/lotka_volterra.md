@@ -102,7 +102,7 @@ def _solve(*, solver, info_op, tol):
         info_op=info_op,
         atol=1e-3 * tol,
         rtol=tol,
-        control=controls.ClippedProportionalIntegral(),
+        control=controls.ProportionalIntegral(),
     )
     diff = (solution.u - ys_reference) / (1e-5 + ys_reference)
     return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
@@ -132,41 +132,43 @@ def workprecision(*, solve_fns, tols, **kwargs):
 ```python
 d = u0.shape[0]
 
-_ekf1_3 = prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d))
-_ckf1_3 = prepare(recipes.ckf1(num_derivatives=3, ode_dimension=d))
-_ekf1_3_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=3, ode_dimension=d))
-_ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
-_ckf1_5 = prepare(recipes.ckf1(num_derivatives=5, ode_dimension=d))
-_ekf1_5_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=5, ode_dimension=d))
-_eks1_5_dynamic = prepare(recipes.eks1_dynamic(num_derivatives=5, ode_dimension=d))
-_ekf1_7 = prepare(recipes.ekf1(num_derivatives=7, ode_dimension=d))
-_ckf1_7 = prepare(recipes.ckf1(num_derivatives=7, ode_dimension=d))
-_ekf1_7_dynamic = prepare(recipes.ekf1_dynamic(num_derivatives=7, ode_dimension=d))
-_ekf0_3_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=3))
-_ekf0_3_isotropic_dynamic = prepare(recipes.ekf0_isotropic_dynamic(num_derivatives=3))
-_ekf0_5_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=5))
-_eks0_5_isotropic_dynamic = prepare(recipes.eks0_isotropic_dynamic(num_derivatives=5))
-_ekf0_5_isotropic_dynamic_fixpt = prepare(
-    recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=5)
+ekf1_3 = prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d))
+ckf1_3 = prepare(recipes.ckf1(num_derivatives=3, ode_dimension=d))
+ekf1_3_dynamic = prepare(
+    recipes.ekf1(calibration="dynamic", num_derivatives=3, ode_dimension=d)
+)
+ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
+ckf1_5 = prepare(recipes.ckf1(num_derivatives=5, ode_dimension=d))
+ekf1_5_dynamic = prepare(recipes.ekf1(calibration="dynamic", num_derivatives=5, ode_dimension=d))
+eks1_5_dynamic = prepare(recipes.eks1(calibration="dynamic", num_derivatives=5, ode_dimension=d))
+ekf1_7 = prepare(recipes.ekf1(num_derivatives=7, ode_dimension=d))
+ckf1_7 = prepare(recipes.ckf1(num_derivatives=7, ode_dimension=d))
+ekf1_7_dynamic = prepare(recipes.ekf1(calibration="dynamic", num_derivatives=7, ode_dimension=d))
+ekf0_3_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=3))
+ekf0_3_isotropic_dynamic = prepare(recipes.ekf0_isotropic(calibration="dynamic", num_derivatives=3))
+ekf0_5_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=5))
+eks0_5_isotropic_dynamic = prepare(recipes.eks0_isotropic(calibration="dynamic", num_derivatives=5))
+ekf0_5_isotropic_dynamic_fixpt = prepare(
+    recipes.eks0_isotropic_fixedpoint(calibration="dynamic", num_derivatives=5)
 )
 
 solve_fns = [
     # EK1
-    (_ekf1_3, f"EKF1({3})"),
-    (_ckf1_3, f"CKF1({3})"),
-    # (_ekf1_3_dynamic, f"Dynamic EKF1({3})"),
-    (_ekf1_5, f"EKF1({5})"),
-    (_ckf1_5, f"CKF1({5})"),
-    (_ekf1_5_dynamic, f"Dynamic EKF1({5})"),
-    (_eks1_5_dynamic, f"Dynamic EKS1({5})"),
-    (_ekf1_7, f"EKF1({7})"),
-    # (_ckf1_7, f"CKF1({7})"),
+    (ekf1_3, f"EKF1({3})"),
+    (ckf1_3, f"CKF1({3})"),
+    # (ekf1_3_dynamic, f"Dynamic EKF1({3})"),
+    (ekf1_5, f"EKF1({5})"),
+    (ckf1_5, f"CKF1({5})"),
+    (ekf1_5_dynamic, f"Dynamic EKF1({5})"),
+    (eks1_5_dynamic, f"Dynamic EKS1({5})"),
+    (ekf1_7, f"EKF1({7})"),
+    # (ckf1_7, f"CKF1({7})"),
     # # EK0
-    (_ekf0_3_isotropic, f"Isotropic EKF0({3})"),
-    (_ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({3})"),
-    (_ekf0_5_isotropic, f"Isotropic EKF0({5})"),
-    (_eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
-    (_ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
+    (ekf0_3_isotropic, f"Isotropic EKF0({3})"),
+    (ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({3})"),
+    (ekf0_5_isotropic, f"Isotropic EKF0({5})"),
+    (eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
+    (ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
 ]
 ```
 
