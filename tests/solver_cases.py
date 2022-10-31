@@ -72,7 +72,7 @@ def solver_ekf1():
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ckf1():
     cube = cubature.SphericalCubatureIntegration.from_params(ode_dimension=2)
-    correction = dense.CK1(cubature=cube, ode_dimension=2)
+    correction = dense.MomentMatch(cubature=cube, ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
     strategy = filters.Filter(correction=correction, extrapolation=extrapolation)
     return solvers.MLESolver(strategy=strategy)
@@ -81,7 +81,7 @@ def solver_ckf1():
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ukf1():
     cube = cubature.UnscentedTransform.from_params(ode_dimension=2)
-    correction = dense.CK1(cubature=cube, ode_dimension=2)
+    correction = dense.MomentMatch(cubature=cube, ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
     strategy = filters.Filter(correction=correction, extrapolation=extrapolation)
     return solvers.DynamicSolver(strategy=strategy)
@@ -90,7 +90,7 @@ def solver_ukf1():
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ghkf1():
     cube = cubature.GaussHermite.from_params(ode_dimension=2)
-    correction = dense.CK1(cubature=cube, ode_dimension=2)
+    correction = dense.MomentMatch(cubature=cube, ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
     strategy = filters.Filter(correction=correction, extrapolation=extrapolation)
     return solvers.DynamicSolver(strategy=strategy)

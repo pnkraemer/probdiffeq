@@ -91,7 +91,7 @@ class TS1(_correction.Correction):
 
 
 @register_pytree_node_class
-class CK1(_correction.Correction):
+class MomentMatch(_correction.Correction):
     """Cubature Kalman filter correction."""
 
     def __init__(self, *, cubature, ode_dimension, ode_order=1):
