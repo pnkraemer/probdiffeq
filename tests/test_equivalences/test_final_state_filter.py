@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jax.tree_util import tree_all, tree_map
 from pytest_cases import case, parametrize, parametrize_with_cases
 
-from odefilter import ivpsolve, recipes, solvers
+from odefilter import ivpsolve, solvers
 from odefilter.strategies import filters, smoothers
 
 

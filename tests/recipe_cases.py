@@ -2,9 +2,9 @@
 
 All ODE test problems will be two-dimensional.
 """
-from pytest_cases import case, parametrize
+from pytest_cases import case
 
-from odefilter import cubature, recipes, solvers
+from odefilter import cubature, solvers
 from odefilter.implementations import batch, dense, isotropic
 from odefilter.strategies import filters, smoothers
 
@@ -105,9 +105,10 @@ def solver_eks1():
 
 
 @case(tags=["terminal_value", "checkpoint", "smoother"])
-@parametrize("calibration", ["dynamic", "mle"])
-@parametrize("n", [3])
-def solver_eks1_fixedpoint(calibration, n):
-    return recipes.eks1_fixedpoint(
-        ode_dimension=2, num_derivatives=n, calibration=calibration
+def solver_eks1_fixedpoint():
+    correction = dense.EK1(ode_dimension=2)
+    extrapolation = dense.IBM.from_params(ode_dimension=2)
+    strategy = smoothers.FixedPointSmoother(
+        correction=correction, extrapolation=extrapolation
     )
+    return solvers.MLESolver(strategy=strategy)
