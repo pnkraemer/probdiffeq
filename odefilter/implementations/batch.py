@@ -8,7 +8,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
 
@@ -24,7 +24,7 @@ _CType = Tuple[Array]
 
 
 @register_pytree_node_class
-class EK0(_information.Information[_BatchNormal, _CType]):
+class EK0(_correction.Correction[_BatchNormal, _CType]):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
@@ -95,7 +95,7 @@ class EK0(_information.Information[_BatchNormal, _CType]):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class BatchIBM(_implementation.Implementation):
+class BatchIBM(_extrapolation.Extrapolation):
     """Handle block-diagonal covariances."""
 
     a: Any
@@ -126,13 +126,13 @@ class BatchIBM(_implementation.Implementation):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         a = jnp.stack([a] * ode_dimension)
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
-        p, p_inv = _ibm.preconditioner_diagonal(
+        p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
         p = jnp.stack([p] * self.ode_dimension)

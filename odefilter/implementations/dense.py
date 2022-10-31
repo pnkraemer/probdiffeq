@@ -10,7 +10,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
 class MultivariateNormal(NamedTuple):
@@ -20,7 +20,7 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Array  # (k,k) shape
 
 
-class _DenseInformationCommon(_information.Information):
+class _DenseInformationCommon(_correction.Correction):
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
@@ -223,7 +223,7 @@ class CK1(_DenseInformationCommon):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class IBM(_implementation.Implementation):
+class IBM(_extrapolation.Extrapolation):
     """Handle dense covariances."""
 
     a: Array
@@ -251,7 +251,7 @@ class IBM(_implementation.Implementation):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
         return cls(
             a=jnp.kron(eye_d, a),
@@ -283,7 +283,7 @@ class IBM(_implementation.Implementation):
         return MultivariateNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
-        p, p_inv = _ibm.preconditioner_diagonal(
+        p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
         p = jnp.tile(p, self.ode_dimension)

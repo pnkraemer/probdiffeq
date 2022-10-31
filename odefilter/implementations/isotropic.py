@@ -9,7 +9,7 @@ import jax.tree_util
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
 class IsotropicNormal(NamedTuple):
@@ -20,7 +20,7 @@ class IsotropicNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class EK0(_information.Information):
+class EK0(_correction.Correction):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
@@ -78,7 +78,7 @@ class EK0(_information.Information):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicIBM(_implementation.Implementation):
+class IsotropicIBM(_extrapolation.Extrapolation):
     """Handle isotropic covariances."""
 
     a: Any
@@ -101,7 +101,7 @@ class IsotropicIBM(_implementation.Implementation):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
     @property
@@ -139,7 +139,9 @@ class IsotropicIBM(_implementation.Implementation):
         return IsotropicNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
-        return _ibm.preconditioner_diagonal(dt=dt, num_derivatives=self.num_derivatives)
+        return _ibm_util.preconditioner_diagonal(
+            dt=dt, num_derivatives=self.num_derivatives
+        )
 
     def complete_extrapolation(  # noqa: D102
         self, *, linearisation_pt, l0, cache, output_scale_sqrtm

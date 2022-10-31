@@ -11,8 +11,8 @@ C = TypeVar("C")  # think: Information operator's personal cache-type
 
 
 @register_pytree_node_class
-class Information(abc.ABC, Generic[R, C]):
-    """Interface for information operators."""
+class Correction(abc.ABC, Generic[R, C]):
+    """Correction model interface."""
 
     def __init__(self, *, ode_order):
         self.ode_order = ode_order
