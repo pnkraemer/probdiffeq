@@ -27,13 +27,6 @@ class _DenseInformationCommon(_information.Information):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    def _residual(self, x, *, t, p):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
-
-        x1 = x_reshaped[self.ode_order, ...]
-        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
-        return x1 - fx0
-
 
 @register_pytree_node_class
 class EK1(_DenseInformationCommon):
@@ -87,6 +80,13 @@ class EK1(_DenseInformationCommon):
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
+
+    def _residual(self, x, *, t, p):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+
+        x1 = x_reshaped[self.ode_order, ...]
+        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
+        return x1 - fx0
 
 
 @register_pytree_node_class
@@ -159,117 +159,59 @@ class CK1(_DenseInformationCommon):
         # This uses the fewest sigma-points possible, and ultimately should
         # lead to the fastest, most stable implementation.
 
-        # todo: bring down the number of QR decompositions
-        #  (I am certain we can bring it down quite drastically, probably two overall:
-        #  one for the qr(R E0^T) which is used for sigma-points,
-        #  and one to compute the gains.
+        # Compute the linearisation as in
+        # Eq. (9) in https://arxiv.org/abs/2102.00514
+        H, noise = self._linearize(x=extrapolated, cache=cache)
 
-        # 1. x -> (e0x, e1x)
-        marg1, (bw1, gain1), cache_new = self._step_1(x=extrapolated, cache=cache)
-
-        # 2. (x, y) -> (f(x), y)
-        marg2, (bw2, gain2) = self._step_2(x=extrapolated, marg1=marg1, cache=cache_new)
-
-        # 3. (x, y) -> y - x
-        marg3, (bw3, gain3) = self._step_3(marg2=marg2)
-
-        # Summarise and return
-        bw_noise, bw_transition = self._condense_three_backward_models(
-            bw1=bw1, bw2=bw2, bw3=bw3, gain1=gain1, gain2=gain2, gain3=gain3
+        # Compute the CKF correction
+        (_, e0v, e1v), L = cache, extrapolated.cov_sqrtm_lower
+        HL = e1v(L) - H @ e0v(L)
+        r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
+            R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
-        marginals = marg3
-        return marginals, (bw_noise, bw_transition)
 
-    def _step_1(self, *, x, cache):
-        (vmap_f, e0v, e1v) = cache
-
-        r_x = x.cov_sqrtm_lower.T
-        r_x0, r_x1 = e0v(r_x.T).T, e1v(r_x.T).T
-        r_x_f = jnp.hstack((r_x0, r_x1))
-        r_marg, (r_bw, gain) = _sqrtm.revert_conditional_noisefree(R_X_F=r_x_f, R_X=r_x)
-
-        m_marg = jnp.hstack((self._e0(x.mean), self._e1(x.mean)))
-        m_bw = x.mean - gain @ m_marg
-
+        # Catch up the marginals
+        x = extrapolated  # alias for readability in this code-block
+        m_marg = self._e1(x.mean) - (H @ self._e0(x.mean) + noise.mean)
         marginals = MultivariateNormal(m_marg, r_marg.T)
+
+        # Catch up the backward noise and return result
+        m_bw = extrapolated.mean - gain @ m_marg
         backward_noise = MultivariateNormal(m_bw, r_bw.T)
+        return marginals, (backward_noise, gain)
 
-        new_cache = (vmap_f, r_x0, r_x1)
-        return marginals, (backward_noise, gain), new_cache
+    def _linearize(self, *, x, cache):
+        vmap_f, e0v, _ = cache
 
-    def _step_2(self, *, x, marg1, cache):
-
-        (vmap_f, r_x0, _) = cache
-
-        # Create sigma-points (redo the select-from-x0 bit)
-        m_x0 = self._e0(x.mean)
-        r_x0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_x0)
-        pts_centered = self.cubature.points @ r_x0_square
-        pts = m_x0[None, :] + pts_centered
+        # Create sigma points
+        m_0 = self._e0(x.mean)
+        r_0 = e0v(x.cov_sqrtm_lower).T
+        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        pts_centered = self.cubature.points @ r_0_square
+        pts = m_0[None, :] + pts_centered
 
         # Evaluate the vector-field
         fx = vmap_f(pts)
         fx_mean = self.cubature.weights_sqrtm**2 @ fx
         fx_centered = fx - fx_mean[None, :]
 
-        # Revert the transition
+        # Revert the transition to get H and Omega
+        # This is a pure sqrt-implementation of
+        # Eq. (9) in https://arxiv.org/abs/2102.00514
+        # It seems to be different to Section VI.B in
+        # https://arxiv.org/pdf/2207.00426.pdf,
+        # because the implementation below avoids sqrt-down-dates
         pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
         fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
-        r_marg_x, (r_bw_x, gain_x) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=fx_centered_normed, R_X=pts_centered_normed
-        )
-        m_bw_x = m_x0 - gain_x @ fx_mean
-
-        # Embed the backward model into an identity model
-        gain = jsp.linalg.block_diag(gain_x, jnp.eye(*gain_x.shape))
-        r_bw = jsp.linalg.block_diag(r_bw_x, jnp.zeros_like(r_bw_x))
-        m_bw = jnp.hstack((m_bw_x, jnp.zeros_like(m_bw_x)))
-
-        # Compute the "joint marginal".
-        # To this end, compute the linearisation matrix H as in
-        # Eq. (9) in https://arxiv.org/abs/2102.00514
-        # and multiply the "original" marginal by blockdiag(H, I)
-        cross_cov = gain_x @ (r_marg_x.T @ r_marg_x)  # hacky...
-        H_x = jsp.linalg.cho_solve((r_x0_square.T, True), cross_cov).T
-        H = jsp.linalg.block_diag(H_x, jnp.eye(*H_x.shape))
-        r_marg = marg1.cov_sqrtm_lower.T @ H.T
-        m_x1 = self._e1(x.mean)
-        m_marg = jnp.hstack((fx_mean, m_x1))
-
-        # Summarise and return values
-        marginals = MultivariateNormal(m_marg, r_marg.T)
-        backward_noise = MultivariateNormal(m_bw, r_bw.T)
-        return marginals, (backward_noise, gain)
-
-    def _step_3(self, *, marg2):
-
-        m0, m1 = jnp.split(marg2.mean, indices_or_sections=2, axis=0)
-        r0, r1 = jnp.split(marg2.cov_sqrtm_lower.T, indices_or_sections=2, axis=1)
-
-        m, r_x_f, r_x = m1 - m0, r1 - r0, marg2.cov_sqrtm_lower.T
-        r_marg, (r_bw, gain) = _sqrtm.revert_conditional_noisefree(R_X_F=r_x_f, R_X=r_x)
-        m_bw = marg2.mean - gain @ m
-
-        marginals = MultivariateNormal(m, r_marg.T)
-        backward_noise = MultivariateNormal(m_bw, r_bw.T)
-
-        return marginals, (backward_noise, gain)
-
-    @staticmethod
-    def _condense_three_backward_models(*, bw1, bw2, bw3, gain1, gain2, gain3):
-        bw_transition = gain1 @ gain2 @ gain3
-
-        bw_noise_mean = gain1 @ (gain2 @ bw3.mean + bw2.mean) + bw1.mean
-
-        x = _sqrtm.sum_of_sqrtm_factors(
-            R1=bw3.cov_sqrtm_lower.T @ gain2.T, R2=bw2.cov_sqrtm_lower.T
-        )
-        bw_noise_cov_sqrtm = _sqrtm.sum_of_sqrtm_factors(
-            R1=x @ gain1.T, R2=bw1.cov_sqrtm_lower.T
+        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
+        #  (but would it still be valid?)
+        _, (r_Om, H) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=pts_centered_normed, R_X=fx_centered_normed
         )
 
-        bw_noise = MultivariateNormal(bw_noise_mean, bw_noise_cov_sqrtm.T)
-        return bw_noise, bw_transition
+        # Catch up the transition-mean and return the result
+        d = fx_mean - H @ m_0
+        return H, MultivariateNormal(d, r_Om.T)
 
     def _e1(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[1, ...]

@@ -102,7 +102,7 @@ def _solve(*, solver, info_op, tol):
         info_op=info_op,
         atol=1e-3 * tol,
         rtol=tol,
-        control=controls.ProportionalIntegral(),
+        control=controls.ClippedProportionalIntegral(),
     )
     diff = (solution.u - ys_reference) / (1e-5 + ys_reference)
     return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
@@ -137,8 +137,8 @@ ckf1_3 = prepare(recipes.ckf1(num_derivatives=3, ode_dimension=d))
 ekf1_3_dynamic = prepare(
     recipes.ekf1(calibration="dynamic", num_derivatives=3, ode_dimension=d)
 )
-ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
-ckf1_5 = prepare(recipes.ckf1(num_derivatives=5, ode_dimension=d))
+ekf1_4 = prepare(recipes.ekf1(num_derivatives=4, ode_dimension=d))
+ckf1_4 = prepare(recipes.ckf1(num_derivatives=4, ode_dimension=d))
 ekf1_5_dynamic = prepare(
     recipes.ekf1(calibration="dynamic", num_derivatives=5, ode_dimension=d)
 )
@@ -164,28 +164,28 @@ ekf0_5_isotropic_dynamic_fixpt = prepare(
 
 solve_fns = [
     # EK1
-    (ekf1_3, f"EKF1({3})"),
-    (ckf1_3, f"CKF1({3})"),
+    #     (ekf1_3, f"EKF1({3})"),
+    #     (ckf1_3, f"CKF1({3})"),
     # (ekf1_3_dynamic, f"Dynamic EKF1({3})"),
-    (ekf1_5, f"EKF1({5})"),
-    (ckf1_5, f"CKF1({5})"),
-    (ekf1_5_dynamic, f"Dynamic EKF1({5})"),
-    (eks1_5_dynamic, f"Dynamic EKS1({5})"),
-    (ekf1_7, f"EKF1({7})"),
+    (ekf1_4, f"EKF1({4})"),
+    (ckf1_4, f"CKF1({4})"),
+    #     (ekf1_5_dynamic, f"Dynamic EKF1({5})"),
+    #     (eks1_5_dynamic, f"Dynamic EKS1({5})"),
+    #     (ekf1_7, f"EKF1({7})"),
     # (ckf1_7, f"CKF1({7})"),
     # # EK0
-    (ekf0_3_isotropic, f"Isotropic EKF0({3})"),
-    (ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({3})"),
-    (ekf0_5_isotropic, f"Isotropic EKF0({5})"),
-    (eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
-    (ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
+    #     (ekf0_3_isotropic, f"Isotropic EKF0({3})"),
+    #     (ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({3})"),
+    #     (ekf0_5_isotropic, f"Isotropic EKF0({5})"),
+    #     (eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
+    #     (ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
 ]
 ```
 
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
+tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=0.5)
 
 results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
 ```
