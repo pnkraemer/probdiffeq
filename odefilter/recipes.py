@@ -140,16 +140,14 @@ def ckf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = filters.Filter(implementation=implementation)
-    solver = _calibration_to_solver[calibration](strategy=strategy)
-
-    information_op = jax.tree_util.Partial(
-        dense.CK1,
+    information = dense.CK1(
         cubature=_cubature.SCI.from_params(dim=ode_dimension),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )
-    return solver, information_op
+    strategy = filters.Filter(implementation=implementation, information=information)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
+    return solver
 
 
 def ukf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, r=1.0):
@@ -186,16 +184,14 @@ def ghkf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, degree=
     implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = filters.Filter(implementation=implementation)
-    solver = _calibration_to_solver[calibration](strategy=strategy)
-
-    information_op = jax.tree_util.Partial(
-        dense.CK1,
+    information = dense.CK1(
         cubature=_cubature.GaussHermite.from_params(degree=degree, dim=ode_dimension),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )
-    return solver, information_op
+    strategy = filters.Filter(implementation=implementation, information=information)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
+    return solver
 
 
 def ekf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):

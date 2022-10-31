@@ -93,32 +93,30 @@ class EK1(_DenseInformationCommon):
 class CK1(_DenseInformationCommon):
     """Cubature Kalman filter information."""
 
-    def __init__(self, f, /, *, cubature, ode_order, ode_dimension):
+    def __init__(self, *, cubature, ode_order, ode_dimension):
         if ode_order > 1:
             raise ValueError
 
-        super().__init__(f, ode_order=ode_order)
+        super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
         self.cubature = cubature
 
     def tree_flatten(self):
         children = (self.cubature,)
-        aux = self.f, self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_dimension
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (cubature,) = children
-        f, ode_order, ode_dimension = aux
-        return cls(
-            f, ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature
-        )
+        ode_order, ode_dimension = aux
+        return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
 
-    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
+    def begin_correction(self, x: MultivariateNormal, /, *, vector_field, t, p):
 
         # Vmap relevant functions
-        vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
+        vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
         e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
         cache = (vmap_f, e0v, e1v)
