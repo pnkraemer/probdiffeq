@@ -32,22 +32,25 @@ class _DenseInformationCommon(_information.Information):
 class EK1(_DenseInformationCommon):
     """Extended Kalman filter information."""
 
-    def __init__(self, f, /, *, ode_order, ode_dimension):
-        super().__init__(f, ode_order=ode_order)
+    def __init__(self, *, ode_order, ode_dimension):
+        super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
     def tree_flatten(self):
         children = ()
-        aux = self.f, self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_dimension
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, _children):
-        f, ode_order, ode_dimension = aux
-        return cls(f, ode_order=ode_order, ode_dimension=ode_dimension)
+        ode_order, ode_dimension = aux
+        return cls(ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-        b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
+    def begin_correction(self, x: MultivariateNormal, /, *, vector_field, t, p):
+        vf_partial = jax.tree_util.Partial(
+            self._residual, vector_field=vector_field, t=t, p=p
+        )
+        b, fn = jax.linearize(vf_partial, x.mean)
 
         cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(b, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
@@ -81,11 +84,11 @@ class EK1(_DenseInformationCommon):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
-    def _residual(self, x, *, t, p):
+    def _residual(self, x, *, vector_field, t, p):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
 
         x1 = x_reshaped[self.ode_order, ...]
-        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
+        fx0 = vector_field(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
 

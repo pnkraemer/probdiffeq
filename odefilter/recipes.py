@@ -205,13 +205,10 @@ def ekf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = filters.Filter(implementation=implementation)
+    information = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
+    strategy = filters.Filter(implementation=implementation, information=information)
     solver = _calibration_to_solver[calibration](strategy=strategy)
-
-    information_op = jax.tree_util.Partial(
-        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
-    )
-    return solver, information_op
+    return solver
 
 
 def eks1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
@@ -225,12 +222,12 @@ def eks1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = smoothers.Smoother(implementation=implementation)
-    solver = _calibration_to_solver[calibration](strategy=strategy)
-    information_op = jax.tree_util.Partial(
-        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    information = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
+    strategy = smoothers.Smoother(
+        implementation=implementation, information=information
     )
-    return solver, information_op
+    solver = _calibration_to_solver[calibration](strategy=strategy)
+    return solver
 
 
 def eks1_fixedpoint(
@@ -246,12 +243,12 @@ def eks1_fixedpoint(
     implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = _calibration_to_solver[calibration](strategy=strategy)
-    information_op = jax.tree_util.Partial(
-        dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
+    information = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
+    strategy = smoothers.FixedPointSmoother(
+        implementation=implementation, information=information
     )
-    return solver, information_op
+    solver = _calibration_to_solver[calibration](strategy=strategy)
+    return solver
 
 
 _calibration_to_solver = {"mle": solvers.Solver, "dynamic": solvers.DynamicSolver}
