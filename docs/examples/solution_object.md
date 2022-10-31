@@ -99,7 +99,7 @@ for i in [0, 1, 2]:  # ["S", "I", "R"]
     ls = dense.cov_sqrtm_lower[:, i, :]
 
     # Overemphasise the uncertainty (for plotting reasons)
-    stds = 10* jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
+    stds = 10 * jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     ax[0].plot(ts, ms)
     ax[0].fill_between(ts, ms - 1.96 * stds, ms + 1.96 * stds, alpha=0.3)

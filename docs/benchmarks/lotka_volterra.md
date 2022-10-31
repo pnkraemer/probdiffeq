@@ -139,15 +139,25 @@ ekf1_3_dynamic = prepare(
 )
 ekf1_5 = prepare(recipes.ekf1(num_derivatives=5, ode_dimension=d))
 ckf1_5 = prepare(recipes.ckf1(num_derivatives=5, ode_dimension=d))
-ekf1_5_dynamic = prepare(recipes.ekf1(calibration="dynamic", num_derivatives=5, ode_dimension=d))
-eks1_5_dynamic = prepare(recipes.eks1(calibration="dynamic", num_derivatives=5, ode_dimension=d))
+ekf1_5_dynamic = prepare(
+    recipes.ekf1(calibration="dynamic", num_derivatives=5, ode_dimension=d)
+)
+eks1_5_dynamic = prepare(
+    recipes.eks1(calibration="dynamic", num_derivatives=5, ode_dimension=d)
+)
 ekf1_7 = prepare(recipes.ekf1(num_derivatives=7, ode_dimension=d))
 ckf1_7 = prepare(recipes.ckf1(num_derivatives=7, ode_dimension=d))
-ekf1_7_dynamic = prepare(recipes.ekf1(calibration="dynamic", num_derivatives=7, ode_dimension=d))
+ekf1_7_dynamic = prepare(
+    recipes.ekf1(calibration="dynamic", num_derivatives=7, ode_dimension=d)
+)
 ekf0_3_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=3))
-ekf0_3_isotropic_dynamic = prepare(recipes.ekf0_isotropic(calibration="dynamic", num_derivatives=3))
+ekf0_3_isotropic_dynamic = prepare(
+    recipes.ekf0_isotropic(calibration="dynamic", num_derivatives=3)
+)
 ekf0_5_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=5))
-eks0_5_isotropic_dynamic = prepare(recipes.eks0_isotropic(calibration="dynamic", num_derivatives=5))
+eks0_5_isotropic_dynamic = prepare(
+    recipes.eks0_isotropic(calibration="dynamic", num_derivatives=5)
+)
 ekf0_5_isotropic_dynamic_fixpt = prepare(
     recipes.eks0_isotropic_fixedpoint(calibration="dynamic", num_derivatives=5)
 )
