@@ -24,8 +24,8 @@ _CType = Tuple[Array]
 
 
 @register_pytree_node_class
-class EK0(_correction.Correction[_BatchNormal, _CType]):
-    """EK0-linearise an ODE assuming a linearisation-point with\
+class TS0(_correction.Correction[_BatchNormal, _CType]):
+    """TS0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(

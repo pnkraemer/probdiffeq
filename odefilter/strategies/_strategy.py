@@ -16,7 +16,7 @@ class Strategy(abc.ABC):
     """Inference strategy interface."""
 
     extrapolation: Any = isotropic.IsotropicIBM.from_params()
-    correction: Any = isotropic.EK0()
+    correction: Any = isotropic.TS0()
 
     @abc.abstractmethod
     def init_posterior(self, *, taylor_coefficients):

@@ -20,8 +20,8 @@ class IsotropicNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class EK0(_correction.Correction):
-    """EK0-linearise an ODE assuming a linearisation-point with\
+class TS0(_correction.Correction):
+    """TS0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(self, x: IsotropicNormal, /, *, vector_field, t, p):
