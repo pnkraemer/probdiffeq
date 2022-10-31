@@ -12,8 +12,8 @@ from odefilter.strategies import filters, smoothers
 
 @case
 def filter_smoother_pair_eks0():
-    filter = filters.Filter()
-    solver1 = solvers.DynamicSolver(filter)
+    filter_ = filters.Filter()
+    solver1 = solvers.DynamicSolver(filter_)
 
     smoother = smoothers.Smoother()
     solver2 = solvers.DynamicSolver(smoother)
@@ -22,8 +22,8 @@ def filter_smoother_pair_eks0():
 
 @case
 def filter_smoother_pair_fixedpoint_eks0():
-    filter = filters.Filter()
-    solver1 = solvers.DynamicSolver(filter)
+    filter_ = filters.Filter()
+    solver1 = solvers.DynamicSolver(filter_)
 
     smoother = smoothers.FixedPointSmoother()
     solver2 = solvers.DynamicSolver(smoother)
