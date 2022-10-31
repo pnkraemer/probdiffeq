@@ -51,7 +51,9 @@ def eks0_batch(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order
     return solver, information_op
 
 
-def eks0_batch_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
+def eks0_batch_fixedpoint(
+    *, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1
+):
     """Construct the equivalent of an explicit solver with a block-diagonal covariance \
     structure.
 
@@ -64,7 +66,7 @@ def eks0_batch_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.Solver(strategy=strategy)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
     information_op = jax.tree_util.Partial(batch.EK0, ode_order=ode_order)
     return solver, information_op
 
@@ -208,7 +210,9 @@ def eks1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     return solver, information_op
 
 
-def eks1_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
+def eks1_fixedpoint(
+    *, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1
+):
     """Construct the equivalent of a semi-implicit solver.
 
     Suitable for low-dimensional, stiff problems.
@@ -220,7 +224,7 @@ def eks1_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.Solver(strategy=strategy)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
     information_op = jax.tree_util.Partial(
         dense.EK1, ode_dimension=ode_dimension, ode_order=ode_order
     )

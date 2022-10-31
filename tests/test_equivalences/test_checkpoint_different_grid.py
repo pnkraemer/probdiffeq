@@ -11,8 +11,10 @@ from odefilter import ivpsolve, recipes
 @case
 @parametrize("n", [2])
 def smoother_fixedpoint_smoother_pair_eks0(n):
-    eks0 = recipes.eks0_isotropic_dynamic(num_derivatives=n)
-    fixedpoint_eks0 = recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=n)
+    eks0 = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
+    fixedpoint_eks0 = recipes.eks0_isotropic_fixedpoint(
+        calibration="dynamic", num_derivatives=n
+    )
     return eks0, fixedpoint_eks0
 
 
