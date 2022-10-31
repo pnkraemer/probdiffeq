@@ -9,7 +9,7 @@ from odefilter import controls, ivpsolve
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver",
-    cases=".recipe_cases",
+    cases=".solver_cases",
     prefix="solver_",
     has_tag=("solve", "filter"),
 )
@@ -40,7 +40,7 @@ def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver):
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver",
-    cases=".recipe_cases",
+    cases=".solver_cases",
     prefix="solver_",
     has_tag=("solve", "smoother"),
 )
@@ -80,7 +80,7 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver):
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver",
-    cases=".recipe_cases",
+    cases=".solver_cases",
     prefix="solver_",
     has_tag=["checkpoint", "smoother"],
 )
