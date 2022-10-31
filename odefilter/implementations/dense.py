@@ -20,16 +20,8 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Array  # (k,k) shape
 
 
-class _DenseInformationCommon(_correction.Correction):
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
-
-
 @register_pytree_node_class
-class EK1(_DenseInformationCommon):
+class EK1(_correction.Correction):
     """Extended Kalman filter correction."""
 
     def __init__(self, *, ode_dimension, ode_order=1):
@@ -91,9 +83,15 @@ class EK1(_DenseInformationCommon):
         fx0 = vector_field(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
 
 @register_pytree_node_class
-class CK1(_DenseInformationCommon):
+class CK1(_correction.Correction):
     """Cubature Kalman filter correction."""
 
     def __init__(self, *, cubature, ode_dimension, ode_order=1):
@@ -219,6 +217,12 @@ class CK1(_DenseInformationCommon):
 
     def _e0(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
+
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
 
 
 @register_pytree_node_class
