@@ -99,7 +99,7 @@ class IsotropicIBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
-    def from_num_derivatives(cls, *, num_derivatives):
+    def from_params(cls, *, num_derivatives):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)

@@ -23,7 +23,8 @@ def ekf0_batch(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = batch.BatchIBM.from_num_derivatives(
+
+    extrapolation = batch.BatchIBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = batch.EK0(ode_order=ode_order)
@@ -41,7 +42,7 @@ def eks0_batch(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = batch.BatchIBM.from_num_derivatives(
+    extrapolation = batch.BatchIBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = batch.EK0(ode_order=ode_order)
@@ -61,7 +62,7 @@ def eks0_batch_fixedpoint(
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = batch.BatchIBM.from_num_derivatives(
+    extrapolation = batch.BatchIBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = batch.EK0(ode_order=ode_order)
@@ -81,9 +82,7 @@ def ekf0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = isotropic.IsotropicIBM.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
+    extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=num_derivatives)
     correction = isotropic.EK0(ode_order=ode_order)
     strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
@@ -99,9 +98,7 @@ def eks0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = isotropic.IsotropicIBM.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
+    extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=num_derivatives)
     correction = isotropic.EK0(ode_order=ode_order)
     strategy = smoothers.Smoother(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
@@ -117,9 +114,7 @@ def eks0_isotropic_fixedpoint(*, calibration="mle", num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = isotropic.IsotropicIBM.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
+    extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=num_derivatives)
     correction = isotropic.EK0(ode_order=ode_order)
     strategy = smoothers.FixedPointSmoother(
         extrapolation=extrapolation, correction=correction
@@ -136,7 +131,7 @@ def ckf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = dense.CK1(
@@ -157,7 +152,7 @@ def ukf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, r=1.0):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = dense.CK1(
@@ -178,7 +173,7 @@ def ghkf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, degree=
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = dense.CK1(
@@ -199,7 +194,7 @@ def ekf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
@@ -216,7 +211,7 @@ def eks1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
@@ -235,7 +230,7 @@ def eks1_fixedpoint(
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    extrapolation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_params(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
     correction = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)

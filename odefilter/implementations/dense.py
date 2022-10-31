@@ -249,7 +249,7 @@ class IBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
 
     @classmethod
-    def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
+    def from_params(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
