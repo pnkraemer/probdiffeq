@@ -29,12 +29,14 @@ class EK0(_information.Information[_BatchNormal, _CType]):
      isotropic Kronecker structure."""
 
     def begin_correction(
-        self, x: _BatchNormal, /, *, t, p
+        self, x: _BatchNormal, /, *, vector_field, t, p
     ) -> Tuple[Array, float, _CType]:
         m = x.mean
 
         # m has shape (d, n)
-        bias = m[..., self.ode_order] - self.f(*(m[..., : self.ode_order]).T, t=t, p=p)
+        bias = m[..., self.ode_order] - vector_field(
+            *(m[..., : self.ode_order]).T, t=t, p=p
+        )
         l_obs_nonsquare = self._cov_sqrtm_lower(
             cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
