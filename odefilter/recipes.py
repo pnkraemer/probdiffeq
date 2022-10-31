@@ -8,7 +8,6 @@ We still recommend to build an ODE filter yourself,
 but until you do so, use one of ours.
 
 """
-import jax.tree_util
 
 from odefilter import _cubature, solvers
 from odefilter.implementations import batch, dense, isotropic
@@ -165,16 +164,14 @@ def ukf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, r=1.0):
     implementation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    strategy = filters.Filter(implementation=implementation)
-    solver = _calibration_to_solver[calibration](strategy=strategy)
-
-    information_op = jax.tree_util.Partial(
-        dense.CK1,
+    information = dense.CK1(
         cubature=_cubature.UT.from_params(dim=ode_dimension, r=r),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )
-    return solver, information_op
+    strategy = filters.Filter(implementation=implementation, information=information)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
+    return solver
 
 
 def ghkf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, degree=1):

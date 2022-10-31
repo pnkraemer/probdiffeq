@@ -37,8 +37,7 @@ def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks, tol):
         t0=t0,
         t1=t1,
         parameters=p,
-        solver=ekf[0],
-        info_op=ekf[1],
+        solver=ekf,
         atol=1e-2 * tol,
         rtol=tol,
     )
@@ -48,8 +47,7 @@ def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks, tol):
         t0=t0,
         t1=t1,
         parameters=p,
-        solver=eks[0],
-        info_op=eks[1],
+        solver=eks,
         atol=1e-2 * tol,
         rtol=tol,
     )
