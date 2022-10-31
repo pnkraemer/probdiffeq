@@ -10,6 +10,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
+from odefilter import cubature as cubature_module
 from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
@@ -94,14 +95,19 @@ class TaylorLinear(_correction.Correction):
 class MomentMatch(_correction.Correction):
     """Cubature Kalman filter correction."""
 
-    def __init__(self, *, cubature, ode_dimension, ode_order=1):
+    def __init__(self, *, ode_dimension, cubature=None, ode_order=1):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
-        self.cubature = cubature
+        if cubature is None:
+            self.cubature = cubature_module.SphericalCubatureIntegration.from_params(
+                ode_dimension=ode_dimension
+            )
+        else:
+            self.cubature = cubature
 
     def tree_flatten(self):
         children = (self.cubature,)

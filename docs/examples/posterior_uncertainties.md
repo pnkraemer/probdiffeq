@@ -27,7 +27,9 @@ from odefilter import ivpsolve, solvers
 from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
-backend.select("jax")
+
+if not backend.has_been_selected:
+    backend.select("jax")
 ```
 
 Set an example problem.

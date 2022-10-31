@@ -23,10 +23,11 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import ivpsolve, solvers
-from odefilter.implementations import dense, isotropic
-from odefilter.strategies import filters, smoothers
+from odefilter.implementations import isotropic
+from odefilter.strategies import filters
 
 config.update("jax_enable_x64", True)
+
 if not backend.has_been_selected:
     backend.select("jax")
 ```
@@ -74,7 +75,7 @@ In fact, above, we used the following solver:
 correction = isotropic.TaylorConstant(ode_order=1)
 extrapolation = isotropic.IsotropicIBM.from_params()
 ek0_1_granular = solvers.MLESolver(
-    filters.Filter(extrapolation=extrapolation, correction=correction)
+    strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
 )
 assert ek0_1_granular == ek0_1
 ```
@@ -94,7 +95,7 @@ def vf_2(y, dy, t, p):
 correction = isotropic.TaylorConstant(ode_order=2)
 extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=5)
 ek0_2 = solvers.MLESolver(
-    filters.Filter(extrapolation=extrapolation, correction=correction)
+    strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
 )
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
