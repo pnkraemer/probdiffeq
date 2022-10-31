@@ -44,7 +44,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver, info_op = recipes.eks1(ode_dimension=3, num_derivatives=2)
+solver = recipes.eks1(ode_dimension=3, num_derivatives=2)
 ```
 
 ```python tags=[]
@@ -55,7 +55,6 @@ solution = ivpsolve.solve(
     t0=t0,
     t1=t1,
     solver=solver,
-    info_op=info_op,
     parameters=f_args,
     atol=1e-1,
     rtol=1e-1,
@@ -98,7 +97,7 @@ for i in [0, 1, 2]:  # ["S", "I", "R"]
     ms = dense.mean[:, i]
     ls = dense.cov_sqrtm_lower[:, i, :]
 
-    # Overemphasise the uncertainty (for plotting reasons)
+    # Exaggerate the uncertainty (for plotting reasons)
     stds = 10 * jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     ax[0].plot(ts, ms)

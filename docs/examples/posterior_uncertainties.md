@@ -46,7 +46,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0, info_op = recipes.ekf0_isotropic(num_derivatives=1)
+ek0 = recipes.ekf0_isotropic(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -54,14 +54,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 %%time
 
 solution = ivpsolve.simulate_checkpoints(
-    vf,
-    initial_values=(u0,),
-    ts=ts,
-    solver=ek0,
-    info_op=info_op,
-    rtol=1e-1,
-    atol=1e-1,
-    parameters=f_args,
+    vf, initial_values=(u0,), ts=ts, solver=ek0, rtol=1e-1, atol=1e-1, parameters=f_args
 )
 ```
 
@@ -107,7 +100,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0, info_op = recipes.eks0_isotropic_fixedpoint(num_derivatives=1)
+ek0 = recipes.eks0_isotropic_fixedpoint(num_derivatives=1)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -119,7 +112,6 @@ solution = ivpsolve.simulate_checkpoints(
     initial_values=(u0,),
     ts=ts,
     solver=ek0,
-    info_op=info_op,
     rtol=1e-1,
     atol=1e-1,
     parameters=f_args,
