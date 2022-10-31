@@ -339,7 +339,7 @@ class Solver(_Solver):
         return filtered, dt * error
 
     def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
-        evidence_sqrtm = self.strategy.information.evidence_sqrtm(observed=obs)
+        evidence_sqrtm = self.strategy.correction.evidence_sqrtm(observed=obs)
         return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):  # noqa: D102

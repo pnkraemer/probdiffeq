@@ -23,11 +23,11 @@ def ekf0_batch(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchIBM.from_num_derivatives(
+    extrapolation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = batch.EK0(ode_order=ode_order)
-    strategy = filters.Filter(implementation=implementation, information=information)
+    correction = batch.EK0(ode_order=ode_order)
+    strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -41,13 +41,11 @@ def eks0_batch(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchIBM.from_num_derivatives(
+    extrapolation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = batch.EK0(ode_order=ode_order)
-    strategy = smoothers.Smoother(
-        implementation=implementation, information=information
-    )
+    correction = batch.EK0(ode_order=ode_order)
+    strategy = smoothers.Smoother(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -63,12 +61,12 @@ def eks0_batch_fixedpoint(
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = batch.BatchIBM.from_num_derivatives(
+    extrapolation = batch.BatchIBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = batch.EK0(ode_order=ode_order)
+    correction = batch.EK0(ode_order=ode_order)
     strategy = smoothers.FixedPointSmoother(
-        implementation=implementation, information=information
+        extrapolation=extrapolation, correction=correction
     )
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
@@ -83,11 +81,11 @@ def ekf0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicIBM.from_num_derivatives(
+    extrapolation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    information = isotropic.EK0(ode_order=ode_order)
-    strategy = filters.Filter(implementation=implementation, information=information)
+    correction = isotropic.EK0(ode_order=ode_order)
+    strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -101,13 +99,11 @@ def eks0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicIBM.from_num_derivatives(
+    extrapolation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    information = isotropic.EK0(ode_order=ode_order)
-    strategy = smoothers.Smoother(
-        implementation=implementation, information=information
-    )
+    correction = isotropic.EK0(ode_order=ode_order)
+    strategy = smoothers.Smoother(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -121,12 +117,12 @@ def eks0_isotropic_fixedpoint(*, calibration="mle", num_derivatives=4, ode_order
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = isotropic.IsotropicIBM.from_num_derivatives(
+    extrapolation = isotropic.IsotropicIBM.from_num_derivatives(
         num_derivatives=num_derivatives
     )
-    information = isotropic.EK0(ode_order=ode_order)
+    correction = isotropic.EK0(ode_order=ode_order)
     strategy = smoothers.FixedPointSmoother(
-        implementation=implementation, information=information
+        extrapolation=extrapolation, correction=correction
     )
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
@@ -140,15 +136,15 @@ def ckf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = dense.CK1(
+    correction = dense.CK1(
         cubature=_cubature.SCI.from_params(dim=ode_dimension),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )
-    strategy = filters.Filter(implementation=implementation, information=information)
+    strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -161,15 +157,15 @@ def ukf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, r=1.0):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = dense.CK1(
+    correction = dense.CK1(
         cubature=_cubature.UT.from_params(dim=ode_dimension, r=r),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )
-    strategy = filters.Filter(implementation=implementation, information=information)
+    strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -182,15 +178,15 @@ def ghkf1(*, ode_dimension, calibration, num_derivatives=4, ode_order=1, degree=
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = dense.CK1(
+    correction = dense.CK1(
         cubature=_cubature.GaussHermite.from_params(degree=degree, dim=ode_dimension),
         ode_dimension=ode_dimension,
         ode_order=ode_order,
     )
-    strategy = filters.Filter(implementation=implementation, information=information)
+    strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -203,11 +199,11 @@ def ekf1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
-    strategy = filters.Filter(implementation=implementation, information=information)
+    correction = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
+    strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -220,13 +216,11 @@ def eks1(*, ode_dimension, calibration="mle", num_derivatives=4, ode_order=1):
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
-    strategy = smoothers.Smoother(
-        implementation=implementation, information=information
-    )
+    correction = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
+    strategy = smoothers.Smoother(extrapolation=extrapolation, correction=correction)
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver
 
@@ -241,12 +235,12 @@ def eks1_fixedpoint(
     _assert_num_derivatives_sufficiently_large(
         num_derivatives=num_derivatives, ode_order=ode_order
     )
-    implementation = dense.IBM.from_num_derivatives(
+    extrapolation = dense.IBM.from_num_derivatives(
         num_derivatives=num_derivatives, ode_dimension=ode_dimension
     )
-    information = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
+    correction = dense.EK1(ode_dimension=ode_dimension, ode_order=ode_order)
     strategy = smoothers.FixedPointSmoother(
-        implementation=implementation, information=information
+        extrapolation=extrapolation, correction=correction
     )
     solver = _calibration_to_solver[calibration](strategy=strategy)
     return solver

@@ -1,4 +1,4 @@
-"""Batch-style implementations."""
+"""Batch-style extrapolations."""
 from dataclasses import dataclass
 from typing import Any, NamedTuple, Tuple
 
@@ -204,11 +204,11 @@ class BatchIBM(_extrapolation.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return _BatchNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
 
-    # todo: move to information?
+    # todo: move to correction?
     def init_error_estimate(self):  # noqa: D102
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
-    # todo: move to information?
+    # todo: move to correction?
     def init_output_scale_sqrtm(self):
         return jnp.ones((self.ode_dimension,))
 

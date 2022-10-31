@@ -30,7 +30,7 @@ class _DenseInformationCommon(_correction.Correction):
 
 @register_pytree_node_class
 class EK1(_DenseInformationCommon):
-    """Extended Kalman filter information."""
+    """Extended Kalman filter correction."""
 
     def __init__(self, *, ode_order, ode_dimension):
         super().__init__(ode_order=ode_order)
@@ -94,7 +94,7 @@ class EK1(_DenseInformationCommon):
 
 @register_pytree_node_class
 class CK1(_DenseInformationCommon):
-    """Cubature Kalman filter information."""
+    """Cubature Kalman filter correction."""
 
     def __init__(self, *, cubature, ode_order, ode_dimension):
         if ode_order > 1:

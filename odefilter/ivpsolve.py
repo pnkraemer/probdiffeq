@@ -29,7 +29,7 @@ def simulate_terminal_values(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
@@ -59,7 +59,7 @@ def simulate_checkpoints(
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
         t=ts[0],
         parameters=parameters,
     )
@@ -97,7 +97,7 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
