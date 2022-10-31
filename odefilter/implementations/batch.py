@@ -101,11 +101,6 @@ class BatchIBM(_extrapolation.Extrapolation):
     a: Any
     q_sqrtm_lower: Any
 
-    def __repr__(self):
-        """Print a string representation of the class."""
-        n_and_d = f"n={self.num_derivatives}, d={self.ode_dimension}"
-        return f"{self.__class__.__name__}({n_and_d})"
-
     @property
     def num_derivatives(self):
         return self.a.shape[1] - 1

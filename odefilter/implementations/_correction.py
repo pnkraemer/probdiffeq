@@ -3,19 +3,27 @@
 import abc
 from typing import Generic, Tuple, TypeVar
 
+import jax.numpy as jnp
+import jax.tree_util
 from jax import Array
-from jax.tree_util import register_pytree_node_class
 
 R = TypeVar("R")  # think: Random variable type
 C = TypeVar("C")  # think: Information operator's personal cache-type
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class Correction(abc.ABC, Generic[R, C]):
     """Correction model interface."""
 
     def __init__(self, *, ode_order=1):
         self.ode_order = ode_order
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(ode_order={self.ode_order})"
+
+    def __eq__(self, other):
+        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
+        return jax.tree_util.tree_all(equal)
 
     def tree_flatten(self):
         children = ()

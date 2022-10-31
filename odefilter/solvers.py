@@ -83,11 +83,21 @@ class Solution(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass
 class _Solver(abc.ABC):
     """Inference strategy interface."""
 
-    strategy: Any = filters.Filter()
+    def __init__(self, strategy=None):
+        if strategy is None:
+            self.strategy = strategy or filters.Filter()
+        else:
+            self.strategy = strategy
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(strategy={self.strategy})"
+
+    def __eq__(self, other):
+        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
+        return jax.tree_util.tree_all(equal)
 
     # Abstract methods
 

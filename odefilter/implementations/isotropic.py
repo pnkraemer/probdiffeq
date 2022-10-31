@@ -84,10 +84,6 @@ class IsotropicIBM(_extrapolation.Extrapolation):
     a: Any
     q_sqrtm_lower: Any
 
-    def __repr__(self):
-        """Print a string representation of the class."""
-        return f"{self.__class__.__name__}(n={self.num_derivatives})"
-
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
         aux = ()
