@@ -63,7 +63,7 @@ def solver_eks0_batch_fixedpoint():
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
 def solver_ekf1():
-    correction = dense.EK1(ode_dimension=2)
+    correction = dense.TS1(ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
     strategy = filters.Filter(correction=correction, extrapolation=extrapolation)
     return solvers.DynamicSolver(strategy=strategy)
@@ -98,7 +98,7 @@ def solver_ghkf1():
 
 @case(tags=["terminal_value", "solve", "smoother"])
 def solver_eks1():
-    correction = dense.EK1(ode_dimension=2)
+    correction = dense.TS1(ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
     strategy = smoothers.Smoother(correction=correction, extrapolation=extrapolation)
     return solvers.MLESolver(strategy=strategy)
@@ -106,7 +106,7 @@ def solver_eks1():
 
 @case(tags=["terminal_value", "checkpoint", "smoother"])
 def solver_eks1_fixedpoint():
-    correction = dense.EK1(ode_dimension=2)
+    correction = dense.TS1(ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
     strategy = smoothers.FixedPointSmoother(
         correction=correction, extrapolation=extrapolation

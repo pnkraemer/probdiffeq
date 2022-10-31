@@ -120,7 +120,7 @@ def case_solver_pair_ekf1_dynamic(num, atol, rtol, factor_min, factor_max, safet
         return f(y, *p)
 
     extrapolation = dense.IBM.from_params(ode_dimension=2, num_derivatives=num)
-    correction = dense.EK1(ode_dimension=2)
+    correction = dense.TS1(ode_dimension=2)
     ekf1_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     ekf1 = solvers.DynamicSolver(strategy=ekf1_strategy)
     controller = controls.ClippedIntegral(

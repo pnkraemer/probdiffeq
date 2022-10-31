@@ -21,7 +21,7 @@ class MultivariateNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class EK1(_correction.Correction):
+class TS1(_correction.Correction):
     """Extended Kalman filter correction."""
 
     def __init__(self, *, ode_dimension, ode_order=1):
