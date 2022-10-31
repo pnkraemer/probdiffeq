@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util
 
-from odefilter import odefilters, taylor
+from odefilter import odefilter, taylor
 
 # The high-level checkpoint-style routines
 
@@ -34,7 +34,7 @@ def simulate_terminal_values(
         parameters=parameters,
     )
 
-    return odefilters.odefilter_terminal_values(
+    return odefilter.odefilter_terminal_values(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -64,7 +64,7 @@ def simulate_checkpoints(
         parameters=parameters,
     )
 
-    return odefilters.odefilter_checkpoints(
+    return odefilter.odefilter_checkpoints(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         ts=ts,
@@ -102,7 +102,7 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
         parameters=parameters,
     )
 
-    return odefilters.odefilter(
+    return odefilter.odefilter(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,

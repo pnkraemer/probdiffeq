@@ -86,7 +86,7 @@ class Solution(Generic[T]):
 class _Solver(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, strategy=None):
+    def __init__(self, *, strategy=None):
         if strategy is None:
             self.strategy = strategy or filters.Filter()
         else:

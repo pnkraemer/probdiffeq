@@ -80,12 +80,11 @@ nav:
         - "examples/solution_object.ipynb"
     - API Documentation:
         - "api_docs/ivpsolve.md"
-        - "api_docs/recipes.md"
         - "api_docs/taylor.md"
+        - "api_docs/odefilter.md"
+        - "api_docs/controls.md"
+        - "api_docs/solvers.md"
     - Advanced API Documentation:
-        - "api_docs_advanced/odefilters.md"
-        - "api_docs_advanced/controls.md"
-        - "api_docs_advanced/solvers.md"
         - Inference strategies:
           - "api_docs_advanced/strategies/filters.md"
           - "api_docs_advanced/strategies/smoothers.md"
