@@ -11,8 +11,8 @@ C = TypeVar("C")  # think: my personal cache
 
 
 @dataclass(frozen=True)
-class Implementation(abc.ABC, Generic[R, C]):
-    """Implementation interface."""
+class Extrapolation(abc.ABC, Generic[R, C]):
+    """Extrapolation model interface."""
 
     @abc.abstractmethod
     def init_corrected(self, *, taylor_coefficients) -> R:

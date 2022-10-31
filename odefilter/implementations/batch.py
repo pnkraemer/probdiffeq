@@ -1,4 +1,4 @@
-"""Batch-style implementations."""
+"""Batch-style extrapolations."""
 from dataclasses import dataclass
 from typing import Any, NamedTuple, Tuple
 
@@ -8,7 +8,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
 
@@ -24,17 +24,19 @@ _CType = Tuple[Array]
 
 
 @register_pytree_node_class
-class EK0(_information.Information[_BatchNormal, _CType]):
+class EK0(_correction.Correction[_BatchNormal, _CType]):
     """EK0-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(
-        self, x: _BatchNormal, /, *, t, p
+        self, x: _BatchNormal, /, *, vector_field, t, p
     ) -> Tuple[Array, float, _CType]:
         m = x.mean
 
         # m has shape (d, n)
-        bias = m[..., self.ode_order] - self.f(*(m[..., : self.ode_order]).T, t=t, p=p)
+        bias = m[..., self.ode_order] - vector_field(
+            *(m[..., : self.ode_order]).T, t=t, p=p
+        )
         l_obs_nonsquare = self._cov_sqrtm_lower(
             cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
         )
@@ -93,7 +95,7 @@ class EK0(_information.Information[_BatchNormal, _CType]):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class BatchIBM(_implementation.Implementation):
+class BatchIBM(_extrapolation.Extrapolation):
     """Handle block-diagonal covariances."""
 
     a: Any
@@ -124,13 +126,13 @@ class BatchIBM(_implementation.Implementation):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         a = jnp.stack([a] * ode_dimension)
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
-        p, p_inv = _ibm.preconditioner_diagonal(
+        p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
         p = jnp.stack([p] * self.ode_dimension)
@@ -202,11 +204,11 @@ class BatchIBM(_implementation.Implementation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return _BatchNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
 
-    # todo: move to information?
+    # todo: move to correction?
     def init_error_estimate(self):  # noqa: D102
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
-    # todo: move to information?
+    # todo: move to correction?
     def init_output_scale_sqrtm(self):
         return jnp.ones((self.ode_dimension,))
 

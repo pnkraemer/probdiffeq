@@ -13,7 +13,8 @@ import jax.tree_util
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    implementation: Any
+    extrapolation: Any
+    correction: Any
 
     @abc.abstractmethod
     def init_posterior(self, *, taylor_coefficients):
@@ -64,7 +65,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, info_op, extrapolated, cache_obs):
+    def complete_correction(self, *, extrapolated, cache_obs):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -76,24 +77,26 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     def tree_flatten(self):
-        children = (self.implementation,)
+        children = (self.extrapolation, self.correction)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
+        (extrapolation, correction) = children
+        return cls(extrapolation=extrapolation, correction=correction)
 
     def _base_samples(self, key, *, shape):
         base_samples = jax.random.normal(key=key, shape=shape)
         return base_samples
 
     def init_error_estimate(self):
-        return self.implementation.init_error_estimate()
+        return self.extrapolation.init_error_estimate()
 
     def init_output_scale_sqrtm(self):
-        return self.implementation.init_output_scale_sqrtm()
+        return self.extrapolation.init_output_scale_sqrtm()
 
-    def begin_correction(self, linearisation_pt, *, info_op, t, p):
-        return info_op.begin_correction(linearisation_pt, t=t, p=p)
+    def begin_correction(self, linearisation_pt, *, vector_field, t, p):
+        return self.correction.begin_correction(
+            linearisation_pt, vector_field=vector_field, t=t, p=p
+        )

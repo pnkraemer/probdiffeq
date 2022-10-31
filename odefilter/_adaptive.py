@@ -135,7 +135,7 @@ class AdaptiveODEFilter(Generic[R]):
     @property
     def error_contraction_rate(self):
         """Error order."""
-        return self.solver.strategy.implementation.num_derivatives + 1
+        return self.solver.strategy.extrapolation.num_derivatives + 1
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
@@ -174,13 +174,13 @@ class AdaptiveODEFilter(Generic[R]):
         return scale * norm_y0 / norm_dy0
 
     @jax.jit
-    def step_fn(self, state, info_op, t1, parameters):
+    def step_fn(self, state, vector_field, t1, parameters):
         """Perform a step."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
             lambda s: self._rejection_loop(
-                state0=s, info_op=info_op, t1=t1, parameters=parameters
+                state0=s, vector_field=vector_field, t1=t1, parameters=parameters
             ),
             lambda s: s,
             state,
@@ -193,7 +193,7 @@ class AdaptiveODEFilter(Generic[R]):
         )
         return state
 
-    def _rejection_loop(self, *, info_op, state0, t1, parameters):
+    def _rejection_loop(self, *, vector_field, state0, t1, parameters):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
@@ -201,7 +201,7 @@ class AdaptiveODEFilter(Generic[R]):
         def body_fn(x):
             _, s = x
             s = self._attempt_step_fn(
-                state=s, info_op=info_op, t1=t1, parameters=parameters
+                state=s, vector_field=vector_field, t1=t1, parameters=parameters
             )
             proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
@@ -220,7 +220,7 @@ class AdaptiveODEFilter(Generic[R]):
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, info_op, t1, parameters):
+    def _attempt_step_fn(self, *, state, vector_field, t1, parameters):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
@@ -229,7 +229,10 @@ class AdaptiveODEFilter(Generic[R]):
 
         # Perform the actual step.
         posterior, error_estimate = self.solver.step_fn(
-            state=state.accepted, info_op=info_op, dt=dt, parameters=parameters
+            state=state.accepted,
+            vector_field=vector_field,
+            dt=dt,
+            parameters=parameters,
         )
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(

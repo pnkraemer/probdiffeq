@@ -10,7 +10,7 @@ class Filter(_strategy.Strategy):
     """Filter."""
 
     def init_posterior(self, *, taylor_coefficients):
-        return self.implementation.init_corrected(
+        return self.extrapolation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
 
@@ -55,33 +55,35 @@ class Filter(_strategy.Strategy):
         return posterior
 
     def scale_marginals(self, marginals, *, output_scale_sqrtm):
-        return self.implementation.scale_covariance(
+        return self.extrapolation.scale_covariance(
             rv=marginals, scale_sqrtm=output_scale_sqrtm
         )
 
     def scale_posterior(self, posterior, *, output_scale_sqrtm):
-        return self.implementation.scale_covariance(
+        return self.extrapolation.scale_covariance(
             rv=posterior, scale_sqrtm=output_scale_sqrtm
         )
 
     def extract_sol_terminal_value(self, *, posterior):
-        return self.implementation.extract_sol(rv=posterior)
+        return self.extrapolation.extract_sol(rv=posterior)
 
     def extract_sol_from_marginals(self, *, marginals):
-        return self.implementation.extract_sol(rv=marginals)
+        return self.extrapolation.extract_sol(rv=marginals)
 
     def begin_extrapolation(self, *, posterior, dt):
-        return self.implementation.begin_extrapolation(posterior.mean, dt=dt)
+        return self.extrapolation.begin_extrapolation(posterior.mean, dt=dt)
 
     def complete_extrapolation(
         self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
-        return self.implementation.complete_extrapolation(
+        return self.extrapolation.complete_extrapolation(
             linearisation_pt=linearisation_pt,
             cache=cache,
             l0=posterior_previous.cov_sqrtm_lower,
             output_scale_sqrtm=output_scale_sqrtm,
         )
 
-    def complete_correction(self, *, info_op, extrapolated, cache_obs):
-        return info_op.complete_correction(extrapolated=extrapolated, cache=cache_obs)
+    def complete_correction(self, *, extrapolated, cache_obs):
+        return self.correction.complete_correction(
+            extrapolated=extrapolated, cache=cache_obs
+        )

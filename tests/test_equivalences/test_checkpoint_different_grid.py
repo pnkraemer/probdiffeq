@@ -34,14 +34,12 @@ def test_smoothing_checkpoint_equals_solver_state(
 
     args = (vf, u0)
     kwargs = {"parameters": p, "atol": 1e-1, "rtol": 1e-1}
-    eks_sol = ivpsolve.solve(
-        *args, t0=t0, t1=t1, solver=eks[0], info_op=eks[1], **kwargs
-    )
+    eks_sol = ivpsolve.solve(*args, t0=t0, t1=t1, solver=eks, **kwargs)
     ts = jnp.linspace(t0, t1, num=k * len(eks_sol.t) // 2)
-    u, dense = eks[0].offgrid_marginals_searchsorted(ts=ts[1:-1], solution=eks_sol)
+    u, dense = eks.offgrid_marginals_searchsorted(ts=ts[1:-1], solution=eks_sol)
 
     fp_eks_sol = ivpsolve.simulate_checkpoints(
-        *args, ts=ts, solver=fixedpoint_eks[0], info_op=fixedpoint_eks[1], **kwargs
+        *args, ts=ts, solver=fixedpoint_eks, **kwargs
     )
     fixedpoint_eks_sol = fp_eks_sol[1:-1]  # reference is defined only on the interior
 

@@ -13,7 +13,7 @@ from odefilter import _adaptive, _control_flow
 
 @jax.jit
 def odefilter_terminal_values(
-    info, taylor_coefficients, t0, t1, solver, parameters, **options
+    vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
     """Simulate the terminal values of an ODE with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
@@ -25,7 +25,7 @@ def odefilter_terminal_values(
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
-        info_op=info,
+        vector_field=vector_field,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
@@ -33,7 +33,9 @@ def odefilter_terminal_values(
 
 
 @jax.jit
-def odefilter_checkpoints(info, taylor_coefficients, ts, solver, parameters, **options):
+def odefilter_checkpoints(
+    vector_field, taylor_coefficients, ts, solver, parameters, **options
+):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     _assert_not_scalar(taylor_coefficients)
 
@@ -43,7 +45,7 @@ def odefilter_checkpoints(info, taylor_coefficients, ts, solver, parameters, **o
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
-            info_op=info,
+            vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
         )
@@ -60,7 +62,9 @@ def odefilter_checkpoints(info, taylor_coefficients, ts, solver, parameters, **o
     return adaptive_solver.extract_fn(state=solution)
 
 
-def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver, parameters):
+def _advance_ivp_solution_adaptively(
+    vector_field, t1, state0, adaptive_solver, parameters
+):
     """Advance an IVP solution from an initial state to a terminal state."""
 
     def cond_fun(s):
@@ -68,7 +72,7 @@ def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver, param
 
     def body_fun(s):
         state = adaptive_solver.step_fn(
-            state=s, info_op=info_op, t1=t1, parameters=parameters
+            state=s, vector_field=vector_field, t1=t1, parameters=parameters
         )
         return state
 
@@ -80,7 +84,7 @@ def _advance_ivp_solution_adaptively(info_op, t1, state0, adaptive_solver, param
     return sol
 
 
-def odefilter(info_op, taylor_coefficients, t0, t1, solver, parameters, **options):
+def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **options):
     """Solve an initial value problem.
 
     !!! warning
@@ -92,7 +96,7 @@ def odefilter(info_op, taylor_coefficients, t0, t1, solver, parameters, **option
 
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
     generator = _odefilter_generator(
-        info_op,
+        vector_field,
         state=state,
         t1=t1,
         adaptive_solver=adaptive_solver,
@@ -102,12 +106,12 @@ def odefilter(info_op, taylor_coefficients, t0, t1, solver, parameters, **option
     return adaptive_solver.extract_fn(state=forward_solution)
 
 
-def _odefilter_generator(info_op, *, state, t1, adaptive_solver, parameters):
+def _odefilter_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate an ODE filter solution iteratively."""
     while state.solution.t < t1:
         yield state
         state = adaptive_solver.step_fn(
-            state=state, info_op=info_op, t1=t1, parameters=parameters
+            state=state, vector_field=vector_field, t1=t1, parameters=parameters
         )
 
     yield state

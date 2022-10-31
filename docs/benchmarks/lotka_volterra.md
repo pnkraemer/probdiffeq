@@ -86,12 +86,11 @@ Let's start with finding the fastest ODE filter.
 ### Terminal-value simulation
 
 ```python
-def prepare(x, **kwargs):
-    solver, info_op = x
-    return jax.jit(partial(_solve, solver=solver, info_op=info_op))
+def prepare(solver, **kwargs):
+    return jax.jit(partial(_solve, solver=solver))
 
 
-def _solve(*, solver, info_op, tol):
+def _solve(*, solver, tol):
     solution = ivpsolve.simulate_terminal_values(
         vf,
         initial_values=(u0,),
@@ -99,7 +98,6 @@ def _solve(*, solver, info_op, tol):
         t1=t1,
         parameters=f_args,
         solver=solver,
-        info_op=info_op,
         atol=1e-3 * tol,
         rtol=tol,
         control=controls.ClippedProportionalIntegral(),

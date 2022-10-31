@@ -39,7 +39,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ek0_1, info_op_1 = recipes.ekf0_isotropic(num_derivatives=5)
+ek0_1 = recipes.ekf0_isotropic(num_derivatives=5)
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -51,7 +51,6 @@ solution = ivpsolve.simulate_checkpoints(
     initial_values=(u0,),
     ts=ts,
     solver=ek0_1,
-    info_op=info_op_1,
     atol=1e-5,
     rtol=1e-5,
     parameters=f_args,
@@ -74,7 +73,7 @@ def vf_2(y, dy, t, p):
 
 
 # One derivative more than above because we don't transform to first order
-ek0_2, info_op_2 = recipes.ekf0_isotropic(num_derivatives=6, ode_order=2)
+ek0_2 = recipes.ekf0_isotropic(num_derivatives=6, ode_order=2)
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -86,7 +85,6 @@ solution = ivpsolve.simulate_checkpoints(
     initial_values=(u0, du0),
     ts=ts,
     solver=ek0_2,
-    info_op=info_op_2,
     atol=1e-5,
     rtol=1e-5,
     parameters=f_args,

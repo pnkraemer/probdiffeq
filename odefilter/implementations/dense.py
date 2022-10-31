@@ -10,7 +10,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm, _implementation, _information, _sqrtm
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
 class MultivariateNormal(NamedTuple):
@@ -20,7 +20,7 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Array  # (k,k) shape
 
 
-class _DenseInformationCommon(_information.Information):
+class _DenseInformationCommon(_correction.Correction):
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
@@ -30,24 +30,27 @@ class _DenseInformationCommon(_information.Information):
 
 @register_pytree_node_class
 class EK1(_DenseInformationCommon):
-    """Extended Kalman filter information."""
+    """Extended Kalman filter correction."""
 
-    def __init__(self, f, /, *, ode_order, ode_dimension):
-        super().__init__(f, ode_order=ode_order)
+    def __init__(self, *, ode_order, ode_dimension):
+        super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
     def tree_flatten(self):
         children = ()
-        aux = self.f, self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_dimension
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, _children):
-        f, ode_order, ode_dimension = aux
-        return cls(f, ode_order=ode_order, ode_dimension=ode_dimension)
+        ode_order, ode_dimension = aux
+        return cls(ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
-        b, fn = jax.linearize(jax.tree_util.Partial(self._residual, t=t, p=p), x.mean)
+    def begin_correction(self, x: MultivariateNormal, /, *, vector_field, t, p):
+        vf_partial = jax.tree_util.Partial(
+            self._residual, vector_field=vector_field, t=t, p=p
+        )
+        b, fn = jax.linearize(vf_partial, x.mean)
 
         cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(b, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
@@ -81,44 +84,42 @@ class EK1(_DenseInformationCommon):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
-    def _residual(self, x, *, t, p):
+    def _residual(self, x, *, vector_field, t, p):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
 
         x1 = x_reshaped[self.ode_order, ...]
-        fx0 = self.f(*x_reshaped[: self.ode_order, ...], t=t, p=p)
+        fx0 = vector_field(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
 
 @register_pytree_node_class
 class CK1(_DenseInformationCommon):
-    """Cubature Kalman filter information."""
+    """Cubature Kalman filter correction."""
 
-    def __init__(self, f, /, *, cubature, ode_order, ode_dimension):
+    def __init__(self, *, cubature, ode_order, ode_dimension):
         if ode_order > 1:
             raise ValueError
 
-        super().__init__(f, ode_order=ode_order)
+        super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
         self.cubature = cubature
 
     def tree_flatten(self):
         children = (self.cubature,)
-        aux = self.f, self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_dimension
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (cubature,) = children
-        f, ode_order, ode_dimension = aux
-        return cls(
-            f, ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature
-        )
+        ode_order, ode_dimension = aux
+        return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
 
-    def begin_correction(self, x: MultivariateNormal, /, *, t, p):
+    def begin_correction(self, x: MultivariateNormal, /, *, vector_field, t, p):
 
         # Vmap relevant functions
-        vmap_f = jax.vmap(jax.tree_util.Partial(self.f, t=t, p=p))
+        vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
         e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
         cache = (vmap_f, e0v, e1v)
@@ -222,7 +223,7 @@ class CK1(_DenseInformationCommon):
 
 @register_pytree_node_class
 @dataclass(frozen=True)
-class IBM(_implementation.Implementation):
+class IBM(_extrapolation.Extrapolation):
     """Handle dense covariances."""
 
     a: Array
@@ -250,7 +251,7 @@ class IBM(_implementation.Implementation):
     @classmethod
     def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
         """Create a strategy from hyperparameters."""
-        a, q_sqrtm = _ibm.system_matrices_1d(num_derivatives=num_derivatives)
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
         return cls(
             a=jnp.kron(eye_d, a),
@@ -282,7 +283,7 @@ class IBM(_implementation.Implementation):
         return MultivariateNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
-        p, p_inv = _ibm.preconditioner_diagonal(
+        p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
         p = jnp.tile(p, self.ode_dimension)

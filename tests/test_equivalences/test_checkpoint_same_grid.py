@@ -43,8 +43,7 @@ def test_smoothing_checkpoint_equals_solver_state(
         t0=t0,
         t1=t1,
         parameters=p,
-        solver=eks[0],
-        info_op=eks[1],
+        solver=eks,
         atol=1e-2 * tol,
         rtol=tol,
     )
@@ -54,8 +53,7 @@ def test_smoothing_checkpoint_equals_solver_state(
         u0,
         ts=eks_sol.t,
         parameters=p,
-        solver=fixedpoint_eks[0],
-        info_op=fixedpoint_eks[1],
+        solver=fixedpoint_eks,
         atol=1e-2 * tol,
         rtol=tol,
     )

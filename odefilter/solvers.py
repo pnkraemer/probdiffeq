@@ -90,7 +90,7 @@ class _Solver(abc.ABC):
     # Abstract methods
 
     @abc.abstractmethod
-    def step_fn(self, *, state, info_op, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -230,13 +230,13 @@ class _Solver(abc.ABC):
 class DynamicSolver(_Solver):
     """Dynamic calibration."""
 
-    def step_fn(self, *, state, info_op, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters):
         # p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
         error, scale_sqrtm, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, info_op=info_op, t=state.t + dt, p=parameters
+            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
@@ -248,7 +248,7 @@ class DynamicSolver(_Solver):
 
         # Final observation
         _, (corrected, _) = self.strategy.complete_correction(
-            info_op=info_op, extrapolated=extrapolated, cache_obs=cache_obs
+            extrapolated=extrapolated, cache_obs=cache_obs
         )
 
         # Return solution
@@ -293,10 +293,10 @@ class DynamicSolver(_Solver):
 
 
 @jax.tree_util.register_pytree_node_class  # is this necessary?
-class Solver(_Solver):
+class MLESolver(_Solver):
     """Standard calibration. Nothing dynamic."""
 
-    def step_fn(self, *, state, info_op, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters):
         """Step."""
         # Pre-error-estimate steps
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
@@ -305,7 +305,7 @@ class Solver(_Solver):
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, info_op=info_op, t=state.t + dt, p=parameters
+            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
@@ -319,12 +319,11 @@ class Solver(_Solver):
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.strategy.complete_correction(
-            info_op=info_op,
             extrapolated=extrapolated,
             cache_obs=cache_obs,
         )
         new_output_scale_sqrtm = self._update_output_scale_sqrtm(
-            info_op=info_op, diffsqrtm=output_scale_sqrtm, n=n, obs=observed
+            diffsqrtm=output_scale_sqrtm, n=n, obs=observed
         )
 
         # Extract and return solution
@@ -339,8 +338,8 @@ class Solver(_Solver):
         )
         return filtered, dt * error
 
-    def _update_output_scale_sqrtm(self, *, info_op, diffsqrtm, n, obs):
-        evidence_sqrtm = info_op.evidence_sqrtm(observed=obs)
+    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
+        evidence_sqrtm = self.strategy.correction.evidence_sqrtm(observed=obs)
         return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):  # noqa: D102

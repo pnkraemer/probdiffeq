@@ -17,7 +17,7 @@ from odefilter import odefilters, taylor
 
 @functools.partial(jax.jit, static_argnums=[0, 5])
 def simulate_terminal_values(
-    vector_field, initial_values, t0, t1, solver, info_op, parameters=(), **options
+    vector_field, initial_values, t0, t1, solver, parameters=(), **options
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -27,16 +27,15 @@ def simulate_terminal_values(
     _assert_tuple(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vector_field,
+        vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
-    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter_terminal_values(
-        info_op_partial,
+        jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
@@ -48,7 +47,7 @@ def simulate_terminal_values(
 
 @functools.partial(jax.jit, static_argnums=[0, 4])
 def simulate_checkpoints(
-    vector_field, initial_values, ts, solver, info_op, parameters=(), **options
+    vector_field, initial_values, ts, solver, parameters=(), **options
 ):
     """Solve an IVP and return the solution at checkpoints.
 
@@ -58,16 +57,15 @@ def simulate_checkpoints(
     _assert_tuple(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vector_field,
+        vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
         t=ts[0],
         parameters=parameters,
     )
-    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter_checkpoints(
-        info_op_partial,
+        jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         ts=ts,
         solver=solver,
@@ -79,9 +77,7 @@ def simulate_checkpoints(
 # Full solver routines
 
 
-def solve(
-    vector_field, initial_values, t0, t1, solver, info_op, parameters=(), **options
-):
+def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options):
     """Solve an initial value problem.
 
     !!! warning
@@ -99,16 +95,15 @@ def solve(
     _assert_tuple(initial_values)
 
     taylor_coefficients = taylor.taylor_mode_fn(
-        vector_field=vector_field,
+        vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.implementation.num_derivatives + 1 - len(initial_values),
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
-    info_op_partial = info_op(vector_field)
 
     return odefilters.odefilter(
-        info_op_partial,
+        jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,

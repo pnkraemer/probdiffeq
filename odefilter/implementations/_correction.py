@@ -11,25 +11,26 @@ C = TypeVar("C")  # think: Information operator's personal cache-type
 
 
 @register_pytree_node_class
-class Information(abc.ABC, Generic[R, C]):
-    """Interface for information operators."""
+class Correction(abc.ABC, Generic[R, C]):
+    """Correction model interface."""
 
-    def __init__(self, f, /, *, ode_order):
-        self.f = f
+    def __init__(self, *, ode_order):
         self.ode_order = ode_order
 
     def tree_flatten(self):
         children = ()
-        aux = self.f, self.ode_order
+        aux = (self.ode_order,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, _children):
-        f, ode_order = aux
-        return cls(f, ode_order=ode_order)
+        (ode_order,) = aux
+        return cls(ode_order=ode_order)
 
     @abc.abstractmethod
-    def begin_correction(self, x: R, /, *, t, p) -> Tuple[Array, float, C]:
+    def begin_correction(
+        self, x: R, /, *, vector_field, t, p
+    ) -> Tuple[Array, float, C]:
         raise NotImplementedError
 
     @abc.abstractmethod
