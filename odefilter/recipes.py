@@ -123,7 +123,7 @@ def eks0_batch_dynamic_fixedpoint(*, ode_dimension, num_derivatives=4, ode_order
     return solver, information_op
 
 
-def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
+def ekf0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure, and optimised for terminal-value simulation.
 
@@ -136,30 +136,12 @@ def ekf0_isotropic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     strategy = filters.Filter(implementation=implementation)
-    solver = solvers.Solver(strategy=strategy)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
-def ekf0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
-    """Construct the equivalent of an explicit solver with an isotropic covariance \
-    structure, dynamic calibration, and optimised for terminal-value simulation.
-
-    Suitable for high-dimensional, non-stiff problems.
-    """
-    _assert_num_derivatives_sufficiently_large(
-        num_derivatives=num_derivatives, ode_order=ode_order
-    )
-    implementation = isotropic.IsotropicIBM.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
-    strategy = filters.Filter(implementation=implementation)
-    solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
-    return solver, information_op
-
-
-def eks0_isotropic(*, num_derivatives=4, ode_order=1):
+def eks0_isotropic(*, calibration="mle", num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure.
 
@@ -172,12 +154,12 @@ def eks0_isotropic(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.Solver(strategy=strategy)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
-def eks0_isotropic_fixedpoint(*, num_derivatives=4, ode_order=1):
+def eks0_isotropic_fixedpoint(*, calibration="mle", num_derivatives=4, ode_order=1):
     """Construct the equivalent of an explicit solver with an isotropic covariance \
     structure.
 
@@ -190,45 +172,12 @@ def eks0_isotropic_fixedpoint(*, num_derivatives=4, ode_order=1):
         num_derivatives=num_derivatives
     )
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.Solver(strategy=strategy)
+    solver = _calibration_to_solver[calibration](strategy=strategy)
     information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
     return solver, information_op
 
 
-def eks0_isotropic_dynamic(*, num_derivatives=4, ode_order=1):
-    """Construct the equivalent of an explicit solver with an isotropic covariance \
-    structure and dynamic calibration.
-
-    Suitable for high-dimensional, non-stiff problems.
-    """
-    _assert_num_derivatives_sufficiently_large(
-        num_derivatives=num_derivatives, ode_order=ode_order
-    )
-    implementation = isotropic.IsotropicIBM.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
-    strategy = smoothers.Smoother(implementation=implementation)
-    solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
-    return solver, information_op
-
-
-def eks0_isotropic_dynamic_fixedpoint(*, num_derivatives=4, ode_order=1):
-    """Construct the equivalent of an explicit solver with an isotropic covariance \
-    structure and dynamic calibration.
-
-    Suitable for high-dimensional, non-stiff problems.
-    """
-    _assert_num_derivatives_sufficiently_large(
-        num_derivatives=num_derivatives, ode_order=ode_order
-    )
-    implementation = isotropic.IsotropicIBM.from_num_derivatives(
-        num_derivatives=num_derivatives
-    )
-    strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    solver = solvers.DynamicSolver(strategy=strategy)
-    information_op = jax.tree_util.Partial(isotropic.EK0, ode_order=ode_order)
-    return solver, information_op
+_calibration_to_solver = {"mle": solvers.Solver, "dynamic": solvers.DynamicSolver}
 
 
 def ckf1(*, ode_dimension, num_derivatives=4, ode_order=1):

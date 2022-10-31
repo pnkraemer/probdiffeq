@@ -2,39 +2,30 @@
 
 All ODE test problems will be two-dimensional.
 """
-from pytest_cases import case
+from pytest_cases import case, parametrize
 
 from odefilter import recipes
 
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
-def solver_ekf0_isotropic():
-    return recipes.ekf0_isotropic(num_derivatives=3)
-
-
-@case(tags=["terminal_value", "solve", "checkpoint", "filter"])
-def solver_ekf0_isotropic_dynamic():
-    return recipes.ekf0_isotropic_dynamic(num_derivatives=3)
+@parametrize("calibration", ["dynamic", "mle"])
+@parametrize("n", [3])
+def solver_ekf0_isotropic(calibration, n):
+    return recipes.ekf0_isotropic(num_derivatives=n, calibration=calibration)
 
 
 @case(tags=["terminal_value", "solve", "smoother"])
-def solver_eks0_isotropic():
-    return recipes.eks0_isotropic(num_derivatives=3)
-
-
-@case(tags=["terminal_value", "solve", "smoother"])
-def solver_eks0_isotropic_dynamic():
-    return recipes.eks0_isotropic_dynamic(num_derivatives=3)
+@parametrize("calibration", ["dynamic", "mle"])
+@parametrize("n", [3])
+def solver_eks0_isotropic(calibration, n):
+    return recipes.eks0_isotropic(num_derivatives=n, calibration=calibration)
 
 
 @case(tags=["terminal_value", "checkpoint", "smoother"])
-def solver_eks0_isotropic_fixedpoint():
-    return recipes.eks0_isotropic_fixedpoint(num_derivatives=3)
-
-
-@case(tags=["terminal_value", "checkpoint", "smoother"])
-def solver_eks0_isotropic_dynamic_fixedpoint():
-    return recipes.eks0_isotropic_dynamic_fixedpoint(num_derivatives=3)
+@parametrize("calibration", ["dynamic", "mle"])
+@parametrize("n", [3])
+def solver_eks0_isotropic_fixedpoint(calibration, n):
+    return recipes.eks0_isotropic_fixedpoint(num_derivatives=n, calibration=calibration)
 
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
