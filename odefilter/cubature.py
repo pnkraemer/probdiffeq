@@ -31,7 +31,7 @@ class _PositiveCubatureRule:
 
 @register_pytree_node_class
 @dataclass
-class SCI(_PositiveCubatureRule):
+class SphericalCubatureIntegration(_PositiveCubatureRule):
     """Spherical cubature integration."""
 
     @classmethod
@@ -48,12 +48,12 @@ class SCI(_PositiveCubatureRule):
 
 @register_pytree_node_class
 @dataclass
-class UT(_PositiveCubatureRule):
+class UnscentedTransform(_PositiveCubatureRule):
     """Unscented transform."""
 
     # todo: more parameters...
     @classmethod
-    def from_params(cls, *, dim, r):
+    def from_params(cls, *, dim, r=1.0):
         """Construct an unscented transform from parameters.
 
         The number of cubature points is _higher_ than ``dim``.
@@ -74,7 +74,7 @@ class GaussHermite(_PositiveCubatureRule):
     """Gauss-Hermite cubature."""
 
     @classmethod
-    def from_params(cls, *, degree, dim):
+    def from_params(cls, *, dim, degree=5):
         """Construct an Gauss-Hermite cubature rule.
 
         The number of cubature points is dim**degree.

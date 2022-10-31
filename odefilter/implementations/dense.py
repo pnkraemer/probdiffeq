@@ -32,7 +32,7 @@ class _DenseInformationCommon(_correction.Correction):
 class EK1(_DenseInformationCommon):
     """Extended Kalman filter correction."""
 
-    def __init__(self, *, ode_order, ode_dimension):
+    def __init__(self, *, ode_dimension, ode_order=1):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
@@ -96,7 +96,7 @@ class EK1(_DenseInformationCommon):
 class CK1(_DenseInformationCommon):
     """Cubature Kalman filter correction."""
 
-    def __init__(self, *, cubature, ode_order, ode_dimension):
+    def __init__(self, *, cubature, ode_dimension, ode_order=1):
         if ode_order > 1:
             raise ValueError
 
@@ -249,7 +249,7 @@ class IBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
 
     @classmethod
-    def from_params(cls, *, num_derivatives, ode_dimension):
+    def from_params(cls, *, ode_dimension, num_derivatives=4):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)

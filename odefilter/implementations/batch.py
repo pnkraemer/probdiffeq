@@ -124,7 +124,7 @@ class BatchIBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
-    def from_params(cls, *, num_derivatives, ode_dimension):
+    def from_params(cls, *, ode_dimension, num_derivatives=4):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         a = jnp.stack([a] * ode_dimension)
