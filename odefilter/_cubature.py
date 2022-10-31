@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 import jax.numpy as jnp
-import scipy.special  # for Gauss--Hermite roots
+import scipy.special  # type: ignore
 from jax import Array
 from jax.tree_util import register_pytree_node_class, tree_map
 
