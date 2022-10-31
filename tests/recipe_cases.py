@@ -4,7 +4,19 @@ All ODE test problems will be two-dimensional.
 """
 from pytest_cases import case, parametrize
 
-from odefilter import recipes
+from odefilter import recipes, solvers
+from odefilter.implementations import batch, dense, isotropic
+from odefilter.strategies import filters, smoothers
+
+
+@case(tags=["terminal_value"])
+def solver_mle_default():
+    return solvers.MLESolver()
+
+
+@case(tags=["terminal_value"])
+def solver_dynamic_default():
+    return solvers.DynamicSolver()
 
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])

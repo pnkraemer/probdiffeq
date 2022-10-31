@@ -7,14 +7,16 @@ from typing import Any
 import jax
 import jax.tree_util
 
+from odefilter.implementations import isotropic
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclass
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    extrapolation: Any
-    correction: Any
+    extrapolation: Any = isotropic.IsotropicIBM.from_params()
+    correction: Any = isotropic.EK0()
 
     @abc.abstractmethod
     def init_posterior(self, *, taylor_coefficients):

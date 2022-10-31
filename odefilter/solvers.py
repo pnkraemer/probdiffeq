@@ -8,6 +8,8 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util
 
+from odefilter.strategies import filters
+
 T = TypeVar("T")
 
 
@@ -85,7 +87,7 @@ class Solution(Generic[T]):
 class _Solver(abc.ABC):
     """Inference strategy interface."""
 
-    strategy: Any
+    strategy: Any = filters.Filter()
 
     # Abstract methods
 
