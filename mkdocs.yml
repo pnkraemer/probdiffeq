@@ -80,18 +80,17 @@ nav:
         - "examples/solution_object.ipynb"
     - API Documentation:
         - "api_docs/ivpsolve.md"
-        - "api_docs/taylor.md"
         - "api_docs/odefiltersolve.md"
-        - "api_docs/controls.md"
         - "api_docs/solvers.md"
-    - Advanced API Documentation:
         - Inference strategies:
-          - "api_docs_advanced/strategies/filters.md"
-          - "api_docs_advanced/strategies/smoothers.md"
+          - "api_docs/strategies/filters.md"
+          - "api_docs/strategies/smoothers.md"
         - Solver implementations:
-          - "api_docs_advanced/implementations/dense.md"
-          - "api_docs_advanced/implementations/isotropic.md"
-          - "api_docs_advanced/implementations/batch.md"
+          - "api_docs/implementations/dense.md"
+          - "api_docs/implementations/isotropic.md"
+          - "api_docs/implementations/batch.md"
+        - "api_docs/taylor.md"
+        - "api_docs/controls.md"
     - Developer Documentation:
         - "dev_docs/init_apply_extract.md"
         - "dev_docs/on_the_edges.md"
