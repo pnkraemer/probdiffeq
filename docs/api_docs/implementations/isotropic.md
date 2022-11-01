@@ -1,3 +1,3 @@
-# Isotropic Kronecker factorisation
+# Priors with isotropic diffusion
 
 ::: odefilter.implementations.isotropic

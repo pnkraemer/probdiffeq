@@ -44,8 +44,8 @@ def case_solver_pair_isotropic_ekf0(num, atol, rtol, factor_min, factor_max, saf
     def vf_ode(y, *, t, p):
         return f(y, *p)
 
-    extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=num)
-    correction = isotropic.TaylorConstant()
+    extrapolation = isotropic.IsoIBM.from_params(num_derivatives=num)
+    correction = isotropic.IsoTaylorZerothOrder()
     ekf0_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     ekf0 = solvers.DynamicSolver(strategy=ekf0_strategy)
     controller = controls.ClippedIntegral(
@@ -120,7 +120,7 @@ def case_solver_pair_ekf1_dynamic(num, atol, rtol, factor_min, factor_max, safet
         return f(y, *p)
 
     extrapolation = dense.IBM.from_params(ode_dimension=2, num_derivatives=num)
-    correction = dense.TaylorLinear(ode_dimension=2)
+    correction = dense.TaylorFirstOrder(ode_dimension=2)
     ekf1_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
     ekf1 = solvers.DynamicSolver(strategy=ekf1_strategy)
     controller = controls.ClippedIntegral(

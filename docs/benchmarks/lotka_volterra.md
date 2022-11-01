@@ -146,16 +146,16 @@ def correction_to_solver(correction, num_derivatives):
     )
 
 
-ekf1_correction = dense.TaylorLinear(ode_dimension=d)
-ckf1_correction = dense.MomentMatch(
+ekf1_correction = dense.TaylorFirstOrder(ode_dimension=d)
+ckf1_correction = dense.MomentMatching(
     cubature=cubature.SphericalCubatureIntegration.from_params(ode_dimension=d),
     ode_dimension=d,
 )
-ukf1_correction = dense.MomentMatch(
+ukf1_correction = dense.MomentMatching(
     cubature=cubature.UnscentedTransform.from_params(ode_dimension=d, r=1.0),
     ode_dimension=d,
 )
-ghkf1_correction = dense.MomentMatch(
+ghkf1_correction = dense.MomentMatching(
     cubature=cubature.GaussHermite.from_params(ode_dimension=d, degree=3),
     ode_dimension=d,
 )
@@ -179,11 +179,11 @@ solve_fns = [
 
 tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
 
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
+results = workprecision(solve_fns=solve_fns, tols=tolerances, number=5, repeat=5)
 ```
 
 ```python
-fig, ax = plt.subplots(figsize=(5, 5))
+fig, ax = plt.subplots(figsize=(5, 3))
 
 for solver in results:
     times, errors = results[solver]
@@ -191,7 +191,7 @@ for solver in results:
 
 ax.grid("both")
 ax.set_xticks(0.1 ** (jnp.arange(1.0, 12.0, step=1.0)))
-ax.set_yticks(0.1 ** (jnp.arange(1.0, 4.5, step=0.5)))
+ax.set_yticks(0.1 ** (jnp.arange(1.5, 4.0, step=0.5)))
 ax.set_title(f"Internal solvers [{ODE_NAME}]")
 ax.set_xlabel("Precision [RMSE, absolute]")
 ax.set_ylabel("Work [wall time, s]")

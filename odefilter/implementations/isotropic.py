@@ -12,19 +12,14 @@ from odefilter import _control_flow
 from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
-class IsotropicNormal(NamedTuple):
-    """Random variable with a normal distribution."""
-
+class _IsoNormal(NamedTuple):
     mean: Any  # (n, d) shape
     cov_sqrtm_lower: Any  # (n,n) shape
 
 
 @register_pytree_node_class
-class TaylorConstant(_correction.Correction):
-    """TaylorConstant-linearise an ODE assuming a linearisation-point with\
-     isotropic Kronecker structure."""
-
-    def begin_correction(self, x: IsotropicNormal, /, *, vector_field, t, p):
+class IsoTaylorZerothOrder(_correction.Correction):
+    def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - vector_field(
             *m[: self.ode_order, ...], t=t, p=p
@@ -58,12 +53,12 @@ class TaylorConstant(_correction.Correction):
         )
         c_obs = l_obs_scalar**2
 
-        observed = IsotropicNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = _IsoNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * bias[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = IsotropicNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = _IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
 
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
@@ -78,8 +73,7 @@ class TaylorConstant(_correction.Correction):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicIBM(_extrapolation.Extrapolation):
-    """Handle isotropic covariances."""
+class IsoIBM(_extrapolation.Extrapolation):
 
     a: Any
     q_sqrtm_lower: Any
@@ -96,29 +90,26 @@ class IsotropicIBM(_extrapolation.Extrapolation):
 
     @classmethod
     def from_params(cls, *, num_derivatives=4):
-        """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
     @property
     def num_derivatives(self):
-        """Number of derivatives in the state-space model."""  # noqa: D401
         return self.a.shape[0] - 1
 
     def init_corrected(self, *, taylor_coefficients):
-        """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return IsotropicNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
-    def init_error_estimate(self):  # noqa: D102
+    def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 
-    def init_backward_transition(self):  # noqa: D102
+    def init_backward_transition(self):
         return jnp.eye(*self.a.shape)
 
-    def init_backward_noise(self, *, rv_proto):  # noqa: D102
-        return IsotropicNormal(
+    def init_backward_noise(self, *, rv_proto):
+        return _IsoNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
@@ -126,20 +117,20 @@ class IsotropicIBM(_extrapolation.Extrapolation):
     def init_output_scale_sqrtm(self):
         return 1.0
 
-    def begin_extrapolation(self, m0, /, *, dt):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return IsotropicNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+        return _IsoNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
-    def _assemble_preconditioner(self, *, dt):  # noqa: D102
+    def _assemble_preconditioner(self, *, dt):
         return _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
 
-    def complete_extrapolation(  # noqa: D102
+    def complete_extrapolation(
         self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
         _, _, p, p_inv = cache
@@ -151,11 +142,9 @@ class IsotropicIBM(_extrapolation.Extrapolation):
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return IsotropicNormal(m_ext, l_ext)
+        return _IsoNormal(m_ext, l_ext)
 
-    def revert_markov_kernel(  # noqa: D102
-        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
-    ):
+    def revert_markov_kernel(self, *, linearisation_pt, l0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
@@ -177,27 +166,29 @@ class IsotropicIBM(_extrapolation.Extrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_op = g_bw
-        backward_noise = IsotropicNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        extrapolated = IsotropicNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = _IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        extrapolated = _IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    def extract_sol(self, *, rv):  # noqa: D102
+    def extract_sol(self, *, rv):
         m = rv.mean[..., 0, :]
         return m
 
-    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
+    def condense_backward_models(
+        self, *, transition_init, noise_init, transition_state, noise_state
+    ):
 
-        A = bw_init.transition
-        (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
+        A = transition_init
+        (b, B_sqrtm) = noise_init.mean, noise_init.cov_sqrtm_lower
 
-        C = bw_state.transition
-        (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
+        C = transition_state
+        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
 
         g = A @ C
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
-        noise = IsotropicNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = _IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
     def marginalise_backwards(self, *, init, linop, noise):
@@ -233,7 +224,7 @@ class IsotropicIBM(_extrapolation.Extrapolation):
         m_new = m_new_p
         l_new = l_new_p
 
-        return IsotropicNormal(mean=m_new, cov_sqrtm_lower=l_new)
+        return _IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def sample_backwards(self, init, linop, noise, base_samples):
         def body_fun(carry, x):
@@ -262,10 +253,10 @@ class IsotropicIBM(_extrapolation.Extrapolation):
 
     def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
-            return IsotropicNormal(
+            return _IsoNormal(
                 mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
             )
-        return IsotropicNormal(
+        return _IsoNormal(
             mean=rv.mean,
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
         )

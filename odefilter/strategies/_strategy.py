@@ -15,12 +15,12 @@ class Strategy(abc.ABC):
 
     def __init__(self, *, extrapolation=None, correction=None):
         if extrapolation is None:
-            self.extrapolation = isotropic.IsotropicIBM.from_params()
+            self.extrapolation = isotropic.IsoIBM.from_params()
         else:
             self.extrapolation = extrapolation
 
         if correction is None:
-            self.correction = isotropic.TaylorConstant()
+            self.correction = isotropic.IsoTaylorZerothOrder()
         else:
             self.correction = correction
 

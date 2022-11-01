@@ -11,6 +11,8 @@ from odefilter.strategies import _strategy
 T = TypeVar("T")
 """A type-variable to alias appropriate Normal-like random variables."""
 
+# todo: are those data structures private?
+
 
 @jax.tree_util.register_pytree_node_class
 class BackwardModel(Generic[T]):
@@ -56,7 +58,7 @@ class _SmootherCommon(_strategy.Strategy):
     # Inherited abstract methods
 
     @abc.abstractmethod
-    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
+    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -218,8 +220,6 @@ class Smoother(_SmootherCommon):
         # The latter extrapolation is discarded in favour of s1.marginals_filtered,
         # but the backward transition is kept.
 
-        # rv0, diffsqrtm = p0.init, s1.output_scale_sqrtm
-
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
             rv=p0.init, output_scale_sqrtm=scale_sqrtm, t=t, t0=t0
@@ -244,8 +244,6 @@ class Smoother(_SmootherCommon):
             t1=t1,
             scale_sqrtm=scale_sqrtm,
         )
-        # todo: what to do here? We need to smooth from the marginals,
-        # but we only get the posterior. Right?
         marginals_t = self.extrapolation.marginalise_model(
             init=marginals,
             linop=acc.backward_model.transition,
@@ -271,8 +269,10 @@ class FixedPointSmoother(_SmootherCommon):
         bw_increment = BackwardModel(transition=bw_op, noise=bw_noise)
 
         noise, gain = self.extrapolation.condense_backward_models(
-            bw_state=bw_increment,
-            bw_init=posterior_previous.backward_model,
+            transition_state=bw_increment.transition,
+            noise_state=bw_increment.noise,
+            transition_init=posterior_previous.backward_model.transition,
+            noise_init=posterior_previous.backward_model.noise,
         )
         backward_model = BackwardModel(transition=gain, noise=noise)
 
@@ -283,7 +283,10 @@ class FixedPointSmoother(_SmootherCommon):
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
         noise0, g0 = self.extrapolation.condense_backward_models(
-            bw_init=p0.backward_model, bw_state=p1.backward_model
+            transition_state=p1.backward_model.transition,
+            noise_state=p1.backward_model.noise,
+            transition_init=p0.backward_model.transition,
+            noise_init=p0.backward_model.noise,
         )
         backward_model1 = BackwardModel(transition=g0, noise=noise0)
 
@@ -293,7 +296,7 @@ class FixedPointSmoother(_SmootherCommon):
 
         return accepted, solution, previous
 
-    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
+    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -309,7 +312,10 @@ class FixedPointSmoother(_SmootherCommon):
             t0=t0,
         )
         noise0, g0 = self.extrapolation.condense_backward_models(
-            bw_init=p0.backward_model, bw_state=bw0
+            transition_state=bw0.transition,
+            noise_state=bw0.noise,
+            transition_init=p0.backward_model.transition,
+            noise_init=p0.backward_model.noise,
         )
         backward_model0 = BackwardModel(transition=g0, noise=noise0)
         solution = MarkovSequence(init=extrapolated0, backward_model=backward_model0)

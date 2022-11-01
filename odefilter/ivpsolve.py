@@ -21,7 +21,7 @@ def simulate_terminal_values(
 ):
     """Simulate the terminal values of an initial value problem.
 
-    Thin wrapper around :func:`odefilter_terminal_values`.
+    Thin wrapper around :func:`odefiltersolve.odefilter_terminal_values`.
     """
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
@@ -51,7 +51,7 @@ def simulate_checkpoints(
 ):
     """Solve an IVP and return the solution at checkpoints.
 
-    Thin wrapper around :func:`odefilter_checkpoints`.
+    Thin wrapper around :func:`odefiltersolve.odefilter_checkpoints`.
     """
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
@@ -83,13 +83,6 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
     !!! warning
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
-
-    !!! warning
-        The parameters are essentially static. Why?
-        Because we use ``lambda t, y: f(t, y, p)``-style implementations
-        and pass this lambda function to lower-level implementations,
-        which have static "fun" arguments. Since we cannot jit this function.
-        the lower-level stuff must recompile... :(
     """
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
