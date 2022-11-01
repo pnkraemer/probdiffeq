@@ -90,9 +90,7 @@ class TaylorFirstOrder(_correction.Correction):
 
 
 @register_pytree_node_class
-class MomentMatch(_correction.Correction):
-    """Cubature Kalman filter correction."""
-
+class MomentMatching(_correction.Correction):
     def __init__(self, *, ode_dimension, cubature=None, ode_order=1):
         if ode_order > 1:
             raise ValueError
