@@ -1,3 +1,3 @@
 # ODE filter routines
 
-::: odefilter.odefilters
+::: odefilter.odefilter
