@@ -52,38 +52,29 @@ class _DenseCorrection(_correction.Correction):
         return x_reshaped[self.ode_order, ...]
 
     def _e0v(self, x):
-        return jax.vmap(self._e0v, in_axes=1, out_axes=1)(x)
+        return jax.vmap(lambda s: self._e0(s), in_axes=1, out_axes=1)(x)
 
     def _e1v(self, x):
-        return jax.vmap(self._e1v, in_axes=1, out_axes=1)(x)
+        return jax.vmap(lambda s: self._e1(s), in_axes=1, out_axes=1)(x)
 
 
 @register_pytree_node_class
 class TaylorZerothOrder(_DenseCorrection):
-    """Extended Kalman filter correction."""
-
     def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
-        vf_partial = jax.tree_util.Partial(
-            self._residual, vector_field=vector_field, t=t, p=p
-        )
-        b, fn = jax.linearize(vf_partial, x.mean)
-
-        cov_sqrtm_lower = self._cov_sqrtm_lower(
-            cache=(b, fn), cov_sqrtm_lower=x.cov_sqrtm_lower
-        )
+        m0, m1 = self._e0(x.mean), self._e1(x.mean)
+        b = m1 - vector_field(*m0, t=t, p=p)
+        cov_sqrtm_lower = self._e1v(x.cov_sqrtm_lower)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         output_scale_sqrtm = self.evidence_sqrtm(observed=_Normal(b, l_obs_raw))
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
 
     def complete_correction(self, *, extrapolated, cache):
-        b, _ = cache
-
+        (b,) = cache
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
 
-        l_obs_nonsquare = self._cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
-
+        l_obs_nonsquare = self._e1v(l_ext)
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
         )
@@ -93,17 +84,6 @@ class TaylorZerothOrder(_DenseCorrection):
         observed = _Normal(mean=b, cov_sqrtm_lower=l_obs)
         corrected = _Normal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
-
-    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
-        _, fn = cache
-        return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
-
-    def _residual(self, x, *, vector_field, t, p):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
-
-        x1 = x_reshaped[self.ode_order, ...]
-        fx0 = vector_field(*x_reshaped[: self.ode_order, ...], t=t, p=p)
-        return x1 - fx0
 
 
 @register_pytree_node_class
@@ -158,8 +138,7 @@ class MomentMatching(_DenseCorrection):
         if ode_order > 1:
             raise ValueError
 
-        super().__init__(ode_order=ode_order)
-        self.ode_dimension = ode_dimension
+        super().__init__(ode_order=ode_order, ode_dimension=ode_dimension)
 
         if cubature is None:
             self.cubature = cubature_module.SphericalCubatureIntegration.from_params(
@@ -169,6 +148,7 @@ class MomentMatching(_DenseCorrection):
             self.cubature = cubature
 
     def tree_flatten(self):
+        # todo: should this call super().tree_flatten()?
         children = (self.cubature,)
         aux = self.ode_order, self.ode_dimension
         return children, aux

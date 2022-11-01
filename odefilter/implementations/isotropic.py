@@ -21,13 +21,9 @@ class _IsoNormal(NamedTuple):
 class IsoTaylorZerothOrder(_correction.Correction):
     def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
-        bias = m[self.ode_order, ...] - vector_field(
-            *m[: self.ode_order, ...], t=t, p=p
-        )
-
-        cov_sqrtm_lower = self._cov_sqrtm_lower(
-            cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
-        )
+        m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
+        bias = m1 - vector_field(*m0, t=t, p=p)
+        cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, ...]
 
         l_obs = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None]), ()
@@ -46,7 +42,7 @@ class IsoTaylorZerothOrder(_correction.Correction):
         (bias,) = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs = self._cov_sqrtm_lower(cache=(), cov_sqrtm_lower=l_ext)
+        l_obs = l_ext[self.ode_order, ...]
 
         l_obs_scalar = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
@@ -61,8 +57,8 @@ class IsoTaylorZerothOrder(_correction.Correction):
         corrected = _IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
 
-    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
-        return cov_sqrtm_lower[self.ode_order, ...]
+    # def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+    #     return cov_sqrtm_lower[self.ode_order, ...]
 
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
