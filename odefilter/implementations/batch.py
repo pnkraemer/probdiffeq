@@ -24,7 +24,7 @@ _CType = Tuple[Array]  # Cache type
 
 
 @register_pytree_node_class
-class TaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
+class BatchTaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 

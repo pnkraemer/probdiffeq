@@ -1,3 +1,3 @@
-# No factorisation
+# Default implementations
 
 ::: odefilter.implementations.dense

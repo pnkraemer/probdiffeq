@@ -14,7 +14,7 @@ from odefilter import cubature as cubature_module
 from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
-class _MVNormal(NamedTuple):
+class _Normal(NamedTuple):
     """Random variable with a normal distribution."""
 
     mean: Array  # (k,) shape
@@ -39,7 +39,7 @@ class TaylorFirstOrder(_correction.Correction):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def begin_correction(self, x: _MVNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
         vf_partial = jax.tree_util.Partial(
             self._residual, vector_field=vector_field, t=t, p=p
         )
@@ -50,7 +50,7 @@ class TaylorFirstOrder(_correction.Correction):
         )
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        output_scale_sqrtm = self.evidence_sqrtm(observed=_MVNormal(b, l_obs_raw))
+        output_scale_sqrtm = self.evidence_sqrtm(observed=_Normal(b, l_obs_raw))
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
@@ -67,8 +67,8 @@ class TaylorFirstOrder(_correction.Correction):
         l_obs, l_cor = r_obs.T, r_cor.T
 
         m_cor = m_ext - gain @ b
-        observed = _MVNormal(mean=b, cov_sqrtm_lower=l_obs)
-        corrected = _MVNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        observed = _Normal(mean=b, cov_sqrtm_lower=l_obs)
+        corrected = _Normal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
@@ -116,7 +116,7 @@ class MomentMatching(_correction.Correction):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
 
-    def begin_correction(self, x: _MVNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
@@ -142,7 +142,7 @@ class MomentMatching(_correction.Correction):
         l_marg = _sqrtm.sum_of_sqrtm_factors(R1=e1v(R_X.T).T, R2=fx_centered_normed).T
 
         # Summarise
-        marginals = _MVNormal(m_marg, l_marg)
+        marginals = _Normal(m_marg, l_marg)
         output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
 
         # Compute error estimate
@@ -174,11 +174,11 @@ class MomentMatching(_correction.Correction):
         # Catch up the marginals
         x = extrapolated  # alias for readability in this code-block
         m_marg = self._e1(x.mean) - (H @ self._e0(x.mean) + noise.mean)
-        marginals = _MVNormal(m_marg, r_marg.T)
+        marginals = _Normal(m_marg, r_marg.T)
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain @ m_marg
-        backward_noise = _MVNormal(m_bw, r_bw.T)
+        backward_noise = _Normal(m_bw, r_bw.T)
         return marginals, (backward_noise, gain)
 
     def _linearize(self, *, x, cache):
@@ -212,7 +212,7 @@ class MomentMatching(_correction.Correction):
 
         # Catch up the transition-mean and return the result
         d = fx_mean - H @ m_0
-        return H, _MVNormal(d, r_Om.T)
+        return H, _Normal(d, r_Om.T)
 
     def _e1(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
@@ -270,7 +270,7 @@ class IBM(_extrapolation.Extrapolation):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return _MVNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _Normal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_error_estimate(self):  # noqa: D102
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
@@ -281,7 +281,7 @@ class IBM(_extrapolation.Extrapolation):
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return _MVNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+        return _Normal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm_util.preconditioner_diagonal(
@@ -301,7 +301,7 @@ class IBM(_extrapolation.Extrapolation):
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _MVNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return _Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, linearisation_pt, cache, l0, output_scale_sqrtm
@@ -327,8 +327,8 @@ class IBM(_extrapolation.Extrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_op = g_bw
-        backward_noise = _MVNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        extrapolated = _MVNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = _Normal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        extrapolated = _Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
     def condense_backward_models(
@@ -345,7 +345,7 @@ class IBM(_extrapolation.Extrapolation):
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
-        noise = _MVNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = _Normal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
     def extract_sol(self, *, rv):  # noqa: D102
@@ -358,7 +358,7 @@ class IBM(_extrapolation.Extrapolation):
         return jnp.eye(k)
 
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
-        return _MVNormal(
+        return _Normal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
@@ -368,10 +368,10 @@ class IBM(_extrapolation.Extrapolation):
 
     def scale_covariance(self, *, rv, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
-            return _MVNormal(
+            return _Normal(
                 mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
             )
-        return _MVNormal(
+        return _Normal(
             mean=rv.mean,
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
         )
@@ -407,7 +407,7 @@ class IBM(_extrapolation.Extrapolation):
         m_new = m_new_p
         l_new = l_new_p
 
-        return _MVNormal(mean=m_new, cov_sqrtm_lower=l_new)
+        return _Normal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def sample_backwards(self, init, linop, noise, base_samples):
         def body_fun(carry, x):

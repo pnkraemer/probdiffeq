@@ -18,7 +18,7 @@ class _IsoNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class TaylorZerothOrder(_correction.Correction):
+class IsoTaylorZerothOrder(_correction.Correction):
     def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
         bias = m[self.ode_order, ...] - vector_field(
@@ -73,7 +73,7 @@ class TaylorZerothOrder(_correction.Correction):
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class IsotropicIBM(_extrapolation.Extrapolation):
+class IsoIBM(_extrapolation.Extrapolation):
 
     a: Any
     q_sqrtm_lower: Any
