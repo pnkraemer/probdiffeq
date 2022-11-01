@@ -72,7 +72,7 @@ In fact, above, we used the following solver:
 
 
 ```python
-correction = isotropic.TaylorConstant(ode_order=1)
+correction = isotropic.TaylorZerothOrder(ode_order=1)
 extrapolation = isotropic.IsotropicIBM.from_params()
 ek0_1_granular = solvers.MLESolver(
     strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
@@ -92,7 +92,7 @@ def vf_2(y, dy, t, p):
 
 
 # One derivative more than above because we don't transform to first order
-correction = isotropic.TaylorConstant(ode_order=2)
+correction = isotropic.TaylorZerothOrder(ode_order=2)
 extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=5)
 ek0_2 = solvers.MLESolver(
     strategy=filters.Filter(extrapolation=extrapolation, correction=correction)

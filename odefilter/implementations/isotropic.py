@@ -20,8 +20,8 @@ class IsotropicNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class TaylorConstant(_correction.Correction):
-    """TaylorConstant-linearise an ODE assuming a linearisation-point with\
+class TaylorZerothOrder(_correction.Correction):
+    """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(self, x: IsotropicNormal, /, *, vector_field, t, p):

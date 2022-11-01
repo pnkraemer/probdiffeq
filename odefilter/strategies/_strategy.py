@@ -20,7 +20,7 @@ class Strategy(abc.ABC):
             self.extrapolation = extrapolation
 
         if correction is None:
-            self.correction = isotropic.TaylorConstant()
+            self.correction = isotropic.TaylorZerothOrder()
         else:
             self.correction = correction
 

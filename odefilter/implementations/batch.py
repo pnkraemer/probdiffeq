@@ -20,12 +20,12 @@ class _BatchNormal(NamedTuple):
     cov_sqrtm_lower: Any  # (d, k, k) shape
 
 
-_CType = Tuple[Array]
+_CType = Tuple[Array]  # Cache type
 
 
 @register_pytree_node_class
-class TaylorConstant(_correction.Correction[_BatchNormal, _CType]):
-    """TaylorConstant-linearise an ODE assuming a linearisation-point with\
+class TaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
+    """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(
