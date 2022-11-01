@@ -22,9 +22,7 @@ class _Normal(NamedTuple):
 
 
 @register_pytree_node_class
-class TaylorFirstOrder(_correction.Correction):
-    """Extended Kalman filter correction."""
-
+class _DenseCorrection(_correction.Correction):
     def __init__(self, *, ode_dimension, ode_order=1):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -38,6 +36,59 @@ class TaylorFirstOrder(_correction.Correction):
     def tree_unflatten(cls, aux, _children):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension)
+
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
+    def _e0(self, x):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        return x_reshaped[: self.ode_order, ...]
+
+    def _e1(self, x):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        return x_reshaped[self.ode_order, ...]
+
+    def _e0v(self, x):
+        return jax.vmap(lambda s: self._e0(s), in_axes=1, out_axes=1)(x)
+
+    def _e1v(self, x):
+        return jax.vmap(lambda s: self._e1(s), in_axes=1, out_axes=1)(x)
+
+
+@register_pytree_node_class
+class TaylorZerothOrder(_DenseCorrection):
+    def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
+        m0, m1 = self._e0(x.mean), self._e1(x.mean)
+        b = m1 - vector_field(*m0, t=t, p=p)
+        cov_sqrtm_lower = self._e1v(x.cov_sqrtm_lower)
+
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        output_scale_sqrtm = self.evidence_sqrtm(observed=_Normal(b, l_obs_raw))
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
+
+    def complete_correction(self, *, extrapolated, cache):
+        (b,) = cache
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+
+        l_obs_nonsquare = self._e1v(l_ext)
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
+        )
+        l_obs, l_cor = r_obs.T, r_cor.T
+
+        m_cor = m_ext - gain @ b
+        observed = _Normal(mean=b, cov_sqrtm_lower=l_obs)
+        corrected = _Normal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        return observed, (corrected, gain)
+
+
+@register_pytree_node_class
+class TaylorFirstOrder(_DenseCorrection):
+    """Extended Kalman filter correction."""
 
     def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
         vf_partial = jax.tree_util.Partial(
@@ -76,27 +127,18 @@ class TaylorFirstOrder(_correction.Correction):
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
     def _residual(self, x, *, vector_field, t, p):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
-
-        x1 = x_reshaped[self.ode_order, ...]
-        fx0 = vector_field(*x_reshaped[: self.ode_order, ...], t=t, p=p)
+        x0, x1 = self._e0(x), self._e1(x)
+        fx0 = vector_field(*x0, t=t, p=p)
         return x1 - fx0
-
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
 
 
 @register_pytree_node_class
-class MomentMatching(_correction.Correction):
+class MomentMatching(_DenseCorrection):
     def __init__(self, *, ode_dimension, cubature=None, ode_order=1):
         if ode_order > 1:
             raise ValueError
 
-        super().__init__(ode_order=ode_order)
-        self.ode_dimension = ode_dimension
+        super().__init__(ode_order=ode_order, ode_dimension=ode_dimension)
 
         if cubature is None:
             self.cubature = cubature_module.SphericalCubatureIntegration.from_params(
@@ -106,6 +148,7 @@ class MomentMatching(_correction.Correction):
             self.cubature = cubature
 
     def tree_flatten(self):
+        # todo: should this call super().tree_flatten()?
         children = (self.cubature,)
         aux = self.ode_order, self.ode_dimension
         return children, aux
@@ -214,17 +257,13 @@ class MomentMatching(_correction.Correction):
         d = fx_mean - H @ m_0
         return H, _Normal(d, r_Om.T)
 
+    # Are we overwriting a method here?
+
     def _e1(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
 
     def _e0(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
-
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
 
 
 @register_pytree_node_class

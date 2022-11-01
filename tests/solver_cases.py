@@ -112,3 +112,13 @@ def solver_eks1_fixedpoint():
         correction=correction, extrapolation=extrapolation
     )
     return solvers.MLESolver(strategy=strategy)
+
+
+@case(tags=["terminal_value", "checkpoint", "smoother"])
+def solver_eks0_fixedpoint():
+    correction = dense.TaylorZerothOrder(ode_dimension=2)
+    extrapolation = dense.IBM.from_params(ode_dimension=2)
+    strategy = smoothers.FixedPointSmoother(
+        correction=correction, extrapolation=extrapolation
+    )
+    return solvers.MLESolver(strategy=strategy)
