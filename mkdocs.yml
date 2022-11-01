@@ -81,7 +81,7 @@ nav:
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/taylor.md"
-        - "api_docs/odefilter.md"
+        - "api_docs/odefiltersolve.md"
         - "api_docs/controls.md"
         - "api_docs/solvers.md"
     - Advanced API Documentation:
