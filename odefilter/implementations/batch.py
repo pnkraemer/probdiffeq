@@ -147,15 +147,17 @@ class BatchIBM(_extrapolation.Extrapolation):
         l_ext = p[..., None] * l_ext_p
         return _BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
-    def condense_backward_models(self, *, bw_init, bw_state):  # noqa: D102
+    def condense_backward_models(
+        self, *, transition_init, noise_init, transition_state, noise_state
+    ):  # noqa: D102
 
-        A = bw_init.transition  # (d, k, k)
+        A = transition_init  # (d, k, k)
         # (d, k), (d, k, k)
-        (b, B_sqrtm) = (bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower)
+        (b, B_sqrtm) = (noise_init.mean, noise_init.cov_sqrtm_lower)
 
-        C = bw_state.transition  # (d, k, k)
+        C = transition_state  # (d, k, k)
         # (d, k), (d, k, k)
-        (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
+        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
 
         g = A @ C
         xi = (A @ d[..., None])[..., 0] + b

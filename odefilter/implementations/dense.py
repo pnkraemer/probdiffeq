@@ -335,15 +335,20 @@ class IBM(_extrapolation.Extrapolation):
         extrapolated = MultivariateNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
-    # todo: this must not operate on the backward model data structure
-    def condense_backward_models(self, *, bw_init, bw_state):
-        A = bw_init.transition
-        (b, B_sqrtm) = bw_init.noise.mean, bw_init.noise.cov_sqrtm_lower
-        C = bw_state.transition
-        (d, D_sqrtm) = (bw_state.noise.mean, bw_state.noise.cov_sqrtm_lower)
+    def condense_backward_models(
+        self, *, transition_init, noise_init, transition_state, noise_state
+    ):
+
+        A = transition_init
+        (b, B_sqrtm) = noise_init.mean, noise_init.cov_sqrtm_lower
+
+        C = transition_state
+        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
+
         g = A @ C
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
         noise = MultivariateNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
