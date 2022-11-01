@@ -22,7 +22,7 @@ class MultivariateNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class TaylorLinear(_correction.Correction):
+class TaylorFirstOrder(_correction.Correction):
     """Extended Kalman filter correction."""
 
     def __init__(self, *, ode_dimension, ode_order=1):
