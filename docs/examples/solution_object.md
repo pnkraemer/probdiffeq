@@ -25,9 +25,11 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve, solvers
+from odefilter.strategies import smoothers
 
-backend.select("jax")  # ivp examples in jax
+if not backend.has_been_selected:
+    backend.select("jax")  # ivp examples in jax
 
 
 config.update("jax_enable_x64", True)
@@ -44,7 +46,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = recipes.eks1(ode_dimension=3, num_derivatives=2)
+solver = solvers.DynamicSolver(strategy=smoothers.Smoother())
 ```
 
 ```python tags=[]
@@ -94,8 +96,8 @@ _, dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
 fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 
 for i in [0, 1, 2]:  # ["S", "I", "R"]
-    ms = dense.mean[:, i]
-    ls = dense.cov_sqrtm_lower[:, i, :]
+    ms = dense.mean[:, 0, i]
+    ls = dense.cov_sqrtm_lower[:, 0]
 
     # Exaggerate the uncertainty (for plotting reasons)
     stds = 10 * jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))

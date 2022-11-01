@@ -1,20 +1,36 @@
 """Inference interface."""
 
 import abc
-from dataclasses import dataclass
-from typing import Any
 
 import jax
+import jax.numpy as jnp
 import jax.tree_util
+
+from odefilter.implementations import isotropic
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    extrapolation: Any
-    correction: Any
+    def __init__(self, *, extrapolation=None, correction=None):
+        if extrapolation is None:
+            self.extrapolation = isotropic.IsotropicIBM.from_params()
+        else:
+            self.extrapolation = extrapolation
+
+        if correction is None:
+            self.correction = isotropic.TaylorConstant()
+        else:
+            self.correction = correction
+
+    def __repr__(self):
+        args = f"extrapolation={self.extrapolation}, correction={self.correction}"
+        return f"{self.__class__.__name__}({args})"
+
+    def __eq__(self, other):
+        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
+        return jax.tree_util.tree_all(equal)
 
     @abc.abstractmethod
     def init_posterior(self, *, taylor_coefficients):

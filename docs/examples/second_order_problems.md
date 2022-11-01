@@ -22,10 +22,14 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve, solvers
+from odefilter.implementations import isotropic
+from odefilter.strategies import filters
 
 config.update("jax_enable_x64", True)
-backend.select("jax")
+
+if not backend.has_been_selected:
+    backend.select("jax")
 ```
 
 Quick refresher: first-order ODEs
@@ -39,7 +43,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ek0_1 = recipes.ekf0_isotropic(num_derivatives=5)
+ek0_1 = solvers.MLESolver()
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -63,6 +67,21 @@ plt.plot(solution.u[:, 0], solution.u[:, 1])
 plt.show()
 ```
 
+The default configuration assumes that the ODE to be solved is of first order.
+In fact, above, we used the following solver:
+
+
+```python
+correction = isotropic.TaylorConstant(ode_order=1)
+extrapolation = isotropic.IsotropicIBM.from_params()
+ek0_1_granular = solvers.MLESolver(
+    strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
+)
+assert ek0_1_granular == ek0_1
+```
+
+Now, the same game with a second-order ODE
+
 ```python
 f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
@@ -73,7 +92,11 @@ def vf_2(y, dy, t, p):
 
 
 # One derivative more than above because we don't transform to first order
-ek0_2 = recipes.ekf0_isotropic(num_derivatives=6, ode_order=2)
+correction = isotropic.TaylorConstant(ode_order=2)
+extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=5)
+ek0_2 = solvers.MLESolver(
+    strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
+)
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 

@@ -23,10 +23,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve, solvers
+from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
-backend.select("jax")
+
+if not backend.has_been_selected:
+    backend.select("jax")
 ```
 
 Set an example problem.
@@ -46,7 +49,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0 = recipes.ekf0_isotropic(num_derivatives=1)
+ek0 = solvers.MLESolver(strategy=filters.Filter())
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -69,7 +72,7 @@ fig, axes_all = plt.subplots(
     ncols=num_derivatives,
     sharex=True,
     tight_layout=True,
-    figsize=(8, 5),
+    figsize=(8, 3),
 )
 
 for i, axes_cols in enumerate(axes_all.T):
@@ -78,13 +81,13 @@ for i, axes_cols in enumerate(axes_all.T):
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
-        axes_cols[0].set_title(f"{i}st time-derivative")
+        axes_cols[0].set_title(f"{i}st deriv.")
     elif i == 2:
-        axes_cols[0].set_title(f"{i}nd time-derivative")
+        axes_cols[0].set_title(f"{i}nd deriv.")
     elif i == 3:
-        axes_cols[0].set_title(f"{i}rd time-derivative")
+        axes_cols[0].set_title(f"{i}rd deriv.")
     else:
-        axes_cols[0].set_title(f"{i}th time-derivative")
+        axes_cols[0].set_title(f"{i}th deriv.")
 
     axes_cols[0].plot(solution.t, ms)
     for m in ms.T:
@@ -100,7 +103,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0 = recipes.eks0_isotropic_fixedpoint(num_derivatives=1)
+ek0 = solvers.MLESolver(strategy=smoothers.FixedPointSmoother())
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -132,7 +135,7 @@ fig, axes_all = plt.subplots(
     ncols=num_derivatives,
     sharex=True,
     tight_layout=True,
-    figsize=(8, 5),
+    figsize=(8, 3),
 )
 
 for i, axes_cols in enumerate(axes_all.T):
@@ -142,13 +145,13 @@ for i, axes_cols in enumerate(axes_all.T):
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
-        axes_cols[0].set_title(f"{i}st time-derivative")
+        axes_cols[0].set_title(f"{i}st deriv.")
     elif i == 2:
-        axes_cols[0].set_title(f"{i}nd time-derivative")
+        axes_cols[0].set_title(f"{i}nd deriv.")
     elif i == 3:
-        axes_cols[0].set_title(f"{i}rd time-derivative")
+        axes_cols[0].set_title(f"{i}rd deriv.")
     else:
-        axes_cols[0].set_title(f"{i}th time-derivative")
+        axes_cols[0].set_title(f"{i}th deriv.")
 
     axes_cols[0].plot(solution.t, ms)
     for s in samps:

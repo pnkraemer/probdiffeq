@@ -1,18 +1,33 @@
 """Interface for implementations."""
 
 import abc
-from dataclasses import dataclass
 from typing import Generic, Tuple, TypeVar
 
+import jax.numpy as jnp
+import jax.tree_util
 from jax import Array
 
 R = TypeVar("R")  # think: random variables
 C = TypeVar("C")  # think: my personal cache
 
 
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
 class Extrapolation(abc.ABC, Generic[R, C]):
     """Extrapolation model interface."""
+
+    def tree_flatten(self):
+        return (), ()
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        return cls()
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+
+    def __eq__(self, other):
+        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
+        return jax.tree_util.tree_all(equal)
 
     @abc.abstractmethod
     def init_corrected(self, *, taylor_coefficients) -> R:

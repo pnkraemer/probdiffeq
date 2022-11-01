@@ -26,10 +26,12 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve, solvers
+from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
-backend.select("jax")
+if not backend.has_been_selected:
+    backend.select("jax")
 ```
 
 ```python
@@ -39,9 +41,6 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 10.0))
 @jax.jit
 def vf(*ys, t, p):
     return f(*ys, *p)
-
-
-num_derivatives = 2
 ```
 
 ## Terminal-value simulation
@@ -50,16 +49,16 @@ If you are interested in the terminal value of the ODE solution, you can use fil
 But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient.
 
 ```python
-ek0 = recipes.ekf0_isotropic(num_derivatives=num_derivatives)
-ek0sol = ivpsolve.simulate_terminal_values(
+ekf0 = solvers.MLESolver(strategy=filters.Filter())
+ekf0sol = ivpsolve.simulate_terminal_values(
     vf,
     initial_values=(u0,),
     t0=t0,
     t1=t1,
-    solver=ek0,
+    solver=ekf0,
     parameters=f_args,
 )
-print(ek0sol.t, ek0sol.u)
+print(ekf0sol.t, ekf0sol.u)
 ```
 
 ## Traditional simulation
@@ -67,19 +66,19 @@ print(ek0sol.t, ek0sol.u)
 If you are used to calling traditional solve() methods, use one of the conventional smoothers (i.e. not the fixed-point smoothers).
 
 ```python
-ek0 = recipes.eks0_isotropic(num_derivatives=num_derivatives)
-ek0sol = ivpsolve.solve(
+eks0 = solvers.MLESolver(strategy=smoothers.Smoother())
+eks0sol = ivpsolve.solve(
     vf,
     initial_values=(u0,),
     t0=t0,
     t1=t1,
-    solver=ek0,
+    solver=eks0,
     parameters=f_args,
 )
 
 plt.subplots(figsize=(5, 3))
 plt.title("EKS0 solution")
-plt.plot(ek0sol.t, ek0sol.u, "o-")
+plt.plot(eks0sol.t, eks0sol.u, "o-")
 plt.show()
 ```
 
@@ -89,12 +88,12 @@ If you like, compute the solution on a dense grid after solving.
 ts_dense = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=500, endpoint=True
 )  # must be off-grid
-dense, _ = ek0.offgrid_marginals_searchsorted(ts=ts_dense, solution=ek0sol)
+dense, _ = eks0.offgrid_marginals_searchsorted(ts=ts_dense, solution=eks0sol)
 
 ts_coarse = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=25, endpoint=True
 )  # must be off-grid
-coarse, _ = ek0.offgrid_marginals_searchsorted(ts=ts_coarse, solution=ek0sol)
+coarse, _ = eks0.offgrid_marginals_searchsorted(ts=ts_coarse, solution=eks0sol)
 
 fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
@@ -113,17 +112,17 @@ If you know in advance that you like to have the solution at a pre-specified set
 use the simulate_checkpoints function together with a fixed-point smoother.
 
 ```python
-fixedpoint_ek0 = recipes.eks0_isotropic_fixedpoint(num_derivatives=num_derivatives)
-fixedpointsol = ivpsolve.simulate_checkpoints(
+eks0_fixpt = solvers.MLESolver(strategy=smoothers.FixedPointSmoother())
+fixptsol = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),
     ts=ts_dense,  # reuse from above
-    solver=fixedpoint_ek0,
+    solver=eks0_fixpt,
     parameters=f_args,
 )
 
 plt.subplots(figsize=(5, 3))
 plt.title("FixedPt-EKS0 solution")
-plt.plot(fixedpointsol.t, fixedpointsol.u, ".-")
+plt.plot(fixptsol.t, fixptsol.u, ".-")
 plt.show()
 ```

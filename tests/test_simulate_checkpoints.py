@@ -9,7 +9,7 @@ from odefilter import ivpsolve
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver", cases=".recipe_cases", prefix="solver_", has_tag=("checkpoint",)
+    "solver", cases=".solver_cases", prefix="solver_", has_tag=("checkpoint",)
 )
 def test_simulate_checkpoints(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)

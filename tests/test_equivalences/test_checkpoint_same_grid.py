@@ -3,28 +3,34 @@
 import jax.numpy as jnp
 from pytest_cases import case, parametrize, parametrize_with_cases
 
-from odefilter import ivpsolve, recipes
+from odefilter import ivpsolve, solvers
+from odefilter.strategies import smoothers
 
 
 @case
-@parametrize("n", [2])
-def smoother_fixedpoint_smoother_pair_fixedpoint_eks0(n):
-    eks0 = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
-    fixedpoint_eks0 = recipes.eks0_isotropic_fixedpoint(
-        calibration="dynamic", num_derivatives=n
-    )
-    return eks0, fixedpoint_eks0
+def smoother_fixedpoint_smoother_pair_fixedpoint_eks0():
+
+    smoother = smoothers.Smoother()
+    solver1 = solvers.DynamicSolver(strategy=smoother)
+
+    fixedpoint_smoother = smoothers.FixedPointSmoother()
+    solver2 = solvers.DynamicSolver(strategy=fixedpoint_smoother)
+
+    return solver1, solver2
 
 
 @case
-@parametrize("n", [2])
-def smoother_fixedpoint_smoother_pair_two_eks0(n, tol):
+def smoother_fixedpoint_smoother_pair_two_eks0():
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
-    eks0a = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
-    eks0b = recipes.eks0_isotropic(calibration="dynamic", num_derivatives=n)
-    return eks0a, eks0b
+    smoother = smoothers.Smoother()
+    solver1 = solvers.DynamicSolver(strategy=smoother)
+
+    fixedpoint_smoother = smoothers.Smoother()
+    solver2 = solvers.DynamicSolver(strategy=fixedpoint_smoother)
+
+    return solver1, solver2
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")

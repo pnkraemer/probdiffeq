@@ -10,6 +10,7 @@ from jax import Array
 from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
+from odefilter import cubature as cubature_module
 from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
@@ -20,19 +21,11 @@ class MultivariateNormal(NamedTuple):
     cov_sqrtm_lower: Array  # (k,k) shape
 
 
-class _DenseInformationCommon(_correction.Correction):
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
-
-
 @register_pytree_node_class
-class EK1(_DenseInformationCommon):
+class TaylorLinear(_correction.Correction):
     """Extended Kalman filter correction."""
 
-    def __init__(self, *, ode_order, ode_dimension):
+    def __init__(self, *, ode_dimension, ode_order=1):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
@@ -91,19 +84,30 @@ class EK1(_DenseInformationCommon):
         fx0 = vector_field(*x_reshaped[: self.ode_order, ...], t=t, p=p)
         return x1 - fx0
 
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
 
 @register_pytree_node_class
-class CK1(_DenseInformationCommon):
+class MomentMatch(_correction.Correction):
     """Cubature Kalman filter correction."""
 
-    def __init__(self, *, cubature, ode_order, ode_dimension):
+    def __init__(self, *, ode_dimension, cubature=None, ode_order=1):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
-        self.cubature = cubature
+        if cubature is None:
+            self.cubature = cubature_module.SphericalCubatureIntegration.from_params(
+                ode_dimension=ode_dimension
+            )
+        else:
+            self.cubature = cubature
 
     def tree_flatten(self):
         children = (self.cubature,)
@@ -220,6 +224,12 @@ class CK1(_DenseInformationCommon):
     def _e0(self, x):
         return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
 
+    def evidence_sqrtm(self, *, observed):
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
+        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
 
 @register_pytree_node_class
 @dataclass(frozen=True)
@@ -231,11 +241,6 @@ class IBM(_extrapolation.Extrapolation):
 
     num_derivatives: int
     ode_dimension: int
-
-    def __repr__(self):
-        """Print a string representation of the class."""
-        n_and_d = f"n={self.num_derivatives}, d={self.ode_dimension}"
-        return f"{self.__class__.__name__}({n_and_d})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
@@ -249,7 +254,7 @@ class IBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
 
     @classmethod
-    def from_num_derivatives(cls, *, num_derivatives, ode_dimension):
+    def from_params(cls, *, ode_dimension, num_derivatives=4):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)

@@ -7,7 +7,9 @@ import pytest_cases
 from diffeqzoo import ivps
 from tornadox import ek0, ek1, init, ivp, step
 
-from odefilter import controls, ivpsolve, recipes
+from odefilter import controls, ivpsolve, solvers
+from odefilter.implementations import dense, isotropic
+from odefilter.strategies import filters
 
 
 @pytest_cases.case
@@ -42,7 +44,10 @@ def case_solver_pair_isotropic_ekf0(num, atol, rtol, factor_min, factor_max, saf
     def vf_ode(y, *, t, p):
         return f(y, *p)
 
-    ekf0 = recipes.ekf0_isotropic(calibration="dynamic", num_derivatives=num)
+    extrapolation = isotropic.IsotropicIBM.from_params(num_derivatives=num)
+    correction = isotropic.TaylorConstant()
+    ekf0_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
+    ekf0 = solvers.DynamicSolver(strategy=ekf0_strategy)
     controller = controls.ClippedIntegral(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )
@@ -114,7 +119,10 @@ def case_solver_pair_ekf1_dynamic(num, atol, rtol, factor_min, factor_max, safet
     def vf_ode(y, *, t, p):
         return f(y, *p)
 
-    ekf1 = recipes.ekf1(calibration="dynamic", ode_dimension=2, num_derivatives=num)
+    extrapolation = dense.IBM.from_params(ode_dimension=2, num_derivatives=num)
+    correction = dense.TaylorLinear(ode_dimension=2)
+    ekf1_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
+    ekf1 = solvers.DynamicSolver(strategy=ekf1_strategy)
     controller = controls.ClippedIntegral(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )

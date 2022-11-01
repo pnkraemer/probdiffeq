@@ -29,7 +29,9 @@ from diffeqzoo import backend, ivps
 from jax import config
 from tqdm import tqdm
 
-from odefilter import controls, ivpsolve, recipes
+from odefilter import controls, cubature, ivpsolve, solvers
+from odefilter.implementations import dense
+from odefilter.strategies import filters
 
 # Nice-looking plots
 plt.rcParams.update(plot_config())
@@ -86,7 +88,7 @@ Let's start with finding the fastest ODE filter.
 ### Terminal-value simulation
 
 ```python
-def prepare(solver, **kwargs):
+def solver_to_solve(solver, **kwargs):
     return jax.jit(partial(_solve, solver=solver))
 
 
@@ -130,60 +132,52 @@ def workprecision(*, solve_fns, tols, **kwargs):
 ```python
 d = u0.shape[0]
 
-ekf1_3 = prepare(recipes.ekf1(num_derivatives=3, ode_dimension=d))
-ckf1_3 = prepare(recipes.ckf1(num_derivatives=3, ode_dimension=d))
-ekf1_3_dynamic = prepare(
-    recipes.ekf1(calibration="dynamic", num_derivatives=3, ode_dimension=d)
+
+def correction_to_solver(correction, num_derivatives):
+    return solver_to_solve(
+        solvers.MLESolver(
+            strategy=filters.Filter(
+                extrapolation=dense.IBM.from_params(
+                    ode_dimension=d, num_derivatives=num_derivatives
+                ),
+                correction=correction,
+            )
+        )
+    )
+
+
+ekf1_correction = dense.TaylorLinear(ode_dimension=d)
+ckf1_correction = dense.MomentMatch(
+    cubature=cubature.SphericalCubatureIntegration.from_params(ode_dimension=d),
+    ode_dimension=d,
 )
-ekf1_4 = prepare(recipes.ekf1(num_derivatives=4, ode_dimension=d))
-ckf1_4 = prepare(recipes.ckf1(num_derivatives=4, ode_dimension=d))
-ekf1_5_dynamic = prepare(
-    recipes.ekf1(calibration="dynamic", num_derivatives=5, ode_dimension=d)
+ukf1_correction = dense.MomentMatch(
+    cubature=cubature.UnscentedTransform.from_params(ode_dimension=d, r=1.0),
+    ode_dimension=d,
 )
-eks1_5_dynamic = prepare(
-    recipes.eks1(calibration="dynamic", num_derivatives=5, ode_dimension=d)
-)
-ekf1_7 = prepare(recipes.ekf1(num_derivatives=7, ode_dimension=d))
-ckf1_7 = prepare(recipes.ckf1(num_derivatives=7, ode_dimension=d))
-ekf1_7_dynamic = prepare(
-    recipes.ekf1(calibration="dynamic", num_derivatives=7, ode_dimension=d)
-)
-ekf0_3_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=3))
-ekf0_3_isotropic_dynamic = prepare(
-    recipes.ekf0_isotropic(calibration="dynamic", num_derivatives=3)
-)
-ekf0_5_isotropic = prepare(recipes.ekf0_isotropic(num_derivatives=5))
-eks0_5_isotropic_dynamic = prepare(
-    recipes.eks0_isotropic(calibration="dynamic", num_derivatives=5)
-)
-ekf0_5_isotropic_dynamic_fixpt = prepare(
-    recipes.eks0_isotropic_fixedpoint(calibration="dynamic", num_derivatives=5)
+ghkf1_correction = dense.MomentMatch(
+    cubature=cubature.GaussHermite.from_params(ode_dimension=d, degree=3),
+    ode_dimension=d,
 )
 
+num_derivatives = 5
+ekf1 = correction_to_solver(ekf1_correction, num_derivatives)
+ckf1 = correction_to_solver(ckf1_correction, num_derivatives)
+ukf1 = correction_to_solver(ukf1_correction, num_derivatives)
+ghkf1 = correction_to_solver(ghkf1_correction, num_derivatives)
+
 solve_fns = [
-    # EK1
-    #     (ekf1_3, f"EKF1({3})"),
-    #     (ckf1_3, f"CKF1({3})"),
-    # (ekf1_3_dynamic, f"Dynamic EKF1({3})"),
-    (ekf1_4, f"EKF1({4})"),
-    (ckf1_4, f"CKF1({4})"),
-    #     (ekf1_5_dynamic, f"Dynamic EKF1({5})"),
-    #     (eks1_5_dynamic, f"Dynamic EKS1({5})"),
-    #     (ekf1_7, f"EKF1({7})"),
-    # (ckf1_7, f"CKF1({7})"),
-    # # EK0
-    #     (ekf0_3_isotropic, f"Isotropic EKF0({3})"),
-    #     (ekf0_3_isotropic_dynamic, f"Dynamic Isotropic EKF0({3})"),
-    #     (ekf0_5_isotropic, f"Isotropic EKF0({5})"),
-    #     (eks0_5_isotropic_dynamic, f"Dynamic Isotropic EKS0({5})"),
-    #     (ekf0_5_isotropic_dynamic_fixpt, f"Dynamic Isotropic FixPt-EKS0({5})"),
+    (ekf1, f"EKF1({num_derivatives})"),
+    (ckf1, f"CKF1({num_derivatives})"),
+    (ukf1, f"UKF1({num_derivatives})"),
+    (ghkf1, f"GHKF1({num_derivatives})"),
 ]
 ```
 
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=0.5)
+tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
 
 results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
 ```

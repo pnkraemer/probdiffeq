@@ -20,8 +20,8 @@ class IsotropicNormal(NamedTuple):
 
 
 @register_pytree_node_class
-class EK0(_correction.Correction):
-    """EK0-linearise an ODE assuming a linearisation-point with\
+class TaylorConstant(_correction.Correction):
+    """TaylorConstant-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(self, x: IsotropicNormal, /, *, vector_field, t, p):
@@ -84,10 +84,6 @@ class IsotropicIBM(_extrapolation.Extrapolation):
     a: Any
     q_sqrtm_lower: Any
 
-    def __repr__(self):
-        """Print a string representation of the class."""
-        return f"{self.__class__.__name__}(n={self.num_derivatives})"
-
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
         aux = ()
@@ -99,7 +95,7 @@ class IsotropicIBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
-    def from_num_derivatives(cls, *, num_derivatives):
+    def from_params(cls, *, num_derivatives=4):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
