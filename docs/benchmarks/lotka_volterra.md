@@ -24,15 +24,13 @@ import jax
 import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from _benchmark_utils import print_info, plot_config, workprecision
+from _benchmark_utils import plot_config, print_info, workprecision
 from diffeqzoo import backend, ivps
 from jax import config
-from tqdm import tqdm
 
 from odefilter import controls, cubature, ivpsolve, solvers
-from odefilter.implementations import dense, isotropic, batch
+from odefilter.implementations import batch, dense, isotropic
 from odefilter.strategies import filters, smoothers
-
 
 # x64 precision
 config.update("jax_enable_x64", True)
@@ -361,9 +359,9 @@ fixpt_smoother_solver = solver_to_solve(
 )
 
 solve_fns = [
-    (filter_solver, f"Filter()"),
-    (smoother_solver, f"Smoother()"),
-    (fixpt_smoother_solver, f"FixedPointSmoother()"),
+    (filter_solver, "Filter()"),
+    (smoother_solver, "Smoother()"),
+    (fixpt_smoother_solver, "FixedPointSmoother()"),
 ]
 ```
 
