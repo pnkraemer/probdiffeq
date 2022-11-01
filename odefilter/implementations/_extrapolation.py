@@ -62,7 +62,9 @@ class Extrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def condense_backward_models(self, *, bw_init, bw_state):
+    def condense_backward_models(
+        self, *, transition_init, noise_init: R, transition_state, noise_state: R
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -70,7 +72,7 @@ class Extrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_backward_noise(self, *, rv_proto):
+    def init_backward_noise(self, *, rv_proto: R):
         raise NotImplementedError
 
     @abc.abstractmethod

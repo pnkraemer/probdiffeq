@@ -147,15 +147,15 @@ def correction_to_solver(correction, num_derivatives):
 
 
 ekf1_correction = dense.TaylorLinear(ode_dimension=d)
-ckf1_correction = dense.MomentMatch(
+ckf1_correction = dense.MomentMatching(
     cubature=cubature.SphericalCubatureIntegration.from_params(ode_dimension=d),
     ode_dimension=d,
 )
-ukf1_correction = dense.MomentMatch(
+ukf1_correction = dense.MomentMatching(
     cubature=cubature.UnscentedTransform.from_params(ode_dimension=d, r=1.0),
     ode_dimension=d,
 )
-ghkf1_correction = dense.MomentMatch(
+ghkf1_correction = dense.MomentMatching(
     cubature=cubature.GaussHermite.from_params(ode_dimension=d, degree=3),
     ode_dimension=d,
 )
