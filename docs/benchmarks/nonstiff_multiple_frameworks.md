@@ -25,7 +25,12 @@ import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import scipy.integrate
-from _benchmark_utils import plot_config, print_info, workprecision
+from _benchmark_utils import (
+    plot_config,
+    print_info,
+    workprecision_make,
+    workprecision_plot,
+)
 from diffeqzoo import backend, ivps
 from jax import config
 
@@ -159,9 +164,6 @@ def scipy_solve_ivp_dop853(*, tol):
 
 
 ode_dimension = u0.shape[0]
-
-tolerances = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12]
-workprecision_diagram = partial(workprecision, number=1, repeat=3, tols=tolerances)
 ```
 
 ```python
@@ -185,24 +187,16 @@ solve_fns = [
 
 ```python
 %%time
+tolerances = [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12]
 
-results = workprecision_diagram(solve_fns=solve_fns)
+results = workprecision_make(solve_fns=solve_fns, number=1, repeat=3, tols=tolerances)
 ```
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 5))
 
-for solver in results:
-    times, errors = results[solver]
-    ax.loglog(errors, times, label=solver, alpha=0.9)
+fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
 
-ax.grid("both")
-# ax.set_xticks(0.1 ** (jnp.arange(1.0, 12.0, step=1.0)))
-ax.set_yticks(0.1 ** (jnp.arange(1.5, 5.0, step=0.5)))
-ax.set_title(f"Internal solvers [{ODE_NAME}]")
-ax.set_xlabel("Precision [RMSE, absolute]")
-ax.set_ylabel("Work [wall time, s]")
-ax.legend()
 plt.show()
 ```
 
