@@ -267,7 +267,7 @@ class Solver(_AbstractSolver):
         )
 
         # Complete step (incl. calibration!)
-        observed, (corrected, _) = self.strategy.complete_correction(
+        _, (corrected, _) = self.strategy.complete_correction(
             extrapolated=extrapolated,
             cache_obs=cache_obs,
         )
