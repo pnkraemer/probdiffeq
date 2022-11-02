@@ -16,7 +16,7 @@
 
 ### Initial value problem solvers
 - [x] Stable implementation
-- [ ] Fixed-steps
+- [x] Fixed-steps
 - [x] Error estimation and step-size adaptation
 - [x] I-control
 - [x] PI-control
