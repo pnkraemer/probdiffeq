@@ -178,7 +178,7 @@ solve_fns = [
     (scipy_solve_ivp_rk45, "RK45 (scipy.integrate)"),
     (scipy_solve_ivp_dop853, "DOP853 (scipy.integrate)"),
     (jax_solve, "Dormand-Prince (jax.experimental)"),
-    (solver_to_solve(solvers.MLESolver(strategy=ekf0)), "EK0a(n=4)"),
+    (solver_to_solve(solvers.MLESolver(strategy=ekf0)), "EK0(n=4)"),
     (solver_to_solve(solvers.MLESolver(strategy=ekf1)), "EK1(n=7)"),
 ]
 ```
