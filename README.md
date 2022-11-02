@@ -23,10 +23,15 @@
 - [ ] PID-control
 - [x] EK0 (Think: explicit solvers)
 - [x] EK1 (Think: semi-implicit solvers w/ Jacobians)
-- [ ] UK1 (Think: semi-implicit solvers w/o Jacobians)
+- [x] Moment matching algorithms (think: semi-implicit solvers w/o Jacobians):
+  - [x] UK
+  - [x] GHK
+  - [x] CK
+  - [x] Arbitrary cubature rules
+  - [ ] BQ
 - [x] Global (automatic) calibration
 - [x] Dynamic (automatic) calibration
-- [ ] No automatic calibration
+- [x] No automatic calibration
 - [ ] State-space model factorizations:
   - [x] Isotropic state-space models
   - [ ] Kronecker state-space models
