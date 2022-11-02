@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# Lotka-Volterra
+# ODE-filters only
 
 Let's find the fastest solver of the Lotka--Volterra problem, a standard benchmark problem. It is low-dimensional, not stiff, and generally poses no major problems for any numerical solver.
 
@@ -95,13 +95,17 @@ def _solve(*, solver, tol):
         solver=solver,
         atol=1e-3 * tol,
         rtol=tol,
-        control=controls.ClippedProportionalIntegral(),
+        control=controls.ProportionalIntegral(),
     )
     diff = (solution.u - ys_reference) / (1e-5 + ys_reference)
     return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
 
 
 ode_dimension = u0.shape[0]
+
+tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
+
+workprecision_diagram = partial(workprecision, number=2, repeat=2, tols=tolerances)
 ```
 
 ### Which mode of linearization?
@@ -140,7 +144,7 @@ ghkf1_correction = dense.MomentMatching(
     ode_dimension=ode_dimension,
 )
 
-num_derivatives = 5
+num_derivatives = 4
 ekf1 = correction_to_solver(ekf1_correction, num_derivatives)
 ckf1 = correction_to_solver(ckf1_correction, num_derivatives)
 ukf1 = correction_to_solver(ukf1_correction, num_derivatives)
@@ -157,9 +161,7 @@ solve_fns = [
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
-
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
+results = workprecision_diagram(solve_fns=solve_fns)
 ```
 
 ```python
@@ -179,7 +181,7 @@ ax.legend()
 plt.show()
 ```
 
-The Taylor-series based method is more efficient. The cubature rule has little effect on the efficiency.
+The Taylor-series based method is more efficient. The cubature rule has little effect on the efficiency of the moment-matching solver.
 
 
 ### Which factorisation?
@@ -198,7 +200,7 @@ def solver(extrapolation, correction):
     )
 
 
-num_derivatives = 5
+num_derivatives = 4
 iso_correction = isotropic.IsoTaylorZerothOrder()
 iso_extrapolation = isotropic.IsoIBM.from_params(num_derivatives=num_derivatives)
 iso_solver = solver(iso_extrapolation, iso_correction)
@@ -226,9 +228,7 @@ solve_fns = [
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
-
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
+results = workprecision_diagram(solve_fns=solve_fns)
 ```
 
 ```python
@@ -315,12 +315,7 @@ for strat, label in [
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
-
-results_all = [
-    workprecision(solve_fns=fns, tols=tolerances, number=3, repeat=3)
-    for fns in solve_fns
-]
+results_all = [workprecision_diagram(solve_fns=fns) for fns in solve_fns]
 ```
 
 ```python
@@ -346,7 +341,7 @@ plt.show()
 ```
 
 For zeroth-order Taylor series, the choice between dynamic and non-dynamic solvers is fairly irrelevant (the non-dynamic solver seems to have a sliiiiiight edge over the dynamic solver, but that is not very apparent).
-For first-order Taylor series, dynamic calibration helps with low-order solvers and low precision and non-dynamic calibration is better in all other settings.
+For first-order Taylor series, non-dynamic calibration is better, but the difference is minimal for low-order methods and low precision.
 
 
 ### Should I use a filter or a smoother?
@@ -368,9 +363,7 @@ solve_fns = [
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
-
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
+results = workprecision_diagram(solve_fns=solve_fns)
 ```
 
 ```python
@@ -460,9 +453,7 @@ solve_fns = [
 ```python
 %%time
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
-
-results = workprecision(solve_fns=solve_fns, tols=tolerances, number=3, repeat=3)
+results = workprecision_diagram(solve_fns=solve_fns)
 ```
 
 ```python
@@ -491,8 +482,3 @@ We can observe more:
 * Dynamic calibration seems to perform at most as good as non-dynamic calibration. (Except for low order, low-precision EKF1, where the dynamic calibration seems to help. But even with the dynamic calibration is the low-order EKF1 one of the slowest solvers.)
 * Low precision is best achieved with an isotropic EKF0(3). High precision is best achieved with an EKF1(8). The middle ground is better covered by an isotropic EKF0(5) than an EKF1(5).
 * The cubature filters are more expensive than the extended filters (because cubature-linearisation costs more than Taylor-linearisation)
-
-
-
-## External solvers
-TBD.

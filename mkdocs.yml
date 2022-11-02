@@ -63,7 +63,8 @@ plugins:
     - exclude:
         glob:
           - "examples/*.md"
-          - "benchmarks/lotka_volterra.md"
+          - "benchmarks/odefilters_only.md"
+          - "benchmarks/multiple_frameworks.md"
     - mkdocs-jupyter:
         include: ["examples/*.ipynb", "benchmarks/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
 
