@@ -64,7 +64,7 @@ plugins:
         glob:
           - "examples/*.md"
           - "benchmarks/odefilters_only.md"
-          - "benchmarks/multiple_frameworks.md"
+          - "benchmarks/nonstiff_multiple_frameworks.md"
     - mkdocs-jupyter:
         include: ["examples/*.ipynb", "benchmarks/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
 
@@ -97,4 +97,5 @@ nav:
         - "dev_docs/on_the_edges.md"
     - Benchmarks:
         - "benchmarks/insights.md"
-        - "benchmarks/lotka_volterra.ipynb"
+        - "benchmarks/odefilters_only.ipynb"
+        - "benchmarks/nonstiff_multiple_frameworks.ipynb"

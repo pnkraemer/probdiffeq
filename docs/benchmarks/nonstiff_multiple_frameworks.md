@@ -13,7 +13,9 @@ jupyter:
     name: python3
 ---
 
-# Non-stiff problem (Lotka-Volterra)
+# Lotka-Volterra
+
+How efficient are the solvers on a simple benchmark problem?
 
 ```python
 from functools import partial
