@@ -8,6 +8,8 @@ import jax.numpy as jnp
 import jax.tree_util
 
 
+# todo: this function only works if the output of scan has the same
+#  pytree structure as the init; i.e., if the carry is the solution.
 @partial(jax.jit, static_argnames=["f", "reverse"])
 def scan_with_init(*, f, init, xs, reverse=False):
     """Scan, but include the ``init`` parameter into the output.

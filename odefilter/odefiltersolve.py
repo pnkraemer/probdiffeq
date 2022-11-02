@@ -117,6 +117,34 @@ def _odefilter_generator(vector_field, *, state, t1, adaptive_solver, parameters
     yield state
 
 
+def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
+    """Solve an initial value problem.
+
+    !!! warning
+        Uses native python control flow.
+        Not JITable, not reverse-mode-differentiable.
+    """
+    _assert_not_scalar(taylor_coefficients)
+
+    t0 = ts[0]
+
+    # todo: annoying that the error estimate is not part of the state...
+    state, _ = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+
+    def body_fn(carry, t_new):
+        s, t_old = carry
+        dt = t_new - t_old
+        s_new, _ = solver.step_fn(
+            state=s, vector_field=vector_field, dt=dt, parameters=parameters
+        )
+        return (s_new, t_new), (s_new, t_new)
+
+    _, (result, _) = _control_flow.scan_with_init(
+        f=body_fn, init=(state, t0), xs=ts[1:]
+    )
+    return solver.extract_fn(state=result)
+
+
 def _assert_not_scalar(x, /):
     """Verify the initial conditions are not scalar.
 
