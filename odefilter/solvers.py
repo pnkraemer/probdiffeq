@@ -83,7 +83,7 @@ class Solution(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-class _Solver(abc.ABC):
+class _AbstractSolver(abc.ABC):
     """Inference strategy interface."""
 
     def __init__(self, *, strategy=None):
@@ -136,7 +136,7 @@ class _Solver(abc.ABC):
 
         return solution, error_estimate
 
-    def interpolate_fn(self, *, s0, s1, t):  # noqa: D102
+    def interpolate_fn(self, *, s0, s1, t):
         def interpolate(s0_, s1_, t_):
             return self.strategy.case_interpolate(
                 p0=s0_.posterior,
@@ -200,7 +200,7 @@ class _Solver(abc.ABC):
             Again there is no check and anything can happen if you don't follow
             this rule.
         """
-        # todo: support "method" argument.
+        # todo: support "method" argument to be passed to searchsorted.
 
         # side="left" and side="right" are equivalent
         # because we _assume_ that the point sets are disjoint.
@@ -238,12 +238,94 @@ class _Solver(abc.ABC):
         return cls(strategy=strategy)
 
 
-@jax.tree_util.register_pytree_node_class  # is this necessary?
-class DynamicSolver(_Solver):
+@jax.tree_util.register_pytree_node_class
+class Solver(_AbstractSolver):
+    def __init__(self, *, strategy, output_scale_sqrtm):
+        super().__init__(strategy=strategy)
+
+        # todo: overwrite init_fn()?
+        self._output_scale_sqrtm = output_scale_sqrtm
+
+    def step_fn(self, *, state, vector_field, dt, parameters):
+        """Step."""
+        # Pre-error-estimate steps
+        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+            posterior=state.posterior, dt=dt
+        )
+
+        # Linearise and estimate error
+        error, _, cache_obs = self.strategy.begin_correction(
+            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+        )
+
+        # Post-error-estimate steps
+        extrapolated = self.strategy.complete_extrapolation(
+            linearisation_pt,
+            cache_ext,
+            output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
+            posterior_previous=state.posterior,
+        )
+
+        # Complete step (incl. calibration!)
+        observed, (corrected, _) = self.strategy.complete_correction(
+            extrapolated=extrapolated,
+            cache_obs=cache_obs,
+        )
+
+        # Extract and return solution
+        sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
+        filtered = Solution(
+            t=state.t + dt,
+            u=sol,
+            marginals=None,
+            posterior=corrected,
+            output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
+            num_data_points=state.num_data_points + 1,
+        )
+        return filtered, dt * error
+
+    # todo: move this to the abstract solver and overwrite when necessary?
+    #  the dynamic solver uses the same...
+    def extract_fn(self, *, state):
+        marginals = self.strategy.marginals(posterior=state.posterior)
+        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        return Solution(
+            t=state.t,
+            u=u,  # new!
+            marginals=marginals,  # new!
+            posterior=state.posterior,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+
+    def extract_terminal_value_fn(self, *, state):
+        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        return Solution(
+            t=state.t,
+            u=u,  # new!
+            marginals=marginals,  # new!
+            posterior=state.posterior,
+            output_scale_sqrtm=state.output_scale_sqrtm,
+            num_data_points=state.num_data_points,
+        )
+
+    def tree_flatten(self):
+        children = (self.strategy, self._output_scale_sqrtm)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (strategy, output_scale_sqrtm) = children
+        return cls(strategy=strategy, output_scale_sqrtm=output_scale_sqrtm)
+
+
+@jax.tree_util.register_pytree_node_class
+class DynamicSolver(_AbstractSolver):
     """Dynamic calibration."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
-        # p, p_inv = self.strategy.assemble_preconditioner(dt=dt)
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
@@ -276,7 +358,7 @@ class DynamicSolver(_Solver):
 
         return smoothing_solution, dt * error
 
-    def extract_fn(self, *, state):  # noqa: D102
+    def extract_fn(self, *, state):
 
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = self.strategy.extract_sol_from_marginals(marginals=marginals)
@@ -290,7 +372,7 @@ class DynamicSolver(_Solver):
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, *, state):  # noqa: D102
+    def extract_terminal_value_fn(self, *, state):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         u = self.strategy.extract_sol_from_marginals(marginals=marginals)
 
@@ -304,8 +386,8 @@ class DynamicSolver(_Solver):
         )
 
 
-@jax.tree_util.register_pytree_node_class  # is this necessary?
-class MLESolver(_Solver):
+@jax.tree_util.register_pytree_node_class
+class MLESolver(_AbstractSolver):
     """Standard calibration. Nothing dynamic."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
@@ -354,7 +436,7 @@ class MLESolver(_Solver):
         evidence_sqrtm = self.strategy.correction.evidence_sqrtm(observed=obs)
         return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
-    def extract_fn(self, *, state):  # noqa: D102
+    def extract_fn(self, *, state):
 
         marginals = self.strategy.marginals(posterior=state.posterior)
         s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)

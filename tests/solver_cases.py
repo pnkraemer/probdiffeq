@@ -32,7 +32,7 @@ def solver_eks0_isotropic_fixedpoint():
     strategy = smoothers.FixedPointSmoother(
         correction=correction, extrapolation=extrapolation
     )
-    return solvers.DynamicSolver(strategy=strategy)
+    return solvers.Solver(strategy=strategy, output_scale_sqrtm=100.0)
 
 
 @case(tags=["terminal_value", "solve", "checkpoint", "filter"])
