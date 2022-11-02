@@ -106,6 +106,36 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
     )
 
 
+def solve_fixed_grid(
+    vector_field, initial_values, ts, solver, parameters=(), **options
+):
+    """Solve an initial value problem.
+
+    !!! warning
+        Uses native python control flow.
+        Not JITable, not reverse-mode-differentiable.
+    """
+    _assert_not_scalar(initial_values)
+    _assert_tuple(initial_values)
+
+    taylor_coefficients = taylor.taylor_mode_fn(
+        vector_field=jax.tree_util.Partial(vector_field),
+        initial_values=initial_values,
+        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
+        t=ts[0],
+        parameters=parameters,
+    )
+
+    return odefiltersolve.odefilter_fixed_grid(
+        jax.tree_util.Partial(vector_field),
+        taylor_coefficients=taylor_coefficients,
+        ts=ts,
+        solver=solver,
+        parameters=parameters,
+        **options,
+    )
+
+
 def _assert_not_scalar(x, /):
     """Verify the initial conditions are not scalar.
 
