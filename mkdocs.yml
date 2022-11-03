@@ -79,6 +79,7 @@ nav:
         - "examples/second_order_problems.ipynb"
         - "examples/smoothing.ipynb"
         - "examples/solution_object.ipynb"
+        - "examples/physics_enhanced_regression.ipynb"
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/odefiltersolve.md"
