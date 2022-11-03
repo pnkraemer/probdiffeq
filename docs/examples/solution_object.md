@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, solvers
+from odefilter import dense_output, ivpsolve, solvers
 from odefilter.strategies import smoothers
 
 if not backend.has_been_selected:
@@ -91,7 +91,9 @@ Look at this:
 
 ```python tags=[]
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
-_, dense = solver.offgrid_marginals_searchsorted(ts=ts, solution=solution)
+_, dense = dense_output.offgrid_marginals_searchsorted(
+    ts=ts, solution=solution, solver=solver
+)
 
 fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 

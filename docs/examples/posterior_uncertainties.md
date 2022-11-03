@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, solvers
+from odefilter import dense_output, ivpsolve, solvers
 from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
@@ -123,7 +123,7 @@ solution = ivpsolve.simulate_checkpoints(
 
 ```python
 key = jax.random.PRNGKey(seed=1)
-u, samples = ek0.sample(key, solution=solution, shape=(2,))
+u, samples = dense_output.sample(key, solution=solution, shape=(2,), solver=ek0)
 ```
 
 ```python
