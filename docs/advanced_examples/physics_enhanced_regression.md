@@ -19,14 +19,13 @@ jupyter:
 import jax
 import jax.numpy as jnp
 import jax.random
-from jax.config import config
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import dense_output, ivpsolve, solvers
-from odefilter.strategies import smoothers, filters
 from odefilter.implementations import dense
+from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
 
@@ -90,7 +89,9 @@ def param_to_nmll(p):
     )
 
     m_obs = ek1.strategy.correction._select_derivative(solution_wrong.marginals.mean, 0)
-    l_obs = ek1.strategy.correction._select_derivative_vect(solution_wrong.marginals.cov_sqrtm_lower, 0)
+    l_obs = ek1.strategy.correction._select_derivative_vect(
+        solution_wrong.marginals.cov_sqrtm_lower, 0
+    )
 
     return (data - solution_wrong.u) @ (data - solution_wrong.u)
 
@@ -117,7 +118,6 @@ f1 = f1 - 1e-1 * df(f1)
 print(f1, f_args)
 f1 = f1 - 1e-1 * df(f1)
 print(f1, f_args)
-
 ```
 
 ```python
