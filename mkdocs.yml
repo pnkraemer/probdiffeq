@@ -90,6 +90,7 @@ nav:
           - "api_docs/implementations/dense.md"
           - "api_docs/implementations/isotropic.md"
           - "api_docs/implementations/batch.md"
+        - "api_docs/dense_output.md"
         - "api_docs/taylor.md"
         - "api_docs/controls.md"
     - Developer Documentation:

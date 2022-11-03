@@ -1,13 +1,9 @@
 """Do fun stuff with the solution objects."""
 
 from functools import partial
-from typing import TypeVar
 
 import jax
 import jax.numpy as jnp
-
-S = TypeVar("S")  # Filter/smoother
-R = TypeVar("R")  # RV
 
 
 # todo: why do we need this function??
