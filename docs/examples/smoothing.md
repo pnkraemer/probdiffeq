@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, solvers
+from odefilter import dense_output, ivpsolve, solvers
 from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
@@ -88,12 +88,16 @@ If you like, compute the solution on a dense grid after solving.
 ts_dense = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=500, endpoint=True
 )  # must be off-grid
-dense, _ = eks0.offgrid_marginals_searchsorted(ts=ts_dense, solution=eks0sol)
+dense, _ = dense_output.offgrid_marginals_searchsorted(
+    ts=ts_dense, solution=eks0sol, solver=eks0
+)
 
 ts_coarse = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=25, endpoint=True
 )  # must be off-grid
-coarse, _ = eks0.offgrid_marginals_searchsorted(ts=ts_coarse, solution=eks0sol)
+coarse, _ = dense_output.offgrid_marginals_searchsorted(
+    ts=ts_coarse, solution=eks0sol, solver=eks0
+)
 
 fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
