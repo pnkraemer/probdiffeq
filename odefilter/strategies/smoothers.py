@@ -22,6 +22,10 @@ class BackwardModel(Generic[T]):
         self.transition = transition
         self.noise = noise
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
     def tree_flatten(self):
         children = self.transition, self.noise
         aux = ()
@@ -40,6 +44,10 @@ class MarkovSequence(Generic[T]):
     def __init__(self, *, init: T, backward_model: BackwardModel[T]):
         self.init = init
         self.backward_model = backward_model
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(init={self.init}, backward_model={self.backward_model})"
 
     def tree_flatten(self):
         children = (self.init, self.backward_model)

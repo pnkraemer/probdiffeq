@@ -2,12 +2,14 @@
 
 
 import functools
+import warnings
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util
 
 from odefilter import odefiltersolve, taylor
+from odefilter.strategies import smoothers
 
 # The high-level checkpoint-style routines
 
@@ -15,7 +17,7 @@ from odefilter import odefiltersolve, taylor
 #  to match the signature of the vector field?
 
 
-@functools.partial(jax.jit, static_argnums=[0, 5])
+@functools.partial(jax.jit, static_argnums=[0])
 def simulate_terminal_values(
     vector_field, initial_values, t0, t1, solver, parameters=(), **options
 ):
@@ -45,7 +47,7 @@ def simulate_terminal_values(
     )
 
 
-@functools.partial(jax.jit, static_argnums=[0, 4])
+@functools.partial(jax.jit, static_argnums=[0])
 def simulate_checkpoints(
     vector_field, initial_values, ts, solver, parameters=(), **options
 ):
@@ -55,6 +57,12 @@ def simulate_checkpoints(
     """
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
+    if isinstance(solver.strategy, smoothers.Smoother):
+        msg = (
+            "A conventional smoother cannot be used."
+            "Did you mean ``smoothers.FixedPointSmoother()``?"
+        )
+        warnings.warn(msg)
 
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
