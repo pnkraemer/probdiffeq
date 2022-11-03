@@ -6,6 +6,7 @@ from jax.experimental.ode import odeint
 from pytest_cases import parametrize_with_cases
 
 from odefilter import ivpsolve, solvers
+from odefilter.implementations import dense
 from odefilter.strategies import smoothers
 
 
@@ -36,3 +37,26 @@ def test_smoother_warning(vf, u0, t0, t1, p):
 
     with pytest.warns():
         ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+
+
+@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
+@parametrize_with_cases(
+    "solver", cases=".solver_cases", prefix="solver_", has_tag=("checkpoint", "dense")
+)
+def test_negative_marginal_log_likelihood(vf, u0, t0, t1, p, solver):
+    ts = jnp.linspace(t0, t1, num=5)
+    solution = ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+
+    data = solution.u + 0.005
+    k, d = solution.u.shape
+
+    def h(x):
+        return x.reshape((-1, d), order="F")[0, ...]
+
+    sigmas = jnp.ones((k, d))
+    mll = dense.negative_marginal_log_likelihood(
+        h=h, sigmas=sigmas, data=data, posterior=solution.posterior
+    )
+    assert mll.shape == ()
+    assert not jnp.isnan(mll)
+    assert not jnp.isinf(mll)
