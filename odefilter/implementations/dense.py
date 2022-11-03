@@ -509,6 +509,7 @@ def negative_marginal_log_likelihood(*, h, sigmas, data, posterior):
         m_cor = m_ext - gain @ (m_obs - y)
 
         # Compute marginal log likelihood and go
+        # todo: extract a log-likelihood function
         res_white = jsp.linalg.solve_triangular(r_obs, (m_obs - y), lower=False)
         x1 = jnp.dot(res_white, res_white.T)
         _, x2 = jnp.linalg.slogdet(r_obs)
