@@ -15,7 +15,7 @@ from odefilter import odefiltersolve, taylor
 #  to match the signature of the vector field?
 
 
-@functools.partial(jax.jit, static_argnums=[0, 5])
+@functools.partial(jax.jit, static_argnums=[0])
 def simulate_terminal_values(
     vector_field, initial_values, t0, t1, solver, parameters=(), **options
 ):
@@ -45,7 +45,7 @@ def simulate_terminal_values(
     )
 
 
-@functools.partial(jax.jit, static_argnums=[0, 4])
+@functools.partial(jax.jit, static_argnums=[0])
 def simulate_checkpoints(
     vector_field, initial_values, ts, solver, parameters=(), **options
 ):
