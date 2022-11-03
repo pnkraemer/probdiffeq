@@ -22,6 +22,10 @@ class BackwardModel(Generic[T]):
         self.transition = transition
         self.noise = noise
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
     def tree_flatten(self):
         children = self.transition, self.noise
         aux = ()
