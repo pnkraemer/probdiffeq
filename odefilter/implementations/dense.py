@@ -518,6 +518,14 @@ def negative_marginal_log_likelihood(*, h, sigmas, data, posterior):
         mll_updated = (num_data * mll + mll_new) / (num_data + 1)
         return (_Normal(m_cor, r_cor.T), num_data + 1, mll_updated), None
 
+    # todo: this should return a Filtering posterior or a smoothing posterior
+    #  which could then be plotted. Right?
+    #  (We might also want some dense-output/checkpoint kind of thing here)
+    # todo: we should reuse the extrapolation model implementations.
+    #  But this only works if the ODE posterior uses the preconditioner (I think).
+    # todo: we should allow proper noise, and proper information functions.
+    #  But it is not clear which data structure that should be.
+    #
     (_, _, mll), _ = jax.lax.scan(
         f=filter_step,
         init=(init, 0, 0.0),
