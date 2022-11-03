@@ -113,9 +113,6 @@ class _AbstractSolver(abc.ABC):
     def extract_terminal_value_fn(self, *, state):
         raise NotImplementedError
 
-    def sample(self, key, *, solution, shape=()):
-        return self.strategy.sample(key, posterior=solution.posterior, shape=shape)
-
     def init_fn(self, *, taylor_coefficients, t0):
         posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
@@ -185,46 +182,6 @@ class _AbstractSolver(abc.ABC):
             output_scale_sqrtm=state.output_scale_sqrtm,
             marginals=None,
             num_data_points=state.num_data_points,
-        )
-
-    def offgrid_marginals_searchsorted(self, *, ts, solution):
-        """Dense output for a whole grid via jax.numpy.searchsorted.
-
-        !!! warning
-            The elements in ts and the elements in the solution grid must be disjoint.
-            Otherwise, anything can happen and the solution will be incorrect.
-            We do not check for this case! (Because we want to jit!)
-
-        !!! warning
-            The elements in ts must be strictly in (t0, t1).
-            Again there is no check and anything can happen if you don't follow
-            this rule.
-        """
-        # todo: support "method" argument to be passed to searchsorted.
-
-        # side="left" and side="right" are equivalent
-        # because we _assume_ that the point sets are disjoint.
-        indices = jnp.searchsorted(solution.t, ts)
-
-        # Solution slicing to the rescue
-        solution_left = solution[indices - 1]
-        solution_right = solution[indices]
-
-        # Vmap to the rescue :) It does not like kw-only arguments, though.
-        @jax.vmap
-        def marginals_vmap(sprev, t, s):
-            return self.offgrid_marginals(t=t, state=s, state_previous=sprev)
-
-        return marginals_vmap(solution_left, ts, solution_right)
-
-    def offgrid_marginals(self, *, state, t, state_previous):
-        return self.strategy.offgrid_marginals(
-            marginals=state.marginals,
-            posterior_previous=state_previous.posterior,
-            t=t,
-            t0=state_previous.t,
-            t1=state.t,
-            scale_sqrtm=state.output_scale_sqrtm,
         )
 
     def tree_flatten(self):
