@@ -2,12 +2,14 @@
 
 
 import functools
+import warnings
 
 import jax
 import jax.numpy as jnp
 import jax.tree_util
 
 from odefilter import odefiltersolve, taylor
+from odefilter.strategies import smoothers
 
 # The high-level checkpoint-style routines
 
@@ -55,6 +57,12 @@ def simulate_checkpoints(
     """
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
+    if isinstance(solver.strategy, smoothers.Smoother):
+        msg = (
+            "A conventional smoother cannot be used."
+            "Did you mean ``smoothers.FixedPointSmoother()``?"
+        )
+        warnings.warn(msg)
 
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),

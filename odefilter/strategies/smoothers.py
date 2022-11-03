@@ -41,6 +41,10 @@ class MarkovSequence(Generic[T]):
         self.init = init
         self.backward_model = backward_model
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(init={self.init}, backward_model={self.backward_model})"
+
     def tree_flatten(self):
         children = (self.init, self.backward_model)
         aux = ()
