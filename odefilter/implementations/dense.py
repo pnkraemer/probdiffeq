@@ -44,6 +44,28 @@ class _DenseCorrection(_correction.Correction):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
+    def correct_sol_observation(self, *, rv, u, observation_std):
+        hc = self.e0v(rv.cov_sqrtm_lower)
+        m_obs = self.e0(rv.mean)
+
+        r_yx = observation_std * jnp.eye(u.shape[0])
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
+            R_X_F=hc.T, R_X=rv.cov_sqrtm_lower.T, R_YX=r_yx
+        )
+        m_cor = rv.mean - gain @ (m_obs - u)
+
+        return _Normal(m_obs, r_obs.T), (_Normal(m_cor, r_cor.T), gain)
+
+    def marginal_log_likelihood(self, observed, u):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+
+        res_white = jsp.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
+
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return 0.5 * (x1 + x2 + x3)
+
     def _e0(self, x):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
         return x_reshaped[: self.ode_order, ...]
@@ -57,6 +79,15 @@ class _DenseCorrection(_correction.Correction):
 
     def _e1v(self, x):
         return jax.vmap(lambda s: self._e1(s), in_axes=1, out_axes=1)(x)
+
+    # todo: duplication...
+
+    def e0(self, x):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        return x_reshaped[0, ...]
+
+    def e0v(self, x):
+        return jax.vmap(lambda s: self.e0(s), in_axes=1, out_axes=1)(x)
 
 
 @register_pytree_node_class
@@ -476,61 +507,3 @@ class IBM(_extrapolation.Extrapolation):
         if mean.ndim == 1:
             return mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
         return jax.vmap(self.extract_mean_from_marginals)(mean)
-
-
-def negative_marginal_log_likelihood(*, h, sigmas, data, posterior):
-
-    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], posterior.backward_model)
-    init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-
-    def filter_step(carry, x):
-
-        rv, num_data, mll = carry
-
-        # Read
-        bw_model, sigma, y = x
-        A = bw_model.transition
-        m_noise, l_noise = bw_model.noise.mean, bw_model.noise.cov_sqrtm_lower
-
-        # Extrapolate
-        m_ext = A @ rv.mean + m_noise
-        l_ext = _sqrtm.sum_of_sqrtm_factors(
-            R1=(A @ rv.cov_sqrtm_lower).T, R2=l_noise.T
-        ).T
-
-        # Correct
-        hc = jax.vmap(h, in_axes=1, out_axes=1)(l_ext)
-        m_obs = h(m_ext)
-        d = y.shape[0]
-        r_yx = sigma * jnp.eye(d)
-        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
-            R_X_F=hc.T, R_X=l_ext.T, R_YX=r_yx
-        )
-        m_cor = m_ext - gain @ (m_obs - y)
-
-        # Compute marginal log likelihood and go
-        # todo: extract a log-likelihood function
-        res_white = jsp.linalg.solve_triangular(r_obs, (m_obs - y), lower=False)
-        x1 = jnp.dot(res_white, res_white.T)
-        _, x2 = jnp.linalg.slogdet(r_obs)
-        x2 = x2**2
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        mll_new = 0.5 * (x1 + x2 + x3)
-        mll_updated = (num_data * mll + mll_new) / (num_data + 1)
-        return (_Normal(m_cor, r_cor.T), num_data + 1, mll_updated), None
-
-    # todo: this should return a Filtering posterior or a smoothing posterior
-    #  which could then be plotted. Right?
-    #  (We might also want some dense-output/checkpoint kind of thing here)
-    # todo: we should reuse the extrapolation model implementations.
-    #  But this only works if the ODE posterior uses the preconditioner (I think).
-    # todo: we should allow proper noise, and proper information functions.
-    #  But it is not clear which data structure that should be.
-    #
-    (_, _, mll), _ = jax.lax.scan(
-        f=filter_step,
-        init=(init, 0, 0.0),
-        xs=(bw_models, sigmas[:-1], data[:-1]),
-        reverse=True,
-    )
-    return mll

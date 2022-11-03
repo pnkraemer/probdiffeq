@@ -1,6 +1,7 @@
 """Do fun stuff with the solution objects."""
 
 from functools import partial
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -57,3 +58,60 @@ def offgrid_marginals(*, solution, t, solution_previous, solver):
         t1=solution.t,
         scale_sqrtm=solution.output_scale_sqrtm,
     )
+
+
+class _NMLLState(NamedTuple):
+    rv: Any
+    num_data: int
+    nmll: float
+
+
+def negative_marginal_log_likelihood(*, observation_std, u, solution, solver):
+    """Compute the negative marginal log-likelihood of observations."""
+    # todo: complain if it is used with a filter, not a smoother?
+
+    bw_models = jax.tree_util.tree_map(
+        lambda x: x[1:, ...], solution.posterior.backward_model
+    )
+    init = jax.tree_util.tree_map(lambda x: x[-1, ...], solution.posterior.init)
+
+    def filter_step(carry, x):
+
+        # Read
+        rv, num_data, nmll_prev = carry.rv, carry.num_data, carry.nmll
+        bw_model, obs_std, data = x
+
+        # Extrapolate
+        rv_ext = solver.strategy.extrapolation.marginalise_model(
+            linop=bw_model.transition, noise=bw_model.noise, init=rv
+        )
+
+        # Correct
+        obs, (cor, _) = solver.strategy.correction.correct_sol_observation(
+            rv=rv_ext, u=data, observation_std=obs_std
+        )
+
+        # Compute marginal log likelihood and go
+        nmll_new = solver.strategy.correction.marginal_log_likelihood(
+            observed=obs, u=data
+        )
+        nmll_updated = (num_data * nmll_prev + nmll_new) / (num_data + 1)
+
+        x = _NMLLState(cor, num_data + 1, nmll_updated)
+        return x, x
+
+    # todo: this should return a Filtering posterior or a smoothing posterior
+    #  which could then be plotted. Right?
+    #  (We might also want some dense-output/checkpoint kind of thing here)
+    # todo: we should reuse the extrapolation model implementations.
+    #  But this only works if the ODE posterior uses the preconditioner (I think).
+    # todo: we should allow proper noise, and proper information functions.
+    #  But it is not clear which data structure that should be.
+    #
+    (_, _, nmll), _ = jax.lax.scan(
+        f=filter_step,
+        init=_NMLLState(init, 0, 0.0),
+        xs=(bw_models, observation_std[:-1], u[:-1]),  # todo: use all data!
+        reverse=True,
+    )
+    return nmll

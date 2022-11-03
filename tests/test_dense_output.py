@@ -116,3 +116,22 @@ def test_grid_samples(vf, u0, t0, t1, p, solver, shape):
     #  in terms of the joint posterior. But this requires a joint_posterior()
     #  method, which is only future work I guess. So far we use the eye-test
     #  in the notebooks, which looks good.
+
+
+@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
+@parametrize_with_cases(
+    "solver", cases=".solver_cases", prefix="solver_", has_tag=("checkpoint", "dense")
+)
+def test_negative_marginal_log_likelihood(vf, u0, t0, t1, p, solver):
+    ts = jnp.linspace(t0, t1, num=5)
+    solution = ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+
+    data = solution.u + 0.005
+    k, d = solution.u.shape
+
+    mll = dense_output.negative_marginal_log_likelihood(
+        observation_std=jnp.ones((k, d)), u=data, solution=solution, solver=solver
+    )
+    assert mll.shape == ()
+    assert not jnp.isnan(mll)
+    assert not jnp.isinf(mll)
