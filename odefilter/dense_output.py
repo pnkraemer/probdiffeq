@@ -91,12 +91,13 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution, solver):
             rv=rv_ext, u=data, observation_std=obs_std
         )
 
-        # Compute marginal log likelihood and go
-        nmll_new = solver.strategy.correction.marginal_log_likelihood(
+        # Compute marginal log likelihood
+        nmll_new = solver.strategy.correction.negative_marginal_log_likelihood(
             observed=obs, u=data
         )
         nmll_updated = (num_data * nmll_prev + nmll_new) / (num_data + 1)
 
+        # Return values
         x = _NMLLState(cor, num_data + 1, nmll_updated)
         return x, x
 
