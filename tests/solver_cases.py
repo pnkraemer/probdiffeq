@@ -104,7 +104,7 @@ def solver_eks1():
     return solvers.MLESolver(strategy=strategy)
 
 
-@case(tags=["terminal_value", "checkpoint", "smoother"])
+@case(tags=["terminal_value", "checkpoint", "smoother", "dense"])
 def solver_eks1_fixedpoint():
     correction = dense.TaylorFirstOrder(ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
