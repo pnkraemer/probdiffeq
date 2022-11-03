@@ -1,6 +1,7 @@
 """There are too many ways to smooth. We assert they all do the same."""
 
 import jax.numpy as jnp
+import pytest
 from pytest_cases import case, parametrize, parametrize_with_cases
 
 from odefilter import ivpsolve, solvers
@@ -33,6 +34,11 @@ def smoother_fixedpoint_smoother_pair_two_eks0():
     return solver1, solver2
 
 
+# We plug a non-fixed-point smoother into the checkpoint simulation
+# which does not work, UNLESS the smoother happens to step exactly
+# from checkpoint to checkpoint (which is the corner case that we are
+# testing here). Therefore, we happily ignore the warning.
+@pytest.mark.filterwarnings("ignore:A conventional smoother")
 @parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "eks, fixedpoint_eks", cases=".", prefix="smoother_fixedpoint_smoother_pair_"

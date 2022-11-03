@@ -54,15 +54,9 @@ def test_negative_marginal_log_likelihood(vf, u0, t0, t1, p, solver):
         return x.reshape((-1, d), order="F")[0, ...]
 
     sigmas = jnp.ones((k, d))
-    # import jax
-    #
-    # with jax.disable_jit():
     mll = dense.negative_marginal_log_likelihood(
         h=h, sigmas=sigmas, data=data, posterior=solution.posterior
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)
     assert not jnp.isinf(mll)
-
-    print(mll)
-    assert False
