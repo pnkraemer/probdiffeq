@@ -92,6 +92,33 @@ class BatchTaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
 
         return evidence_sqrtm
 
+    def correct_sol_observation(self, *, rv, u, observation_std):
+        hc = rv.cov_sqrtm_lower[:, 0, ...]  # (d, k)
+        m_obs = rv.mean[:, 0]  # (d,)
+        d = m_obs.shape[0]
+        r_yx = observation_std * jnp.ones((d, 1, 1))
+
+        r_x_f = hc[..., None]
+        r_x = _transpose(rv.cov_sqrtm_lower)
+        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
+            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
+        )
+        m_cor = rv.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
+
+        obs = _BatchNormal(m_obs, _transpose(r_obs))
+        cor = _BatchNormal(m_cor, _transpose(r_cor))
+        return obs, (cor, gain)
+
+    def negative_marginal_log_likelihood(self, observed, u):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+
+        # todo: is this correct??
+        res_white = (m_obs - u) / jnp.reshape(l_obs, m_obs.shape)
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return 0.5 * (x1 + x2 + x3)
+
 
 @register_pytree_node_class
 @dataclass(frozen=True)
