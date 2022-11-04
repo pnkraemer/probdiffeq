@@ -46,8 +46,8 @@
 - [x] Terminal-value simulation
 - [x] Global simulation (the traditional ``solve()`` method)
 - [x] Checkpointing
-- [ ] Discrete forward-mode differentiation
-- [ ] Discrete reverse-mode differentiation
+- [x] Discrete forward-mode differentiation
+- [x] Discrete reverse-mode differentiation
 - [ ] Continuous forward-mode differentiation
 - [ ] Continuous reverse-mode differentiation
 - [x] Autodiff initialisation
@@ -55,7 +55,7 @@
 - [ ] Model fit evaluation
 - [ ] Discrete event handling
 - [ ] Continuous event handling
-- [ ] Physics-enhanced regression
+- [x] Physics-enhanced regression
 - [ ] Dense output:
   - [x] Offgrid-marginalisation
   - [x] Posterior sampling

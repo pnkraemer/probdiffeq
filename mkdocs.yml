@@ -63,6 +63,7 @@ plugins:
     - exclude:
         glob:
           - "examples/*.md"
+          - "advanced_examples/*.md"
           - "benchmarks/odefilters_only.md"
           - "benchmarks/nonstiff_multiple_frameworks.md"
     - mkdocs-jupyter:
