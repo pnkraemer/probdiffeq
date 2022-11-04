@@ -2,15 +2,15 @@
 import jax.numpy as jnp
 import pytest
 from jax.experimental.ode import odeint
-from pytest_cases import parametrize_with_cases
+from pytest_cases import filters, parametrize_with_cases
 
 from odefilter import ivpsolve
 
+_FILTER = filters.has_tag("filter") | filters.has_tag("smoother")
+
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
-@parametrize_with_cases(
-    "solver", cases=".solver_cases", prefix="solver_", has_tag=("solve",)
-)
+@parametrize_with_cases("solver", cases=".solver_cases", filter=_FILTER)
 def test_solve(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=10)
     odeint_solution = odeint(
