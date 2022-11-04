@@ -32,9 +32,11 @@ example:
 	jupytext --sync docs/examples/*
 	jupytext --execute docs/examples/*
 	jupytext --sync docs/examples/*
+	jupytext --sync docs/advanced_examples/*
+	jupytext --execute docs/advanced_examples/*
+	jupytext --sync docs/advanced_examples/*
 	# No --execute for advanced examples and benchmarks (takes too long)
 	jupytext --sync docs/benchmarks/*
-	jupytext --sync docs/advanced_examples/*
 
 pre-commit:
 	pre-commit autoupdate
