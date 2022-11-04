@@ -24,7 +24,7 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 
 @pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
 def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
-    vf, u0, t0, t1, f_args = ode_problem
+    vf, u0, _, _, f_args = ode_problem
 
     filter_or_smoother = strategy(
         # Low order because it traces/differentiates faster
