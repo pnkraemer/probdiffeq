@@ -24,10 +24,9 @@ import jax
 import jax.numpy as jnp
 import jax.random
 import matplotlib.pyplot as plt
+import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
-import optax
-
 
 from odefilter import dense_output, ivpsolve, solvers
 from odefilter.implementations import isotropic
