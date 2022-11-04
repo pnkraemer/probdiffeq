@@ -118,7 +118,7 @@ Now, enter optax: build an optimizer, and optimise the parameter-to-model-fit fu
 
 ```python
 def build_update_fn(*, optimizer, loss_fn):
-    """Builds a function for executing a single step in the optimization."""
+    """Build a function for executing a single step in the optimization."""
 
     @jax.jit
     def update(params, opt_state):
