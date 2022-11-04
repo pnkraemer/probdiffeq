@@ -133,3 +133,21 @@ def fixture_solution_solve(ode_problem, tolerances, solver):
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
     )
+
+
+# Solve_fixed_grid() fixtures
+
+
+@pytest_cases.fixture(scope="session", name="fixed_grid")
+def fixture_fixed_grid(ode_problem):
+    _, _, t0, t1, _ = ode_problem
+    return jnp.linspace(t0, t1, endpoint=True, num=10)
+
+
+@pytest_cases.fixture(scope="session", name="solution_fixed_grid")
+@pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_SOLVE)
+def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
+    vf, u0, t0, t1, f_args = ode_problem
+    return ivpsolve.solve_fixed_grid(
+        vf, u0, ts=fixed_grid, parameters=f_args, solver=solver
+    )
