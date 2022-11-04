@@ -1,17 +1,14 @@
 """Tests for IVP solvers."""
 import jax.numpy as jnp
 import jax.random
-from pytest_cases import parametrize, parametrize_with_cases
+from pytest_cases import filters, parametrize, parametrize_with_cases
 
 from odefilter import controls, dense_output, ivpsolve
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver",
-    cases=".solver_cases",
-    prefix="solver_",
-    has_tag=("solve", "filter"),
+    "solver", cases=".solver_cases", filter=filters.has_tag("filter")
 )
 def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver):
     solution = ivpsolve.solve(
@@ -45,12 +42,12 @@ def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver):
     assert not jnp.allclose(u[0], solution.u[1], atol=1e-3, rtol=1e-3)
 
 
+_FILTER = filters.has_tag("filter") | filters.has_tag("smoother")
+
+
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver",
-    cases=".solver_cases",
-    prefix="solver_",
-    has_tag=("solve", "smoother"),
+    "solver", cases=".solver_cases", filter=filters.has_tag("smoother")
 )
 def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver):
 
@@ -95,10 +92,7 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver):
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver",
-    cases=".solver_cases",
-    prefix="solver_",
-    has_tag=["checkpoint", "smoother"],
+    "solver", cases=".solver_cases", filter=filters.has_tag("fixedpoint")
 )
 @parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_grid_samples(vf, u0, t0, t1, p, solver, shape):
@@ -120,7 +114,7 @@ def test_grid_samples(vf, u0, t0, t1, p, solver, shape):
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
-    "solver", cases=".solver_cases", prefix="solver_", has_tag=["fixedpoint"]
+    "solver", cases=".solver_cases", filter=filters.has_tag("fixedpoint")
 )
 def test_negative_marginal_log_likelihood(vf, u0, t0, t1, p, solver):
     ts = jnp.linspace(t0, t1, num=5)

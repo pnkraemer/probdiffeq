@@ -34,5 +34,6 @@ def test_smoother_warning(vf, u0, t0, t1, p):
     ts = jnp.linspace(t0, t1, num=3)
     solver = solvers.DynamicSolver(strategy=smoothers.Smoother())
 
+    # todo: does this compute the full solve? We only want to catch a warning!
     with pytest.warns():
         ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
