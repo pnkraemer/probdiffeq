@@ -6,11 +6,12 @@ from pytest_cases import filters, parametrize, parametrize_with_cases
 from odefilter import controls, dense_output, ivpsolve
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver", cases=".solver_cases", filter=filters.has_tag("filter")
 )
-def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver):
+def test_offgrid_marginals_filter(ode_problem, solver):
+    vf, u0, t0, t1, p = ode_problem
+
     solution = ivpsolve.solve(
         vf, u0, t0=t0, t1=t1, parameters=p, solver=solver, atol=1e-1, rtol=1e-1
     )
@@ -45,11 +46,11 @@ def test_offgrid_marginals_filter(vf, u0, t0, t1, p, solver):
 _FILTER = filters.has_tag("filter") | filters.has_tag("smoother")
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver", cases=".solver_cases", filter=filters.has_tag("smoother")
 )
-def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver):
+def test_offgrid_marginals_smoother(ode_problem, solver):
+    vf, u0, t0, t1, p = ode_problem
 
     solution = ivpsolve.solve(
         vf,
@@ -90,12 +91,13 @@ def test_offgrid_marginals_smoother(vf, u0, t0, t1, p, solver):
     assert jnp.allclose(u[-1], solution.u[-1], atol=1e-3, rtol=1e-3)
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver", cases=".solver_cases", filter=filters.has_tag("fixedpoint")
 )
 @parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_grid_samples(vf, u0, t0, t1, p, solver, shape):
+def test_grid_samples(ode_problem, solver, shape):
+    vf, u0, t0, t1, p = ode_problem
+
     ts = jnp.linspace(t0, t1, num=20, endpoint=True)
     solution = ivpsolve.simulate_checkpoints(
         vf, u0, ts=ts, parameters=p, solver=solver, atol=1e-1, rtol=1e-1
@@ -112,11 +114,12 @@ def test_grid_samples(vf, u0, t0, t1, p, solver, shape):
     #  in the notebooks, which looks good.
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
 @parametrize_with_cases(
     "solver", cases=".solver_cases", filter=filters.has_tag("fixedpoint")
 )
-def test_negative_marginal_log_likelihood(vf, u0, t0, t1, p, solver):
+def test_negative_marginal_log_likelihood(ode_problem, solver):
+    vf, u0, t0, t1, p = ode_problem
+
     ts = jnp.linspace(t0, t1, num=5)
     solution = ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
 
