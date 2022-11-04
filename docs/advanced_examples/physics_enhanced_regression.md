@@ -15,7 +15,11 @@ jupyter:
 
 # Physics-enhanced regression
 
+Aka Phenrir (Fenrir).
+
 ```python
+import functools
+
 import jax
 import jax.numpy as jnp
 import jax.random
@@ -24,8 +28,8 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import dense_output, ivpsolve, solvers
-from odefilter.implementations import dense
-from odefilter.strategies import filters, smoothers
+from odefilter.implementations import isotropic
+from odefilter.strategies import smoothers
 
 config.update("jax_enable_x64", True)
 
@@ -34,8 +38,11 @@ if not backend.has_been_selected:
 ```
 
 ```python
-f, u0, (t0, t1), f_args = ivps.seir()
+f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 f_args = jnp.asarray(f_args)
+
+parameter_true = f_args + 0.05
+parameter_guess = f_args
 
 
 @jax.jit
@@ -46,34 +53,33 @@ def vf(y, t, p):
 ```python
 # make data
 
-ts = jnp.linspace(t0, t1, endpoint=True, num=3)
+ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
-ek1 = solvers.MLESolver(
-    strategy=filters.Filter(
-        extrapolation=dense.IBM.from_params(ode_dimension=4),
-        correction=dense.TaylorFirstOrder(ode_dimension=4),
-    )
+strategy = smoothers.Smoother(
+    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=1),
 )
+solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=10.0)
 
-solution_true = ivpsolve.simulate_terminal_values(
-    vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek1, parameters=f_args + 0.05
+
+solution_true = ivpsolve.solve_fixed_grid(
+    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameter_true
 )
 data = solution_true.u
-print(data)
+plt.plot(ts, data, "P-")
+plt.show()
 ```
 
 ```python
 
-
 ```
 
 ```python
-# Initial guess
-
-solution_wrong = ivpsolve.simulate_terminal_values(
-    vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek1, parameters=f_args
+solution_wrong = ivpsolve.solve_fixed_grid(
+    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameter_guess
 )
-print(solution_wrong.u)
+plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
+plt.plot(ts, solution_wrong.u)
+plt.show()
 ```
 
 ```python
@@ -81,43 +87,30 @@ print(solution_wrong.u)
 ```
 
 ```python
-@jax.jit
-def param_to_nmll(p):
-    observation_std = jnp.ones_like(ts) * 0.1
-    solution_wrong = ivpsolve.simulate_terminal_values(
-        vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek1, parameters=p
+def data_likelihood(parameters_, u0_, ts_, solver_, vf_, data_):
+    sol_ = ivpsolve.solve_fixed_grid(
+        vf_, initial_values=(u0_,), ts=ts_, solver=solver_, parameters=parameters_
     )
 
-    m_obs = ek1.strategy.correction._select_derivative(solution_wrong.marginals.mean, 0)
-    l_obs = ek1.strategy.correction._select_derivative_vect(
-        solution_wrong.marginals.cov_sqrtm_lower, 0
+    observation_std = jnp.ones_like(ts_) * 1e-1
+    return dense_output.negative_marginal_log_likelihood(
+        observation_std=observation_std, u=data_, solution=sol_, solver=solver_
     )
 
-    return (data - solution_wrong.u) @ (data - solution_wrong.u)
 
-
-#     return (solution_wrong.u[-1, ...] - 20.) @ (solution_wrong.u[-1, ...] - 20.)
-#     return dense_output.negative_marginal_log_likelihood(
-#         observation_std=observation_std, u=data, solution=solution_wrong, solver=ek1
-#     )
+parameter_to_solution = jax.jit(
+    functools.partial(
+        data_likelihood, solver_=solver, ts_=ts, vf_=vf, u0_=u0, data_=data
+    )
+)
+sensitivity = jax.jit(jax.grad(parameter_to_solution))
 ```
 
 ```python
-param_to_nmll(f_args)
-```
+%%time
 
-```python
-df = jax.jit(jax.jacfwd(param_to_nmll))
-```
-
-```python
-f0 = f_args
-f1 = f0 - 1e-1 * df(f0)
-print(f1, f_args)
-f1 = f1 - 1e-1 * df(f1)
-print(f1, f_args)
-f1 = f1 - 1e-1 * df(f1)
-print(f1, f_args)
+parameter_to_solution(parameter_guess)
+sensitivity(parameter_guess)
 ```
 
 ```python
@@ -125,13 +118,26 @@ print(f1, f_args)
 ```
 
 ```python
+%%time
 
+f1 = parameter_guess
+lrate = 2e-6
+block_size = 50
+for i in range(block_size):
+    for _ in range(block_size):
+        f1 = f1 - lrate * sensitivity(f1)
+
+    print(f"After {(i+1)*block_size} iterations:", f1, parameter_true)
+
+
+print(f1, parameter_true)
 ```
 
 ```python
-
-```
-
-```python
-
+solution_wrong = ivpsolve.solve_fixed_grid(
+    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=f1
+)
+plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
+plt.plot(ts, solution_wrong.u)
+plt.show()
 ```
