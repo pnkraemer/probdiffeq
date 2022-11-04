@@ -7,6 +7,7 @@ format:
 	nbqa black docs/
 	nbqa isort docs/
 	jupytext --sync docs/examples/*
+	jupytext --sync docs/advanced_examples/*
 	jupytext --sync docs/benchmarks/*
 
 lint:

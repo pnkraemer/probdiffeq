@@ -22,9 +22,10 @@ import jax.random
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
+import functools
 
 from odefilter import dense_output, ivpsolve, solvers
-from odefilter.implementations import dense
+from odefilter.implementations import dense, isotropic
 from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
@@ -34,10 +35,11 @@ if not backend.has_been_selected:
 ```
 
 ```python
-f, u0, (t0, t1), f_args = ivps.seir()
+f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 f_args = jnp.asarray(f_args)
 
-
+parameter_true = f_args + 0.1
+parameter_guess = f_args
 @jax.jit
 def vf(y, t, p):
     return f(y, *p)
@@ -46,34 +48,32 @@ def vf(y, t, p):
 ```python
 # make data
 
-ts = jnp.linspace(t0, t1, endpoint=True, num=3)
+ts = jnp.linspace(t0, t1, endpoint=True, num=50)
 
-ek1 = solvers.MLESolver(
-    strategy=filters.Filter(
-        extrapolation=dense.IBM.from_params(ode_dimension=4),
-        correction=dense.TaylorFirstOrder(ode_dimension=4),
-    )
+strategy = smoothers.Smoother(
+    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=1),
 )
+solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=1.)
 
-solution_true = ivpsolve.simulate_terminal_values(
-    vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek1, parameters=f_args + 0.05
+
+solution_true = ivpsolve.solve_fixed_grid(
+    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameter_true
 )
 data = solution_true.u
-print(data)
+print(data[::2])
 ```
 
 ```python
-
 
 ```
 
 ```python
 # Initial guess
 
-solution_wrong = ivpsolve.simulate_terminal_values(
-    vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek1, parameters=f_args
+solution_wrong = ivpsolve.solve_fixed_grid(
+    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameter_guess
 )
-print(solution_wrong.u)
+print(solution_wrong.u[::2])
 ```
 
 ```python
@@ -81,43 +81,44 @@ print(solution_wrong.u)
 ```
 
 ```python
-@jax.jit
-def param_to_nmll(p):
-    observation_std = jnp.ones_like(ts) * 0.1
-    solution_wrong = ivpsolve.simulate_terminal_values(
-        vf, initial_values=(u0,), t0=t0, t1=t1, solver=ek1, parameters=p
+def data_likelihood(parameters, u0, ts, solver, vf, data):
+    solution_wrong = ivpsolve.solve_fixed_grid(
+        vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameters
     )
 
-    m_obs = ek1.strategy.correction._select_derivative(solution_wrong.marginals.mean, 0)
-    l_obs = ek1.strategy.correction._select_derivative_vect(
-        solution_wrong.marginals.cov_sqrtm_lower, 0
+    observation_std = jnp.ones_like(ts) * 1e-4
+    return dense_output.negative_marginal_log_likelihood(
+        observation_std=observation_std, u=data, solution=solution_wrong, solver=solver
     )
 
-    return (data - solution_wrong.u) @ (data - solution_wrong.u)
 
+parameter_to_solution = functools.partial(
+    data_likelihood, solver=solver, ts=ts, vf=vf, u0=u0, data=data
+)
+sensitivity = jax.jit(jax.grad(parameter_to_solution))
 
-#     return (solution_wrong.u[-1, ...] - 20.) @ (solution_wrong.u[-1, ...] - 20.)
-#     return dense_output.negative_marginal_log_likelihood(
-#         observation_std=observation_std, u=data, solution=solution_wrong, solver=ek1
-#     )
 ```
 
 ```python
-param_to_nmll(f_args)
+parameter_to_solution(parameter_guess)
+sensitivity(parameter_guess)
 ```
 
 ```python
-df = jax.jit(jax.jacfwd(param_to_nmll))
+
 ```
 
 ```python
-f0 = f_args
-f1 = f0 - 1e-1 * df(f0)
-print(f1, f_args)
-f1 = f1 - 1e-1 * df(f1)
-print(f1, f_args)
-f1 = f1 - 1e-1 * df(f1)
-print(f1, f_args)
+f1 = parameter_guess
+lrate = 1e-7
+for i in range(100):
+    for _ in range(100):
+        f1 = f1 - lrate * sensitivity(f1)
+    print(f"{i+1}00 iterations:", f1, parameter_true)
+
+
+print(f1, parameter_true)
+
 ```
 
 ```python
