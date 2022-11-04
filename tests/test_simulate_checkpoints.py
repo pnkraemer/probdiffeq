@@ -12,9 +12,10 @@ def test_checkpoints_simulated_correctly(
 ):
     t_ref, u_ref = reference_checkpoints
     atol, rtol = tolerances
+    solution, _ = solution_checkpoints
 
-    assert jnp.allclose(solution_checkpoints.t, t_ref)
-    assert jnp.allclose(solution_checkpoints.u, u_ref, atol=atol, rtol=rtol)
+    assert jnp.allclose(solution.t, t_ref)
+    assert jnp.allclose(solution.u, u_ref, atol=atol, rtol=rtol)
 
 
 def test_smoother_warning(ode_problem):

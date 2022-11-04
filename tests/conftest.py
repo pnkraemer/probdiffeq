@@ -63,7 +63,7 @@ def fixture_reference_terminal_values(ode_problem, tolerances):
 def fixture_solution_terminal_values(ode_problem, tolerances, solver):
     vf, u0, t0, t1, f_args = ode_problem
     atol, rtol = tolerances
-    return ivpsolve.simulate_terminal_values(
+    solution = ivpsolve.simulate_terminal_values(
         vf,
         u0,
         t0=t0,
@@ -73,6 +73,7 @@ def fixture_solution_terminal_values(ode_problem, tolerances, solver):
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
     )
+    return solution, solver
 
 
 # Checkpoint fixtures
@@ -104,7 +105,7 @@ def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
 def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_grid):
     vf, u0, t0, t1, f_args = ode_problem
     atol, rtol = tolerances
-    return ivpsolve.simulate_checkpoints(
+    solution = ivpsolve.simulate_checkpoints(
         vf,
         u0,
         ts=checkpoint_grid,
@@ -113,6 +114,7 @@ def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_gri
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
     )
+    return solution, solver
 
 
 # Solve() fixtures
@@ -123,7 +125,7 @@ def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_gri
 def fixture_solution_solve(ode_problem, tolerances, solver):
     vf, u0, t0, t1, f_args = ode_problem
     atol, rtol = tolerances
-    return ivpsolve.solve(
+    solution = ivpsolve.solve(
         vf,
         u0,
         t0=t0,
@@ -133,6 +135,7 @@ def fixture_solution_solve(ode_problem, tolerances, solver):
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
     )
+    return solution, solver
 
 
 # Solve_fixed_grid() fixtures
@@ -148,6 +151,7 @@ def fixture_fixed_grid(ode_problem):
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_SOLVE)
 def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
     vf, u0, t0, t1, f_args = ode_problem
-    return ivpsolve.solve_fixed_grid(
+    solution = ivpsolve.solve_fixed_grid(
         vf, u0, ts=fixed_grid, parameters=f_args, solver=solver
     )
+    return solution, solver

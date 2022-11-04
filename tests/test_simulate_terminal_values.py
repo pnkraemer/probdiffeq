@@ -8,6 +8,7 @@ def test_terminal_values_simulated_correctly(
 ):
     t_ref, u_ref = reference_terminal_values
     atol, rtol = tolerances
+    solution, _ = solution_terminal_values
 
-    assert solution_terminal_values.t == t_ref
-    assert jnp.allclose(solution_terminal_values.u, u_ref, atol=atol, rtol=rtol)
+    assert solution.t == t_ref
+    assert jnp.allclose(solution.u, u_ref, atol=atol, rtol=rtol)
