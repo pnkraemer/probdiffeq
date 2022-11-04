@@ -3,6 +3,7 @@
 import jax
 import jax.numpy as jnp
 import pytest_cases
+import pytest_cases.filters
 from diffeqzoo import ivps
 from jax.experimental.ode import odeint
 
@@ -37,7 +38,7 @@ def fixture_reference_terminal_values(ode_problem, tolerances):
         return vf(y, t=t, p=p)
 
     ts = jnp.asarray([t0, t1])
-    odeint_solution = odeint(func, u0, ts, *f_args, atol=atol, rtol=rtol)
+    odeint_solution = odeint(func, u0, ts, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol)
     ys_reference = odeint_solution[-1, :]
     return t1, ys_reference
 
@@ -49,6 +50,57 @@ def fixture_solution_terminal_values(ode_problem, tolerances, solver):
     atol, rtol = tolerances
 
     solution = ivpsolve.simulate_terminal_values(
-        vf, u0, t0=t0, t1=t1, parameters=f_args, solver=solver, atol=atol, rtol=rtol
+        vf,
+        u0,
+        t0=t0,
+        t1=t1,
+        parameters=f_args,
+        solver=solver,
+        atol=1e-1 * atol,
+        rtol=1e-1 * rtol,
+    )
+    return solution.t, solution.u
+
+
+@pytest_cases.fixture(scope="session", name="checkpoint_grid")
+def fixture_checkpoint_grid(ode_problem):
+    _, _, t0, t1, _ = ode_problem
+    return jnp.linspace(t0, t1, endpoint=True, num=5)
+
+
+@pytest_cases.fixture(scope="session", name="reference_checkpoints")
+def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
+    vf, (u0,), t0, t1, f_args = ode_problem
+    atol, rtol = tolerances
+
+    @jax.jit
+    def func(y, t, *p):
+        return vf(y, t=t, p=p)
+
+    odeint_solution = odeint(
+        func, u0, checkpoint_grid, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol
+    )
+    return checkpoint_grid, odeint_solution
+
+
+_IS_FILTER = pytest_cases.filters.has_tag("filter")
+_IS_FIXEDPOINT = pytest_cases.filters.has_tag("filter")
+_CHECKPT = _IS_FILTER | _IS_FIXEDPOINT
+
+
+@pytest_cases.fixture(scope="session", name="solution_checkpoints")
+@pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_CHECKPT)
+def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_grid):
+    vf, u0, t0, t1, f_args = ode_problem
+    atol, rtol = tolerances
+
+    solution = ivpsolve.simulate_checkpoints(
+        vf,
+        u0,
+        ts=checkpoint_grid,
+        parameters=f_args,
+        solver=solver,
+        atol=1e-1 * atol,
+        rtol=1e-1 * rtol,
     )
     return solution.t, solution.u

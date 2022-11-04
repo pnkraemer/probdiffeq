@@ -11,4 +11,4 @@ def test_terminal_values_simulated_correctly(
     atol, rtol = tolerances
 
     assert t_ref == t
-    assert jnp.allclose(u, u_ref, atol=10 * atol, rtol=10 * rtol)
+    assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)
