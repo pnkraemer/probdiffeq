@@ -57,14 +57,33 @@ class IsoTaylorZerothOrder(_correction.Correction):
         corrected = _IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
 
-    # def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
-    #     return cov_sqrtm_lower[self.ode_order, ...]
-
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
         res_white = obs_pt / l_obs
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
+
+    def correct_sol_observation(self, *, rv, u, observation_std):
+        hc = rv.cov_sqrtm_lower[0, ...].reshape((1, -1))
+        m_obs = rv.mean[0, ...]
+
+        r_yx = observation_std * jnp.ones((1, 1))
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
+            R_X_F=hc.T, R_X=rv.cov_sqrtm_lower.T, R_YX=r_yx
+        )
+        m_cor = rv.mean - gain * (m_obs - u)[None, :]
+
+        return _IsoNormal(m_obs, r_obs.T), (_IsoNormal(m_cor, r_cor.T), gain)
+
+    def negative_marginal_log_likelihood(self, observed, u):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+
+        res_white = (m_obs - u) / jnp.reshape(l_obs, ())
+
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.reshape(l_obs, ()) ** 2
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return 0.5 * (x1 + x2 + x3)
 
 
 @jax.tree_util.register_pytree_node_class

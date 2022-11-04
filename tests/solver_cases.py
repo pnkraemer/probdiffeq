@@ -25,7 +25,7 @@ def solver_eks0_isotropic():
     return solvers.DynamicSolver(strategy=strategy)
 
 
-@case(tags=["terminal_value", "checkpoint", "smoother"])
+@case(tags=["terminal_value", "checkpoint", "smoother", "fixedpoint"])
 def solver_eks0_isotropic_fixedpoint():
     correction = isotropic.IsoTaylorZerothOrder()
     extrapolation = isotropic.IsoIBM.from_params()
@@ -51,7 +51,7 @@ def solver_eks0_batch():
     return solvers.MLESolver(strategy=strategy)
 
 
-@case(tags=["terminal_value", "checkpoint", "smoother"])
+@case(tags=["terminal_value", "checkpoint", "smoother", "fixedpoint"])
 def solver_eks0_batch_fixedpoint():
     correction = batch.BatchTaylorZerothOrder()
     extrapolation = batch.BatchIBM.from_params(ode_dimension=2)
@@ -104,7 +104,7 @@ def solver_eks1():
     return solvers.MLESolver(strategy=strategy)
 
 
-@case(tags=["terminal_value", "checkpoint", "smoother", "dense"])
+@case(tags=["terminal_value", "checkpoint", "smoother", "fixedpoint"])
 def solver_eks1_fixedpoint():
     correction = dense.TaylorFirstOrder(ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)
@@ -114,7 +114,7 @@ def solver_eks1_fixedpoint():
     return solvers.MLESolver(strategy=strategy)
 
 
-@case(tags=["terminal_value", "checkpoint", "smoother"])
+@case(tags=["terminal_value", "checkpoint", "smoother", "fixedpoint"])
 def solver_eks0_fixedpoint():
     correction = dense.TaylorZerothOrder(ode_dimension=2)
     extrapolation = dense.IBM.from_params(ode_dimension=2)

@@ -44,27 +44,46 @@ class _DenseCorrection(_correction.Correction):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    def _e0(self, x):
+    def correct_sol_observation(self, *, rv, u, observation_std):
+        hc = self._select_derivative_vect(rv.cov_sqrtm_lower, 0)
+        m_obs = self._select_derivative(rv.mean, 0)
+
+        r_yx = observation_std * jnp.eye(u.shape[0])
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
+            R_X_F=hc.T, R_X=rv.cov_sqrtm_lower.T, R_YX=r_yx
+        )
+        m_cor = rv.mean - gain @ (m_obs - u)
+
+        return _Normal(m_obs, r_obs.T), (_Normal(m_cor, r_cor.T), gain)
+
+    def negative_marginal_log_likelihood(self, observed, u):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+
+        res_white = jsp.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
+
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return 0.5 * (x1 + x2 + x3)
+
+    def _select_derivative_vect(self, x, i):
+        select = jax.vmap(
+            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
+        )
+        return select(x)
+
+    def _select_derivative(self, x, i):
         x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
-        return x_reshaped[: self.ode_order, ...]
-
-    def _e1(self, x):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
-        return x_reshaped[self.ode_order, ...]
-
-    def _e0v(self, x):
-        return jax.vmap(lambda s: self._e0(s), in_axes=1, out_axes=1)(x)
-
-    def _e1v(self, x):
-        return jax.vmap(lambda s: self._e1(s), in_axes=1, out_axes=1)(x)
+        return x_reshaped[i, ...]
 
 
 @register_pytree_node_class
 class TaylorZerothOrder(_DenseCorrection):
     def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
-        m0, m1 = self._e0(x.mean), self._e1(x.mean)
+        m0 = self._select_derivative(x.mean, slice(0, self.ode_order))
+        m1 = self._select_derivative(x.mean, self.ode_order)
         b = m1 - vector_field(*m0, t=t, p=p)
-        cov_sqrtm_lower = self._e1v(x.cov_sqrtm_lower)
+        cov_sqrtm_lower = self._select_derivative_vect(x.cov_sqrtm_lower, 1)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         output_scale_sqrtm = self.evidence_sqrtm(observed=_Normal(b, l_obs_raw))
@@ -75,7 +94,7 @@ class TaylorZerothOrder(_DenseCorrection):
         (b,) = cache
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
 
-        l_obs_nonsquare = self._e1v(l_ext)
+        l_obs_nonsquare = self._select_derivative_vect(l_ext, self.ode_order)
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
         )
@@ -128,7 +147,8 @@ class TaylorFirstOrder(_DenseCorrection):
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
     def _residual(self, x, *, vector_field, t, p):
-        x0, x1 = self._e0(x), self._e1(x)
+        x0 = self._select_derivative(x, slice(0, self.ode_order))
+        x1 = self._select_derivative(x, self.ode_order)
         fx0 = vector_field(*x0, t=t, p=p)
         return x1 - fx0
 
@@ -164,14 +184,14 @@ class MomentMatching(_DenseCorrection):
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
-        e0v = jax.vmap(self._e0, in_axes=1, out_axes=1)
-        e1v = jax.vmap(self._e1, in_axes=1, out_axes=1)
-        cache = (vmap_f, e0v, e1v)
+        cache = (vmap_f,)
 
         # 1. x -> (e0x, e1x)
         R_X = x.cov_sqrtm_lower.T
-        r_marg1_x = _sqrtm.sqrtm_to_upper_triangular(R=e0v(R_X.T).T)
-        m_marg1_x, m_marg1_y = self._e0(x.mean), self._e1(x.mean)
+        L0 = self._select_derivative_vect(R_X.T, 0)
+        r_marg1_x = _sqrtm.sqrtm_to_upper_triangular(R=L0.T)
+        m_marg1_x = self._select_derivative(x.mean, 0)
+        m_marg1_y = self._select_derivative(x.mean, 1)
 
         # 2. (x, y) -> (f(x), y)
         x_centered = self.cubature.points @ r_marg1_x
@@ -183,7 +203,8 @@ class MomentMatching(_DenseCorrection):
 
         # 3. (x, y) -> y - x (last one)
         m_marg = m_marg1_y - m_marg2
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=e1v(R_X.T).T, R2=fx_centered_normed).T
+        R1 = self._select_derivative_vect(R_X.T, 1).T
+        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=fx_centered_normed).T
 
         # Summarise
         marginals = _Normal(m_marg, l_marg)
@@ -209,15 +230,19 @@ class MomentMatching(_DenseCorrection):
         H, noise = self._linearize(x=extrapolated, cache=cache)
 
         # Compute the CKF correction
-        (_, e0v, e1v), L = cache, extrapolated.cov_sqrtm_lower
-        HL = e1v(L) - H @ e0v(L)
+        L = extrapolated.cov_sqrtm_lower
+        L0 = self._select_derivative_vect(L, 0)
+        L1 = self._select_derivative_vect(L, 1)
+        HL = L1 - H @ L0
         r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
 
         # Catch up the marginals
         x = extrapolated  # alias for readability in this code-block
-        m_marg = self._e1(x.mean) - (H @ self._e0(x.mean) + noise.mean)
+        x0 = self._select_derivative(x.mean, 0)
+        x1 = self._select_derivative(x.mean, 1)
+        m_marg = x1 - (H @ x0 + noise.mean)
         marginals = _Normal(m_marg, r_marg.T)
 
         # Catch up the backward noise and return result
@@ -226,11 +251,11 @@ class MomentMatching(_DenseCorrection):
         return marginals, (backward_noise, gain)
 
     def _linearize(self, *, x, cache):
-        vmap_f, e0v, _ = cache
+        vmap_f, *_ = cache
 
         # Create sigma points
-        m_0 = self._e0(x.mean)
-        r_0 = e0v(x.cov_sqrtm_lower).T
+        m_0 = self._select_derivative(x.mean, 0)
+        r_0 = self._select_derivative_vect(x.cov_sqrtm_lower, 0).T
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
         pts_centered = self.cubature.points @ r_0_square
         pts = m_0[None, :] + pts_centered
@@ -257,14 +282,6 @@ class MomentMatching(_DenseCorrection):
         # Catch up the transition-mean and return the result
         d = fx_mean - H @ m_0
         return H, _Normal(d, r_Om.T)
-
-    # Are we overwriting a method here?
-
-    def _e1(self, x):
-        return x.reshape((-1, self.ode_dimension), order="F")[1, ...]
-
-    def _e0(self, x):
-        return x.reshape((-1, self.ode_dimension), order="F")[0, ...]
 
 
 @register_pytree_node_class
@@ -476,61 +493,3 @@ class IBM(_extrapolation.Extrapolation):
         if mean.ndim == 1:
             return mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
         return jax.vmap(self.extract_mean_from_marginals)(mean)
-
-
-def negative_marginal_log_likelihood(*, h, sigmas, data, posterior):
-
-    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], posterior.backward_model)
-    init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-
-    def filter_step(carry, x):
-
-        rv, num_data, mll = carry
-
-        # Read
-        bw_model, sigma, y = x
-        A = bw_model.transition
-        m_noise, l_noise = bw_model.noise.mean, bw_model.noise.cov_sqrtm_lower
-
-        # Extrapolate
-        m_ext = A @ rv.mean + m_noise
-        l_ext = _sqrtm.sum_of_sqrtm_factors(
-            R1=(A @ rv.cov_sqrtm_lower).T, R2=l_noise.T
-        ).T
-
-        # Correct
-        hc = jax.vmap(h, in_axes=1, out_axes=1)(l_ext)
-        m_obs = h(m_ext)
-        d = y.shape[0]
-        r_yx = sigma * jnp.eye(d)
-        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
-            R_X_F=hc.T, R_X=l_ext.T, R_YX=r_yx
-        )
-        m_cor = m_ext - gain @ (m_obs - y)
-
-        # Compute marginal log likelihood and go
-        # todo: extract a log-likelihood function
-        res_white = jsp.linalg.solve_triangular(r_obs, (m_obs - y), lower=False)
-        x1 = jnp.dot(res_white, res_white.T)
-        _, x2 = jnp.linalg.slogdet(r_obs)
-        x2 = x2**2
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        mll_new = 0.5 * (x1 + x2 + x3)
-        mll_updated = (num_data * mll + mll_new) / (num_data + 1)
-        return (_Normal(m_cor, r_cor.T), num_data + 1, mll_updated), None
-
-    # todo: this should return a Filtering posterior or a smoothing posterior
-    #  which could then be plotted. Right?
-    #  (We might also want some dense-output/checkpoint kind of thing here)
-    # todo: we should reuse the extrapolation model implementations.
-    #  But this only works if the ODE posterior uses the preconditioner (I think).
-    # todo: we should allow proper noise, and proper information functions.
-    #  But it is not clear which data structure that should be.
-    #
-    (_, _, mll), _ = jax.lax.scan(
-        f=filter_step,
-        init=(init, 0, 0.0),
-        xs=(bw_models, sigmas[:-1], data[:-1]),
-        reverse=True,
-    )
-    return mll
