@@ -8,12 +8,7 @@ from odefilter import ivpsolve
 
 
 @parametrize_with_cases("vf, u0, t0, t1, p", cases=".ivp_cases", prefix="problem_")
-@parametrize_with_cases(
-    "solver",
-    cases=".solver_cases",
-    prefix="solver_",
-    has_tag=("terminal_value",),
-)
+@parametrize_with_cases("solver", cases=".solver_cases")
 def test_simulate_terminal_values(vf, u0, t0, t1, p, solver):
     def func(y, t, *p):
         return vf(y, t=t, p=p)
