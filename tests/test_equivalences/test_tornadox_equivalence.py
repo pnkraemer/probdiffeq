@@ -2,7 +2,6 @@
 
 import jax
 import jax.numpy as jnp
-import pytest
 import pytest_cases
 from diffeqzoo import ivps
 from tornadox import ek0, ek1, init, ivp, step
@@ -12,63 +11,120 @@ from odefilter.implementations import dense, isotropic
 from odefilter.strategies import filters
 
 
-@pytest_cases.case
-def case_solver_pair_isotropic_ekf0(num, atol, rtol, factor_min, factor_max, safety):
+@pytest_cases.fixture(scope="session", name="num")
+def fixture_num():
+    return 4
 
+
+@pytest_cases.fixture(scope="session", name="control_params")
+def fixture_control_params():
+    return 0.2, 10.0, 0.95
+
+
+@pytest_cases.fixture(scope="session", name="vanderpol")
+def fixture_vanderpol():
     # van-der-Pol as a setup. We really don't want stiffness here.
-    f, u0, (t0, t1), f_args = ivps.van_der_pol_first_order(
-        time_span=(0.0, 1.0), stiffness_constant=1.0
-    )
+    return ivps.van_der_pol_first_order(time_span=(0.0, 1.0), stiffness_constant=1.0)
 
-    # Tornadox
+
+@pytest_cases.fixture(scope="session", name="ivp_tornadox")
+def fixture_ivp_tornadox(vanderpol):
+    f, u0, (t0, t1), f_args = vanderpol
 
     @jax.jit
     def vf_tor(t, y):
         return f(y, *f_args)
 
-    solver = ek0.KroneckerEK0(
-        initialization=init.TaylorMode(),
-        num_derivatives=num,
-        steprule=step.AdaptiveSteps(
-            max_changes=(factor_min, factor_max),
-            safety_scale=safety,
-            abstol=atol,
-            reltol=rtol,
-        ),
+    return ivp.InitialValueProblem(
+        f=vf_tor, t0=t0, tmax=t1, y0=u0, df=jax.jit(jax.jacfwd(vf_tor, argnums=1))
     )
-    vdp = ivp.InitialValueProblem(f=vf_tor, t0=t0, tmax=t1, y0=u0)
-    solution_tornadox = solver.solve(vdp)
+
+
+@pytest_cases.fixture(scope="session", name="ivp_odefilter")
+def fixture_ivp_odefilter(vanderpol):
+    f, u0, (t0, t1), f_args = vanderpol
 
     # ODE-filter
     @jax.jit
     def vf_ode(y, *, t, p):
         return f(y, *p)
 
+    return vf_ode, (u0,), (t0, t1), f_args
+
+
+@pytest_cases.fixture(scope="session", name="steprule_tornadox")
+def fixture_steprule_tornadox(tolerances, control_params):
+    atol, rtol = tolerances
+    factor_min, factor_max, safety = control_params
+    return step.AdaptiveSteps(
+        max_changes=(factor_min, factor_max),
+        safety_scale=safety,
+        abstol=atol,
+        reltol=rtol,
+    )
+
+
+@pytest_cases.fixture(scope="session", name="controller_odefilter")
+def fixture_controller_odefilter(control_params):
+    factor_min, factor_max, safety = control_params
+    return controls.ClippedIntegral(
+        safety=safety, factor_min=factor_min, factor_max=factor_max
+    )
+
+
+@pytest_cases.fixture(scope="session", name="solver_tornadox_ekf0")
+def fixture_solver_tornadox_ekf0(num, steprule_tornadox):
+    return ek0.KroneckerEK0(
+        initialization=init.TaylorMode(),
+        num_derivatives=num,
+        steprule=steprule_tornadox,
+    )
+
+
+@pytest_cases.fixture(scope="session", name="solver_odefilter_ekf0")
+def fixture_solver_odefilter_ekf0(num):
+
     extrapolation = isotropic.IsoIBM.from_params(num_derivatives=num)
     correction = isotropic.IsoTaylorZerothOrder()
     ekf0_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
-    ekf0 = solvers.DynamicSolver(strategy=ekf0_strategy)
-    controller = controls.ClippedIntegral(
-        safety=safety, factor_min=factor_min, factor_max=factor_max
-    )
+    return solvers.DynamicSolver(strategy=ekf0_strategy)
+
+
+@pytest_cases.case
+def case_solver_pair_isotropic_ekf0(
+    tolerances,
+    ivp_tornadox,
+    ivp_odefilter,
+    solver_tornadox_ekf0,
+    solver_odefilter_ekf0,
+    controller_odefilter,
+):
+    # Solve with tornadox
+    solution_tornadox = solver_tornadox_ekf0.solve(ivp_tornadox)
+
+    # Solve with odefilter
+    atol, rtol = tolerances
+    vf_ode, u0, (t0, t1), f_args = ivp_odefilter
     solution_odefilter = ivpsolve.solve(
         vf_ode,
-        initial_values=(u0,),
+        initial_values=u0,
         t0=t0,
         t1=t1,
-        solver=ekf0,
+        solver=solver_odefilter_ekf0,
         atol=atol,
         rtol=rtol,
-        control=controller,
+        control=controller_odefilter,
         parameters=f_args,
         reference_state_fn=lambda x, y: jnp.abs(x),
     )
+
+    # Get both solutions into the same format
 
     @jax.vmap
     def cov(x):
         return x @ x.T
 
-    d = u0.shape[0]
+    d = u0[0].shape[0]
 
     @jax.vmap
     def kroncov(x):
@@ -87,57 +143,51 @@ def case_solver_pair_isotropic_ekf0(num, atol, rtol, factor_min, factor_max, saf
     return output_tornadox, solution_odefilter
 
 
-@pytest_cases.case
-def case_solver_pair_ekf1_dynamic(num, atol, rtol, factor_min, factor_max, safety):
-
-    f, u0, (t0, t1), f_args = ivps.van_der_pol_first_order(
-        time_span=(0.0, 1.0), stiffness_constant=4.0
-    )
-
-    @jax.jit
-    def vf_tor(t, y):
-        return f(y, *f_args)
-
-    # Tornadox
-    solver = ek1.ReferenceEK1(
+@pytest_cases.fixture(scope="session", name="solver_tornadox_ekf1")
+def fixture_solver_tornadox_ekf1(num, steprule_tornadox):
+    return ek1.ReferenceEK1(
         initialization=init.TaylorMode(),
         num_derivatives=num,
-        steprule=step.AdaptiveSteps(
-            max_changes=(factor_min, factor_max),
-            safety_scale=safety,
-            abstol=atol,
-            reltol=rtol,
-        ),
+        steprule=steprule_tornadox,
     )
-    vdp = ivp.InitialValueProblem(
-        f=vf_tor, t0=t0, tmax=t1, y0=u0, df=jax.jit(jax.jacfwd(vf_tor, argnums=1))
-    )
-    solution_tornadox = solver.solve(vdp)
 
-    # ODE-filter
-    @jax.jit
-    def vf_ode(y, *, t, p):
-        return f(y, *p)
 
-    extrapolation = dense.IBM.from_params(ode_dimension=2, num_derivatives=num)
+@pytest_cases.fixture(scope="session", name="solver_odefilter_ekf1")
+def fixture_solver_odefilter_ekf1(num):
+    extrapolation = dense.IBM.from_params(num_derivatives=num, ode_dimension=2)
     correction = dense.TaylorFirstOrder(ode_dimension=2)
     ekf1_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
-    ekf1 = solvers.DynamicSolver(strategy=ekf1_strategy)
-    controller = controls.ClippedIntegral(
-        safety=safety, factor_min=factor_min, factor_max=factor_max
-    )
+    return solvers.DynamicSolver(strategy=ekf1_strategy)
+
+
+@pytest_cases.case
+def case_solver_pair_ekf1_dynamic(
+    tolerances,
+    ivp_tornadox,
+    ivp_odefilter,
+    solver_tornadox_ekf1,
+    solver_odefilter_ekf1,
+    controller_odefilter,
+):
+    # Solve with tornadox
+    solution_tornadox = solver_tornadox_ekf1.solve(ivp_tornadox)
+
+    # Solve with odefilter
+    atol, rtol = tolerances
+    vf_ode, u0, (t0, t1), f_args = ivp_odefilter
     solution_odefilter = ivpsolve.solve(
         vf_ode,
-        initial_values=(u0,),
+        initial_values=u0,
         t0=t0,
         t1=t1,
-        solver=ekf1,
+        solver=solver_odefilter_ekf1,
         atol=atol,
         rtol=rtol,
-        control=controller,
+        control=controller_odefilter,
         parameters=f_args,
-        reference_state_fn=lambda x, y: jnp.maximum(jnp.abs(x), jnp.abs(y)),
     )
+
+    # Get both into the same format
 
     @jax.vmap
     def cov(x):
@@ -160,9 +210,6 @@ def case_solver_pair_ekf1_dynamic(num, atol, rtol, factor_min, factor_max, safet
     return output_tornadox, solution_odefilter
 
 
-@pytest.mark.parametrize("num", [4])
-@pytest.mark.parametrize("atol, rtol", [(1e-3, 1e-5)])
-@pytest.mark.parametrize("factor_min, factor_max, safety", [(0.2, 10.0, 0.95)])
 @pytest_cases.parametrize_with_cases(
     "solution_tornadox, solution_odefilter", cases=".", prefix="case_solver_pair_"
 )

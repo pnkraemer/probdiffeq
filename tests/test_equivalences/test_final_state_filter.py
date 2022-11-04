@@ -3,44 +3,48 @@
 # todo: reuse solve() calls with default smoothers.
 import jax
 import jax.numpy as jnp
+import pytest_cases
 from jax.tree_util import tree_all, tree_map
-from pytest_cases import case, parametrize, parametrize_with_cases
 
 from odefilter import ivpsolve, solvers
 from odefilter.strategies import filters, smoothers
 
 
-@case
-def filter_smoother_pair_eks0():
-    filter_ = filters.Filter()
-    solver1 = solvers.DynamicSolver(strategy=filter_)
-
-    smoother = smoothers.Smoother()
-    solver2 = solvers.DynamicSolver(strategy=smoother)
-    return solver1, solver2
+@pytest_cases.case
+def strategy_pair_smoother():
+    return filters.Filter(), smoothers.Smoother()
 
 
-@case
-def filter_smoother_pair_fixedpoint_eks0():
-    filter_ = filters.Filter()
-    solver1 = solvers.DynamicSolver(strategy=filter_)
-
-    smoother = smoothers.FixedPointSmoother()
-    solver2 = solvers.DynamicSolver(strategy=smoother)
-    return solver1, solver2
+@pytest_cases.case
+def strategy_pair_fixedpoint_smoother():
+    return filters.Filter(), smoothers.FixedPointSmoother()
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
-@parametrize_with_cases("ekf, eks", cases=".", prefix="filter_smoother_pair_")
-@parametrize("tol", [1e-1, 1e-3])
-def test_final_state_equal_to_filter(vf, u0, t0, t1, p, ekf, eks, tol):
-    """In simulate_terminal_values(), \
-    every filter and smoother should yield the exact same result."""
+@pytest_cases.parametrize_with_cases("ekf, eks", cases=".", prefix="strategy_pair_")
+def test_final_state_equal_to_filter(ode_problem, ekf, eks):
+    """Filters and smoothers should compute the same terminal values."""
+    vf, u0, t0, t1, p = ode_problem
+
+    atol, rtol = 1e-2, 1e-1
     ekf_sol = ivpsolve.simulate_terminal_values(
-        vf, u0, t0=t0, t1=t1, parameters=p, solver=ekf, atol=1e-2 * tol, rtol=tol
+        vf,
+        u0,
+        t0=t0,
+        t1=t1,
+        parameters=p,
+        solver=solvers.DynamicSolver(strategy=ekf),
+        atol=atol,
+        rtol=rtol,
     )
     eks_sol = ivpsolve.simulate_terminal_values(
-        vf, u0, t0=t0, t1=t1, parameters=p, solver=eks, atol=1e-2 * tol, rtol=tol
+        vf,
+        u0,
+        t0=t0,
+        t1=t1,
+        parameters=p,
+        solver=solvers.DynamicSolver(strategy=eks),
+        atol=atol,
+        rtol=rtol,
     )
 
     @jax.vmap

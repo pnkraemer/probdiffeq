@@ -2,49 +2,43 @@
 
 import jax
 import jax.numpy as jnp
+import pytest_cases
 from jax.tree_util import tree_all, tree_map
-from pytest_cases import case, parametrize, parametrize_with_cases
 
 from odefilter import dense_output, ivpsolve, solvers
 from odefilter.strategies import smoothers
 
-
-@case
-def smoother_fixedpoint_smoother_pair_eks0():
-
-    smoother = smoothers.Smoother()
-    solver1 = solvers.DynamicSolver(strategy=smoother)
-
-    fixedpoint_smoother = smoothers.FixedPointSmoother()
-    solver2 = solvers.DynamicSolver(strategy=fixedpoint_smoother)
-
-    return solver1, solver2
+# todo: both this file and test_checkpoint_same_grid.py call
+#  solve(... solver=eks) and simulate_checkpoints(solver=fp_eks)
 
 
-@parametrize_with_cases("vf, u0, t0, t1, p", cases="..ivp_cases", prefix="problem_")
-@parametrize_with_cases(
-    "eks, fixedpoint_eks", cases=".", prefix="smoother_fixedpoint_smoother_pair_"
-)
-@parametrize("k", [1, 3])  # k * N // 2 off-grid points
-def test_smoothing_checkpoint_equals_solver_state(
-    vf, u0, t0, t1, p, eks, fixedpoint_eks, k
-):
+@pytest_cases.case
+def smoother_pair_eks0():
+    return smoothers.Smoother(), smoothers.FixedPointSmoother()
+
+
+@pytest_cases.parametrize_with_cases("eks, fp_eks", cases=".", prefix="smoother_pair_")
+@pytest_cases.parametrize("k", [1, 3])  # k * N // 2 off-grid points
+def test_smoothing_checkpoint_equals_solver_state(ode_problem, eks, fp_eks, k):
     """In simulate_checkpoints(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""
+    vf, u0, t0, t1, p = ode_problem
     # eks_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
 
     args = (vf, u0)
     kwargs = {"parameters": p, "atol": 1e-1, "rtol": 1e-1}
-    eks_sol = ivpsolve.solve(*args, t0=t0, t1=t1, solver=eks, **kwargs)
+    eks_sol = ivpsolve.solve(
+        *args, t0=t0, t1=t1, solver=solvers.DynamicSolver(strategy=eks), **kwargs
+    )
     ts = jnp.linspace(t0, t1, num=k * len(eks_sol.t) // 2)
     u, dense = dense_output.offgrid_marginals_searchsorted(
-        ts=ts[1:-1], solution=eks_sol, solver=eks
+        ts=ts[1:-1], solution=eks_sol, solver=solvers.DynamicSolver(strategy=eks)
     )
 
     fp_eks_sol = ivpsolve.simulate_checkpoints(
-        *args, ts=ts, solver=fixedpoint_eks, **kwargs
+        *args, ts=ts, solver=solvers.DynamicSolver(strategy=fp_eks), **kwargs
     )
     fixedpoint_eks_sol = fp_eks_sol[1:-1]  # reference is defined only on the interior
 
