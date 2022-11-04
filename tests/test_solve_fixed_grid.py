@@ -4,6 +4,7 @@ import functools
 import jax
 import jax.numpy as jnp
 import jax.tree_util
+import pytest_cases
 
 from odefilter import ivpsolve, solvers
 from odefilter.implementations import isotropic
@@ -21,33 +22,27 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
     assert jnp.allclose(solution.u[-1], u_ref, atol=atol, rtol=rtol)
 
 
-def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid):
+@pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
+def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
     vf, u0, t0, t1, f_args = ode_problem
-    solver = solvers.MLESolver(
-        strategy=filters.Filter(
-            extrapolation=isotropic.IsoIBM.from_params(num_derivatives=1)
-        )
-    )
 
-    fn = jax.jit(
-        functools.partial(
-            _param_to_sol,
-            solver=solver,
-            fixed_grid=fixed_grid,
-            vf=vf,
-            parameters=f_args,
-        )
+    filter_or_smoother = strategy(
+        # Low order because it traces/differentiates faster
+        extrapolation=isotropic.IsoIBM.from_params(num_derivatives=1)
+    )
+    solver = solvers.Solver(strategy=filter_or_smoother, output_scale_sqrtm=1.0)
+
+    fn = functools.partial(
+        _parameter_to_solution,
+        solver=solver,
+        fixed_grid=fixed_grid,
+        vf=vf,
+        parameters=f_args,
     )
 
     fx = fn(u0[0])
     dfx_fwd = jax.jit(jax.jacfwd(fn, argnums=0))(u0[0])
     dfx_rev = jax.jit(jax.jacrev(fn, argnums=0))(u0[0])
-
-    # print("FwdJac-shape", _tree_shape(dfx_fwd))
-    # print("RevJac-shape", _tree_shape(dfx_rev))
-    # print("In-shape:", _tree_shape(u0[0]))
-    # print("Out-shape:", _tree_shape(fx))
-    # print(dfx_fwd)
 
     out_shape = _tree_shape(fx)
     in_shape = _tree_shape(u0[0])
@@ -55,7 +50,7 @@ def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid):
     assert _tree_shape(dfx_fwd) == out_shape + in_shape
 
 
-def _param_to_sol(u0, parameters, vf, solver, fixed_grid):
+def _parameter_to_solution(u0, parameters, vf, solver, fixed_grid):
     solution = ivpsolve.solve_fixed_grid(
         vf, (u0,), ts=fixed_grid, parameters=parameters, solver=solver
     )
