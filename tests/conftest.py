@@ -87,7 +87,7 @@ def fixture_checkpoint_grid(ode_problem):
 
 @pytest_cases.fixture(scope="session", name="reference_checkpoints")
 def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
-    vf, (u0,), t0, t1, f_args = ode_problem
+    vf, (u0,), _, _, f_args = ode_problem
     atol, rtol = tolerances
 
     @jax.jit
@@ -103,7 +103,7 @@ def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
 @pytest_cases.fixture(scope="session", name="solution_checkpoints")
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_CHECKPT)
 def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_grid):
-    vf, u0, t0, t1, f_args = ode_problem
+    vf, u0, _, _, f_args = ode_problem
     atol, rtol = tolerances
     solution = ivpsolve.simulate_checkpoints(
         vf,
@@ -150,7 +150,7 @@ def fixture_fixed_grid(ode_problem):
 @pytest_cases.fixture(scope="session", name="solution_fixed_grid")
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_SOLVE)
 def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
-    vf, u0, t0, t1, f_args = ode_problem
+    vf, u0, _, _, f_args = ode_problem
     solution = ivpsolve.solve_fixed_grid(
         vf, u0, ts=fixed_grid, parameters=f_args, solver=solver
     )
