@@ -1,14 +1,10 @@
 """State-space models with dense covariance structure   ."""
 
-from dataclasses import dataclass
+import dataclasses
 from typing import NamedTuple
 
 import jax
-import jax.lax
 import jax.numpy as jnp
-import jax.scipy as jsp
-from jax import Array
-from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
@@ -18,11 +14,11 @@ from odefilter.implementations import _correction, _extrapolation, _ibm_util, _s
 class _Normal(NamedTuple):
     """Random variable with a normal distribution."""
 
-    mean: Array  # (k,) shape
-    cov_sqrtm_lower: Array  # (k,k) shape
+    mean: jax.Array  # (k,) shape
+    cov_sqrtm_lower: jax.Array  # (k,k) shape
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class _DenseCorrection(_correction.Correction):
     def __init__(self, *, ode_dimension, ode_order=1):
         super().__init__(ode_order=ode_order)
@@ -40,7 +36,7 @@ class _DenseCorrection(_correction.Correction):
 
     def evidence_sqrtm(self, *, observed):
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jsp.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
@@ -59,7 +55,7 @@ class _DenseCorrection(_correction.Correction):
     def negative_marginal_log_likelihood(self, observed, u):
         m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
 
-        res_white = jsp.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
 
         x1 = jnp.dot(res_white, res_white.T)
         x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
@@ -77,7 +73,7 @@ class _DenseCorrection(_correction.Correction):
         return x_reshaped[i, ...]
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class TaylorZerothOrder(_DenseCorrection):
     def begin_correction(self, x: _Normal, /, *, vector_field, t, p):
         m0 = self._select_derivative(x.mean, slice(0, self.ode_order))
@@ -106,7 +102,7 @@ class TaylorZerothOrder(_DenseCorrection):
         return observed, (corrected, gain)
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class TaylorFirstOrder(_DenseCorrection):
     """Extended Kalman filter correction."""
 
@@ -153,7 +149,7 @@ class TaylorFirstOrder(_DenseCorrection):
         return x1 - fx0
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class MomentMatching(_DenseCorrection):
     def __init__(self, *, ode_dimension, cubature=None, ode_order=1):
         if ode_order > 1:
@@ -284,13 +280,13 @@ class MomentMatching(_DenseCorrection):
         return H, _Normal(d, r_Om.T)
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class IBM(_extrapolation.Extrapolation):
     """Handle dense covariances."""
 
-    a: Array
-    q_sqrtm_lower: Array
+    a: jax.Array
+    q_sqrtm_lower: jax.Array
 
     num_derivatives: int
     ode_dimension: int

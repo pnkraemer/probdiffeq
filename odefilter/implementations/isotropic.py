@@ -1,12 +1,10 @@
 """State-space models with isotropic covariance structure."""
 
-from dataclasses import dataclass
+import dataclasses
 from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
-from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
 from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
@@ -17,7 +15,7 @@ class _IsoNormal(NamedTuple):
     cov_sqrtm_lower: Any  # (n,n) shape
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_correction.Correction):
     def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
@@ -87,7 +85,7 @@ class IsoTaylorZerothOrder(_correction.Correction):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass(frozen=True)
+@dataclasses.dataclass
 class IsoIBM(_extrapolation.Extrapolation):
 
     a: Any

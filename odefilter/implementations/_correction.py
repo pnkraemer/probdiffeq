@@ -1,11 +1,10 @@
-"""Interface for implementations."""
+"""Interface for corrections."""
 
 import abc
 from typing import Generic, Tuple, TypeVar
 
+import jax
 import jax.numpy as jnp
-import jax.tree_util
-from jax import Array
 
 R = TypeVar("R")  # think: Random variable type
 C = TypeVar("C")  # think: Information operator's personal cache-type
@@ -38,7 +37,7 @@ class Correction(abc.ABC, Generic[R, C]):
     @abc.abstractmethod
     def begin_correction(
         self, x: R, /, *, vector_field, t, p
-    ) -> Tuple[Array, float, C]:
+    ) -> Tuple[jax.Array, float, C]:
         raise NotImplementedError
 
     @abc.abstractmethod

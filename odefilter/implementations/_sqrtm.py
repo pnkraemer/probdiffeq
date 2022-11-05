@@ -19,9 +19,8 @@ manipulation of square root matrices.
     is more natural.
 
 """
-
+import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 
 
 def revert_conditional_noisefree(*, R_X_F, R_X):
@@ -29,7 +28,7 @@ def revert_conditional_noisefree(*, R_X_F, R_X):
     assert R_X_F.shape[1] <= R_X_F.shape[0]
     r_marg = sqrtm_to_upper_triangular(R=R_X_F)
     crosscov = R_X.T @ R_X_F
-    gain = jsp.linalg.cho_solve((r_marg.T, True), crosscov.T).T
+    gain = jax.scipy.linalg.cho_solve((r_marg.T, True), crosscov.T).T
     r_cor = R_X - R_X_F @ gain.T
 
     # todo: only with this line is the output equivalent to the other function
@@ -130,7 +129,7 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
     R12 = R[:d_out, d_out:]
 
     # Implements G = R12.T @ jnp.linalg.inv(R_Y.T) in clever:
-    G = jsp.linalg.solve_triangular(R_Y, R12, lower=False).T
+    G = jax.scipy.linalg.solve_triangular(R_Y, R12, lower=False).T
 
     # ~R_{X \mid Y}
     R_XY = R[d_out:, d_out:]

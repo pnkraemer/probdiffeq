@@ -1,11 +1,9 @@
 """Batch-style extrapolations."""
-from dataclasses import dataclass
+import dataclasses
 from typing import Any, NamedTuple, Tuple
 
 import jax
 import jax.numpy as jnp
-from jax import Array
-from jax.tree_util import register_pytree_node_class
 
 from odefilter import _control_flow
 from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
@@ -20,17 +18,17 @@ class _BatchNormal(NamedTuple):
     cov_sqrtm_lower: Any  # (d, k, k) shape
 
 
-_CType = Tuple[Array]  # Cache type
+_CType = Tuple[jax.Array]  # Cache type
 
 
-@register_pytree_node_class
+@jax.tree_util.register_pytree_node_class
 class BatchTaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(
         self, x: _BatchNormal, /, *, vector_field, t, p
-    ) -> Tuple[Array, float, _CType]:
+    ) -> Tuple[jax.Array, float, _CType]:
         m = x.mean
 
         # m has shape (d, n)
@@ -120,8 +118,8 @@ class BatchTaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
         return 0.5 * (x1 + x2 + x3)
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class BatchIBM(_extrapolation.Extrapolation):
     """Handle block-diagonal covariances."""
 

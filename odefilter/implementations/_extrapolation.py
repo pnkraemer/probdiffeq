@@ -1,11 +1,10 @@
-"""Interface for implementations."""
+"""Interface for extrapolations."""
 
 import abc
 from typing import Generic, Tuple, TypeVar
 
+import jax
 import jax.numpy as jnp
-import jax.tree_util
-from jax import Array
 
 R = TypeVar("R")  # think: random variables
 C = TypeVar("C")  # think: my personal cache
@@ -38,7 +37,7 @@ class Extrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_error_estimate(self) -> Array:
+    def init_error_estimate(self) -> jax.Array:
         raise NotImplementedError
 
     @abc.abstractmethod
