@@ -1,12 +1,11 @@
 """Inference interface."""
 
 import abc
-from dataclasses import dataclass
+import dataclasses
 from typing import Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
 
 from odefilter.strategies import filters
 
@@ -14,7 +13,7 @@ T = TypeVar("T")
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclass
+@dataclasses.dataclass
 class Solution(Generic[T]):
     """Inferred solutions."""
 

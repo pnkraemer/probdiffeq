@@ -6,7 +6,6 @@ import warnings
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
 
 from odefilter import odefiltersolve, taylor
 from odefilter.strategies import smoothers

@@ -1,7 +1,7 @@
-"""Tests for initialisation functions."""
+"""Tests for Taylor series approximations / initialisation functions."""
 
+import diffeqzoo.ivps
 import pytest_cases
-from diffeqzoo import ivps as ivpzoo
 
 from odefilter import taylor
 
@@ -18,7 +18,7 @@ def case_taylor_mode():
 
 @pytest_cases.case
 def problem_three_body_first_order():
-    f, u0, (t0, _), f_args = ivpzoo.three_body_restricted_first_order()
+    f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
 
     def vf(u, *, t, p):
         return f(u, *p)
@@ -28,7 +28,7 @@ def problem_three_body_first_order():
 
 @pytest_cases.case
 def problem_van_der_pol_second_order():
-    f, (u0, du0), (t0, _), f_args = ivpzoo.van_der_pol()
+    f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
 
     def vf(u, du, *, t, p):
         return f(u, du, *p)

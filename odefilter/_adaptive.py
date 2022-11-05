@@ -1,22 +1,21 @@
 """Adaptive solvers."""
-from dataclasses import dataclass
+import dataclasses
 from typing import Any, Callable, Generic, TypeVar, Union
 
-import jax.lax
+import jax
 import jax.numpy as jnp
-import jax.tree_util
-from jax.tree_util import register_pytree_node_class
 
 from odefilter import controls
 
 T = TypeVar("T")
 """A generic ODE Filter state."""
+
 R = TypeVar("R")
 """A generic ODE Filter strategy."""
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class AdaptiveODEFilterState(Generic[T]):
     """Solver state."""
 
@@ -88,8 +87,8 @@ def _reference_state_fn_max_abs(sol, sol_previous):
     return jnp.maximum(jnp.abs(sol), jnp.abs(sol_previous))
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class AdaptiveODEFilter(Generic[R]):
     """Make an adaptive ODE filter."""
 

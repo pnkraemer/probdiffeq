@@ -28,14 +28,14 @@ and $n$ is the number of recursions, which commonly describes how many
 derivatives to "add" to the existing initial conditions.
 """
 
-from functools import partial
+import functools
 from typing import Callable, Tuple
 
 import jax
-from jax.experimental.jet import jet
+import jax.experimental.jet
 
 
-@partial(jax.jit, static_argnames=["vector_field", "num"])
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def taylor_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
@@ -50,7 +50,9 @@ def taylor_mode_fn(
     taylor_coeffs = [*initial_values, primals]
     for _ in range(num - 1):
         series = _subsets(taylor_coeffs[1:], num_arguments)
-        primals, series_new = jet(vf, primals=initial_values, series=series)
+        primals, series_new = jax.experimental.jet.jet(
+            vf, primals=initial_values, series=series
+        )
         taylor_coeffs = [*initial_values, primals, *series_new]
     return taylor_coeffs
 
@@ -77,7 +79,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@partial(jax.jit, static_argnames=["vector_field", "num"])
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def forward_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):

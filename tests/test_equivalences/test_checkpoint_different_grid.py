@@ -3,13 +3,13 @@
 import jax
 import jax.numpy as jnp
 import pytest_cases
-from jax.tree_util import tree_all, tree_map
 
 from odefilter import dense_output, ivpsolve, solvers
 from odefilter.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
 #  solve(... solver=eks) and simulate_checkpoints(solver=fp_eks)
+#  this redundancy should be eliminated
 
 
 @pytest_cases.case
@@ -64,11 +64,11 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, eks, fp_eks, k):
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
     trees_is_allclose = _tree_allclose(tree1, tree2, **kwargs)
-    return tree_all(trees_is_allclose)
+    return jax.tree_util.tree_all(trees_is_allclose)
 
 
 def _tree_allclose(tree1, tree2, **kwargs):
     def allclose_partial(*args):
         return jnp.allclose(*args, **kwargs)
 
-    return tree_map(allclose_partial, tree1, tree2)
+    return jax.tree_util.tree_map(allclose_partial, tree1, tree2)

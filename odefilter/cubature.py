@@ -1,19 +1,18 @@
 """Cubature rules."""
-from dataclasses import dataclass
+import dataclasses
 
+import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
-from jax import Array
-from jax.tree_util import register_pytree_node_class, tree_map
 
 
-@register_pytree_node_class
-@dataclass
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class _PositiveCubatureRule:
     """Cubature rule with positive weights."""
 
-    points: Array
-    weights_sqrtm: Array
+    points: jax.Array
+    weights_sqrtm: jax.Array
 
     def __repr__(self):
         return f"{self.__class__.__name__}(k={self.points.shape[0]})"
@@ -29,8 +28,8 @@ class _PositiveCubatureRule:
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
 
-@register_pytree_node_class
-@dataclass
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class SphericalCubatureIntegration(_PositiveCubatureRule):
     """Spherical cubature integration."""
 
@@ -46,8 +45,8 @@ class SphericalCubatureIntegration(_PositiveCubatureRule):
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
 
-@register_pytree_node_class
-@dataclass
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class UnscentedTransform(_PositiveCubatureRule):
     """Unscented transform."""
 
@@ -70,8 +69,8 @@ class UnscentedTransform(_PositiveCubatureRule):
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
 
-@register_pytree_node_class
-@dataclass
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class GaussHermite(_PositiveCubatureRule):
     """Gauss-Hermite cubature."""
 
@@ -106,5 +105,5 @@ def _tensor_weights(*args, **kwargs):
 
 def _tensor_points(x, /, *, ode_dimension):
     x_mesh = jnp.meshgrid(*([x] * ode_dimension))
-    y_mesh = tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
+    y_mesh = jax.tree_util.tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
     return jnp.vstack(y_mesh).T

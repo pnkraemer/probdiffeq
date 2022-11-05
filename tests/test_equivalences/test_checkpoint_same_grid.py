@@ -9,6 +9,7 @@ from odefilter.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
 #  solve(... solver=eks) and simulate_checkpoints(solver=fp_eks)
+#  this redundancy should be eliminated
 
 
 @pytest_cases.case

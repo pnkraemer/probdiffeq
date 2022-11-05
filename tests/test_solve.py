@@ -1,4 +1,4 @@
-"""Tests for IVP solvers."""
+"""Tests for solving IVPs on adaptive grids."""
 import jax.numpy as jnp
 import pytest
 

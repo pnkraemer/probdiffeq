@@ -1,6 +1,6 @@
 """Do fun stuff with the solution objects."""
 
-from functools import partial
+import functools
 from typing import Any, NamedTuple
 
 import jax
@@ -8,7 +8,7 @@ import jax.numpy as jnp
 
 
 # todo: why do we need this function??
-@partial(jax.jit, static_argnames=["shape"])
+@functools.partial(jax.jit, static_argnames=["shape"])
 def sample(key, *, solution, solver, shape=()):
     return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
 

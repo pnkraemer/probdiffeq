@@ -22,7 +22,6 @@ import functools
 
 import jax
 import jax.numpy as jnp
-import jax.random
 import matplotlib.pyplot as plt
 import optax
 from diffeqzoo import backend, ivps

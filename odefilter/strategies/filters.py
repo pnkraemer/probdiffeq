@@ -1,6 +1,5 @@
 """Inference via filters."""
 import jax
-import jax.tree_util
 
 from odefilter.strategies import _strategy
 
