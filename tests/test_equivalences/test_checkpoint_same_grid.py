@@ -13,12 +13,12 @@ from odefilter.strategies import smoothers
 
 
 @pytest_cases.case
-def smoother_pair_fixedpoint_eks0():
+def smoother_pair_smoother_and_fixedpoint():
     return smoothers.Smoother.from_params(), smoothers.FixedPointSmoother.from_params()
 
 
 @pytest_cases.case
-def smoother_pair_two_eks0():
+def smoother_pair_two_smoothers():
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.

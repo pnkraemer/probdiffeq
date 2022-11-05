@@ -13,7 +13,7 @@ from odefilter.strategies import smoothers
 
 
 @pytest_cases.case
-def smoother_pair_eks0():
+def smoother_pair_smoother_and_fixedpoint():
     return smoothers.Smoother.from_params(), smoothers.FixedPointSmoother.from_params()
 
 

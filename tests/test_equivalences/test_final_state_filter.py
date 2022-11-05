@@ -19,29 +19,29 @@ def strategy_pair_fixedpoint_smoother():
     return filters.Filter.from_params(), smoothers.FixedPointSmoother.from_params()
 
 
-@pytest_cases.parametrize_with_cases("ekf, eks", cases=".", prefix="strategy_pair_")
-def test_final_state_equal_to_filter(ode_problem, ekf, eks):
+@pytest_cases.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
+def test_final_state_equal_to_filter(ode_problem, fil, smo):
     """Filters and smoothers should compute the same terminal values."""
     vf, u0, t0, t1, p = ode_problem
 
     atol, rtol = 1e-2, 1e-1
-    ekf_sol = ivpsolve.simulate_terminal_values(
+    filter_solution = ivpsolve.simulate_terminal_values(
         vf,
         u0,
         t0=t0,
         t1=t1,
         parameters=p,
-        solver=solvers.DynamicSolver(strategy=ekf),
+        solver=solvers.DynamicSolver(strategy=fil),
         atol=atol,
         rtol=rtol,
     )
-    eks_sol = ivpsolve.simulate_terminal_values(
+    smoother_solution = ivpsolve.simulate_terminal_values(
         vf,
         u0,
         t0=t0,
         t1=t1,
         parameters=p,
-        solver=solvers.DynamicSolver(strategy=eks),
+        solver=solvers.DynamicSolver(strategy=smo),
         atol=atol,
         rtol=rtol,
     )
@@ -50,13 +50,18 @@ def test_final_state_equal_to_filter(ode_problem, ekf, eks):
     def cov(x):
         return x @ x.T
 
-    assert _tree_all_allclose(ekf_sol.t, eks_sol.t)
-    assert _tree_all_allclose(ekf_sol.u, eks_sol.u)
-    assert _tree_all_allclose(ekf_sol.marginals.mean, eks_sol.marginals.mean)
+    assert _tree_all_allclose(filter_solution.t, smoother_solution.t)
+    assert _tree_all_allclose(filter_solution.u, smoother_solution.u)
     assert _tree_all_allclose(
-        cov(ekf_sol.marginals.cov_sqrtm_lower), cov(eks_sol.marginals.cov_sqrtm_lower)
+        filter_solution.marginals.mean, smoother_solution.marginals.mean
     )
-    assert _tree_all_allclose(ekf_sol.output_scale_sqrtm, eks_sol.output_scale_sqrtm)
+    assert _tree_all_allclose(
+        cov(filter_solution.marginals.cov_sqrtm_lower),
+        cov(smoother_solution.marginals.cov_sqrtm_lower),
+    )
+    assert _tree_all_allclose(
+        filter_solution.output_scale_sqrtm, smoother_solution.output_scale_sqrtm
+    )
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
