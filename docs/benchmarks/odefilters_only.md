@@ -18,10 +18,9 @@ jupyter:
 Let's find the fastest solver of the Lotka--Volterra problem, a standard benchmark problem. It is low-dimensional, not stiff, and generally poses no major problems for any numerical solver.
 
 ```python
-from functools import partial
+import functools
 
 import jax
-import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from _benchmark_utils import (
@@ -87,7 +86,7 @@ Let's start with finding the fastest ODE filter.
 
 ```python
 def solver_to_solve(solver, **kwargs):
-    return jax.jit(partial(_solve, solver=solver))
+    return jax.jit(functools.partial(_solve, solver=solver))
 
 
 def _solve(*, solver, tol):
@@ -110,7 +109,9 @@ ode_dimension = u0.shape[0]
 
 tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
 
-workprecision_diagram = partial(workprecision_make, number=2, repeat=2, tols=tolerances)
+workprecision_diagram = functools.partial(
+    workprecision_make, number=2, repeat=2, tols=tolerances
+)
 ```
 
 ### Which mode of linearization?

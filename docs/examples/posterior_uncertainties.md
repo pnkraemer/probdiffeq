@@ -18,7 +18,6 @@ jupyter:
 ```python
 import jax
 import jax.numpy as jnp
-import jax.random
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config

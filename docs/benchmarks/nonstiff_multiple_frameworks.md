@@ -18,10 +18,9 @@ jupyter:
 How efficient are the solvers on a simple benchmark problem?
 
 ```python
-from functools import partial
+import functools
 
 import jax
-import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import scipy.integrate
@@ -105,7 +104,7 @@ plt.show()
 
 ```python
 def solver_to_solve(solver):
-    return jax.jit(partial(_solve, solver=solver))
+    return jax.jit(functools.partial(_solve, solver=solver))
 
 
 def _solve(*, solver, tol):
@@ -124,7 +123,7 @@ def _solve(*, solver, tol):
     return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
 
 
-@partial(jax.jit, static_argnames=("tol",))  # hm...
+@functools.partial(jax.jit, static_argnames=("tol",))  # hm...
 def jax_solve(*, tol):
     odeint_solution = jax.experimental.ode.odeint(
         vf_jax, u0, jnp.asarray([t0, t1]), *f_args, atol=1e-3 * tol, rtol=tol

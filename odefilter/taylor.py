@@ -32,6 +32,7 @@ import functools
 from typing import Callable, Tuple
 
 import jax
+import jax.experimental.jet
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
