@@ -85,11 +85,15 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     def init_posterior(self, *, taylor_coefficients):
-        corrected = self.extrapolation.init_corrected(
+        corrected = self.implementation.extrapolation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
-        backward_transition = self.extrapolation.init_backward_transition()
-        backward_noise = self.extrapolation.init_backward_noise(rv_proto=corrected)
+        backward_transition = (
+            self.implementation.extrapolation.init_backward_transition()
+        )
+        backward_noise = self.implementation.extrapolation.init_backward_noise(
+            rv_proto=corrected
+        )
         backward_model = BackwardModel(
             transition=backward_transition,
             noise=backward_noise,
@@ -98,10 +102,12 @@ class _SmootherCommon(_strategy.Strategy):
         return posterior
 
     def begin_extrapolation(self, *, posterior, dt):
-        return self.extrapolation.begin_extrapolation(posterior.init.mean, dt=dt)
+        return self.implementation.extrapolation.begin_extrapolation(
+            posterior.init.mean, dt=dt
+        )
 
     def complete_correction(self, *, extrapolated, cache_obs):
-        a, (corrected, b) = self.correction.complete_correction(
+        a, (corrected, b) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.init, cache=cache_obs
         )
         corrected_seq = MarkovSequence(
@@ -110,17 +116,17 @@ class _SmootherCommon(_strategy.Strategy):
         return a, (corrected_seq, b)
 
     def extract_sol_terminal_value(self, *, posterior):
-        return self.extrapolation.extract_sol(rv=posterior.init)
+        return self.implementation.extrapolation.extract_sol(rv=posterior.init)
 
     def extract_sol_from_marginals(self, *, marginals):
-        return self.extrapolation.extract_sol(rv=marginals)
+        return self.implementation.extrapolation.extract_sol(rv=marginals)
 
     def marginals_terminal_value(self, *, posterior):
         return posterior.init
 
     def marginals(self, *, posterior):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-        marginals = self.extrapolation.marginalise_backwards(
+        marginals = self.implementation.extrapolation.marginalise_backwards(
             init=init,
             linop=posterior.backward_model.transition,
             noise=posterior.backward_model.noise,
@@ -148,22 +154,22 @@ class _SmootherCommon(_strategy.Strategy):
     def _sample_one(self, posterior, base_samples):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
         noise = posterior.backward_model.noise
-        samples = self.extrapolation.sample_backwards(
+        samples = self.implementation.extrapolation.sample_backwards(
             init, posterior.backward_model.transition, noise, base_samples
         )
-        u = self.extrapolation.extract_mean_from_marginals(samples)
+        u = self.implementation.extrapolation.extract_mean_from_marginals(samples)
         return u, samples
 
     def scale_marginals(self, marginals, *, output_scale_sqrtm):
-        return self.extrapolation.scale_covariance(
+        return self.implementation.extrapolation.scale_covariance(
             rv=marginals, scale_sqrtm=output_scale_sqrtm
         )
 
     def scale_posterior(self, posterior, *, output_scale_sqrtm):
-        init = self.extrapolation.scale_covariance(
+        init = self.implementation.extrapolation.scale_covariance(
             rv=posterior.init, scale_sqrtm=output_scale_sqrtm
         )
-        noise = self.extrapolation.scale_covariance(
+        noise = self.implementation.extrapolation.scale_covariance(
             rv=posterior.backward_model.noise, scale_sqrtm=output_scale_sqrtm
         )
 
@@ -176,8 +182,13 @@ class _SmootherCommon(_strategy.Strategy):
 
     def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
-        linearisation_pt, cache = self.extrapolation.begin_extrapolation(rv.mean, dt=dt)
-        extrapolated, (bw_noise, bw_op) = self.extrapolation.revert_markov_kernel(
+        linearisation_pt, cache = self.implementation.extrapolation.begin_extrapolation(
+            rv.mean, dt=dt
+        )
+        extrapolated, (
+            bw_noise,
+            bw_op,
+        ) = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
             l0=rv.cov_sqrtm_lower,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -187,8 +198,8 @@ class _SmootherCommon(_strategy.Strategy):
         return extrapolated, backward_model  # should this return a MarkovSequence?
 
     def _duplicate_with_unit_backward_model(self, *, posterior):
-        bw_transition0 = self.extrapolation.init_backward_transition()
-        bw_noise0 = self.extrapolation.init_backward_noise(
+        bw_transition0 = self.implementation.extrapolation.init_backward_transition()
+        bw_noise0 = self.implementation.extrapolation.init_backward_noise(
             rv_proto=posterior.backward_model.noise
         )
         bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
@@ -203,7 +214,10 @@ class Smoother(_SmootherCommon):
     def complete_extrapolation(
         self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
-        extrapolated, (bw_noise, bw_op) = self.extrapolation.revert_markov_kernel(
+        extrapolated, (
+            bw_noise,
+            bw_op,
+        ) = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
             cache=cache,
@@ -251,7 +265,7 @@ class Smoother(_SmootherCommon):
             t1=t1,
             scale_sqrtm=scale_sqrtm,
         )
-        marginals_t = self.extrapolation.marginalise_model(
+        marginals_t = self.implementation.extrapolation.marginalise_model(
             init=marginals,
             linop=acc.backward_model.transition,
             noise=acc.backward_model.noise,
@@ -267,7 +281,10 @@ class FixedPointSmoother(_SmootherCommon):
     def complete_extrapolation(
         self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm
     ):
-        extrapolated, (bw_noise, bw_op) = self.extrapolation.revert_markov_kernel(
+        extrapolated, (
+            bw_noise,
+            bw_op,
+        ) = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -275,7 +292,7 @@ class FixedPointSmoother(_SmootherCommon):
         )
         bw_increment = BackwardModel(transition=bw_op, noise=bw_noise)
 
-        noise, gain = self.extrapolation.condense_backward_models(
+        noise, gain = self.implementation.extrapolation.condense_backward_models(
             transition_state=bw_increment.transition,
             noise_state=bw_increment.noise,
             transition_init=posterior_previous.backward_model.transition,
@@ -289,7 +306,7 @@ class FixedPointSmoother(_SmootherCommon):
 
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        noise0, g0 = self.extrapolation.condense_backward_models(
+        noise0, g0 = self.implementation.extrapolation.condense_backward_models(
             transition_state=p1.backward_model.transition,
             noise_state=p1.backward_model.noise,
             transition_init=p0.backward_model.transition,
@@ -318,7 +335,7 @@ class FixedPointSmoother(_SmootherCommon):
             t=t,
             t0=t0,
         )
-        noise0, g0 = self.extrapolation.condense_backward_models(
+        noise0, g0 = self.implementation.extrapolation.condense_backward_models(
             transition_state=bw0.transition,
             noise_state=bw0.noise,
             transition_init=p0.backward_model.transition,

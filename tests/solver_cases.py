@@ -17,19 +17,15 @@ def case_ekf0_isotropic():
 
 @pytest_cases.case(tags=["smoother"])
 def case_eks0_isotropic():
-    correction = isotropic.IsoTaylorZerothOrder()
-    extrapolation = isotropic.IsoIBM.from_params()
-    strategy = smoothers.Smoother(correction=correction, extrapolation=extrapolation)
+    implementation = isotropic.IsoTS0.from_params()
+    strategy = smoothers.Smoother(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["fixedpoint"])
 def case_eks0_isotropic_fixedpoint():
-    correction = isotropic.IsoTaylorZerothOrder()
-    extrapolation = isotropic.IsoIBM.from_params()
-    strategy = smoothers.FixedPointSmoother(
-        correction=correction, extrapolation=extrapolation
-    )
+    implementation = isotropic.IsoTS0.from_params()
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.Solver(strategy=strategy, output_scale_sqrtm=100.0)
 
 
