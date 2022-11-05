@@ -21,8 +21,8 @@
 - [x] I-control
 - [x] PI-control
 - [ ] PID-control
-- [x] EK0 (Think: explicit solvers)
-- [x] EK1 (Think: semi-implicit solvers w/ Jacobians)
+- [x] Zeroth-order Taylor series (Think: explicit solvers)
+- [x] First-order Taylor series (Think: semi-implicit solvers w/ Jacobians)
 - [x] Moment matching algorithms (think: semi-implicit solvers w/o Jacobians):
   - [x] UK
   - [x] GHK
