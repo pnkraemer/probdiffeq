@@ -25,9 +25,9 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
     vf, u0, _, _, f_args = ode_problem
 
+    # Low order because it traces/differentiates faster
     filter_or_smoother = strategy(
-        # Low order because it traces/differentiates faster
-        extrapolation=isotropic.IsoIBM.from_params(num_derivatives=1)
+        implementation=isotropic.IsoTS0.from_params(num_derivatives=1)
     )
     solver = solvers.Solver(strategy=filter_or_smoother, output_scale_sqrtm=1.0)
 

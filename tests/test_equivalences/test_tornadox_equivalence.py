@@ -154,10 +154,9 @@ def fixture_solver_tornadox_ekf1(num, steprule_tornadox):
 
 @pytest_cases.fixture(scope="session", name="solver_odefilter_ekf1")
 def fixture_solver_odefilter_ekf1(num):
-    extrapolation = dense.IBM.from_params(num_derivatives=num, ode_dimension=2)
-    correction = dense.TaylorFirstOrder(ode_dimension=2)
-    ekf1_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
-    return solvers.DynamicSolver(strategy=ekf1_strategy)
+    implementation = dense.TS1.from_params(num_derivatives=num, ode_dimension=2)
+    strategy = filters.Filter(implementation=implementation)
+    return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case

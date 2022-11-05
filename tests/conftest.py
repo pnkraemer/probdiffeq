@@ -2,6 +2,7 @@
 
 import diffeqzoo.ivps
 import jax
+import jax.experimental.ode
 import jax.numpy as jnp
 import pytest_cases
 import pytest_cases.filters

@@ -14,7 +14,7 @@ class Strategy(abc.ABC):
 
     def __init__(self, *, implementation=None):
         if implementation is None:
-            implementation = isotropic.IsoEK0.from_params()
+            implementation = isotropic.IsoTS0.from_params()
         self.implementation = implementation
 
     def __repr__(self):
