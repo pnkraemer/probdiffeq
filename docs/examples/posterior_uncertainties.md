@@ -48,7 +48,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0 = solvers.MLESolver(strategy=filters.Filter.from_params())
+ts0 = solvers.MLESolver(strategy=filters.Filter.from_params())
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -56,7 +56,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 %%time
 
 solution = ivpsolve.simulate_checkpoints(
-    vf, initial_values=(u0,), ts=ts, solver=ek0, rtol=1e-1, atol=1e-1, parameters=f_args
+    vf, initial_values=(u0,), ts=ts, solver=ts0, rtol=1e-1, atol=1e-1, parameters=f_args
 )
 ```
 
@@ -102,7 +102,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0 = solvers.MLESolver(strategy=smoothers.FixedPointSmoother.from_params())
+ts0 = solvers.MLESolver(strategy=smoothers.FixedPointSmoother.from_params())
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -113,7 +113,7 @@ solution = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),
     ts=ts,
-    solver=ek0,
+    solver=ts0,
     rtol=1e-1,
     atol=1e-1,
     parameters=f_args,
@@ -122,7 +122,7 @@ solution = ivpsolve.simulate_checkpoints(
 
 ```python
 key = jax.random.PRNGKey(seed=1)
-u, samples = dense_output.sample(key, solution=solution, shape=(2,), solver=ek0)
+u, samples = dense_output.sample(key, solution=solution, shape=(2,), solver=ts0)
 ```
 
 ```python
