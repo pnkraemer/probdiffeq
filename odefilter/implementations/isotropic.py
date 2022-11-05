@@ -7,7 +7,13 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter.implementations import (
+    _correction,
+    _extrapolation,
+    _ibm_util,
+    _sqrtm,
+    implementation,
+)
 
 
 class _IsoNormal(NamedTuple):
@@ -16,25 +22,11 @@ class _IsoNormal(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTS0:
-    def __init__(self, *, correction: "IsoTaylorZerothOrder", extrapolation: "IsoIBM"):
-        self.correction = correction
-        self.extrapolation = extrapolation
-
-    def tree_flatten(self):
-        children = (self.correction, self.extrapolation)
-        aux = ()
-        return children, aux
-
+class IsoTS0(implementation.Implementation["IsoTaylorZerothOrder", "IsoIBM"]):
     @classmethod
-    def tree_unflatten(cls, _aux, children):
-        correction, extrapolation = children
-        return cls(correction=correction, extrapolation=extrapolation)
-
-    @classmethod
-    def from_params(cls, **kwargs):
-        correction = IsoTaylorZerothOrder()
-        extrapolation = IsoIBM.from_params(**kwargs)
+    def from_params(cls, *, ode_order=1, num_derivatives=4):
+        correction = IsoTaylorZerothOrder(ode_order=ode_order)
+        extrapolation = IsoIBM.from_params(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
 
 
@@ -125,7 +117,7 @@ class IsoIBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
-    def from_params(cls, *, num_derivatives=4):
+    def from_params(cls, *, num_derivatives):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 

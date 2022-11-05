@@ -85,10 +85,8 @@ def fixture_solver_tornadox_ekf0(num, steprule_tornadox):
 
 @pytest_cases.fixture(scope="session", name="solver_odefilter_ekf0")
 def fixture_solver_odefilter_ekf0(num):
-
-    extrapolation = isotropic.IsoIBM.from_params(num_derivatives=num)
-    correction = isotropic.IsoTaylorZerothOrder()
-    ekf0_strategy = filters.Filter(extrapolation=extrapolation, correction=correction)
+    implementation = isotropic.IsoTS0.from_params(num_derivatives=num)
+    ekf0_strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=ekf0_strategy)
 
 

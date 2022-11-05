@@ -31,9 +31,8 @@ def case_eks0_isotropic_fixedpoint():
 
 @pytest_cases.case(tags=["filter"])
 def case_ekf0_batch():
-    correction = batch.BatchTaylorZerothOrder()
-    extrapolation = batch.BatchIBM.from_params(ode_dimension=2, num_derivatives=3)
-    strategy = filters.Filter(correction=correction, extrapolation=extrapolation)
+    implementation = batch.BatchTS0.from_params(ode_dimension=2, num_derivatives=3)
+    strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 

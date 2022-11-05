@@ -6,7 +6,13 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter.implementations import (
+    _correction,
+    _extrapolation,
+    _ibm_util,
+    _sqrtm,
+    implementation,
+)
 
 # todo: reconsider naming!
 
@@ -19,6 +25,18 @@ class _BatchNormal(NamedTuple):
 
 
 _CType = Tuple[jax.Array]  # Cache type
+
+
+# todo: no more kwargs
+
+
+@jax.tree_util.register_pytree_node_class
+class BatchTS0(implementation.Implementation["IsoTaylorZerothOrder", "IsoIBM"]):
+    @classmethod
+    def from_params(cls, **kwargs):
+        correction = BatchTaylorZerothOrder()
+        extrapolation = BatchIBM.from_params(**kwargs)
+        return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
