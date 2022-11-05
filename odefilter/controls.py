@@ -1,11 +1,11 @@
-"""Control algorithms."""
+"""Controllers / control algorithms."""
 
 import abc
-from dataclasses import dataclass
+import dataclasses
 from typing import NamedTuple
 
+import jax
 import jax.numpy as jnp
-from jax.tree_util import register_pytree_node_class
 
 
 class AbstractControl(abc.ABC):
@@ -41,8 +41,8 @@ class _PIState(NamedTuple):
     error_norm_previously_accepted: float
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class _ProportionalIntegralCommon(AbstractControl):
     """Proportional-integral (PI) controller."""
 
@@ -97,8 +97,8 @@ class _ProportionalIntegralCommon(AbstractControl):
         return scale_factor * dt_previous, state
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class ProportionalIntegral(_ProportionalIntegralCommon):
     """Proportional-integral (PI) controller."""
 
@@ -106,8 +106,8 @@ class ProportionalIntegral(_ProportionalIntegralCommon):
         return dt
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class ClippedProportionalIntegral(_ProportionalIntegralCommon):
     r"""Proportional-integral (PI) controller.
 
@@ -118,8 +118,8 @@ class ClippedProportionalIntegral(_ProportionalIntegralCommon):
         return jnp.minimum(dt, t1 - state.t)
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class _IntegralCommon(AbstractControl):
 
     safety: float = 0.95
@@ -155,8 +155,8 @@ class _IntegralCommon(AbstractControl):
         return scale_factor * dt_previous, ()
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class Integral(_IntegralCommon):
     r"""Integral (I) controller.
 
@@ -167,8 +167,8 @@ class Integral(_IntegralCommon):
         return dt
 
 
-@register_pytree_node_class
-@dataclass(frozen=True)
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
 class ClippedIntegral(_IntegralCommon):
     r"""Integral (I) controller.
 

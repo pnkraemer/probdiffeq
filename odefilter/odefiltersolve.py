@@ -1,8 +1,7 @@
 """ODE filter routines."""
 
-import jax.lax
+import jax
 import jax.numpy as jnp
-import jax.tree_util
 
 from odefilter import _adaptive, _control_flow
 

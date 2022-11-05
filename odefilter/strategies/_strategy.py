@@ -1,10 +1,9 @@
-"""Inference interface."""
+"""Strategy interface."""
 
 import abc
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
 
 from odefilter.implementations import isotropic
 
