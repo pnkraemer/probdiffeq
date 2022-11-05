@@ -10,9 +10,8 @@ from odefilter.strategies import filters, smoothers
 
 @pytest_cases.case(tags=["filter"])
 def case_ekf0_isotropic():
-    correction = isotropic.IsoTaylorZerothOrder()
-    extrapolation = isotropic.IsoIBM.from_params()
-    strategy = filters.Filter(correction=correction, extrapolation=extrapolation)
+    implementation = isotropic.IsoTS0.from_params()
+    strategy = filters.Filter(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 

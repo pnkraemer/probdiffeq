@@ -16,6 +16,29 @@ class _IsoNormal(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
+class IsoTS0:
+    def __init__(self, *, correction: "IsoTaylorZerothOrder", extrapolation: "IsoIBM"):
+        self.correction = correction
+        self.extrapolation = extrapolation
+
+    def tree_flatten(self):
+        children = (self.correction, self.extrapolation)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        correction, extrapolation = children
+        return cls(correction=correction, extrapolation=extrapolation)
+
+    @classmethod
+    def from_params(cls, **kwargs):
+        correction = IsoTaylorZerothOrder()
+        extrapolation = IsoIBM.from_params(**kwargs)
+        return cls(correction=correction, extrapolation=extrapolation)
+
+
+@jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_correction.Correction):
     def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
