@@ -8,7 +8,55 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter.implementations import (
+    _correction,
+    _extrapolation,
+    _ibm_util,
+    _sqrtm,
+    implementation,
+)
+
+
+@jax.tree_util.register_pytree_node_class
+class TS1(implementation.Implementation["TaylorFirstOrder", "IBM"]):
+    @classmethod
+    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
+        correction = TaylorFirstOrder(ode_dimension=ode_dimension, ode_order=ode_order)
+        extrapolation = IBM.from_params(
+            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+        )
+        return cls(correction=correction, extrapolation=extrapolation)
+
+
+@jax.tree_util.register_pytree_node_class
+class TS0(implementation.Implementation["TaylorZerothOrder", "IBM"]):
+    @classmethod
+    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
+        correction = TaylorZerothOrder(ode_dimension=ode_dimension, ode_order=ode_order)
+        extrapolation = IBM.from_params(
+            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+        )
+        return cls(correction=correction, extrapolation=extrapolation)
+
+
+@jax.tree_util.register_pytree_node_class
+class MM1(implementation.Implementation["MomentMatching", "IBM"]):
+    @classmethod
+    def from_params(
+        cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
+    ):
+        if cubature is None:
+            correction = MomentMatching.from_params(
+                ode_dimension=ode_dimension, ode_order=ode_order
+            )
+        else:
+            correction = MomentMatching(
+                ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature
+            )
+        extrapolation = IBM.from_params(
+            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+        )
+        return cls(correction=correction, extrapolation=extrapolation)
 
 
 class _Normal(NamedTuple):
@@ -20,7 +68,7 @@ class _Normal(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 class _DenseCorrection(_correction.Correction):
-    def __init__(self, *, ode_dimension, ode_order=1):
+    def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
@@ -151,18 +199,19 @@ class TaylorFirstOrder(_DenseCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class MomentMatching(_DenseCorrection):
-    def __init__(self, *, ode_dimension, cubature=None, ode_order=1):
+    def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order, ode_dimension=ode_dimension)
+        self.cubature = cubature
 
-        if cubature is None:
-            self.cubature = cubature_module.SphericalCubatureIntegration.from_params(
-                ode_dimension=ode_dimension
-            )
-        else:
-            self.cubature = cubature
+    @classmethod
+    def from_params(cls, *, ode_dimension, ode_order):
+        cubature = cubature_module.SphericalCubatureIntegration.from_params(
+            ode_dimension=ode_dimension
+        )
+        return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
@@ -303,7 +352,7 @@ class IBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
 
     @classmethod
-    def from_params(cls, *, ode_dimension, num_derivatives=4):
+    def from_params(cls, *, ode_dimension, num_derivatives):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)

@@ -55,7 +55,7 @@ def vf(y, t, p):
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
 strategy = smoothers.Smoother(
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=1),
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=1),
 )
 solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=10.0)
 

@@ -21,6 +21,7 @@ How efficient are the solvers on a simple benchmark problem?
 import functools
 
 import jax
+import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import scipy.integrate
@@ -166,21 +167,17 @@ ode_dimension = u0.shape[0]
 ```
 
 ```python
-ekf0 = filters.Filter(
-    correction=isotropic.IsoTaylorZerothOrder(),
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=4),
-)
+ekf0 = filters.Filter(implementation=isotropic.IsoTS0.from_params(num_derivatives=4))
 ekf1 = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(ode_dimension=ode_dimension, num_derivatives=7),
+    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=7)
 )
 
 solve_fns = [
     (scipy_solve_ivp_rk45, "RK45 (scipy.integrate)"),
     (scipy_solve_ivp_dop853, "DOP853 (scipy.integrate)"),
     (jax_solve, "Dormand-Prince (jax.experimental)"),
-    (solver_to_solve(solvers.MLESolver(strategy=ekf0)), "EK0(n=4)"),
-    (solver_to_solve(solvers.MLESolver(strategy=ekf1)), "EK1(n=7)"),
+    (solver_to_solve(solvers.MLESolver(strategy=ekf0)), "IsoTS0(n=4)"),
+    (solver_to_solve(solvers.MLESolver(strategy=ekf1)), "TS1(n=7)"),
 ]
 ```
 
@@ -192,17 +189,9 @@ results = workprecision_make(solve_fns=solve_fns, number=1, repeat=3, tols=toler
 ```
 
 ```python
-fig, ax = plt.subplots(figsize=(5, 5))
+fig, ax = plt.subplots(figsize=(5, 4))
 
 fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
 
 plt.show()
-```
-
-```python
-
-```
-
-```python
-
 ```

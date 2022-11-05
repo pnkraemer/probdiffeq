@@ -43,7 +43,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ek0_1 = solvers.MLESolver()
+ek0_1 = solvers.MLESolver.from_params()
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -72,10 +72,9 @@ In fact, above, we used the following solver:
 
 
 ```python
-correction = isotropic.IsoTaylorZerothOrder(ode_order=1)
-extrapolation = isotropic.IsoIBM.from_params()
+implementation = isotropic.IsoTS0.from_params(ode_order=1, num_derivatives=4)
 ek0_1_granular = solvers.MLESolver(
-    strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
+    strategy=filters.Filter(implementation=implementation)
 )
 assert ek0_1_granular == ek0_1
 ```
@@ -92,11 +91,8 @@ def vf_2(y, dy, t, p):
 
 
 # One derivative more than above because we don't transform to first order
-correction = isotropic.IsoTaylorZerothOrder(ode_order=2)
-extrapolation = isotropic.IsoIBM.from_params(num_derivatives=5)
-ek0_2 = solvers.MLESolver(
-    strategy=filters.Filter(extrapolation=extrapolation, correction=correction)
-)
+implementation = isotropic.IsoTS0.from_params(ode_order=2, num_derivatives=5)
+ek0_2 = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 

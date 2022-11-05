@@ -14,7 +14,7 @@ C = TypeVar("C")  # think: Information operator's personal cache-type
 class Correction(abc.ABC, Generic[R, C]):
     """Correction model interface."""
 
-    def __init__(self, *, ode_order=1):
+    def __init__(self, *, ode_order):
         self.ode_order = ode_order
 
     def __repr__(self):

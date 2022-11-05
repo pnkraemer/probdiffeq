@@ -14,7 +14,7 @@ from odefilter.strategies import smoothers
 
 @pytest_cases.case
 def smoother_pair_fixedpoint_eks0():
-    return smoothers.Smoother(), smoothers.FixedPointSmoother()
+    return smoothers.Smoother.from_params(), smoothers.FixedPointSmoother.from_params()
 
 
 @pytest_cases.case
@@ -22,7 +22,7 @@ def smoother_pair_two_eks0():
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
-    return smoothers.Smoother(), smoothers.Smoother()
+    return smoothers.Smoother.from_params(), smoothers.Smoother.from_params()
 
 
 # Why a filter-warning?

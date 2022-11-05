@@ -27,10 +27,11 @@ def simulate_terminal_values(
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
+    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
+        num=num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
@@ -63,10 +64,11 @@ def simulate_checkpoints(
         )
         warnings.warn(msg)
 
+    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
+        num=num_derivatives + 1 - len(initial_values),
         t=ts[0],
         parameters=parameters,
     )
@@ -94,10 +96,11 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
+    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
+        num=num_derivatives + 1 - len(initial_values),
         t=t0,
         parameters=parameters,
     )
@@ -125,10 +128,11 @@ def solve_fixed_grid(
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
+    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor.taylor_mode_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
-        num=solver.strategy.extrapolation.num_derivatives + 1 - len(initial_values),
+        num=num_derivatives + 1 - len(initial_values),
         t=ts[0],
         parameters=parameters,
     )

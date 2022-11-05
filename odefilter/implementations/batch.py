@@ -6,7 +6,13 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter.implementations import (
+    _correction,
+    _extrapolation,
+    _ibm_util,
+    _sqrtm,
+    implementation,
+)
 
 # todo: reconsider naming!
 
@@ -19,6 +25,20 @@ class _BatchNormal(NamedTuple):
 
 
 _CType = Tuple[jax.Array]  # Cache type
+
+
+# todo: no more kwargs
+
+
+@jax.tree_util.register_pytree_node_class
+class BatchTS0(implementation.Implementation["BatchTaylorZerothOrder", "BatchIBM"]):
+    @classmethod
+    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
+        correction = BatchTaylorZerothOrder(ode_order=ode_order)
+        extrapolation = BatchIBM.from_params(
+            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+        )
+        return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -144,7 +164,7 @@ class BatchIBM(_extrapolation.Extrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
-    def from_params(cls, *, ode_dimension, num_derivatives=4):
+    def from_params(cls, *, ode_dimension, num_derivatives):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         a = jnp.stack([a] * ode_dimension)

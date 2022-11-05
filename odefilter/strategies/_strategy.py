@@ -12,19 +12,16 @@ from odefilter.implementations import isotropic
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, extrapolation=None, correction=None):
-        if extrapolation is None:
-            self.extrapolation = isotropic.IsoIBM.from_params()
-        else:
-            self.extrapolation = extrapolation
+    def __init__(self, *, implementation):
+        self.implementation = implementation
 
-        if correction is None:
-            self.correction = isotropic.IsoTaylorZerothOrder()
-        else:
-            self.correction = correction
+    @classmethod
+    def from_params(cls):
+        implementation = isotropic.IsoTS0.from_params()
+        return cls(implementation=implementation)
 
     def __repr__(self):
-        args = f"extrapolation={self.extrapolation}, correction={self.correction}"
+        args = f"implementation={self.implementation}"
         return f"{self.__class__.__name__}({args})"
 
     def __eq__(self, other):
@@ -92,26 +89,26 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     def tree_flatten(self):
-        children = (self.extrapolation, self.correction)
+        children = (self.implementation,)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (extrapolation, correction) = children
-        return cls(extrapolation=extrapolation, correction=correction)
+        (implementation,) = children
+        return cls(implementation=implementation)
 
     def _base_samples(self, key, *, shape):
         base_samples = jax.random.normal(key=key, shape=shape)
         return base_samples
 
     def init_error_estimate(self):
-        return self.extrapolation.init_error_estimate()
+        return self.implementation.extrapolation.init_error_estimate()
 
     def init_output_scale_sqrtm(self):
-        return self.extrapolation.init_output_scale_sqrtm()
+        return self.implementation.extrapolation.init_output_scale_sqrtm()
 
     def begin_correction(self, linearisation_pt, *, vector_field, t, p):
-        return self.correction.begin_correction(
+        return self.implementation.correction.begin_correction(
             linearisation_pt, vector_field=vector_field, t=t, p=p
         )

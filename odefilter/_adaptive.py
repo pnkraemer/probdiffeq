@@ -134,7 +134,7 @@ class AdaptiveODEFilter(Generic[R]):
     @property
     def error_contraction_rate(self):
         """Error order."""
-        return self.solver.strategy.extrapolation.num_derivatives + 1
+        return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
 
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):

@@ -48,7 +48,7 @@ def vf(*ys, t, p):
 Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
-ek0 = solvers.MLESolver(strategy=filters.Filter())
+ek0 = solvers.MLESolver(strategy=filters.Filter.from_params())
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -102,7 +102,7 @@ plt.show()
 ## Smoother
 
 ```python
-ek0 = solvers.MLESolver(strategy=smoothers.FixedPointSmoother())
+ek0 = solvers.MLESolver(strategy=smoothers.FixedPointSmoother.from_params())
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 

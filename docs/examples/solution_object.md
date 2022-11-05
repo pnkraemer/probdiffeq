@@ -46,7 +46,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = solvers.DynamicSolver(strategy=smoothers.Smoother())
+solver = solvers.DynamicSolver(strategy=smoothers.Smoother.from_params())
 ```
 
 ```python tags=[]

@@ -85,11 +85,12 @@ class Solution(Generic[T]):
 class _AbstractSolver(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, strategy=None):
-        if strategy is None:
-            self.strategy = strategy or filters.Filter()
-        else:
-            self.strategy = strategy
+    def __init__(self, *, strategy):
+        self.strategy = strategy
+
+    @classmethod
+    def from_params(cls):
+        return cls(strategy=filters.Filter.from_params())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(strategy={self.strategy})"
@@ -389,7 +390,9 @@ class MLESolver(_AbstractSolver):
         return filtered, dt * error
 
     def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
-        evidence_sqrtm = self.strategy.correction.evidence_sqrtm(observed=obs)
+        evidence_sqrtm = self.strategy.implementation.correction.evidence_sqrtm(
+            observed=obs
+        )
         return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):

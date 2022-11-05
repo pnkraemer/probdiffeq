@@ -11,12 +11,12 @@ from odefilter.strategies import filters, smoothers
 
 @pytest_cases.case
 def strategy_pair_smoother():
-    return filters.Filter(), smoothers.Smoother()
+    return filters.Filter.from_params(), smoothers.Smoother.from_params()
 
 
 @pytest_cases.case
 def strategy_pair_fixedpoint_smoother():
-    return filters.Filter(), smoothers.FixedPointSmoother()
+    return filters.Filter.from_params(), smoothers.FixedPointSmoother.from_params()
 
 
 @pytest_cases.parametrize_with_cases("ekf, eks", cases=".", prefix="strategy_pair_")
