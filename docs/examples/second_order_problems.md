@@ -92,9 +92,7 @@ def vf_2(y, dy, t, p):
 
 # One derivative more than above because we don't transform to first order
 implementation = isotropic.IsoTS0.from_params(ode_order=2, num_derivatives=5)
-ek0_2 = solvers.MLESolver(
-    strategy=filters.Filter(implementation=implementation)
-)
+ek0_2 = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
