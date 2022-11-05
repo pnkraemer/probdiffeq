@@ -1,4 +1,4 @@
-"""Tests for IVP solvers."""
+"""Tests for solving IVPs for the terminal value."""
 
 import jax.numpy as jnp
 

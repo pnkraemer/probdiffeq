@@ -1,9 +1,9 @@
 """Make sure that the results are equivalent to tornadox."""
 
+import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 import pytest_cases
-from diffeqzoo import ivps
 from tornadox import ek0, ek1, init, ivp, step
 
 from odefilter import controls, ivpsolve, solvers
@@ -24,7 +24,9 @@ def fixture_control_params():
 @pytest_cases.fixture(scope="session", name="vanderpol")
 def fixture_vanderpol():
     # van-der-Pol as a setup. We really don't want stiffness here.
-    return ivps.van_der_pol_first_order(time_span=(0.0, 1.0), stiffness_constant=1.0)
+    return diffeqzoo.ivps.van_der_pol_first_order(
+        time_span=(0.0, 1.0), stiffness_constant=1.0
+    )
 
 
 @pytest_cases.fixture(scope="session", name="ivp_tornadox")

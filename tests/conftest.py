@@ -1,11 +1,10 @@
-"""Solution cases."""
+"""Test configurations."""
 
+import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 import pytest_cases
 import pytest_cases.filters
-from diffeqzoo import ivps
-from jax.experimental.ode import odeint
 
 from odefilter import ivpsolve
 
@@ -24,7 +23,7 @@ _SOLVE = _IS_FILTER | _IS_SMOOTHER
 
 @pytest_cases.fixture(scope="session", name="ode_problem")
 def fixture_ode_problem():
-    f, u0, (t0, t1), f_args = ivps.lotka_volterra()
+    f, u0, (t0, t1), f_args = diffeqzoo.ivps.lotka_volterra()
     t1 = 2.0
 
     @jax.jit
@@ -53,7 +52,9 @@ def fixture_reference_terminal_values(ode_problem, tolerances):
         return vf(y, t=t, p=p)
 
     ts = jnp.asarray([t0, t1])
-    odeint_solution = odeint(func, u0, ts, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol)
+    odeint_solution = jax.experimental.ode.odeint(
+        func, u0, ts, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol
+    )
     ys_reference = odeint_solution[-1, :]
     return t1, ys_reference
 
@@ -94,7 +95,7 @@ def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
     def func(y, t, *p):
         return vf(y, t=t, p=p)
 
-    odeint_solution = odeint(
+    odeint_solution = jax.experimental.ode.odeint(
         func, u0, checkpoint_grid, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol
     )
     return checkpoint_grid, odeint_solution

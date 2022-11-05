@@ -1,9 +1,8 @@
-"""Tests for IVP solvers."""
+"""Tests for solving IVPs on fixed grids."""
 import functools
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
 import pytest_cases
 
 from odefilter import ivpsolve, solvers
