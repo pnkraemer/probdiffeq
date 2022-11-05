@@ -21,6 +21,7 @@ Let's find the fastest solver of the Lotka--Volterra problem, a standard benchma
 import functools
 
 import jax
+import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from _benchmark_utils import (
@@ -110,7 +111,7 @@ ode_dimension = u0.shape[0]
 tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
 
 workprecision_diagram = functools.partial(
-    workprecision_make, number=2, repeat=2, tols=tolerances
+    workprecision_make, number=3, repeat=3, tols=tolerances
 )
 ```
 
@@ -119,48 +120,46 @@ workprecision_diagram = functools.partial(
 Should we linearize with a Taylor-approximation or by moment matching?
 
 ```python
-def correction_to_solver(correction, num_derivatives):
-    return solver_to_solve(
-        solvers.MLESolver(
-            strategy=filters.Filter(
-                extrapolation=dense.IBM.from_params(
-                    ode_dimension=ode_dimension, num_derivatives=num_derivatives
-                ),
-                correction=correction,
-            )
-        )
-    )
+def correction_to_solver(implementation):
+    solver = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
+    return solver_to_solve(solver)
 
 
-ekf1_correction = dense.TaylorFirstOrder(ode_dimension=ode_dimension)
-ckf1_correction = dense.MomentMatching(
+num_derivatives = 4
+ts1 = dense.TS1.from_params(ode_dimension=ode_dimension)
+mm1_sci = dense.MM1.from_params(
+    ode_dimension=ode_dimension,
+    num_derivatives=num_derivatives,
     cubature=cubature.SphericalCubatureIntegration.from_params(
         ode_dimension=ode_dimension
     ),
-    ode_dimension=ode_dimension,
 )
-ukf1_correction = dense.MomentMatching(
+
+mm1_ut = dense.MM1.from_params(
+    ode_dimension=ode_dimension,
+    num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(
         ode_dimension=ode_dimension, r=1.0
     ),
-    ode_dimension=ode_dimension,
-)
-ghkf1_correction = dense.MomentMatching(
-    cubature=cubature.GaussHermite.from_params(ode_dimension=ode_dimension, degree=3),
-    ode_dimension=ode_dimension,
 )
 
-num_derivatives = 4
-ekf1 = correction_to_solver(ekf1_correction, num_derivatives)
-ckf1 = correction_to_solver(ckf1_correction, num_derivatives)
-ukf1 = correction_to_solver(ukf1_correction, num_derivatives)
-ghkf1 = correction_to_solver(ghkf1_correction, num_derivatives)
+mm1_gh = dense.MM1.from_params(
+    ode_dimension=ode_dimension,
+    num_derivatives=num_derivatives,
+    cubature=cubature.GaussHermite.from_params(ode_dimension=ode_dimension, degree=3),
+)
+
+
+ts1_solver = correction_to_solver(ts1)
+mm1_sci_solver = correction_to_solver(mm1_sci)
+mm1_ut_solver = correction_to_solver(mm1_ut)
+mm1_gh_solver = correction_to_solver(mm1_gh)
 
 solve_fns = [
-    (ekf1, f"TaylorFirstOrder({num_derivatives})"),
-    (ckf1, f"MomentMatching({num_derivatives}, SCI)"),
-    (ukf1, f"MomentMatching({num_derivatives}, UT)"),
-    (ghkf1, f"MomentMatching({num_derivatives}, GH)"),
+    (ts1_solver, f"TS1({num_derivatives})"),
+    (mm1_sci_solver, f"MM1({num_derivatives}, SCI)"),
+    (mm1_ut_solver, f"MM1({num_derivatives}, UT)"),
+    (mm1_gh_solver, f"MM1({num_derivatives}, GH)"),
 ]
 ```
 
@@ -184,39 +183,28 @@ The Taylor-series based method is more efficient. The cubature rule has little e
 What is the performance difference between an `IsoTaylorZerothOrder`, a `BatchTaylorZerothOrder`, and a `TaylorZerothOrder`?
 
 ```python
-def solver(extrapolation, correction):
+def solver(implementation):
     return solver_to_solve(
-        solvers.MLESolver(
-            strategy=filters.Filter(
-                extrapolation=extrapolation,
-                correction=correction,
-            )
-        )
+        solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
     )
 
 
 num_derivatives = 4
-iso_correction = isotropic.IsoTaylorZerothOrder()
-iso_extrapolation = isotropic.IsoIBM.from_params(num_derivatives=num_derivatives)
-iso_solver = solver(iso_extrapolation, iso_correction)
-
-batch_correction = batch.BatchTaylorZerothOrder()
-batch_extrapolation = batch.BatchIBM.from_params(
-    ode_dimension=ode_dimension, num_derivatives=num_derivatives
+iso_solver = solver(isotropic.IsoTS0.from_params(num_derivatives=num_derivatives))
+batch_solver = solver(
+    batch.BatchTS0.from_params(
+        ode_dimension=ode_dimension, num_derivatives=num_derivatives
+    )
 )
-batch_solver = solver(batch_extrapolation, batch_correction)
-
-dense_correction = dense.TaylorZerothOrder(ode_dimension=ode_dimension)
-dense_extrapolation = dense.IBM.from_params(
-    ode_dimension=ode_dimension, num_derivatives=num_derivatives
+dense_solver = solver(
+    dense.TS0.from_params(ode_dimension=ode_dimension, num_derivatives=num_derivatives)
 )
-dense_solver = solver(dense_extrapolation, dense_correction)
 
 
 solve_fns = [
-    (iso_solver, f"Isotropic({num_derivatives})"),
-    (batch_solver, f"BatchSolver({num_derivatives})"),
-    (dense_solver, f"DenseSolver({num_derivatives})"),
+    (iso_solver, f"IsoTS0({num_derivatives})"),
+    (batch_solver, f"BatchTS0({num_derivatives})"),
+    (dense_solver, f"TS0({num_derivatives})"),
 ]
 ```
 
@@ -251,40 +239,34 @@ def strategy_to_mle_solver(strategy):
 
 
 ekf0_iso_low = filters.Filter(
-    correction=isotropic.IsoTaylorZerothOrder(),
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=2),
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=2)
 )
 ekf0_iso_medium = filters.Filter(
-    correction=isotropic.IsoTaylorZerothOrder(),
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=3),
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=3)
 )
 ekf0_iso_high = filters.Filter(
-    correction=isotropic.IsoTaylorZerothOrder(),
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=5),
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=5)
 )
 
 ekf1_low = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(ode_dimension=ode_dimension, num_derivatives=3),
+    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=3)
 )
 ekf1_medium = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(ode_dimension=ode_dimension, num_derivatives=5),
+    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=5)
 )
 ekf1_high = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(ode_dimension=ode_dimension, num_derivatives=8),
+    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=8)
 )
 
 
 solve_fns = []
 for strat, label in [
-    (ekf0_iso_low, "EKF0(2)"),
-    (ekf0_iso_medium, "EKF0(3)"),
-    (ekf0_iso_high, "EKF0(5)"),
-    (ekf1_low, "EKF1(3)"),
-    (ekf1_medium, "EKF1(5)"),
-    (ekf1_high, "EKF1(8)"),
+    (ekf0_iso_low, "IsoTS0(2)"),
+    (ekf0_iso_medium, "IsoTS0(3)"),
+    (ekf0_iso_high, "IsoTS0(5)"),
+    (ekf1_low, "TS1(3)"),
+    (ekf1_medium, "TS1(5)"),
+    (ekf1_high, "TS1(8)"),
 ]:
     dynamic_solver = strategy_to_dynamic_solver(strat)
     mle_solver = strategy_to_mle_solver(strat)
@@ -326,10 +308,14 @@ For first-order Taylor series, non-dynamic calibration is better, but the differ
 ### Should I use a filter or a smoother?
 
 ```python
-filter_solver = solver_to_solve(solvers.MLESolver(strategy=filters.Filter()))
-smoother_solver = solver_to_solve(solvers.MLESolver(strategy=smoothers.Smoother()))
+filter_solver = solver_to_solve(
+    solvers.MLESolver(strategy=filters.Filter.from_params())
+)
+smoother_solver = solver_to_solve(
+    solvers.MLESolver(strategy=smoothers.Smoother.from_params())
+)
 fixpt_smoother_solver = solver_to_solve(
-    solvers.MLESolver(strategy=smoothers.FixedPointSmoother())
+    solvers.MLESolver(strategy=smoothers.FixedPointSmoother.from_params())
 )
 
 solve_fns = [
@@ -381,40 +367,43 @@ def strategy_to_mle_solver(strategy):
 
 num_low, num_medium, num_high = 3, 5, 8
 
-ekf0_iso_low = filters.Filter(
-    correction=isotropic.IsoTaylorZerothOrder(),
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=num_low),
+ts0_iso_low = filters.Filter(
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=num_low)
 )
-ekf0_iso_medium = filters.Filter(
-    correction=isotropic.IsoTaylorZerothOrder(),
-    extrapolation=isotropic.IsoIBM.from_params(num_derivatives=num_medium),
+ts0_iso_medium = filters.Filter(
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=num_medium)
 )
 
-ekf1_low = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(
+ts1_low = filters.Filter(
+    implementation=dense.TS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_low
-    ),
+    )
 )
-ekf1_medium = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(
+ts1_medium = filters.Filter(
+    implementation=dense.TS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_medium
-    ),
+    )
 )
-ekf1_high = filters.Filter(
-    correction=dense.TaylorFirstOrder(ode_dimension=ode_dimension),
-    extrapolation=dense.IBM.from_params(
+ts1_high = filters.Filter(
+    implementation=dense.TS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
-    ),
+    )
+)
+
+
+mm1_high = filters.Filter(
+    implementation=dense.MM1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=num_high
+    )
 )
 
 solve_fns = [
-    (strategy_to_mle_solver(ekf0_iso_low), f"EKF0({num_low}), MLE"),
-    (strategy_to_mle_solver(ekf0_iso_medium), f"EKF0({num_medium}), MLE"),
-    (strategy_to_dynamic_solver(ekf1_low), f"EKF1({num_low}), Dynamic"),
-    (strategy_to_mle_solver(ekf1_medium), f"EKF1({num_medium}), MLE"),
-    (strategy_to_mle_solver(ekf1_high), f"EKF1({num_high}), MLE"),
+    (strategy_to_mle_solver(ts0_iso_low), f"IsoTS0({num_low}), MLE"),
+    (strategy_to_mle_solver(ts0_iso_medium), f"IsoTS0({num_medium}), MLE"),
+    (strategy_to_dynamic_solver(ts1_low), f"TS1({num_low}), Dynamic"),
+    (strategy_to_mle_solver(ts1_medium), f"TS1({num_medium}), MLE"),
+    (strategy_to_mle_solver(ts1_high), f"TS1({num_high}), MLE"),
+    (strategy_to_mle_solver(mm1_high), f"MM1({num_high}), MLE"),
 ]
 ```
 
