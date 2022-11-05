@@ -38,19 +38,15 @@ def case_ekf0_batch():
 
 @pytest_cases.case(tags=["smoother"])
 def case_eks0_batch():
-    correction = batch.BatchTaylorZerothOrder()
-    extrapolation = batch.BatchIBM.from_params(ode_dimension=2)
-    strategy = smoothers.Smoother(correction=correction, extrapolation=extrapolation)
+    implementation = batch.BatchTS0.from_params(ode_dimension=2)
+    strategy = smoothers.Smoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["fixedpoint"])
 def case_eks0_batch_fixedpoint():
-    correction = batch.BatchTaylorZerothOrder()
-    extrapolation = batch.BatchIBM.from_params(ode_dimension=2)
-    strategy = smoothers.FixedPointSmoother(
-        correction=correction, extrapolation=extrapolation
-    )
+    implementation = batch.BatchTS0.from_params(ode_dimension=2)
+    strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
