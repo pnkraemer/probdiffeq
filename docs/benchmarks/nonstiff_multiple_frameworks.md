@@ -167,8 +167,10 @@ ode_dimension = u0.shape[0]
 ```
 
 ```python
-ekf0 = filters.Filter(implementation=isotropic.IsoTS0.from_params(num_derivatives=4))
-ekf1 = filters.Filter(
+filter_ts0 = filters.Filter(
+    implementation=isotropic.IsoTS0.from_params(num_derivatives=4)
+)
+filter_ts1 = filters.Filter(
     implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=7)
 )
 
@@ -176,8 +178,8 @@ solve_fns = [
     (scipy_solve_ivp_rk45, "RK45 (scipy.integrate)"),
     (scipy_solve_ivp_dop853, "DOP853 (scipy.integrate)"),
     (jax_solve, "Dormand-Prince (jax.experimental)"),
-    (solver_to_solve(solvers.MLESolver(strategy=ekf0)), "IsoTS0(n=4)"),
-    (solver_to_solve(solvers.MLESolver(strategy=ekf1)), "TS1(n=7)"),
+    (solver_to_solve(solvers.MLESolver(strategy=filter_ts0)), "IsoTS0(n=4)"),
+    (solver_to_solve(solvers.MLESolver(strategy=filter_ts1)), "TS1(n=7)"),
 ]
 ```
 

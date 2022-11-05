@@ -74,8 +74,8 @@ def fixture_controller_odefilter(control_params):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solver_tornadox_ekf0")
-def fixture_solver_tornadox_ekf0(num, steprule_tornadox):
+@pytest_cases.fixture(scope="session", name="solver_tornadox_kronecker_ek0")
+def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
     return ek0.KroneckerEK0(
         initialization=init.TaylorMode(),
         num_derivatives=num,
@@ -83,24 +83,24 @@ def fixture_solver_tornadox_ekf0(num, steprule_tornadox):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solver_odefilter_ekf0")
-def fixture_solver_odefilter_ekf0(num):
+@pytest_cases.fixture(scope="session", name="solver_odefilter_kronecker_ek0")
+def fixture_solver_odefilter_kronecker_ek0(num):
     implementation = isotropic.IsoTS0.from_params(num_derivatives=num)
-    ekf0_strategy = filters.Filter(implementation=implementation)
-    return solvers.DynamicSolver(strategy=ekf0_strategy)
+    strategy = filters.Filter(implementation=implementation)
+    return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case
-def case_solver_pair_isotropic_ekf0(
+def case_solver_pair_kronecker_ek0(
     tolerances,
     ivp_tornadox,
     ivp_odefilter,
-    solver_tornadox_ekf0,
-    solver_odefilter_ekf0,
+    solver_tornadox_kronecker_ek0,
+    solver_odefilter_kronecker_ek0,
     controller_odefilter,
 ):
     # Solve with tornadox
-    solution_tornadox = solver_tornadox_ekf0.solve(ivp_tornadox)
+    solution_tornadox = solver_tornadox_kronecker_ek0.solve(ivp_tornadox)
 
     # Solve with odefilter
     atol, rtol = tolerances
@@ -110,7 +110,7 @@ def case_solver_pair_isotropic_ekf0(
         initial_values=u0,
         t0=t0,
         t1=t1,
-        solver=solver_odefilter_ekf0,
+        solver=solver_odefilter_kronecker_ek0,
         atol=atol,
         rtol=rtol,
         control=controller_odefilter,
@@ -132,7 +132,7 @@ def case_solver_pair_isotropic_ekf0(
 
     output_tornadox = (
         solution_tornadox.t,
-        (solution_tornadox.mean),
+        solution_tornadox.mean,
         cov(solution_tornadox.cov_sqrtm),
     )
     solution_odefilter = (
@@ -143,8 +143,8 @@ def case_solver_pair_isotropic_ekf0(
     return output_tornadox, solution_odefilter
 
 
-@pytest_cases.fixture(scope="session", name="solver_tornadox_ekf1")
-def fixture_solver_tornadox_ekf1(num, steprule_tornadox):
+@pytest_cases.fixture(scope="session", name="solver_tornadox_reference_ek1")
+def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
     return ek1.ReferenceEK1(
         initialization=init.TaylorMode(),
         num_derivatives=num,
@@ -152,24 +152,24 @@ def fixture_solver_tornadox_ekf1(num, steprule_tornadox):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solver_odefilter_ekf1")
-def fixture_solver_odefilter_ekf1(num):
+@pytest_cases.fixture(scope="session", name="solver_odefilter_reference_ek1")
+def fixture_solver_odefilter_reference_ek1(num):
     implementation = dense.TS1.from_params(num_derivatives=num, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case
-def case_solver_pair_ekf1_dynamic(
+def case_solver_pair_reference_ek1(
     tolerances,
     ivp_tornadox,
     ivp_odefilter,
-    solver_tornadox_ekf1,
-    solver_odefilter_ekf1,
+    solver_tornadox_reference_ek1,
+    solver_odefilter_reference_ek1,
     controller_odefilter,
 ):
     # Solve with tornadox
-    solution_tornadox = solver_tornadox_ekf1.solve(ivp_tornadox)
+    solution_tornadox = solver_tornadox_reference_ek1.solve(ivp_tornadox)
 
     # Solve with odefilter
     atol, rtol = tolerances
@@ -179,7 +179,7 @@ def case_solver_pair_ekf1_dynamic(
         initial_values=u0,
         t0=t0,
         t1=t1,
-        solver=solver_odefilter_ekf1,
+        solver=solver_odefilter_reference_ek1,
         atol=atol,
         rtol=rtol,
         control=controller_odefilter,

@@ -43,7 +43,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ek0_1 = solvers.MLESolver.from_params()
+ts0_1 = solvers.MLESolver.from_params()
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -54,7 +54,7 @@ solution = ivpsolve.simulate_checkpoints(
     vf_1,
     initial_values=(u0,),
     ts=ts,
-    solver=ek0_1,
+    solver=ts0_1,
     atol=1e-5,
     rtol=1e-5,
     parameters=f_args,
@@ -73,10 +73,10 @@ In fact, above, we used the following solver:
 
 ```python
 implementation = isotropic.IsoTS0.from_params(ode_order=1, num_derivatives=4)
-ek0_1_granular = solvers.MLESolver(
+ts0_1_granular = solvers.MLESolver(
     strategy=filters.Filter(implementation=implementation)
 )
-assert ek0_1_granular == ek0_1
+assert ts0_1_granular == ts0_1
 ```
 
 Now, the same game with a second-order ODE
@@ -92,7 +92,7 @@ def vf_2(y, dy, t, p):
 
 # One derivative more than above because we don't transform to first order
 implementation = isotropic.IsoTS0.from_params(ode_order=2, num_derivatives=5)
-ek0_2 = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
+ts0_2 = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -103,7 +103,7 @@ solution = ivpsolve.simulate_checkpoints(
     vf_2,
     initial_values=(u0, du0),
     ts=ts,
-    solver=ek0_2,
+    solver=ts0_2,
     atol=1e-5,
     rtol=1e-5,
     parameters=f_args,

@@ -238,35 +238,35 @@ def strategy_to_mle_solver(strategy):
     return solver_to_solve(solvers.MLESolver(strategy=strategy))
 
 
-ekf0_iso_low = filters.Filter(
+filter_ts0_iso_low = filters.Filter(
     implementation=isotropic.IsoTS0.from_params(num_derivatives=2)
 )
-ekf0_iso_medium = filters.Filter(
+filter_ts0_iso_medium = filters.Filter(
     implementation=isotropic.IsoTS0.from_params(num_derivatives=3)
 )
-ekf0_iso_high = filters.Filter(
+filter_ts0_iso_high = filters.Filter(
     implementation=isotropic.IsoTS0.from_params(num_derivatives=5)
 )
 
-ekf1_low = filters.Filter(
+filter_ts1_low = filters.Filter(
     implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=3)
 )
-ekf1_medium = filters.Filter(
+filter_ts1_medium = filters.Filter(
     implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=5)
 )
-ekf1_high = filters.Filter(
+filter_ts1_high = filters.Filter(
     implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=8)
 )
 
 
 solve_fns = []
 for strat, label in [
-    (ekf0_iso_low, "IsoTS0(2)"),
-    (ekf0_iso_medium, "IsoTS0(3)"),
-    (ekf0_iso_high, "IsoTS0(5)"),
-    (ekf1_low, "TS1(3)"),
-    (ekf1_medium, "TS1(5)"),
-    (ekf1_high, "TS1(8)"),
+    (filter_ts0_iso_low, "IsoTS0(2)"),
+    (filter_ts0_iso_medium, "IsoTS0(3)"),
+    (filter_ts0_iso_high, "IsoTS0(5)"),
+    (filter_ts1_low, "TS1(3)"),
+    (filter_ts1_medium, "TS1(5)"),
+    (filter_ts1_high, "TS1(8)"),
 ]:
     dynamic_solver = strategy_to_dynamic_solver(strat)
     mle_solver = strategy_to_mle_solver(strat)
