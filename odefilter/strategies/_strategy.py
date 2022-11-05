@@ -12,10 +12,13 @@ from odefilter.implementations import isotropic
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, implementation=None):
-        if implementation is None:
-            implementation = isotropic.IsoTS0.from_params()
+    def __init__(self, *, implementation):
         self.implementation = implementation
+
+    @classmethod
+    def from_params(cls):
+        implementation = isotropic.IsoTS0.from_params()
+        return cls(implementation=implementation)
 
     def __repr__(self):
         args = f"implementation={self.implementation}"

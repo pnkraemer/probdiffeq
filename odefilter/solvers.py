@@ -85,11 +85,12 @@ class Solution(Generic[T]):
 class _AbstractSolver(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, strategy=None):
-        if strategy is None:
-            self.strategy = strategy or filters.Filter()
-        else:
-            self.strategy = strategy
+    def __init__(self, *, strategy):
+        self.strategy = strategy
+
+    @classmethod
+    def from_params(cls):
+        return cls(strategy=filters.Filter.from_params())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(strategy={self.strategy})"

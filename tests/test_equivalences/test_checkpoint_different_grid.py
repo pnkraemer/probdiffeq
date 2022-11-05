@@ -14,7 +14,7 @@ from odefilter.strategies import smoothers
 
 @pytest_cases.case
 def smoother_pair_eks0():
-    return smoothers.Smoother(), smoothers.FixedPointSmoother()
+    return smoothers.Smoother.from_params(), smoothers.FixedPointSmoother.from_params()
 
 
 @pytest_cases.parametrize_with_cases("eks, fp_eks", cases=".", prefix="smoother_pair_")
