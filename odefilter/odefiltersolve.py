@@ -10,7 +10,6 @@ from odefilter import _adaptive, _control_flow
 #  it is generally safer to use the ivpsolve.py methods.
 
 
-@jax.jit
 def odefilter_terminal_values(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
@@ -31,7 +30,6 @@ def odefilter_terminal_values(
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
 
-@jax.jit
 def odefilter_checkpoints(
     vector_field, taylor_coefficients, ts, solver, parameters, **options
 ):
