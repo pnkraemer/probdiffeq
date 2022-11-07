@@ -1,7 +1,5 @@
 """Custom control flow. Extends jax.lax."""
 
-import functools
-
 import jax
 import jax.numpy as jnp
 
@@ -9,8 +7,6 @@ import jax.numpy as jnp
 # todo: this function only works if the output of scan has the same
 #  pytree structure as the init;
 #  i.e., if the carry type is the solution type.
-# todo: remove the jit?
-@functools.partial(jax.jit, static_argnames=["f", "reverse"])
 def scan_with_init(*, f, init, xs, reverse=False):
     """Scan, but include the ``init`` parameter into the output.
 
