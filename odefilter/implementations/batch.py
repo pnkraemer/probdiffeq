@@ -23,12 +23,14 @@ class BatchNormal(NamedTuple):
 
 # todo: extract the below into functions.
 
-C = TypeVar("C")
+BatchCacheType = TypeVar("BatchCacheType")
 """Cache-type variable."""
 
 
 @jax.tree_util.register_pytree_node_class
-class _BatchCorrection(correction.AbstractCorrection[BatchNormal, C], Generic[C]):
+class _BatchCorrection(
+    correction.AbstractCorrection[BatchNormal, BatchCacheType], Generic[BatchCacheType]
+):
     def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 
@@ -65,12 +67,12 @@ class _BatchCorrection(correction.AbstractCorrection[BatchNormal, C], Generic[C]
         return 0.5 * (x1 + x2 + x3)
 
 
-MM1CacheType = Tuple[Callable]
+BatchMM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchMomentMatching(_BatchCorrection[MM1CacheType]):
+class BatchMomentMatching(_BatchCorrection[BatchMM1CacheType]):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -225,17 +227,17 @@ class BatchMomentMatching(_BatchCorrection[MM1CacheType]):
         return H_reshaped, BatchNormal(d, r_Om_reshaped)
 
 
-TS0CacheType = Tuple[jax.Array]
+BatchTS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(_BatchCorrection[TS0CacheType]):
+class BatchTaylorZerothOrder(_BatchCorrection[BatchTS0CacheType]):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(
         self, x: BatchNormal, /, *, vector_field, t, p
-    ) -> Tuple[jax.Array, float, TS0CacheType]:
+    ) -> Tuple[jax.Array, float, BatchTS0CacheType]:
         m = x.mean
 
         # m has shape (d, n)
@@ -259,7 +261,9 @@ class BatchTaylorZerothOrder(_BatchCorrection[TS0CacheType]):
         error_estimate = l_obs  # (d,)
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
-    def complete_correction(self, *, extrapolated: BatchNormal, cache: TS0CacheType):
+    def complete_correction(
+        self, *, extrapolated: BatchNormal, cache: BatchTS0CacheType
+    ):
         (bias,) = cache
 
         # (d, k), (d, k, k)
@@ -290,13 +294,13 @@ class BatchTaylorZerothOrder(_BatchCorrection[TS0CacheType]):
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
 
-IBMCacheType = Tuple[jax.Array]  # Cache type
+BatchIBMCacheType = Tuple[jax.Array]  # Cache type
 """Type of the extrapolation-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, IBMCacheType]):
+class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheType]):
     """Handle block-diagonal covariances."""
 
     a: Any

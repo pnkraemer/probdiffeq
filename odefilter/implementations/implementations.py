@@ -19,7 +19,7 @@ CorrType = TypeVar("CorrType", bound=correction_module.AbstractCorrection)
 
 
 class AbstractImplementation(Generic[CorrType, ExtraType]):
-    """Implementations.
+    """Solver / inference implementations.
 
     Mostly a container for an extrapolation method and a correction method.
     """
