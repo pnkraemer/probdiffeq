@@ -1,3 +1,3 @@
-# Default implementations
+# Traditional priors
 
 ::: odefilter.implementations.dense

@@ -4,19 +4,29 @@ from typing import Generic, TypeVar
 
 import jax
 
-from odefilter.implementations import batch, dense, isotropic
+from odefilter.implementations import (
+    _correction,
+    _extrapolation,
+    batch,
+    dense,
+    isotropic,
+)
 
-E = TypeVar("E")  # think: Extrapolation style
-C = TypeVar("C")  # think: Correction style
+ExtraType = TypeVar("ExtraType", bound=_extrapolation.Extrapolation)
+"""Extrapolation style."""
 
 
-class Implementation(Generic[C, E]):
+CorrType = TypeVar("CorrType", bound=_correction.Correction)  # think: Correction style
+"""Correction style."""
+
+
+class AbstractImplementation(Generic[CorrType, ExtraType]):
     """Implementations.
 
     Mostly a container for an extrapolation method and a correction method.
     """
 
-    def __init__(self, *, correction: C, extrapolation: E):
+    def __init__(self, *, correction: CorrType, extrapolation: ExtraType):
         self.correction = correction
         self.extrapolation = extrapolation
 
@@ -32,7 +42,7 @@ class Implementation(Generic[C, E]):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTS0(Implementation[isotropic.IsoTaylorZerothOrder, isotropic.IsoIBM]):
+class IsoTS0(AbstractImplementation[isotropic.IsoTaylorZerothOrder, isotropic.IsoIBM]):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
         correction = isotropic.IsoTaylorZerothOrder(ode_order=ode_order)
@@ -41,7 +51,7 @@ class IsoTS0(Implementation[isotropic.IsoTaylorZerothOrder, isotropic.IsoIBM]):
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchMM1(Implementation[batch.BatchMomentMatching, batch.BatchIBM]):
+class BatchMM1(AbstractImplementation[batch.BatchMomentMatching, batch.BatchIBM]):
     @classmethod
     def from_params(
         cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
@@ -61,7 +71,7 @@ class BatchMM1(Implementation[batch.BatchMomentMatching, batch.BatchIBM]):
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTS0(Implementation[batch.BatchMomentMatching, batch.BatchIBM]):
+class BatchTS0(AbstractImplementation[batch.BatchMomentMatching, batch.BatchIBM]):
     @classmethod
     def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
         correction = batch.BatchTaylorZerothOrder(ode_order=ode_order)
@@ -72,7 +82,7 @@ class BatchTS0(Implementation[batch.BatchMomentMatching, batch.BatchIBM]):
 
 
 @jax.tree_util.register_pytree_node_class
-class TS1(Implementation[dense.TaylorFirstOrder, dense.IBM]):
+class TS1(AbstractImplementation[dense.TaylorFirstOrder, dense.IBM]):
     @classmethod
     def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
         correction = dense.TaylorFirstOrder(
@@ -85,7 +95,7 @@ class TS1(Implementation[dense.TaylorFirstOrder, dense.IBM]):
 
 
 @jax.tree_util.register_pytree_node_class
-class TS0(Implementation[dense.TaylorZerothOrder, dense.IBM]):
+class TS0(AbstractImplementation[dense.TaylorZerothOrder, dense.IBM]):
     @classmethod
     def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
         correction = dense.TaylorZerothOrder(
@@ -98,7 +108,7 @@ class TS0(Implementation[dense.TaylorZerothOrder, dense.IBM]):
 
 
 @jax.tree_util.register_pytree_node_class
-class MM1(Implementation[dense.MomentMatching, dense.IBM]):
+class MM1(AbstractImplementation[dense.MomentMatching, dense.IBM]):
     @classmethod
     def from_params(
         cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4

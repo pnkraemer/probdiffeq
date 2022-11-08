@@ -1,3 +1,3 @@
-# Priors with diagonal diffusion
+# Priors with block-diagonal covariance structure
 
 ::: odefilter.implementations.batch

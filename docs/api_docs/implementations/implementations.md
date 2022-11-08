@@ -1,3 +1,3 @@
-# Implementations
+# Implementation recipes
 
 ::: odefilter.implementations.implementations

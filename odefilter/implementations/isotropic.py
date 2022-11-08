@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter._implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 
 class _IsoNormal(NamedTuple):
