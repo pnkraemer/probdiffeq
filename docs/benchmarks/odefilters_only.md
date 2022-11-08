@@ -197,7 +197,9 @@ batch_solver = solver(
     )
 )
 dense_solver = solver(
-    implementations.TS0.from_params(ode_dimension=ode_dimension, num_derivatives=num_derivatives)
+    implementations.TS0.from_params(
+        ode_dimension=ode_dimension, num_derivatives=num_derivatives
+    )
 )
 
 
@@ -249,13 +251,19 @@ filter_ts0_iso_high = filters.Filter(
 )
 
 filter_ts1_low = filters.Filter(
-    implementation=implementations.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=3)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=3
+    )
 )
 filter_ts1_medium = filters.Filter(
-    implementation=implementations.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=5)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=5
+    )
 )
 filter_ts1_high = filters.Filter(
-    implementation=implementations.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=8)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=8
+    )
 )
 
 

@@ -181,7 +181,9 @@ filter_mm1_batch = filters.Filter(
     )
 )
 filter_ts1 = filters.Filter(
-    implementation=implementations.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=7)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=7
+    )
 )
 
 solve_fns = [
