@@ -296,7 +296,7 @@ IBMCacheType = Tuple[jax.Array]  # Cache type
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class BatchIBM(extrapolation.Extrapolation[BatchNormal, IBMCacheType]):
+class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, IBMCacheType]):
     """Handle block-diagonal covariances."""
 
     a: Any

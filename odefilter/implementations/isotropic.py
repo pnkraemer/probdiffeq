@@ -86,7 +86,7 @@ class IsoTaylorZerothOrder(correction.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class IsoIBM(extrapolation.Extrapolation):
+class IsoIBM(extrapolation.AbstractExtrapolation):
 
     a: Any
     q_sqrtm_lower: Any

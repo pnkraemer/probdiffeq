@@ -287,7 +287,7 @@ class MomentMatching(_DenseCorrection):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class IBM(extrapolation.Extrapolation):
+class IBM(extrapolation.AbstractExtrapolation):
     """Handle dense covariances."""
 
     a: jax.Array

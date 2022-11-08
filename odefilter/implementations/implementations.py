@@ -10,7 +10,7 @@ from odefilter.implementations import dense
 from odefilter.implementations import extrapolation as extrapolation_module
 from odefilter.implementations import isotropic
 
-ExtraType = TypeVar("ExtraType", bound=extrapolation_module.Extrapolation)
+ExtraType = TypeVar("ExtraType", bound=extrapolation_module.AbstractExtrapolation)
 """Extrapolation style."""
 
 
