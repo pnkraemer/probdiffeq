@@ -130,6 +130,11 @@ class IsoIBM(_extrapolation.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return _IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
+    def init_rv(self, ode_dimension):
+        m0 = jnp.zeros((self.num_derivatives + 1, ode_dimension))
+        c0 = jnp.eye(self.num_derivatives + 1)
+        return _IsoNormal(m0, c0)
+
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 

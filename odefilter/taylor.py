@@ -33,6 +33,10 @@ from typing import Callable, Tuple
 
 import jax
 import jax.experimental.jet
+import jax.experimental.ode
+import jax.numpy as jnp
+
+from odefilter.implementations import isotropic
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -111,3 +115,82 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         return tangents_out
 
     return jax.tree_util.Partial(df)
+
+
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+def runge_kutta_starter_fn(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
+    # Assertions and early exits
+
+    if len(initial_values) > 1:
+        raise ValueError("Higher-order ODEs are not supported at the moment.")
+
+    if num == 0:
+        return initial_values
+
+    if num == 1:
+        return initial_values + (vector_field(*initial_values, t=t, p=parameters),)
+
+    # Generate data
+
+    def func(y, t, *p):
+        return vector_field(y, t=t, p=p)
+
+    dt0 = 1e-6
+    k = num + 1  # important: k > num
+    ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
+    ys = jax.experimental.ode.odeint(
+        func, initial_values[0], ts, *parameters, atol=1e-10, rtol=1e-10
+    )
+
+    # Run fixed-point smoother
+
+    _impl = isotropic.IsoTS0.from_params(num_derivatives=num)
+    extrapolation, correction = (_impl.extrapolation, _impl.correction)
+
+    def filter_step(carry, y):
+
+        # Read
+        (rv, (noise, op)) = carry
+        m0, l0 = rv.mean, rv.cov_sqrtm_lower
+
+        # Extrapolate (with fixed-point-style condensation)
+        lin_pt, extra_cache = extrapolation.begin_extrapolation(m0, dt=dt0)
+        extra, (bw_noise, bw_op) = extrapolation.revert_markov_kernel(
+            linearisation_pt=lin_pt, l0=l0, cache=extra_cache, output_scale_sqrtm=1.0
+        )
+        noise_new, op_new = extrapolation.condense_backward_models(
+            transition_init=op,
+            noise_init=noise,
+            transition_state=bw_op,
+            noise_state=bw_noise,
+        )
+
+        # Correct
+        observed, (corrected, gain) = correction.correct_sol_observation(
+            rv=extra, u=y, observation_std=0.0
+        )
+
+        # Return correction and backward-model
+        return (corrected, (noise_new, op_new)), None
+
+    # Initialise
+    d = initial_values[0].shape[0]
+    init_rv = extrapolation.init_rv(ode_dimension=d)
+    init_bw_op = extrapolation.init_backward_transition()
+    init_bw_noise = extrapolation.init_backward_noise(rv_proto=init_rv)
+    init_val = init_rv, (init_bw_noise, init_bw_op)
+
+    # Scan
+    carry_fin, _ = jax.lax.scan(filter_step, init=init_val, xs=ys, reverse=False)
+    (corrected_fin, (noise_fin, op_fin)) = carry_fin
+
+    # Backward-marginalise to get the initial value
+    u0_full = extrapolation.marginalise_model(
+        init=corrected_fin, linop=op_fin, noise=noise_fin
+    )
+
+    # Turn the mean into a tuple of arrays and return
+    taylor_coefficients = tuple(u0_full.mean)
+    return taylor_coefficients
