@@ -16,6 +16,10 @@ from odefilter.implementations import (
     implementation,
 )
 
+# todo: extract _DenseCorrection methods into functions
+# todo: make RV type and CacheType public, and give a docstring?
+# todo: sort the function order a little bit. Make the docs useful.
+
 
 @jax.tree_util.register_pytree_node_class
 class TS1(implementation.Implementation["TaylorFirstOrder", "IBM"]):

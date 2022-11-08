@@ -15,6 +15,9 @@ from odefilter.implementations import (
 )
 
 # todo: reconsider naming!
+# todo: extract _BatchCorrection methods into functions
+# todo: make RV type and CacheType public, and give a docstring?
+# todo: sort the function order a little bit. Make the docs useful.
 
 
 class _BatchNormal(NamedTuple):
@@ -27,7 +30,24 @@ class _BatchNormal(NamedTuple):
 _CType = Tuple[jax.Array]  # Cache type
 
 
-# todo: no more kwargs
+@jax.tree_util.register_pytree_node_class
+class BatchMM1(implementation.Implementation["BatchMomentMatching", "BatchIBM"]):
+    @classmethod
+    def from_params(
+        cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
+    ):
+        if cubature is None:
+            correction = BatchMomentMatching.from_params(
+                ode_dimension=ode_dimension, ode_order=ode_order
+            )
+        else:
+            correction = BatchMomentMatching(
+                ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature
+            )
+        extrapolation = BatchIBM.from_params(
+            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+        )
+        return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -41,8 +61,198 @@ class BatchTS0(implementation.Implementation["BatchTaylorZerothOrder", "BatchIBM
         return cls(correction=correction, extrapolation=extrapolation)
 
 
+# todo: extract the below into functions.
+
+
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
+class _BatchCorrection(_correction.Correction[_BatchNormal, _CType]):
+    def evidence_sqrtm(self, *, observed: _BatchNormal) -> float:
+        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
+
+        res_white = obs_pt / l_obs  # (d, )
+        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
+
+        return evidence_sqrtm
+
+    def correct_sol_observation(self, *, rv, u, observation_std):
+        hc = rv.cov_sqrtm_lower[:, 0, ...]  # (d, k)
+        m_obs = rv.mean[:, 0]  # (d,)
+        d = m_obs.shape[0]
+        r_yx = observation_std * jnp.ones((d, 1, 1))
+
+        r_x_f = hc[..., None]
+        r_x = _transpose(rv.cov_sqrtm_lower)
+        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
+            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
+        )
+        m_cor = rv.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
+
+        obs = _BatchNormal(m_obs, _transpose(r_obs))
+        cor = _BatchNormal(m_cor, _transpose(r_cor))
+        return obs, (cor, gain)
+
+    def negative_marginal_log_likelihood(self, observed, u):
+        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+
+        # todo: is this correct??
+        res_white = (m_obs - u) / jnp.reshape(l_obs, m_obs.shape)
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return 0.5 * (x1 + x2 + x3)
+
+
+@jax.tree_util.register_pytree_node_class
+class BatchMomentMatching(_BatchCorrection):
+    def __init__(self, *, ode_dimension, ode_order, cubature):
+        if ode_order > 1:
+            raise ValueError
+
+        super().__init__(ode_order=ode_order)
+        self.cubature = cubature
+        self.ode_dimension = ode_dimension
+
+    def tree_flatten(self):
+        # todo: should this call super().tree_flatten()?
+        children = (self.cubature,)
+        aux = self.ode_order, self.ode_dimension
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        (cubature,) = children
+        ode_order, ode_dimension = aux
+        return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
+
+    def begin_correction(self, x: _BatchNormal, /, *, vector_field, t, p):
+
+        # Vmap relevant functions
+        vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
+        cache = (vmap_f,)
+
+        # 1. x -> (e0x, e1x)
+        L_X = x.cov_sqrtm_lower
+        L0 = L_X[:, 0, :]  # (d, n)
+        r_marg1_x = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(
+            R=L0[:, :, None]
+        )  # (d, 1, 1)
+        r_marg1_x_squeeze = jnp.reshape(r_marg1_x, (self.ode_dimension,))
+        m_marg1_x, m_marg1_y = x.mean[:, 0], x.mean[:, 1]
+
+        # 2. (x, y) -> (f(x), y)
+        x_centered = (
+            self.cubature.points * r_marg1_x_squeeze[None, :]
+        )  # (S, d) * (1, d) = (S, d)
+        sigma_points = m_marg1_x[None, :] + x_centered
+        fx = vmap_f(sigma_points)
+        m_marg2 = self.cubature.weights_sqrtm**2 @ fx
+        fx_centered = fx - m_marg2[None, :]
+        fx_centered_normed = (
+            fx_centered * self.cubature.weights_sqrtm[:, None]
+        )  # (S, d)
+
+        # 3. (x, y) -> y - x (last one)
+        m_marg = m_marg1_y - m_marg2
+        L1 = L_X[:, 1, :]  # (d, n)
+        # (d, n) @ (n, d) + (d, S) @ (S, d) = (d, d)
+        # becomes (d, 1, n) @ (d, n, 1) + (d, 1, S) @ (d, S, 1) = (D, 1, 1)
+        l_marg_block = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
+            R1=L1[:, :, None], R2=fx_centered_normed.T[:, :, None]
+        )
+        l_marg = jnp.reshape(l_marg_block, (self.ode_dimension,))
+
+        # Summarise
+        marginals = _BatchNormal(m_marg, l_marg)
+        output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
+
+        # Compute error estimate
+        error_estimate = l_marg
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+
+    def complete_correction(self, *, extrapolated, cache):
+        # The correction step for the cubature Kalman filter implementation
+        # is quite complicated. The reason is that the observation model
+        # is x -> e1(x) - f(e0(x)), i.e., a composition of a linear/nonlinear/linear
+        # model, and that we _only_ want to cubature-linearise the nonlinearity.
+        # So what we do is that we compute marginals, gains, and posteriors
+        # for each of the three transitions and merge them in the end.
+        # This uses the fewest sigma-points possible, and ultimately should
+        # lead to the fastest, most stable implementation.
+
+        # Compute the linearisation as in
+        # Eq. (9) in https://arxiv.org/abs/2102.00514
+        H, noise = self._linearize(x=extrapolated, cache=cache)
+        # (d,), ((d,), (d,))
+
+        # Compute the CKF correction
+        L = extrapolated.cov_sqrtm_lower
+        L0 = L[:, 0, :]  # (d, n)
+        L1 = L[:, 1, :]  # (d, n)
+        HL = L1 - H[:, None] * L0[:, :]  # (d, n) - (d, 1) @ (d, n) = (d, n)
+        r_marg, (r_bw, gain) = jax.vmap(_sqrtm.revert_conditional)(
+            R_X_F=HL[:, :, None],
+            R_X=_transpose(L),
+            R_YX=noise.cov_sqrtm_lower[:, None, None],
+        )
+        r_marg_squeezed = jnp.reshape(r_marg, (self.ode_dimension,))
+
+        # Catch up the marginals
+        x = extrapolated  # alias for readability in this code-block
+        x0 = x.mean[:, 0]
+        x1 = x.mean[:, 1]
+        m_marg = x1 - (H * x0 + noise.mean)
+        marginals = _BatchNormal(m_marg, r_marg_squeezed)
+
+        # Catch up the backward noise and return result
+        m_bw = extrapolated.mean - (gain @ m_marg[:, None, None])[:, :, 0]
+        backward_noise = _BatchNormal(m_bw, _transpose(r_bw))
+
+        return marginals, (backward_noise, gain)
+
+    def _linearize(self, *, x, cache):
+        vmap_f, *_ = cache
+
+        # Create sigma points
+        m_0 = x.mean[:, 0]
+        l_0 = x.cov_sqrtm_lower[:, 0, :]  # (d, n)
+        r_0_square = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(
+            R=l_0[:, :, None]
+        )  # (d, n, 1) -> (d, 1, 1)
+        r_0_reshaped = jnp.reshape(r_0_square, (self.ode_dimension,))  # (d,)
+        pts_centered = (
+            self.cubature.points * r_0_reshaped[None, :]
+        )  # (S, d) * (1, d) = (S, d)
+        pts = m_0[None, :] + pts_centered  # (S, d)
+
+        # Evaluate the vector-field
+        fx = vmap_f(pts)
+        fx_mean = self.cubature.weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None, :]  # (S, d)
+
+        # Revert the transition to get H and Omega
+        # This is a pure sqrt-implementation of
+        # Eq. (9) in https://arxiv.org/abs/2102.00514
+        # It seems to be different to Section VI.B in
+        # https://arxiv.org/abs/2207.00426,
+        # because the implementation below avoids sqrt-down-dates
+        pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
+        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
+        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
+        #  (but would it still be valid?)
+        _, (r_Om, H) = jax.vmap(_sqrtm.revert_conditional_noisefree)(
+            R_X_F=pts_centered_normed.T[:, :, None],
+            R_X=fx_centered_normed.T[:, :, None],
+        )
+        r_Om_reshaped = jnp.reshape(r_Om, (self.ode_dimension,))  # why (d,)??
+        H_reshaped = jnp.reshape(H, (self.ode_dimension,))  # why (d,)??
+
+        # Catch up the transition-mean and return the result
+        d = fx_mean - H_reshaped * m_0
+        return H_reshaped, _BatchNormal(d, r_Om_reshaped)
+
+
+@jax.tree_util.register_pytree_node_class
+class BatchTaylorZerothOrder(_BatchCorrection):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
@@ -101,41 +311,6 @@ class BatchTaylorZerothOrder(_correction.Correction[_BatchNormal, _CType]):
 
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
-
-    def evidence_sqrtm(self, *, observed: _BatchNormal) -> float:
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
-
-        res_white = obs_pt / l_obs  # (d, )
-        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
-
-        return evidence_sqrtm
-
-    def correct_sol_observation(self, *, rv, u, observation_std):
-        hc = rv.cov_sqrtm_lower[:, 0, ...]  # (d, k)
-        m_obs = rv.mean[:, 0]  # (d,)
-        d = m_obs.shape[0]
-        r_yx = observation_std * jnp.ones((d, 1, 1))
-
-        r_x_f = hc[..., None]
-        r_x = _transpose(rv.cov_sqrtm_lower)
-        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
-            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
-        )
-        m_cor = rv.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
-
-        obs = _BatchNormal(m_obs, _transpose(r_obs))
-        cor = _BatchNormal(m_cor, _transpose(r_cor))
-        return obs, (cor, gain)
-
-    def negative_marginal_log_likelihood(self, observed, u):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-
-        # todo: is this correct??
-        res_white = (m_obs - u) / jnp.reshape(l_obs, m_obs.shape)
-        x1 = jnp.dot(res_white, res_white.T)
-        x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return 0.5 * (x1 + x2 + x3)
 
 
 @jax.tree_util.register_pytree_node_class
