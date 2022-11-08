@@ -28,7 +28,7 @@ C = TypeVar("C")
 
 
 @jax.tree_util.register_pytree_node_class
-class _BatchCorrection(correction.Correction[BatchNormal, C], Generic[C]):
+class _BatchCorrection(correction.AbstractCorrection[BatchNormal, C], Generic[C]):
     def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 

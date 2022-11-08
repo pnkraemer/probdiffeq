@@ -16,7 +16,7 @@ class _IsoNormal(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTaylorZerothOrder(correction.Correction):
+class IsoTaylorZerothOrder(correction.AbstractCorrection):
     def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]

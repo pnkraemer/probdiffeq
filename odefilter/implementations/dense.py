@@ -23,7 +23,7 @@ class _Normal(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseCorrection(correction.Correction):
+class _DenseCorrection(correction.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension

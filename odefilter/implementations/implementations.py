@@ -14,9 +14,7 @@ ExtraType = TypeVar("ExtraType", bound=extrapolation_module.Extrapolation)
 """Extrapolation style."""
 
 
-CorrType = TypeVar(
-    "CorrType", bound=correction_module.Correction
-)  # think: Correction style
+CorrType = TypeVar("CorrType", bound=correction_module.AbstractCorrection)
 """Correction style."""
 
 
