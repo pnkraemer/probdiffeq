@@ -35,7 +35,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from odefilter import controls, ivpsolve, solvers
-from odefilter.implementations import dense, isotropic
+from odefilter.implementations import dense, isotropic, batch
 from odefilter.strategies import filters
 
 # x64 precision
@@ -170,6 +170,16 @@ ode_dimension = u0.shape[0]
 filter_ts0 = filters.Filter(
     implementation=isotropic.IsoTS0.from_params(num_derivatives=4)
 )
+filter_ts0_batch = filters.Filter(
+    implementation=batch.BatchTS0.from_params(
+        ode_dimension=ode_dimension, num_derivatives=5
+    )
+)
+filter_mm1_batch = filters.Filter(
+    implementation=batch.BatchMM1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=6
+    )
+)
 filter_ts1 = filters.Filter(
     implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=7)
 )
@@ -179,13 +189,15 @@ solve_fns = [
     (scipy_solve_ivp_dop853, "DOP853 (scipy.integrate)"),
     (jax_solve, "Dormand-Prince (jax.experimental)"),
     (solver_to_solve(solvers.MLESolver(strategy=filter_ts0)), "IsoTS0(n=4)"),
+    (solver_to_solve(solvers.MLESolver(strategy=filter_ts0_batch)), "BatchTS0(n=5)"),
+    (solver_to_solve(solvers.MLESolver(strategy=filter_mm1_batch)), "BatchMM1(n=6)"),
     (solver_to_solve(solvers.MLESolver(strategy=filter_ts1)), "TS1(n=7)"),
 ]
 ```
 
 ```python
 %%time
-tolerances = [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12]
+tolerances = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12]
 
 results = workprecision_make(solve_fns=solve_fns, number=1, repeat=3, tols=tolerances)
 ```

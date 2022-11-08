@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
+from odefilter import cubature as cubature_module
 from odefilter.implementations import (
     _correction,
     _extrapolation,
@@ -123,6 +124,13 @@ class BatchMomentMatching(_BatchCorrection):
         (cubature,) = children
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
+
+    @classmethod
+    def from_params(cls, *, ode_dimension, ode_order):
+        cubature = cubature_module.SphericalCubatureIntegration.from_params(
+            ode_dimension=ode_dimension
+        )
+        return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
     def begin_correction(self, x: _BatchNormal, /, *, vector_field, t, p):
 
