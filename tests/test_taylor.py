@@ -18,7 +18,7 @@ def case_taylor_mode():
 
 @pytest_cases.case(tags=["first"])
 def case_runge_kutta_starter():
-    return taylor.runge_kutta_starter_fn
+    return taylor.make_runge_kutta_starter_fn()
 
 
 @pytest_cases.case(tags=["first"])

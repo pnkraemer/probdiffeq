@@ -117,15 +117,18 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def runge_kutta_starter_fn(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
+    """Create a routine that estimates a Taylor series with a Runge-Kutta starter."""
+    return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
+
+
+# atol and rtol are static bc. of odeint...
+@functools.partial(jax.jit, static_argnames=["vector_field", "num", "atol", "rtol"])
+def _runge_kutta_starter_fn(
+    *, vector_field, initial_values, num: int, t, parameters, dt0, atol, rtol
 ):
-    """Estimate the ODE solution's Taylor series with a Runge-Kutta starter."""
-    # todo [MAGIC]: dt0 is a magic number
-    # todo [MAGIC]: atol and rtol are magic numbers
-    # todo [MAGIC]: allow implementations other than IsoIBM
     # todo [INACCURATE]: the initial-value uncertainty is discarded
+    # todo [FEATURE]: allow implementations other than IsoIBM?
     # todo [FEATURE]: allow EM-style initial value updates
     # todo [FEATURE]: higher-order ODEs
 
@@ -145,11 +148,10 @@ def runge_kutta_starter_fn(
     def func(y, t, *p):
         return vector_field(y, t=t, p=p)
 
-    dt0 = 1e-6
     k = num + 1  # important: k > num
     ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
     ys = jax.experimental.ode.odeint(
-        func, initial_values[0], ts, *parameters, atol=1e-10, rtol=1e-10
+        func, initial_values[0], ts, *parameters, atol=atol, rtol=rtol
     )
 
     # Run fixed-point smoother
