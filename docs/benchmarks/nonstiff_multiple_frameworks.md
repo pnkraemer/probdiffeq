@@ -35,7 +35,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from odefilter import controls, ivpsolve, solvers
-from odefilter.implementations import batch, dense, isotropic
+from odefilter.implementations import implementations
 from odefilter.strategies import filters
 
 # x64 precision
@@ -168,20 +168,20 @@ ode_dimension = u0.shape[0]
 
 ```python
 filter_ts0 = filters.Filter(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=4)
+    implementation=implementations.IsoTS0.from_params(num_derivatives=4)
 )
 filter_ts0_batch = filters.Filter(
-    implementation=batch.BatchTS0.from_params(
+    implementation=implementations.BatchTS0.from_params(
         ode_dimension=ode_dimension, num_derivatives=5
     )
 )
 filter_mm1_batch = filters.Filter(
-    implementation=batch.BatchMM1.from_params(
+    implementation=implementations.BatchMM1.from_params(
         ode_dimension=ode_dimension, num_derivatives=6
     )
 )
 filter_ts1 = filters.Filter(
-    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=7)
+    implementation=implementations.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=7)
 )
 
 solve_fns = [
