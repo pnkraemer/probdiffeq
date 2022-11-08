@@ -1,73 +1,35 @@
 """Batch-style extrapolations."""
 import dataclasses
-from typing import Any, NamedTuple, Tuple
+from typing import Any, Callable, Generic, NamedTuple, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import (
-    _correction,
-    _extrapolation,
-    _ibm_util,
-    _sqrtm,
-    implementation,
-)
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
 # todo: extract _BatchCorrection methods into functions
-# todo: make RV type and CacheType public, and give a docstring?
 # todo: sort the function order a little bit. Make the docs useful.
 
 
-class _BatchNormal(NamedTuple):
-    """Random variable with a normal distribution."""
+class BatchNormal(NamedTuple):
+    """Batched normally-distributed random variables."""
 
     mean: Any  # (d, k) shape
     cov_sqrtm_lower: Any  # (d, k, k) shape
 
 
-_CType = Tuple[jax.Array]  # Cache type
-
-
-@jax.tree_util.register_pytree_node_class
-class BatchMM1(implementation.Implementation["BatchMomentMatching", "BatchIBM"]):
-    @classmethod
-    def from_params(
-        cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
-    ):
-        if cubature is None:
-            correction = BatchMomentMatching.from_params(
-                ode_dimension=ode_dimension, ode_order=ode_order
-            )
-        else:
-            correction = BatchMomentMatching(
-                ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature
-            )
-        extrapolation = BatchIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
-
-
-@jax.tree_util.register_pytree_node_class
-class BatchTS0(implementation.Implementation["BatchTaylorZerothOrder", "BatchIBM"]):
-    @classmethod
-    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
-        correction = BatchTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = BatchIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
-
-
 # todo: extract the below into functions.
 
+C = TypeVar("C")
+"""Cache-type variable."""
+
 
 @jax.tree_util.register_pytree_node_class
-class _BatchCorrection(_correction.Correction[_BatchNormal, _CType]):
-    def evidence_sqrtm(self, *, observed: _BatchNormal) -> float:
+class _BatchCorrection(_correction.Correction[BatchNormal, C], Generic[C]):
+    def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 
         res_white = obs_pt / l_obs  # (d, )
@@ -88,8 +50,8 @@ class _BatchCorrection(_correction.Correction[_BatchNormal, _CType]):
         )
         m_cor = rv.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
 
-        obs = _BatchNormal(m_obs, _transpose(r_obs))
-        cor = _BatchNormal(m_cor, _transpose(r_cor))
+        obs = BatchNormal(m_obs, _transpose(r_obs))
+        cor = BatchNormal(m_cor, _transpose(r_cor))
         return obs, (cor, gain)
 
     def negative_marginal_log_likelihood(self, observed, u):
@@ -103,8 +65,12 @@ class _BatchCorrection(_correction.Correction[_BatchNormal, _CType]):
         return 0.5 * (x1 + x2 + x3)
 
 
+MM1CacheType = Tuple[Callable]
+"""Type of the correction-cache."""
+
+
 @jax.tree_util.register_pytree_node_class
-class BatchMomentMatching(_BatchCorrection):
+class BatchMomentMatching(_BatchCorrection[MM1CacheType]):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -132,7 +98,7 @@ class BatchMomentMatching(_BatchCorrection):
         )
         return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
-    def begin_correction(self, x: _BatchNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: BatchNormal, /, *, vector_field, t, p):
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
@@ -170,7 +136,7 @@ class BatchMomentMatching(_BatchCorrection):
         l_marg = jnp.reshape(l_marg_block, (self.ode_dimension,))
 
         # Summarise
-        marginals = _BatchNormal(m_marg, l_marg)
+        marginals = BatchNormal(m_marg, l_marg)
         output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
 
         # Compute error estimate
@@ -209,11 +175,11 @@ class BatchMomentMatching(_BatchCorrection):
         x0 = x.mean[:, 0]
         x1 = x.mean[:, 1]
         m_marg = x1 - (H * x0 + noise.mean)
-        marginals = _BatchNormal(m_marg, r_marg_squeezed)
+        marginals = BatchNormal(m_marg, r_marg_squeezed)
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - (gain @ m_marg[:, None, None])[:, :, 0]
-        backward_noise = _BatchNormal(m_bw, _transpose(r_bw))
+        backward_noise = BatchNormal(m_bw, _transpose(r_bw))
 
         return marginals, (backward_noise, gain)
 
@@ -256,17 +222,20 @@ class BatchMomentMatching(_BatchCorrection):
 
         # Catch up the transition-mean and return the result
         d = fx_mean - H_reshaped * m_0
-        return H_reshaped, _BatchNormal(d, r_Om_reshaped)
+        return H_reshaped, BatchNormal(d, r_Om_reshaped)
+
+
+TS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(_BatchCorrection):
+class BatchTaylorZerothOrder(_BatchCorrection[TS0CacheType]):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
     def begin_correction(
-        self, x: _BatchNormal, /, *, vector_field, t, p
-    ) -> Tuple[jax.Array, float, _CType]:
+        self, x: BatchNormal, /, *, vector_field, t, p
+    ) -> Tuple[jax.Array, float, TS0CacheType]:
         m = x.mean
 
         # m has shape (d, n)
@@ -284,13 +253,13 @@ class BatchTaylorZerothOrder(_BatchCorrection):
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
         output_scale_sqrtm = self.evidence_sqrtm(
-            observed=_BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
+            observed=BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
         )  # (d,)
 
         error_estimate = l_obs  # (d,)
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
-    def complete_correction(self, *, extrapolated: _BatchNormal, cache: _CType):
+    def complete_correction(self, *, extrapolated: BatchNormal, cache: TS0CacheType):
         (bias,) = cache
 
         # (d, k), (d, k, k)
@@ -304,7 +273,7 @@ class BatchTaylorZerothOrder(_BatchCorrection):
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = _BatchNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = BatchNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
@@ -314,16 +283,20 @@ class BatchTaylorZerothOrder(_BatchCorrection):
         m_cor = m_ext - (gain * bias[..., None])  # (d, k)
         l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
 
-        corrected = _BatchNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = BatchNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
 
+IBMCacheType = Tuple[jax.Array]  # Cache type
+"""Type of the extrapolation-cache."""
+
+
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class BatchIBM(_extrapolation.Extrapolation):
+class BatchIBM(_extrapolation.Extrapolation[BatchNormal, IBMCacheType]):
     """Handle block-diagonal covariances."""
 
     a: Any
@@ -373,7 +346,7 @@ class BatchIBM(_extrapolation.Extrapolation):
         )
         l_ext_p = _transpose(r_ext_p)
         l_ext = p[..., None] * l_ext_p
-        return _BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
     def condense_backward_models(
         self, *, transition_init, noise_init, transition_state, noise_state
@@ -394,7 +367,7 @@ class BatchIBM(_extrapolation.Extrapolation):
         )
         Xi = _transpose(Xi_r)
 
-        noise = _BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
     def extract_mean_from_marginals(self, mean):
@@ -411,11 +384,11 @@ class BatchIBM(_extrapolation.Extrapolation):
         m_ext = p * m_ext_p
 
         q_ext = p[..., None] * self.q_sqrtm_lower
-        return _BatchNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
+        return BatchNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
     # todo: make into init_backward_model?
     def init_backward_noise(self, *, rv_proto):  # noqa: D102
-        return _BatchNormal(
+        return BatchNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
@@ -427,7 +400,7 @@ class BatchIBM(_extrapolation.Extrapolation):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_matrix = jnp.vstack(taylor_coefficients).T
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return _BatchNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return BatchNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     # todo: move to correction?
     def init_error_estimate(self):  # noqa: D102
@@ -469,7 +442,7 @@ class BatchIBM(_extrapolation.Extrapolation):
         m_new = m_new_p
         l_new = l_new_p
 
-        return _BatchNormal(mean=m_new, cov_sqrtm_lower=l_new)
+        return BatchNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     def revert_markov_kernel(  # noqa: D102
         self, *, linearisation_pt, l0, output_scale_sqrtm, cache
@@ -498,8 +471,8 @@ class BatchIBM(_extrapolation.Extrapolation):
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
         backward_op = g_bw
-        backward_noise = _BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        extrapolated = _BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        extrapolated = BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
 
     def sample_backwards(self, init, linop, noise, base_samples):
@@ -528,13 +501,13 @@ class BatchIBM(_extrapolation.Extrapolation):
     def scale_covariance(self, *, rv, scale_sqrtm):
         # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
         if jnp.ndim(scale_sqrtm) == 1:
-            return _BatchNormal(
+            return BatchNormal(
                 mean=rv.mean,
                 cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
             )
 
         # Time series: (N, d, 1, 1) * (N, d, k, k) -> (N, d, k, k)
-        return _BatchNormal(
+        return BatchNormal(
             mean=rv.mean,
             cov_sqrtm_lower=scale_sqrtm[..., None, None] * rv.cov_sqrtm_lower,
         )

@@ -8,59 +8,11 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import (
-    _correction,
-    _extrapolation,
-    _ibm_util,
-    _sqrtm,
-    implementation,
-)
+from odefilter.implementations import _correction, _extrapolation, _ibm_util, _sqrtm
 
 # todo: extract _DenseCorrection methods into functions
 # todo: make RV type and CacheType public, and give a docstring?
 # todo: sort the function order a little bit. Make the docs useful.
-
-
-@jax.tree_util.register_pytree_node_class
-class TS1(implementation.Implementation["TaylorFirstOrder", "IBM"]):
-    @classmethod
-    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
-        correction = TaylorFirstOrder(ode_dimension=ode_dimension, ode_order=ode_order)
-        extrapolation = IBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
-
-
-@jax.tree_util.register_pytree_node_class
-class TS0(implementation.Implementation["TaylorZerothOrder", "IBM"]):
-    @classmethod
-    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
-        correction = TaylorZerothOrder(ode_dimension=ode_dimension, ode_order=ode_order)
-        extrapolation = IBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
-
-
-@jax.tree_util.register_pytree_node_class
-class MM1(implementation.Implementation["MomentMatching", "IBM"]):
-    @classmethod
-    def from_params(
-        cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
-    ):
-        if cubature is None:
-            correction = MomentMatching.from_params(
-                ode_dimension=ode_dimension, ode_order=ode_order
-            )
-        else:
-            correction = MomentMatching(
-                ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature
-            )
-        extrapolation = IBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
 
 
 class _Normal(NamedTuple):

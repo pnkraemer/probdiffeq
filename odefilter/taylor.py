@@ -36,7 +36,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from odefilter.implementations import isotropic
+from odefilter.implementations import implementations
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -155,7 +155,7 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    impl = isotropic.IsoTS0.from_params(num_derivatives=num)
+    impl = implementations.IsoTS0.from_params(num_derivatives=num)
 
     # Initialise
     d = initial_values[0].shape[0]
