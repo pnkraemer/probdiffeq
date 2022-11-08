@@ -16,7 +16,14 @@ from odefilter.strategies import smoothers
 
 
 def simulate_terminal_values(
-    vector_field, initial_values, t0, t1, solver, parameters=(), **options
+    vector_field,
+    initial_values,
+    t0,
+    t1,
+    solver,
+    parameters=(),
+    taylor_fn=taylor.taylor_mode_fn,
+    **options,
 ):
     """Simulate the terminal values of an initial value problem.
 
@@ -26,7 +33,7 @@ def simulate_terminal_values(
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
-    taylor_coefficients = taylor.taylor_mode_fn(
+    taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
@@ -46,7 +53,13 @@ def simulate_terminal_values(
 
 
 def simulate_checkpoints(
-    vector_field, initial_values, ts, solver, parameters=(), **options
+    vector_field,
+    initial_values,
+    ts,
+    solver,
+    parameters=(),
+    taylor_fn=taylor.taylor_mode_fn,
+    **options,
 ):
     """Solve an IVP and return the solution at checkpoints.
 
@@ -62,7 +75,7 @@ def simulate_checkpoints(
         warnings.warn(msg)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
-    taylor_coefficients = taylor.taylor_mode_fn(
+    taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
@@ -83,7 +96,16 @@ def simulate_checkpoints(
 # Full solver routines
 
 
-def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options):
+def solve(
+    vector_field,
+    initial_values,
+    t0,
+    t1,
+    solver,
+    parameters=(),
+    taylor_fn=taylor.taylor_mode_fn,
+    **options,
+):
     """Solve an initial value problem.
 
     !!! warning
@@ -94,7 +116,7 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
-    taylor_coefficients = taylor.taylor_mode_fn(
+    taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
@@ -114,7 +136,13 @@ def solve(vector_field, initial_values, t0, t1, solver, parameters=(), **options
 
 
 def solve_fixed_grid(
-    vector_field, initial_values, ts, solver, parameters=(), **options
+    vector_field,
+    initial_values,
+    ts,
+    solver,
+    parameters=(),
+    taylor_fn=taylor.taylor_mode_fn,
+    **options,
 ):
     """Solve an initial value problem.
 
@@ -126,7 +154,7 @@ def solve_fixed_grid(
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
-    taylor_coefficients = taylor.taylor_mode_fn(
+    taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),

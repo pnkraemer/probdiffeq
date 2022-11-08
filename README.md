@@ -51,7 +51,7 @@
 - [ ] Continuous forward-mode differentiation
 - [ ] Continuous reverse-mode differentiation
 - [x] Autodiff initialisation
-- [ ] Non-autodiff initialisation
+- [x] Non-autodiff initialisation
 - [ ] Model fit evaluation
 - [ ] Discrete event handling
 - [ ] Continuous event handling
@@ -61,6 +61,7 @@
   - [x] Posterior sampling
   - [ ] Joint distributions
 
+and many more.
 
 ### Boundary value problem solvers
 - [ ] Separable boundary conditions
@@ -82,12 +83,12 @@
 - [x] Different ways of smoothing
 - [x] Exploring the solution object
 - [ ] Custom information operators
-- [ ] Physics-enhanced regression
+- [x] Physics-enhanced regression
 - [ ] Probabilistic numerical method of lines
 - [ ] TBC...
 
 ### Benchmarks
-- [ ] Lotka-Volterra
+- [x] Lotka-Volterra
 - [ ] Pleiades
 - [ ] Stiff van-der-Pol
 - [ ] 100-dimensional linear ODE

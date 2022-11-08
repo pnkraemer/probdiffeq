@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import pytest_cases
 import pytest_cases.filters
 
-from odefilter import ivpsolve
+from odefilter import ivpsolve, taylor
 
 # Set some test filters
 
@@ -74,6 +74,7 @@ def fixture_solution_terminal_values(ode_problem, tolerances, solver):
         solver=solver,
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
+        taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver
 
@@ -115,6 +116,7 @@ def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_gri
         solver=solver,
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
+        taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver
 
@@ -136,6 +138,7 @@ def fixture_solution_solve(ode_problem, tolerances, solver):
         solver=solver,
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
+        taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver
 
@@ -154,6 +157,11 @@ def fixture_fixed_grid(ode_problem):
 def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
     vf, u0, _, _, f_args = ode_problem
     solution = ivpsolve.solve_fixed_grid(
-        vf, u0, ts=fixed_grid, parameters=f_args, solver=solver
+        vf,
+        u0,
+        ts=fixed_grid,
+        parameters=f_args,
+        solver=solver,
+        taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver
