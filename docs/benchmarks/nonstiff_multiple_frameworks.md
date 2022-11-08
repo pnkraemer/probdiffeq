@@ -35,7 +35,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from odefilter import controls, ivpsolve, solvers
-from odefilter.implementations import dense, isotropic, batch
+from odefilter.implementations import batch, dense, isotropic
 from odefilter.strategies import filters
 
 # x64 precision
