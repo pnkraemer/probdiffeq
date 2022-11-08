@@ -208,7 +208,7 @@ def _rk_filter_step(carry, y, extrapolation, correction, dt):
     )
 
     # Correct
-    observed, (corrected, gain) = correction.correct_sol_observation(
+    _, (corrected, _) = correction.correct_sol_observation(
         rv=extra, u=y, observation_std=0.0
     )
 
