@@ -121,6 +121,15 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 def runge_kutta_starter_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
+    """Estimate the ODE solution's Taylor series with a Runge-Kutta starter."""
+    # todo: dt0 is a magic number
+    # todo: the initial-value uncertainty is discarder
+    # todo: phrase the fixed-point smoother as init_improve?
+    # todo: allow EM-style initial value updates
+    # todo: atol and rtol are magic numbers
+    # todo: higher-order ODEs
+    #
+
     # Assertions and early exits
 
     if len(initial_values) > 1:
@@ -148,6 +157,8 @@ def runge_kutta_starter_fn(
 
     _impl = isotropic.IsoTS0.from_params(num_derivatives=num)
     extrapolation, correction = (_impl.extrapolation, _impl.correction)
+    d = initial_values[0].shape[0]
+    init_rv = extrapolation.init_rv(ode_dimension=d)
 
     def filter_step(carry, y):
 
@@ -176,8 +187,6 @@ def runge_kutta_starter_fn(
         return (corrected, (noise_new, op_new)), None
 
     # Initialise
-    d = initial_values[0].shape[0]
-    init_rv = extrapolation.init_rv(ode_dimension=d)
     init_bw_op = extrapolation.init_backward_transition()
     init_bw_noise = extrapolation.init_backward_noise(rv_proto=init_rv)
     init_val = init_rv, (init_bw_noise, init_bw_op)
