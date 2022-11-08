@@ -8,7 +8,7 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter._implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
 
 # todo: extract _DenseCorrection methods into functions
 # todo: make RV type and CacheType public, and give a docstring?
@@ -23,7 +23,7 @@ class _Normal(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseCorrection(_correction.Correction):
+class _DenseCorrection(correction.Correction):
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -287,7 +287,7 @@ class MomentMatching(_DenseCorrection):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class IBM(_extrapolation.Extrapolation):
+class IBM(extrapolation.Extrapolation):
     """Handle dense covariances."""
 
     a: jax.Array

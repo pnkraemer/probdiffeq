@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter._implementations import _correction, _extrapolation, _ibm_util, _sqrtm
+from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
 
 # todo: reconsider naming!
 # todo: extract _BatchCorrection methods into functions
@@ -28,7 +28,7 @@ C = TypeVar("C")
 
 
 @jax.tree_util.register_pytree_node_class
-class _BatchCorrection(_correction.Correction[BatchNormal, C], Generic[C]):
+class _BatchCorrection(correction.Correction[BatchNormal, C], Generic[C]):
     def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
 
@@ -296,7 +296,7 @@ IBMCacheType = Tuple[jax.Array]  # Cache type
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class BatchIBM(_extrapolation.Extrapolation[BatchNormal, IBMCacheType]):
+class BatchIBM(extrapolation.Extrapolation[BatchNormal, IBMCacheType]):
     """Handle block-diagonal covariances."""
 
     a: Any
