@@ -129,7 +129,6 @@ def _runge_kutta_starter_fn(
 ):
     # todo [INACCURATE]: the initial-value uncertainty is discarded
     # todo [FEATURE]: allow implementations other than IsoIBM?
-    # todo [FEATURE]: allow EM-style initial value updates
     # todo [FEATURE]: higher-order ODEs
 
     # Assertions and early exits
