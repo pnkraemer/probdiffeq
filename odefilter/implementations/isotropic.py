@@ -7,13 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import (
-    _correction,
-    _extrapolation,
-    _ibm_util,
-    _sqrtm,
-    implementation,
-)
+from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
 
 
 class _IsoNormal(NamedTuple):
@@ -22,16 +16,7 @@ class _IsoNormal(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTS0(implementation.Implementation["IsoTaylorZerothOrder", "IsoIBM"]):
-    @classmethod
-    def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = IsoTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = IsoIBM.from_params(num_derivatives=num_derivatives)
-        return cls(correction=correction, extrapolation=extrapolation)
-
-
-@jax.tree_util.register_pytree_node_class
-class IsoTaylorZerothOrder(_correction.Correction):
+class IsoTaylorZerothOrder(correction.AbstractCorrection):
     def begin_correction(self, x: _IsoNormal, /, *, vector_field, t, p):
         m = x.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
@@ -101,7 +86,7 @@ class IsoTaylorZerothOrder(_correction.Correction):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class IsoIBM(_extrapolation.Extrapolation):
+class IsoIBM(extrapolation.AbstractExtrapolation):
 
     a: Any
     q_sqrtm_lower: Any

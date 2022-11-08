@@ -90,6 +90,7 @@ nav:
           - "api_docs/strategies/filters.md"
           - "api_docs/strategies/smoothers.md"
         - Solver implementations:
+          - "api_docs/implementations/implementations.md"
           - "api_docs/implementations/dense.md"
           - "api_docs/implementations/isotropic.md"
           - "api_docs/implementations/batch.md"

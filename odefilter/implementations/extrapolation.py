@@ -11,7 +11,7 @@ C = TypeVar("C")  # think: my personal cache
 
 
 @jax.tree_util.register_pytree_node_class
-class Extrapolation(abc.ABC, Generic[R, C]):
+class AbstractExtrapolation(abc.ABC, Generic[R, C]):
     """Extrapolation model interface."""
 
     def tree_flatten(self):

@@ -34,7 +34,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from odefilter import controls, cubature, ivpsolve, solvers
-from odefilter.implementations import batch, dense, isotropic
+from odefilter.implementations import implementations
 from odefilter.strategies import filters, smoothers
 
 # x64 precision
@@ -126,8 +126,8 @@ def correction_to_solver(implementation):
 
 
 num_derivatives = 4
-ts1 = dense.TS1.from_params(ode_dimension=ode_dimension)
-mm1_sci = dense.MM1.from_params(
+ts1 = implementations.TS1.from_params(ode_dimension=ode_dimension)
+mm1_sci = implementations.MM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.SphericalCubatureIntegration.from_params(
@@ -135,7 +135,7 @@ mm1_sci = dense.MM1.from_params(
     ),
 )
 
-mm1_ut = dense.MM1.from_params(
+mm1_ut = implementations.MM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(
@@ -143,7 +143,7 @@ mm1_ut = dense.MM1.from_params(
     ),
 )
 
-mm1_gh = dense.MM1.from_params(
+mm1_gh = implementations.MM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.GaussHermite.from_params(ode_dimension=ode_dimension, degree=3),
@@ -190,14 +190,16 @@ def solver(implementation):
 
 
 num_derivatives = 4
-iso_solver = solver(isotropic.IsoTS0.from_params(num_derivatives=num_derivatives))
+iso_solver = solver(implementations.IsoTS0.from_params(num_derivatives=num_derivatives))
 batch_solver = solver(
-    batch.BatchTS0.from_params(
+    implementations.BatchTS0.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_derivatives
     )
 )
 dense_solver = solver(
-    dense.TS0.from_params(ode_dimension=ode_dimension, num_derivatives=num_derivatives)
+    implementations.TS0.from_params(
+        ode_dimension=ode_dimension, num_derivatives=num_derivatives
+    )
 )
 
 
@@ -239,23 +241,29 @@ def strategy_to_mle_solver(strategy):
 
 
 filter_ts0_iso_low = filters.Filter(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=2)
+    implementation=implementations.IsoTS0.from_params(num_derivatives=2)
 )
 filter_ts0_iso_medium = filters.Filter(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=3)
+    implementation=implementations.IsoTS0.from_params(num_derivatives=3)
 )
 filter_ts0_iso_high = filters.Filter(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=5)
+    implementation=implementations.IsoTS0.from_params(num_derivatives=5)
 )
 
 filter_ts1_low = filters.Filter(
-    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=3)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=3
+    )
 )
 filter_ts1_medium = filters.Filter(
-    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=5)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=5
+    )
 )
 filter_ts1_high = filters.Filter(
-    implementation=dense.TS1.from_params(ode_dimension=ode_dimension, num_derivatives=8)
+    implementation=implementations.TS1.from_params(
+        ode_dimension=ode_dimension, num_derivatives=8
+    )
 )
 
 
@@ -368,31 +376,31 @@ def strategy_to_mle_solver(strategy):
 num_low, num_medium, num_high = 3, 5, 8
 
 ts0_iso_low = filters.Filter(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=num_low)
+    implementation=implementations.IsoTS0.from_params(num_derivatives=num_low)
 )
 ts0_iso_medium = filters.Filter(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=num_medium)
+    implementation=implementations.IsoTS0.from_params(num_derivatives=num_medium)
 )
 
 ts1_low = filters.Filter(
-    implementation=dense.TS1.from_params(
+    implementation=implementations.TS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_low
     )
 )
 ts1_medium = filters.Filter(
-    implementation=dense.TS1.from_params(
+    implementation=implementations.TS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_medium
     )
 )
 ts1_high = filters.Filter(
-    implementation=dense.TS1.from_params(
+    implementation=implementations.TS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
     )
 )
 
 
 mm1_high = filters.Filter(
-    implementation=dense.MM1.from_params(
+    implementation=implementations.MM1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
     )
 )

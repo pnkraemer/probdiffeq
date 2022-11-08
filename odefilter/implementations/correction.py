@@ -11,7 +11,7 @@ C = TypeVar("C")  # think: Information operator's personal cache-type
 
 
 @jax.tree_util.register_pytree_node_class
-class Correction(abc.ABC, Generic[R, C]):
+class AbstractCorrection(abc.ABC, Generic[R, C]):
     """Correction model interface."""
 
     def __init__(self, *, ode_order):
