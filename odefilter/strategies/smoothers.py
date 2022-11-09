@@ -116,10 +116,10 @@ class _SmootherCommon(_strategy.Strategy):
         return a, (corrected_seq, b)
 
     def extract_sol_terminal_value(self, *, posterior):
-        return self.implementation.extrapolation.extract_sol(rv=posterior.init)
+        return posterior.init.extract_qoi()
 
     def extract_sol_from_marginals(self, *, marginals):
-        return self.implementation.extrapolation.extract_sol(rv=marginals)
+        return marginals.extract_qoi()
 
     def marginals_terminal_value(self, *, posterior):
         return posterior.init

@@ -60,6 +60,10 @@ class IsoNormal(variable.StateSpaceVariable):
 
         return IsoNormal(m_obs, r_obs.T), (IsoNormal(m_cor, r_cor.T), gain)
 
+    def extract_qoi(self):
+        m = self.mean[..., 0, :]
+        return m
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(correction.AbstractCorrection):
@@ -205,10 +209,6 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
         backward_noise = IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
-
-    def extract_sol(self, *, rv):
-        m = rv.mean[..., 0, :]
-        return m
 
     def condense_backward_models(
         self, *, transition_init, noise_init, transition_state, noise_state

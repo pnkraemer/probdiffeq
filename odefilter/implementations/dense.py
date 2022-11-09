@@ -82,6 +82,11 @@ class VectNormal(variable.StateSpaceVariable):
         cor = VectNormal(m_cor, r_cor.T, target_shape=self.target_shape)
         return obs, (cor, gain)
 
+    def extract_qoi(self):  # noqa: D102
+        if self.mean.ndim == 1:
+            return self._select_derivative(self.mean, i=0)
+        return jax.vmap(self._select_derivative, in_axes=(0, None))(self.mean, 0)
+
     def _select_derivative_vect(self, x, i):
         select = jax.vmap(
             lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
@@ -280,7 +285,7 @@ class MomentMatching(correction.AbstractCorrection):
         l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=fx_centered_normed).T
 
         # Summarise
-        marginals = VectNormal(m_marg, l_marg, ode_dimension=self.ode_dimension)
+        marginals = VectNormal(m_marg, l_marg, target_shape=x.target_shape)
         output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
         # Compute error estimate
@@ -316,11 +321,12 @@ class MomentMatching(correction.AbstractCorrection):
         x0 = self._select_derivative(x.mean, 0)
         x1 = self._select_derivative(x.mean, 1)
         m_marg = x1 - (H @ x0 + noise.mean)
-        marginals = VectNormal(m_marg, r_marg.T, ode_dimension=self.ode_dimension)
+        shape = extrapolated.target_shape
+        marginals = VectNormal(m_marg, r_marg.T, target_shape=shape)
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain @ m_marg
-        backward_noise = VectNormal(m_bw, r_bw.T, ode_dimension=self.ode_dimension)
+        backward_noise = VectNormal(m_bw, r_bw.T, target_shape=shape)
         return marginals, (backward_noise, gain)
 
     def _linearize(self, *, x, cache):
@@ -354,7 +360,17 @@ class MomentMatching(correction.AbstractCorrection):
 
         # Catch up the transition-mean and return the result
         d = fx_mean - H @ m_0
-        return H, VectNormal(d, r_Om.T, ode_dimension=self.ode_dimension)
+        return H, VectNormal(d, r_Om.T, target_shape=x.target_shape)
+
+    def _select_derivative_vect(self, x, i):
+        select = jax.vmap(
+            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
+        )
+        return select(x)
+
+    def _select_derivative(self, x, i):
+        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        return x_reshaped[i, ...]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -489,11 +505,6 @@ class IBM(extrapolation.AbstractExtrapolation):
         shape = noise_init.target_shape
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
         return noise, g
-
-    def extract_sol(self, *, rv):  # noqa: D102
-        if rv.mean.ndim == 1:
-            return rv.mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
-        return jax.vmap(self.extract_sol)(rv=rv)
 
     def init_backward_transition(self):  # noqa: D102
         k = (self.num_derivatives + 1) * self.ode_dimension

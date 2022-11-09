@@ -73,6 +73,9 @@ class BatchNormal(variable.StateSpaceVariable):
         cor = BatchNormal(m_cor, _transpose(r_cor))
         return obs, (cor, gain)
 
+    def extract_qoi(self):  # noqa: D102
+        return self.mean[..., 0]
+
 
 # todo: extract the below into functions.
 
@@ -351,6 +354,9 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
+    def extract_mean_from_marginals(self, mean):
+        return mean[..., 0]
+
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
@@ -393,12 +399,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
 
         noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
-
-    def extract_mean_from_marginals(self, mean):
-        return mean[..., 0]
-
-    def extract_sol(self, *, rv):  # noqa: D102
-        return self.extract_mean_from_marginals(mean=rv.mean)
 
     def begin_extrapolation(self, m0, /, *, dt):
 

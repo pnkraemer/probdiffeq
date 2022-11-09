@@ -6,9 +6,7 @@ Essentially, the variables are random variables with a specific structure.
 import abc
 
 # todo: make "u" a property?
-# todo: move evidence_sqrtm here and rename accordingly?
-# todo: make self.whiten() property?
-# todo: move correct_sol_observation here?
+# todo: move extract_sol functions here?
 
 
 class StateSpaceVariable(abc.ABC):
@@ -22,4 +20,9 @@ class StateSpaceVariable(abc.ABC):
 
     @abc.abstractmethod
     def condition_on_qoi_observation(self, u, /, *, observation_std):
+        raise NotImplementedError
+
+    # todo: make this a property?
+    @abc.abstractmethod
+    def extract_qoi(self):
         raise NotImplementedError
