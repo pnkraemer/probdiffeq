@@ -1,6 +1,6 @@
 """Batch-style extrapolations."""
 import dataclasses
-from typing import Any, Callable, Generic, NamedTuple, Tuple, TypeVar
+from typing import Any, Callable, Generic, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -14,11 +14,23 @@ from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolati
 # todo: sort the function order a little bit. Make the docs useful.
 
 
-class BatchNormal(NamedTuple):
+@jax.tree_util.register_pytree_node_class
+class BatchNormal:
     """Batched normally-distributed random variables."""
 
-    mean: Any  # (d, k) shape
-    cov_sqrtm_lower: Any  # (d, k, k) shape
+    def __init__(self, mean, cov_sqrtm_lower):
+        self.mean = mean  # (d, k) shape
+        self.cov_sqrtm_lower = cov_sqrtm_lower  # (d, k, k) shape
+
+    def tree_flatten(self):
+        children = self.mean, self.cov_sqrtm_lower
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        mean, cov_sqrtm_lower = children
+        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
 
 # todo: extract the below into functions.
