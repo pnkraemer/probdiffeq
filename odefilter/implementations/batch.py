@@ -32,6 +32,17 @@ class BatchNormal:
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
+    # todo: rename to self.logpdf(x, /) ?
+    def negative_logpdf(self, u, /):
+        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
+
+        # todo: is this correct??
+        res_white = (m_obs - u) / jnp.reshape(l_obs, m_obs.shape)
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return 0.5 * (x1 + x2 + x3)
+
 
 # todo: extract the below into functions.
 
@@ -68,16 +79,6 @@ class _BatchCorrection(
         obs = BatchNormal(m_obs, _transpose(r_obs))
         cor = BatchNormal(m_cor, _transpose(r_cor))
         return obs, (cor, gain)
-
-    def negative_marginal_log_likelihood(self, observed, u):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-
-        # todo: is this correct??
-        res_white = (m_obs - u) / jnp.reshape(l_obs, m_obs.shape)
-        x1 = jnp.dot(res_white, res_white.T)
-        x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return 0.5 * (x1 + x2 + x3)
 
 
 BatchMM1CacheType = Tuple[Callable]
