@@ -33,7 +33,7 @@ class BatchNormal:
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
     # todo: rename to self.logpdf(x, /) ?
-    def negative_logpdf(self, u, /):
+    def logpdf(self, u, /):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
         # todo: is this correct??
@@ -41,7 +41,7 @@ class BatchNormal:
         x1 = jnp.dot(res_white, res_white.T)
         x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
         x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return 0.5 * (x1 + x2 + x3)
+        return -0.5 * (x1 + x2 + x3)
 
 
 # todo: extract the below into functions.
