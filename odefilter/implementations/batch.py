@@ -56,6 +56,23 @@ class BatchNormal(variable.StateSpaceVariable):
 
         return evidence_sqrtm
 
+    def condition_on_qoi_observation(self, u, /, *, observation_std):
+        hc = self.cov_sqrtm_lower[:, 0, ...]  # (d, k)
+        m_obs = self.mean[:, 0]  # (d,)
+        d = m_obs.shape[0]
+        r_yx = observation_std * jnp.ones((d, 1, 1))
+
+        r_x_f = hc[..., None]
+        r_x = _transpose(self.cov_sqrtm_lower)
+        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
+            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
+        )
+        m_cor = self.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
+
+        obs = BatchNormal(m_obs, _transpose(r_obs))
+        cor = BatchNormal(m_cor, _transpose(r_cor))
+        return obs, (cor, gain)
+
 
 # todo: extract the below into functions.
 
@@ -68,22 +85,7 @@ class _BatchCorrection(
     correction.AbstractCorrection[BatchNormal, BatchCacheTypeVar],
     Generic[BatchCacheTypeVar],
 ):
-    def correct_sol_observation(self, *, rv, u, observation_std):
-        hc = rv.cov_sqrtm_lower[:, 0, ...]  # (d, k)
-        m_obs = rv.mean[:, 0]  # (d,)
-        d = m_obs.shape[0]
-        r_yx = observation_std * jnp.ones((d, 1, 1))
-
-        r_x_f = hc[..., None]
-        r_x = _transpose(rv.cov_sqrtm_lower)
-        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
-            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
-        )
-        m_cor = rv.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
-
-        obs = BatchNormal(m_obs, _transpose(r_obs))
-        cor = BatchNormal(m_cor, _transpose(r_cor))
-        return obs, (cor, gain)
+    pass
 
 
 BatchMM1CacheType = Tuple[Callable]

@@ -19,3 +19,7 @@ class StateSpaceVariable(abc.ABC):
     @abc.abstractmethod
     def norm_of_whitened_residual_sqrtm(self):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def condition_on_qoi_observation(self, u, /, *, observation_std):
+        raise NotImplementedError
