@@ -58,6 +58,12 @@ class MarkovSequence(Generic[T]):
         init, backward_model = children
         return cls(init=init, backward_model=backward_model)
 
+    def scale_covariance(self, *, scale_sqrtm):
+        noise = self.backward_model.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        bw_model = BackwardModel(transition=self.backward_model.transition, noise=noise)
+        init = self.init.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return MarkovSequence(init=init, backward_model=bw_model)
+
 
 class _SmootherCommon(_strategy.Strategy):
     """Common functionality for smoothers."""

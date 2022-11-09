@@ -71,10 +71,6 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_covariance(self, *, rv: R, scale_sqrtm):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def marginalise_backwards(self, *, init: R, linop, noise: R):
         raise NotImplementedError
 

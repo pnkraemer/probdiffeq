@@ -97,6 +97,19 @@ class VectNormal(variable.StateSpaceVariable):
         x_reshaped = jnp.reshape(x, self.target_shape, order="F")
         return x_reshaped[i, ...]
 
+    def scale_covariance(self, *, scale_sqrtm):
+        if jnp.ndim(scale_sqrtm) == 0:
+            return VectNormal(
+                mean=self.mean,
+                cov_sqrtm_lower=scale_sqrtm * self.cov_sqrtm_lower,
+                target_shape=self.target_shape,
+            )
+        return VectNormal(
+            mean=self.mean,
+            cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
+            target_shape=self.target_shape,
+        )
+
 
 @jax.tree_util.register_pytree_node_class
 class TaylorZerothOrder(correction.AbstractCorrection):
@@ -519,19 +532,6 @@ class IBM(extrapolation.AbstractExtrapolation):
 
     def init_output_scale_sqrtm(self):
         return 1.0
-
-    def scale_covariance(self, *, rv, scale_sqrtm):
-        if jnp.ndim(scale_sqrtm) == 0:
-            return VectNormal(
-                mean=rv.mean,
-                cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower,
-                target_shape=rv.target_shape,
-            )
-        return VectNormal(
-            mean=rv.mean,
-            cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
-            target_shape=rv.target_shape,
-        )
 
     def marginalise_backwards(self, *, init, linop, noise):
         def body_fun(carry, x):
