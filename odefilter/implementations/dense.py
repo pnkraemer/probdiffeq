@@ -1,25 +1,42 @@
 """State-space models with dense covariance structure   ."""
 
 import dataclasses
-from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
+from odefilter.implementations import (
+    _ibm_util,
+    _sqrtm,
+    correction,
+    extrapolation,
+    random_variable,
+)
 
 # todo: extract _DenseCorrection methods into functions
 # todo: make RV type and CacheType public, and give a docstring?
 # todo: sort the function order a little bit. Make the docs useful.
 
 
-class _Normal(NamedTuple):
+@jax.tree_util.register_pytree_node_class
+class _Normal(random_variable.RandomVariable):
     """Random variable with a normal distribution."""
 
-    mean: jax.Array  # (k,) shape
-    cov_sqrtm_lower: jax.Array  # (k,k) shape
+    def __init__(self, mean, cov_sqrtm_lower):
+        self.mean = mean  # (n,) shape
+        self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape
+
+    def tree_flatten(self):
+        children = self.mean, self.cov_sqrtm_lower
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        mean, cov_sqrtm_lower = children
+        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
 
 @jax.tree_util.register_pytree_node_class
