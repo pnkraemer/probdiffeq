@@ -28,7 +28,7 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import dense_output, ivpsolve, solvers
-from odefilter.implementations import isotropic
+from odefilter.implementations import implementations
 from odefilter.strategies import smoothers
 
 config.update("jax_enable_x64", True)
@@ -55,7 +55,7 @@ def vf(y, t, p):
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
 strategy = smoothers.Smoother(
-    implementation=isotropic.IsoTS0.from_params(num_derivatives=1),
+    implementation=implementations.IsoTS0.from_params(num_derivatives=1),
 )
 solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=10.0)
 
