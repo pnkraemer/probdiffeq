@@ -38,6 +38,16 @@ class _Normal(random_variable.RandomVariable):
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
+    def logpdf(self, u, /):
+        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
+
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
+
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
+
 
 @jax.tree_util.register_pytree_node_class
 class _DenseCorrection(correction.AbstractCorrection):
@@ -72,16 +82,6 @@ class _DenseCorrection(correction.AbstractCorrection):
         m_cor = rv.mean - gain @ (m_obs - u)
 
         return _Normal(m_obs, r_obs.T), (_Normal(m_cor, r_cor.T), gain)
-
-    def negative_marginal_log_likelihood(self, observed, u):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
-
-        x1 = jnp.dot(res_white, res_white.T)
-        x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return 0.5 * (x1 + x2 + x3)
 
     def _select_derivative_vect(self, x, i):
         select = jax.vmap(
