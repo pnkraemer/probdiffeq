@@ -23,13 +23,14 @@ class BatchNormal(NamedTuple):
 
 # todo: extract the below into functions.
 
-BatchCacheType = TypeVar("BatchCacheType")
+BatchCacheTypeVar = TypeVar("BatchCacheTypeVar")
 """Cache-type variable."""
 
 
 @jax.tree_util.register_pytree_node_class
 class _BatchCorrection(
-    correction.AbstractCorrection[BatchNormal, BatchCacheType], Generic[BatchCacheType]
+    correction.AbstractCorrection[BatchNormal, BatchCacheTypeVar],
+    Generic[BatchCacheTypeVar],
 ):
     def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
         obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
