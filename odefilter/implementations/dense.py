@@ -12,7 +12,7 @@ from odefilter.implementations import (
     _sqrtm,
     correction,
     extrapolation,
-    random_variable,
+    variable,
 )
 
 # todo: extract _DenseCorrection methods into functions
@@ -21,7 +21,7 @@ from odefilter.implementations import (
 
 
 @jax.tree_util.register_pytree_node_class
-class _Normal(random_variable.RandomVariable):
+class _Normal(variable.StateSpaceVariable):
     """Random variable with a normal distribution."""
 
     def __init__(self, mean, cov_sqrtm_lower):

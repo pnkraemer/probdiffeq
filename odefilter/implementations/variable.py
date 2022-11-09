@@ -1,4 +1,7 @@
-"""Random variable API."""
+"""State-space model variable API.
+
+Essentially, the variables are random variables with a specific structure.
+"""
 
 import abc
 
@@ -8,7 +11,7 @@ import abc
 # todo: move correct_sol_observation here?
 
 
-class RandomVariable(abc.ABC):
+class StateSpaceVariable(abc.ABC):
     @abc.abstractmethod
     def logpdf(self, u, /):
         raise NotImplementedError

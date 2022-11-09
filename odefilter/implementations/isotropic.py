@@ -12,12 +12,12 @@ from odefilter.implementations import (
     _sqrtm,
     correction,
     extrapolation,
-    random_variable,
+    variable,
 )
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoNormal(random_variable.RandomVariable):
+class _IsoNormal(variable.StateSpaceVariable):
     def __init__(self, mean, cov_sqrtm_lower):
         self.mean = mean  # (n, d) shape
         self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape

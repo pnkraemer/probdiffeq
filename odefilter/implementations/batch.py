@@ -12,7 +12,7 @@ from odefilter.implementations import (
     _sqrtm,
     correction,
     extrapolation,
-    random_variable,
+    variable,
 )
 
 # todo: reconsider naming!
@@ -21,7 +21,7 @@ from odefilter.implementations import (
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchNormal(random_variable.RandomVariable):
+class BatchNormal(variable.StateSpaceVariable):
     """Batched normally-distributed random variables."""
 
     def __init__(self, mean, cov_sqrtm_lower):
