@@ -38,6 +38,8 @@ class _Normal(random_variable.RandomVariable):
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
+    # todo: extract _whiten() method?!
+
     def logpdf(self, u, /):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
@@ -47,6 +49,12 @@ class _Normal(random_variable.RandomVariable):
         x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
+
+    def norm_of_whitened_residual_sqrtm(self):
+        obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
@@ -64,12 +72,6 @@ class _DenseCorrection(correction.AbstractCorrection):
     def tree_unflatten(cls, aux, _children):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension)
-
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
 
     def correct_sol_observation(self, *, rv, u, observation_std):
         hc = self._select_derivative_vect(rv.cov_sqrtm_lower, 0)
@@ -103,7 +105,8 @@ class TaylorZerothOrder(_DenseCorrection):
         cov_sqrtm_lower = self._select_derivative_vect(x.cov_sqrtm_lower, 1)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        output_scale_sqrtm = self.evidence_sqrtm(observed=_Normal(b, l_obs_raw))
+        observed = _Normal(b, l_obs_raw)
+        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
 
@@ -138,7 +141,7 @@ class TaylorFirstOrder(_DenseCorrection):
         )
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        output_scale_sqrtm = self.evidence_sqrtm(observed=_Normal(b, l_obs_raw))
+        output_scale_sqrtm = _Normal(b, l_obs_raw).norm_of_whitened_residual_sqrtm()
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
@@ -226,7 +229,7 @@ class MomentMatching(_DenseCorrection):
 
         # Summarise
         marginals = _Normal(m_marg, l_marg)
-        output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
+        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
         # Compute error estimate
         l_obs = marginals.cov_sqrtm_lower

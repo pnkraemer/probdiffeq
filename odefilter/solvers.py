@@ -389,11 +389,10 @@ class MLESolver(_AbstractSolver):
         )
         return filtered, dt * error
 
-    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
-        evidence_sqrtm = self.strategy.implementation.correction.evidence_sqrtm(
-            observed=obs
-        )
-        return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
+    @staticmethod
+    def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
+        x = obs.norm_of_whitened_residual_sqrtm()
+        return jnp.sqrt(n * diffsqrtm**2 + x**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):
 

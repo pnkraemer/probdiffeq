@@ -42,6 +42,12 @@ class _IsoNormal(random_variable.RandomVariable):
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
+    def norm_of_whitened_residual_sqrtm(self):
+        obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
+        res_white = obs_pt / l_obs
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(correction.AbstractCorrection):
@@ -82,12 +88,6 @@ class IsoTaylorZerothOrder(correction.AbstractCorrection):
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = _IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
-
-    def evidence_sqrtm(self, *, observed):
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower
-        res_white = obs_pt / l_obs
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
 
     def correct_sol_observation(self, *, rv, u, observation_std):
         hc = rv.cov_sqrtm_lower[0, ...].reshape((1, -1))

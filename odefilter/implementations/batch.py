@@ -48,6 +48,14 @@ class BatchNormal(random_variable.RandomVariable):
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
+    def norm_of_whitened_residual_sqrtm(self):
+        obs_pt, l_obs = self.mean, self.cov_sqrtm_lower  # (d,), (d,)
+
+        res_white = obs_pt / l_obs  # (d, )
+        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
+
+        return evidence_sqrtm
+
 
 # todo: extract the below into functions.
 
@@ -60,14 +68,6 @@ class _BatchCorrection(
     correction.AbstractCorrection[BatchNormal, BatchCacheTypeVar],
     Generic[BatchCacheTypeVar],
 ):
-    def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
-
-        res_white = obs_pt / l_obs  # (d, )
-        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
-
-        return evidence_sqrtm
-
     def correct_sol_observation(self, *, rv, u, observation_std):
         hc = rv.cov_sqrtm_lower[:, 0, ...]  # (d, k)
         m_obs = rv.mean[:, 0]  # (d,)
@@ -158,7 +158,7 @@ class BatchMomentMatching(_BatchCorrection[BatchMM1CacheType]):
 
         # Summarise
         marginals = BatchNormal(m_marg, l_marg)
-        output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
+        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
         # Compute error estimate
         error_estimate = l_marg
@@ -273,9 +273,8 @@ class BatchTaylorZerothOrder(_BatchCorrection[BatchTS0CacheType]):
         l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
-        output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
-        )  # (d,)
+        observed = BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
+        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
 
         error_estimate = l_obs  # (d,)
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
