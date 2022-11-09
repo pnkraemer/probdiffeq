@@ -1,18 +1,46 @@
 """State-space models with isotropic covariance structure."""
 
 import dataclasses
-from typing import Any, NamedTuple
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
+from odefilter.implementations import (
+    _ibm_util,
+    _sqrtm,
+    correction,
+    extrapolation,
+    random_variable,
+)
 
 
-class _IsoNormal(NamedTuple):
-    mean: Any  # (n, d) shape
-    cov_sqrtm_lower: Any  # (n,n) shape
+@jax.tree_util.register_pytree_node_class
+class _IsoNormal(random_variable.RandomVariable):
+    def __init__(self, mean, cov_sqrtm_lower):
+        self.mean = mean  # (n, d) shape
+        self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape
+
+    def tree_flatten(self):
+        children = self.mean, self.cov_sqrtm_lower
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        mean, cov_sqrtm_lower = children
+        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
+
+    def logpdf(self, u, /):
+        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
+
+        res_white = (m_obs - u) / jnp.reshape(l_obs, ())
+
+        x1 = jnp.dot(res_white, res_white.T)
+        x2 = jnp.reshape(l_obs, ()) ** 2
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -72,16 +100,6 @@ class IsoTaylorZerothOrder(correction.AbstractCorrection):
         m_cor = rv.mean - gain * (m_obs - u)[None, :]
 
         return _IsoNormal(m_obs, r_obs.T), (_IsoNormal(m_cor, r_cor.T), gain)
-
-    def negative_marginal_log_likelihood(self, observed, u):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
-
-        res_white = (m_obs - u) / jnp.reshape(l_obs, ())
-
-        x1 = jnp.dot(res_white, res_white.T)
-        x2 = jnp.reshape(l_obs, ()) ** 2
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return 0.5 * (x1 + x2 + x3)
 
 
 @jax.tree_util.register_pytree_node_class

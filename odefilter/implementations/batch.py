@@ -7,7 +7,13 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
+from odefilter.implementations import (
+    _ibm_util,
+    _sqrtm,
+    correction,
+    extrapolation,
+    random_variable,
+)
 
 # todo: reconsider naming!
 # todo: extract _BatchCorrection methods into functions
@@ -15,7 +21,7 @@ from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolati
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchNormal:
+class BatchNormal(random_variable.RandomVariable):
     """Batched normally-distributed random variables."""
 
     def __init__(self, mean, cov_sqrtm_lower):
@@ -28,11 +34,10 @@ class BatchNormal:
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(cls, _aux, children):
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
-    # todo: rename to self.logpdf(x, /) ?
     def logpdf(self, u, /):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
