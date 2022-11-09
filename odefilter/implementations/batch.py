@@ -16,7 +16,6 @@ from odefilter.implementations import (
 )
 
 # todo: reconsider naming!
-# todo: extract _BatchCorrection methods into functions
 # todo: sort the function order a little bit. Make the docs useful.
 
 
