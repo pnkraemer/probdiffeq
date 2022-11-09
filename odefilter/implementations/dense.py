@@ -25,7 +25,7 @@ class VectNormal(variable.StateSpaceVariable):
     """Vector-normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.
-    But infact, it is more of a matrix-normal distribution.
+    But in fact, it is more of a matrix-normal distribution.
     This means that the mean vector is a (d*n,)-shaped array but
     represents a (d,n)-shaped matrix.
     """

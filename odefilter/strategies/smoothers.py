@@ -118,9 +118,6 @@ class _SmootherCommon(_strategy.Strategy):
     def extract_sol_terminal_value(self, *, posterior):
         return posterior.init.extract_qoi()
 
-    def extract_sol_from_marginals(self, *, marginals):
-        return marginals.extract_qoi()
-
     def marginals_terminal_value(self, *, posterior):
         return posterior.init
 
@@ -270,7 +267,7 @@ class Smoother(_SmootherCommon):
             linop=acc.backward_model.transition,
             noise=acc.backward_model.noise,
         )
-        u = self.extract_sol_from_marginals(marginals=marginals_t)
+        u = marginals_t.extract_qoi()
         return u, marginals_t
 
 

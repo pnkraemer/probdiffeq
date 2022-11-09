@@ -37,10 +37,6 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_sol_from_marginals(self, *, marginals):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):
         raise NotImplementedError
 

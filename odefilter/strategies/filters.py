@@ -66,9 +66,6 @@ class Filter(_strategy.Strategy):
     def extract_sol_terminal_value(self, *, posterior):
         return posterior.extract_qoi()
 
-    def extract_sol_from_marginals(self, *, marginals):
-        return marginals.extract_qoi()
-
     def begin_extrapolation(self, *, posterior, dt):
         return self.implementation.extrapolation.begin_extrapolation(
             posterior.mean, dt=dt

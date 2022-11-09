@@ -245,7 +245,7 @@ class Solver(_AbstractSolver):
     #  the dynamic solver uses the same...
     def extract_fn(self, *, state):
         marginals = self.strategy.marginals(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,  # new!
@@ -257,7 +257,7 @@ class Solver(_AbstractSolver):
 
     def extract_terminal_value_fn(self, *, state):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,  # new!
@@ -318,7 +318,7 @@ class DynamicSolver(_AbstractSolver):
     def extract_fn(self, *, state):
 
         marginals = self.strategy.marginals(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
 
         return Solution(
             t=state.t,
@@ -331,7 +331,7 @@ class DynamicSolver(_AbstractSolver):
 
     def extract_terminal_value_fn(self, *, state):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
 
         return Solution(
             t=state.t,
@@ -402,7 +402,7 @@ class MLESolver(_AbstractSolver):
         marginals = self.strategy.scale_marginals(marginals, output_scale_sqrtm=s)
         posterior = self.strategy.scale_posterior(state.posterior, output_scale_sqrtm=s)
 
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,
@@ -419,7 +419,7 @@ class MLESolver(_AbstractSolver):
         marginals = self.strategy.scale_marginals(marginals, output_scale_sqrtm=s)
         posterior = self.strategy.scale_posterior(state.posterior, output_scale_sqrtm=s)
 
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,
