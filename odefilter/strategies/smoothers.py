@@ -58,6 +58,13 @@ class MarkovSequence(Generic[T]):
         init, backward_model = children
         return cls(init=init, backward_model=backward_model)
 
+    def scale_covariance(self, *, scale_sqrtm):
+        noise = self.backward_model.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        bw_model = BackwardModel(transition=self.backward_model.transition, noise=noise)
+
+        init = self.init.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return MarkovSequence(init=init, backward_model=bw_model)
+
 
 class _SmootherCommon(_strategy.Strategy):
     """Common functionality for smoothers."""
@@ -116,10 +123,7 @@ class _SmootherCommon(_strategy.Strategy):
         return a, (corrected_seq, b)
 
     def extract_sol_terminal_value(self, *, posterior):
-        return self.implementation.extrapolation.extract_sol(rv=posterior.init)
-
-    def extract_sol_from_marginals(self, *, marginals):
-        return self.implementation.extrapolation.extract_sol(rv=marginals)
+        return posterior.init.extract_qoi()
 
     def marginals_terminal_value(self, *, posterior):
         return posterior.init
@@ -160,23 +164,24 @@ class _SmootherCommon(_strategy.Strategy):
         u = self.implementation.extrapolation.extract_mean_from_marginals(samples)
         return u, samples
 
-    def scale_marginals(self, marginals, *, output_scale_sqrtm):
-        return self.implementation.extrapolation.scale_covariance(
-            rv=marginals, scale_sqrtm=output_scale_sqrtm
-        )
-
-    def scale_posterior(self, posterior, *, output_scale_sqrtm):
-        init = self.implementation.extrapolation.scale_covariance(
-            rv=posterior.init, scale_sqrtm=output_scale_sqrtm
-        )
-        noise = self.implementation.extrapolation.scale_covariance(
-            rv=posterior.backward_model.noise, scale_sqrtm=output_scale_sqrtm
-        )
-
-        bw_model = BackwardModel(
-            transition=posterior.backward_model.transition, noise=noise
-        )
-        return MarkovSequence(init=init, backward_model=bw_model)
+    #
+    # def scale_marginals(self, marginals, *, output_scale_sqrtm):
+    #     return self.implementation.extrapolation.scale_covariance(
+    #         rv=marginals, scale_sqrtm=output_scale_sqrtm
+    #     )
+    #
+    # def scale_posterior(self, posterior, *, output_scale_sqrtm):
+    #     init = self.implementation.extrapolation.scale_covariance(
+    #         rv=posterior.init, scale_sqrtm=output_scale_sqrtm
+    #     )
+    #     noise = self.implementation.extrapolation.scale_covariance(
+    #         rv=posterior.backward_model.noise, scale_sqrtm=output_scale_sqrtm
+    #     )
+    #
+    #     bw_model = BackwardModel(
+    #         transition=posterior.backward_model.transition, noise=noise
+    #     )
+    #     return MarkovSequence(init=init, backward_model=bw_model)
 
     # Auxiliary routines that are the same among all subclasses
 
@@ -270,7 +275,7 @@ class Smoother(_SmootherCommon):
             linop=acc.backward_model.transition,
             noise=acc.backward_model.noise,
         )
-        u = self.extract_sol_from_marginals(marginals=marginals_t)
+        u = marginals_t.extract_qoi()
         return u, marginals_t
 
 

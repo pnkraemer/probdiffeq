@@ -57,10 +57,6 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_sol(self, *, rv: R):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def condense_backward_models(
         self, *, transition_init, noise_init: R, transition_state, noise_state: R
     ):
@@ -72,10 +68,6 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
 
     @abc.abstractmethod
     def init_backward_noise(self, *, rv_proto: R):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def scale_covariance(self, *, rv: R, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod

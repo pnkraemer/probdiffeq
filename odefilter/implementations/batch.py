@@ -1,70 +1,91 @@
 """Batch-style extrapolations."""
 import dataclasses
-from typing import Any, Callable, Generic, NamedTuple, Tuple, TypeVar
+from typing import Any, Callable, Tuple
 
 import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import _ibm_util, _sqrtm, correction, extrapolation
+from odefilter.implementations import (
+    _ibm_util,
+    _sqrtm,
+    correction,
+    extrapolation,
+    variable,
+)
 
 # todo: reconsider naming!
-# todo: extract _BatchCorrection methods into functions
 # todo: sort the function order a little bit. Make the docs useful.
 
 
-class BatchNormal(NamedTuple):
+@jax.tree_util.register_pytree_node_class
+class BatchNormal(variable.StateSpaceVariable):
     """Batched normally-distributed random variables."""
 
-    mean: Any  # (d, k) shape
-    cov_sqrtm_lower: Any  # (d, k, k) shape
+    def __init__(self, mean, cov_sqrtm_lower):
+        self.mean = mean  # (d, k) shape
+        self.cov_sqrtm_lower = cov_sqrtm_lower  # (d, k, k) shape
 
+    def __repr__(self):
+        name = f"{self.__class__.__name__}"
+        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
+        return f"{name}({args})"
 
-# todo: extract the below into functions.
+    def tree_flatten(self):
+        children = self.mean, self.cov_sqrtm_lower
+        aux = ()
+        return children, aux
 
-BatchCacheType = TypeVar("BatchCacheType")
-"""Cache-type variable."""
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        mean, cov_sqrtm_lower = children
+        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
-
-@jax.tree_util.register_pytree_node_class
-class _BatchCorrection(
-    correction.AbstractCorrection[BatchNormal, BatchCacheType], Generic[BatchCacheType]
-):
-    def evidence_sqrtm(self, *, observed: BatchNormal) -> float:
-        obs_pt, l_obs = observed.mean, observed.cov_sqrtm_lower  # (d,), (d,)
-
-        res_white = obs_pt / l_obs  # (d, )
-        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
-
-        return evidence_sqrtm
-
-    def correct_sol_observation(self, *, rv, u, observation_std):
-        hc = rv.cov_sqrtm_lower[:, 0, ...]  # (d, k)
-        m_obs = rv.mean[:, 0]  # (d,)
-        d = m_obs.shape[0]
-        r_yx = observation_std * jnp.ones((d, 1, 1))
-
-        r_x_f = hc[..., None]
-        r_x = _transpose(rv.cov_sqrtm_lower)
-        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
-            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
-        )
-        m_cor = rv.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
-
-        obs = BatchNormal(m_obs, _transpose(r_obs))
-        cor = BatchNormal(m_cor, _transpose(r_cor))
-        return obs, (cor, gain)
-
-    def negative_marginal_log_likelihood(self, observed, u):
-        m_obs, l_obs = observed.mean, observed.cov_sqrtm_lower
+    def logpdf(self, u, /):
+        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
         # todo: is this correct??
         res_white = (m_obs - u) / jnp.reshape(l_obs, m_obs.shape)
         x1 = jnp.dot(res_white, res_white.T)
         x2 = jnp.sum(jnp.reshape(l_obs, m_obs.shape) ** 2)
         x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return 0.5 * (x1 + x2 + x3)
+        return -0.5 * (x1 + x2 + x3)
+
+    def norm_of_whitened_residual_sqrtm(self):
+        obs_pt, l_obs = self.mean, self.cov_sqrtm_lower  # (d,), (d,)
+
+        res_white = obs_pt / l_obs  # (d, )
+        evidence_sqrtm = res_white / jnp.sqrt(res_white.size)
+
+        return evidence_sqrtm
+
+    def condition_on_qoi_observation(self, u, /, *, observation_std):
+        hc = self.cov_sqrtm_lower[:, 0, ...]  # (d, k)
+        m_obs = self.mean[:, 0]  # (d,)
+        d = m_obs.shape[0]
+        r_yx = observation_std * jnp.ones((d, 1, 1))
+
+        r_x_f = hc[..., None]
+        r_x = _transpose(self.cov_sqrtm_lower)
+        r_obs, (r_cor, gain) = jax.vmap(_sqrtm.revert_conditional)(
+            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
+        )
+        m_cor = self.mean - (gain @ (m_obs - u)[:, None, None])[..., 0]
+
+        obs = BatchNormal(m_obs, _transpose(r_obs))
+        cor = BatchNormal(m_cor, _transpose(r_cor))
+        return obs, (cor, gain)
+
+    def extract_qoi(self):  # noqa: D102
+        return self.mean[..., 0]
+
+    def scale_covariance(self, *, scale_sqrtm):
+        # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
+        return BatchNormal(
+            mean=self.mean,
+            cov_sqrtm_lower=scale_sqrtm[..., None, None] * self.cov_sqrtm_lower,
+        )
 
 
 BatchMM1CacheType = Tuple[Callable]
@@ -72,7 +93,9 @@ BatchMM1CacheType = Tuple[Callable]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchMomentMatching(_BatchCorrection[BatchMM1CacheType]):
+class BatchMomentMatching(
+    correction.AbstractCorrection[BatchNormal, BatchMM1CacheType]
+):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -139,7 +162,7 @@ class BatchMomentMatching(_BatchCorrection[BatchMM1CacheType]):
 
         # Summarise
         marginals = BatchNormal(m_marg, l_marg)
-        output_scale_sqrtm = self.evidence_sqrtm(observed=marginals)
+        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
         # Compute error estimate
         error_estimate = l_marg
@@ -231,7 +254,9 @@ BatchTS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(_BatchCorrection[BatchTS0CacheType]):
+class BatchTaylorZerothOrder(
+    correction.AbstractCorrection[BatchNormal, BatchTS0CacheType]
+):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
@@ -254,9 +279,8 @@ class BatchTaylorZerothOrder(_BatchCorrection[BatchTS0CacheType]):
         l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
-        output_scale_sqrtm = self.evidence_sqrtm(
-            observed=BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
-        )  # (d,)
+        observed = BatchNormal(mean=bias, cov_sqrtm_lower=l_obs)
+        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
 
         error_estimate = l_obs  # (d,)
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
@@ -331,6 +355,9 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
+    def extract_mean_from_marginals(self, mean):
+        return mean[..., 0]
+
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
@@ -374,12 +401,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
         return noise, g
 
-    def extract_mean_from_marginals(self, mean):
-        return mean[..., 0]
-
-    def extract_sol(self, *, rv):  # noqa: D102
-        return self.extract_mean_from_marginals(mean=rv.mean)
-
     def begin_extrapolation(self, m0, /, *, dt):
 
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -422,7 +443,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
 
         # Initial condition does not matter
         bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
-
         _, rvs = _control_flow.scan_with_init(
             f=body_fun, init=init, xs=bw_models, reverse=True
         )
@@ -501,20 +521,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
     def _transform_samples(self, rvs, base):
         # (d,k) + ((d,k,k) @ (d,k,1))[..., 0] = (d,k)
         return rvs.mean + (rvs.cov_sqrtm_lower @ base[..., None])[..., 0]
-
-    def scale_covariance(self, *, rv, scale_sqrtm):
-        # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
-        if jnp.ndim(scale_sqrtm) == 1:
-            return BatchNormal(
-                mean=rv.mean,
-                cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
-            )
-
-        # Time series: (N, d, 1, 1) * (N, d, k, k) -> (N, d, k, k)
-        return BatchNormal(
-            mean=rv.mean,
-            cov_sqrtm_lower=scale_sqrtm[..., None, None] * rv.cov_sqrtm_lower,
-        )
 
 
 def _transpose(x):

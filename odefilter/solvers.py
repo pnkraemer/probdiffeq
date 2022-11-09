@@ -245,7 +245,7 @@ class Solver(_AbstractSolver):
     #  the dynamic solver uses the same...
     def extract_fn(self, *, state):
         marginals = self.strategy.marginals(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,  # new!
@@ -257,7 +257,7 @@ class Solver(_AbstractSolver):
 
     def extract_terminal_value_fn(self, *, state):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,  # new!
@@ -318,7 +318,7 @@ class DynamicSolver(_AbstractSolver):
     def extract_fn(self, *, state):
 
         marginals = self.strategy.marginals(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
 
         return Solution(
             t=state.t,
@@ -331,7 +331,7 @@ class DynamicSolver(_AbstractSolver):
 
     def extract_terminal_value_fn(self, *, state):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+        u = marginals.extract_qoi()
 
         return Solution(
             t=state.t,
@@ -389,43 +389,31 @@ class MLESolver(_AbstractSolver):
         )
         return filtered, dt * error
 
-    def _update_output_scale_sqrtm(self, *, diffsqrtm, n, obs):
-        evidence_sqrtm = self.strategy.implementation.correction.evidence_sqrtm(
-            observed=obs
-        )
-        return jnp.sqrt(n * diffsqrtm**2 + evidence_sqrtm**2) / jnp.sqrt(n + 1)
+    @staticmethod
+    def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
+        x = obs.norm_of_whitened_residual_sqrtm()
+        return jnp.sqrt(n * diffsqrtm**2 + x**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):
-
-        marginals = self.strategy.marginals(posterior=state.posterior)
         s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
-
-        marginals = self.strategy.scale_marginals(marginals, output_scale_sqrtm=s)
-        posterior = self.strategy.scale_posterior(state.posterior, output_scale_sqrtm=s)
-
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
-        return Solution(
-            t=state.t,
-            u=u,
-            marginals=marginals,  # new!
-            posterior=posterior,  # new!
-            output_scale_sqrtm=s,  # new!
-            num_data_points=state.num_data_points,
-        )
+        margs = self.strategy.marginals(posterior=state.posterior)
+        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
 
     def extract_terminal_value_fn(self, *, state):
-        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         s = state.output_scale_sqrtm
+        margs = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
 
-        marginals = self.strategy.scale_marginals(marginals, output_scale_sqrtm=s)
-        posterior = self.strategy.scale_posterior(state.posterior, output_scale_sqrtm=s)
-
-        u = self.strategy.extract_sol_from_marginals(marginals=marginals)
+    @staticmethod
+    def _rescale(*, scale_sqrtm, marginals_unscaled, state):
+        marginals = marginals_unscaled.scale_covariance(scale_sqrtm=scale_sqrtm)
+        posterior = state.posterior.scale_covariance(scale_sqrtm=scale_sqrtm)
+        u = marginals.extract_qoi()
         return Solution(
             t=state.t,
             u=u,
             marginals=marginals,  # new!
             posterior=posterior,  # new!
-            output_scale_sqrtm=s,  # new!
+            output_scale_sqrtm=scale_sqrtm,  # new!
             num_data_points=state.num_data_points,
         )

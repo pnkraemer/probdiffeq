@@ -84,12 +84,12 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution, solver):
         )
 
         # Correct (with an alias for long function names)
-        fn = solver.strategy.implementation.correction.correct_sol_observation
-        obs, (cor, _) = fn(rv=rv_ext, u=data, observation_std=obs_std)
+        obs, (cor, _) = rv_ext.condition_on_qoi_observation(
+            data, observation_std=obs_std
+        )
 
         # Compute marginal log likelihood (with an alias for long function names)
-        fn = solver.strategy.implementation.correction.negative_marginal_log_likelihood
-        nmll_new = fn(observed=obs, u=data)
+        nmll_new = -1 * obs.logpdf(data)
         nmll_updated = (num_data * nmll_prev + nmll_new) / (num_data + 1)
 
         # Return values

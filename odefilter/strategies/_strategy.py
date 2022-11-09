@@ -37,10 +37,6 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_sol_from_marginals(self, *, marginals):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):
         raise NotImplementedError
 
@@ -78,14 +74,6 @@ class Strategy(abc.ABC):
 
     @abc.abstractmethod
     def complete_correction(self, *, extrapolated, cache_obs):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def scale_marginals(self, marginals, *, output_scale_sqrtm):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def scale_posterior(self, posterior, *, output_scale_sqrtm):
         raise NotImplementedError
 
     def tree_flatten(self):

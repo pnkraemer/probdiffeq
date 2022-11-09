@@ -43,7 +43,3 @@ class AbstractCorrection(abc.ABC, Generic[R, C]):
     @abc.abstractmethod
     def complete_correction(self, *, extrapolated: R, cache: C):
         raise NotImplementedError
-
-    @abc.abstractmethod
-    def evidence_sqrtm(self, *, observed: R):
-        raise NotImplementedError
