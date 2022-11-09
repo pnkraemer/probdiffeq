@@ -395,8 +395,11 @@ class MLESolver(_AbstractSolver):
         return jnp.sqrt(n * diffsqrtm**2 + x**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):
-
         s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
+        return self._marginalise_and_rescale(scale_sqrtm=s, state=state)
+
+    def extract_terminal_value_fn(self, *, state):
+        s = state.output_scale_sqrtm
         return self._marginalise_and_rescale(scale_sqrtm=s, state=state)
 
     def _marginalise_and_rescale(self, *, scale_sqrtm, state):
@@ -412,7 +415,3 @@ class MLESolver(_AbstractSolver):
             output_scale_sqrtm=scale_sqrtm,  # new!
             num_data_points=state.num_data_points,
         )
-
-    def extract_terminal_value_fn(self, *, state):
-        s = state.output_scale_sqrtm
-        return self._marginalise_and_rescale(scale_sqrtm=s, state=state)
