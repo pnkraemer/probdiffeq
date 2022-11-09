@@ -28,6 +28,11 @@ class BatchNormal(variable.StateSpaceVariable):
         self.mean = mean  # (d, k) shape
         self.cov_sqrtm_lower = cov_sqrtm_lower  # (d, k, k) shape
 
+    def __repr__(self):
+        name = f"{self.__class__.__name__}"
+        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
+        return f"{name}({args})"
+
     def tree_flatten(self):
         children = self.mean, self.cov_sqrtm_lower
         aux = ()
@@ -75,6 +80,13 @@ class BatchNormal(variable.StateSpaceVariable):
 
     def extract_qoi(self):  # noqa: D102
         return self.mean[..., 0]
+
+    def scale_covariance(self, *, scale_sqrtm):
+        # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
+        return BatchNormal(
+            mean=self.mean,
+            cov_sqrtm_lower=scale_sqrtm[..., None, None] * self.cov_sqrtm_lower,
+        )
 
 
 # todo: extract the below into functions.
@@ -442,7 +454,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
 
         # Initial condition does not matter
         bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
-
         _, rvs = _control_flow.scan_with_init(
             f=body_fun, init=init, xs=bw_models, reverse=True
         )
@@ -521,20 +532,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
     def _transform_samples(self, rvs, base):
         # (d,k) + ((d,k,k) @ (d,k,1))[..., 0] = (d,k)
         return rvs.mean + (rvs.cov_sqrtm_lower @ base[..., None])[..., 0]
-
-    def scale_covariance(self, *, rv, scale_sqrtm):
-        # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
-        if jnp.ndim(scale_sqrtm) == 1:
-            return BatchNormal(
-                mean=rv.mean,
-                cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
-            )
-
-        # Time series: (N, d, 1, 1) * (N, d, k, k) -> (N, d, k, k)
-        return BatchNormal(
-            mean=rv.mean,
-            cov_sqrtm_lower=scale_sqrtm[..., None, None] * rv.cov_sqrtm_lower,
-        )
 
 
 def _transpose(x):

@@ -209,9 +209,7 @@ def _rk_filter_step(carry, y, extrapolation, correction, dt):
     )
 
     # Correct
-    _, (corrected, _) = correction.correct_sol_observation(
-        rv=extra, u=y, observation_std=0.0
-    )
+    _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
 
     # Return correction and backward-model
-    return (corrected, (noise_new, op_new)), None
+    return (corr, (noise_new, op_new)), None

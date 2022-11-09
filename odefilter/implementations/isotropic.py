@@ -64,6 +64,16 @@ class IsoNormal(variable.StateSpaceVariable):
         m = self.mean[..., 0, :]
         return m
 
+    def scale_covariance(self, *, scale_sqrtm):
+        if jnp.ndim(scale_sqrtm) == 0:
+            return IsoNormal(
+                mean=self.mean, cov_sqrtm_lower=scale_sqrtm * self.cov_sqrtm_lower
+            )
+        return IsoNormal(
+            mean=self.mean,
+            cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
+        )
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(correction.AbstractCorrection):
@@ -286,13 +296,3 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
 
     def extract_mean_from_marginals(self, mean):
         return mean[..., 0, :]
-
-    def scale_covariance(self, *, rv, scale_sqrtm):
-        if jnp.ndim(scale_sqrtm) == 0:
-            return IsoNormal(
-                mean=rv.mean, cov_sqrtm_lower=scale_sqrtm * rv.cov_sqrtm_lower
-            )
-        return IsoNormal(
-            mean=rv.mean,
-            cov_sqrtm_lower=scale_sqrtm[:, None, None] * rv.cov_sqrtm_lower,
-        )

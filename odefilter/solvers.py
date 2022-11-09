@@ -396,15 +396,17 @@ class MLESolver(_AbstractSolver):
 
     def extract_fn(self, *, state):
         s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
-        return self._marginalise_and_rescale(scale_sqrtm=s, state=state)
+        margs = self.strategy.marginals(posterior=state.posterior)
+        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
 
     def extract_terminal_value_fn(self, *, state):
         s = state.output_scale_sqrtm
-        return self._marginalise_and_rescale(scale_sqrtm=s, state=state)
+        margs = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
 
-    def _marginalise_and_rescale(self, *, scale_sqrtm, state):
-        marginals = self.strategy.marginals(posterior=state.posterior)
-        marginals = marginals.scale_covariance(scale_sqrtm=scale_sqrtm)
+    @staticmethod
+    def _rescale(*, scale_sqrtm, marginals_unscaled, state):
+        marginals = marginals_unscaled.scale_covariance(scale_sqrtm=scale_sqrtm)
         posterior = state.posterior.scale_covariance(scale_sqrtm=scale_sqrtm)
         u = marginals.extract_qoi()
         return Solution(

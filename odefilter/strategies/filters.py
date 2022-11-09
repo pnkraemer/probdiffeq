@@ -53,15 +53,16 @@ class Filter(_strategy.Strategy):
     def marginals_terminal_value(self, *, posterior):
         return posterior
 
-    def scale_marginals(self, marginals, *, output_scale_sqrtm):
-        return self.implementation.extrapolation.scale_covariance(
-            rv=marginals, scale_sqrtm=output_scale_sqrtm
-        )
-
-    def scale_posterior(self, posterior, *, output_scale_sqrtm):
-        return self.implementation.extrapolation.scale_covariance(
-            rv=posterior, scale_sqrtm=output_scale_sqrtm
-        )
+    #
+    # def scale_marginals(self, marginals, *, output_scale_sqrtm):
+    #     return self.implementation.extrapolation.scale_covariance(
+    #         rv=marginals, scale_sqrtm=output_scale_sqrtm
+    #     )
+    #
+    # def scale_posterior(self, posterior, *, output_scale_sqrtm):
+    #     return self.implementation.extrapolation.scale_covariance(
+    #         rv=posterior, scale_sqrtm=output_scale_sqrtm
+    #     )
 
     def extract_sol_terminal_value(self, *, posterior):
         return posterior.extract_qoi()

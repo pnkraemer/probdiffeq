@@ -76,14 +76,6 @@ class Strategy(abc.ABC):
     def complete_correction(self, *, extrapolated, cache_obs):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def scale_marginals(self, marginals, *, output_scale_sqrtm):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def scale_posterior(self, posterior, *, output_scale_sqrtm):
-        raise NotImplementedError
-
     def tree_flatten(self):
         children = (self.implementation,)
         aux = ()
