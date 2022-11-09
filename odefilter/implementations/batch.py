@@ -1,6 +1,6 @@
 """Batch-style extrapolations."""
 import dataclasses
-from typing import Any, Callable, Generic, Tuple, TypeVar
+from typing import Any, Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -89,26 +89,14 @@ class BatchNormal(variable.StateSpaceVariable):
         )
 
 
-# todo: extract the below into functions.
-
-BatchCacheTypeVar = TypeVar("BatchCacheTypeVar")
-"""Cache-type variable."""
-
-
-@jax.tree_util.register_pytree_node_class
-class _BatchCorrection(
-    correction.AbstractCorrection[BatchNormal, BatchCacheTypeVar],
-    Generic[BatchCacheTypeVar],
-):
-    pass
-
-
 BatchMM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchMomentMatching(_BatchCorrection[BatchMM1CacheType]):
+class BatchMomentMatching(
+    correction.AbstractCorrection[BatchNormal, BatchMM1CacheType]
+):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -267,7 +255,9 @@ BatchTS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(_BatchCorrection[BatchTS0CacheType]):
+class BatchTaylorZerothOrder(
+    correction.AbstractCorrection[BatchNormal, BatchTS0CacheType]
+):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
 
