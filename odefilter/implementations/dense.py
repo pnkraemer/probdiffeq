@@ -1,6 +1,5 @@
 """State-space models with dense covariance structure   ."""
-
-import dataclasses
+import functools
 
 import jax
 import jax.numpy as jnp
@@ -16,7 +15,6 @@ from odefilter.implementations import (
 )
 
 # todo: extract _DenseCorrection methods into functions
-# todo: make RV type and CacheType public, and give a docstring?
 # todo: sort the function order a little bit. Make the docs useful.
 
 
@@ -44,11 +42,7 @@ class VectNormal(variable.StateSpaceVariable):
     def tree_unflatten(cls, aux, children):
         mean, cov_sqrtm_lower = children
         (target_shape,) = aux
-        return cls(
-            mean=mean,
-            cov_sqrtm_lower=cov_sqrtm_lower,
-            target_shape=target_shape,
-        )
+        return cls(mean, cov_sqrtm_lower, target_shape=target_shape)
 
     # todo: extract _whiten() method?!
 
@@ -82,15 +76,19 @@ class VectNormal(variable.StateSpaceVariable):
         cor = VectNormal(m_cor, r_cor.T, target_shape=self.target_shape)
         return obs, (cor, gain)
 
-    def extract_qoi(self):  # noqa: D102
+    def extract_qoi(self):
         if self.mean.ndim == 1:
             return self._select_derivative(self.mean, i=0)
         return jax.vmap(self._select_derivative, in_axes=(0, None))(self.mean, 0)
 
+    def extract_qoi_from_sample(self, u, /):
+        if u.ndim == 1:
+            return u.reshape(self.target_shape, order="F")[0, ...]
+        return jax.vmap(self.extract_qoi_from_sample)(u)
+
     def _select_derivative_vect(self, x, i):
-        select = jax.vmap(
-            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
-        )
+        fn = functools.partial(self._select_derivative, i=i)
+        select = jax.vmap(fn, in_axes=1, out_axes=1)
         return select(x)
 
     def _select_derivative(self, x, i):
@@ -169,8 +167,6 @@ class TaylorZerothOrder(correction.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class TaylorFirstOrder(correction.AbstractCorrection):
-    """Extended Kalman filter correction."""
-
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -387,15 +383,20 @@ class MomentMatching(correction.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
 class IBM(extrapolation.AbstractExtrapolation):
-    """Handle dense covariances."""
+    def __init__(self, a, q_sqrtm_lower, *, num_derivatives, ode_dimension):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
 
-    a: jax.Array
-    q_sqrtm_lower: jax.Array
+        self.num_derivatives = num_derivatives
+        self.ode_dimension = ode_dimension
 
-    num_derivatives: int
-    ode_dimension: int
+    def __repr__(self):
+        name = self.__class__.__name__
+        args1 = f"a={self.a}, q={self.q_sqrtm_lower}"
+        args2 = f"num_derivatives={self.num_derivatives}"
+        args3 = f"ode_dimension={self.ode_dimension}"
+        return f"{name}({args1}, {args2}, {args3})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
@@ -435,10 +436,10 @@ class IBM(extrapolation.AbstractExtrapolation):
             target_shape=m0_matrix.shape,
         )
 
-    def init_error_estimate(self):  # noqa: D102
+    def init_error_estimate(self):
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
-    def begin_extrapolation(self, m0, /, *, dt):  # noqa: D102
+    def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * m0
         m_ext_p = self.a @ m0_p
@@ -449,7 +450,7 @@ class IBM(extrapolation.AbstractExtrapolation):
         extrapolated = VectNormal(m_ext, q_sqrtm, target_shape=shape)
         return extrapolated, (m_ext_p, m0_p, p, p_inv)
 
-    def _assemble_preconditioner(self, *, dt):  # noqa: D102
+    def _assemble_preconditioner(self, *, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -457,7 +458,7 @@ class IBM(extrapolation.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
 
-    def complete_extrapolation(  # noqa: D102
+    def complete_extrapolation(
         self, *, linearisation_pt, l0, cache, output_scale_sqrtm
     ):
         _, _, p, p_inv = cache
@@ -471,9 +472,7 @@ class IBM(extrapolation.AbstractExtrapolation):
         shape = linearisation_pt.target_shape
         return VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
 
-    def revert_markov_kernel(  # noqa: D102
-        self, *, linearisation_pt, cache, l0, output_scale_sqrtm
-    ):
+    def revert_markov_kernel(self, *, linearisation_pt, cache, l0, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
@@ -519,11 +518,11 @@ class IBM(extrapolation.AbstractExtrapolation):
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
         return noise, g
 
-    def init_backward_transition(self):  # noqa: D102
+    def init_backward_transition(self):
         k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
 
-    def init_backward_noise(self, *, rv_proto):  # noqa: D102
+    def init_backward_noise(self, *, rv_proto):
         return VectNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
@@ -588,8 +587,3 @@ class IBM(extrapolation.AbstractExtrapolation):
     def _transform_samples(self, rvs, base):
         m, l_sqrtm = rvs.mean, rvs.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
-
-    def extract_mean_from_marginals(self, mean):
-        if mean.ndim == 1:
-            return mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
-        return jax.vmap(self.extract_mean_from_marginals)(mean)

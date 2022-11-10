@@ -64,6 +64,9 @@ class IsoNormal(variable.StateSpaceVariable):
         m = self.mean[..., 0, :]
         return m
 
+    def extract_qoi_from_sample(self, u, /):
+        return u[..., 0, :]
+
     def scale_covariance(self, *, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return IsoNormal(
@@ -293,6 +296,3 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
     # automatically batched because of numpy's broadcasting rules?
     def _transform_samples(self, rvs, base):
         return rvs.mean + rvs.cov_sqrtm_lower @ base
-
-    def extract_mean_from_marginals(self, mean):
-        return mean[..., 0, :]

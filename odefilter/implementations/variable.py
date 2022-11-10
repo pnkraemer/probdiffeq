@@ -27,5 +27,9 @@ class StateSpaceVariable(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def extract_qoi_from_sample(self, u, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def scale_covariance(self, *, scale_sqrtm):
         raise NotImplementedError

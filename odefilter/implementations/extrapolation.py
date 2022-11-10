@@ -81,8 +81,3 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
     @abc.abstractmethod
     def sample_backwards(self, init: R, linop, noise: R, base_samples):
         raise NotImplementedError
-
-    # todo: make the extract_*_from_* functions use this one?
-    @abc.abstractmethod
-    def extract_mean_from_marginals(self, mean):
-        raise NotImplementedError
