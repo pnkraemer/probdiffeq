@@ -1,6 +1,7 @@
 """State-space models with isotropic covariance structure."""
 
 import dataclasses
+import functools
 from typing import Any
 
 import jax
@@ -142,6 +143,20 @@ class IsoConditional(_collections.AbstractConditional):
         bw_model = IsoConditional(g, noise=noise)
         return bw_model
 
+    def marginalise(self, rv, /):
+        """Marginalise the output of a linear model."""
+        # Read
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
+
+        # Apply transition
+        m_new = self.transition @ m0_p + self.noise.mean
+        l_new = _sqrtm.sum_of_sqrtm_factors(
+            R1=(self.transition @ l0_p).T, R2=self.noise.cov_sqrtm_lower.T
+        ).T
+
+        return IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
@@ -238,40 +253,18 @@ class IsoIBM(_collections.AbstractExtrapolation):
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 
-    def marginalise_backwards(self, *, init, linop, noise):
-        """Compute marginals of a markov sequence."""
-
-        def body_fun(carry, x):
-            op, noi = x
-            out = self.marginalise_model(init=carry, linop=op, noise=noi)
+    def marginalise_backwards(self, *, init, conditionals):
+        def body_fun(rv, conditional):
+            out = conditional.marginalise(rv)
             return out, out
 
         # Initial condition does not matter
-        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
-        _, rvs = _control_flow.scan_with_init(
-            f=body_fun, init=init, xs=bw_models, reverse=True
-        )
+        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], conditionals)
+
+        # Scan and return
+        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
+        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
         return rvs
-
-    def marginalise_model(self, *, init, linop, noise):
-        """Marginalise the output of a linear model."""
-        # todo: add preconditioner?
-
-        # Pull into preconditioned space
-        m0_p = init.mean
-        l0_p = init.cov_sqrtm_lower
-
-        # Apply transition
-        m_new_p = linop @ m0_p + noise.mean
-        l_new_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(linop @ l0_p).T, R2=noise.cov_sqrtm_lower.T
-        ).T
-
-        # Push back into non-preconditioned space
-        m_new = m_new_p
-        l_new = l_new_p
-
-        return IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
     # todo: should this be a classmethod in IsoConditional?
     def init_conditional(self, *, rv_proto):
