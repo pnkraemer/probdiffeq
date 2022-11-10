@@ -63,17 +63,13 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_backward_transition(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def init_backward_noise(self, *, rv_proto: R):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def marginalise_backwards(self, *, init: R, linop, noise: R):
         raise NotImplementedError
 
     @abc.abstractmethod
     def marginalise_model(self, *, init: R, linop, noise: R):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init_conditional(self, *, rv_proto):
         raise NotImplementedError
