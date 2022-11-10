@@ -1,6 +1,5 @@
-"""Batch-style extrapolations."""
-import dataclasses
-from typing import Any, Callable, Tuple
+"""Batch-style implementations."""
+from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -9,7 +8,6 @@ from odefilter import cubature as cubature_module
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
-# todo: sort the function order a little bit. Make the docs useful.
 
 
 @jax.tree_util.register_pytree_node_class
@@ -372,12 +370,16 @@ BatchIBMCacheType = Tuple[jax.Array]  # Cache type
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
 class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType]):
     """Handle block-diagonal covariances."""
 
-    a: Any
-    q_sqrtm_lower: Any
+    def __init__(self, a, q_sqrtm_lower):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(a={self.a}, q_sqrtm_lower={self.q_sqrtm_lower})"
 
     @property
     def num_derivatives(self):
