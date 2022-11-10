@@ -248,9 +248,8 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, *, ode_dimension, ode_order):
-        cubature = cubature_module.SphericalCubatureIntegration.from_params(
-            ode_dimension=ode_dimension
-        )
+        sci_fn = cubature_module.SphericalCubatureIntegration.from_params
+        cubature = sci_fn(input_dimension=ode_dimension)
         return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
     def tree_flatten(self):
