@@ -181,7 +181,7 @@ filter_mm1_batch = filters.Filter(
     )
 )
 filter_ts1 = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=7
     )
 )
@@ -193,7 +193,7 @@ solve_fns = [
     (solver_to_solve(solvers.MLESolver(strategy=filter_ts0)), "IsoTS0(n=4)"),
     (solver_to_solve(solvers.MLESolver(strategy=filter_ts0_batch)), "BatchTS0(n=5)"),
     (solver_to_solve(solvers.MLESolver(strategy=filter_mm1_batch)), "BatchMM1(n=6)"),
-    (solver_to_solve(solvers.MLESolver(strategy=filter_ts1)), "TS1(n=7)"),
+    (solver_to_solve(solvers.MLESolver(strategy=filter_ts1)), "VectTS1(n=7)"),
 ]
 ```
 

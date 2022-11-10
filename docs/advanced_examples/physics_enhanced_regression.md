@@ -91,7 +91,7 @@ def param_to_log_likelihood(parameters_, u0_, ts_, solver_, vf_, data_, obs_stde
 
     observation_std = jnp.ones_like(ts_) * obs_stdev
     return dense_output.negative_marginal_log_likelihood(
-        observation_std=observation_std, u=data_, solution=sol_, solver=solver_
+        observation_std=observation_std, u=data_, solution=sol_
     )
 
 

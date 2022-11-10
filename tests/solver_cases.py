@@ -53,24 +53,24 @@ def case_mle_fixedpoint_ts0_batch():
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_ts1():
-    implementation = implementations.TS1.from_params(ode_dimension=2)
+def case_dynamic_filter_ts1_vect():
+    implementation = implementations.VectTS1.from_params(ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
-def case_mle_filter_mm1_sci():
+def case_mle_filter_mm1_sci_vect():
     cube = cubature.SphericalCubatureIntegration.from_params(ode_dimension=2)
-    implementation = implementations.MM1.from_params(cubature=cube, ode_dimension=2)
+    implementation = implementations.VectMM1.from_params(cubature=cube, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_mm1_ut():
+def case_dynamic_filter_mm1_ut_vect():
     cube = cubature.UnscentedTransform.from_params(ode_dimension=2)
-    implementation = implementations.MM1.from_params(cubature=cube, ode_dimension=2)
+    implementation = implementations.VectMM1.from_params(cubature=cube, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
@@ -86,29 +86,29 @@ def case_dynamic_filter_mm1_ut_batch():
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_mm1_gh():
+def case_dynamic_filter_mm1_gh_vect():
     cube = cubature.GaussHermite.from_params(ode_dimension=2)
-    implementation = implementations.MM1.from_params(cubature=cube, ode_dimension=2)
+    implementation = implementations.VectMM1.from_params(cubature=cube, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["smoother"])
-def case_mle_smoother_ts1():
-    implementation = implementations.TS1.from_params(ode_dimension=2)
+def case_mle_smoother_ts1_vect():
+    implementation = implementations.VectTS1.from_params(ode_dimension=2)
     strategy = smoothers.Smoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["fixedpoint"])
-def case_mle_fixedpoint_ts1():
-    implementation = implementations.TS1.from_params(ode_dimension=2)
+def case_mle_fixedpoint_ts1_vect():
+    implementation = implementations.VectTS1.from_params(ode_dimension=2)
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["fixedpoint"])
-def case_mle_fixedpoint_ts0():
-    implementation = implementations.TS0.from_params(ode_dimension=2)
+def case_mle_fixedpoint_ts0_vect():
+    implementation = implementations.VectTS0.from_params(ode_dimension=2)
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)

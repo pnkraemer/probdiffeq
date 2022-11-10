@@ -126,8 +126,8 @@ def correction_to_solver(implementation):
 
 
 num_derivatives = 4
-ts1 = implementations.TS1.from_params(ode_dimension=ode_dimension)
-mm1_sci = implementations.MM1.from_params(
+ts1 = implementations.VectTS1.from_params(ode_dimension=ode_dimension)
+mm1_sci = implementations.VectMM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.SphericalCubatureIntegration.from_params(
@@ -135,7 +135,7 @@ mm1_sci = implementations.MM1.from_params(
     ),
 )
 
-mm1_ut = implementations.MM1.from_params(
+mm1_ut = implementations.VectMM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(
@@ -143,7 +143,7 @@ mm1_ut = implementations.MM1.from_params(
     ),
 )
 
-mm1_gh = implementations.MM1.from_params(
+mm1_gh = implementations.VectMM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.GaussHermite.from_params(ode_dimension=ode_dimension, degree=3),
@@ -197,7 +197,7 @@ batch_solver = solver(
     )
 )
 dense_solver = solver(
-    implementations.TS0.from_params(
+    implementations.VectTS0.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_derivatives
     )
 )
@@ -206,7 +206,7 @@ dense_solver = solver(
 solve_fns = [
     (iso_solver, f"IsoTS0({num_derivatives})"),
     (batch_solver, f"BatchTS0({num_derivatives})"),
-    (dense_solver, f"TS0({num_derivatives})"),
+    (dense_solver, f"VectTS0({num_derivatives})"),
 ]
 ```
 
@@ -251,17 +251,17 @@ filter_ts0_iso_high = filters.Filter(
 )
 
 filter_ts1_low = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=3
     )
 )
 filter_ts1_medium = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=5
     )
 )
 filter_ts1_high = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=8
     )
 )
@@ -272,9 +272,9 @@ for strat, label in [
     (filter_ts0_iso_low, "IsoTS0(2)"),
     (filter_ts0_iso_medium, "IsoTS0(3)"),
     (filter_ts0_iso_high, "IsoTS0(5)"),
-    (filter_ts1_low, "TS1(3)"),
-    (filter_ts1_medium, "TS1(5)"),
-    (filter_ts1_high, "TS1(8)"),
+    (filter_ts1_low, "VectTS1(3)"),
+    (filter_ts1_medium, "VectTS1(5)"),
+    (filter_ts1_high, "VectTS1(8)"),
 ]:
     dynamic_solver = strategy_to_dynamic_solver(strat)
     mle_solver = strategy_to_mle_solver(strat)
@@ -383,24 +383,24 @@ ts0_iso_medium = filters.Filter(
 )
 
 ts1_low = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_low
     )
 )
 ts1_medium = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_medium
     )
 )
 ts1_high = filters.Filter(
-    implementation=implementations.TS1.from_params(
+    implementation=implementations.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
     )
 )
 
 
 mm1_high = filters.Filter(
-    implementation=implementations.MM1.from_params(
+    implementation=implementations.VectMM1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
     )
 )
@@ -408,10 +408,10 @@ mm1_high = filters.Filter(
 solve_fns = [
     (strategy_to_mle_solver(ts0_iso_low), f"IsoTS0({num_low}), MLE"),
     (strategy_to_mle_solver(ts0_iso_medium), f"IsoTS0({num_medium}), MLE"),
-    (strategy_to_dynamic_solver(ts1_low), f"TS1({num_low}), Dynamic"),
-    (strategy_to_mle_solver(ts1_medium), f"TS1({num_medium}), MLE"),
-    (strategy_to_mle_solver(ts1_high), f"TS1({num_high}), MLE"),
-    (strategy_to_mle_solver(mm1_high), f"MM1({num_high}), MLE"),
+    (strategy_to_dynamic_solver(ts1_low), f"VectTS1({num_low}), Dynamic"),
+    (strategy_to_mle_solver(ts1_medium), f"VectTS1({num_medium}), MLE"),
+    (strategy_to_mle_solver(ts1_high), f"VectTS1({num_high}), MLE"),
+    (strategy_to_mle_solver(mm1_high), f"VectMM1({num_high}), MLE"),
 ]
 ```
 

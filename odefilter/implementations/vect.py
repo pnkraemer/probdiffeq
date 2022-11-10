@@ -112,7 +112,7 @@ class VectNormal(_collections.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class TaylorZerothOrder(_collections.AbstractCorrection):
+class VectTaylorZerothOrder(_collections.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -166,7 +166,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class TaylorFirstOrder(_collections.AbstractCorrection):
+class VectTaylorFirstOrder(_collections.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -237,7 +237,7 @@ class TaylorFirstOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class MomentMatching(_collections.AbstractCorrection):
+class VectMomentMatching(_collections.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -381,7 +381,7 @@ class MomentMatching(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class Conditional(_collections.AbstractConditional):
+class VectConditional(_collections.AbstractConditional):
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         shape = self.noise.target_shape
@@ -389,7 +389,7 @@ class Conditional(_collections.AbstractConditional):
 
     def scale_covariance(self, *, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return Conditional(transition=self.transition, noise=noise)
+        return VectConditional(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -404,7 +404,7 @@ class Conditional(_collections.AbstractConditional):
 
         shape = self.noise.target_shape
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return Conditional(g, noise=noise)
+        return VectConditional(g, noise=noise)
 
     def marginalise(self, rv, /):
         # Pull into preconditioned space
@@ -425,7 +425,7 @@ class Conditional(_collections.AbstractConditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class IBM(_collections.AbstractExtrapolation):
+class VectIBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower, *, num_derivatives, ode_dimension):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
@@ -537,14 +537,14 @@ class IBM(_collections.AbstractExtrapolation):
 
         shape = linearisation_pt.target_shape
         backward_noise = VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=shape)
-        bw_model = Conditional(g_bw, noise=backward_noise)
+        bw_model = VectConditional(g_bw, noise=backward_noise)
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
         return extrapolated, bw_model
 
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return Conditional(op, noise=noi)
+        return VectConditional(op, noise=noi)
 
     def _init_backward_transition(self):
         k = (self.num_derivatives + 1) * self.ode_dimension
