@@ -276,9 +276,7 @@ class BatchTaylorZerothOrder(
         bias = m[..., self.ode_order] - vector_field(
             *(m[..., : self.ode_order]).T, t=t, p=p
         )
-        l_obs_nonsquare = self._cov_sqrtm_lower(
-            cache=(), cov_sqrtm_lower=x.cov_sqrtm_lower
-        )
+        l_obs_nonsquare = self._cov_sqrtm_lower(x.cov_sqrtm_lower)
 
         l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
 
@@ -299,9 +297,7 @@ class BatchTaylorZerothOrder(
 
         # (d, k), (d, k, k)
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs_nonsquare = self._cov_sqrtm_lower(
-            cache=(), cov_sqrtm_lower=l_ext
-        )  # (d, k)
+        l_obs_nonsquare = self._cov_sqrtm_lower(l_ext)  # (d, k)
 
         # (d, 1, 1)
         l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare[..., None])
@@ -321,7 +317,7 @@ class BatchTaylorZerothOrder(
         corrected = BatchNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, gain)
 
-    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+    def _cov_sqrtm_lower(self, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
 

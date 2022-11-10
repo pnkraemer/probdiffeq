@@ -147,13 +147,11 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
         )
-        l_obs, l_cor = r_obs.T, r_cor.T
-
         m_cor = m_ext - gain @ b
 
-        shape = extrapolated.target_shape
-        observed = VectNormal(mean=b, cov_sqrtm_lower=l_obs, target_shape=shape)
-        corrected = VectNormal(mean=m_cor, cov_sqrtm_lower=l_cor, target_shape=shape)
+        _shape = extrapolated.target_shape
+        observed = VectNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=_shape)
+        corrected = VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=_shape)
         return observed, (corrected, gain)
 
     def _select_derivative_vect(self, x, i):
@@ -210,13 +208,11 @@ class TaylorFirstOrder(_collections.AbstractCorrection):
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
         )
-        l_obs, l_cor = r_obs.T, r_cor.T
-
         m_cor = m_ext - gain @ b
 
         shape = extrapolated.target_shape
-        observed = VectNormal(mean=b, cov_sqrtm_lower=l_obs, target_shape=shape)
-        corrected = VectNormal(mean=m_cor, cov_sqrtm_lower=l_cor, target_shape=shape)
+        observed = VectNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=shape)
+        corrected = VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=shape)
         return observed, (corrected, gain)
 
     def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):

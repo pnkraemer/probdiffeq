@@ -239,9 +239,9 @@ class Smoother(_SmootherCommon):
             t1=t1,
             scale_sqrtm=scale_sqrtm,
         )
-        marginals_t = acc.backward_model.marginalise(marginals)
-        u = marginals_t.extract_qoi()
-        return u, marginals_t
+        marginals_at_t = acc.backward_model.marginalise(marginals)
+        u = marginals_at_t.extract_qoi()
+        return u, marginals_at_t
 
 
 @jax.tree_util.register_pytree_node_class

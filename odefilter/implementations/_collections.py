@@ -52,16 +52,8 @@ SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVariable)
 CacheTypeVar = TypeVar("CacheTypeVar")
 
 
-@jax.tree_util.register_pytree_node_class
 class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     """Extrapolation model interface."""
-
-    def tree_flatten(self):
-        return (), ()
-
-    @classmethod
-    def tree_unflatten(cls, aux, children):
-        return cls()
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"
