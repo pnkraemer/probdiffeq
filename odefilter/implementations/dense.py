@@ -1,4 +1,5 @@
 """State-space models with dense covariance structure   ."""
+import functools
 
 import jax
 import jax.numpy as jnp
@@ -41,11 +42,7 @@ class VectNormal(variable.StateSpaceVariable):
     def tree_unflatten(cls, aux, children):
         mean, cov_sqrtm_lower = children
         (target_shape,) = aux
-        return cls(
-            mean=mean,
-            cov_sqrtm_lower=cov_sqrtm_lower,
-            target_shape=target_shape,
-        )
+        return cls(mean, cov_sqrtm_lower, target_shape=target_shape)
 
     # todo: extract _whiten() method?!
 
@@ -84,10 +81,14 @@ class VectNormal(variable.StateSpaceVariable):
             return self._select_derivative(self.mean, i=0)
         return jax.vmap(self._select_derivative, in_axes=(0, None))(self.mean, 0)
 
+    def extract_qoi_from_sample(self, u, /):
+        if u.ndim == 1:
+            return u.reshape(self.target_shape, order="F")[0, ...]
+        return jax.vmap(self.extract_qoi_from_sample)(u)
+
     def _select_derivative_vect(self, x, i):
-        select = jax.vmap(
-            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
-        )
+        fn = functools.partial(self._select_derivative, i=i)
+        select = jax.vmap(fn, in_axes=1, out_axes=1)
         return select(x)
 
     def _select_derivative(self, x, i):
@@ -586,8 +587,3 @@ class IBM(extrapolation.AbstractExtrapolation):
     def _transform_samples(self, rvs, base):
         m, l_sqrtm = rvs.mean, rvs.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
-
-    def extract_mean_from_marginals(self, mean):
-        if mean.ndim == 1:
-            return mean.reshape((-1, self.ode_dimension), order="F")[0, ...]
-        return jax.vmap(self.extract_mean_from_marginals)(mean)

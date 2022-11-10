@@ -80,6 +80,9 @@ class BatchNormal(variable.StateSpaceVariable):
     def extract_qoi(self):  # noqa: D102
         return self.mean[..., 0]
 
+    def extract_qoi_from_sample(self, u, /):
+        return u[..., 0]
+
     def scale_covariance(self, *, scale_sqrtm):
         # Endpoint: (d, 1, 1) * (d, k, k) -> (d, k, k)
         return BatchNormal(
@@ -354,9 +357,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         a = jnp.stack([a] * ode_dimension)
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
-
-    def extract_mean_from_marginals(self, mean):
-        return mean[..., 0]
 
     def _assemble_preconditioner(self, *, dt):  # noqa: D102
         p, p_inv = _ibm_util.preconditioner_diagonal(

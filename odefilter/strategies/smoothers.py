@@ -7,17 +7,15 @@ import jax
 
 from odefilter.strategies import _strategy
 
-T = TypeVar("T")
-"""A type-variable to alias appropriate Normal-like random variables."""
-
-# todo: are those data structures private?
+SSVTypeVar = TypeVar("SSVTypeVar")
+"""A type-variable to alias appropriate state-space variable types."""
 
 
 @jax.tree_util.register_pytree_node_class
-class BackwardModel(Generic[T]):
+class BackwardModel(Generic[SSVTypeVar]):
     """Backward model for backward-Gauss--Markov process representations."""
 
-    def __init__(self, *, transition: Any, noise: T):
+    def __init__(self, *, transition: Any, noise: SSVTypeVar):
         self.transition = transition
         self.noise = noise
 
@@ -37,10 +35,10 @@ class BackwardModel(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-class MarkovSequence(Generic[T]):
+class MarkovSequence(Generic[SSVTypeVar]):
     """Markov sequence."""
 
-    def __init__(self, *, init: T, backward_model: BackwardModel[T]):
+    def __init__(self, *, init: SSVTypeVar, backward_model: BackwardModel[SSVTypeVar]):
         self.init = init
         self.backward_model = backward_model
 
@@ -161,7 +159,7 @@ class _SmootherCommon(_strategy.Strategy):
         samples = self.implementation.extrapolation.sample_backwards(
             init, posterior.backward_model.transition, noise, base_samples
         )
-        u = self.implementation.extrapolation.extract_mean_from_marginals(samples)
+        u = noise.extract_qoi_from_sample(samples)
         return u, samples
 
     # Auxiliary routines that are the same among all subclasses
