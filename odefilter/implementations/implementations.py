@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 
 import jax
 
-from odefilter.implementations import _collections, batch, isotropic, vect
+from odefilter.implementations import _collections, batch, iso, vect
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""
@@ -36,11 +36,11 @@ class AbstractImplementation(Generic[CorrType, ExtraType]):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTS0(AbstractImplementation[isotropic.IsoTaylorZerothOrder, isotropic.IsoIBM]):
+class IsoTS0(AbstractImplementation[iso.IsoTaylorZerothOrder, iso.IsoIBM]):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = isotropic.IsoTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = isotropic.IsoIBM.from_params(num_derivatives=num_derivatives)
+        correction = iso.IsoTaylorZerothOrder(ode_order=ode_order)
+        extrapolation = iso.IsoIBM.from_params(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
 
 
