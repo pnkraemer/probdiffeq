@@ -7,7 +7,6 @@ from typing import Any, Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from odefilter import _tree_utils
 from odefilter.strategies import filters
 
 T = TypeVar("T")
@@ -83,7 +82,7 @@ class Solution(Generic[T]):
 
 
 @jax.tree_util.register_pytree_node_class
-class _AbstractSolver(abc.ABC, _tree_utils.TreeEqualMixIn):
+class _AbstractSolver(abc.ABC):
     """Inference strategy interface."""
 
     def __init__(self, *, strategy):

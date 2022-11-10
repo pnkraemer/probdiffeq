@@ -159,7 +159,7 @@ class _SmootherCommon(_strategy.Strategy):
         # from the terminal RV x_N and the backward noises z_(1:N)
         # and then combining them backwards as
         # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-        base_samples = self._base_samples(key, shape=shape + posterior.sample_shape)
+        base_samples = jax.random.normal(key=key, shape=shape + posterior.sample_shape)
         return posterior.transform_unit_sample(base_samples)
 
     # Auxiliary routines that are the same among all subclasses
