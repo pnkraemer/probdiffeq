@@ -3,13 +3,13 @@
 import abc
 
 import jax
-import jax.numpy as jnp
 
+from odefilter import _tree_utils
 from odefilter.implementations import implementations
 
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(abc.ABC):
+class Strategy(abc.ABC, _tree_utils.TreeEqualMixIn):
     """Inference strategy interface."""
 
     def __init__(self, *, implementation):
@@ -23,10 +23,6 @@ class Strategy(abc.ABC):
     def __repr__(self):
         args = f"implementation={self.implementation}"
         return f"{self.__class__.__name__}({args})"
-
-    def __eq__(self, other):
-        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
-        return jax.tree_util.tree_all(equal)
 
     @abc.abstractmethod
     def init_posterior(self, *, taylor_coefficients):

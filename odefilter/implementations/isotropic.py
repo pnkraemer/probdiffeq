@@ -7,17 +7,11 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import (
-    _ibm_util,
-    _sqrtm,
-    correction,
-    extrapolation,
-    variable,
-)
+from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormal(variable.StateSpaceVariable):
+class IsoNormal(_collections.StateSpaceVariable):
     def __init__(self, mean, cov_sqrtm_lower):
         self.mean = mean  # (n, d) shape
         self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape
@@ -87,7 +81,7 @@ class IsoNormal(variable.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTaylorZerothOrder(correction.AbstractCorrection):
+class IsoTaylorZerothOrder(_collections.AbstractCorrection):
     def begin_correction(self, x: IsoNormal, /, *, vector_field, t, p):
         m = x.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
@@ -129,7 +123,7 @@ class IsoTaylorZerothOrder(correction.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class IsoIBM(extrapolation.AbstractExtrapolation):
+class IsoIBM(_collections.AbstractExtrapolation):
 
     a: Any
     q_sqrtm_lower: Any
@@ -165,15 +159,6 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
-
-    def init_backward_transition(self):
-        return jnp.eye(*self.a.shape)
-
-    def init_backward_noise(self, *, rv_proto):
-        return IsoNormal(
-            mean=jnp.zeros_like(rv_proto.mean),
-            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-        )
 
     def init_output_scale_sqrtm(self):
         return 1.0
@@ -226,10 +211,10 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_op = g_bw
         backward_noise = IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return extrapolated, (backward_noise, backward_op)
+        return extrapolated, bw_model
 
     def condense_backward_models(
         self, *, transition_init, noise_init, transition_state, noise_state
@@ -246,7 +231,8 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
         noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return noise, g
+        bw_model = _collections.BackwardModel(g, noise=noise)
+        return bw_model
 
     def marginalise_backwards(self, *, init, linop, noise):
         """Compute marginals of a markov sequence."""
@@ -282,3 +268,17 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
         l_new = l_new_p
 
         return IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
+
+    def init_conditional(self, *, rv_proto):
+        op = self._init_backward_transition()
+        noi = self._init_backward_noise(rv_proto=rv_proto)
+        return _collections.BackwardModel(op, noise=noi)
+
+    def _init_backward_transition(self):
+        return jnp.eye(*self.a.shape)
+
+    def _init_backward_noise(self, *, rv_proto):
+        return IsoNormal(
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+        )

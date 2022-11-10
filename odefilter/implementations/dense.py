@@ -6,17 +6,11 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import (
-    _ibm_util,
-    _sqrtm,
-    correction,
-    extrapolation,
-    variable,
-)
+from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class VectNormal(variable.StateSpaceVariable):
+class VectNormal(_collections.StateSpaceVariable):
     """Vector-normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.
@@ -115,7 +109,7 @@ class VectNormal(variable.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class TaylorZerothOrder(correction.AbstractCorrection):
+class TaylorZerothOrder(_collections.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -171,7 +165,7 @@ class TaylorZerothOrder(correction.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class TaylorFirstOrder(correction.AbstractCorrection):
+class TaylorFirstOrder(_collections.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
@@ -244,7 +238,7 @@ class TaylorFirstOrder(correction.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class MomentMatching(correction.AbstractCorrection):
+class MomentMatching(_collections.AbstractCorrection):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -388,7 +382,7 @@ class MomentMatching(correction.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class IBM(extrapolation.AbstractExtrapolation):
+class IBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower, *, num_derivatives, ode_dimension):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
@@ -498,12 +492,11 @@ class IBM(extrapolation.AbstractExtrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_op = g_bw
-
         shape = linearisation_pt.target_shape
         backward_noise = VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=shape)
+        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
-        return extrapolated, (backward_noise, backward_op)
+        return extrapolated, bw_model
 
     def condense_backward_models(
         self, *, transition_init, noise_init, transition_state, noise_state
@@ -521,13 +514,19 @@ class IBM(extrapolation.AbstractExtrapolation):
 
         shape = noise_init.target_shape
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return noise, g
+        return _collections.BackwardModel(g, noise=noise)
 
-    def init_backward_transition(self):
+    def init_conditional(self, *, rv_proto):
+        op = self._init_backward_transition()
+        noi = self._init_backward_noise(rv_proto=rv_proto)
+        return _collections.BackwardModel(op, noise=noi)
+
+    def _init_backward_transition(self):
         k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
 
-    def init_backward_noise(self, *, rv_proto):
+    @staticmethod
+    def _init_backward_noise(*, rv_proto):
         return VectNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),

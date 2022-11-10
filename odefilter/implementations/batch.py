@@ -7,20 +7,14 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import (
-    _ibm_util,
-    _sqrtm,
-    correction,
-    extrapolation,
-    variable,
-)
+from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
 # todo: sort the function order a little bit. Make the docs useful.
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchNormal(variable.StateSpaceVariable):
+class BatchNormal(_collections.StateSpaceVariable):
     """Batched normally-distributed random variables."""
 
     def __init__(self, mean, cov_sqrtm_lower):
@@ -77,7 +71,7 @@ class BatchNormal(variable.StateSpaceVariable):
         cor = BatchNormal(m_cor, _transpose(r_cor))
         return obs, (cor, gain)
 
-    def extract_qoi(self):  # noqa: D102
+    def extract_qoi(self):
         return self.mean[..., 0]
 
     def extract_qoi_from_sample(self, u, /):
@@ -104,7 +98,7 @@ BatchMM1CacheType = Tuple[Callable]
 
 @jax.tree_util.register_pytree_node_class
 class BatchMomentMatching(
-    correction.AbstractCorrection[BatchNormal, BatchMM1CacheType]
+    _collections.AbstractCorrection[BatchNormal, BatchMM1CacheType]
 ):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
@@ -265,7 +259,7 @@ BatchTS0CacheType = Tuple[jax.Array]
 
 @jax.tree_util.register_pytree_node_class
 class BatchTaylorZerothOrder(
-    correction.AbstractCorrection[BatchNormal, BatchTS0CacheType]
+    _collections.AbstractCorrection[BatchNormal, BatchTS0CacheType]
 ):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
@@ -334,7 +328,7 @@ BatchIBMCacheType = Tuple[jax.Array]  # Cache type
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheType]):
+class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType]):
     """Handle block-diagonal covariances."""
 
     a: Any
@@ -365,7 +359,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         q_sqrtm = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
-    def _assemble_preconditioner(self, *, dt):  # noqa: D102
+    def _assemble_preconditioner(self, *, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -388,7 +382,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
 
     def condense_backward_models(
         self, *, transition_init, noise_init, transition_state, noise_state
-    ):  # noqa: D102
+    ):
 
         A = transition_init  # (d, k, k)
         # (d, k), (d, k, k)
@@ -406,10 +400,9 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         Xi = _transpose(Xi_r)
 
         noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return noise, g
+        return _collections.BackwardModel(g, noise=noise)
 
     def begin_extrapolation(self, m0, /, *, dt):
-
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * m0  # (d, k)
         m_ext_p = (self.a @ m0_p[..., None])[..., 0]  # (d, k)
@@ -418,14 +411,18 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         q_ext = p[..., None] * self.q_sqrtm_lower
         return BatchNormal(m_ext, q_ext), (m_ext_p, m0_p, p, p_inv)
 
-    # todo: make into init_backward_model?
-    def init_backward_noise(self, *, rv_proto):  # noqa: D102
+    def init_conditional(self, *, rv_proto):
+        noi = self._init_backward_noise(rv_proto=rv_proto)
+        op = self._init_backward_transition()
+        return _collections.BackwardModel(op, noise=noi)
+
+    def _init_backward_noise(self, *, rv_proto):
         return BatchNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
-    def init_backward_transition(self):  # noqa: D102
+    def _init_backward_transition(self):
         return jnp.stack([jnp.eye(self.num_derivatives + 1)] * self.ode_dimension)
 
     def init_corrected(self, *, taylor_coefficients):
@@ -435,7 +432,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         return BatchNormal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     # todo: move to correction?
-    def init_error_estimate(self):  # noqa: D102
+    def init_error_estimate(self):
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
     # todo: move to correction?
@@ -475,9 +472,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
 
         return BatchNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
-    def revert_markov_kernel(  # noqa: D102
-        self, *, linearisation_pt, l0, output_scale_sqrtm, cache
-    ):
+    def revert_markov_kernel(self, *, linearisation_pt, l0, output_scale_sqrtm, cache):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
@@ -501,10 +496,10 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         l_bw = p[..., None] * l_bw_p
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
-        backward_op = g_bw
         backward_noise = BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
         extrapolated = BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return extrapolated, (backward_noise, backward_op)
+        return extrapolated, bw_model
 
 
 def _transpose(x):
