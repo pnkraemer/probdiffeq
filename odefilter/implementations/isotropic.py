@@ -7,18 +7,11 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import _control_flow
-from odefilter.implementations import (
-    _ibm_util,
-    _sqrtm,
-    conditional,
-    correction,
-    extrapolation,
-    variable,
-)
+from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormal(variable.StateSpaceVariable):
+class IsoNormal(_collections.StateSpaceVariable):
     def __init__(self, mean, cov_sqrtm_lower):
         self.mean = mean  # (n, d) shape
         self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape
@@ -88,7 +81,7 @@ class IsoNormal(variable.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTaylorZerothOrder(correction.AbstractCorrection):
+class IsoTaylorZerothOrder(_collections.AbstractCorrection):
     def begin_correction(self, x: IsoNormal, /, *, vector_field, t, p):
         m = x.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
@@ -130,7 +123,7 @@ class IsoTaylorZerothOrder(correction.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class IsoIBM(extrapolation.AbstractExtrapolation):
+class IsoIBM(_collections.AbstractExtrapolation):
 
     a: Any
     q_sqrtm_lower: Any
@@ -220,7 +213,7 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
 
         backward_op = g_bw
         backward_noise = IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = conditional.BackwardModel(
+        bw_model = _collections.BackwardModel(
             noise=backward_noise, transition=backward_op
         )
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
@@ -241,7 +234,7 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
         noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
-        bw_model = conditional.BackwardModel(transition=g, noise=noise)
+        bw_model = _collections.BackwardModel(transition=g, noise=noise)
         return bw_model
 
     def marginalise_backwards(self, *, init, linop, noise):
@@ -282,7 +275,7 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return conditional.BackwardModel(transition=op, noise=noi)
+        return _collections.BackwardModel(transition=op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)

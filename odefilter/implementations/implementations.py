@@ -4,17 +4,13 @@ from typing import Generic, TypeVar
 
 import jax
 
-from odefilter.implementations import batch
-from odefilter.implementations import correction as correction_module
-from odefilter.implementations import dense
-from odefilter.implementations import extrapolation as extrapolation_module
-from odefilter.implementations import isotropic
+from odefilter.implementations import _collections, batch, dense, isotropic
 
-ExtraType = TypeVar("ExtraType", bound=extrapolation_module.AbstractExtrapolation)
+ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""
 
 
-CorrType = TypeVar("CorrType", bound=correction_module.AbstractCorrection)
+CorrType = TypeVar("CorrType", bound=_collections.AbstractCorrection)
 """Correction style."""
 
 

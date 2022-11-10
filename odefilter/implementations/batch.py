@@ -7,21 +7,14 @@ import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter import cubature as cubature_module
-from odefilter.implementations import (
-    _ibm_util,
-    _sqrtm,
-    conditional,
-    correction,
-    extrapolation,
-    variable,
-)
+from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
 # todo: sort the function order a little bit. Make the docs useful.
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchNormal(variable.StateSpaceVariable):
+class BatchNormal(_collections.StateSpaceVariable):
     """Batched normally-distributed random variables."""
 
     def __init__(self, mean, cov_sqrtm_lower):
@@ -105,7 +98,7 @@ BatchMM1CacheType = Tuple[Callable]
 
 @jax.tree_util.register_pytree_node_class
 class BatchMomentMatching(
-    correction.AbstractCorrection[BatchNormal, BatchMM1CacheType]
+    _collections.AbstractCorrection[BatchNormal, BatchMM1CacheType]
 ):
     def __init__(self, *, ode_dimension, ode_order, cubature):
         if ode_order > 1:
@@ -266,7 +259,7 @@ BatchTS0CacheType = Tuple[jax.Array]
 
 @jax.tree_util.register_pytree_node_class
 class BatchTaylorZerothOrder(
-    correction.AbstractCorrection[BatchNormal, BatchTS0CacheType]
+    _collections.AbstractCorrection[BatchNormal, BatchTS0CacheType]
 ):
     """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
      isotropic Kronecker structure."""
@@ -335,7 +328,7 @@ BatchIBMCacheType = Tuple[jax.Array]  # Cache type
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheType]):
+class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType]):
     """Handle block-diagonal covariances."""
 
     a: Any
@@ -407,7 +400,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         Xi = _transpose(Xi_r)
 
         noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return conditional.BackwardModel(transition=g, noise=noise)
+        return _collections.BackwardModel(transition=g, noise=noise)
 
     def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -421,7 +414,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
     def init_conditional(self, *, rv_proto):
         noi = self._init_backward_noise(rv_proto=rv_proto)
         op = self._init_backward_transition()
-        return conditional.BackwardModel(transition=op, noise=noi)
+        return _collections.BackwardModel(transition=op, noise=noi)
 
     def _init_backward_noise(self, *, rv_proto):
         return BatchNormal(
@@ -504,7 +497,7 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
         backward_noise = BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = conditional.BackwardModel(transition=g_bw, noise=backward_noise)
+        bw_model = _collections.BackwardModel(transition=g_bw, noise=backward_noise)
         extrapolated = BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 
