@@ -9,6 +9,7 @@ from odefilter import cubature as cubature_module
 from odefilter.implementations import (
     _ibm_util,
     _sqrtm,
+    conditional,
     correction,
     extrapolation,
     variable,
@@ -502,8 +503,11 @@ class IBM(extrapolation.AbstractExtrapolation):
 
         shape = linearisation_pt.target_shape
         backward_noise = VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=shape)
+        bw_model = conditional.BackwardModel(
+            transition=backward_op, noise=backward_noise
+        )
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
-        return extrapolated, (backward_noise, backward_op)
+        return extrapolated, bw_model
 
     def condense_backward_models(
         self, *, transition_init, noise_init, transition_state, noise_state
@@ -521,13 +525,18 @@ class IBM(extrapolation.AbstractExtrapolation):
 
         shape = noise_init.target_shape
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return noise, g
+        return conditional.BackwardModel(transition=g, noise=noise)
 
-    def init_backward_transition(self):
+    def init_conditional(self, *, rv_proto):
+        op = self._init_backward_transition()
+        noi = self._init_backward_noise(rv_proto=rv_proto)
+        return conditional.BackwardModel(transition=op, noise=noi)
+
+    def _init_backward_transition(self):
         k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
 
-    def init_backward_noise(self, *, rv_proto):
+    def _init_backward_noise(self, *, rv_proto):
         return VectNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
