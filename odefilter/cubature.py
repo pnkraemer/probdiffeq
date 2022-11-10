@@ -14,9 +14,6 @@ class _PositiveCubatureRule:
     points: jax.Array
     weights_sqrtm: jax.Array
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(k={self.points.shape[0]})"
-
     def tree_flatten(self):
         children = self.points, self.weights_sqrtm
         aux = ()

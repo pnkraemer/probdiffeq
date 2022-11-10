@@ -63,7 +63,7 @@ class _NMLLState(NamedTuple):
     nmll: float
 
 
-def negative_marginal_log_likelihood(*, observation_std, u, solution, solver):
+def negative_marginal_log_likelihood(*, observation_std, u, solution):
     """Compute the negative marginal log-likelihood of observations."""
     # todo: complain if it is used with a filter, not a smoother?
 

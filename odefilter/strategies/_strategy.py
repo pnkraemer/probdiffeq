@@ -4,12 +4,11 @@ import abc
 
 import jax
 
-from odefilter import _tree_utils
-from odefilter.implementations import implementations
+from odefilter.implementations import implementations  # for defaults
 
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(abc.ABC, _tree_utils.TreeEqualMixIn):
+class Strategy(abc.ABC):
     """Inference strategy interface."""
 
     def __init__(self, *, implementation):
@@ -81,10 +80,6 @@ class Strategy(abc.ABC, _tree_utils.TreeEqualMixIn):
     def tree_unflatten(cls, _aux, children):
         (implementation,) = children
         return cls(implementation=implementation)
-
-    def _base_samples(self, key, *, shape):
-        base_samples = jax.random.normal(key=key, shape=shape)
-        return base_samples
 
     def init_error_estimate(self):
         return self.implementation.extrapolation.init_error_estimate()

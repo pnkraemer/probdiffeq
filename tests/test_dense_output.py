@@ -103,7 +103,7 @@ def test_negative_marginal_log_likelihood(solution_checkpoints):
         k = solution.u.shape[0]
 
         mll = dense_output.negative_marginal_log_likelihood(
-            observation_std=jnp.ones((k,)), u=data, solution=solution, solver=solver
+            observation_std=jnp.ones((k,)), u=data, solution=solution
         )
         assert mll.shape == ()
         assert not jnp.isnan(mll)
