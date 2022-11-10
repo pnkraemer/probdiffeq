@@ -178,9 +178,6 @@ class _SmootherCommon(_strategy.Strategy):
         sample_shape = posterior.backward_model.noise.mean.shape
         base_samples = self._base_samples(key, shape=shape + sample_shape)
         return posterior.transform_unit_sample(base_samples)
-        # return self.transform_base_samples(
-        #     posterior=posterior, base_samples=base_samples
-        # )
 
     # Auxiliary routines that are the same among all subclasses
 
