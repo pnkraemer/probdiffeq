@@ -41,6 +41,10 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def init_conditional(self, *, rv_proto):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def begin_extrapolation(self, m0, /, *, dt) -> Tuple[R, C]:
         raise NotImplementedError
 
@@ -68,8 +72,4 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
 
     @abc.abstractmethod
     def marginalise_model(self, *, init: R, linop, noise: R):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def init_conditional(self, *, rv_proto):
         raise NotImplementedError

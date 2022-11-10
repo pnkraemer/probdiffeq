@@ -12,34 +12,6 @@ from odefilter.strategies import _strategy
 SSVTypeVar = TypeVar("SSVTypeVar")
 """A type-variable to alias appropriate state-space variable types."""
 
-#
-# @jax.tree_util.register_pytree_node_class
-# class BackwardModel(Generic[SSVTypeVar]):
-#     """Backward model for backward-Gauss--Markov process representations."""
-#
-#     def __init__(self, *, transition: Any, noise: SSVTypeVar):
-#         self.transition = transition
-#         self.noise = noise
-#
-#     def __repr__(self):
-#         name = self.__class__.__name__
-#         return f"{name}(transition={self.transition}, noise={self.noise})"
-#
-#     def tree_flatten(self):
-#         children = self.transition, self.noise
-#         aux = ()
-#         return children, aux
-#
-#     @classmethod
-#     def tree_unflatten(cls, _aux, children):
-#         transition, noise = children
-#         return cls(transition=transition, noise=noise)
-#
-#     def scale_covariance(self, *, scale_sqrtm):
-#         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-#         return BackwardModel(transition=self.transition, noise=noise)
-#
-
 
 @jax.tree_util.register_pytree_node_class
 class MarkovSequence(Generic[SSVTypeVar]):
@@ -131,21 +103,10 @@ class _SmootherCommon(_strategy.Strategy):
         corrected = self.implementation.extrapolation.init_corrected(
             taylor_coefficients=taylor_coefficients
         )
-        bw_model = self.implementation.extrapolation.init_conditional(
-            rv_proto=corrected
-        )
-        # backward_transition = (
-        #     self.implementation.extrapolation.init_backward_transition()
-        # )
-        # backward_noise = self.implementation.extrapolation.init_backward_noise(
-        #     rv_proto=corrected
-        # )
-        # backward_model = BackwardModel(
-        #     transition=backward_transition,
-        #     noise=backward_noise,
-        # )
-        posterior = MarkovSequence(init=corrected, backward_model=bw_model)
-        return posterior
+
+        init_bw_model = self.implementation.extrapolation.init_conditional
+        bw_model = init_bw_model(rv_proto=corrected)
+        return MarkovSequence(init=corrected, backward_model=bw_model)
 
     def begin_extrapolation(self, *, posterior, dt):
         return self.implementation.extrapolation.begin_extrapolation(
@@ -201,13 +162,6 @@ class _SmootherCommon(_strategy.Strategy):
         return extrapolated, bw_model  # should this return a MarkovSequence?
 
     def _duplicate_with_unit_backward_model(self, *, posterior):
-        # bw_transition0 = self.implementation.extrapolation.init_backward_transition()
-        # bw_noise0 = self.implementation.extrapolation.init_backward_noise(
-        #     rv_proto=posterior.backward_model.noise
-        # )
-        #
-        # bw_model = BackwardModel(transition=bw_transition0, noise=bw_noise0)
-
         bw_model = self.implementation.extrapolation.init_conditional(
             rv_proto=posterior.backward_model.noise
         )
