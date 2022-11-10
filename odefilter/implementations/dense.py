@@ -106,6 +106,10 @@ class VectNormal(_collections.StateSpaceVariable):
     def Ax_plus_y(self, *, A, x, y):
         return A @ x + y
 
+    @property
+    def sample_shape(self):
+        return self.mean.shape
+
 
 @jax.tree_util.register_pytree_node_class
 class TaylorZerothOrder(_collections.AbstractCorrection):
@@ -382,6 +386,11 @@ class MomentMatching(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class Conditional(_collections.AbstractConditional):
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        shape = self.noise.target_shape
+        return VectNormal(m, self.noise.cov_sqrtm_lower, target_shape=shape)
+
     def scale_covariance(self, *, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return Conditional(transition=self.transition, noise=noise)

@@ -90,6 +90,10 @@ class BatchNormal(_collections.StateSpaceVariable):
     def Ax_plus_y(self, *, A, x, y):
         return (A @ x[..., None])[..., 0] + y
 
+    @property
+    def sample_shape(self):
+        return self.mean.shape
+
 
 BatchMM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
@@ -323,6 +327,10 @@ class BatchTaylorZerothOrder(
 
 @jax.tree_util.register_pytree_node_class
 class BatchConditional(_collections.AbstractConditional):
+    def __call__(self, x, /):
+        m = (self.transition @ x[..., None])[..., 0] + self.noise.mean
+        return BatchNormal(m, self.noise.cov_sqrtm_lower)
+
     def scale_covariance(self, *, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return BatchConditional(transition=self.transition, noise=noise)
