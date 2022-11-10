@@ -130,12 +130,9 @@ class _SmootherCommon(_strategy.Strategy):
 
     def marginals(self, *, posterior):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-        marginals = self.implementation.extrapolation.marginalise_backwards(
-            init=init,
-            linop=posterior.backward_model.transition,
-            noise=posterior.backward_model.noise,
-        )
-        return marginals
+
+        marginalise_fn = self.implementation.extrapolation.marginalise_backwards
+        return marginalise_fn(init=init, conditionals=posterior.backward_model)
 
     def sample(self, key, *, posterior, shape):
         # A smoother samples on the grid by sampling i.i.d values

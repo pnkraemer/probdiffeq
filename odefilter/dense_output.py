@@ -79,9 +79,7 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution, solver):
         bw_model, obs_std, data = x
 
         # Extrapolate
-        rv_ext = solver.strategy.implementation.extrapolation.marginalise_model(
-            linop=bw_model.transition, noise=bw_model.noise, init=rv
-        )
+        rv_ext = bw_model.marginalise(rv)
 
         # Correct (with an alias for long function names)
         obs, (cor, _) = rv_ext.condition_on_qoi_observation(

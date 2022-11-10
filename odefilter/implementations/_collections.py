@@ -107,10 +107,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def marginalise_backwards(self, *, init: SSVTypeVar, linop, noise: SSVTypeVar):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def marginalise_model(self, *, init: SSVTypeVar, linop, noise: SSVTypeVar):
-        raise NotImplementedError
-
 
 @jax.tree_util.register_pytree_node_class
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
@@ -140,6 +136,10 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
 
     @abc.abstractmethod
     def merge_with_incoming_conditional(self, incoming, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginalise(self, rv, /):
         raise NotImplementedError
 
 
