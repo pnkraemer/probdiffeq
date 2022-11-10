@@ -400,7 +400,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         Xi = _transpose(Xi_r)
 
         noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return _collections.BackwardModel(transition=g, noise=noise)
+        return _collections.BackwardModel(g, noise=noise)
 
     def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -414,7 +414,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
     def init_conditional(self, *, rv_proto):
         noi = self._init_backward_noise(rv_proto=rv_proto)
         op = self._init_backward_transition()
-        return _collections.BackwardModel(transition=op, noise=noi)
+        return _collections.BackwardModel(op, noise=noi)
 
     def _init_backward_noise(self, *, rv_proto):
         return BatchNormal(
@@ -497,7 +497,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
         backward_noise = BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _collections.BackwardModel(transition=g_bw, noise=backward_noise)
+        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
         extrapolated = BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 

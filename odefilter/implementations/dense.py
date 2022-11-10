@@ -492,13 +492,9 @@ class IBM(_collections.AbstractExtrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_op = g_bw
-
         shape = linearisation_pt.target_shape
         backward_noise = VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=shape)
-        bw_model = _collections.BackwardModel(
-            transition=backward_op, noise=backward_noise
-        )
+        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
         return extrapolated, bw_model
 
@@ -518,18 +514,19 @@ class IBM(_collections.AbstractExtrapolation):
 
         shape = noise_init.target_shape
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return _collections.BackwardModel(transition=g, noise=noise)
+        return _collections.BackwardModel(g, noise=noise)
 
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _collections.BackwardModel(transition=op, noise=noi)
+        return _collections.BackwardModel(op, noise=noi)
 
     def _init_backward_transition(self):
         k = (self.num_derivatives + 1) * self.ode_dimension
         return jnp.eye(k)
 
-    def _init_backward_noise(self, *, rv_proto):
+    @staticmethod
+    def _init_backward_noise(*, rv_proto):
         return VectNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),

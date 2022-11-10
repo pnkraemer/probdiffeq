@@ -211,11 +211,8 @@ class IsoIBM(_collections.AbstractExtrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_op = g_bw
         backward_noise = IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _collections.BackwardModel(
-            noise=backward_noise, transition=backward_op
-        )
+        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 
@@ -234,7 +231,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
         noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
-        bw_model = _collections.BackwardModel(transition=g, noise=noise)
+        bw_model = _collections.BackwardModel(g, noise=noise)
         return bw_model
 
     def marginalise_backwards(self, *, init, linop, noise):
@@ -275,7 +272,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _collections.BackwardModel(transition=op, noise=noi)
+        return _collections.BackwardModel(op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)
