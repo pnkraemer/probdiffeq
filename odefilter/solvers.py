@@ -88,6 +88,13 @@ class _AbstractSolver(abc.ABC):
     def __init__(self, *, strategy):
         self.strategy = strategy
 
+    def __eq__(self, other):
+        def isequal(a, b):
+            return a == b
+
+        tree_equal = jax.tree_util.tree_map(isequal, self, other)
+        return jax.tree_util.tree_all(tree_equal)
+
     @classmethod
     def from_params(cls):
         return cls(strategy=filters.Filter.from_params())
