@@ -1,8 +1,5 @@
 """State-space models with isotropic covariance structure."""
 
-import dataclasses
-from typing import Any
-
 import jax
 import jax.numpy as jnp
 
@@ -157,11 +154,14 @@ class IsoConditional(_collections.AbstractConditional):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
 class IsoIBM(_collections.AbstractExtrapolation):
+    def __init__(self, a, q_sqrtm_lower):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
 
-    a: Any
-    q_sqrtm_lower: Any
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(a={self.a}, q_sqrtm_lower={self.q_sqrtm_lower})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
