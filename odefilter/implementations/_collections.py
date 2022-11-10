@@ -5,11 +5,8 @@ from typing import Any, Generic, Tuple, TypeVar
 
 import jax
 
-from odefilter import _tree_utils
 
 # todo: make "u" a property?
-
-
 class StateSpaceVariable(abc.ABC):
     @abc.abstractmethod
     def logpdf(self, u, /):
@@ -51,9 +48,7 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractExtrapolation(
-    abc.ABC, Generic[SSVTypeVar, CacheTypeVar], _tree_utils.TreeEqualMixIn
-):
+class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     """Extrapolation model interface."""
 
     def tree_flatten(self):
@@ -129,7 +124,7 @@ class AbstractExtrapolation(
 
 
 @jax.tree_util.register_pytree_node_class
-class BackwardModel(Generic[SSVTypeVar]):
+class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     """Backward model for backward-Gauss--Markov process representations."""
 
     def __init__(self, transition: Any, *, noise: SSVTypeVar):
@@ -150,15 +145,19 @@ class BackwardModel(Generic[SSVTypeVar]):
         transition, noise = children
         return cls(transition=transition, noise=noise)
 
+    @abc.abstractmethod
     def scale_covariance(self, *, scale_sqrtm):
-        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return BackwardModel(transition=self.transition, noise=noise)
+        raise NotImplementedError
+
+    #
+    # @abc.abstractmethod
+    # def merge_with_previous_conditional(self, other, /):
+    #     raise NotImplementedError
+    #
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractCorrection(
-    abc.ABC, Generic[SSVTypeVar, CacheTypeVar], _tree_utils.TreeEqualMixIn
-):
+class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     """Correction model interface."""
 
     def __init__(self, *, ode_order):

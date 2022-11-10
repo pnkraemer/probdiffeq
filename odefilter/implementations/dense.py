@@ -382,6 +382,13 @@ class MomentMatching(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
+class Conditional(_collections.AbstractConditional):
+    def scale_covariance(self, *, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return Conditional(transition=self.transition, noise=noise)
+
+
+@jax.tree_util.register_pytree_node_class
 class IBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower, *, num_derivatives, ode_dimension):
         self.a = a
@@ -494,7 +501,7 @@ class IBM(_collections.AbstractExtrapolation):
 
         shape = linearisation_pt.target_shape
         backward_noise = VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=shape)
-        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
+        bw_model = Conditional(g_bw, noise=backward_noise)
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
         return extrapolated, bw_model
 
@@ -514,12 +521,12 @@ class IBM(_collections.AbstractExtrapolation):
 
         shape = noise_init.target_shape
         noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return _collections.BackwardModel(g, noise=noise)
+        return Conditional(g, noise=noise)
 
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _collections.BackwardModel(op, noise=noi)
+        return Conditional(op, noise=noi)
 
     def _init_backward_transition(self):
         k = (self.num_derivatives + 1) * self.ode_dimension
