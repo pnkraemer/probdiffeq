@@ -75,6 +75,10 @@ class IsoNormal(_collections.StateSpaceVariable):
     def Ax_plus_y(self, *, A, x, y):
         return A @ x + y
 
+    @property
+    def sample_shape(self):
+        return self.mean.shape
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_collections.AbstractCorrection):
@@ -119,6 +123,10 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class IsoConditional(_collections.AbstractConditional):
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        return IsoNormal(m, self.noise.cov_sqrtm_lower)
+
     def scale_covariance(self, *, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return IsoConditional(transition=self.transition, noise=noise)

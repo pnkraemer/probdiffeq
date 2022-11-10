@@ -5,6 +5,7 @@ import functools
 from typing import Any, Generic, TypeVar
 
 import jax
+import jax.numpy as jnp
 
 from odefilter import _control_flow
 from odefilter.strategies import _strategy
@@ -40,38 +41,41 @@ class MarkovSequence(Generic[SSVTypeVar]):
         init = self.init.scale_covariance(scale_sqrtm=scale_sqrtm)
         return MarkovSequence(init=init, backward_model=bw_model)
 
-    def transform_unit_sample(self, x, /):
-        if x.ndim == self.backward_model.noise.mean.ndim:
-            return self._transform_one_unit_sample(x)
+    def transform_unit_sample(self, base_sample, /):
+        if base_sample.shape == self.sample_shape:
+            return self._transform_one_unit_sample(base_sample)
 
         transform = self.transform_unit_sample
         transform_vmap = jax.vmap(transform, in_axes=0)
-        return transform_vmap(x)
+        return transform_vmap(base_sample)
 
-    def _transform_one_unit_sample(self, x, /):
-        init = jax.tree_util.tree_map(lambda s: s[-1, ...], self.init)
-        linop, noise = self.backward_model.transition, self.backward_model.noise
-        linop_, noise_ = jax.tree_util.tree_map(lambda s: s[1:, ...], (linop, noise))
+    def _transform_one_unit_sample(self, base_sample, /):
+        def body_fun(carry, conditionals_and_base_samples):
+            _, samp_prev = carry
+            conditional, base = conditionals_and_base_samples
 
-        noise_sample = noise_.transform_unit_sample(x[:-1])
-        init_sample = init.transform_unit_sample(x[-1])
-        init_qoi = init.extract_qoi_from_sample(init_sample)
-
-        def body_fun(carry, op_and_noi):
-            _, samp_last = carry
-            op, noi = op_and_noi
-
-            # todo: move the function below to the random variable implementations?
-            samp = init.Ax_plus_y(A=op, x=samp_last, y=noi)
+            samp = conditional(samp_prev).transform_unit_sample(base)
             qoi = init.extract_qoi_from_sample(samp)
 
             return (qoi, samp), (qoi, samp)
 
-        xs = (linop_, noise_sample)
+        # Compute a sample at the terminal value
+        init = jax.tree_util.tree_map(lambda s: s[-1, ...], self.init)
+        init_sample = init.transform_unit_sample(base_sample[-1])
+        init_qoi = init.extract_qoi_from_sample(init_sample)
         init_val = (init_qoi, init_sample)
-        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
-        _, (qois, samples) = reverse_scan(f=body_fun, init=init_val, xs=xs)
-        return qois, samples
+
+        # Remove the initial backward-model
+        conds = jax.tree_util.tree_map(lambda s: s[1:, ...], self.backward_model)
+
+        # Loop over backward models and the remaining base samples
+        xs = (conds, base_sample[:-1])
+        _, (qois, samples) = jax.lax.scan(
+            f=body_fun, init=init_val, xs=xs, reverse=True
+        )
+        qois_full = jnp.vstack((qois, init_qoi[None, ...]))
+        samples_full = jnp.vstack((samples, init_sample[None, ...]))
+        return qois_full, samples_full
 
     def marginalise_backwards(self):
         def body_fun(rv, conditional):
@@ -85,6 +89,10 @@ class MarkovSequence(Generic[SSVTypeVar]):
         reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
         _, rvs = reverse_scan(f=body_fun, init=self.init, xs=conds)
         return rvs
+
+    @property
+    def sample_shape(self):
+        return self.backward_model.noise.sample_shape
 
 
 class _SmootherCommon(_strategy.Strategy):
@@ -151,8 +159,7 @@ class _SmootherCommon(_strategy.Strategy):
         # from the terminal RV x_N and the backward noises z_(1:N)
         # and then combining them backwards as
         # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-        sample_shape = posterior.backward_model.noise.mean.shape
-        base_samples = self._base_samples(key, shape=shape + sample_shape)
+        base_samples = self._base_samples(key, shape=shape + posterior.sample_shape)
         return posterior.transform_unit_sample(base_samples)
 
     # Auxiliary routines that are the same among all subclasses
@@ -170,6 +177,7 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return extrapolated, bw_model  # should this return a MarkovSequence?
 
+    # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, *, posterior):
         bw_model = self.implementation.extrapolation.init_conditional(
             rv_proto=posterior.backward_model.noise

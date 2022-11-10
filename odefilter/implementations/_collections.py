@@ -40,6 +40,11 @@ class StateSpaceVariable(abc.ABC):
     def Ax_plus_y(self, *, A, x, y):
         raise NotImplementedError
 
+    @property
+    @abc.abstractmethod
+    def sample_shape(self):
+        raise NotImplementedError
+
 
 SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVariable)
 """A type-variable to alias appropriate state-space variable types."""
@@ -125,6 +130,10 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     def tree_unflatten(cls, _aux, children):
         transition, noise = children
         return cls(transition=transition, noise=noise)
+
+    @abc.abstractmethod
+    def __call__(self, x, /):
+        raise NotImplementedError
 
     @abc.abstractmethod
     def scale_covariance(self, *, scale_sqrtm):
