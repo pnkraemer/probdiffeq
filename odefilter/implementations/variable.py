@@ -33,3 +33,11 @@ class StateSpaceVariable(abc.ABC):
     @abc.abstractmethod
     def scale_covariance(self, *, scale_sqrtm):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def transform_unit_sample(self, x, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def Ax_plus_y(self, *, A, x, y):
+        raise NotImplementedError

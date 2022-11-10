@@ -77,7 +77,3 @@ class AbstractExtrapolation(abc.ABC, Generic[R, C]):
     @abc.abstractmethod
     def marginalise_model(self, *, init: R, linop, noise: R):
         raise NotImplementedError
-
-    @abc.abstractmethod
-    def sample_backwards(self, init: R, linop, noise: R, base_samples):
-        raise NotImplementedError
