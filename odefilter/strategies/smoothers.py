@@ -1,10 +1,12 @@
 """Inference via smoothing."""
 
 import abc
+import functools
 from typing import Any, Generic, TypeVar
 
 import jax
 
+from odefilter import _control_flow
 from odefilter.strategies import _strategy
 
 SSVTypeVar = TypeVar("SSVTypeVar")
@@ -62,6 +64,39 @@ class MarkovSequence(Generic[SSVTypeVar]):
 
         init = self.init.scale_covariance(scale_sqrtm=scale_sqrtm)
         return MarkovSequence(init=init, backward_model=bw_model)
+
+    def transform_unit_sample(self, x, /):
+        if x.ndim == self.backward_model.noise.mean.ndim:
+            return self._transform_one_unit_sample(x)
+
+        transform = self.transform_unit_sample
+        transform_vmap = jax.vmap(transform, in_axes=0)
+        return transform_vmap(x)
+
+    def _transform_one_unit_sample(self, x, /):
+        init = jax.tree_util.tree_map(lambda s: s[-1, ...], self.init)
+        linop, noise = self.backward_model.transition, self.backward_model.noise
+        linop_, noise_ = jax.tree_util.tree_map(lambda s: s[1:, ...], (linop, noise))
+
+        noise_sample = noise_.transform_unit_sample(x[:-1])
+        init_sample = init.transform_unit_sample(x[-1])
+        init_qoi = init.extract_qoi_from_sample(init_sample)
+
+        def body_fun(carry, op_and_noi):
+            _, samp_last = carry
+            op, noi = op_and_noi
+
+            # todo: move the function below to the random variable implementations?
+            samp = init.Ax_plus_y(A=op, x=samp_last, y=noi)
+            qoi = init.extract_qoi_from_sample(samp)
+
+            return (qoi, samp), (qoi, samp)
+
+        xs = (linop_, noise_sample)
+        init_val = (init_qoi, init_sample)
+        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
+        _, (qois, samples) = reverse_scan(f=body_fun, init=init_val, xs=xs)
+        return qois, samples
 
 
 class _SmootherCommon(_strategy.Strategy):
@@ -142,25 +177,10 @@ class _SmootherCommon(_strategy.Strategy):
         # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
         sample_shape = posterior.backward_model.noise.mean.shape
         base_samples = self._base_samples(key, shape=shape + sample_shape)
-        return self.transform_base_samples(
-            posterior=posterior, base_samples=base_samples
-        )
-
-    def transform_base_samples(self, posterior, base_samples):
-        if base_samples.ndim == posterior.backward_model.noise.mean.ndim:
-            return self._sample_one(posterior, base_samples)
-
-        transform_vmap = jax.vmap(self.transform_base_samples, in_axes=(None, 0))
-        return transform_vmap(posterior, base_samples)
-
-    def _sample_one(self, posterior, base_samples):
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-        noise = posterior.backward_model.noise
-        samples = self.implementation.extrapolation.sample_backwards(
-            init, posterior.backward_model.transition, noise, base_samples
-        )
-        u = noise.extract_qoi_from_sample(samples)
-        return u, samples
+        return posterior.transform_unit_sample(base_samples)
+        # return self.transform_base_samples(
+        #     posterior=posterior, base_samples=base_samples
+        # )
 
     # Auxiliary routines that are the same among all subclasses
 

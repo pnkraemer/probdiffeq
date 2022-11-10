@@ -90,6 +90,13 @@ class BatchNormal(variable.StateSpaceVariable):
             cov_sqrtm_lower=scale_sqrtm[..., None, None] * self.cov_sqrtm_lower,
         )
 
+    def transform_unit_sample(self, x, /):
+        # (d,k) + ((d,k,k) @ (d,k,1))[..., 0] = (d,k)
+        return self.mean + (self.cov_sqrtm_lower @ x[..., None])[..., 0]
+
+    def Ax_plus_y(self, *, A, x, y):
+        return (A @ x[..., None])[..., 0] + y
+
 
 BatchMM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
@@ -498,29 +505,6 @@ class BatchIBM(extrapolation.AbstractExtrapolation[BatchNormal, BatchIBMCacheTyp
         backward_noise = BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         extrapolated = BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, (backward_noise, backward_op)
-
-    def sample_backwards(self, init, linop, noise, base_samples):
-        def body_fun(carry, x):
-            op, noi = x
-            out = (op @ carry[..., None])[..., 0] + noi
-            return out, out
-
-        linop_sample, noise_ = jax.tree_util.tree_map(
-            lambda x: x[1:, ...], (linop, noise)
-        )
-        noise_sample = self._transform_samples(noise_, base_samples[..., :-1, :, :])
-        init_sample = self._transform_samples(init, base_samples[..., -1, :, :])
-
-        # todo: should we use an associative scan here?
-        _, samples = _control_flow.scan_with_init(
-            f=body_fun, init=init_sample, xs=(linop_sample, noise_sample), reverse=True
-        )
-        return samples
-
-    # automatically batched because of numpy's broadcasting rules?
-    def _transform_samples(self, rvs, base):
-        # (d,k) + ((d,k,k) @ (d,k,1))[..., 0] = (d,k)
-        return rvs.mean + (rvs.cov_sqrtm_lower @ base[..., None])[..., 0]
 
 
 def _transpose(x):

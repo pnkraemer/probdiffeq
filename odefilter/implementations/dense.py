@@ -110,6 +110,9 @@ class VectNormal(variable.StateSpaceVariable):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
 
+    def Ax_plus_y(self, *, A, x, y):
+        return A @ x + y
+
 
 @jax.tree_util.register_pytree_node_class
 class TaylorZerothOrder(correction.AbstractCorrection):
@@ -566,19 +569,3 @@ class IBM(extrapolation.AbstractExtrapolation):
         l_new = l_new_p
 
         return VectNormal(m_new, l_new, target_shape=init.target_shape)
-
-    # todo: move to thingamagiggy
-    def sample_backwards(self, init, linop, noise, base_samples):
-        def body_fun(carry, x):
-            op, noi = x
-            out = op @ carry + noi
-            return out, out
-
-        linop_, noise_ = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
-        noise_sample = noise_.transform_unit_sample(base_samples[:-1])
-        init_sample = init.transform_unit_sample(base_samples[-1])
-
-        _, samples = _control_flow.scan_with_init(
-            f=body_fun, init=init_sample, xs=(linop_, noise_sample), reverse=True
-        )
-        return samples

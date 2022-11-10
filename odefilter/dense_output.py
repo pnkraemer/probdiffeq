@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 
 def sample(key, *, solution, solver, shape=()):
+    # return solution.posterior.sample()
     return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
 

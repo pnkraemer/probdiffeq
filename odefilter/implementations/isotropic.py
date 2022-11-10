@@ -67,6 +67,8 @@ class IsoNormal(variable.StateSpaceVariable):
     def extract_qoi_from_sample(self, u, /):
         return u[..., 0, :]
 
+    # todo: split those functions into a batch and a non-batch version?
+
     def scale_covariance(self, *, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return IsoNormal(
@@ -76,6 +78,12 @@ class IsoNormal(variable.StateSpaceVariable):
             mean=self.mean,
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
         )
+
+    def transform_unit_sample(self, base, /):
+        return self.mean + self.cov_sqrtm_lower @ base
+
+    def Ax_plus_y(self, *, A, x, y):
+        return A @ x + y
 
 
 @jax.tree_util.register_pytree_node_class
@@ -274,25 +282,3 @@ class IsoIBM(extrapolation.AbstractExtrapolation):
         l_new = l_new_p
 
         return IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
-
-    def sample_backwards(self, init, linop, noise, base_samples):
-        def body_fun(carry, x):
-            op, noi = x
-            out = op @ carry + noi
-            return out, out
-
-        linop_sample, noise_ = jax.tree_util.tree_map(
-            lambda x: x[1:, ...], (linop, noise)
-        )
-        noise_sample = self._transform_samples(noise_, base_samples[..., :-1, :, :])
-        init_sample = self._transform_samples(init, base_samples[..., -1, :, :])
-
-        # todo: should we use an associative scan here?
-        _, samples = _control_flow.scan_with_init(
-            f=body_fun, init=init_sample, xs=(linop_sample, noise_sample), reverse=True
-        )
-        return samples
-
-    # automatically batched because of numpy's broadcasting rules?
-    def _transform_samples(self, rvs, base):
-        return rvs.mean + rvs.cov_sqrtm_lower @ base
