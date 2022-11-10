@@ -172,16 +172,16 @@ def _runge_kutta_starter_fn(
 def _rk_starter_improve(init_rv, extrapolation, correction, ys, dt):
 
     # Initialise backward-transitions
-    init_bw_op = extrapolation.init_backward_transition()
-    init_bw_noise = extrapolation.init_backward_noise(rv_proto=init_rv)
-    init_val = init_rv, (init_bw_noise, init_bw_op)
+    init_bw = extrapolation.init_conditional(rv_proto=init_rv)
+    init_val = init_rv, init_bw
 
     # Scan
     fn = functools.partial(
         _rk_filter_step, extrapolation=extrapolation, correction=correction, dt=dt
     )
     carry_fin, _ = jax.lax.scan(fn, init=init_val, xs=ys, reverse=False)
-    (corrected_fin, (noise_fin, op_fin)) = carry_fin
+    (corrected_fin, bw_fin) = carry_fin
+    op_fin, noise_fin = bw_fin.transition, bw_fin.noise
 
     # Backward-marginalise to get the initial value
     u0_full = extrapolation.marginalise_model(
@@ -193,15 +193,17 @@ def _rk_starter_improve(init_rv, extrapolation, correction, ys, dt):
 def _rk_filter_step(carry, y, extrapolation, correction, dt):
 
     # Read
-    (rv, (noise, op)) = carry
+    (rv, bw_old) = carry
     m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
     # Extrapolate (with fixed-point-style condensation)
     lin_pt, extra_cache = extrapolation.begin_extrapolation(m0, dt=dt)
-    extra, (bw_noise, bw_op) = extrapolation.revert_markov_kernel(
+    extra, bw_model = extrapolation.revert_markov_kernel(
         linearisation_pt=lin_pt, l0=l0, cache=extra_cache, output_scale_sqrtm=1.0
     )
-    noise_new, op_new = extrapolation.condense_backward_models(
+    noise, op = bw_old.noise, bw_old.transition
+    bw_noise, bw_op = bw_model.noise, bw_model.transition
+    bw_new = extrapolation.condense_backward_models(
         transition_init=op,
         noise_init=noise,
         transition_state=bw_op,
@@ -212,4 +214,4 @@ def _rk_filter_step(carry, y, extrapolation, correction, dt):
     _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
 
     # Return correction and backward-model
-    return (corr, (noise_new, op_new)), None
+    return (corr, bw_new), None
