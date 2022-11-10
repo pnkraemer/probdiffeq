@@ -4,7 +4,8 @@ import abc
 from typing import Any, Generic, Tuple, TypeVar
 
 import jax
-import jax.numpy as jnp
+
+from odefilter import _tree_utils
 
 # todo: make "u" a property?
 
@@ -50,7 +51,9 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
+class AbstractExtrapolation(
+    abc.ABC, Generic[SSVTypeVar, CacheTypeVar], _tree_utils.TreeEqualMixIn
+):
     """Extrapolation model interface."""
 
     def tree_flatten(self):
@@ -62,10 +65,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"
-
-    def __eq__(self, other):
-        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
-        return jax.tree_util.tree_all(equal)
 
     @abc.abstractmethod
     def init_corrected(self, *, taylor_coefficients) -> SSVTypeVar:
@@ -133,7 +132,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 class BackwardModel(Generic[SSVTypeVar]):
     """Backward model for backward-Gauss--Markov process representations."""
 
-    def __init__(self, *, transition: Any, noise: SSVTypeVar):
+    def __init__(self, transition: Any, *, noise: SSVTypeVar):
         self.transition = transition
         self.noise = noise
 
@@ -157,7 +156,9 @@ class BackwardModel(Generic[SSVTypeVar]):
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
+class AbstractCorrection(
+    abc.ABC, Generic[SSVTypeVar, CacheTypeVar], _tree_utils.TreeEqualMixIn
+):
     """Correction model interface."""
 
     def __init__(self, *, ode_order):
@@ -165,10 +166,6 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
     def __repr__(self):
         return f"{self.__class__.__name__}(ode_order={self.ode_order})"
-
-    def __eq__(self, other):
-        equal = jax.tree_util.tree_map(lambda a, b: jnp.all(a == b), self, other)
-        return jax.tree_util.tree_all(equal)
 
     def tree_flatten(self):
         children = ()
