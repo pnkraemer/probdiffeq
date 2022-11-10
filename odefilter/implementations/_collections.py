@@ -104,17 +104,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def condense_backward_models(
-        self,
-        *,
-        transition_init,
-        noise_init: SSVTypeVar,
-        transition_state,
-        noise_state: SSVTypeVar,
-    ):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def marginalise_backwards(self, *, init: SSVTypeVar, linop, noise: SSVTypeVar):
         raise NotImplementedError
 
@@ -149,11 +138,9 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     def scale_covariance(self, *, scale_sqrtm):
         raise NotImplementedError
 
-    #
-    # @abc.abstractmethod
-    # def merge_with_previous_conditional(self, other, /):
-    #     raise NotImplementedError
-    #
+    @abc.abstractmethod
+    def merge_with_incoming_conditional(self, incoming, /):
+        raise NotImplementedError
 
 
 @jax.tree_util.register_pytree_node_class

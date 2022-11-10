@@ -328,6 +328,25 @@ class BatchConditional(_collections.AbstractConditional):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return BatchConditional(transition=self.transition, noise=noise)
 
+    def merge_with_incoming_conditional(self, incoming, /):
+        # (d, k, k); (d, k), (d, k, k)
+        A = self.transition
+        (b, B_sqrtm) = (self.noise.mean, self.noise.cov_sqrtm_lower)
+
+        # (d, k, k); (d, k), (d, k, k)
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = (A @ d[..., None])[..., 0] + b
+        Xi_r = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
+            R1=_transpose(A @ D_sqrtm), R2=_transpose(B_sqrtm)
+        )
+        Xi = _transpose(Xi_r)
+
+        noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return BatchConditional(g, noise=noise)
+
 
 BatchIBMCacheType = Tuple[jax.Array]  # Cache type
 """Type of the extrapolation-cache."""
@@ -386,28 +405,6 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         l_ext_p = _transpose(r_ext_p)
         l_ext = p[..., None] * l_ext_p
         return BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-
-    def condense_backward_models(
-        self, *, transition_init, noise_init, transition_state, noise_state
-    ):
-
-        A = transition_init  # (d, k, k)
-        # (d, k), (d, k, k)
-        (b, B_sqrtm) = (noise_init.mean, noise_init.cov_sqrtm_lower)
-
-        C = transition_state  # (d, k, k)
-        # (d, k), (d, k, k)
-        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = (A @ d[..., None])[..., 0] + b
-        Xi_r = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
-            R1=_transpose(A @ D_sqrtm), R2=_transpose(B_sqrtm)
-        )
-        Xi = _transpose(Xi_r)
-
-        noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return BatchConditional(g, noise=noise)
 
     def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)

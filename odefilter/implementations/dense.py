@@ -387,6 +387,21 @@ class Conditional(_collections.AbstractConditional):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return Conditional(transition=self.transition, noise=noise)
 
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        shape = self.noise.target_shape
+        noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
+        return Conditional(g, noise=noise)
+
 
 @jax.tree_util.register_pytree_node_class
 class IBM(_collections.AbstractExtrapolation):
@@ -504,24 +519,6 @@ class IBM(_collections.AbstractExtrapolation):
         bw_model = Conditional(g_bw, noise=backward_noise)
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
         return extrapolated, bw_model
-
-    def condense_backward_models(
-        self, *, transition_init, noise_init, transition_state, noise_state
-    ):
-
-        A = transition_init
-        (b, B_sqrtm) = noise_init.mean, noise_init.cov_sqrtm_lower
-
-        C = transition_state
-        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
-
-        shape = noise_init.target_shape
-        noise = VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return Conditional(g, noise=noise)
 
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()

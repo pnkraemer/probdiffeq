@@ -238,22 +238,16 @@ class FixedPointSmoother(_SmootherCommon):
     def complete_extrapolation(
         self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm
     ):
-        (
-            extrapolated,
-            bw_increment,
-        ) = self.implementation.extrapolation.revert_markov_kernel(
+        _temp = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
             l0=posterior_previous.init.cov_sqrtm_lower,
             output_scale_sqrtm=output_scale_sqrtm,
             cache=cache,
         )
+        extrapolated, bw_increment = _temp
 
-        backward_model = self.implementation.extrapolation.condense_backward_models(
-            transition_state=bw_increment.transition,
-            noise_state=bw_increment.noise,
-            transition_init=posterior_previous.backward_model.transition,
-            noise_init=posterior_previous.backward_model.noise,
-        )
+        merge_fn = posterior_previous.backward_model.merge_with_incoming_conditional
+        backward_model = merge_fn(bw_increment)
 
         return MarkovSequence(init=extrapolated, backward_model=backward_model)
 
@@ -261,12 +255,8 @@ class FixedPointSmoother(_SmootherCommon):
 
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        backward_model1 = self.implementation.extrapolation.condense_backward_models(
-            transition_state=p1.backward_model.transition,
-            noise_state=p1.backward_model.noise,
-            transition_init=p0.backward_model.transition,
-            noise_init=p0.backward_model.noise,
-        )
+        merge_fn = p0.backward_model.merge_with_incoming_conditional
+        backward_model1 = merge_fn(p1.backward_model)
 
         solution = MarkovSequence(init=p1.init, backward_model=backward_model1)
         accepted = self._duplicate_with_unit_backward_model(posterior=solution)
@@ -289,12 +279,7 @@ class FixedPointSmoother(_SmootherCommon):
             t=t,
             t0=t0,
         )
-        backward_model0 = self.implementation.extrapolation.condense_backward_models(
-            transition_state=bw0.transition,
-            noise_state=bw0.noise,
-            transition_init=p0.backward_model.transition,
-            noise_init=p0.backward_model.noise,
-        )
+        backward_model0 = p0.backward_model.merge_with_incoming_conditional(bw0)
         solution = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
         previous = self._duplicate_with_unit_backward_model(posterior=solution)

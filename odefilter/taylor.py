@@ -191,19 +191,12 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     (rv, bw_old) = carry
     m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
-    # Extrapolate (with fixed-point-style condensation)
+    # Extrapolate (with fixed-point-style merging)
     lin_pt, extra_cache = extrapolation.begin_extrapolation(m0, dt=dt)
     extra, bw_model = extrapolation.revert_markov_kernel(
         linearisation_pt=lin_pt, l0=l0, cache=extra_cache, output_scale_sqrtm=1.0
     )
-    noise, op = bw_old.noise, bw_old.transition
-    bw_noise, bw_op = bw_model.noise, bw_model.transition
-    bw_new = extrapolation.condense_backward_models(
-        transition_init=op,
-        noise_init=noise,
-        transition_state=bw_op,
-        noise_state=bw_noise,
-    )
+    bw_new = bw_old.merge_with_incoming_conditional(bw_model)
 
     # Correct
     _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
