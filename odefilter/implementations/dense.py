@@ -14,9 +14,6 @@ from odefilter.implementations import (
     variable,
 )
 
-# todo: extract _DenseCorrection methods into functions
-# todo: sort the function order a little bit. Make the docs useful.
-
 
 @jax.tree_util.register_pytree_node_class
 class VectNormal(variable.StateSpaceVariable):
@@ -107,6 +104,11 @@ class VectNormal(variable.StateSpaceVariable):
             cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
             target_shape=self.target_shape,
         )
+
+    # automatically batched because of numpy's broadcasting rules?
+    def transform_unit_sample(self, base, /):
+        m, l_sqrtm = self.mean, self.cov_sqrtm_lower
+        return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -565,25 +567,18 @@ class IBM(extrapolation.AbstractExtrapolation):
 
         return VectNormal(m_new, l_new, target_shape=init.target_shape)
 
+    # todo: move to thingamagiggy
     def sample_backwards(self, init, linop, noise, base_samples):
         def body_fun(carry, x):
             op, noi = x
             out = op @ carry + noi
             return out, out
 
-        linop_sample, noise_ = jax.tree_util.tree_map(
-            lambda x: x[1:, ...], (linop, noise)
-        )
-        noise_sample = self._transform_samples(noise_, base_samples[..., :-1, :])
-        init_sample = self._transform_samples(init, base_samples[..., -1, :])
+        linop_, noise_ = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
+        noise_sample = noise_.transform_unit_sample(base_samples[:-1])
+        init_sample = init.transform_unit_sample(base_samples[-1])
 
-        # todo: should we use an associative scan here?
         _, samples = _control_flow.scan_with_init(
-            f=body_fun, init=init_sample, xs=(linop_sample, noise_sample), reverse=True
+            f=body_fun, init=init_sample, xs=(linop_, noise_sample), reverse=True
         )
         return samples
-
-    # automatically batched because of numpy's broadcasting rules?
-    def _transform_samples(self, rvs, base):
-        m, l_sqrtm = rvs.mean, rvs.cov_sqrtm_lower
-        return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
