@@ -164,25 +164,6 @@ class _SmootherCommon(_strategy.Strategy):
         u = self.implementation.extrapolation.extract_mean_from_marginals(samples)
         return u, samples
 
-    #
-    # def scale_marginals(self, marginals, *, output_scale_sqrtm):
-    #     return self.implementation.extrapolation.scale_covariance(
-    #         rv=marginals, scale_sqrtm=output_scale_sqrtm
-    #     )
-    #
-    # def scale_posterior(self, posterior, *, output_scale_sqrtm):
-    #     init = self.implementation.extrapolation.scale_covariance(
-    #         rv=posterior.init, scale_sqrtm=output_scale_sqrtm
-    #     )
-    #     noise = self.implementation.extrapolation.scale_covariance(
-    #         rv=posterior.backward_model.noise, scale_sqrtm=output_scale_sqrtm
-    #     )
-    #
-    #     bw_model = BackwardModel(
-    #         transition=posterior.backward_model.transition, noise=noise
-    #     )
-    #     return MarkovSequence(init=init, backward_model=bw_model)
-
     # Auxiliary routines that are the same among all subclasses
 
     def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
