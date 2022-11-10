@@ -103,10 +103,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     ):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def marginalise_backwards(self, *, init: SSVTypeVar, linop, noise: SSVTypeVar):
-        raise NotImplementedError
-
 
 @jax.tree_util.register_pytree_node_class
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):

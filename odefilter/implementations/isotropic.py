@@ -1,13 +1,11 @@
 """State-space models with isotropic covariance structure."""
 
 import dataclasses
-import functools
 from typing import Any
 
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 
@@ -252,19 +250,6 @@ class IsoIBM(_collections.AbstractExtrapolation):
         bw_model = IsoConditional(g_bw, noise=backward_noise)
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
-
-    def marginalise_backwards(self, *, init, conditionals):
-        def body_fun(rv, conditional):
-            out = conditional.marginalise(rv)
-            return out, out
-
-        # Initial condition does not matter
-        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], conditionals)
-
-        # Scan and return
-        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
-        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
-        return rvs
 
     # todo: should this be a classmethod in IsoConditional?
     def init_conditional(self, *, rv_proto):

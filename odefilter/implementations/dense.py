@@ -4,7 +4,6 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
 from odefilter import cubature as cubature_module
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
@@ -556,16 +555,3 @@ class IBM(_collections.AbstractExtrapolation):
 
     def init_output_scale_sqrtm(self):
         return 1.0
-
-    def marginalise_backwards(self, *, init, conditionals):
-        def body_fun(rv, conditional):
-            out = conditional.marginalise(rv)
-            return out, out
-
-        # Initial condition does not matter
-        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], conditionals)
-
-        # Scan and return
-        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
-        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
-        return rvs

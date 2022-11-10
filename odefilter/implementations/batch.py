@@ -1,18 +1,15 @@
 """Batch-style extrapolations."""
 import dataclasses
-import functools
 from typing import Any, Callable, Tuple
 
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
 from odefilter import cubature as cubature_module
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 # todo: reconsider naming!
 # todo: sort the function order a little bit. Make the docs useful.
-# todo: move marginalise_backwards to markovsequence?
 
 
 @jax.tree_util.register_pytree_node_class
@@ -460,19 +457,6 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
     # todo: move to correction?
     def init_output_scale_sqrtm(self):
         return jnp.ones((self.ode_dimension,))
-
-    def marginalise_backwards(self, *, init, conditionals):
-        def body_fun(rv, conditional):
-            out = conditional.marginalise(rv)
-            return out, out
-
-        # Initial condition does not matter
-        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], conditionals)
-
-        # Scan and return
-        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
-        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
-        return rvs
 
     def revert_markov_kernel(self, *, linearisation_pt, l0, output_scale_sqrtm, cache):
         m_ext_p, m0_p, p, p_inv = cache

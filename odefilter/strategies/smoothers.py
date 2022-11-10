@@ -73,6 +73,19 @@ class MarkovSequence(Generic[SSVTypeVar]):
         _, (qois, samples) = reverse_scan(f=body_fun, init=init_val, xs=xs)
         return qois, samples
 
+    def marginalise_backwards(self):
+        def body_fun(rv, conditional):
+            out = conditional.marginalise(rv)
+            return out, out
+
+        # Initial condition does not matter
+        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.backward_model)
+
+        # Scan and return
+        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
+        _, rvs = reverse_scan(f=body_fun, init=self.init, xs=conds)
+        return rvs
+
 
 class _SmootherCommon(_strategy.Strategy):
     """Common functionality for smoothers."""
@@ -130,9 +143,8 @@ class _SmootherCommon(_strategy.Strategy):
 
     def marginals(self, *, posterior):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-
-        marginalise_fn = self.implementation.extrapolation.marginalise_backwards
-        return marginalise_fn(init=init, conditionals=posterior.backward_model)
+        markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
+        return markov.marginalise_backwards()
 
     def sample(self, key, *, posterior, shape):
         # A smoother samples on the grid by sampling i.i.d values
