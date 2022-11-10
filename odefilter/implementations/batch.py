@@ -5,7 +5,6 @@ from typing import Any, Callable, Tuple
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
 from odefilter import cubature as cubature_module
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
@@ -322,6 +321,48 @@ class BatchTaylorZerothOrder(
         return cov_sqrtm_lower[:, self.ode_order, ...]
 
 
+@jax.tree_util.register_pytree_node_class
+class BatchConditional(_collections.AbstractConditional):
+    def scale_covariance(self, *, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return BatchConditional(transition=self.transition, noise=noise)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        # (d, k, k); (d, k), (d, k, k)
+        A = self.transition
+        (b, B_sqrtm) = (self.noise.mean, self.noise.cov_sqrtm_lower)
+
+        # (d, k, k); (d, k), (d, k, k)
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = (A @ d[..., None])[..., 0] + b
+        Xi_r = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
+            R1=_transpose(A @ D_sqrtm), R2=_transpose(B_sqrtm)
+        )
+        Xi = _transpose(Xi_r)
+
+        noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return BatchConditional(g, noise=noise)
+
+    def marginalise(self, rv, /):
+
+        # Read
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
+
+        # Apply transition
+        m_new = (self.transition @ m0_p[..., None])[..., 0] + self.noise.mean
+        r_new = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
+            R1=_transpose(self.transition @ l0_p),
+            R2=_transpose(self.noise.cov_sqrtm_lower),
+        )
+        l_new = _transpose(r_new)
+
+        return BatchNormal(mean=m_new, cov_sqrtm_lower=l_new)
+
+
 BatchIBMCacheType = Tuple[jax.Array]  # Cache type
 """Type of the extrapolation-cache."""
 
@@ -380,28 +421,6 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         l_ext = p[..., None] * l_ext_p
         return BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
 
-    def condense_backward_models(
-        self, *, transition_init, noise_init, transition_state, noise_state
-    ):
-
-        A = transition_init  # (d, k, k)
-        # (d, k), (d, k, k)
-        (b, B_sqrtm) = (noise_init.mean, noise_init.cov_sqrtm_lower)
-
-        C = transition_state  # (d, k, k)
-        # (d, k), (d, k, k)
-        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = (A @ d[..., None])[..., 0] + b
-        Xi_r = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
-            R1=_transpose(A @ D_sqrtm), R2=_transpose(B_sqrtm)
-        )
-        Xi = _transpose(Xi_r)
-
-        noise = BatchNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return _collections.BackwardModel(g, noise=noise)
-
     def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * m0  # (d, k)
@@ -414,7 +433,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
     def init_conditional(self, *, rv_proto):
         noi = self._init_backward_noise(rv_proto=rv_proto)
         op = self._init_backward_transition()
-        return _collections.BackwardModel(op, noise=noi)
+        return BatchConditional(op, noise=noi)
 
     def _init_backward_noise(self, *, rv_proto):
         return BatchNormal(
@@ -439,39 +458,6 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
     def init_output_scale_sqrtm(self):
         return jnp.ones((self.ode_dimension,))
 
-    def marginalise_backwards(self, *, init, linop, noise):
-        def body_fun(carry, x):
-            op, noi = x
-            out = self.marginalise_model(init=carry, linop=op, noise=noi)
-            return out, out
-
-        # Initial condition does not matter
-        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
-        _, rvs = _control_flow.scan_with_init(
-            f=body_fun, init=init, xs=bw_models, reverse=True
-        )
-        return rvs
-
-    def marginalise_model(self, *, init, linop, noise):
-        # todo: add preconditioner?
-
-        # Pull into preconditioned space
-        m0_p = init.mean
-        l0_p = init.cov_sqrtm_lower
-
-        # Apply transition
-        m_new_p = (linop @ m0_p[..., None])[..., 0] + noise.mean
-        r_new_p = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
-            R1=_transpose(linop @ l0_p), R2=_transpose(noise.cov_sqrtm_lower)
-        )
-        l_new_p = _transpose(r_new_p)
-
-        # Push back into non-preconditioned space
-        m_new = m_new_p
-        l_new = l_new_p
-
-        return BatchNormal(mean=m_new, cov_sqrtm_lower=l_new)
-
     def revert_markov_kernel(self, *, linearisation_pt, l0, output_scale_sqrtm, cache):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
@@ -482,7 +468,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         r_ext_p, (r_bw_p, g_bw_p) = jax.vmap(_sqrtm.revert_conditional)(
             R_X_F=_transpose(self.a @ l0_p),
             R_X=_transpose(l0_p),
-            # transpose((d, 1, 1) * (d, k, k)) = tranpose((d,k,k)) = (d, k, k)
+            # transpose((d, 1, 1) * (d, k, k)) = (d, k, k)
             R_YX=_transpose(output_scale_sqrtm[..., None, None] * self.q_sqrtm_lower),
         )
         l_ext_p, l_bw_p = _transpose(r_ext_p), _transpose(r_bw_p)
@@ -497,7 +483,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
         backward_noise = BatchNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
+        bw_model = BatchConditional(g_bw, noise=backward_noise)
         extrapolated = BatchNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 

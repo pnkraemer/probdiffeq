@@ -1,12 +1,8 @@
 """State-space models with isotropic covariance structure."""
 
-import dataclasses
-from typing import Any
-
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 
@@ -122,11 +118,50 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
-class IsoIBM(_collections.AbstractExtrapolation):
+class IsoConditional(_collections.AbstractConditional):
+    def scale_covariance(self, *, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return IsoConditional(transition=self.transition, noise=noise)
 
-    a: Any
-    q_sqrtm_lower: Any
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
+        bw_model = IsoConditional(g, noise=noise)
+        return bw_model
+
+    def marginalise(self, rv, /):
+        """Marginalise the output of a linear model."""
+        # Read
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
+
+        # Apply transition
+        m_new = self.transition @ m0_p + self.noise.mean
+        l_new = _sqrtm.sum_of_sqrtm_factors(
+            R1=(self.transition @ l0_p).T, R2=self.noise.cov_sqrtm_lower.T
+        ).T
+
+        return IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoIBM(_collections.AbstractExtrapolation):
+    def __init__(self, a, q_sqrtm_lower):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(a={self.a}, q_sqrtm_lower={self.q_sqrtm_lower})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
@@ -212,67 +247,15 @@ class IsoIBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _collections.BackwardModel(g_bw, noise=backward_noise)
+        bw_model = IsoConditional(g_bw, noise=backward_noise)
         extrapolated = IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 
-    def condense_backward_models(
-        self, *, transition_init, noise_init, transition_state, noise_state
-    ):
-
-        A = transition_init
-        (b, B_sqrtm) = noise_init.mean, noise_init.cov_sqrtm_lower
-
-        C = transition_state
-        (d, D_sqrtm) = (noise_state.mean, noise_state.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
-
-        noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
-        bw_model = _collections.BackwardModel(g, noise=noise)
-        return bw_model
-
-    def marginalise_backwards(self, *, init, linop, noise):
-        """Compute marginals of a markov sequence."""
-
-        def body_fun(carry, x):
-            op, noi = x
-            out = self.marginalise_model(init=carry, linop=op, noise=noi)
-            return out, out
-
-        # Initial condition does not matter
-        bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], (linop, noise))
-        _, rvs = _control_flow.scan_with_init(
-            f=body_fun, init=init, xs=bw_models, reverse=True
-        )
-        return rvs
-
-    def marginalise_model(self, *, init, linop, noise):
-        """Marginalise the output of a linear model."""
-        # todo: add preconditioner?
-
-        # Pull into preconditioned space
-        m0_p = init.mean
-        l0_p = init.cov_sqrtm_lower
-
-        # Apply transition
-        m_new_p = linop @ m0_p + noise.mean
-        l_new_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(linop @ l0_p).T, R2=noise.cov_sqrtm_lower.T
-        ).T
-
-        # Push back into non-preconditioned space
-        m_new = m_new_p
-        l_new = l_new_p
-
-        return IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
-
+    # todo: should this be a classmethod in IsoConditional?
     def init_conditional(self, *, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _collections.BackwardModel(op, noise=noi)
+        return IsoConditional(op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)

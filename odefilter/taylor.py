@@ -155,60 +155,46 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    impl = implementations.IsoTS0.from_params(num_derivatives=num)
+    _impl = implementations.IsoTS0.from_params(num_derivatives=num)
+    extrapolation = _impl.extrapolation
 
     # Initialise
     d = initial_values[0].shape[0]
-    init_rv = impl.extrapolation.init_rv(ode_dimension=d)
+    init_rv = extrapolation.init_rv(ode_dimension=d)
 
     # Estimate
-    u0_full = _rk_starter_improve(init_rv, impl.extrapolation, impl.correction, ys, dt0)
+    u0_full = _runge_kutta_starter_improve(init_rv, extrapolation, ys=ys, dt=dt0)
 
     # Turn the mean into a tuple of arrays and return
     taylor_coefficients = tuple(u0_full.mean)
     return taylor_coefficients
 
 
-def _rk_starter_improve(init_rv, extrapolation, correction, ys, dt):
-
+def _runge_kutta_starter_improve(init_rv, extrapolation, ys, dt):
     # Initialise backward-transitions
     init_bw = extrapolation.init_conditional(rv_proto=init_rv)
     init_val = init_rv, init_bw
 
     # Scan
-    fn = functools.partial(
-        _rk_filter_step, extrapolation=extrapolation, correction=correction, dt=dt
-    )
+    fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
     carry_fin, _ = jax.lax.scan(fn, init=init_val, xs=ys, reverse=False)
     (corrected_fin, bw_fin) = carry_fin
-    op_fin, noise_fin = bw_fin.transition, bw_fin.noise
 
     # Backward-marginalise to get the initial value
-    u0_full = extrapolation.marginalise_model(
-        init=corrected_fin, linop=op_fin, noise=noise_fin
-    )
-    return u0_full
+    return bw_fin.marginalise(corrected_fin)
 
 
-def _rk_filter_step(carry, y, extrapolation, correction, dt):
-
+def _rk_filter_step(carry, y, extrapolation, dt):
     # Read
     (rv, bw_old) = carry
     m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
-    # Extrapolate (with fixed-point-style condensation)
+    # Extrapolate (with fixed-point-style merging)
     lin_pt, extra_cache = extrapolation.begin_extrapolation(m0, dt=dt)
     extra, bw_model = extrapolation.revert_markov_kernel(
         linearisation_pt=lin_pt, l0=l0, cache=extra_cache, output_scale_sqrtm=1.0
     )
-    noise, op = bw_old.noise, bw_old.transition
-    bw_noise, bw_op = bw_model.noise, bw_model.transition
-    bw_new = extrapolation.condense_backward_models(
-        transition_init=op,
-        noise_init=noise,
-        transition_state=bw_op,
-        noise_state=bw_noise,
-    )
+    bw_new = bw_old.merge_with_incoming_conditional(bw_model)
 
     # Correct
     _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
