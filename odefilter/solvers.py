@@ -89,10 +89,10 @@ class _AbstractSolver(abc.ABC):
         self.strategy = strategy
 
     def __eq__(self, other):
-        def isequal(a, b):
-            return a == b
+        def all_equal(a, b):
+            return jnp.all(jnp.equal(a, b))
 
-        tree_equal = jax.tree_util.tree_map(isequal, self, other)
+        tree_equal = jax.tree_util.tree_map(all_equal, self, other)
         return jax.tree_util.tree_all(tree_equal)
 
     @classmethod
