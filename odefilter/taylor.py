@@ -179,11 +179,9 @@ def _runge_kutta_starter_improve(init_rv, extrapolation, ys, dt):
     fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
     carry_fin, _ = jax.lax.scan(fn, init=init_val, xs=ys, reverse=False)
     (corrected_fin, bw_fin) = carry_fin
-    op_fin, noise_fin = bw_fin.transition, bw_fin.noise
 
     # Backward-marginalise to get the initial value
-    marginalise_fn = extrapolation.marginalise_model
-    return marginalise_fn(init=corrected_fin, linop=op_fin, noise=noise_fin)
+    return bw_fin.marginalise(corrected_fin)
 
 
 def _rk_filter_step(carry, y, extrapolation, dt):

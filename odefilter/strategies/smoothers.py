@@ -231,11 +231,7 @@ class Smoother(_SmootherCommon):
             t1=t1,
             scale_sqrtm=scale_sqrtm,
         )
-        marginals_t = self.implementation.extrapolation.marginalise_model(
-            init=marginals,
-            linop=acc.backward_model.transition,
-            noise=acc.backward_model.noise,
-        )
+        marginals_t = acc.backward_model.marginalise(marginals)
         u = marginals_t.extract_qoi()
         return u, marginals_t
 
