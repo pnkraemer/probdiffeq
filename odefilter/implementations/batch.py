@@ -314,7 +314,8 @@ class BatchTaylorZerothOrder(_BatchTS0Base):
         fx = vector_field(*m0.T, t=t, p=p)
 
         marginalise_fn = jax.vmap(_scalar.TaylorZerothOrder.marginalise_observation)
-        cache, observed = marginalise_fn(self._ts0, fx, m1, x)
+        cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x)
+        observed = BatchScalarNormal(obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower)
 
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
         error_estimate = observed.cov_sqrtm_lower
