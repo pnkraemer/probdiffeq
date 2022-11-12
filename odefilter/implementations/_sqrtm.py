@@ -112,6 +112,15 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
     """
+    if R_X.ndim != 2 or R_YX.ndim != 2 or R_X_F.ndim != 2:
+        msg = (
+            "Unexpected tensor-dimension of the inputs."
+            "\n\nExpected:\n\tR_X.shape=(n, n), "
+            "R_X_F.shape=(n, k), R_YX.shape=(k, k)."
+            f"\nReceived:\n\tR_X.shape={R_X.shape}, "
+            f"R_X_F.shape={R_X_F.shape}, R_YX.shape={R_YX.shape}."
+        )
+        raise ValueError(msg)
     d_out = R_YX.shape[0]
     d_in = R_X.shape[1]
     R = jnp.block(
