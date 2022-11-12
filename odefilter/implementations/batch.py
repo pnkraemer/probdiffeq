@@ -205,7 +205,7 @@ class BatchMomentMatching(
         l_marg = jnp.reshape(l_marg_block, (self.ode_dimension,))
 
         # Summarise
-        marginals = BatchScalarNormal(m_marg, l_marg)  # type: ignore
+        marginals = BatchScalarNormal(m_marg, l_marg)
         output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
         # Compute error estimate
@@ -301,51 +301,33 @@ _BatchTS0Base = _collections.AbstractCorrection[BatchNormal, BatchTS0CacheType]
 
 @jax.tree_util.register_pytree_node_class
 class BatchTaylorZerothOrder(_BatchTS0Base):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ts0 = _scalar.TaylorZerothOrder(*args, **kwargs)
+
     def begin_correction(self, x: BatchNormal, /, vector_field, t, p):
-        m = x.mean
+        x_unbatch = _scalar.Normal(x.mean, x.cov_sqrtm_lower)
 
-        # m has shape (d, n)
-        m1 = m[..., self.ode_order]
-        m0 = m[..., : self.ode_order].T
-        bias = m1 - vector_field(*m0, t=t, p=p)
-        l_obs_nonsquare = self._cov_sqrtm_lower(x.cov_sqrtm_lower)
+        select_fn = jax.vmap(_scalar.TaylorZerothOrder.select_derivatives)
+        m0, m1 = select_fn(self._ts0, x_unbatch)
 
-        l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
+        fx = vector_field(*m0.T, t=t, p=p)
 
-        # (d, 1, 1)
-        l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
-        l_obs = l_obs_raw[..., 0, 0]  # (d,)
+        marginalise_fn = jax.vmap(_scalar.TaylorZerothOrder.marginalise_observation)
+        cache, observed = marginalise_fn(self._ts0, fx, m1, x)
 
-        observed = BatchScalarNormal(mean=bias, cov_sqrtm_lower=l_obs)  # type: ignore
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
-
-        error_estimate = l_obs  # (d,)
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
+        error_estimate = observed.cov_sqrtm_lower
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated: BatchNormal, cache: BatchTS0CacheType):
-        (bias,) = cache
+        extra_unbatch = _scalar.Normal(extrapolated.mean, extrapolated.cov_sqrtm_lower)
+        fn = jax.vmap(_scalar.TaylorZerothOrder.complete_correction)
+        obs_unbatch, (cor_unbatch, gain) = fn(self._ts0, extra_unbatch, cache)
 
-        # (d, k), (d, k, k)
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
-        l_obs_nonsquare = self._cov_sqrtm_lower(l_ext)  # (d, k)
-
-        # (d, 1, 1)
-        l_obs = _sqrtm.sqrtm_to_upper_triangular(R=l_obs_nonsquare[..., None])
-        l_obs_scalar = l_obs[..., 0, 0]  # (d,)
-
-        # (d,), (d,)
-        observed = BatchScalarNormal(bias, l_obs_scalar)  # type: ignore
-
-        # (d, k)
-        crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
-
-        gain = crosscov / (l_obs_scalar[..., None]) ** 2  # (d, k)
-
-        m_cor = m_ext - (gain * bias[..., None])  # (d, k)
-        l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
-
-        corrected = BatchNormal(mean=m_cor, cov_sqrtm_lower=l_cor)  # type: ignore
-        return observed, (corrected, gain)
+        obs = BatchScalarNormal(obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower)
+        cor = BatchNormal(cor_unbatch.mean, cor_unbatch.cov_sqrtm_lower)
+        return obs, (cor, gain)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
