@@ -381,6 +381,24 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class VectConditional(_collections.AbstractConditional):
+    def __init__(self, transition, *, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
+
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         shape = self.noise.target_shape
