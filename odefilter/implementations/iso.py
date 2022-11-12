@@ -38,7 +38,7 @@ class IsoNormal(_collections.StateSpaceVariable):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    def condition_on_qoi_observation(self, u, /, *, observation_std):
+    def condition_on_qoi_observation(self, u, /, observation_std):
         hc = self.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.mean[0, ...]
 
@@ -59,7 +59,7 @@ class IsoNormal(_collections.StateSpaceVariable):
 
     # todo: split those functions into a batch and a non-batch version?
 
-    def scale_covariance(self, *, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return IsoNormal(
                 mean=self.mean, cov_sqrtm_lower=scale_sqrtm * self.cov_sqrtm_lower
@@ -72,7 +72,7 @@ class IsoNormal(_collections.StateSpaceVariable):
     def transform_unit_sample(self, base, /):
         return self.mean + self.cov_sqrtm_lower @ base
 
-    def Ax_plus_y(self, *, A, x, y):
+    def Ax_plus_y(self, A, x, y):
         return A @ x + y
 
     @property
@@ -82,7 +82,7 @@ class IsoNormal(_collections.StateSpaceVariable):
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_collections.AbstractCorrection):
-    def begin_correction(self, x: IsoNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: IsoNormal, /, vector_field, t, p):
         m = x.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -101,7 +101,7 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate = l_obs
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
-    def complete_correction(self, *, extrapolated, cache):
+    def complete_correction(self, extrapolated, cache):
         (bias,) = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
@@ -123,11 +123,29 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class IsoConditional(_collections.AbstractConditional):
+    def __init__(self, transition, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
+
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         return IsoNormal(m, self.noise.cov_sqrtm_lower)
 
-    def scale_covariance(self, *, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return IsoConditional(transition=self.transition, noise=noise)
 
@@ -182,7 +200,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
 
     @classmethod
-    def from_params(cls, *, num_derivatives):
+    def from_params(cls, num_derivatives):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
@@ -190,7 +208,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def init_corrected(self, *, taylor_coefficients):
+    def init_corrected(self, taylor_coefficients):
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
@@ -206,7 +224,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def init_output_scale_sqrtm(self):
         return 1.0
 
-    def begin_extrapolation(self, m0, /, *, dt):
+    def begin_extrapolation(self, m0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * m0
         m_ext_p = self.a @ m0_p
@@ -214,14 +232,12 @@ class IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         return IsoNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
-    def _assemble_preconditioner(self, *, dt):
+    def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
 
-    def complete_extrapolation(
-        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
-    ):
+    def complete_extrapolation(self, linearisation_pt, l0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
@@ -233,7 +249,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
         return IsoNormal(m_ext, l_ext)
 
-    def revert_markov_kernel(self, *, linearisation_pt, l0, cache, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, l0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
@@ -260,7 +276,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return extrapolated, bw_model
 
     # todo: should this be a classmethod in IsoConditional?
-    def init_conditional(self, *, rv_proto):
+    def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return IsoConditional(op, noise=noi)
@@ -268,7 +284,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)
 
-    def _init_backward_noise(self, *, rv_proto):
+    def _init_backward_noise(self, rv_proto):
         return IsoNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),

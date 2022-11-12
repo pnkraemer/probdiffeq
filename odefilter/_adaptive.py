@@ -1,6 +1,5 @@
 """Adaptive solvers."""
-import dataclasses
-from typing import Any, Callable, Generic, TypeVar, Union
+from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -15,38 +14,39 @@ R = TypeVar("R")
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
 class AdaptiveODEFilterState(Generic[T]):
     """Solver state."""
 
-    dt_proposed: float
-    error_norm_proposed: float
+    def __init__(
+        self,
+        dt_proposed,
+        error_norm_proposed,
+        control,
+        proposed,
+        accepted,
+        solution,
+        previous,
+    ):
+        self.dt_proposed = dt_proposed
+        self.error_norm_proposed = error_norm_proposed
+        self.control = control
+        self.proposed = proposed
+        self.accepted = accepted
+        self.solution = solution
+        self.previous = previous
 
-    control: Any  # must contain field "scale_factor".
-    """Controller state."""
-
-    # All sorts of solutions types.
-    # previous.t <= solution.t <= accepted.t <= proposed.t
-
-    proposed: T
-    """The most recent proposal."""
-
-    accepted: T
-    """The most recent accepted state."""
-
-    solution: T
-    """The current best solution.
-
-    Sometimes equal to :attr:`accepted`, but not always.
-    Not equal to :attr:`accepted` if the solution has been obtained
-    by overstepping a boundary and subsequent interpolation.
-    In this case, it equals :attr:`previous`
-    (which has been the interpolation result).
-    """
-
-    previous: T
-    """The penultimate (2nd most recent) accepted state. Needed for interpolation.
-    """
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"\n\tdt_proposed={self.dt_proposed},"
+            f"\n\terror_norm_proposed={self.error_norm_proposed},"
+            f"\n\tcontrol={self.control},"
+            f"\n\tproposed={self.proposed},"
+            f"\n\taccepted={self.accepted},"
+            f"\n\tsolution={self.solution},"
+            f"\n\tprevious={self.previous},"
+            "\n)"
+        )
 
     def tree_flatten(self):
         children = (
@@ -88,23 +88,39 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
 class AdaptiveODEFilter(Generic[R]):
     """Make an adaptive ODE filter."""
 
-    solver: R
+    def __init__(
+        self,
+        solver,
+        atol=1e-4,
+        rtol=1e-2,
+        control=controls.ProportionalIntegral(),
+        norm_ord=None,
+        numerical_zero=1e-10,
+        reference_state_fn=_reference_state_fn_max_abs,
+    ):
+        self.solver = solver
+        self.atol = atol
+        self.rtol = rtol
+        self.control = control
+        self.norm_ord = norm_ord
+        self.numerical_zero = numerical_zero
+        self.reference_state_fn = reference_state_fn
 
-    atol: float = 1e-4
-    rtol: float = 1e-2
-
-    control: Any = controls.ProportionalIntegral()
-    norm_ord: Union[int, str, None] = None
-
-    numerical_zero: float = 1e-10
-    """Assume we reached the checkpoint if the distance of the current \
-     state to the checkpoint is smaller than this value."""
-
-    reference_state_fn: Callable[[Any, Any], Any] = _reference_state_fn_max_abs
+    def __repr__(self):
+        return (
+            f"\n{self.__class__.__name__}("
+            f"\n\tsolver={self.solver},"
+            f"\n\tatol={self.atol},"
+            f"\n\trtol={self.rtol},"
+            f"\n\tcontrol={self.control},"
+            f"\n\tnorm_order={self.norm_ord},"
+            f"\n\tnumerical_zero={self.numerical_zero},"
+            f"\n\treference_state_fn={self.reference_state_fn},"
+            "\n)"
+        )
 
     def tree_flatten(self):
         children = (
