@@ -25,7 +25,15 @@ import jax.numpy as jnp
 
 def revert_conditional_noisefree(*, R_X_F, R_X):
     """Like revert_conditional, but without observation noise."""
-    assert R_X_F.shape[1] <= R_X_F.shape[0]
+    if not R_X_F.shape[1] <= R_X_F.shape[0]:
+        msg = (
+            "Reverting noise-free conditionals requires "
+            "that the conditional dimension is at most as "
+            "large as the prior dimension. "
+            f"Received: {R_X_F.shape[1]} >= {R_X_F.shape[0]}"
+        )
+        raise ValueError(msg)
+
     r_marg = sqrtm_to_upper_triangular(R=R_X_F)
     crosscov = R_X.T @ R_X_F
     gain = jax.scipy.linalg.cho_solve((r_marg.T, True), crosscov.T).T
@@ -112,8 +120,7 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
     """
-    d_out = R_YX.shape[0]
-    d_in = R_X.shape[1]
+    d_out, d_in = R_YX.shape[0], R_X.shape[1]
     R = jnp.block(
         [
             [R_YX, jnp.zeros((d_out, d_in))],
