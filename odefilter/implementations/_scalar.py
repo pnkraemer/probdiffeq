@@ -155,3 +155,56 @@ class Normal(_collections.StateSpaceVariable):
 
     def Ax_plus_y(self, A, x, y):
         return A @ x + y
+
+
+@jax.tree_util.register_pytree_node_class
+class Conditional(_collections.AbstractConditional):
+    def __init__(self, transition, *, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
+
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        return Normal(m, self.noise.cov_sqrtm_lower)
+
+    def scale_covariance(self, *, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return Conditional(transition=self.transition, noise=noise)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        noise = Normal(mean=xi, cov_sqrtm_lower=Xi)
+        return Conditional(g, noise=noise)
+
+    def marginalise(self, rv, /):
+        m0, l0 = rv.mean, rv.cov_sqrtm_lower
+
+        m_new = self.transition @ m0 + self.noise.mean
+        l_new = _sqrtm.sum_of_sqrtm_factors(
+            R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
+        ).T
+
+        return Normal(m_new, l_new)
