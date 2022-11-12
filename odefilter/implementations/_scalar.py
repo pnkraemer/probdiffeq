@@ -104,7 +104,6 @@ class Normal(_collections.StateSpaceVariable):
 
     def norm_of_whitened_residual_sqrtm(self):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        print(l_obs.shape, obs_pt.shape)
         res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
@@ -128,9 +127,6 @@ class Normal(_collections.StateSpaceVariable):
 
     def extract_qoi(self):
         return self.mean[..., 0]
-        # if self.mean.ndim == 1:
-        #     return self.mean[0]
-        # return jax.vmap(self._select_derivative, in_axes=(0, None))(self.mean, 0)
 
     def extract_qoi_from_sample(self, u, /):
 
@@ -139,6 +135,9 @@ class Normal(_collections.StateSpaceVariable):
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
     def scale_covariance(self, scale_sqrtm):
+        # todo: this if should not be necessary
+        #  whether this function is called in batch mode or not should
+        #  be the caller's concern.
         if jnp.ndim(scale_sqrtm) == 0:
             return Normal(
                 mean=self.mean,
