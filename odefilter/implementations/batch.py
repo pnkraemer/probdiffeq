@@ -14,6 +14,7 @@ from odefilter.implementations import _collections, _ibm_util, _scalar, _sqrtm
 class Batch(_collections.StateSpaceVariable):
     def __init__(self, normal, /):
         self.normal = normal
+        self.wrap_type = type(normal)
 
     def tree_flatten(self):
         children = (self.normal,)
@@ -38,37 +39,39 @@ class Batch(_collections.StateSpaceVariable):
         return self.normal.cov_sqrtm_lower
 
     def logpdf(self, u, /):
-        batch_logpdf = jax.vmap(_scalar.Normal.logpdf)(self.normal, u)
+        batch_logpdf = jax.vmap(self.wrap_type.logpdf)(self.normal, u)
         return jnp.sum(batch_logpdf)
 
     def norm_of_whitened_residual_sqrtm(self):
-        fn = jax.vmap(_scalar.Normal.norm_of_whitened_residual_sqrtm)
+        print(self.wrap_type)
+        print(self.mean.shape)
+        fn = jax.vmap(self.wrap_type.norm_of_whitened_residual_sqrtm)
         return fn(self.normal)
 
     def condition_on_qoi_observation(self, u, /, observation_std):
-        fn = jax.vmap(_scalar.Normal.condition_on_qoi_observation, in_axes=(0, 0, None))
+        fn = jax.vmap(self.wrap_type.condition_on_qoi_observation, in_axes=(0, 0, None))
         print(self.normal.sample_shape, u.shape, observation_std.shape)
         obs, (cor, gain) = fn(self.normal, u, observation_std)
         return Batch(obs), (Batch(cor), gain)
 
     def extract_qoi(self):
-        return jax.vmap(_scalar.Normal.extract_qoi)(self.normal)
+        return jax.vmap(self.wrap_type.extract_qoi)(self.normal)
 
     def extract_qoi_from_sample(self, u, /):
-        fn = jax.vmap(_scalar.Normal.extract_qoi_from_sample)
+        fn = jax.vmap(self.wrap_type.extract_qoi_from_sample)
         return fn(self.normal, u)
 
     def Ax_plus_y(self, A, x, y):
-        fn = jax.vmap(_scalar.Normal.Ax_plus_y)
+        fn = jax.vmap(self.wrap_type.Ax_plus_y)
         return fn(self.normal, A, x, y)
 
     def scale_covariance(self, scale_sqrtm):
-        fn = jax.vmap(_scalar.Normal.scale_covariance)
+        fn = jax.vmap(self.wrap_type.scale_covariance)
         scaled = fn(self.normal, scale_sqrtm)
         return Batch(scaled)
 
     def transform_unit_sample(self, x, /):
-        fn = jax.vmap(_scalar.Normal.transform_unit_sample)
+        fn = jax.vmap(self.wrap_type.transform_unit_sample)
         return fn(self.normal, x)
 
 
@@ -344,7 +347,7 @@ class BatchTaylorZerothOrder(
         l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
-        observed = Batch(_scalar.Normal(mean=bias, cov_sqrtm_lower=l_obs))
+        observed = Batch(_scalar.ScalarNormal(mean=bias, cov_sqrtm_lower=l_obs))
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
 
         error_estimate = l_obs  # (d,)
@@ -364,7 +367,7 @@ class BatchTaylorZerothOrder(
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = Batch(_scalar.Normal(mean=bias, cov_sqrtm_lower=l_obs_scalar))
+        observed = Batch(_scalar.ScalarNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar))
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]

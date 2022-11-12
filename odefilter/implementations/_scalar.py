@@ -7,6 +7,67 @@ from odefilter.implementations import _collections, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
+class ScalarNormal(_collections.StateSpaceVariable):
+    # Normal RV. Shapes (), ()
+
+    def __init__(self, mean, cov_sqrtm_lower):
+        self.mean = mean
+        self.cov_sqrtm_lower = cov_sqrtm_lower
+
+    def __repr__(self):
+        name = f"{self.__class__.__name__}"
+        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
+        return f"{name}({args})"
+
+    def tree_flatten(self):
+        children = self.mean, self.cov_sqrtm_lower
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        mean, cov_sqrtm_lower = children
+        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
+
+    @property
+    def sample_shape(self):
+        return self.mean.shape
+
+    def transform_unit_sample(self, base, /):
+        m, l_sqrtm = self.mean, self.cov_sqrtm_lower
+        return m + l_sqrtm * base
+
+    def Ax_plus_y(self, A, x, y):
+        return A * x + y
+
+    def condition_on_qoi_observation(self, u, /, observation_std):
+        raise NotImplementedError
+
+    def extract_qoi(self):
+        raise NotImplementedError
+
+    def extract_qoi_from_sample(self, u, /):
+        raise NotImplementedError
+
+    def scale_covariance(self, scale_sqrtm):
+        return ScalarNormal(self.mean, scale_sqrtm * self.cov_sqrtm_lower)
+
+    def logpdf(self, u, /):
+        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
+        res_white = (m_obs - u) / l_obs
+        x1 = l_obs**2
+        x2 = jnp.dot(res_white, res_white.T)
+        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
+
+    def norm_of_whitened_residual_sqrtm(self):
+        obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
+        res_white = obs_pt / l_obs
+        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        return evidence_sqrtm
+
+
+@jax.tree_util.register_pytree_node_class
 class Normal(_collections.StateSpaceVariable):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
@@ -29,28 +90,22 @@ class Normal(_collections.StateSpaceVariable):
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
+    @property
+    def sample_shape(self):
+        return self.mean.shape
+
     def logpdf(self, u, /):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
-        print(l_obs.shape)
-        if l_obs.shape == ():
-            res_white = (m_obs - u) / l_obs
-            x1 = l_obs**2
-        else:
-            res_white = jax.scipy.linalg.solve_triangular(
-                l_obs.T, (m_obs - u), lower=False
-            )
-            x1 = jnp.linalg.slogdet(l_obs)[1] ** 2
-
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
+        x1 = jnp.linalg.slogdet(l_obs)[1] ** 2
         x2 = jnp.dot(res_white, res_white.T)
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
     def norm_of_whitened_residual_sqrtm(self):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        if l_obs.ndim == 0:
-            res_white = obs_pt / l_obs
-        else:
-            res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        print(l_obs.shape, obs_pt.shape)
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
@@ -67,7 +122,7 @@ class Normal(_collections.StateSpaceVariable):
 
         m_cor = self.mean - gain * (m_obs - u)
 
-        obs = Normal(m_obs, r_obs.T)
+        obs = ScalarNormal(m_obs, r_obs.T)
         cor = Normal(m_cor, r_cor.T)
         return obs, (cor, gain)
 
@@ -100,7 +155,3 @@ class Normal(_collections.StateSpaceVariable):
 
     def Ax_plus_y(self, A, x, y):
         return A @ x + y
-
-    @property
-    def sample_shape(self):
-        return self.mean.shape
