@@ -8,7 +8,7 @@ from odefilter.implementations import _collections, _sqrtm
 
 @jax.tree_util.register_pytree_node_class
 class ScalarNormal(_collections.StateSpaceVariable):
-    # Normal RV. Shapes (), ()
+    # Normal RV. Shapes (), (). No QOI.
 
     def __init__(self, mean, cov_sqrtm_lower):
         self.mean = mean

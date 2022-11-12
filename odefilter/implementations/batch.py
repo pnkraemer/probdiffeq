@@ -1,5 +1,5 @@
 """Batch-style implementations."""
-from typing import Callable, Tuple
+from typing import Any, Callable, Generic, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -9,10 +9,12 @@ from odefilter.implementations import _collections, _ibm_util, _scalar, _sqrtm
 
 # todo: reconsider naming!
 
+SSV = TypeVar("SSV")
+
 
 @jax.tree_util.register_pytree_node_class
-class Batch(_collections.StateSpaceVariable):
-    def __init__(self, normal, /):
+class BatchVariable(_collections.StateSpaceVariable, Generic[SSV]):
+    def __init__(self, normal: SSV, /):
         self.normal = normal
         self.wrap_type = type(normal)
 
@@ -38,23 +40,23 @@ class Batch(_collections.StateSpaceVariable):
     def cov_sqrtm_lower(self):
         return self.normal.cov_sqrtm_lower
 
-    def logpdf(self, u, /):
+    def logpdf(self, u, /) -> float:
         batch_logpdf = jax.vmap(self.wrap_type.logpdf)(self.normal, u)
         return jnp.sum(batch_logpdf)
 
-    def norm_of_whitened_residual_sqrtm(self):
-        print(self.wrap_type)
-        print(self.mean.shape)
+    def norm_of_whitened_residual_sqrtm(self) -> jax.Array:
         fn = jax.vmap(self.wrap_type.norm_of_whitened_residual_sqrtm)
         return fn(self.normal)
 
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def condition_on_qoi_observation(
+        self, u, /, observation_std
+    ) -> Tuple["BatchVariable[Any]", Tuple["BatchVariable[SSV]", jax.Array]]:
         fn = jax.vmap(self.wrap_type.condition_on_qoi_observation, in_axes=(0, 0, None))
         print(self.normal.sample_shape, u.shape, observation_std.shape)
         obs, (cor, gain) = fn(self.normal, u, observation_std)
-        return Batch(obs), (Batch(cor), gain)
+        return BatchVariable(obs), (BatchVariable(cor), gain)
 
-    def extract_qoi(self):
+    def extract_qoi(self) -> "BatchVariable[Any]":
         return jax.vmap(self.wrap_type.extract_qoi)(self.normal)
 
     def extract_qoi_from_sample(self, u, /):
@@ -65,10 +67,10 @@ class Batch(_collections.StateSpaceVariable):
         fn = jax.vmap(self.wrap_type.Ax_plus_y)
         return fn(self.normal, A, x, y)
 
-    def scale_covariance(self, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm) -> "BatchVariable[SSV]":
         fn = jax.vmap(self.wrap_type.scale_covariance)
         scaled = fn(self.normal, scale_sqrtm)
-        return Batch(scaled)
+        return BatchVariable(scaled)
 
     def transform_unit_sample(self, x, /):
         fn = jax.vmap(self.wrap_type.transform_unit_sample)
@@ -322,23 +324,20 @@ class BatchMomentMatching(
 
 BatchTS0CacheType = Tuple[jax.Array]
 
+_BatchTS0Base = _collections.AbstractCorrection[BatchNormal, BatchTS0CacheType]
+
 
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(
-    _collections.AbstractCorrection[BatchNormal, BatchTS0CacheType]
-):
-    """TaylorZerothOrder-linearise an ODE assuming a linearisation-point with\
-     isotropic Kronecker structure."""
-
+class BatchTaylorZerothOrder(_BatchTS0Base):
     def begin_correction(
         self, x: BatchNormal, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, BatchTS0CacheType]:
         m = x.mean
 
         # m has shape (d, n)
-        bias = m[..., self.ode_order] - vector_field(
-            *(m[..., : self.ode_order]).T, t=t, p=p
-        )
+        m1 = m[..., self.ode_order]
+        m0 = m[..., : self.ode_order].T
+        bias = m1 - vector_field(*m0, t=t, p=p)
         l_obs_nonsquare = self._cov_sqrtm_lower(x.cov_sqrtm_lower)
 
         l_obs_nonsquare_1 = l_obs_nonsquare[..., None]  # (d, k, 1)
@@ -347,7 +346,7 @@ class BatchTaylorZerothOrder(
         l_obs_raw = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(R=l_obs_nonsquare_1)
         l_obs = l_obs_raw[..., 0, 0]  # (d,)
 
-        observed = Batch(_scalar.ScalarNormal(mean=bias, cov_sqrtm_lower=l_obs))
+        observed = BatchVariable(_scalar.ScalarNormal(mean=bias, cov_sqrtm_lower=l_obs))
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
 
         error_estimate = l_obs  # (d,)
@@ -367,7 +366,9 @@ class BatchTaylorZerothOrder(
         l_obs_scalar = l_obs[..., 0, 0]  # (d,)
 
         # (d,), (d,)
-        observed = Batch(_scalar.ScalarNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar))
+        observed = BatchVariable(
+            _scalar.ScalarNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        )
 
         # (d, k)
         crosscov = (l_ext @ l_obs_nonsquare[..., None])[..., 0]
@@ -377,7 +378,7 @@ class BatchTaylorZerothOrder(
         m_cor = m_ext - (gain * bias[..., None])  # (d, k)
         l_cor = l_ext - gain[..., None] * l_obs_nonsquare[..., None, :]  # (d, k, k)
 
-        corrected = Batch(_scalar.Normal(mean=m_cor, cov_sqrtm_lower=l_cor))
+        corrected = BatchVariable(_scalar.Normal(mean=m_cor, cov_sqrtm_lower=l_cor))
         return observed, (corrected, gain)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
@@ -388,7 +389,7 @@ class BatchTaylorZerothOrder(
 class BatchConditional(_collections.AbstractConditional):
     def __call__(self, x, /):
         m = (self.transition @ x[..., None])[..., 0] + self.noise.mean
-        return Batch(_scalar.Normal(m, self.noise.cov_sqrtm_lower))
+        return BatchVariable(_scalar.Normal(m, self.noise.cov_sqrtm_lower))
 
     def scale_covariance(self, *, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -410,7 +411,7 @@ class BatchConditional(_collections.AbstractConditional):
         )
         Xi = _transpose(Xi_r)
 
-        noise = Batch(_scalar.Normal(mean=xi, cov_sqrtm_lower=Xi))
+        noise = BatchVariable(_scalar.Normal(mean=xi, cov_sqrtm_lower=Xi))
         return BatchConditional(g, noise=noise)
 
     def marginalise(self, rv, /):
@@ -427,7 +428,7 @@ class BatchConditional(_collections.AbstractConditional):
         )
         l_new = _transpose(r_new)
 
-        return Batch(_scalar.Normal(mean=m_new, cov_sqrtm_lower=l_new))
+        return BatchVariable(_scalar.Normal(mean=m_new, cov_sqrtm_lower=l_new))
 
 
 BatchIBMCacheType = Tuple[jax.Array]  # Cache type
@@ -490,7 +491,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         )
         l_ext_p = _transpose(r_ext_p)
         l_ext = p[..., None] * l_ext_p
-        return Batch(_scalar.Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
+        return BatchVariable(_scalar.Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
 
     def begin_extrapolation(self, m0, /, *, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -499,7 +500,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         m_ext = p * m_ext_p
 
         q_ext = p[..., None] * self.q_sqrtm_lower
-        return Batch(_scalar.Normal(m_ext, q_ext)), (m_ext_p, m0_p, p, p_inv)
+        return BatchVariable(_scalar.Normal(m_ext, q_ext)), (m_ext_p, m0_p, p, p_inv)
 
     def init_conditional(self, *, rv_proto):
         noi = self._init_backward_noise(rv_proto=rv_proto)
@@ -507,7 +508,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         return BatchConditional(op, noise=noi)
 
     def _init_backward_noise(self, *, rv_proto):
-        return Batch(
+        return BatchVariable(
             _scalar.Normal(
                 mean=jnp.zeros_like(rv_proto.mean),
                 cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
@@ -521,7 +522,9 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_matrix = jnp.vstack(taylor_coefficients).T
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return Batch(_scalar.Normal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected))
+        return BatchVariable(
+            _scalar.Normal(mean=m0_matrix, cov_sqrtm_lower=c_sqrtm0_corrected)
+        )
 
     # todo: move to correction?
     def init_error_estimate(self):
@@ -555,9 +558,9 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         l_bw = p[..., None] * l_bw_p
         g_bw = p[..., None] * g_bw_p * p_inv[:, None, :]
 
-        backward_noise = Batch(_scalar.Normal(mean=m_bw, cov_sqrtm_lower=l_bw))
+        backward_noise = BatchVariable(_scalar.Normal(mean=m_bw, cov_sqrtm_lower=l_bw))
         bw_model = BatchConditional(g_bw, noise=backward_noise)
-        extrapolated = Batch(_scalar.Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
+        extrapolated = BatchVariable(_scalar.Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
         return extrapolated, bw_model
 
 
