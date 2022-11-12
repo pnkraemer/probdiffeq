@@ -94,8 +94,8 @@ class AdaptiveODEFilter(Generic[R]):
     def __init__(
         self,
         solver,
-        atol,
-        rtol,
+        atol=1e-4,
+        rtol=1e-2,
         control=controls.ProportionalIntegral(),
         norm_ord=None,
         numerical_zero=1e-10,

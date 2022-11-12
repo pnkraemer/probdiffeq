@@ -18,7 +18,7 @@ class VectNormal(_collections.StateSpaceVariable):
     represents a (d,n)-shaped matrix.
     """
 
-    def __init__(self, mean, cov_sqrtm_lower, *, target_shape):
+    def __init__(self, mean, cov_sqrtm_lower, target_shape):
         self.mean = mean  # (n,) shape
         self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape
         self.target_shape = target_shape
@@ -52,7 +52,7 @@ class VectNormal(_collections.StateSpaceVariable):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    def condition_on_qoi_observation(self, u, /, *, observation_std):
+    def condition_on_qoi_observation(self, u, /, observation_std):
         hc = self._select_derivative_vect(self.cov_sqrtm_lower, 0)
         m_obs = self._select_derivative(self.mean, 0)
 
@@ -85,7 +85,7 @@ class VectNormal(_collections.StateSpaceVariable):
         x_reshaped = jnp.reshape(x, self.target_shape, order="F")
         return x_reshaped[i, ...]
 
-    def scale_covariance(self, *, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm):
         if jnp.ndim(scale_sqrtm) == 0:
             return VectNormal(
                 mean=self.mean,
@@ -103,7 +103,7 @@ class VectNormal(_collections.StateSpaceVariable):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
 
-    def Ax_plus_y(self, *, A, x, y):
+    def Ax_plus_y(self, A, x, y):
         return A @ x + y
 
     @property
@@ -113,7 +113,7 @@ class VectNormal(_collections.StateSpaceVariable):
 
 @jax.tree_util.register_pytree_node_class
 class VectTaylorZerothOrder(_collections.AbstractCorrection):
-    def __init__(self, *, ode_dimension, ode_order):
+    def __init__(self, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
@@ -127,7 +127,7 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def begin_correction(self, x: VectNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: VectNormal, /, vector_field, t, p):
         m0 = self._select_derivative(x.mean, slice(0, self.ode_order))
         m1 = self._select_derivative(x.mean, self.ode_order)
         b = m1 - vector_field(*m0, t=t, p=p)
@@ -139,7 +139,7 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
 
-    def complete_correction(self, *, extrapolated, cache):
+    def complete_correction(self, extrapolated, cache):
         (b,) = cache
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
 
@@ -167,7 +167,7 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class VectTaylorFirstOrder(_collections.AbstractCorrection):
-    def __init__(self, *, ode_dimension, ode_order):
+    def __init__(self, ode_dimension, ode_order):
         super().__init__(ode_order=ode_order)
         self.ode_dimension = ode_dimension
 
@@ -181,7 +181,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension)
 
-    def begin_correction(self, x: VectNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: VectNormal, /, vector_field, t, p):
         vf_partial = jax.tree_util.Partial(
             self._residual, vector_field=vector_field, t=t, p=p
         )
@@ -198,7 +198,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
 
-    def complete_correction(self, *, extrapolated, cache):
+    def complete_correction(self, extrapolated, cache):
         b, _ = cache
 
         m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
@@ -215,11 +215,11 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         corrected = VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=shape)
         return observed, (corrected, gain)
 
-    def _cov_sqrtm_lower(self, *, cache, cov_sqrtm_lower):
+    def _cov_sqrtm_lower(self, cache, cov_sqrtm_lower):
         _, fn = cache
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
-    def _residual(self, x, *, vector_field, t, p):
+    def _residual(self, x, vector_field, t, p):
         x0 = self._select_derivative(x, slice(0, self.ode_order))
         x1 = self._select_derivative(x, self.ode_order)
         fx0 = vector_field(*x0, t=t, p=p)
@@ -238,7 +238,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class VectMomentMatching(_collections.AbstractCorrection):
-    def __init__(self, *, ode_dimension, ode_order, cubature):
+    def __init__(self, ode_dimension, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
 
@@ -247,7 +247,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
         self.cubature = cubature
 
     @classmethod
-    def from_params(cls, *, ode_dimension, ode_order):
+    def from_params(cls, ode_dimension, ode_order):
         sci_fn = cubature_module.SphericalCubatureIntegration.from_params
         cubature = sci_fn(input_dimension=ode_dimension)
         return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
@@ -264,7 +264,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
         ode_order, ode_dimension = aux
         return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
 
-    def begin_correction(self, x: VectNormal, /, *, vector_field, t, p):
+    def begin_correction(self, x: VectNormal, /, vector_field, t, p):
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
@@ -299,7 +299,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
-    def complete_correction(self, *, extrapolated, cache):
+    def complete_correction(self, extrapolated, cache):
         # The correction step for the cubature Kalman filter implementation
         # is quite complicated. The reason is that the observation model
         # is x -> e1(x) - f(e0(x)), i.e., a composition of a linear/nonlinear/linear
@@ -335,7 +335,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
         backward_noise = VectNormal(m_bw, r_bw.T, target_shape=shape)
         return marginals, (backward_noise, gain)
 
-    def _linearize(self, *, x, cache):
+    def _linearize(self, x, cache):
         vmap_f, *_ = cache
 
         # Create sigma points
@@ -381,7 +381,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class VectConditional(_collections.AbstractConditional):
-    def __init__(self, transition, *, noise):
+    def __init__(self, transition, noise):
         self.transition = transition
         self.noise = noise
 
@@ -404,7 +404,7 @@ class VectConditional(_collections.AbstractConditional):
         shape = self.noise.target_shape
         return VectNormal(m, self.noise.cov_sqrtm_lower, target_shape=shape)
 
-    def scale_covariance(self, *, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return VectConditional(transition=self.transition, noise=noise)
 
@@ -443,7 +443,7 @@ class VectConditional(_collections.AbstractConditional):
 
 @jax.tree_util.register_pytree_node_class
 class VectIBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower, *, num_derivatives, ode_dimension):
+    def __init__(self, a, q_sqrtm_lower, num_derivatives, ode_dimension):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
 
@@ -469,7 +469,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
 
     @classmethod
-    def from_params(cls, *, ode_dimension, num_derivatives):
+    def from_params(cls, ode_dimension, num_derivatives):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(ode_dimension)
@@ -480,7 +480,7 @@ class VectIBM(_collections.AbstractExtrapolation):
             ode_dimension=ode_dimension,
         )
 
-    def init_corrected(self, *, taylor_coefficients):
+    def init_corrected(self, taylor_coefficients):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
         if taylor_coefficients[0].shape[0] != self.ode_dimension:
             msg = "The solver's ODE dimension does not match the initial condition."
@@ -498,7 +498,7 @@ class VectIBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
 
-    def begin_extrapolation(self, m0, /, *, dt):
+    def begin_extrapolation(self, m0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * m0
         m_ext_p = self.a @ m0_p
@@ -509,7 +509,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         extrapolated = VectNormal(m_ext, q_sqrtm, target_shape=shape)
         return extrapolated, (m_ext_p, m0_p, p, p_inv)
 
-    def _assemble_preconditioner(self, *, dt):
+    def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
@@ -517,9 +517,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, self.ode_dimension)
         return p, p_inv
 
-    def complete_extrapolation(
-        self, *, linearisation_pt, l0, cache, output_scale_sqrtm
-    ):
+    def complete_extrapolation(self, linearisation_pt, l0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
@@ -531,7 +529,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         shape = linearisation_pt.target_shape
         return VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
 
-    def revert_markov_kernel(self, *, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, cache, l0, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
@@ -558,7 +556,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         extrapolated = VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
         return extrapolated, bw_model
 
-    def init_conditional(self, *, rv_proto):
+    def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return VectConditional(op, noise=noi)
@@ -568,7 +566,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         return jnp.eye(k)
 
     @staticmethod
-    def _init_backward_noise(*, rv_proto):
+    def _init_backward_noise(rv_proto):
         return VectNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),

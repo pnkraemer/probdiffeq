@@ -17,7 +17,7 @@ class StateSpaceVariable(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def condition_on_qoi_observation(self, u, /, *, observation_std):
+    def condition_on_qoi_observation(self, u, /, observation_std):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -29,7 +29,7 @@ class StateSpaceVariable(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_covariance(self, *, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -37,7 +37,7 @@ class StateSpaceVariable(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def Ax_plus_y(self, *, A, x, y):
+    def Ax_plus_y(self, A, x, y):
         raise NotImplementedError
 
     @property
@@ -59,7 +59,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
-    def init_corrected(self, *, taylor_coefficients) -> SSVTypeVar:
+    def init_corrected(self, taylor_coefficients) -> SSVTypeVar:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -71,17 +71,16 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_conditional(self, *, rv_proto):
+    def init_conditional(self, rv_proto):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, m0, /, *, dt) -> Tuple[SSVTypeVar, CacheTypeVar]:
+    def begin_extrapolation(self, m0, /, dt) -> Tuple[SSVTypeVar, CacheTypeVar]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
         self,
-        *,
         linearisation_pt: SSVTypeVar,
         l0,
         cache: CacheTypeVar,
@@ -92,7 +91,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     @abc.abstractmethod
     def revert_markov_kernel(
         self,
-        *,
         linearisation_pt: SSVTypeVar,
         l0,
         cache: CacheTypeVar,
@@ -109,7 +107,7 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_covariance(self, *, scale_sqrtm):
+    def scale_covariance(self, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -125,7 +123,7 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
 class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     """Correction model interface."""
 
-    def __init__(self, *, ode_order):
+    def __init__(self, ode_order):
         self.ode_order = ode_order
 
     def __repr__(self):
@@ -143,10 +141,10 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
     @abc.abstractmethod
     def begin_correction(
-        self, x: SSVTypeVar, /, *, vector_field, t, p
+        self, x: SSVTypeVar, /, vector_field, t, p
     ) -> Tuple[jax.Array, float, CacheTypeVar]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, extrapolated: SSVTypeVar, cache: CacheTypeVar):
+    def complete_correction(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
         raise NotImplementedError
