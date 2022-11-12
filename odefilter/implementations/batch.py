@@ -41,7 +41,7 @@ class BatchNormal(_collections.StateSpaceVariable, Generic[SSV]):
     def sample_shape(self):
         return self._normal.sample_shape  # mean is (d, n)
 
-    def logpdf(self, u, /) -> float:
+    def logpdf(self, u, /):
         batch_logpdf = jax.vmap(_scalar.Normal.logpdf)(self._normal, u)
         return jnp.sum(batch_logpdf)
 
@@ -105,7 +105,7 @@ class BatchScalarNormal(_collections.StateSpaceVariable, Generic[SSV]):
     def sample_shape(self):
         return self._normal.sample_shape  # mean is (d, n)
 
-    def logpdf(self, u, /) -> float:
+    def logpdf(self, u, /):
         batch_logpdf = jax.vmap(_scalar.ScalarNormal.logpdf)(self._normal, u)
         return jnp.sum(batch_logpdf)
 
