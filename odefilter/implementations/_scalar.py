@@ -157,6 +157,47 @@ class Normal(_collections.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
+class TaylorZerothOrder(_collections.AbstractCorrection):
+    def begin_correction(self, x: Normal, /, vector_field, t, p):
+        m0, m1 = self.select_derivatives(x)
+        fx = vector_field(*m0, t=t, p=p)
+        cache, observed = self.marginalise_observation(fx, m1, x)
+
+        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
+        error_estimate = observed.cov_sqrtm_lower
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+
+    def marginalise_observation(self, fx, m1, x):
+        b = m1 - fx
+        cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, :]
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
+        l_obs = jnp.reshape(l_obs_raw, ())
+        observed = ScalarNormal(b, l_obs)
+        cache = (b,)
+        return cache, observed
+
+    def select_derivatives(self, x):
+        m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
+        return m0, m1
+
+    def complete_correction(self, extrapolated, cache):
+        (b,) = cache
+        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+
+        l_obs_nonsquare = l_ext[self.ode_order, :]
+        r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=l_obs_nonsquare[:, None], R_X=l_ext.T
+        )
+        r_obs = jnp.reshape(r_obs_mat, (-1,))
+        gain = jnp.reshape(gain_mat, (-1,))
+        m_cor = m_ext - gain * b
+
+        observed = ScalarNormal(mean=b, cov_sqrtm_lower=r_obs.T)
+        corrected = Normal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        return observed, (corrected, gain)
+
+
+@jax.tree_util.register_pytree_node_class
 class Conditional(_collections.AbstractConditional):
     def __init__(self, transition, noise):
         self.transition = transition

@@ -23,7 +23,7 @@ lint:
 	pylint odefilter/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
 	pylint tests/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
 	# A very soft mypy check to detect obvious problems
-	mypy odefilter
+	mypy odefilter --disable-error-code=var-annotated
 test:
 	pytest -n auto -x -v -s  # parallelise, fail early, verbose output, show all 'stdout's
 	python -m doctest odefilter/*.py
