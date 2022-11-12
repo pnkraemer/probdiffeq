@@ -1,8 +1,7 @@
 """Inference interface."""
 
 import abc
-import dataclasses
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -13,16 +12,30 @@ T = TypeVar("T")
 
 
 @jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
 class Solution(Generic[T]):
     """Inferred solutions."""
 
-    t: float
-    u: float
-    output_scale_sqrtm: float
-    marginals: T
-    posterior: Any
-    num_data_points: float
+    def __init__(
+        self, t, u, output_scale_sqrtm, marginals: T, posterior, num_data_points
+    ):
+        self.t = t
+        self.u = u
+        self.output_scale_sqrtm = output_scale_sqrtm
+        self.marginals = marginals
+        self.posterior = posterior
+        self.num_data_points = num_data_points
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"t={self.t},"
+            f"u={self.u},"
+            f"output_scale_sqrtm={self.output_scale_sqrtm},"
+            f"marginals={self.marginals},"
+            f"posterior={self.posterior},"
+            f"num_data_points={self.num_data_points},"
+            ")"
+        )
 
     def tree_flatten(self):
         children = (
