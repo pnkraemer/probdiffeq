@@ -10,11 +10,15 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ 3.8 ]
+        os: [ ubuntu-latest ]
     steps:
     - uses: actions/setup-python@v2
-      with:
-        python-version: "3.8.x"
     - uses: actions/checkout@v2
     - name: Install dependencies
       run:
@@ -25,12 +29,15 @@ jobs:
         make lint
 
   test:
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ 3.8,3.9]
+        os: [ ubuntu-latest ]
     steps:
     - uses: actions/setup-python@v2
-      with:
-        python-version: "3.8.x"
     - uses: actions/checkout@v2
     - name: Install dependencies
       run:
@@ -40,11 +47,15 @@ jobs:
         make test
 
   example:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ 3.8 ]
+        os: [ ubuntu-latest ]
     steps:
     - uses: actions/setup-python@v2
-      with:
-        python-version: "3.8.x"
     - uses: actions/checkout@v2
     - name: Install dependencies
       run:
@@ -54,11 +65,15 @@ jobs:
         make example
 
   doc:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ 3.8 ]
+        os: [ ubuntu-latest ]
     steps:
     - uses: actions/setup-python@v2
-      with:
-        python-version: "3.8.x"
     - uses: actions/checkout@v2
     - name: Install dependencies
       run: |
