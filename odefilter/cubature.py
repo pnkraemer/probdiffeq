@@ -15,6 +15,11 @@ class _PositiveCubatureRule:
         self.points = points
         self.weights_sqrtm = weights_sqrtm
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        args = f"points={self.points}, weights_sqrtm={self.weights_sqrtm}"
+        return f"{name}({args})"
+
     def tree_flatten(self):
         children = self.points, self.weights_sqrtm
         aux = ()
