@@ -4,8 +4,6 @@ import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
-# todo: input_dimension -> input_shape. But how does the UT work in this case?
-
 
 @jax.tree_util.register_pytree_node_class
 class _PositiveCubatureRule:
@@ -41,15 +39,25 @@ class SphericalCubatureIntegration(_PositiveCubatureRule):
 
         The number of cubature points is _higher_ than ``input_dimension``.
         """
-        assert len(input_shape) == 1
-        (input_dimension,) = input_shape
+        assert len(input_shape) <= 1
+        if len(input_shape) == 1:
+            (d,) = input_shape
+            points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=d)
+            return cls(points=points_mat, weights_sqrtm=weights_sqrtm)
 
-        _d = input_dimension  # alias for readability
-        eye_d = jnp.eye(_d) * jnp.sqrt(_d)
-        pts = jnp.vstack((eye_d, -1 * eye_d))
+        # If input_shape == (), compute weights via input_shape=(1,)
+        # and 'squeeze' the points.
+        points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=1)
+        (S,) = points_mat.shape
+        points = jnp.reshape(points_mat, (S,))
+        return cls(points=points, weights_sqrtm=weights_sqrtm)
 
-        weights_sqrtm = jnp.ones((2 * _d,)) / jnp.sqrt(2.0 * _d)
-        return cls(points=pts, weights_sqrtm=weights_sqrtm)
+
+def _sci_pts_and_weights_sqrtm(*, d):
+    eye_d = jnp.eye(d) * jnp.sqrt(d)
+    pts = jnp.vstack((eye_d, -1 * eye_d))
+    weights_sqrtm = jnp.ones((2 * d,)) / jnp.sqrt(2.0 * d)
+    return pts, weights_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
