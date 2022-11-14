@@ -76,7 +76,7 @@ def case_dynamic_filter_mm1_ut_vect():
 
 @pytest_cases.case(tags=["filter"])
 def case_dynamic_filter_mm1_ut_batch():
-    cube = cubature.UnscentedTransform.from_params(input_shape=(2,))
+    cube = cubature.UnscentedTransform.from_params_batch(input_shape=(2,))
     implementation = implementations.BatchMM1.from_params(
         cubature=cube, ode_dimension=2
     )

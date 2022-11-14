@@ -4,6 +4,9 @@ import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
+# todo: clean up the constructors
+#  (there is a lot of duplication, and the *_batch logic is not really obvious)
+
 
 @jax.tree_util.register_pytree_node_class
 class _PositiveCubatureRule:
@@ -28,13 +31,23 @@ class _PositiveCubatureRule:
         pts, weights_sqrtm = children
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
+    @classmethod
+    def from_params_batch(cls, input_shape, **kwargs):
+        batch_dim, *input_dims = input_shape
+        instance = cls.from_params(input_shape=input_dims, **kwargs)
+        return _tree_stack_duplicates(instance, n=batch_dim)
+
+
+def _tree_stack_duplicates(tree, n):
+    return jax.tree_util.tree_map(lambda s: jnp.vstack([s[None, ...]] * n), tree)
+
 
 @jax.tree_util.register_pytree_node_class
 class SphericalCubatureIntegration(_PositiveCubatureRule):
     """Spherical cubature integration."""
 
     @classmethod
-    def from_params(cls, *, input_shape):
+    def from_params(cls, input_shape):
         """Construct an SCI rule from the dimension of a random variable.
 
         The number of cubature points is _higher_ than ``input_dimension``.
@@ -71,19 +84,29 @@ class UnscentedTransform(_PositiveCubatureRule):
 
         The number of cubature points is _higher_ than ``input_dimension``.
         """
-        assert len(input_shape) == 1
-        (input_dimension,) = input_shape
+        assert len(input_shape) <= 1
+        if len(input_shape) == 1:
+            (d,) = input_shape
+            points_mat, weights_sqrtm = _ut_points_and_weights_sqrtm(d=d, r=r)
+            return cls(points=points_mat, weights_sqrtm=weights_sqrtm)
 
-        _d = input_dimension  # alias for readability
-        eye_d = jnp.eye(_d) * jnp.sqrt(_d + r)
-        zeros = jnp.zeros((1, _d))
-        pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
+        # If input_shape == (), compute weights via input_shape=(1,)
+        # and 'squeeze' the points.
+        points_mat, weights_sqrtm = _ut_points_and_weights_sqrtm(d=1, r=r)
+        (S, _) = points_mat.shape
+        points = jnp.reshape(points_mat, (S,))
+        return cls(points=points, weights_sqrtm=weights_sqrtm)
 
-        _scale = _d + r
-        weights_sqrtm1 = jnp.ones((_d,)) / jnp.sqrt(2.0 * _scale)
-        weights_sqrtm2 = jnp.sqrt(r / _scale)
-        weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
-        return cls(points=pts, weights_sqrtm=weights_sqrtm)
+
+def _ut_points_and_weights_sqrtm(*, d, r):
+    eye_d = jnp.eye(d) * jnp.sqrt(d + r)
+    zeros = jnp.zeros((1, d))
+    pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
+    _scale = d + r
+    weights_sqrtm1 = jnp.ones((d,)) / jnp.sqrt(2.0 * _scale)
+    weights_sqrtm2 = jnp.sqrt(r / _scale)
+    weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
+    return pts, weights_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
