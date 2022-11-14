@@ -34,9 +34,12 @@ class _PositiveCubatureRule:
     @classmethod
     def from_params_batch(cls, input_shape, **kwargs):
         # Todo: is this what _we want_?
-        # It is what we had so far, but how does the complexity of this mess
-        # scale with the dimensionality of the problem?
-
+        #  It is what we had so far, but how does the complexity of this mess
+        #  scale with the dimensionality of the problem?
+        #  It would be more efficient if S would not depend on the dimension anymore.
+        #  Currently it does. If we simply stacked 'd' 1-dimensional rules
+        #  on top of each other, the complexity reduces
+        #  (but the solver seems to suffer a lot...)
         # Alright, so what do we do here?
         # Make a _PositiveCubatureRule(points.shape=(S, d), weights.shape=(S,))
         instance = cls.from_params(input_shape=input_shape, **kwargs)
