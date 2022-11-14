@@ -33,13 +33,26 @@ class _PositiveCubatureRule:
 
     @classmethod
     def from_params_batch(cls, input_shape, **kwargs):
-        batch_dim, *input_dims = input_shape
-        instance = cls.from_params(input_shape=input_dims, **kwargs)
-        return _tree_stack_duplicates(instance, n=batch_dim)
+        # Todo: is this what _we want_?
+        # It is what we had so far, but how does the complexity of this mess
+        # scale with the dimensionality of the problem?
+
+        # Alright, so what do we do here?
+        # Make a _PositiveCubatureRule(points.shape=(S, d), weights.shape=(S,))
+        instance = cls.from_params(input_shape=input_shape, **kwargs)
+
+        d, *_ = input_shape
+        points = instance.points.T  # (d, S)
+        weights_sqrtm = jnp.stack(d * [instance.weights_sqrtm])  # (d, S)
+        return cls(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _tree_stack_duplicates(tree, n):
     return jax.tree_util.tree_map(lambda s: jnp.vstack([s[None, ...]] * n), tree)
+
+
+def _tree_shape(tree):
+    return jax.tree_util.tree_map(jnp.shape, tree)
 
 
 @jax.tree_util.register_pytree_node_class

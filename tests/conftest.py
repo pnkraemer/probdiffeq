@@ -149,7 +149,7 @@ def fixture_solution_solve(ode_problem, tolerances, solver):
 @pytest_cases.fixture(scope="session", name="fixed_grid")
 def fixture_fixed_grid(ode_problem):
     _, _, t0, t1, _ = ode_problem
-    return jnp.linspace(t0, t1, endpoint=True, num=15)
+    return jnp.linspace(t0, t1, endpoint=True, num=10)
 
 
 @pytest_cases.fixture(scope="session", name="solution_fixed_grid")
