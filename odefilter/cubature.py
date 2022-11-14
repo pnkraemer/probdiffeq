@@ -36,11 +36,14 @@ class SphericalCubatureIntegration(_PositiveCubatureRule):
     """Spherical cubature integration."""
 
     @classmethod
-    def from_params(cls, *, input_dimension):
+    def from_params(cls, *, input_shape):
         """Construct an SCI rule from the dimension of a random variable.
 
         The number of cubature points is _higher_ than ``input_dimension``.
         """
+        assert len(input_shape) == 1
+        (input_dimension,) = input_shape
+
         _d = input_dimension  # alias for readability
         eye_d = jnp.eye(_d) * jnp.sqrt(_d)
         pts = jnp.vstack((eye_d, -1 * eye_d))
@@ -55,11 +58,14 @@ class UnscentedTransform(_PositiveCubatureRule):
 
     # todo: more parameters...
     @classmethod
-    def from_params(cls, *, input_dimension, r=1.0):
+    def from_params(cls, *, input_shape, r=1.0):
         """Construct an unscented transform from parameters.
 
         The number of cubature points is _higher_ than ``input_dimension``.
         """
+        assert len(input_shape) == 1
+        (input_dimension,) = input_shape
+
         _d = input_dimension  # alias for readability
         eye_d = jnp.eye(_d) * jnp.sqrt(_d + r)
         zeros = jnp.zeros((1, _d))
@@ -77,11 +83,14 @@ class GaussHermite(_PositiveCubatureRule):
     """Gauss-Hermite cubature."""
 
     @classmethod
-    def from_params(cls, *, input_dimension, degree=5):
+    def from_params(cls, *, input_shape, degree=5):
         """Construct a Gauss-Hermite cubature rule.
 
         The number of cubature points is input_dimension**degree.
         """
+        assert len(input_shape) == 1
+        (input_dimension,) = input_shape
+
         # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
         _roots = scipy.special.roots_hermitenorm(n=degree, mu=True)
         pts, weights, sum_of_weights = _roots
