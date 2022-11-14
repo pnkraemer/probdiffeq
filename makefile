@@ -16,9 +16,15 @@ lint:
 	black --check --diff .
 	flake8
 	# Apply the basics to the notebooks
-	nbqa isort --check --diff .
-	nbqa black --check --diff .
-	nbqa flake8 docs/
+	nbqa isort --check --diff docs/examples/
+	nbqa isort --check --diff docs/advanced_examples/
+	nbqa isort --check --diff docs/benchmarks/
+	nbqa black --check --diff docs/examples/
+	nbqa black --check --diff docs/advanced_examples/
+	nbqa black --check --diff docs/benchmarks/
+	nbqa flake8 docs/examples/
+	nbqa flake8 docs/advanced_examples/
+	nbqa flake8 docs/benchmarks/
 	# Opt-in for specific pylint checks that flake8 can't detect
 	pylint odefilter/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
 	pylint tests/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
