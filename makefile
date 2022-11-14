@@ -4,12 +4,8 @@
 format:
 	isort .
 	black .
-	nbqa black docs/examples/
-	nbqa black docs/advanced_examples/
-	nbqa black docs/benchmarks/
-	nbqa isort docs/examples/
-	nbqa isort docs/advanced_examples/
-	nbqa isort docs/benchmarks/
+	nbqa black docs/
+	nbqa isort docs/
 	jupytext --sync docs/examples/*
 	jupytext --sync docs/advanced_examples/*
 	jupytext --sync docs/benchmarks/*
