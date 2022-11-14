@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from odefilter import cubature as cubature_module
-from odefilter.implementations import _collections, _ibm_util, _scalar, _sqrtm
+from odefilter.implementations import _collections, _ibm_util, _scalar
 
 # todo: reconsider naming!
 
@@ -18,6 +18,11 @@ class BatchNormal(_collections.StateSpaceVariable, Generic[SSV]):
 
     def __init__(self, mean, cov_sqrtm_lower):
         self._normal = _scalar.Normal(mean, cov_sqrtm_lower)
+
+    def __repr__(self):
+        name = f"{self.__class__.__name__}"
+        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
+        return f"{name}({args})"
 
     @property
     def mean(self):
@@ -35,6 +40,13 @@ class BatchNormal(_collections.StateSpaceVariable, Generic[SSV]):
     @classmethod
     def tree_unflatten(cls, _aux, children):
         (normal,) = children
+        return cls(normal.mean, normal.cov_sqrtm_lower)
+
+    def to_normal(self):
+        return _scalar.Normal(self.mean, self.cov_sqrtm_lower)
+
+    @classmethod
+    def from_normal(cls, normal):
         return cls(normal.mean, normal.cov_sqrtm_lower)
 
     @property
@@ -101,6 +113,10 @@ class BatchScalarNormal(_collections.StateSpaceVariable, Generic[SSV]):
         (normal,) = children
         return cls(normal.mean, normal.cov_sqrtm_lower)
 
+    @classmethod
+    def from_scalar_normal(cls, normal):
+        return cls(normal.mean, normal.cov_sqrtm_lower)
+
     @property
     def sample_shape(self):
         return self._normal.sample_shape  # mean is (d, n)
@@ -145,8 +161,13 @@ class BatchMomentMatching(
             raise ValueError
 
         super().__init__(ode_order=ode_order)
-        self.cubature = cubature
         self.ode_dimension = ode_dimension
+
+        self._mm = _scalar.MomentMatching(ode_order=ode_order, cubature=cubature)
+
+    @property
+    def cubature(self):
+        return self._mm.cubature
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
@@ -163,134 +184,71 @@ class BatchMomentMatching(
     @classmethod
     def from_params(cls, ode_dimension, ode_order):
         cubature_fn = cubature_module.SphericalCubatureIntegration.from_params
-        cubature = cubature_fn(input_dimension=ode_dimension)
+        cubature_1d = cubature_fn(input_shape=())
+        cubature = _tree_stack_duplicates(cubature_1d, n=ode_dimension)
         return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
     def begin_correction(self, x: BatchNormal, /, vector_field, t, p):
+        # Unvmap
+        extrapolated = x.to_normal()
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         cache = (vmap_f,)
 
-        # 1. x -> (e0x, e1x)
-        L_X = x.cov_sqrtm_lower
-        L0 = L_X[:, 0, :]  # (d, n)
-        r_marg1_x = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(
-            R=L0[:, :, None]
-        )  # (d, 1, 1)
-        r_marg1_x_squeeze = jnp.reshape(r_marg1_x, (self.ode_dimension,))
-        m_marg1_x, m_marg1_y = x.mean[:, 0], x.mean[:, 1]
+        # Evaluate vector field at sigma-points
+        sigma_points_fn = jax.vmap(_scalar.MomentMatching.transform_sigma_points)
+        sigma_points, _, _ = sigma_points_fn(self._mm, extrapolated)
 
-        # 2. (x, y) -> (f(x), y)
-        x_centered = (
-            self.cubature.points * r_marg1_x_squeeze[None, :]
-        )  # (S, d) * (1, d) = (S, d)
-        sigma_points = m_marg1_x[None, :] + x_centered
-        fx = vmap_f(sigma_points)
-        m_marg2 = self.cubature.weights_sqrtm**2 @ fx
-        fx_centered = fx - m_marg2[None, :]
-        fx_centered_normed = (
-            fx_centered * self.cubature.weights_sqrtm[:, None]
-        )  # (S, d)
+        fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
+        center_fn = jax.vmap(_scalar.MomentMatching.center)
+        fx_mean, _, fx_centered_normed = center_fn(self._mm, fx)
 
-        # 3. (x, y) -> y - x (last one)
-        m_marg = m_marg1_y - m_marg2
-        L1 = L_X[:, 1, :]  # (d, n)
-        # (d, n) @ (n, d) + (d, S) @ (S, d) = (d, d)
-        # becomes (d, 1, n) @ (d, n, 1) + (d, 1, S) @ (d, S, 1) = (D, 1, 1)
-        l_marg_block = jax.vmap(_sqrtm.sum_of_sqrtm_factors)(
-            R1=L1[:, :, None], R2=fx_centered_normed.T[:, :, None]
+        # Compute output scale and error estimate
+        calibrate_fn = jax.vmap(_scalar.MomentMatching.calibrate)
+        error_estimate, output_scale_sqrtm = calibrate_fn(
+            self._mm, fx_mean, fx_centered_normed, extrapolated
         )
-        l_marg = jnp.reshape(l_marg_block, (self.ode_dimension,))
-
-        # Summarise
-        marginals = BatchScalarNormal(m_marg, l_marg)
-        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
-
-        # Compute error estimate
-        error_estimate = l_marg
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
-        # The correction step for the cubature Kalman filter implementation
-        # is quite complicated. The reason is that the observation model
-        # is x -> e1(x) - f(e0(x)), i.e., a composition of a linear/nonlinear/linear
-        # model, and that we _only_ want to cubature-linearise the nonlinearity.
-        # So what we do is that we compute marginals, gains, and posteriors
-        # for each of the three transitions and merge them in the end.
-        # This uses the fewest sigma-points possible, and ultimately should
-        # lead to the fastest, most stable implementation.
+        # Unvmap
+        extra = extrapolated.to_normal()
+        (vmap_f,) = cache
 
-        # Compute the linearisation as in
-        # Eq. (9) in https://arxiv.org/abs/2102.00514
-        H, noise = self._linearize(x=extrapolated, cache=cache)
-        # (d,), ((d,), (d,))
+        H, noise = self.linearize(extra, vmap_f)
 
-        # Compute the CKF correction
-        L = extrapolated.cov_sqrtm_lower
-        L0 = L[:, 0, :]  # (d, n)
-        L1 = L[:, 1, :]  # (d, n)
-        HL = L1 - H[:, None] * L0[:, :]  # (d, n) - (d, 1) @ (d, n) = (d, n)
-        r_marg, (r_bw, gain) = jax.vmap(_sqrtm.revert_conditional)(
-            R_X_F=HL[:, :, None],
-            R_X=_transpose(L),
-            R_YX=noise.cov_sqrtm_lower[:, None, None],
+        fn = jax.vmap(_scalar.MomentMatching.complete_correction_post_linearize)
+        obs_unb, (cor_unb, gain) = fn(self._mm, H, extra, noise)
+
+        # Vmap
+        obs = BatchScalarNormal.from_scalar_normal(obs_unb)
+        cor = BatchNormal.from_normal(cor_unb)
+        return obs, (cor, gain)
+
+    def linearize(self, extrapolated, vmap_f):
+        # Transform the sigma-points
+        sigma_points_fn = jax.vmap(_scalar.MomentMatching.transform_sigma_points)
+        sigma_points, _, sigma_points_centered_normed = sigma_points_fn(
+            self._mm, extrapolated
         )
-        r_marg_squeezed = jnp.reshape(r_marg, (self.ode_dimension,))
 
-        # Catch up the marginals
-        x = extrapolated  # alias for readability in this code-block
-        x0 = x.mean[:, 0]
-        x1 = x.mean[:, 1]
-        m_marg = x1 - (H * x0 + noise.mean)
-        marginals = BatchScalarNormal(m_marg, r_marg_squeezed)
+        # Evaluate the vector field at the sigma-points
+        fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
+        center_fn = jax.vmap(_scalar.MomentMatching.center)
+        fx_mean, _, fx_centered_normed = center_fn(self._mm, fx)
 
-        # Catch up the backward noise and return result
-        m_bw = extrapolated.mean - (gain @ m_marg[:, None, None])[:, :, 0]
-        backward_noise = BatchNormal(m_bw, _transpose(r_bw))
-
-        return marginals, (backward_noise, gain)
-
-    def _linearize(self, x, cache):
-        vmap_f, *_ = cache
-
-        # Create sigma points
-        m_0 = x.mean[:, 0]
-        l_0 = x.cov_sqrtm_lower[:, 0, :]  # (d, n)
-        r_0_square = jax.vmap(_sqrtm.sqrtm_to_upper_triangular)(
-            R=l_0[:, :, None]
-        )  # (d, n, 1) -> (d, 1, 1)
-        r_0_reshaped = jnp.reshape(r_0_square, (self.ode_dimension,))  # (d,)
-        pts_centered = (
-            self.cubature.points * r_0_reshaped[None, :]
-        )  # (S, d) * (1, d) = (S, d)
-        pts = m_0[None, :] + pts_centered  # (S, d)
-
-        # Evaluate the vector-field
-        fx = vmap_f(pts)
-        fx_mean = self.cubature.weights_sqrtm**2 @ fx
-        fx_centered = fx - fx_mean[None, :]  # (S, d)
-
-        # Revert the transition to get H and Omega
-        # This is a pure sqrt-implementation of
-        # Eq. (9) in https://arxiv.org/abs/2102.00514
-        # It seems to be different to Section VI.B in
-        # https://arxiv.org/abs/2207.00426,
-        # because the implementation below avoids sqrt-down-dates
-        pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
-        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
-        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
-        #  (but would it still be valid?)
-        _, (r_Om, H) = jax.vmap(_sqrtm.revert_conditional_noisefree)(
-            R_X_F=pts_centered_normed.T[:, :, None],
-            R_X=fx_centered_normed.T[:, :, None],
+        # Complete the linearization
+        lin_fn = jax.vmap(_scalar.MomentMatching.linearization_matrices)
+        H, noise_unb = lin_fn(
+            self._mm,
+            fx_centered_normed,
+            fx_mean,
+            sigma_points_centered_normed,
+            extrapolated,
         )
-        r_Om_reshaped = jnp.reshape(r_Om, (self.ode_dimension,))  # why (d,)??
-        H_reshaped = jnp.reshape(H, (self.ode_dimension,))  # why (d,)??
-
-        # Catch up the transition-mean and return the result
-        d = fx_mean - H_reshaped * m_0
-        return H_reshaped, BatchNormal(d, r_Om_reshaped)
+        noise = BatchScalarNormal.from_scalar_normal(noise_unb)
+        return H, noise
 
 
 BatchTS0CacheType = Tuple[jax.Array]
@@ -458,9 +416,5 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         return ext_batched, bw_model_batched
 
 
-def _transpose(x):
-    return jnp.swapaxes(x, -1, -2)
-
-
 def _tree_stack_duplicates(tree, n):
-    return jax.tree_util.tree_map(lambda s: jnp.stack([s] * n), tree)
+    return jax.tree_util.tree_map(lambda s: jnp.vstack([s[None, ...]] * n), tree)

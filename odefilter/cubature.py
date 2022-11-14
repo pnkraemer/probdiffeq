@@ -48,7 +48,7 @@ class SphericalCubatureIntegration(_PositiveCubatureRule):
         # If input_shape == (), compute weights via input_shape=(1,)
         # and 'squeeze' the points.
         points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=1)
-        (S,) = points_mat.shape
+        (S, _) = points_mat.shape
         points = jnp.reshape(points_mat, (S,))
         return cls(points=points, weights_sqrtm=weights_sqrtm)
 
