@@ -162,9 +162,8 @@ class BatchMomentMatching(
 
     @classmethod
     def from_params(cls, ode_dimension, ode_order):
-        cubature = cubature_module.SphericalCubatureIntegration.from_params(
-            input_dimension=ode_dimension
-        )
+        cubature_fn = cubature_module.SphericalCubatureIntegration.from_params
+        cubature = cubature_fn(input_dimension=ode_dimension)
         return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
     def begin_correction(self, x: BatchNormal, /, vector_field, t, p):
