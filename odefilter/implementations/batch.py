@@ -418,6 +418,8 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
     def from_params(cls, ode_dimension, num_derivatives):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+
+        # Todo: extract into a function?!
         a_stack = jnp.stack([a] * ode_dimension)
         q_sqrtm_stack = jnp.stack([q_sqrtm] * ode_dimension)
         return cls(a=a_stack, q_sqrtm_lower=q_sqrtm_stack)
