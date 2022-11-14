@@ -163,7 +163,7 @@ class BatchMomentMatching(
     @classmethod
     def from_params(cls, ode_dimension, ode_order):
         cubature = cubature_module.SphericalCubatureIntegration.from_params(
-            ode_dimension=ode_dimension
+            input_dimension=ode_dimension
         )
         return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
 
@@ -418,10 +418,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
     def from_params(cls, ode_dimension, num_derivatives):
         """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-
-        # Todo: extract into a function?!
-        a_stack = jnp.stack([a] * ode_dimension)
-        q_sqrtm_stack = jnp.stack([q_sqrtm] * ode_dimension)
+        a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=ode_dimension)
         return cls(a=a_stack, q_sqrtm_lower=q_sqrtm_stack)
 
     def begin_extrapolation(self, m0, /, dt):
@@ -464,3 +461,7 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
 
 def _transpose(x):
     return jnp.swapaxes(x, -1, -2)
+
+
+def _tree_stack_duplicates(tree, n):
+    return jax.tree_util.tree_map(lambda s: jnp.stack([s] * n), tree)
