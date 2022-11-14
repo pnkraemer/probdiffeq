@@ -5,15 +5,6 @@ odefilter/_version.py
 .idea/
 .vscode/
 
-# Notebooks are synced with jupytext.
-# Only the *.md conversion is version-controlled.
-docs/source/api/
-docs/_build/
-docs/source/example_notebooks/solve_bvp_with_scipy.ipynb
-docs/source/example_notebooks/solve_ivp_with_scipy.ipynb
-docs/source/example_notebooks/solve_ivp_with_diffrax.ipynb
-docs/source/example_notebooks/solve_ivp_with_jax.ipynb
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

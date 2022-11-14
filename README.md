@@ -12,6 +12,21 @@
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/odefilter/issues)
 
 
+## Installation
+
+Get the most recent stable version from PyPi:
+
+```
+pip install odefilter
+```
+Or directly from GitHub:
+```
+pip install git+https://github.com/pnkraemer/odefilter.git
+```
+
+Read more about installing this package [here](https://odefilter.readthedocs.io/en/latest/getting_started/installation.html).
+
+
 ## Features include
 
 ### Initial value problem solvers
@@ -94,21 +109,6 @@ and many more.
 - [ ] 100-dimensional linear ODE
 - [ ] 1000-dimensional linear ODE?
 - [ ] HIRES
-
-
-## Installation
-
-Get the most recent stable version from PyPi:
-
-```
-pip install odefilter
-```
-Or directly from GitHub:
-```
-pip install git+https://github.com/pnkraemer/odefilter.git
-```
-
-Read more about installing this package [here](https://odefilter.readthedocs.io/en/latest/getting_started/installation.html).
 
 
 ## Similar projects
