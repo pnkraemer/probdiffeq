@@ -13,9 +13,11 @@ jupyter:
     name: python3
 ---
 
-# Physics-enhanced regression
+# Physics-enhanced regression part 1
 
-We create some fake-observational data, compute the marginal likelihood of this fake data _under the ODE posterior_ (which is something you cannot do with non-probabilistic solvers!), and optimize the parameters with `optax`. Tronarp, Bosch, and Hennig call this "physics-enhanced regression" (obviously abbreviated as "Fenrir").
+**Time-series data and optimization with ``optax``**
+
+We create some fake-observational data, compute the marginal likelihood of this fake data _under the ODE posterior_ (which is something you cannot do with non-probabilistic solvers!), and optimize the parameters with `optax`. Tronarp, Bosch, and Hennig call this "physics-enhanced regression".
 
 ```python
 import functools

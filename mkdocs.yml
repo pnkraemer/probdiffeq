@@ -82,7 +82,8 @@ nav:
         - "examples/solution_object.ipynb"
         - "examples/dynamic_output_scales.ipynb"
     - Advanced Examples:
-        - "advanced_examples/physics_enhanced_regression.ipynb"
+        - "advanced_examples/physics_enhanced_regression_1.ipynb"
+        - "advanced_examples/physics_enhanced_regression_2.ipynb"
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/odefiltersolve.md"
