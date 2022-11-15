@@ -80,6 +80,7 @@ nav:
         - "examples/second_order_problems.ipynb"
         - "examples/smoothing.ipynb"
         - "examples/solution_object.ipynb"
+        - "examples/dynamic_output_scales.ipynb"
     - Advanced Examples:
         - "advanced_examples/physics_enhanced_regression.ipynb"
     - API Documentation:
