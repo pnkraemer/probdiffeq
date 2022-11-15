@@ -20,19 +20,16 @@ jupyter:
 We create some fake-observational data, compute the marginal likelihood of this fake data _under the ODE posterior_ (which is something you cannot do with non-probabilistic solvers!), and optimize the parameters with `optax`. Tronarp, Bosch, and Hennig call this "physics-enhanced regression".
 
 ```python
-import functools
-
 import blackjax
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import dense_output, ivpsolve, solvers
+from odefilter import ivpsolve, solvers
 from odefilter.implementations import implementations
-from odefilter.strategies import filters, smoothers
+from odefilter.strategies import filters
 
 config.update("jax_enable_x64", True)
 
