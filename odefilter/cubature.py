@@ -4,7 +4,8 @@ import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
-# todo: input_dimension -> input_shape. But how does the UT work in this case?
+# todo: clean up the constructors
+#  (there is a lot of duplication, and the *_batch logic is not really obvious)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -14,6 +15,11 @@ class _PositiveCubatureRule:
     def __init__(self, *, points, weights_sqrtm):
         self.points = points
         self.weights_sqrtm = weights_sqrtm
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args = f"points={self.points}, weights_sqrtm={self.weights_sqrtm}"
+        return f"{name}({args})"
 
     def tree_flatten(self):
         children = self.points, self.weights_sqrtm
@@ -25,23 +31,62 @@ class _PositiveCubatureRule:
         pts, weights_sqrtm = children
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
+    @classmethod
+    def from_params_batch(cls, input_shape, **kwargs):
+        # Todo: is this what _we want_?
+        #  It is what we had so far, but how does the complexity of this mess
+        #  scale with the dimensionality of the problem?
+        #  It would be more efficient if S would not depend on the dimension anymore.
+        #  Currently it does. If we simply stacked 'd' 1-dimensional rules
+        #  on top of each other, the complexity reduces
+        #  (but the solver seems to suffer a lot...)
+        # Alright, so what do we do here?
+        # Make a _PositiveCubatureRule(points.shape=(S, d), weights.shape=(S,))
+        instance = cls.from_params(input_shape=input_shape, **kwargs)
+
+        d, *_ = input_shape
+        points = instance.points.T  # (d, S)
+        weights_sqrtm = jnp.stack(d * [instance.weights_sqrtm])  # (d, S)
+        return cls(points=points, weights_sqrtm=weights_sqrtm)
+
+
+def _tree_stack_duplicates(tree, n):
+    return jax.tree_util.tree_map(lambda s: jnp.vstack([s[None, ...]] * n), tree)
+
+
+def _tree_shape(tree):
+    return jax.tree_util.tree_map(jnp.shape, tree)
+
 
 @jax.tree_util.register_pytree_node_class
 class SphericalCubatureIntegration(_PositiveCubatureRule):
     """Spherical cubature integration."""
 
     @classmethod
-    def from_params(cls, *, input_dimension):
+    def from_params(cls, input_shape):
         """Construct an SCI rule from the dimension of a random variable.
 
         The number of cubature points is _higher_ than ``input_dimension``.
         """
-        _d = input_dimension  # alias for readability
-        eye_d = jnp.eye(_d) * jnp.sqrt(_d)
-        pts = jnp.vstack((eye_d, -1 * eye_d))
+        assert len(input_shape) <= 1
+        if len(input_shape) == 1:
+            (d,) = input_shape
+            points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=d)
+            return cls(points=points_mat, weights_sqrtm=weights_sqrtm)
 
-        weights_sqrtm = jnp.ones((2 * _d,)) / jnp.sqrt(2.0 * _d)
-        return cls(points=pts, weights_sqrtm=weights_sqrtm)
+        # If input_shape == (), compute weights via input_shape=(1,)
+        # and 'squeeze' the points.
+        points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=1)
+        (S, _) = points_mat.shape
+        points = jnp.reshape(points_mat, (S,))
+        return cls(points=points, weights_sqrtm=weights_sqrtm)
+
+
+def _sci_pts_and_weights_sqrtm(*, d):
+    eye_d = jnp.eye(d) * jnp.sqrt(d)
+    pts = jnp.vstack((eye_d, -1 * eye_d))
+    weights_sqrtm = jnp.ones((2 * d,)) / jnp.sqrt(2.0 * d)
+    return pts, weights_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
@@ -50,21 +95,34 @@ class UnscentedTransform(_PositiveCubatureRule):
 
     # todo: more parameters...
     @classmethod
-    def from_params(cls, *, input_dimension, r=1.0):
+    def from_params(cls, *, input_shape, r=1.0):
         """Construct an unscented transform from parameters.
 
         The number of cubature points is _higher_ than ``input_dimension``.
         """
-        _d = input_dimension  # alias for readability
-        eye_d = jnp.eye(_d) * jnp.sqrt(_d + r)
-        zeros = jnp.zeros((1, _d))
-        pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
+        assert len(input_shape) <= 1
+        if len(input_shape) == 1:
+            (d,) = input_shape
+            points_mat, weights_sqrtm = _ut_points_and_weights_sqrtm(d=d, r=r)
+            return cls(points=points_mat, weights_sqrtm=weights_sqrtm)
 
-        _scale = _d + r
-        weights_sqrtm1 = jnp.ones((_d,)) / jnp.sqrt(2.0 * _scale)
-        weights_sqrtm2 = jnp.sqrt(r / _scale)
-        weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
-        return cls(points=pts, weights_sqrtm=weights_sqrtm)
+        # If input_shape == (), compute weights via input_shape=(1,)
+        # and 'squeeze' the points.
+        points_mat, weights_sqrtm = _ut_points_and_weights_sqrtm(d=1, r=r)
+        (S, _) = points_mat.shape
+        points = jnp.reshape(points_mat, (S,))
+        return cls(points=points, weights_sqrtm=weights_sqrtm)
+
+
+def _ut_points_and_weights_sqrtm(*, d, r):
+    eye_d = jnp.eye(d) * jnp.sqrt(d + r)
+    zeros = jnp.zeros((1, d))
+    pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
+    _scale = d + r
+    weights_sqrtm1 = jnp.ones((d,)) / jnp.sqrt(2.0 * _scale)
+    weights_sqrtm2 = jnp.sqrt(r / _scale)
+    weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
+    return pts, weights_sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
@@ -72,11 +130,14 @@ class GaussHermite(_PositiveCubatureRule):
     """Gauss-Hermite cubature."""
 
     @classmethod
-    def from_params(cls, *, input_dimension, degree=5):
+    def from_params(cls, *, input_shape, degree=5):
         """Construct a Gauss-Hermite cubature rule.
 
         The number of cubature points is input_dimension**degree.
         """
+        assert len(input_shape) == 1
+        (input_dimension,) = input_shape
+
         # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
         _roots = scipy.special.roots_hermitenorm(n=degree, mu=True)
         pts, weights, sum_of_weights = _roots

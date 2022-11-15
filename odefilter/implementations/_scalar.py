@@ -3,6 +3,7 @@
 import jax
 import jax.numpy as jnp
 
+from odefilter import cubature as cubature_module
 from odefilter.implementations import _collections, _ibm_util, _sqrtm
 
 
@@ -195,6 +196,166 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         observed = ScalarNormal(mean=b, cov_sqrtm_lower=r_obs.T)
         corrected = Normal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         return observed, (corrected, gain)
+
+
+@jax.tree_util.register_pytree_node_class
+class MomentMatching(_collections.AbstractCorrection):
+    def __init__(self, ode_order, cubature):
+        if ode_order > 1:
+            raise ValueError
+
+        super().__init__(ode_order=ode_order)
+        self.cubature = cubature
+
+    @classmethod
+    def from_params(cls, ode_order):
+        sci_fn = cubature_module.SphericalCubatureIntegration.from_params
+        cubature = sci_fn(input_shape=())
+        return cls(ode_order=ode_order, cubature=cubature)
+
+    def tree_flatten(self):
+        # todo: should this call super().tree_flatten()?
+        children = (self.cubature,)
+        aux = (self.ode_order,)
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        (cubature,) = children
+        (ode_order,) = aux
+        return cls(ode_order=ode_order, cubature=cubature)
+
+    def begin_correction(self, x: Normal, /, vector_field, t, p):
+        # # Vmap relevant functions
+        # vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
+        # cache = (vmap_f,)
+        #
+        # # Transform sigma-points (Shape: (S,))
+        # sigma_points, _, _ = self.transform_sigma_points(x)
+        #
+        # # Evaluate vector field at sigma points
+        # # Assumes a vector field that maps () -> ().
+        # fx = vmap_f(sigma_points)
+        # _, _, fx_centered_normed = self.center(fx)
+        #
+        # # Compute the error estimate and the output scale
+        # # from the vector-field evaluations
+        # error_estimate, output_scale_sqrtm = self.calibrate(fx_centered_normed, x)
+        # return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+        raise NotImplementedError
+
+    def calibrate(
+        self, fx_mean: jax.Array, fx_centered_normed: jax.Array, extrapolated: Normal
+    ):
+        # Extract shapes
+        (S,) = fx_centered_normed.shape
+        (n,) = extrapolated.mean.shape
+
+        # Marginal mean
+        m_marg = extrapolated.mean[1] - fx_mean
+
+        # Marginal covariance
+        R1 = jnp.reshape(extrapolated.cov_sqrtm_lower[1, :], (n, 1))
+        R2 = jnp.reshape(fx_centered_normed, (S, 1))
+        std_marg_mat = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=R2)
+        std_marg = jnp.reshape(std_marg_mat, ())
+
+        # Extract error estimate and output scale from marginals
+        marginals = ScalarNormal(m_marg, std_marg)
+        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
+        error_estimate = std_marg
+        return error_estimate, output_scale_sqrtm
+
+    def complete_correction(self, extrapolated, cache):
+        # vmap_f, *_ = cache
+        #
+        # # Compute the linearization as in
+        # # Eq. (9) in https://arxiv.org/abs/2102.00514
+        # linop, noise = self.linearize(x=extrapolated, vmap_f=vmap_f)
+        # return self.complete_correction_post_linearize(linop, extrapolated, noise)
+        raise NotImplementedError
+
+    def linearize(self, rv, vmap_f):
+        # Create sigma points
+        pts, _, pts_centered_normed = self.transform_sigma_points(rv)
+
+        # Evaluate the vector-field
+        fx = vmap_f(pts)
+        fx_mean, _, fx_centered_normed = self.center(fx)
+
+        # Complete linearization
+        return self.linearization_matrices(
+            fx_centered_normed, fx_mean, pts_centered_normed, rv
+        )
+
+    def transform_sigma_points(self, rv: Normal):
+        # Extract square-root of covariance (-> std-dev.)
+        L0_nonsq = rv.cov_sqrtm_lower[0, :]
+        r_marg1_x_mat = _sqrtm.sqrtm_to_upper_triangular(R=L0_nonsq[:, None])
+        r_marg1_x = jnp.reshape(r_marg1_x_mat, ())
+
+        # Multiply and shift the unit-points
+        m_marg1_x = rv.mean[0]
+        sigma_points_centered = self.cubature.points * r_marg1_x[None]
+        sigma_points = m_marg1_x[None] + sigma_points_centered
+
+        # Scale the shifted points with square-root weights
+        _w = self.cubature.weights_sqrtm
+        sigma_points_centered_normed = sigma_points_centered * _w
+        return sigma_points, sigma_points_centered, sigma_points_centered_normed
+
+    def center(self, fx):
+        fx_mean = self.cubature.weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None]
+        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm
+        return fx_mean, fx_centered, fx_centered_normed
+
+    def linearization_matrices(
+        self, fx_centered_normed, fx_mean, pts_centered_normed, rv
+    ):
+        # Revert the transition to get H and Omega
+        # This is a pure sqrt-implementation of
+        # Eq. (9) in https://arxiv.org/abs/2102.00514
+        # It seems to be different to Section VI.B in
+        # https://arxiv.org/pdf/2207.00426.pdf,
+        # because the implementation below avoids sqrt-down-dates
+        # pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
+        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
+        #  (but would it still be valid?)
+        _, (std_noi_mat, linop_mat) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=pts_centered_normed[:, None], R_X=fx_centered_normed[:, None]
+        )
+        std_noi = jnp.reshape(std_noi_mat, ())
+        linop = jnp.reshape(linop_mat, ())
+
+        # Catch up the transition-mean and return the result
+        m_noi = fx_mean - linop * rv.mean[0]
+        return linop, ScalarNormal(m_noi, std_noi)
+
+    def complete_correction_post_linearize(self, linop, extrapolated, noise):
+        # Compute the cubature-correction
+        L0, L1 = extrapolated.cov_sqrtm_lower[0, :], extrapolated.cov_sqrtm_lower[1, :]
+        HL = L1 - linop * L0
+        std_marg_mat, (r_bw, gain_mat) = _sqrtm.revert_conditional(
+            R_X=extrapolated.cov_sqrtm_lower.T,
+            R_X_F=HL[:, None],
+            R_YX=noise.cov_sqrtm_lower[None, None],
+        )
+
+        # Reshape the matrices into appropriate scalar-valued versions
+        (n,) = extrapolated.mean.shape
+        std_marg = jnp.reshape(std_marg_mat, ())
+        gain = jnp.reshape(gain_mat, (n,))
+
+        # Catch up the marginals
+        x0, x1 = extrapolated.mean[0], extrapolated.mean[1]
+        m_marg = x1 - (linop * x0 + noise.mean)
+        obs = ScalarNormal(m_marg, std_marg)
+
+        # Catch up the backward noise and return result
+        m_bw = extrapolated.mean - gain * m_marg
+        cor = Normal(m_bw, r_bw.T)
+        return obs, (cor, gain)
 
 
 @jax.tree_util.register_pytree_node_class

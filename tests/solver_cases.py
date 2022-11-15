@@ -60,16 +60,15 @@ def case_dynamic_filter_ts1_vect():
 
 
 @pytest_cases.case(tags=["filter"])
-def case_mle_filter_mm1_sci_vect():
-    cube = cubature.SphericalCubatureIntegration.from_params(input_dimension=2)
-    implementation = implementations.VectMM1.from_params(cubature=cube, ode_dimension=2)
+def case_mle_filter_mm1_vect():
+    implementation = implementations.VectMM1.from_params(ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
 def case_dynamic_filter_mm1_ut_vect():
-    cube = cubature.UnscentedTransform.from_params(input_dimension=2)
+    cube = cubature.UnscentedTransform.from_params(input_shape=(2,))
     implementation = implementations.VectMM1.from_params(cubature=cube, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
@@ -77,7 +76,7 @@ def case_dynamic_filter_mm1_ut_vect():
 
 @pytest_cases.case(tags=["filter"])
 def case_dynamic_filter_mm1_ut_batch():
-    cube = cubature.UnscentedTransform.from_params(input_dimension=2)
+    cube = cubature.UnscentedTransform.from_params_batch(input_shape=(2,))
     implementation = implementations.BatchMM1.from_params(
         cubature=cube, ode_dimension=2
     )
@@ -86,8 +85,15 @@ def case_dynamic_filter_mm1_ut_batch():
 
 
 @pytest_cases.case(tags=["filter"])
+def case_dynamic_filter_mm1_batch():
+    implementation = implementations.BatchMM1.from_params(ode_dimension=2)
+    strategy = filters.Filter(implementation=implementation)
+    return solvers.DynamicSolver(strategy=strategy)
+
+
+@pytest_cases.case(tags=["filter"])
 def case_dynamic_filter_mm1_gh_vect():
-    cube = cubature.GaussHermite.from_params(input_dimension=2)
+    cube = cubature.GaussHermite.from_params(input_shape=(2,))
     implementation = implementations.VectMM1.from_params(cubature=cube, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
