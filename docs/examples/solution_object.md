@@ -26,6 +26,7 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import dense_output, ivpsolve, solvers
+from odefilter.implementations import recipes
 from odefilter.strategies import smoothers
 
 if not backend.has_been_selected:
@@ -46,7 +47,9 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = solvers.DynamicSolver(strategy=smoothers.Smoother.from_params())
+solver = solvers.DynamicSolver(
+    strategy=smoothers.Smoother(recipes.IsoTS0.from_params())
+)
 ```
 
 ```python tags=[]

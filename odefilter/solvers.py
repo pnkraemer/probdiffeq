@@ -6,8 +6,6 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from odefilter.strategies import filters
-
 T = TypeVar("T")
 
 
@@ -98,7 +96,7 @@ class Solution(Generic[T]):
 class _AbstractSolver(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, strategy):
+    def __init__(self, strategy):
         self.strategy = strategy
 
     def __eq__(self, other):
@@ -107,10 +105,6 @@ class _AbstractSolver(abc.ABC):
 
         tree_equal = jax.tree_util.tree_map(all_equal, self, other)
         return jax.tree_util.tree_all(tree_equal)
-
-    @classmethod
-    def from_params(cls):
-        return cls(strategy=filters.Filter.from_params())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(strategy={self.strategy})"
@@ -213,7 +207,7 @@ class _AbstractSolver(abc.ABC):
 
 @jax.tree_util.register_pytree_node_class
 class Solver(_AbstractSolver):
-    def __init__(self, *, strategy, output_scale_sqrtm):
+    def __init__(self, strategy, *, output_scale_sqrtm):
         super().__init__(strategy=strategy)
 
         # todo: overwrite init_fn()?

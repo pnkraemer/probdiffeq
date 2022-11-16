@@ -27,6 +27,7 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import dense_output, ivpsolve, solvers
+from odefilter.implementations import recipes
 from odefilter.strategies import filters, smoothers
 
 config.update("jax_enable_x64", True)
@@ -49,7 +50,7 @@ If you are interested in the terminal value of the ODE solution, you can use fil
 But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient.
 
 ```python
-ekf0 = solvers.MLESolver(strategy=filters.Filter.from_params())
+ekf0 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
 ekf0sol = ivpsolve.simulate_terminal_values(
     vf,
     initial_values=(u0,),
@@ -66,7 +67,7 @@ print(ekf0sol.t, ekf0sol.u)
 If you are used to calling traditional solve() methods, use one of the conventional smoothers (i.e. not the fixed-point smoothers).
 
 ```python
-eks0 = solvers.MLESolver(strategy=smoothers.Smoother.from_params())
+eks0 = solvers.MLESolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
 eks0sol = ivpsolve.solve(
     vf,
     initial_values=(u0,),
@@ -116,7 +117,9 @@ If you know in advance that you like to have the solution at a pre-specified set
 use the simulate_checkpoints function together with a fixed-point smoother.
 
 ```python
-eks0_fixpt = solvers.MLESolver(strategy=smoothers.FixedPointSmoother.from_params())
+eks0_fixpt = solvers.MLESolver(
+    smoothers.FixedPointSmoother(recipes.IsoTS0.from_params())
+)
 fixptsol = ivpsolve.simulate_checkpoints(
     vf,
     initial_values=(u0,),

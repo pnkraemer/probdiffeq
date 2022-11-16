@@ -10,8 +10,7 @@ from odefilter.strategies import filters, smoothers
 
 @pytest_cases.case(tags=["filter"])
 def case_mle_filter_ts0_iso():
-    implementation = recipes.IsoTS0.from_params()
-    strategy = filters.Filter(implementation=implementation)
+    strategy = filters.Filter(recipes.IsoTS0.from_params())
     return solvers.MLESolver(strategy=strategy)
 
 
@@ -19,7 +18,7 @@ def case_mle_filter_ts0_iso():
 def case_dynamic_smoother_ts0_iso():
     implementation = recipes.IsoTS0.from_params()
     strategy = smoothers.Smoother(implementation=implementation)
-    return solvers.DynamicSolver(strategy=strategy)
+    return solvers.DynamicSolver(strategy)
 
 
 @pytest_cases.case(tags=["fixedpoint"])
