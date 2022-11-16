@@ -23,7 +23,7 @@ def simulate_terminal_values(
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
 
-def simulate_and_save_at(
+def solve_and_save_at(
     vector_field, taylor_coefficients, save_at, solver, parameters, **options
 ):
     """Simulate checkpoints of an ODE solution with an ODE filter."""

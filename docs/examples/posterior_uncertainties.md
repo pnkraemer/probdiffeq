@@ -56,7 +56,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```python
 %%time
 
-solution = ivpsolve.simulate_and_save_at(
+solution = ivpsolve.solve_and_save_at(
     vf, initial_values=(u0,), save_at=ts, solver=ts0, rtol=1e-1, atol=1e-1, parameters=f_args
 )
 ```
@@ -110,7 +110,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```python
 %%time
 
-solution = ivpsolve.simulate_and_save_at(
+solution = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),
     save_at=ts,

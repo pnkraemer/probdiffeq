@@ -9,7 +9,7 @@ from odefilter.implementations import recipes
 from odefilter.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
-#  solve(... solver=smo) and simulate_and_save_at(solver=fp_smo)
+#  solve(... solver=smo) and solve_and_save_at(solver=fp_smo)
 #  this redundancy should be eliminated
 
 
@@ -22,7 +22,7 @@ def smoother_pair_smoother_and_fixedpoint():
 @pytest_cases.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
 @pytest_cases.parametrize("k", [1, 3])  # k * N // 2 off-grid points
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
-    """In simulate_and_save_at(), if the checkpoint-grid equals the solution-grid\
+    """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""
     vf, u0, t0, t1, p = ode_problem
     # smo_sol.t is an adaptive grid
@@ -39,7 +39,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
         ts=ts[1:-1], solution=smo_sol, solver=solvers.DynamicSolver(strategy=smo)
     )
 
-    fp_smo_sol = ivpsolve.simulate_and_save_at(
+    fp_smo_sol = ivpsolve.solve_and_save_at(
         *args, ts=ts, solver=solvers.DynamicSolver(strategy=fp_smo), **kwargs
     )
     fixedpoint_smo_sol = fp_smo_sol[1:-1]  # reference is defined only on the interior

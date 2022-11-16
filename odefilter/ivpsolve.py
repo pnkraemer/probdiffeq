@@ -47,7 +47,7 @@ def simulate_terminal_values(
     )
 
 
-def simulate_and_save_at(
+def solve_and_save_at(
     vector_field,
     initial_values,
     save_at,
@@ -75,7 +75,7 @@ def simulate_and_save_at(
         parameters=parameters,
     )
 
-    return _odefiltersolve.simulate_and_save_at(
+    return _odefiltersolve.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         save_at=save_at,

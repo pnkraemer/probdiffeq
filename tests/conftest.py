@@ -108,7 +108,7 @@ def fixture_reference_and_save_at(ode_problem, tolerances, checkpoint_grid):
 def fixture_solution_and_save_at(ode_problem, tolerances, solver, checkpoint_grid):
     vf, u0, _, _, f_args = ode_problem
     atol, rtol = tolerances
-    solution = ivpsolve.simulate_and_save_at(
+    solution = ivpsolve.solve_and_save_at(
         vf,
         u0,
         save_at=checkpoint_grid,
