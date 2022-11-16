@@ -154,7 +154,7 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
 
 @pytest_cases.fixture(scope="session", name="solver_odefilter_reference_ek1")
 def fixture_solver_odefilter_reference_ek1(num):
-    implementation = recipes.VectTS1.from_params(num_derivatives=num, ode_dimension=2)
+    implementation = recipes.VectTS1.from_params(num_derivatives=num, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 

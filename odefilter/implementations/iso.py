@@ -213,8 +213,10 @@ class IsoIBM(_collections.AbstractExtrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
-    def init_rv(self, ode_dimension):
-        m0 = jnp.zeros((self.num_derivatives + 1, ode_dimension))
+    def init_rv(self, ode_shape):
+        assert len(ode_shape) == 1
+        (d,) = ode_shape
+        m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
         return IsoNormal(m0, c0)
 

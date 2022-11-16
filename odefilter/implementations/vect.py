@@ -113,19 +113,20 @@ class VectNormal(_collections.StateSpaceVariable):
 
 @jax.tree_util.register_pytree_node_class
 class VectTaylorZerothOrder(_collections.AbstractCorrection):
-    def __init__(self, ode_dimension, ode_order):
+    def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
-        self.ode_dimension = ode_dimension
+        assert len(ode_shape) == 1
+        self.ode_shape = ode_shape
 
     def tree_flatten(self):
         children = ()
-        aux = self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, _children):
-        ode_order, ode_dimension = aux
-        return cls(ode_order=ode_order, ode_dimension=ode_dimension)
+        ode_order, ode_shape = aux
+        return cls(ode_order=ode_order, ode_shape=ode_shape)
 
     def begin_correction(self, x: VectNormal, /, vector_field, t, p):
         m0 = self._select_derivative(x.mean, slice(0, self.ode_order))
@@ -161,25 +162,27 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         return select(x)
 
     def _select_derivative(self, x, i):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        (d,) = self.ode_shape
+        x_reshaped = jnp.reshape(x, (-1, d), order="F")
         return x_reshaped[i, ...]
 
 
 @jax.tree_util.register_pytree_node_class
 class VectTaylorFirstOrder(_collections.AbstractCorrection):
-    def __init__(self, ode_dimension, ode_order):
+    def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
-        self.ode_dimension = ode_dimension
+        assert len(ode_shape) == 1
+        self.ode_shape = ode_shape
 
     def tree_flatten(self):
         children = ()
-        aux = self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, _children):
-        ode_order, ode_dimension = aux
-        return cls(ode_order=ode_order, ode_dimension=ode_dimension)
+        ode_order, ode_shape = aux
+        return cls(ode_order=ode_order, ode_shape=ode_shape)
 
     def begin_correction(self, x: VectNormal, /, vector_field, t, p):
         vf_partial = jax.tree_util.Partial(
@@ -232,37 +235,39 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         return select(x)
 
     def _select_derivative(self, x, i):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        (d,) = self.ode_shape
+        x_reshaped = jnp.reshape(x, (-1, d), order="F")
         return x_reshaped[i, ...]
 
 
 @jax.tree_util.register_pytree_node_class
 class VectMomentMatching(_collections.AbstractCorrection):
-    def __init__(self, ode_dimension, ode_order, cubature):
+    def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
-        self.ode_dimension = ode_dimension
+        assert len(ode_shape) == 1
+        self.ode_shape = ode_shape
         self.cubature = cubature
 
     @classmethod
-    def from_params(cls, ode_dimension, ode_order):
+    def from_params(cls, ode_shape, ode_order):
         sci_fn = cubature_module.SphericalCubatureIntegration.from_params
-        cubature = sci_fn(input_shape=(ode_dimension,))
-        return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
+        cubature = sci_fn(input_shape=ode_shape)
+        return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
         children = (self.cubature,)
-        aux = self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (cubature,) = children
-        ode_order, ode_dimension = aux
-        return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
+        ode_order, ode_shape = aux
+        return cls(ode_order=ode_order, ode_shape=ode_shape, cubature=cubature)
 
     def begin_correction(self, x: VectNormal, /, vector_field, t, p):
 
@@ -375,7 +380,8 @@ class VectMomentMatching(_collections.AbstractCorrection):
         return select(x)
 
     def _select_derivative(self, x, i):
-        x_reshaped = jnp.reshape(x, (-1, self.ode_dimension), order="F")
+        (d,) = self.ode_shape
+        x_reshaped = jnp.reshape(x, (-1, d), order="F")
         return x_reshaped[i, ...]
 
 
@@ -443,46 +449,49 @@ class VectConditional(_collections.AbstractConditional):
 
 @jax.tree_util.register_pytree_node_class
 class VectIBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower, num_derivatives, ode_dimension):
+    def __init__(self, a, q_sqrtm_lower, num_derivatives, ode_shape):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
 
         self.num_derivatives = num_derivatives
-        self.ode_dimension = ode_dimension
+        assert len(ode_shape) == 1
+        self.ode_shape = ode_shape
 
     def __repr__(self):
         name = self.__class__.__name__
         args1 = f"a={self.a}, q={self.q_sqrtm_lower}"
         args2 = f"num_derivatives={self.num_derivatives}"
-        args3 = f"ode_dimension={self.ode_dimension}"
+        args3 = f"ode_shape={self.ode_shape}"
         return f"{name}({args1}, {args2}, {args3})"
 
     def tree_flatten(self):
         children = self.a, self.q_sqrtm_lower
-        aux = self.num_derivatives, self.ode_dimension
+        aux = self.num_derivatives, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         a, q_sqrtm_lower = children
         n, d = aux
-        return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_dimension=d)
+        return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_shape=d)
 
     @classmethod
-    def from_params(cls, ode_dimension, num_derivatives):
+    def from_params(cls, ode_shape, num_derivatives):
         """Create a strategy from hyperparameters."""
+        assert len(ode_shape) == 1
+        (d,) = ode_shape
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-        eye_d = jnp.eye(ode_dimension)
+        eye_d = jnp.eye(d)
         return cls(
             a=jnp.kron(eye_d, a),
             q_sqrtm_lower=jnp.kron(eye_d, q_sqrtm),
             num_derivatives=num_derivatives,
-            ode_dimension=ode_dimension,
+            ode_shape=ode_shape,
         )
 
     def init_corrected(self, taylor_coefficients):
         """Initialise the "corrected" RV by stacking Taylor coefficients."""
-        if taylor_coefficients[0].shape[0] != self.ode_dimension:
+        if taylor_coefficients[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
 
@@ -496,7 +505,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         )
 
     def init_error_estimate(self):
-        return jnp.zeros((self.ode_dimension,))  # the initialisation is error-free
+        return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
     def begin_extrapolation(self, m0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -505,7 +514,8 @@ class VectIBM(_collections.AbstractExtrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
-        shape = (self.num_derivatives + 1, self.ode_dimension)
+        (d,) = self.ode_shape
+        shape = (self.num_derivatives + 1, d)
         extrapolated = VectNormal(m_ext, q_sqrtm, target_shape=shape)
         return extrapolated, (m_ext_p, m0_p, p, p_inv)
 
@@ -513,8 +523,9 @@ class VectIBM(_collections.AbstractExtrapolation):
         p, p_inv = _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
-        p = jnp.tile(p, self.ode_dimension)
-        p_inv = jnp.tile(p_inv, self.ode_dimension)
+        (d,) = self.ode_shape
+        p = jnp.tile(p, d)
+        p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
     def complete_extrapolation(self, linearisation_pt, l0, cache, output_scale_sqrtm):
@@ -562,7 +573,8 @@ class VectIBM(_collections.AbstractExtrapolation):
         return VectConditional(op, noise=noi)
 
     def _init_backward_transition(self):
-        k = (self.num_derivatives + 1) * self.ode_dimension
+        (d,) = self.ode_shape
+        k = (self.num_derivatives + 1) * d
         return jnp.eye(k)
 
     @staticmethod

@@ -156,12 +156,12 @@ BatchMM1CacheType = Tuple[Callable]
 class BatchMomentMatching(
     _collections.AbstractCorrection[BatchNormal, BatchMM1CacheType]
 ):
-    def __init__(self, ode_dimension, ode_order, cubature):
+    def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
-        self.ode_dimension = ode_dimension
+        self.ode_shape = ode_shape
 
         self._mm = _scalar.MomentMatching(ode_order=ode_order, cubature=cubature)
 
@@ -172,20 +172,20 @@ class BatchMomentMatching(
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
         children = (self.cubature,)
-        aux = self.ode_order, self.ode_dimension
+        aux = self.ode_order, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (cubature,) = children
-        ode_order, ode_dimension = aux
-        return cls(ode_order=ode_order, ode_dimension=ode_dimension, cubature=cubature)
+        ode_order, ode_shape = aux
+        return cls(ode_order=ode_order, ode_shape=ode_shape, cubature=cubature)
 
     @classmethod
-    def from_params(cls, ode_dimension, ode_order):
+    def from_params(cls, ode_shape, ode_order):
         cubature_fn = cubature_module.SphericalCubatureIntegration.from_params_batch
-        cubature = cubature_fn(input_shape=(ode_dimension,))
-        return cls(ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature)
+        cubature = cubature_fn(input_shape=ode_shape)
+        return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
 
     def begin_correction(self, x: BatchNormal, /, vector_field, t, p):
         # Unvmap
@@ -358,8 +358,10 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         return self.ibm.a.shape[1] - 1
 
     @property
-    def ode_dimension(self):
-        return self.ibm.a.shape[0]
+    def ode_shape(self):
+        return (
+            self.ibm.a.shape[0],
+        )  # todo: this does not scale to matrix-valued problems
 
     def tree_flatten(self):
         children = (self.ibm,)
@@ -371,10 +373,12 @@ class BatchIBM(_collections.AbstractExtrapolation[BatchNormal, BatchIBMCacheType
         return cls(a=ibm.a, q_sqrtm_lower=ibm.q_sqrtm_lower)
 
     @classmethod
-    def from_params(cls, ode_dimension, num_derivatives):
+    def from_params(cls, ode_shape, num_derivatives):
         """Create a strategy from hyperparameters."""
+        assert len(ode_shape) == 1
+        (n,) = ode_shape
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-        a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=ode_dimension)
+        a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
         return cls(a=a_stack, q_sqrtm_lower=q_sqrtm_stack)
 
     def begin_extrapolation(self, m0, /, dt):
