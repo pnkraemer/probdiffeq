@@ -98,7 +98,7 @@ But a true pro calls the ODE filter the way it is supposed to be called.
 ### Adaptive simulation of specific time-points
 
 ::: odefilter.ivpsolve.simulate_terminal_values
-::: odefilter.ivpsolve.simulate_checkpoints
+::: odefilter.ivpsolve.solve_and_save_at
 
 ### Adaptive simulation using native Python control flow
 ::: odefilter.ivpsolve.solve

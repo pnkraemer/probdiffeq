@@ -114,16 +114,16 @@ plt.show()
 ## Checkpoint simulation
 
 If you know in advance that you like to have the solution at a pre-specified set of points only,
-use the simulate_checkpoints function together with a fixed-point smoother.
+use the solve_and_save_at function together with a fixed-point smoother.
 
 ```python
 eks0_fixpt = solvers.MLESolver(
     smoothers.FixedPointSmoother(recipes.IsoTS0.from_params())
 )
-fixptsol = ivpsolve.simulate_checkpoints(
+fixptsol = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),
-    ts=ts_dense,  # reuse from above
+    save_at=ts_dense,  # reuse from above
     solver=eks0_fixpt,
     parameters=f_args,
 )

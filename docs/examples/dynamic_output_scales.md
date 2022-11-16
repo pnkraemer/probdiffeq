@@ -66,10 +66,10 @@ num_pts = 200
 
 ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 solution_dynamic = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=dynamic, parameters=f_args
+    vf, initial_values=(u0,), grid=ts, solver=dynamic, parameters=f_args
 )
 solution_mle = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=mle, parameters=f_args
+    vf, initial_values=(u0,), grid=ts, solver=mle, parameters=f_args
 )
 ```
 
@@ -112,10 +112,10 @@ num_pts = num_pts * 7
 ts = jnp.linspace(t0, t1_long, num=num_pts, endpoint=True)
 
 solution_dynamic = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=dynamic, parameters=f_args
+    vf, initial_values=(u0,), grid=ts, solver=dynamic, parameters=f_args
 )
 solution_mle = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=mle, parameters=f_args
+    vf, initial_values=(u0,), grid=ts, solver=mle, parameters=f_args
 )
 ```
 

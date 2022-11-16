@@ -75,8 +75,8 @@ def test_offgrid_marginals_smoother(solution_solve):
 
 
 @pytest_cases.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_grid_samples(solution_checkpoints, shape):
-    solution, solver = solution_checkpoints
+def test_grid_samples(solution_save_at, shape):
+    solution, solver = solution_save_at
 
     # todo: this is hacky. But the tests get faster?
     if isinstance(solver.strategy, smoothers.FixedPointSmoother):
@@ -93,8 +93,8 @@ def test_grid_samples(solution_checkpoints, shape):
         #  in the notebooks, which looks good.
 
 
-def test_negative_marginal_log_likelihood(solution_checkpoints):
-    solution, solver = solution_checkpoints
+def test_negative_marginal_log_likelihood(solution_save_at):
+    solution, solver = solution_save_at
 
     # todo: this is hacky. But the tests get faster?
     if isinstance(solver.strategy, smoothers.FixedPointSmoother):

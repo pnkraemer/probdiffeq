@@ -5,7 +5,7 @@ import jax
 from odefilter import _adaptive, _control_flow
 
 
-def odefilter_terminal_values(
+def simulate_terminal_values(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
     """Simulate the terminal values of an ODE with an ODE filter."""
@@ -23,8 +23,8 @@ def odefilter_terminal_values(
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
 
-def odefilter_checkpoints(
-    vector_field, taylor_coefficients, ts, solver, parameters, **options
+def solve_and_save_at(
+    vector_field, taylor_coefficients, save_at, solver, parameters, **options
 ):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
@@ -39,12 +39,13 @@ def odefilter_checkpoints(
         )
         return s_next, s_next
 
-    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
+    t0 = save_at[0]
+    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
         init=state0,
-        xs=ts[1:],
+        xs=save_at[1:],
         reverse=False,
     )
     return adaptive_solver.extract_fn(state=solution)
@@ -72,7 +73,7 @@ def _advance_ivp_solution_adaptively(
     return sol
 
 
-def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **options):
+def solve(vector_field, taylor_coefficients, t0, t1, solver, parameters, **options):
     """Solve an initial value problem.
 
     !!! warning
@@ -82,7 +83,7 @@ def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **o
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
-    generator = _odefilter_generator(
+    generator = _solution_generator(
         vector_field,
         state=state,
         t1=t1,
@@ -93,7 +94,7 @@ def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **o
     return adaptive_solver.extract_fn(state=forward_solution)
 
 
-def _odefilter_generator(vector_field, *, state, t1, adaptive_solver, parameters):
+def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate an ODE filter solution iteratively."""
     while state.solution.t < t1:
         yield state
@@ -104,7 +105,7 @@ def _odefilter_generator(vector_field, *, state, t1, adaptive_solver, parameters
     yield state
 
 
-def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
+def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters):
     """Solve an initial value problem.
 
     !!! warning
@@ -112,7 +113,7 @@ def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, paramete
         Not JITable, not reverse-mode-differentiable.
     """
     # todo: annoying that the error estimate is not part of the state...
-    t0 = ts[0]
+    t0 = grid[0]
     state, _ = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     def body_fn(carry, t_new):
@@ -124,6 +125,6 @@ def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, paramete
         return (s_new, t_new), (s_new, t_new)
 
     _, (result, _) = _control_flow.scan_with_init(
-        f=body_fn, init=(state, t0), xs=ts[1:]
+        f=body_fn, init=(state, t0), xs=grid[1:]
     )
     return solver.extract_fn(state=result)

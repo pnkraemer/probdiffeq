@@ -51,7 +51,7 @@ def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
 
 def _parameter_to_solution(u0, parameters, vf, solver, fixed_grid):
     solution = ivpsolve.solve_fixed_grid(
-        vf, (u0,), ts=fixed_grid, parameters=parameters, solver=solver
+        vf, (u0,), grid=fixed_grid, parameters=parameters, solver=solver
     )
     return solution.u
 
