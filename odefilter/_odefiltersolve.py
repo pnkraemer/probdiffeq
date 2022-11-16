@@ -5,7 +5,7 @@ import jax
 from odefilter import _adaptive, _control_flow
 
 
-def odefilter_terminal_values(
+def simulate_terminal_values(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
     """Simulate the terminal values of an ODE with an ODE filter."""
@@ -23,7 +23,7 @@ def odefilter_terminal_values(
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
 
-def odefilter_checkpoints(
+def simulate_and_save_at(
     vector_field, taylor_coefficients, ts, solver, parameters, **options
 ):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
@@ -72,7 +72,7 @@ def _advance_ivp_solution_adaptively(
     return sol
 
 
-def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **options):
+def solve(vector_field, taylor_coefficients, t0, t1, solver, parameters, **options):
     """Solve an initial value problem.
 
     !!! warning
@@ -82,7 +82,7 @@ def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **o
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
-    generator = _odefilter_generator(
+    generator = _solution_generator(
         vector_field,
         state=state,
         t1=t1,
@@ -93,7 +93,7 @@ def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **o
     return adaptive_solver.extract_fn(state=forward_solution)
 
 
-def _odefilter_generator(vector_field, *, state, t1, adaptive_solver, parameters):
+def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate an ODE filter solution iteratively."""
     while state.solution.t < t1:
         yield state
@@ -104,7 +104,7 @@ def _odefilter_generator(vector_field, *, state, t1, adaptive_solver, parameters
     yield state
 
 
-def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
+def solve_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
     """Solve an initial value problem.
 
     !!! warning

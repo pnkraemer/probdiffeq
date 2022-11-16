@@ -27,4 +27,4 @@ def test_smoother_warning(ode_problem):
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with pytest.warns():
-        ivpsolve.simulate_checkpoints(vf, u0, ts=ts, parameters=p, solver=solver)
+        ivpsolve.simulate_and_save_at(vf, u0, ts=ts, parameters=p, solver=solver)

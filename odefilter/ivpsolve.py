@@ -36,7 +36,7 @@ def simulate_terminal_values(
         parameters=parameters,
     )
 
-    return _odefiltersolve.odefilter_terminal_values(
+    return _odefiltersolve.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -47,7 +47,7 @@ def simulate_terminal_values(
     )
 
 
-def simulate_checkpoints(
+def simulate_and_save_at(
     vector_field,
     initial_values,
     ts,
@@ -75,7 +75,7 @@ def simulate_checkpoints(
         parameters=parameters,
     )
 
-    return _odefiltersolve.odefilter_checkpoints(
+    return _odefiltersolve.simulate_and_save_at(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         ts=ts,
@@ -115,7 +115,7 @@ def solve(
         parameters=parameters,
     )
 
-    return _odefiltersolve.odefilter(
+    return _odefiltersolve.solve(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -152,7 +152,7 @@ def solve_fixed_grid(
         parameters=parameters,
     )
 
-    return _odefiltersolve.odefilter_fixed_grid(
+    return _odefiltersolve.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         ts=ts,

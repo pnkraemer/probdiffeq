@@ -89,7 +89,7 @@ def fixture_checkpoint_grid(ode_problem):
 
 
 @pytest_cases.fixture(scope="session", name="reference_checkpoints")
-def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
+def fixture_reference_and_save_at(ode_problem, tolerances, checkpoint_grid):
     vf, (u0,), _, _, f_args = ode_problem
     atol, rtol = tolerances
 
@@ -105,10 +105,10 @@ def fixture_reference_checkpoints(ode_problem, tolerances, checkpoint_grid):
 
 @pytest_cases.fixture(scope="session", name="solution_checkpoints")
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_CHECKPT)
-def fixture_solution_checkpoints(ode_problem, tolerances, solver, checkpoint_grid):
+def fixture_solution_and_save_at(ode_problem, tolerances, solver, checkpoint_grid):
     vf, u0, _, _, f_args = ode_problem
     atol, rtol = tolerances
-    solution = ivpsolve.simulate_checkpoints(
+    solution = ivpsolve.simulate_and_save_at(
         vf,
         u0,
         ts=checkpoint_grid,
