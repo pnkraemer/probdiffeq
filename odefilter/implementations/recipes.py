@@ -47,19 +47,17 @@ class IsoTS0(AbstractImplementation[iso.IsoTaylorZerothOrder, iso.IsoIBM]):
 @jax.tree_util.register_pytree_node_class
 class BatchMM1(AbstractImplementation[batch.BatchMomentMatching, batch.BatchIBM]):
     @classmethod
-    def from_params(
-        cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
-    ):
+    def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
             correction = batch.BatchMomentMatching.from_params(
-                ode_dimension=ode_dimension, ode_order=ode_order
+                ode_shape=ode_shape, ode_order=ode_order
             )
         else:
             correction = batch.BatchMomentMatching(
-                ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature
+                ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
             )
         extrapolation = batch.BatchIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+            ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
@@ -67,10 +65,10 @@ class BatchMM1(AbstractImplementation[batch.BatchMomentMatching, batch.BatchIBM]
 @jax.tree_util.register_pytree_node_class
 class BatchTS0(AbstractImplementation[batch.BatchMomentMatching, batch.BatchIBM]):
     @classmethod
-    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
+    def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = batch.BatchTaylorZerothOrder(ode_order=ode_order)
         extrapolation = batch.BatchIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+            ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
@@ -78,12 +76,10 @@ class BatchTS0(AbstractImplementation[batch.BatchMomentMatching, batch.BatchIBM]
 @jax.tree_util.register_pytree_node_class
 class VectTS1(AbstractImplementation[vect.VectTaylorFirstOrder, vect.VectIBM]):
     @classmethod
-    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
-        correction = vect.VectTaylorFirstOrder(
-            ode_dimension=ode_dimension, ode_order=ode_order
-        )
+    def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
+        correction = vect.VectTaylorFirstOrder(ode_shape=ode_shape, ode_order=ode_order)
         extrapolation = vect.VectIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+            ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
@@ -91,12 +87,12 @@ class VectTS1(AbstractImplementation[vect.VectTaylorFirstOrder, vect.VectIBM]):
 @jax.tree_util.register_pytree_node_class
 class VectTS0(AbstractImplementation[vect.VectTaylorZerothOrder, vect.VectIBM]):
     @classmethod
-    def from_params(cls, *, ode_dimension, ode_order=1, num_derivatives=4):
+    def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = vect.VectTaylorZerothOrder(
-            ode_dimension=ode_dimension, ode_order=ode_order
+            ode_shape=ode_shape, ode_order=ode_order
         )
         extrapolation = vect.VectIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+            ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
@@ -104,18 +100,16 @@ class VectTS0(AbstractImplementation[vect.VectTaylorZerothOrder, vect.VectIBM]):
 @jax.tree_util.register_pytree_node_class
 class VectMM1(AbstractImplementation[vect.VectMomentMatching, vect.VectIBM]):
     @classmethod
-    def from_params(
-        cls, *, ode_dimension, cubature=None, ode_order=1, num_derivatives=4
-    ):
+    def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
             correction = vect.VectMomentMatching.from_params(
-                ode_dimension=ode_dimension, ode_order=ode_order
+                ode_shape=ode_shape, ode_order=ode_order
             )
         else:
             correction = vect.VectMomentMatching(
-                ode_dimension=ode_dimension, ode_order=ode_order, cubature=cubature
+                ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
             )
         extrapolation = vect.VectIBM.from_params(
-            ode_dimension=ode_dimension, num_derivatives=num_derivatives
+            ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)

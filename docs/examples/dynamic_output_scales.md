@@ -52,7 +52,7 @@ def vf(*ys, t, p):
 num_derivatives = 1
 
 implementation = recipes.VectTS1.from_params(
-    ode_dimension=1, num_derivatives=num_derivatives
+    ode_shape=(1,), num_derivatives=num_derivatives
 )
 strategy = filters.Filter(implementation=implementation)
 

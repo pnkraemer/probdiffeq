@@ -159,8 +159,7 @@ def _runge_kutta_starter_fn(
     extrapolation = _impl.extrapolation
 
     # Initialise
-    d = initial_values[0].shape[0]
-    init_rv = extrapolation.init_rv(ode_dimension=d)
+    init_rv = extrapolation.init_rv(ode_shape=initial_values[0].shape)
 
     # Estimate
     u0_full = _runge_kutta_starter_improve(init_rv, extrapolation, ys=ys, dt=dt0)

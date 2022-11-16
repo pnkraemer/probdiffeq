@@ -161,39 +161,23 @@ def scipy_solve_ivp_dop853(*, tol):
     )
     diff = (scipy_solution.y[:, -1] - ys_reference) / (1e-5 + ys_reference)
     return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
-
-
-ode_dimension = u0.shape[0]
 ```
 
 ```python
-filter_ts0 = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=4)
-)
-filter_ts0_batch = filters.Filter(
-    implementation=recipes.BatchTS0.from_params(
-        ode_dimension=ode_dimension, num_derivatives=5
-    )
-)
-filter_mm1_batch = filters.Filter(
-    implementation=recipes.BatchMM1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=6
-    )
-)
-filter_ts1 = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=7
-    )
-)
+ode_shape = u0.shape
+ts0 = recipes.IsoTS0.from_params(num_derivatives=4)
+ts0_batch = recipes.BatchTS0.from_params(ode_shape=ode_shape, num_derivatives=5)
+mm1_batch = recipes.BatchMM1.from_params(ode_shape=ode_shape, num_derivatives=6)
+ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=7)
 
 solve_fns = [
     (scipy_solve_ivp_rk45, "RK45 (scipy.integrate)"),
     (scipy_solve_ivp_dop853, "DOP853 (scipy.integrate)"),
     (jax_solve, "Dormand-Prince (jax.experimental)"),
-    (solver_to_solve(solvers.MLESolver(strategy=filter_ts0)), "IsoTS0(n=4)"),
-    (solver_to_solve(solvers.MLESolver(strategy=filter_ts0_batch)), "BatchTS0(n=5)"),
-    (solver_to_solve(solvers.MLESolver(strategy=filter_mm1_batch)), "BatchMM1(n=6)"),
-    (solver_to_solve(solvers.MLESolver(strategy=filter_ts1)), "VectTS1(n=7)"),
+    (solver_to_solve(solvers.MLESolver(filters.Filter(ts0))), "IsoTS0(n=4)"),
+    (solver_to_solve(solvers.MLESolver(filters.Filter(ts0_batch))), "BatchTS0(n=5)"),
+    (solver_to_solve(solvers.MLESolver(filters.Filter(mm1_batch))), "BatchMM1(n=6)"),
+    (solver_to_solve(solvers.MLESolver(filters.Filter(ts1))), "VectTS1(n=7)"),
 ]
 ```
 

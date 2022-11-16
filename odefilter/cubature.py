@@ -64,10 +64,7 @@ class SphericalCubatureIntegration(_PositiveCubatureRule):
 
     @classmethod
     def from_params(cls, input_shape):
-        """Construct an SCI rule from the dimension of a random variable.
-
-        The number of cubature points is _higher_ than ``input_dimension``.
-        """
+        """Construct an SCI rule from the shape of the input of the integrand."""
         assert len(input_shape) <= 1
         if len(input_shape) == 1:
             (d,) = input_shape
@@ -96,10 +93,7 @@ class UnscentedTransform(_PositiveCubatureRule):
     # todo: more parameters...
     @classmethod
     def from_params(cls, *, input_shape, r=1.0):
-        """Construct an unscented transform from parameters.
-
-        The number of cubature points is _higher_ than ``input_dimension``.
-        """
+        """Construct an unscented transform from parameters."""
         assert len(input_shape) <= 1
         if len(input_shape) == 1:
             (d,) = input_shape
@@ -114,7 +108,7 @@ class UnscentedTransform(_PositiveCubatureRule):
         return cls(points=points, weights_sqrtm=weights_sqrtm)
 
 
-def _ut_points_and_weights_sqrtm(*, d, r):
+def _ut_points_and_weights_sqrtm(d, *, r):
     eye_d = jnp.eye(d) * jnp.sqrt(d + r)
     zeros = jnp.zeros((1, d))
     pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
@@ -133,10 +127,10 @@ class GaussHermite(_PositiveCubatureRule):
     def from_params(cls, *, input_shape, degree=5):
         """Construct a Gauss-Hermite cubature rule.
 
-        The number of cubature points is input_dimension**degree.
+        The number of cubature points is prod(input_shape)**degree.
         """
         assert len(input_shape) == 1
-        (input_dimension,) = input_shape
+        (dim,) = input_shape
 
         # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
         _roots = scipy.special.roots_hermitenorm(n=degree, mu=True)
@@ -148,8 +142,8 @@ class GaussHermite(_PositiveCubatureRule):
         weights_sqrtm = jnp.sqrt(jnp.asarray(weights))
 
         # Build a tensor grid and return class
-        tensor_pts = _tensor_points(pts, d=input_dimension)
-        tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=input_dimension)
+        tensor_pts = _tensor_points(pts, d=dim)
+        tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
         return cls(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
 
 
