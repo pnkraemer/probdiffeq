@@ -86,7 +86,6 @@ nav:
         - "advanced_examples/physics_enhanced_regression_2.ipynb"
     - API Documentation:
         - "api_docs/ivpsolve.md"
-        - "api_docs/odefiltersolve.md"
         - "api_docs/solvers.md"
         - Inference strategies:
           - "api_docs/strategies/filters.md"
