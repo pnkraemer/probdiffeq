@@ -63,7 +63,7 @@ solver = solvers.Solver(strategy, output_scale_sqrtm=10.0)
 
 
 solution_true = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameter_true
+    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=parameter_true
 )
 data = solution_true.u
 plt.plot(ts, data, "P-")
@@ -74,7 +74,7 @@ We make an initial guess, but it does not lead to a good data fit:
 
 ```python
 solution_guess = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=parameter_guess
+    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=parameter_guess
 )
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_guess.u)
@@ -88,7 +88,7 @@ This incorporates the likelihood of the data under the distribution induced by t
 ```python
 def param_to_log_likelihood(parameters_, u0_, ts_, solver_, vf_, data_, obs_stdev=1e-1):
     sol_ = ivpsolve.solve_fixed_grid(
-        vf_, initial_values=(u0_,), ts=ts_, solver=solver_, parameters=parameters_
+        vf_, initial_values=(u0_,), grid=ts_, solver=solver_, parameters=parameters_
     )
 
     observation_std = jnp.ones_like(ts_) * obs_stdev
@@ -153,7 +153,7 @@ The solution looks much better:
 
 ```python
 solution_wrong = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), ts=ts, solver=solver, parameters=p
+    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=p
 )
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_wrong.u)

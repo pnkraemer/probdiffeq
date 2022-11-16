@@ -62,7 +62,7 @@ solver = solvers.Solver(strategy, output_scale_sqrtm=10.0)
 
 # Compute a bunch of solutions
 solution_true = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0_true,), ts=ts, solver=solver, parameters=f_args
+    vf, initial_values=(u0_true,), grid=ts, solver=solver, parameters=f_args
 )
 data = solution_true.u[-1, :]
 plt.plot(ts, solution_true.u, "-")
@@ -74,7 +74,7 @@ Make a (poor) initial guess
 
 ```python
 solution_guess = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0_guess,), ts=ts, solver=solver, parameters=f_args
+    vf, initial_values=(u0_guess,), grid=ts, solver=solver, parameters=f_args
 )
 plt.plot(ts, solution_guess.u, "-")
 plt.plot(ts[-1], data[None, :], "P", color="k", markersize=8)
@@ -86,7 +86,7 @@ Set up a logprob function to sample from: the likelihood of the data under the O
 ```python
 def logprob_fn(u0):
     solution_guess = ivpsolve.solve_fixed_grid(
-        vf, initial_values=(u0,), ts=ts, solver=solver, parameters=f_args
+        vf, initial_values=(u0,), grid=ts, solver=solver, parameters=f_args
     )
     posterior = solution_guess.posterior
     posterior_final = jax.tree_map(lambda x: x[-1], posterior)
@@ -141,7 +141,7 @@ Compute the ODE solution for all the samples and plot the results.
 ```python
 def u0_to_sol(u0):
     solution_guess = ivpsolve.solve_fixed_grid(
-        vf, initial_values=(u0,), ts=ts, solver=solver, parameters=f_args
+        vf, initial_values=(u0,), grid=ts, solver=solver, parameters=f_args
     )
     return solution_guess.u
 
