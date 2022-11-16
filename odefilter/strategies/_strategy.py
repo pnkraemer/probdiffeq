@@ -4,7 +4,7 @@ import abc
 
 import jax
 
-from odefilter.implementations import implementations  # for defaults
+from odefilter.implementations import recipes  # for defaults
 
 
 @jax.tree_util.register_pytree_node_class
@@ -16,7 +16,7 @@ class Strategy(abc.ABC):
 
     @classmethod
     def from_params(cls):
-        implementation = implementations.IsoTS0.from_params()
+        implementation = recipes.IsoTS0.from_params()
         return cls(implementation=implementation)
 
     def __repr__(self):

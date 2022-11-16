@@ -7,7 +7,7 @@ import pytest_cases
 from tornadox import ek0, ek1, init, ivp, step
 
 from odefilter import controls, ivpsolve, solvers
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 from odefilter.strategies import filters
 
 
@@ -85,7 +85,7 @@ def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
 
 @pytest_cases.fixture(scope="session", name="solver_odefilter_kronecker_ek0")
 def fixture_solver_odefilter_kronecker_ek0(num):
-    implementation = implementations.IsoTS0.from_params(num_derivatives=num)
+    implementation = recipes.IsoTS0.from_params(num_derivatives=num)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
@@ -154,9 +154,7 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
 
 @pytest_cases.fixture(scope="session", name="solver_odefilter_reference_ek1")
 def fixture_solver_odefilter_reference_ek1(num):
-    implementation = implementations.VectTS1.from_params(
-        num_derivatives=num, ode_dimension=2
-    )
+    implementation = recipes.VectTS1.from_params(num_derivatives=num, ode_dimension=2)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 

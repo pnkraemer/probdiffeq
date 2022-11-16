@@ -22,7 +22,6 @@ In short: choose a `DynamicSolver` if your ODE output-scale varies quite strongl
 
 For example, consider the numerical solution of a linear ODE with fixed steps:
 
-
 ```python
 import jax
 import jax.numpy as jnp
@@ -31,7 +30,7 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import ivpsolve, solvers
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 from odefilter.strategies import filters
 
 config.update("jax_enable_x64", True)
@@ -52,7 +51,7 @@ def vf(*ys, t, p):
 ```python
 num_derivatives = 1
 
-implementation = implementations.VectTS1.from_params(
+implementation = recipes.VectTS1.from_params(
     ode_dimension=1, num_derivatives=num_derivatives
 )
 strategy = filters.Filter(implementation=implementation)
