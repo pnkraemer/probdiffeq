@@ -28,7 +28,7 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from odefilter import ivpsolve, solvers
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 from odefilter.strategies import filters
 
 config.update("jax_enable_x64", True)
@@ -56,7 +56,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
 # Make a solver
 strategy = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=2),
+    implementation=recipes.IsoTS0.from_params(num_derivatives=2),
 )
 solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=10.0)
 

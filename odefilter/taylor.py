@@ -36,7 +36,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -155,7 +155,7 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    _impl = implementations.IsoTS0.from_params(num_derivatives=num)
+    _impl = recipes.IsoTS0.from_params(num_derivatives=num)
     extrapolation = _impl.extrapolation
 
     # Initialise

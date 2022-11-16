@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import ivpsolve, solvers
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 from odefilter.strategies import filters, smoothers
 
 
@@ -27,7 +27,7 @@ def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
 
     # Low order because it traces/differentiates faster
     filter_or_smoother = strategy(
-        implementation=implementations.IsoTS0.from_params(num_derivatives=1)
+        implementation=recipes.IsoTS0.from_params(num_derivatives=1)
     )
     solver = solvers.Solver(strategy=filter_or_smoother, output_scale_sqrtm=1.0)
 

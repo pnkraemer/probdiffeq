@@ -34,7 +34,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from odefilter import controls, cubature, ivpsolve, solvers
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 from odefilter.strategies import filters, smoothers
 
 # x64 precision
@@ -126,8 +126,8 @@ def correction_to_solver(implementation):
 
 
 num_derivatives = 4
-ts1 = implementations.VectTS1.from_params(ode_dimension=ode_dimension)
-mm1_sci = implementations.VectMM1.from_params(
+ts1 = recipes.VectTS1.from_params(ode_dimension=ode_dimension)
+mm1_sci = recipes.VectMM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.SphericalCubatureIntegration.from_params(
@@ -135,7 +135,7 @@ mm1_sci = implementations.VectMM1.from_params(
     ),
 )
 
-mm1_ut = implementations.VectMM1.from_params(
+mm1_ut = recipes.VectMM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(
@@ -143,7 +143,7 @@ mm1_ut = implementations.VectMM1.from_params(
     ),
 )
 
-mm1_gh = implementations.VectMM1.from_params(
+mm1_gh = recipes.VectMM1.from_params(
     ode_dimension=ode_dimension,
     num_derivatives=num_derivatives,
     cubature=cubature.GaussHermite.from_params(ode_dimension=ode_dimension, degree=3),
@@ -190,14 +190,14 @@ def solver(implementation):
 
 
 num_derivatives = 4
-iso_solver = solver(implementations.IsoTS0.from_params(num_derivatives=num_derivatives))
+iso_solver = solver(recipes.IsoTS0.from_params(num_derivatives=num_derivatives))
 batch_solver = solver(
-    implementations.BatchTS0.from_params(
+    recipes.BatchTS0.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_derivatives
     )
 )
 dense_solver = solver(
-    implementations.VectTS0.from_params(
+    recipes.VectTS0.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_derivatives
     )
 )
@@ -241,27 +241,27 @@ def strategy_to_mle_solver(strategy):
 
 
 filter_ts0_iso_low = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=2)
+    implementation=recipes.IsoTS0.from_params(num_derivatives=2)
 )
 filter_ts0_iso_medium = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=3)
+    implementation=recipes.IsoTS0.from_params(num_derivatives=3)
 )
 filter_ts0_iso_high = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=5)
+    implementation=recipes.IsoTS0.from_params(num_derivatives=5)
 )
 
 filter_ts1_low = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=3
     )
 )
 filter_ts1_medium = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=5
     )
 )
 filter_ts1_high = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=8
     )
 )
@@ -376,31 +376,31 @@ def strategy_to_mle_solver(strategy):
 num_low, num_medium, num_high = 3, 5, 8
 
 ts0_iso_low = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=num_low)
+    implementation=recipes.IsoTS0.from_params(num_derivatives=num_low)
 )
 ts0_iso_medium = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=num_medium)
+    implementation=recipes.IsoTS0.from_params(num_derivatives=num_medium)
 )
 
 ts1_low = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_low
     )
 )
 ts1_medium = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_medium
     )
 )
 ts1_high = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
     )
 )
 
 
 mm1_high = filters.Filter(
-    implementation=implementations.VectMM1.from_params(
+    implementation=recipes.VectMM1.from_params(
         ode_dimension=ode_dimension, num_derivatives=num_high
     )
 )

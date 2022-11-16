@@ -35,7 +35,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from odefilter import controls, ivpsolve, solvers
-from odefilter.implementations import implementations
+from odefilter.implementations import recipes
 from odefilter.strategies import filters
 
 # x64 precision
@@ -168,20 +168,20 @@ ode_dimension = u0.shape[0]
 
 ```python
 filter_ts0 = filters.Filter(
-    implementation=implementations.IsoTS0.from_params(num_derivatives=4)
+    implementation=recipes.IsoTS0.from_params(num_derivatives=4)
 )
 filter_ts0_batch = filters.Filter(
-    implementation=implementations.BatchTS0.from_params(
+    implementation=recipes.BatchTS0.from_params(
         ode_dimension=ode_dimension, num_derivatives=5
     )
 )
 filter_mm1_batch = filters.Filter(
-    implementation=implementations.BatchMM1.from_params(
+    implementation=recipes.BatchMM1.from_params(
         ode_dimension=ode_dimension, num_derivatives=6
     )
 )
 filter_ts1 = filters.Filter(
-    implementation=implementations.VectTS1.from_params(
+    implementation=recipes.VectTS1.from_params(
         ode_dimension=ode_dimension, num_derivatives=7
     )
 )
