@@ -56,9 +56,9 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
 # Make a solver
 strategy = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=2),
+    recipes.IsoTS0.from_params(num_derivatives=2),
 )
-solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=10.0)
+solver = solvers.Solver(strategy, output_scale_sqrtm=10.0)
 
 # Compute a bunch of solutions
 solution_true = ivpsolve.solve_fixed_grid(

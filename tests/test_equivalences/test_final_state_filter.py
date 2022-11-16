@@ -6,17 +6,20 @@ import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import ivpsolve, solvers
+from odefilter.implementations import recipes
 from odefilter.strategies import filters, smoothers
 
 
 @pytest_cases.case
 def strategy_pair_smoother():
-    return filters.Filter.from_params(), smoothers.Smoother.from_params()
+    impl = recipes.IsoTS0.from_params()
+    return filters.Filter(impl), smoothers.Smoother(impl)
 
 
 @pytest_cases.case
 def strategy_pair_fixedpoint_smoother():
-    return filters.Filter.from_params(), smoothers.FixedPointSmoother.from_params()
+    impl = recipes.IsoTS0.from_params()
+    return filters.Filter(impl), smoothers.FixedPointSmoother(impl)
 
 
 @pytest_cases.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")

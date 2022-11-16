@@ -4,20 +4,13 @@ import abc
 
 import jax
 
-from odefilter.implementations import recipes  # for defaults
-
 
 @jax.tree_util.register_pytree_node_class
 class Strategy(abc.ABC):
     """Inference strategy interface."""
 
-    def __init__(self, *, implementation):
+    def __init__(self, implementation):
         self.implementation = implementation
-
-    @classmethod
-    def from_params(cls):
-        implementation = recipes.IsoTS0.from_params()
-        return cls(implementation=implementation)
 
     def __repr__(self):
         args = f"implementation={self.implementation}"

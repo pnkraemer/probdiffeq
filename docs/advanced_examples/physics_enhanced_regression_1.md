@@ -57,9 +57,9 @@ def vf(y, t, p):
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
 strategy = smoothers.Smoother(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=1),
+    recipes.IsoTS0.from_params(num_derivatives=1),
 )
-solver = solvers.Solver(strategy=strategy, output_scale_sqrtm=10.0)
+solver = solvers.Solver(strategy, output_scale_sqrtm=10.0)
 
 
 solution_true = ivpsolve.solve_fixed_grid(

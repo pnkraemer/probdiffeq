@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import pytest_cases
 
 from odefilter import dense_output, ivpsolve, solvers
+from odefilter.implementations import recipes
 from odefilter.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
@@ -14,7 +15,8 @@ from odefilter.strategies import smoothers
 
 @pytest_cases.case
 def smoother_pair_smoother_and_fixedpoint():
-    return smoothers.Smoother.from_params(), smoothers.FixedPointSmoother.from_params()
+    impl = recipes.IsoTS0.from_params()
+    return smoothers.Smoother(impl), smoothers.FixedPointSmoother(impl)
 
 
 @pytest_cases.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")

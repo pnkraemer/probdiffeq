@@ -5,6 +5,7 @@ import pytest
 import pytest_cases
 
 from odefilter import ivpsolve, solvers
+from odefilter.implementations import recipes
 from odefilter.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
@@ -14,7 +15,8 @@ from odefilter.strategies import smoothers
 
 @pytest_cases.case
 def smoother_pair_smoother_and_fixedpoint():
-    return smoothers.Smoother.from_params(), smoothers.FixedPointSmoother.from_params()
+    impl = recipes.IsoTS0.from_params()
+    return smoothers.Smoother(impl), smoothers.FixedPointSmoother(impl)
 
 
 @pytest_cases.case
@@ -22,7 +24,8 @@ def smoother_pair_two_smoothers():
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
-    return smoothers.Smoother.from_params(), smoothers.Smoother.from_params()
+    impl = recipes.IsoTS0.from_params()
+    return smoothers.Smoother(impl), smoothers.Smoother(impl)
 
 
 # Why a filter-warning?

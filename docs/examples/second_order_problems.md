@@ -43,7 +43,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ts0_1 = solvers.MLESolver.from_params()
+ts0_1 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -73,9 +73,7 @@ In fact, above, we used the following solver:
 
 ```python
 implementation = recipes.IsoTS0.from_params(ode_order=1, num_derivatives=4)
-ts0_1_granular = solvers.MLESolver(
-    strategy=filters.Filter(implementation=implementation)
-)
+ts0_1_granular = solvers.MLESolver(filters.Filter(implementation))
 assert ts0_1_granular == ts0_1
 ```
 
@@ -92,7 +90,7 @@ def vf_2(y, dy, t, p):
 
 # One derivative more than above because we don't transform to first order
 implementation = recipes.IsoTS0.from_params(ode_order=2, num_derivatives=5)
-ts0_2 = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
+ts0_2 = solvers.MLESolver(filters.Filter(implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -116,4 +114,4 @@ plt.plot(solution.u[:, 0], solution.u[:, 1])
 plt.show()
 ```
 
-The second-order solver is faster and way more accurate.
+The second-order solver seems faster and more accurate (which has to be confirmed in a work-precision diagram; TBC).
