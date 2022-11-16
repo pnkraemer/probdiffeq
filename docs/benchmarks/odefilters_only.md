@@ -106,7 +106,7 @@ def _solve(*, solver, tol):
     return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
 
 
-ode_dimension = u0.shape[0]
+ode_shape = u0.shape
 
 tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
 
@@ -126,27 +126,23 @@ def correction_to_solver(implementation):
 
 
 num_derivatives = 4
-ts1 = recipes.VectTS1.from_params(ode_dimension=ode_dimension)
+ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape)
 mm1_sci = recipes.VectMM1.from_params(
-    ode_dimension=ode_dimension,
+    ode_shape=ode_shape,
     num_derivatives=num_derivatives,
-    cubature=cubature.SphericalCubatureIntegration.from_params(
-        ode_dimension=ode_dimension
-    ),
+    cubature=cubature.SphericalCubatureIntegration.from_params(input_shape=ode_shape),
 )
 
 mm1_ut = recipes.VectMM1.from_params(
-    ode_dimension=ode_dimension,
+    ode_shape=ode_shape,
     num_derivatives=num_derivatives,
-    cubature=cubature.UnscentedTransform.from_params(
-        ode_dimension=ode_dimension, r=1.0
-    ),
+    cubature=cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0),
 )
 
 mm1_gh = recipes.VectMM1.from_params(
-    ode_dimension=ode_dimension,
+    ode_shape=ode_shape,
     num_derivatives=num_derivatives,
-    cubature=cubature.GaussHermite.from_params(ode_dimension=ode_dimension, degree=3),
+    cubature=cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3),
 )
 
 
@@ -192,14 +188,10 @@ def solver(implementation):
 num_derivatives = 4
 iso_solver = solver(recipes.IsoTS0.from_params(num_derivatives=num_derivatives))
 batch_solver = solver(
-    recipes.BatchTS0.from_params(
-        ode_dimension=ode_dimension, num_derivatives=num_derivatives
-    )
+    recipes.BatchTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
 )
 dense_solver = solver(
-    recipes.VectTS0.from_params(
-        ode_dimension=ode_dimension, num_derivatives=num_derivatives
-    )
+    recipes.VectTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
 )
 
 
@@ -240,30 +232,18 @@ def strategy_to_mle_solver(strategy):
     return solver_to_solve(solvers.MLESolver(strategy=strategy))
 
 
-filter_ts0_iso_low = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=2)
-)
-filter_ts0_iso_medium = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=3)
-)
-filter_ts0_iso_high = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=5)
-)
+filter_ts0_iso_low = filters.Filter(recipes.IsoTS0.from_params(num_derivatives=2))
+filter_ts0_iso_medium = filters.Filter(recipes.IsoTS0.from_params(num_derivatives=3))
+filter_ts0_iso_high = filters.Filter(recipes.IsoTS0.from_params(num_derivatives=5))
 
 filter_ts1_low = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=3
-    )
+    recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=3)
 )
 filter_ts1_medium = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=5
-    )
+    recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=5)
 )
 filter_ts1_high = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=8
-    )
+    recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=8)
 )
 
 
@@ -316,20 +296,15 @@ For first-order Taylor series, non-dynamic calibration is better, but the differ
 ### Should I use a filter or a smoother?
 
 ```python
-filter_solver = solver_to_solve(
-    solvers.MLESolver(strategy=filters.Filter.from_params())
-)
-smoother_solver = solver_to_solve(
-    solvers.MLESolver(strategy=smoothers.Smoother.from_params())
-)
-fixpt_smoother_solver = solver_to_solve(
-    solvers.MLESolver(strategy=smoothers.FixedPointSmoother.from_params())
-)
+impl = recipes.IsoTS0.from_params()
+filter_ = filters.Filter(impl)
+smoother = smoothers.Smoother(impl)
+fixpt_smoother = smoothers.FixedPointSmoother(impl)
 
 solve_fns = [
-    (filter_solver, "Filter()"),
-    (smoother_solver, "Smoother()"),
-    (fixpt_smoother_solver, "FixedPointSmoother()"),
+    (strategy_to_mle_solver(filter_), "Filter()"),
+    (strategy_to_mle_solver(smoother), "Smoother()"),
+    (strategy_to_mle_solver(fixpt_smoother), "FixedPointSmoother()"),
 ]
 ```
 
@@ -365,53 +340,35 @@ We know that the dynamic solver is superior over the non-dynamic solver for low 
 Let's compare the winning solvers to find the best one.
 
 ```python
-def strategy_to_dynamic_solver(strategy):
-    return solver_to_solve(solvers.DynamicSolver(strategy=strategy))
+def impl_to_dynamic_solver_filter(impl):
+    return strategy_to_dynamic_solver(filters.Filter(impl))
 
 
-def strategy_to_mle_solver(strategy):
-    return solver_to_solve(solvers.MLESolver(strategy=strategy))
+def impl_to_mle_solver_filter(impl):
+    return strategy_to_mle_solver(filters.Filter(impl))
 
 
 num_low, num_medium, num_high = 3, 5, 8
 
-ts0_iso_low = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=num_low)
-)
-ts0_iso_medium = filters.Filter(
-    implementation=recipes.IsoTS0.from_params(num_derivatives=num_medium)
-)
+ts0_iso_low = recipes.IsoTS0.from_params(num_derivatives=num_low)
+ts0_iso_medium = recipes.IsoTS0.from_params(num_derivatives=num_medium)
 
-ts1_low = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=num_low
-    )
+ts1_low = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=num_low)
+ts1_medium = recipes.VectTS1.from_params(
+    ode_shape=ode_shape, num_derivatives=num_medium
 )
-ts1_medium = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=num_medium
-    )
-)
-ts1_high = filters.Filter(
-    implementation=recipes.VectTS1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=num_high
-    )
-)
+ts1_high = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
 
-mm1_high = filters.Filter(
-    implementation=recipes.VectMM1.from_params(
-        ode_dimension=ode_dimension, num_derivatives=num_high
-    )
-)
+mm1_high = recipes.VectMM1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
 solve_fns = [
-    (strategy_to_mle_solver(ts0_iso_low), f"IsoTS0({num_low}), MLE"),
-    (strategy_to_mle_solver(ts0_iso_medium), f"IsoTS0({num_medium}), MLE"),
-    (strategy_to_dynamic_solver(ts1_low), f"VectTS1({num_low}), Dynamic"),
-    (strategy_to_mle_solver(ts1_medium), f"VectTS1({num_medium}), MLE"),
-    (strategy_to_mle_solver(ts1_high), f"VectTS1({num_high}), MLE"),
-    (strategy_to_mle_solver(mm1_high), f"VectMM1({num_high}), MLE"),
+    (impl_to_mle_solver_filter(ts0_iso_low), f"IsoTS0({num_low}), MLE"),
+    (impl_to_mle_solver_filter(ts0_iso_medium), f"IsoTS0({num_medium}), MLE"),
+    (impl_to_dynamic_solver_filter(ts1_low), f"VectTS1({num_low}), Dynamic"),
+    (impl_to_mle_solver_filter(ts1_medium), f"VectTS1({num_medium}), MLE"),
+    (impl_to_mle_solver_filter(ts1_high), f"VectTS1({num_high}), MLE"),
+    (impl_to_mle_solver_filter(mm1_high), f"VectMM1({num_high}), MLE"),
 ]
 ```
 
