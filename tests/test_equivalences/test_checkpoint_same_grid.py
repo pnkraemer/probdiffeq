@@ -54,7 +54,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     fp_smo_sol = ivpsolve.solve_and_save_at(
         vf,
         u0,
-        ts=smo_sol.t,
+        save_at=smo_sol.t,
         parameters=p,
         solver=solvers.DynamicSolver(strategy=fp_smo),
         atol=1e-2 * tol,

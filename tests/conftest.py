@@ -103,9 +103,9 @@ def fixture_reference_and_save_at(ode_problem, tolerances, checkpoint_grid):
     return checkpoint_grid, odeint_solution
 
 
-@pytest_cases.fixture(scope="session", name="solution_checkpoints")
+@pytest_cases.fixture(scope="session", name="solution_save_at")
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=_CHECKPT)
-def fixture_solution_and_save_at(ode_problem, tolerances, solver, checkpoint_grid):
+def fixture_solution_save_at(ode_problem, tolerances, solver, checkpoint_grid):
     vf, u0, _, _, f_args = ode_problem
     atol, rtol = tolerances
     solution = ivpsolve.solve_and_save_at(

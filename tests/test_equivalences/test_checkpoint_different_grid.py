@@ -40,7 +40,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     )
 
     fp_smo_sol = ivpsolve.solve_and_save_at(
-        *args, ts=ts, solver=solvers.DynamicSolver(strategy=fp_smo), **kwargs
+        *args, save_at=ts, solver=solvers.DynamicSolver(strategy=fp_smo), **kwargs
     )
     fixedpoint_smo_sol = fp_smo_sol[1:-1]  # reference is defined only on the interior
 

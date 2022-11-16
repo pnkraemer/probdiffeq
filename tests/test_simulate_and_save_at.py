@@ -9,11 +9,11 @@ from odefilter.strategies import smoothers
 
 
 def test_checkpoints_simulated_correctly(
-    reference_checkpoints, solution_checkpoints, tolerances
+    reference_checkpoints, solution_save_at, tolerances
 ):
     t_ref, u_ref = reference_checkpoints
     atol, rtol = tolerances
-    solution, _ = solution_checkpoints
+    solution, _ = solution_save_at
 
     assert jnp.allclose(solution.t, t_ref)
     assert jnp.allclose(solution.u, u_ref, atol=atol, rtol=rtol)
