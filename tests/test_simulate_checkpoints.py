@@ -23,7 +23,7 @@ def test_smoother_warning(ode_problem):
     """A non-fixed-point smoother is not usable in checkpoint-simulation."""
     vf, u0, t0, t1, p = ode_problem
     ts = jnp.linspace(t0, t1, num=3)
-    solver = solvers.DynamicSolver(smoothers.Smoother(recipes.IsoTs0.from_params()))
+    solver = solvers.DynamicSolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with pytest.warns():
