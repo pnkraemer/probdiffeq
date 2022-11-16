@@ -4,7 +4,6 @@
 import warnings
 
 import jax
-import jax.numpy as jnp
 
 from odefilter import _odefiltersolve, taylor
 from odefilter.strategies import smoothers
@@ -26,7 +25,6 @@ def simulate_terminal_values(
     **options,
 ):
     """Simulate the terminal values of an initial value problem."""
-    _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
@@ -59,8 +57,8 @@ def simulate_checkpoints(
     **options,
 ):
     """Solve an IVP and return the solution at checkpoints."""
-    _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
+
     if isinstance(solver.strategy, smoothers.Smoother):
         msg = (
             "A conventional smoother cannot be used."
@@ -106,7 +104,6 @@ def solve(
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
-    _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
@@ -144,7 +141,6 @@ def solve_fixed_grid(
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
-    _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
@@ -164,18 +160,6 @@ def solve_fixed_grid(
         parameters=parameters,
         **options,
     )
-
-
-def _assert_not_scalar(x, /):
-    """Verify the initial conditions are not scalar.
-
-    There is no clear mechanism for the internals if the IVP is
-    scalar. Therefore, we don't allow them for now.
-
-    todo: allow scalar problems.
-    """
-    is_not_scalar = jax.tree_util.tree_map(lambda s: jnp.ndim(s) > 0, x)
-    assert jax.tree_util.tree_all(is_not_scalar)
 
 
 def _assert_tuple(x, /):

@@ -1,7 +1,6 @@
 """ODE-filter routines."""
 
 import jax
-import jax.numpy as jnp
 
 from odefilter import _adaptive, _control_flow
 
@@ -10,8 +9,6 @@ def odefilter_terminal_values(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
     """Simulate the terminal values of an ODE with an ODE filter."""
-    _assert_not_scalar(taylor_coefficients)
-
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
@@ -30,8 +27,6 @@ def odefilter_checkpoints(
     vector_field, taylor_coefficients, ts, solver, parameters, **options
 ):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
-    _assert_not_scalar(taylor_coefficients)
-
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     def advance_to_next_checkpoint(s, t_next):
@@ -84,7 +79,6 @@ def odefilter(vector_field, taylor_coefficients, t0, t1, solver, parameters, **o
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
-    _assert_not_scalar(taylor_coefficients)
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
@@ -117,11 +111,8 @@ def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, paramete
         Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
-    _assert_not_scalar(taylor_coefficients)
-
-    t0 = ts[0]
-
     # todo: annoying that the error estimate is not part of the state...
+    t0 = ts[0]
     state, _ = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     def body_fn(carry, t_new):
@@ -136,15 +127,3 @@ def odefilter_fixed_grid(vector_field, taylor_coefficients, ts, solver, paramete
         f=body_fn, init=(state, t0), xs=ts[1:]
     )
     return solver.extract_fn(state=result)
-
-
-def _assert_not_scalar(x, /):
-    """Verify the initial conditions are not scalar.
-
-    There is no clear mechanism for the internals if the IVP is
-    scalar. Therefore, we don't allow them for now.
-
-    todo: allow scalar problems.
-    """
-    is_not_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) > 0, x)
-    assert jax.tree_util.tree_all(is_not_scalar)
