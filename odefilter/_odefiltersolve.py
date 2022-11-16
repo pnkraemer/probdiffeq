@@ -1,13 +1,9 @@
-"""ODE filter routines."""
+"""ODE-filter routines."""
 
 import jax
 import jax.numpy as jnp
 
 from odefilter import _adaptive, _control_flow
-
-# todo: warn that taylor_coefficients might have
-#  to be recomputed when the parameters change.
-#  it is generally safer to use the ivpsolve.py methods.
 
 
 def odefilter_terminal_values(

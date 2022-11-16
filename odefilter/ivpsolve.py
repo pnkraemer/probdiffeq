@@ -6,7 +6,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 
-from odefilter import odefiltersolve, taylor
+from odefilter import _odefiltersolve, taylor
 from odefilter.strategies import smoothers
 
 # The high-level checkpoint-style routines
@@ -25,10 +25,7 @@ def simulate_terminal_values(
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
-    """Simulate the terminal values of an initial value problem.
-
-    Thin wrapper around :func:`odefiltersolve.odefilter_terminal_values`.
-    """
+    """Simulate the terminal values of an initial value problem."""
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
 
@@ -41,7 +38,7 @@ def simulate_terminal_values(
         parameters=parameters,
     )
 
-    return odefiltersolve.odefilter_terminal_values(
+    return _odefiltersolve.odefilter_terminal_values(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -61,10 +58,7 @@ def simulate_checkpoints(
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
-    """Solve an IVP and return the solution at checkpoints.
-
-    Thin wrapper around :func:`odefiltersolve.odefilter_checkpoints`.
-    """
+    """Solve an IVP and return the solution at checkpoints."""
     _assert_not_scalar(initial_values)
     _assert_tuple(initial_values)
     if isinstance(solver.strategy, smoothers.Smoother):
@@ -83,7 +77,7 @@ def simulate_checkpoints(
         parameters=parameters,
     )
 
-    return odefiltersolve.odefilter_checkpoints(
+    return _odefiltersolve.odefilter_checkpoints(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         ts=ts,
@@ -124,7 +118,7 @@ def solve(
         parameters=parameters,
     )
 
-    return odefiltersolve.odefilter(
+    return _odefiltersolve.odefilter(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -162,7 +156,7 @@ def solve_fixed_grid(
         parameters=parameters,
     )
 
-    return odefiltersolve.odefilter_fixed_grid(
+    return _odefiltersolve.odefilter_fixed_grid(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         ts=ts,
