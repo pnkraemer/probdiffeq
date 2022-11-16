@@ -50,7 +50,7 @@ def simulate_terminal_values(
 def simulate_and_save_at(
     vector_field,
     initial_values,
-    ts,
+    save_at,
     solver,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
@@ -71,14 +71,14 @@ def simulate_and_save_at(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
-        t=ts[0],
+        t=save_at[0],
         parameters=parameters,
     )
 
     return _odefiltersolve.simulate_and_save_at(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
-        ts=ts,
+        save_at=save_at,
         solver=solver,
         parameters=parameters,
         **options,
@@ -129,7 +129,7 @@ def solve(
 def solve_fixed_grid(
     vector_field,
     initial_values,
-    ts,
+    grid,
     solver,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
@@ -148,14 +148,14 @@ def solve_fixed_grid(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
-        t=ts[0],
+        t=grid[0],
         parameters=parameters,
     )
 
     return _odefiltersolve.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
-        ts=ts,
+        grid=grid,
         solver=solver,
         parameters=parameters,
         **options,

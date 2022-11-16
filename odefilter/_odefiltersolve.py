@@ -24,7 +24,7 @@ def simulate_terminal_values(
 
 
 def simulate_and_save_at(
-    vector_field, taylor_coefficients, ts, solver, parameters, **options
+    vector_field, taylor_coefficients, save_at, solver, parameters, **options
 ):
     """Simulate checkpoints of an ODE solution with an ODE filter."""
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
@@ -39,12 +39,13 @@ def simulate_and_save_at(
         )
         return s_next, s_next
 
-    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=ts[0])
+    t0 = save_at[0]
+    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
         init=state0,
-        xs=ts[1:],
+        xs=save_at[1:],
         reverse=False,
     )
     return adaptive_solver.extract_fn(state=solution)
@@ -104,7 +105,7 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
     yield state
 
 
-def solve_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
+def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters):
     """Solve an initial value problem.
 
     !!! warning
@@ -112,7 +113,7 @@ def solve_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
         Not JITable, not reverse-mode-differentiable.
     """
     # todo: annoying that the error estimate is not part of the state...
-    t0 = ts[0]
+    t0 = grid[0]
     state, _ = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     def body_fn(carry, t_new):
@@ -124,6 +125,6 @@ def solve_fixed_grid(vector_field, taylor_coefficients, ts, solver, parameters):
         return (s_new, t_new), (s_new, t_new)
 
     _, (result, _) = _control_flow.scan_with_init(
-        f=body_fn, init=(state, t0), xs=ts[1:]
+        f=body_fn, init=(state, t0), xs=grid[1:]
     )
     return solver.extract_fn(state=result)

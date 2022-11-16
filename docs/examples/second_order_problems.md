@@ -50,10 +50,10 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```python
 %%time
 
-solution = ivpsolve.simulate_checkpoints(
+solution = ivpsolve.simulate_and_save_at(
     vf_1,
     initial_values=(u0,),
-    ts=ts,
+    save_at=ts,
     solver=ts0_1,
     atol=1e-5,
     rtol=1e-5,
@@ -97,10 +97,10 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```python
 %%time
 
-solution = ivpsolve.simulate_checkpoints(
+solution = ivpsolve.simulate_and_save_at(
     vf_2,
     initial_values=(u0, du0),
-    ts=ts,
+    save_at=ts,
     solver=ts0_2,
     atol=1e-5,
     rtol=1e-5,

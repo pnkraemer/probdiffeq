@@ -111,7 +111,7 @@ def fixture_solution_and_save_at(ode_problem, tolerances, solver, checkpoint_gri
     solution = ivpsolve.simulate_and_save_at(
         vf,
         u0,
-        ts=checkpoint_grid,
+        save_at=checkpoint_grid,
         parameters=f_args,
         solver=solver,
         atol=1e-1 * atol,
@@ -159,7 +159,7 @@ def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
     solution = ivpsolve.solve_fixed_grid(
         vf,
         u0,
-        ts=fixed_grid,
+        grid=fixed_grid,
         parameters=f_args,
         solver=solver,
         taylor_fn=taylor.taylor_mode_fn,
