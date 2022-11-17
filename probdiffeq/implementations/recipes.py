@@ -4,11 +4,13 @@ from typing import Generic, TypeVar
 
 import jax
 
-from probdiffeq.implementations import _collections, _vect
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.batch import corr as batch_corr
 from probdiffeq.implementations.batch import extra as batch_extra
 from probdiffeq.implementations.iso import corr as iso_corr
 from probdiffeq.implementations.iso import extra as iso_extra
+from probdiffeq.implementations.vect import corr as vect_corr
+from probdiffeq.implementations.vect import extra as vect_extra
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""
@@ -82,44 +84,48 @@ class BatchTS0(
 
 
 @jax.tree_util.register_pytree_node_class
-class VectTS1(AbstractImplementation[_vect.VectTaylorFirstOrder, _vect.VectIBM]):
+class VectTS1(
+    AbstractImplementation[vect_corr.VectTaylorFirstOrder, vect_extra.VectIBM]
+):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = _vect.VectTaylorFirstOrder(
+        correction = vect_corr.VectTaylorFirstOrder(
             ode_shape=ode_shape, ode_order=ode_order
         )
-        extrapolation = _vect.VectIBM.from_params(
+        extrapolation = vect_extra.VectIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class VectTS0(AbstractImplementation[_vect.VectTaylorZerothOrder, _vect.VectIBM]):
+class VectTS0(
+    AbstractImplementation[vect_corr.VectTaylorZerothOrder, vect_extra.VectIBM]
+):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = _vect.VectTaylorZerothOrder(
+        correction = vect_corr.VectTaylorZerothOrder(
             ode_shape=ode_shape, ode_order=ode_order
         )
-        extrapolation = _vect.VectIBM.from_params(
+        extrapolation = vect_extra.VectIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class VectMM1(AbstractImplementation[_vect.VectMomentMatching, _vect.VectIBM]):
+class VectMM1(AbstractImplementation[vect_corr.VectMomentMatching, vect_extra.VectIBM]):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
-            correction = _vect.VectMomentMatching.from_params(
+            correction = vect_corr.VectMomentMatching.from_params(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
-            correction = _vect.VectMomentMatching(
+            correction = vect_corr.VectMomentMatching(
                 ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
             )
-        extrapolation = _vect.VectIBM.from_params(
+        extrapolation = vect_extra.VectIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
