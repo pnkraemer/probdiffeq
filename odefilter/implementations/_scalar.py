@@ -209,7 +209,7 @@ class MomentMatching(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, ode_order):
-        sci_fn = cubature_module.SphericalCubatureIntegration.from_params
+        sci_fn = cubature_module.ThirdOrderSpherical.from_params
         cubature = sci_fn(input_shape=())
         return cls(ode_order=ode_order, cubature=cubature)
 

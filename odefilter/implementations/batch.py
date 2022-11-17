@@ -183,7 +183,7 @@ class BatchMomentMatching(
 
     @classmethod
     def from_params(cls, ode_shape, ode_order):
-        cubature_fn = cubature_module.SphericalCubatureIntegration.from_params_batch
+        cubature_fn = cubature_module.ThirdOrderSpherical.from_params_batch
         cubature = cubature_fn(input_shape=ode_shape)
         return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
 
