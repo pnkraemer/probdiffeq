@@ -22,9 +22,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import filters
+from probdiffeq import ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import filters
 
 config.update("jax_enable_x64", True)
 

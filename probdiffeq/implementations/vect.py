@@ -4,8 +4,8 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from odefilter import cubature as cubature_module
-from odefilter.implementations import _collections, _ibm_util, _sqrtm
+from probdiffeq import cubature as cubature_module
+from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class

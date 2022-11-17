@@ -1,3 +1,3 @@
 # Inference via smoothing
 
-::: odefilter.strategies.smoothers
+::: probdiffeq.strategies.smoothers

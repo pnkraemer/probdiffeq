@@ -7,8 +7,8 @@ from typing import Any, Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from odefilter import _control_flow
-from odefilter.strategies import _strategy
+from probdiffeq import _control_flow
+from probdiffeq.strategies import _strategy
 
 SSVTypeVar = TypeVar("SSVTypeVar")
 """A type-variable to alias appropriate state-space variable types."""

@@ -7,7 +7,7 @@ from math import prod
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter.implementations import _sqrtm
+from probdiffeq.implementations import _sqrtm
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 

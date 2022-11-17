@@ -1,3 +1,3 @@
 # Solvers
 
-::: odefilter.solvers
+::: probdiffeq.solvers

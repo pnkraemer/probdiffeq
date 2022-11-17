@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# ODE-filters only
+# Internal solvers only
 
 Let's find the fastest solver of the Lotka--Volterra problem, a standard benchmark problem. It is low-dimensional, not stiff, and generally poses no major problems for any numerical solver.
 
@@ -33,9 +33,9 @@ from _benchmark_utils import (
 from diffeqzoo import backend, ivps
 from jax import config
 
-from odefilter import controls, cubature, ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import filters, smoothers
+from probdiffeq import controls, cubature, ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import filters, smoothers
 
 # x64 precision
 config.update("jax_enable_x64", True)

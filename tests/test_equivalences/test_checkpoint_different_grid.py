@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import dense_output, ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import smoothers
+from probdiffeq import dense_output, ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
 #  solve(... solver=smo) and solve_and_save_at(solver=fp_smo)

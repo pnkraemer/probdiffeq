@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from odefilter import controls
+from probdiffeq import controls
 
 T = TypeVar("T")
 """A generic ODE Filter state."""

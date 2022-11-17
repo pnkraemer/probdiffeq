@@ -1,3 +1,3 @@
 # Implementation recipes
 
-::: odefilter.implementations.recipes
+::: probdiffeq.implementations.recipes

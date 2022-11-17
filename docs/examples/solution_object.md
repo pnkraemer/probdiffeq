@@ -25,9 +25,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import dense_output, ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import smoothers
+from probdiffeq import dense_output, ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import smoothers
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax

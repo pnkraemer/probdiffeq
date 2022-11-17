@@ -1,3 +1,3 @@
 # Inference via filtering
 
-::: odefilter.strategies.filters
+::: probdiffeq.strategies.filters

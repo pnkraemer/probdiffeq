@@ -1,3 +1,3 @@
 # Priors with isotropic covariance structure
 
-::: odefilter.implementations.iso
+::: probdiffeq.implementations.iso

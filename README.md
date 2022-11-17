@@ -1,15 +1,15 @@
-# odefilter
+# probdiffeq
 
-[![PyPi Version](https://img.shields.io/pypi/v/odefilter.svg?style=flat-square)](https://pypi.org/project/odefilter/)
-[![Docs](https://readthedocs.org/projects/pip/badge/?version=latest&style=flat-square)](https://odefilter.readthedocs.io)
-[![GitHub stars](https://img.shields.io/github/stars/pnkraemer/odefilter.svg?style=flat-square&logo=github&label=Stars&logoColor=white)](https://github.com/pnkraemer/odefilter)
-[![gh-actions](https://img.shields.io/github/workflow/status/pnkraemer/odefilter/ci?style=flat-square)](https://github.com/pnkraemer/odefilter/actions?query=workflow%3Aci)
-<a href="https://github.com/pnkraemer/odefilter/blob/master/LICENSE"><img src="https://img.shields.io/github/license/pnkraemer/odefilter?style=flat-square&color=2b9348" alt="License Badge"/></a>
+[![PyPi Version](https://img.shields.io/pypi/v/probdiffeq.svg?style=flat-square)](https://pypi.org/project/probdiffeq/)
+[![Docs](https://readthedocs.org/projects/pip/badge/?version=latest&style=flat-square)](https://probdiffeq.readthedocs.io)
+[![GitHub stars](https://img.shields.io/github/stars/pnkraemer/probdiffeq.svg?style=flat-square&logo=github&label=Stars&logoColor=white)](https://github.com/pnkraemer/probdiffeq)
+[![gh-actions](https://img.shields.io/github/workflow/status/pnkraemer/probdiffeq/ci?style=flat-square)](https://github.com/pnkraemer/probdiffeq/actions?query=workflow%3Aci)
+<a href="https://github.com/pnkraemer/probdiffeq/blob/master/LICENSE"><img src="https://img.shields.io/github/license/pnkraemer/probdiffeq?style=flat-square&color=2b9348" alt="License Badge"/></a>
 
 
 
 * **DOCUMENTATION:** TBD
-* **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/odefilter/issues)
+* **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
 
 
 ## Installation
@@ -17,14 +17,14 @@
 Get the most recent stable version from PyPi:
 
 ```
-pip install odefilter
+pip install probdiffeq
 ```
 Or directly from GitHub:
 ```
-pip install git+https://github.com/pnkraemer/odefilter.git
+pip install git+https://github.com/pnkraemer/probdiffeq.git
 ```
 
-Read more about installing this package [here](https://odefilter.readthedocs.io/en/latest/getting_started/installation.html).
+Read more about installing this package [here](https://probdiffeq.readthedocs.io/en/latest/getting_started/installation.html).
 
 
 ## Features include

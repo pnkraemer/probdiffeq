@@ -1,2 +1,2 @@
 # Dense output
-::: odefilter.dense_output
+::: probdiffeq.dense_output

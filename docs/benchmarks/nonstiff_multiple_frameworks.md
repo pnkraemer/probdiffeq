@@ -34,9 +34,9 @@ from _benchmark_utils import (
 from diffeqzoo import backend, ivps
 from jax import config
 
-from odefilter import controls, ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import filters
+from probdiffeq import controls, ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import filters
 
 # x64 precision
 config.update("jax_enable_x64", True)

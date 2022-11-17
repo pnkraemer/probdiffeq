@@ -29,9 +29,9 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from odefilter import dense_output, ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import smoothers
+from probdiffeq import dense_output, ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import smoothers
 
 config.update("jax_enable_x64", True)
 
@@ -81,7 +81,7 @@ plt.plot(ts, solution_guess.u)
 plt.show()
 ```
 
-Use the odefilter functionality to compute a parameter-to-data fit function.
+Use the probdiffeq functionality to compute a parameter-to-data fit function.
 
 This incorporates the likelihood of the data under the distribution induced by the probabilistic ODE solution (which was generated with the current parameter guess).
 

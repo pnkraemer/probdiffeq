@@ -7,15 +7,15 @@ ODE solvers are nested iterative algorithms:
 * Iterate through some linearisations/stages to complete the step attempt.
 
 To combine this nested logic of iteration with JAX' functional programming paradigm,
-``odefilters`` use an init-apply-extract mechanism
+``probdiffeqs`` use an init-apply-extract mechanism
 just like many other JAX-based simulation libraries ([Optax](https://optax.readthedocs.io/en/latest/index.html), [Blackjax](https://blackjax-devs.github.io/blackjax/), etc.).
 
-Algorithms in the ``odefilters`` package are collections of parametrised
+Algorithms in the ``probdiffeqs`` package are collections of parametrised
 functions (thanks @[Equinox](https://docs.kidger.site/equinox/)!).
 One such collection roughly implements the ``alg`` bit of:
 ```python
 def iterative_alg(*problem, alg, cond_fun):
-    """Iterative, stateless computation in the ``odefilters`` package."""
+    """Iterative, stateless computation in the ``probdiffeqs`` package."""
     state = alg.init_fn(*problem)
 
     while cond_fun(state):

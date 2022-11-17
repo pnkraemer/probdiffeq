@@ -30,13 +30,13 @@ lint:
 	nbqa flake8 docs/advanced_examples/
 	nbqa flake8 docs/benchmarks/
 	# Opt-in for specific pylint checks that flake8 can't detect
-	pylint odefilter/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
+	pylint probdiffeq/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
 	pylint tests/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
 	# A very soft mypy check to detect obvious problems
-	mypy odefilter --disable-error-code=var-annotated
+	mypy probdiffeq --disable-error-code=var-annotated
 test:
 	pytest -n auto -x -v -s  # parallelise, fail early, verbose output, show all 'stdout's
-	python -m doctest odefilter/*.py
+	python -m doctest probdiffeq/*.py
 
 example:
 	jupytext --sync docs/examples/*
@@ -54,8 +54,9 @@ pre-commit:
 
 clean:
 	rm -rf .pytest_cache
+	rm -rf .mypy_cache
 	rm -rf *.egg-info
-	rm -rf dist site
+	rm -rf dist site build
 	rm -rf *.ipynb_checkpoints
 	rm -rf docs/benchmarks/__pycache__
 
