@@ -4,7 +4,65 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
-from probdiffeq.implementations.iso import _cond, _ssv
+from probdiffeq.implementations.iso import _vars
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoConditional(_collections.AbstractConditional):
+    def __init__(self, transition, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
+
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        return _vars.IsoNormal(m, self.noise.cov_sqrtm_lower)
+
+    def scale_covariance(self, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return IsoConditional(transition=self.transition, noise=noise)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+
+        noise = _vars.IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
+        bw_model = IsoConditional(g, noise=noise)
+        return bw_model
+
+    def marginalise(self, rv, /):
+        """Marginalise the output of a linear model."""
+        # Read
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
+
+        # Apply transition
+        m_new = self.transition @ m0_p + self.noise.mean
+        l_new = _sqrtm.sum_of_sqrtm_factors(
+            R1=(self.transition @ l0_p).T, R2=self.noise.cov_sqrtm_lower.T
+        ).T
+
+        return _vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -39,14 +97,14 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def init_corrected(self, taylor_coefficients):
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return _ssv.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
 
     def init_rv(self, ode_shape):
         assert len(ode_shape) == 1
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _ssv.IsoNormal(m0, c0)
+        return _vars.IsoNormal(m0, c0)
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -60,7 +118,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return _ssv.IsoNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+        return _vars.IsoNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -77,7 +135,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _ssv.IsoNormal(m_ext, l_ext)
+        return _vars.IsoNormal(m_ext, l_ext)
 
     def revert_markov_kernel(self, linearisation_pt, l0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
@@ -100,22 +158,22 @@ class IsoIBM(_collections.AbstractExtrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _ssv.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _cond.IsoConditional(g_bw, noise=backward_noise)
-        extrapolated = _ssv.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = IsoConditional(g_bw, noise=backward_noise)
+        extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return extrapolated, bw_model
 
-    # todo: should this be a classmethod in _cond.IsoConditional?
+    # todo: should this be a classmethod in IsoConditional?
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _cond.IsoConditional(op, noise=noi)
+        return IsoConditional(op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)
 
     def _init_backward_noise(self, rv_proto):
-        return _ssv.IsoNormal(
+        return _vars.IsoNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )

@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _sqrtm
-from probdiffeq.implementations.vect import _ssv
+from probdiffeq.implementations.vect import _vars
 
 
 @jax.tree_util.register_pytree_node_class
@@ -25,14 +25,14 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin_correction(self, x: _ssv.VectNormal, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.VectNormal, /, vector_field, t, p):
         m0 = self._select_derivative(x.mean, slice(0, self.ode_order))
         m1 = self._select_derivative(x.mean, self.ode_order)
         b = m1 - vector_field(*m0, t=t, p=p)
         cov_sqrtm_lower = self._select_derivative_vect(x.cov_sqrtm_lower, 1)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        observed = _ssv.VectNormal(b, l_obs_raw, target_shape=x.target_shape)
+        observed = _vars.VectNormal(b, l_obs_raw, target_shape=x.target_shape)
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
@@ -48,8 +48,10 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = m_ext - gain @ b
 
         _shape = extrapolated.target_shape
-        observed = _ssv.VectNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=_shape)
-        corrected = _ssv.VectNormal(
+        observed = _vars.VectNormal(
+            mean=b, cov_sqrtm_lower=r_obs.T, target_shape=_shape
+        )
+        corrected = _vars.VectNormal(
             mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=_shape
         )
         return observed, (corrected, gain)
@@ -83,7 +85,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin_correction(self, x: _ssv.VectNormal, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.VectNormal, /, vector_field, t, p):
         vf_partial = jax.tree_util.Partial(
             self._residual, vector_field=vector_field, t=t, p=p
         )
@@ -94,7 +96,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         )
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        output_scale_sqrtm = _ssv.VectNormal(
+        output_scale_sqrtm = _vars.VectNormal(
             b, l_obs_raw, target_shape=x.target_shape
         ).norm_of_whitened_residual_sqrtm()
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
@@ -113,8 +115,8 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         m_cor = m_ext - gain @ b
 
         shape = extrapolated.target_shape
-        observed = _ssv.VectNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=shape)
-        corrected = _ssv.VectNormal(
+        observed = _vars.VectNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=shape)
+        corrected = _vars.VectNormal(
             mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=shape
         )
         return observed, (corrected, gain)
@@ -170,7 +172,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, cubature=cubature)
 
-    def begin_correction(self, x: _ssv.VectNormal, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.VectNormal, /, vector_field, t, p):
 
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
@@ -197,7 +199,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
         l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=fx_centered_normed).T
 
         # Summarise
-        marginals = _ssv.VectNormal(m_marg, l_marg, target_shape=x.target_shape)
+        marginals = _vars.VectNormal(m_marg, l_marg, target_shape=x.target_shape)
         output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
         # Compute error estimate
@@ -234,11 +236,11 @@ class VectMomentMatching(_collections.AbstractCorrection):
         x1 = self._select_derivative(x.mean, 1)
         m_marg = x1 - (H @ x0 + noise.mean)
         shape = extrapolated.target_shape
-        marginals = _ssv.VectNormal(m_marg, r_marg.T, target_shape=shape)
+        marginals = _vars.VectNormal(m_marg, r_marg.T, target_shape=shape)
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain @ m_marg
-        backward_noise = _ssv.VectNormal(m_bw, r_bw.T, target_shape=shape)
+        backward_noise = _vars.VectNormal(m_bw, r_bw.T, target_shape=shape)
         return marginals, (backward_noise, gain)
 
     def _linearize(self, x, cache):
@@ -272,7 +274,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Catch up the transition-mean and return the result
         d = fx_mean - H @ m_0
-        return H, _ssv.VectNormal(d, r_Om.T, target_shape=x.target_shape)
+        return H, _vars.VectNormal(d, r_Om.T, target_shape=x.target_shape)
 
     def _select_derivative_vect(self, x, i):
         select = jax.vmap(
