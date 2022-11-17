@@ -4,9 +4,11 @@ from typing import Generic, TypeVar
 
 import jax
 
-from probdiffeq.implementations import _collections, _iso, _vect
+from probdiffeq.implementations import _collections, _vect
 from probdiffeq.implementations.batch import corr as batch_corr
 from probdiffeq.implementations.batch import extra as batch_extra
+from probdiffeq.implementations.iso import corr as iso_corr
+from probdiffeq.implementations.iso import extra as iso_extra
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""
@@ -38,11 +40,11 @@ class AbstractImplementation(Generic[CorrType, ExtraType]):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTS0(AbstractImplementation[_iso.IsoTaylorZerothOrder, _iso.IsoIBM]):
+class IsoTS0(AbstractImplementation[iso_corr.IsoTaylorZerothOrder, iso_extra.IsoIBM]):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = _iso.IsoTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = _iso.IsoIBM.from_params(num_derivatives=num_derivatives)
+        correction = iso_corr.IsoTaylorZerothOrder(ode_order=ode_order)
+        extrapolation = iso_extra.IsoIBM.from_params(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
 
 
