@@ -1,5 +1,7 @@
 """Isotropic-style extrapolations."""
 
+from typing import Any, Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -29,7 +31,7 @@ class IsoConditional(_collections.AbstractConditional):
 
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        return _vars.IsoNormal(m, self.noise.cov_sqrtm_lower)
+        return _vars.IsoVariable(_vars.IsoNormal(m, self.noise.cov_sqrtm_lower))
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -50,19 +52,19 @@ class IsoConditional(_collections.AbstractConditional):
         bw_model = IsoConditional(g, noise=noise)
         return bw_model
 
-    def marginalise(self, rv, /):
+    def marginalise(self, rv: _vars.IsoVariable, /) -> _vars.IsoVariable:
         """Marginalise the output of a linear model."""
         # Read
-        m0_p = rv.mean
-        l0_p = rv.cov_sqrtm_lower
+        m0 = rv.hidden_state.mean
+        l0 = rv.hidden_state.cov_sqrtm_lower
 
         # Apply transition
-        m_new = self.transition @ m0_p + self.noise.mean
+        m_new = self.transition @ m0 + self.noise.mean
         l_new = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.transition @ l0_p).T, R2=self.noise.cov_sqrtm_lower.T
+            R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
         ).T
 
-        return _vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
+        return _vars.IsoVariable(_vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new))
 
 
 @jax.tree_util.register_pytree_node_class
@@ -97,7 +99,8 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def init_corrected(self, taylor_coefficients):
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        rv = _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _vars.IsoVariable(rv)
 
     def init_rv(self, ode_shape):
         assert len(ode_shape) == 1
@@ -112,36 +115,40 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def init_output_scale_sqrtm(self):
         return 1.0
 
-    def begin_extrapolation(self, m0, /, dt):
+    def begin_extrapolation(
+        self, p0: _vars.IsoVariable, /, dt
+    ) -> Tuple[_vars.IsoVariable, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv[:, None] * m0
+        m0_p = p_inv[:, None] * p0.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        return _vars.IsoNormal(m_ext, q_sqrtm), (m_ext_p, m0_p, p, p_inv)
+
+        ext = _vars.IsoNormal(m_ext, q_sqrtm)
+        return _vars.IsoVariable(ext), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
 
-    def complete_extrapolation(self, linearisation_pt, l0, cache, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
-        m_ext = linearisation_pt.mean
+        m_ext = linearisation_pt.hidden_state.mean
 
-        l0_p = p_inv[:, None] * l0
+        l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.a @ l0_p).T,
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.IsoNormal(m_ext, l_ext)
+        return _vars.IsoVariable(_vars.IsoNormal(m_ext, l_ext))
 
-    def revert_markov_kernel(self, linearisation_pt, l0, cache, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
-        m_ext = linearisation_pt.mean
+        m_ext = linearisation_pt.hidden_state.mean
 
-        l0_p = p_inv[:, None] * l0
+        l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -161,7 +168,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = IsoConditional(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return extrapolated, bw_model
+        return _vars.IsoVariable(extrapolated), bw_model
 
     # todo: should this be a classmethod in IsoConditional?
     def init_conditional(self, rv_proto):

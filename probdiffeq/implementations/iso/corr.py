@@ -1,4 +1,6 @@
 """Isotropic-style corrections."""
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -8,11 +10,11 @@ from probdiffeq.implementations.iso import _vars
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_collections.AbstractCorrection):
-    def begin_correction(self, x: _vars.IsoNormal, /, vector_field, t, p):
-        m = x.mean
+    def begin_correction(self, x: _vars.IsoVariable, /, vector_field, t, p):
+        m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
-        cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, ...]
+        cov_sqrtm_lower = x.hidden_state.cov_sqrtm_lower[self.ode_order, ...]
 
         l_obs = jnp.reshape(
             _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None]), ()
@@ -27,10 +29,15 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate = l_obs
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
-    def complete_correction(self, extrapolated, cache):
+    def complete_correction(
+        self, extrapolated: _vars.IsoVariable, cache
+    ) -> Tuple[_vars.IsoNormal, Tuple[_vars.IsoVariable, jax.Array]]:
         (bias,) = cache
 
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+        m_ext, l_ext = (
+            extrapolated.hidden_state.mean,
+            extrapolated.hidden_state.cov_sqrtm_lower,
+        )
         l_obs = l_ext[self.ode_order, ...]
 
         l_obs_scalar = jnp.reshape(
@@ -44,4 +51,4 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = m_ext - g[:, None] * bias[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = _vars.IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (corrected, g)
+        return observed, (_vars.IsoVariable(corrected), g)

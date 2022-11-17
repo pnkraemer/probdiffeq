@@ -6,15 +6,50 @@ from typing import Generic, Tuple, TypeVar
 import jax
 
 
-# todo: make "u" a property?
-class StateSpaceVariable(abc.ABC):
+class RandomVariable(abc.ABC):
     @abc.abstractmethod
     def logpdf(self, u, /):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def transform_unit_sample(self, x, /):
+        raise NotImplementedError
+
+    @property
+    @abc.abstractmethod
+    def sample_shape(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def scale_covariance(self, scale_sqrtm):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def norm_of_whitened_residual_sqrtm(self):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def Ax_plus_y(self, A, x, y):
+        raise NotImplementedError
+
+
+# todo: make "u" a property?
+class StateSpaceVariable(abc.ABC):
+    def __init__(self, hidden_state):
+        self.hidden_state = hidden_state
+
+    def tree_flatten(self):
+        children = (self.hidden_state,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (hidden_state,) = children
+        return cls(hidden_state=hidden_state)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
     @abc.abstractmethod
     def condition_on_qoi_observation(self, u, /, observation_std):
@@ -30,19 +65,6 @@ class StateSpaceVariable(abc.ABC):
 
     @abc.abstractmethod
     def scale_covariance(self, scale_sqrtm):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def transform_unit_sample(self, x, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def Ax_plus_y(self, A, x, y):
-        raise NotImplementedError
-
-    @property
-    @abc.abstractmethod
-    def sample_shape(self):
         raise NotImplementedError
 
 
