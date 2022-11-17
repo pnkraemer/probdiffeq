@@ -5,7 +5,7 @@ import jax
 
 from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _scalar
-from probdiffeq.implementations.batch import _ssv
+from probdiffeq.implementations.batch import _vars
 
 _MM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
@@ -13,7 +13,7 @@ _MM1CacheType = Tuple[Callable]
 
 @jax.tree_util.register_pytree_node_class
 class BatchMomentMatching(
-    _collections.AbstractCorrection[_ssv.BatchNormal, _MM1CacheType]
+    _collections.AbstractCorrection[_vars.BatchNormal, _MM1CacheType]
 ):
     def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
@@ -46,7 +46,7 @@ class BatchMomentMatching(
         cubature = cubature_fn(input_shape=ode_shape)
         return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
 
-    def begin_correction(self, x: _ssv.BatchNormal, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.BatchNormal, /, vector_field, t, p):
         # Unvmap
         extrapolated = x.to_normal()
 
@@ -80,8 +80,8 @@ class BatchMomentMatching(
         obs_unb, (cor_unb, gain) = fn(self._mm, H, extra, noise)
 
         # Vmap
-        obs = _ssv.BatchScalarNormal.from_scalar_normal(obs_unb)
-        cor = _ssv.BatchNormal.from_normal(cor_unb)
+        obs = _vars.BatchScalarNormal.from_scalar_normal(obs_unb)
+        cor = _vars.BatchNormal.from_normal(cor_unb)
         return obs, (cor, gain)
 
     def linearize(self, extrapolated, vmap_f):
@@ -105,13 +105,13 @@ class BatchMomentMatching(
             sigma_points_centered_normed,
             extrapolated,
         )
-        noise = _ssv.BatchScalarNormal.from_scalar_normal(noise_unb)
+        noise = _vars.BatchScalarNormal.from_scalar_normal(noise_unb)
         return H, noise
 
 
 _TS0CacheType = Tuple[jax.Array]
 
-_BatchTS0Base = _collections.AbstractCorrection[_ssv.BatchNormal, _TS0CacheType]
+_BatchTS0Base = _collections.AbstractCorrection[_vars.BatchNormal, _TS0CacheType]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -120,7 +120,7 @@ class BatchTaylorZerothOrder(_BatchTS0Base):
         super().__init__(*args, **kwargs)
         self._ts0 = _scalar.TaylorZerothOrder(*args, **kwargs)
 
-    def begin_correction(self, x: _ssv.BatchNormal, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.BatchNormal, /, vector_field, t, p):
         x_unbatch = _scalar.Normal(x.mean, x.cov_sqrtm_lower)
 
         select_fn = jax.vmap(_scalar.TaylorZerothOrder.select_derivatives)
@@ -130,19 +130,23 @@ class BatchTaylorZerothOrder(_BatchTS0Base):
 
         marginalise_fn = jax.vmap(_scalar.TaylorZerothOrder.marginalise_observation)
         cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x)
-        observed = _ssv.BatchScalarNormal(obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower)
+        observed = _vars.BatchScalarNormal(
+            obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower
+        )
 
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
         error_estimate = observed.cov_sqrtm_lower
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
-    def complete_correction(self, extrapolated: _ssv.BatchNormal, cache: _TS0CacheType):
+    def complete_correction(
+        self, extrapolated: _vars.BatchNormal, cache: _TS0CacheType
+    ):
         extra_unbatch = _scalar.Normal(extrapolated.mean, extrapolated.cov_sqrtm_lower)
         fn = jax.vmap(_scalar.TaylorZerothOrder.complete_correction)
         obs_unbatch, (cor_unbatch, gain) = fn(self._ts0, extra_unbatch, cache)
 
-        obs = _ssv.BatchScalarNormal(obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower)
-        cor = _ssv.BatchNormal(cor_unbatch.mean, cor_unbatch.cov_sqrtm_lower)
+        obs = _vars.BatchScalarNormal(obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower)
+        cor = _vars.BatchNormal(cor_unbatch.mean, cor_unbatch.cov_sqrtm_lower)
         return obs, (cor, gain)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
