@@ -1,3 +1,3 @@
 # Control algorithms
 
-::: odefilter.controls
+::: probdiffeq.controls

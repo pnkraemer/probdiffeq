@@ -5,9 +5,9 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from odefilter import ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import filters, smoothers
+from probdiffeq import ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import filters, smoothers
 
 
 @pytest_cases.case

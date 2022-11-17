@@ -2,7 +2,7 @@
 
 import jax
 
-from odefilter import _adaptive, _control_flow
+from probdiffeq import _adaptive, _control_flow
 
 
 def simulate_terminal_values(

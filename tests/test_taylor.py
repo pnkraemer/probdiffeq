@@ -3,7 +3,7 @@
 import diffeqzoo.ivps
 import pytest_cases
 
-from odefilter import taylor
+from probdiffeq import taylor
 
 
 @pytest_cases.case(tags=["first", "higher"])

@@ -5,8 +5,8 @@ import warnings
 
 import jax
 
-from odefilter import _odefiltersolve, taylor
-from odefilter.strategies import smoothers
+from probdiffeq import _probsolve, taylor
+from probdiffeq.strategies import smoothers
 
 # The high-level checkpoint-style routines
 
@@ -36,7 +36,7 @@ def simulate_terminal_values(
         parameters=parameters,
     )
 
-    return _odefiltersolve.simulate_terminal_values(
+    return _probsolve.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -75,7 +75,7 @@ def solve_and_save_at(
         parameters=parameters,
     )
 
-    return _odefiltersolve.solve_and_save_at(
+    return _probsolve.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         save_at=save_at,
@@ -115,7 +115,7 @@ def solve(
         parameters=parameters,
     )
 
-    return _odefiltersolve.solve(
+    return _probsolve.solve(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -152,7 +152,7 @@ def solve_fixed_grid(
         parameters=parameters,
     )
 
-    return _odefiltersolve.solve_fixed_grid(
+    return _probsolve.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         grid=grid,

@@ -4,8 +4,8 @@ import jax.numpy as jnp
 import pytest_cases
 import pytest_cases.filters
 
-from odefilter import dense_output
-from odefilter.strategies import filters, smoothers
+from probdiffeq import dense_output
+from probdiffeq.strategies import filters, smoothers
 
 
 def test_offgrid_marginals_filter(solution_solve):

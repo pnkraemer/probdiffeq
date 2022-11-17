@@ -1,2 +1,2 @@
 # Taylor series
-::: odefilter.taylor
+::: probdiffeq.taylor

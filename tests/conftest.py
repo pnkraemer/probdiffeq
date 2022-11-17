@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import pytest_cases
 import pytest_cases.filters
 
-from odefilter import ivpsolve, taylor
+from probdiffeq import ivpsolve, taylor
 
 # Set some test filters
 

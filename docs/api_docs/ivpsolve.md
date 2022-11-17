@@ -3,7 +3,7 @@
 There are many ways to skin the cat, and there are even more ways
 of stepping through time to solve an ODE.
 Most libraries expose a single ``solve_ode()`` method.
-``odefilters`` does not, there are differnet function calls for different
+``probdiffeqs`` does not, there are differnet function calls for different
 time-stepping modes and/or quantities of interest. We distinguish
 
 ### Adaptive time-stepping
@@ -53,7 +53,7 @@ Most ``solve_ode()`` style codes are very involved and quite complex,
 because they need to cover all eventualities of evaluation points (checkpoints),
 events, constant or adaptive step-sizes, and so on, often with many
 unused arguments depending on the function call.
-In contrast, the simulation routines in ``odefilters`` are ~10 LoC and
+In contrast, the simulation routines in ``probdiffeqs`` are ~10 LoC and
 all arguments are used (with some minor exceptions).
 
 
@@ -84,7 +84,7 @@ $$
 $$
 
 We can always create the second problem out of the first problem
-with efficient automatic differentiation (see ``odefilters.taylor``).
+with efficient automatic differentiation (see ``probdiffeqs.taylor``).
 The initial values are the Taylor coefficients of $u$ at time $t=0$.
 
 This difference is evident if you compare the different signatures of the
@@ -92,13 +92,13 @@ ODE-filter-specific routines to those of the traditional APIs.
 
 ## Which one should I use?
 
-It is perfectly fine to use the traditional API (not the functions marked with ``odefilter_``).
+It is perfectly fine to use the traditional API (not the functions marked with ``probdiffeq_``).
 But a true pro calls the ODE filter the way it is supposed to be called.
 
 ### Adaptive simulation of specific time-points
 
-::: odefilter.ivpsolve.simulate_terminal_values
-::: odefilter.ivpsolve.solve_and_save_at
+::: probdiffeq.ivpsolve.simulate_terminal_values
+::: probdiffeq.ivpsolve.solve_and_save_at
 
 ### Adaptive simulation using native Python control flow
-::: odefilter.ivpsolve.solve
+::: probdiffeq.ivpsolve.solve

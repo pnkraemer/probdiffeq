@@ -1,5 +1,5 @@
 # version number
-odefilter/_version.py
+probdiffeq/_version.py
 
 # IDE stuff
 .idea/

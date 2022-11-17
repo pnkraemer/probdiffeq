@@ -3,9 +3,9 @@
 import jax.numpy as jnp
 import pytest
 
-from odefilter import ivpsolve, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import smoothers
+from probdiffeq import ivpsolve, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import smoothers
 
 
 def test_save_at_solved_correctly(reference_checkpoints, solution_save_at, tolerances):

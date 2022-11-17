@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 from tueplots import axes, bundles, cycler, markers
 
-from odefilter import __version__ as odefilter_version
+from probdiffeq import __version__ as probdiffeq_version
 
 
 def plot_config():
@@ -31,7 +31,7 @@ def print_info():
 
     commit = _most_recent_commit(abbrev=6)
 
-    print(f"odefilter version:\n\t{odefilter_version}")
+    print(f"probdiffeq version:\n\t{probdiffeq_version}")
     print(f"Most recent commit:\n\t{commit}")
     print()
     jax.print_environment_info()

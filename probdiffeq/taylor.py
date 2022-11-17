@@ -36,7 +36,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from odefilter.implementations import recipes
+from probdiffeq.implementations import recipes
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])

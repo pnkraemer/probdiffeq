@@ -7,14 +7,14 @@ manipulation of square root matrices.
 
     The functions in this module assume **right** square root matrices,
     i.e., it assumes a factorisation $A=R^\top R$.
-    The rest of the ``odefilter`` package assumes a **left** square
+    The rest of the ``probdiffeq`` package assumes a **left** square
     root matrix, i.e., a factorisation $A = L L^\top$.
 
     _**Why?**_
     Because the functions in this module rely heavily on QR factorisations,
     and therefore the **right** square root matrix format is more natural.
 
-    The rest of the ``odefilter`` package frequently maps
+    The rest of the ``probdiffeq`` package frequently maps
     $(m, L) \mapsto (Hm, HL)$, and therefore the **left** square root matrix
     is more natural.
 

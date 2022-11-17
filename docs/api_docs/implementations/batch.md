@@ -1,3 +1,3 @@
 # Priors with block-diagonal covariance structure
 
-::: odefilter.implementations.batch
+::: probdiffeq.implementations.batch

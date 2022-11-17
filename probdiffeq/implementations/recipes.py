@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 
 import jax
 
-from odefilter.implementations import _collections, batch, iso, vect
+from probdiffeq.implementations import _collections, batch, iso, vect
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""

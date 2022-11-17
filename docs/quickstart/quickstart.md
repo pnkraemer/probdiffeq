@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from diffeqzoo import ivps, backend
 from jax.config import config
 
-from odefilter import ivpsolve, recipes, controls
+from probdiffeq import ivpsolve, recipes, controls
 
 backend.select("jax")  # ivp examples in jax
 

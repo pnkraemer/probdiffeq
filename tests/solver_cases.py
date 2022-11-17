@@ -1,9 +1,9 @@
 """Solver test cases."""
 import pytest_cases
 
-from odefilter import cubature, solvers
-from odefilter.implementations import recipes
-from odefilter.strategies import filters, smoothers
+from probdiffeq import cubature, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import filters, smoothers
 
 # Note: All ODE test problems will be two-dimensional.
 

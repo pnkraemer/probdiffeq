@@ -1,7 +1,7 @@
 """Inference via filters."""
 import jax
 
-from odefilter.strategies import _strategy
+from probdiffeq.strategies import _strategy
 
 
 @jax.tree_util.register_pytree_node_class
