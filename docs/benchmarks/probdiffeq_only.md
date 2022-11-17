@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# ODE-filters only
+# Internal solvers only
 
 Let's find the fastest solver of the Lotka--Volterra problem, a standard benchmark problem. It is low-dimensional, not stiff, and generally poses no major problems for any numerical solver.
 
