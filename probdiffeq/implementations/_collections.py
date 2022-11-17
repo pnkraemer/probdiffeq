@@ -6,18 +6,32 @@ from typing import Generic, Tuple, TypeVar
 import jax
 
 
-class RandomVariable(abc.ABC):
+class AbstractNormal(abc.ABC):
+    def __init__(self, mean, cov_sqrtm_lower):
+        self.mean = mean
+        self.cov_sqrtm_lower = cov_sqrtm_lower
+
+    def __repr__(self):
+        name = f"{self.__class__.__name__}"
+        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
+        return f"{name}({args})"
+
+    def tree_flatten(self) -> Tuple:
+        children = self.mean, self.cov_sqrtm_lower
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        mean, cov_sqrtm_lower = children
+        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
+
     @abc.abstractmethod
     def logpdf(self, u, /):
         raise NotImplementedError
 
     @abc.abstractmethod
     def transform_unit_sample(self, x, /):
-        raise NotImplementedError
-
-    @property
-    @abc.abstractmethod
-    def sample_shape(self):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -31,6 +45,10 @@ class RandomVariable(abc.ABC):
     @abc.abstractmethod
     def Ax_plus_y(self, A, x, y):
         raise NotImplementedError
+
+    @property
+    def sample_shape(self) -> Tuple[int]:
+        return self.mean.shape
 
 
 # todo: make "u" a property?

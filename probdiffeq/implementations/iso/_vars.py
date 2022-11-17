@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 
@@ -32,26 +30,7 @@ class IsoVariable(_collections.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormal(_collections.RandomVariable):
-    def __init__(self, mean, cov_sqrtm_lower):
-        self.mean = mean  # (n, d) shape
-        self.cov_sqrtm_lower = cov_sqrtm_lower  # (n, n) shape
-
-    def __repr__(self):
-        name = f"{self.__class__.__name__}"
-        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
-        return f"{name}({args})"
-
-    def tree_flatten(self) -> Tuple:
-        children = self.mean, self.cov_sqrtm_lower
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children) -> "IsoNormal":
-        mean, cov_sqrtm_lower = children
-        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
-
+class IsoNormal(_collections.AbstractNormal):
     def logpdf(self, u, /) -> jax.Array:
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
@@ -68,24 +47,13 @@ class IsoNormal(_collections.RandomVariable):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    # todo: split those functions into a batch and a non-batch version?
-
     def scale_covariance(self, scale_sqrtm) -> "IsoNormal":
-        if jnp.ndim(scale_sqrtm) == 0:
-            return IsoNormal(
-                mean=self.mean, cov_sqrtm_lower=scale_sqrtm * self.cov_sqrtm_lower
-            )
-        return IsoNormal(
-            mean=self.mean,
-            cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
-        )
+        cov_sqrtm_lower = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
+        return IsoNormal(mean=self.mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
     def transform_unit_sample(self, base, /) -> jax.Array:
         return self.mean + self.cov_sqrtm_lower @ base
 
+    # todo: move to conditional???
     def Ax_plus_y(self, A, x, y) -> jax.Array:
         return A @ x + y
-
-    @property
-    def sample_shape(self) -> Tuple[int]:
-        return self.mean.shape
