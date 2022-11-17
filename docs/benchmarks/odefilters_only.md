@@ -130,7 +130,7 @@ ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape)
 mm1_sci = recipes.VectMM1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
-    cubature=cubature.SphericalCubatureIntegration.from_params(input_shape=ode_shape),
+    cubature=cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape),
 )
 
 mm1_ut = recipes.VectMM1.from_params(
