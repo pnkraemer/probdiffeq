@@ -41,7 +41,7 @@ class BatchConditional(_collections.AbstractConditional):
 
     def __call__(self, x, /):
         out = jax.vmap(_scalar.Conditional.__call__)(self.conditional, x)
-        return _vars.BatchNormal(out.mean, out.cov_sqrtm_lower)
+        return _vars.BatchVariable(_vars.BatchNormal(out.mean, out.cov_sqrtm_lower))
 
     def scale_covariance(self, scale_sqrtm):
         out = jax.vmap(_scalar.Conditional.scale_covariance)(
@@ -57,8 +57,12 @@ class BatchConditional(_collections.AbstractConditional):
         return BatchConditional(transition=merged.transition, noise=noise)
 
     def marginalise(self, rv, /):
-        marginalised = jax.vmap(_scalar.Conditional.marginalise)(self.conditional, rv)
-        return _vars.BatchNormal(marginalised.mean, marginalised.cov_sqrtm_lower)
+        marginalised = jax.vmap(_scalar.Conditional.marginalise)(
+            self.conditional, rv.to_normal()
+        )
+        return _vars.BatchVariable(
+            _vars.BatchNormal.from_normal(marginalised.hidden_state)
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -76,9 +80,8 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
 
     @property
     def ode_shape(self):
-        return (
-            self.ibm.a.shape[0],
-        )  # todo: this does not scale to matrix-valued problems
+        # todo: this does not scale to matrix-valued problems
+        return self.ibm.a.shape[0]
 
     def tree_flatten(self):
         children = (self.ibm,)
@@ -98,16 +101,20 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
         a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
         return cls(a=a_stack, q_sqrtm_lower=q_sqrtm_stack)
 
-    def begin_extrapolation(self, m0, /, dt):
+    def begin_extrapolation(self, p0, /, dt):
         fn = jax.vmap(_scalar.IBM.begin_extrapolation, in_axes=(0, 0, None))
-        extra, cache = fn(self.ibm, m0, dt)
-        extra_batch = _vars.BatchNormal(extra.mean, extra.cov_sqrtm_lower)
-        return extra_batch, cache
+        extra, cache = fn(self.ibm, p0, dt)
+        extra_batch = _vars.BatchNormal(
+            extra.hidden_state.mean, extra.hidden_state.cov_sqrtm_lower
+        )
+        return _vars.BatchVariable(extra_batch), cache
 
-    def complete_extrapolation(self, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         fn = jax.vmap(_scalar.IBM.complete_extrapolation)
-        ext = fn(self.ibm, linearisation_pt, cache, l0, output_scale_sqrtm)
-        return _vars.BatchNormal(ext.mean, ext.cov_sqrtm_lower)
+        ext = fn(
+            self.ibm, linearisation_pt, cache, p0.to_normal(), output_scale_sqrtm
+        ).hidden_state
+        return _vars.BatchVariable(_vars.BatchNormal(ext.mean, ext.cov_sqrtm_lower))
 
     def init_conditional(self, rv_proto):
         cond = jax.vmap(_scalar.IBM.init_conditional)(self.ibm, rv_proto)
@@ -115,8 +122,9 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
         return BatchConditional(cond.transition, noise=noise)
 
     def init_corrected(self, taylor_coefficients):
-        cor = jax.vmap(_scalar.IBM.init_corrected)(self.ibm, taylor_coefficients)
-        return _vars.BatchNormal(cor.mean, cor.cov_sqrtm_lower)
+        var_ = jax.vmap(_scalar.IBM.init_corrected)(self.ibm, taylor_coefficients)
+        cor = var_.hidden_state
+        return _vars.BatchVariable(_vars.BatchNormal(cor.mean, cor.cov_sqrtm_lower))
 
     # todo: move to correction?
     def init_error_estimate(self):
@@ -126,16 +134,18 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
     def init_output_scale_sqrtm(self):
         return jax.vmap(_scalar.IBM.init_output_scale_sqrtm)(self.ibm)
 
-    def revert_markov_kernel(self, linearisation_pt, l0, output_scale_sqrtm, cache):
+    def revert_markov_kernel(self, linearisation_pt, p0, output_scale_sqrtm, cache):
         fn = jax.vmap(_scalar.IBM.revert_markov_kernel)
-        ext, bw_model = fn(self.ibm, linearisation_pt, cache, l0, output_scale_sqrtm)
+        ext, bw_model = fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
 
-        ext_batched = _vars.BatchNormal(ext.mean, ext.cov_sqrtm_lower)
+        ext_batched = _vars.BatchVariable(
+            _vars.BatchNormal.from_normal(ext.hidden_state)
+        )
         bw_noise = _vars.BatchNormal(
             bw_model.noise.mean, bw_model.noise.cov_sqrtm_lower
         )
         bw_model_batched = BatchConditional(bw_model.transition, bw_noise)
-        return ext_batched, bw_model_batched
+        return (ext_batched), bw_model_batched
 
 
 def _tree_stack_duplicates(tree, n):

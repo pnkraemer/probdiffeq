@@ -10,6 +10,8 @@ from probdiffeq.implementations.batch import _vars
 _MM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
 
+# todo: batchVariable, BatchNormal, and BatchIBM are kinda useless...
+
 
 @jax.tree_util.register_pytree_node_class
 class BatchMomentMatching(
@@ -56,7 +58,7 @@ class BatchMomentMatching(
 
         # Evaluate vector field at sigma-points
         sigma_points_fn = jax.vmap(_scalar.MomentMatching.transform_sigma_points)
-        sigma_points, _, _ = sigma_points_fn(self._mm, extrapolated)
+        sigma_points, _, _ = sigma_points_fn(self._mm, extrapolated.hidden_state)
 
         fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
         center_fn = jax.vmap(_scalar.MomentMatching.center)
@@ -65,7 +67,7 @@ class BatchMomentMatching(
         # Compute output scale and error estimate
         calibrate_fn = jax.vmap(_scalar.MomentMatching.calibrate)
         error_estimate, output_scale_sqrtm = calibrate_fn(
-            self._mm, fx_mean, fx_centered_normed, extrapolated
+            self._mm, fx_mean, fx_centered_normed, extrapolated.hidden_state
         )
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
@@ -77,18 +79,18 @@ class BatchMomentMatching(
         H, noise = self.linearize(extra, vmap_f)
 
         fn = jax.vmap(_scalar.MomentMatching.complete_correction_post_linearize)
-        obs_unb, (cor_unb, gain) = fn(self._mm, H, extra, noise)
+        obs_unb, (cor_unb, gain) = fn(self._mm, H, extra.hidden_state, noise)
 
         # Vmap
         obs = _vars.BatchScalarNormal.from_scalar_normal(obs_unb)
-        cor = _vars.BatchNormal.from_normal(cor_unb)
+        cor = _vars.BatchVariable(_vars.BatchNormal.from_normal(cor_unb))
         return obs, (cor, gain)
 
     def linearize(self, extrapolated, vmap_f):
         # Transform the sigma-points
         sigma_points_fn = jax.vmap(_scalar.MomentMatching.transform_sigma_points)
         sigma_points, _, sigma_points_centered_normed = sigma_points_fn(
-            self._mm, extrapolated
+            self._mm, extrapolated.hidden_state
         )
 
         # Evaluate the vector field at the sigma-points
@@ -103,7 +105,7 @@ class BatchMomentMatching(
             fx_centered_normed,
             fx_mean,
             sigma_points_centered_normed,
-            extrapolated,
+            extrapolated.hidden_state,
         )
         noise = _vars.BatchScalarNormal.from_scalar_normal(noise_unb)
         return H, noise
@@ -120,16 +122,16 @@ class BatchTaylorZerothOrder(_BatchTS0Base):
         super().__init__(*args, **kwargs)
         self._ts0 = _scalar.TaylorZerothOrder(*args, **kwargs)
 
-    def begin_correction(self, x: _vars.BatchNormal, /, vector_field, t, p):
-        x_unbatch = _scalar.Normal(x.mean, x.cov_sqrtm_lower)
+    def begin_correction(self, x: _vars.BatchVariable, /, vector_field, t, p):
+        x_unbatch = x.to_normal()
 
         select_fn = jax.vmap(_scalar.TaylorZerothOrder.select_derivatives)
-        m0, m1 = select_fn(self._ts0, x_unbatch)
+        m0, m1 = select_fn(self._ts0, x_unbatch.hidden_state)
 
         fx = vector_field(*m0.T, t=t, p=p)
 
         marginalise_fn = jax.vmap(_scalar.TaylorZerothOrder.marginalise_observation)
-        cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x)
+        cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x.hidden_state)
         observed = _vars.BatchScalarNormal(
             obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower
         )
@@ -141,12 +143,14 @@ class BatchTaylorZerothOrder(_BatchTS0Base):
     def complete_correction(
         self, extrapolated: _vars.BatchNormal, cache: _TS0CacheType
     ):
-        extra_unbatch = _scalar.Normal(extrapolated.mean, extrapolated.cov_sqrtm_lower)
+        extra_unbatch = extrapolated.to_normal()
         fn = jax.vmap(_scalar.TaylorZerothOrder.complete_correction)
         obs_unbatch, (cor_unbatch, gain) = fn(self._ts0, extra_unbatch, cache)
 
         obs = _vars.BatchScalarNormal(obs_unbatch.mean, obs_unbatch.cov_sqrtm_lower)
-        cor = _vars.BatchNormal(cor_unbatch.mean, cor_unbatch.cov_sqrtm_lower)
+        cor = _vars.BatchVariable(
+            _vars.BatchNormal.from_normal(cor_unbatch.hidden_state)
+        )
         return obs, (cor, gain)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
