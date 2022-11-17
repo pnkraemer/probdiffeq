@@ -60,7 +60,7 @@ def _tree_shape(tree):
 
 @jax.tree_util.register_pytree_node_class
 class ThirdOrderSpherical(_PositiveCubatureRule):
-    """Spherical cubature integration."""
+    """Third-order spherical cubature integration."""
 
     @classmethod
     def from_params(cls, input_shape):
