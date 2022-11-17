@@ -7,13 +7,13 @@ from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _scalar
 from probdiffeq.implementations.batch import _ssv
 
-BatchMM1CacheType = Tuple[Callable]
+_MM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
 class BatchMomentMatching(
-    _collections.AbstractCorrection[_ssv.BatchNormal, BatchMM1CacheType]
+    _collections.AbstractCorrection[_ssv.BatchNormal, _MM1CacheType]
 ):
     def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
@@ -109,9 +109,9 @@ class BatchMomentMatching(
         return H, noise
 
 
-BatchTS0CacheType = Tuple[jax.Array]
+_TS0CacheType = Tuple[jax.Array]
 
-_BatchTS0Base = _collections.AbstractCorrection[_ssv.BatchNormal, BatchTS0CacheType]
+_BatchTS0Base = _collections.AbstractCorrection[_ssv.BatchNormal, _TS0CacheType]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -136,9 +136,7 @@ class BatchTaylorZerothOrder(_BatchTS0Base):
         error_estimate = observed.cov_sqrtm_lower
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
-    def complete_correction(
-        self, extrapolated: _ssv.BatchNormal, cache: BatchTS0CacheType
-    ):
+    def complete_correction(self, extrapolated: _ssv.BatchNormal, cache: _TS0CacheType):
         extra_unbatch = _scalar.Normal(extrapolated.mean, extrapolated.cov_sqrtm_lower)
         fn = jax.vmap(_scalar.TaylorZerothOrder.complete_correction)
         obs_unbatch, (cor_unbatch, gain) = fn(self._ts0, extra_unbatch, cache)

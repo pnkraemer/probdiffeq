@@ -7,12 +7,12 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _ibm_util, _scalar
 from probdiffeq.implementations.batch import _cond, _ssv
 
-BatchIBMCacheType = Tuple[jax.Array]  # Cache type
+_IBMCacheType = Tuple[jax.Array]  # Cache type
 """Type of the extrapolation-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchIBM(_collections.AbstractExtrapolation[_ssv.BatchNormal, BatchIBMCacheType]):
+class BatchIBM(_collections.AbstractExtrapolation[_ssv.BatchNormal, _IBMCacheType]):
     def __init__(self, a, q_sqrtm_lower):
         self.ibm = _scalar.IBM(a, q_sqrtm_lower)
 
