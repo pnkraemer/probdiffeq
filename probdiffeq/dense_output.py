@@ -87,7 +87,7 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution):
         )
 
         # Compute marginal log likelihood (with an alias for long function names)
-        nmll_new = -1 * obs.logpdf(data)
+        nmll_new = -1 * jnp.sum(obs.logpdf(data))
         nmll_updated = (num_data * nmll_prev + nmll_new) / (num_data + 1)
 
         # Return values

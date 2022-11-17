@@ -76,6 +76,11 @@ class Variable(_collections.StateSpaceVariable):
         return self.hidden_state.mean[..., 0]
 
     def condition_on_qoi_observation(self, u, /, observation_std):
+        if self.hidden_state.cov_sqrtm_lower.ndim > 2:
+            return jax.vmap(
+                Variable.condition_on_qoi_observation, in_axes=(0, 0, None)
+            )(self, u, observation_std)
+
         hc = self.hidden_state.cov_sqrtm_lower[0]
         m_obs = self.hidden_state.mean[0]
 
@@ -105,32 +110,6 @@ class Variable(_collections.StateSpaceVariable):
 
 @jax.tree_util.register_pytree_node_class
 class Normal(_collections.AbstractNormal):
-
-    # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
-
-    def __init__(self, mean, cov_sqrtm_lower):
-        self.mean = mean
-        self.cov_sqrtm_lower = cov_sqrtm_lower
-
-    def __repr__(self):
-        name = f"{self.__class__.__name__}"
-        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
-        return f"{name}({args})"
-
-    def tree_flatten(self):
-        children = self.mean, self.cov_sqrtm_lower
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        mean, cov_sqrtm_lower = children
-        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
-
-    @property
-    def sample_shape(self):
-        return self.mean.shape
-
     def logpdf(self, u, /):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
         res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
@@ -146,17 +125,9 @@ class Normal(_collections.AbstractNormal):
         return evidence_sqrtm
 
     def scale_covariance(self, scale_sqrtm):
-        # todo: this if should not be necessary
-        #  whether this function is called in batch mode or not should
-        #  be the caller's concern.
-        if jnp.ndim(scale_sqrtm) == 0:
-            return Normal(
-                mean=self.mean,
-                cov_sqrtm_lower=scale_sqrtm * self.cov_sqrtm_lower,
-            )
         return Normal(
             mean=self.mean,
-            cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
+            cov_sqrtm_lower=scale_sqrtm[..., None, None] * self.cov_sqrtm_lower,
         )
 
     def transform_unit_sample(self, base, /):
@@ -202,7 +173,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare[:, None], R_X=l_ext.T
         )
-        r_obs = jnp.reshape(r_obs_mat, (-1,))
+        r_obs = jnp.reshape(r_obs_mat, ())
         gain = jnp.reshape(gain_mat, (-1,))
         m_cor = m_ext - gain * b
 
@@ -345,7 +316,7 @@ class MomentMatching(_collections.AbstractCorrection):
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain * m_marg
-        cor = Normal(m_bw, r_bw.T)
+        cor = Variable(Normal(m_bw, r_bw.T))
         return obs, (cor, gain)
 
 
@@ -370,14 +341,21 @@ class Conditional(_collections.AbstractConditional):
         return cls(transition=transition, noise=noise)
 
     def __call__(self, x, /):
+        if self.transition.ndim > 2:
+            return jax.vmap(Conditional.__call__)(self, x)
+
         m = self.transition @ x + self.noise.mean
-        return Normal(m, self.noise.cov_sqrtm_lower)
+        return Variable(Normal(m, self.noise.cov_sqrtm_lower))
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return Conditional(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):
+
+        if self.transition.ndim > 2:
+            return jax.vmap(Conditional.merge_with_incoming_conditional)(self, incoming)
+
         A = self.transition
         (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
 
@@ -392,6 +370,11 @@ class Conditional(_collections.AbstractConditional):
         return Conditional(g, noise=noise)
 
     def marginalise(self, rv, /):
+        # Todo: this auto-batch is a bit hacky,
+        #  but single-handedly replaces the entire BatchConditional class
+        if rv.hidden_state.mean.ndim > 1:
+            return jax.vmap(Conditional.marginalise)(self, rv)
+
         m0, l0 = rv.hidden_state.mean, rv.hidden_state.cov_sqrtm_lower
 
         m_new = self.transition @ m0 + self.noise.mean

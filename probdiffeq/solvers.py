@@ -376,7 +376,6 @@ class MLESolver(_AbstractSolver):
             output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
             posterior_previous=state.posterior,
         )
-
         # Complete step (incl. calibration!)
         output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
         observed, (corrected, _) = self.strategy.complete_correction(
@@ -402,6 +401,7 @@ class MLESolver(_AbstractSolver):
     @staticmethod
     def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
         x = obs.norm_of_whitened_residual_sqrtm()
+        print(jax.tree_util.tree_map(jnp.shape, obs))
         return jnp.sqrt(n * diffsqrtm**2 + x**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):
