@@ -1,0 +1,1 @@
+"""Vectorised state-space models."""
