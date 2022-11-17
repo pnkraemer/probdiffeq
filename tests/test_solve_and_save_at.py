@@ -8,9 +8,7 @@ from odefilter.implementations import recipes
 from odefilter.strategies import smoothers
 
 
-def test_checkpoints_simulated_correctly(
-    reference_checkpoints, solution_save_at, tolerances
-):
+def test_save_at_solved_correctly(reference_checkpoints, solution_save_at, tolerances):
     t_ref, u_ref = reference_checkpoints
     atol, rtol = tolerances
     solution, _ = solution_save_at
@@ -20,7 +18,7 @@ def test_checkpoints_simulated_correctly(
 
 
 def test_smoother_warning(ode_problem):
-    """A non-fixed-point smoother is not usable in checkpoint-simulation."""
+    """A non-fixed-point smoother is not usable in save-at-simulation."""
     vf, u0, t0, t1, p = ode_problem
     ts = jnp.linspace(t0, t1, num=3)
     solver = solvers.DynamicSolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
