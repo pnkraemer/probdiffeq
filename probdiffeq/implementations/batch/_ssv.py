@@ -1,10 +1,9 @@
-from typing import Callable, Generic, Tuple, TypeVar
+from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import cubature as cubature_module
-from probdiffeq.implementations import _collections, _ibm_util, _scalar
+from probdiffeq.implementations import _collections, _scalar
 
 SSV = TypeVar("SSV")
 

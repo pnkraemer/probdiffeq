@@ -4,7 +4,9 @@ from typing import Generic, TypeVar
 
 import jax
 
-from probdiffeq.implementations import _batch, _collections, _iso, _vect
+from probdiffeq.implementations import _collections, _iso, _vect
+from probdiffeq.implementations.batch import corr as batch_corr
+from probdiffeq.implementations.batch import extra as batch_extra
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""
@@ -45,29 +47,33 @@ class IsoTS0(AbstractImplementation[_iso.IsoTaylorZerothOrder, _iso.IsoIBM]):
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchMM1(AbstractImplementation[_batch.BatchMomentMatching, _batch.BatchIBM]):
+class BatchMM1(
+    AbstractImplementation[batch_corr.BatchMomentMatching, batch_extra.BatchIBM]
+):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
-            correction = _batch.BatchMomentMatching.from_params(
+            correction = batch_corr.BatchMomentMatching.from_params(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
-            correction = _batch.BatchMomentMatching(
+            correction = batch_corr.BatchMomentMatching(
                 ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
             )
-        extrapolation = _batch.BatchIBM.from_params(
+        extrapolation = batch_extra.BatchIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTS0(AbstractImplementation[_batch.BatchMomentMatching, _batch.BatchIBM]):
+class BatchTS0(
+    AbstractImplementation[batch_corr.BatchMomentMatching, batch_extra.BatchIBM]
+):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = _batch.BatchTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = _batch.BatchIBM.from_params(
+        correction = batch_corr.BatchTaylorZerothOrder(ode_order=ode_order)
+        extrapolation = batch_extra.BatchIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
