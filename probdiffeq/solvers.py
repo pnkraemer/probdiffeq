@@ -401,7 +401,6 @@ class MLESolver(_AbstractSolver):
     @staticmethod
     def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
         x = obs.norm_of_whitened_residual_sqrtm()
-        print(jax.tree_util.tree_map(jnp.shape, obs))
         return jnp.sqrt(n * diffsqrtm**2 + x**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):

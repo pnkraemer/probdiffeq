@@ -5,6 +5,9 @@ from typing import Generic, Tuple, TypeVar
 
 import jax
 
+# todo: AbstractNormal, StateSpaceVariable, and AbstractConditional are rarely (never?) instantiated by the user.
+#  Why do we have these interfaces then?
+
 
 class AbstractNormal(abc.ABC):
     def __init__(self, mean, cov_sqrtm_lower):

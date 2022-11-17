@@ -129,9 +129,9 @@ class VectIBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
-    def begin_extrapolation(self, m0, /, dt):
+    def begin_extrapolation(self, p0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv * m0
+        m0_p = p_inv * p0.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
@@ -150,11 +150,11 @@ class VectIBM(_collections.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_extrapolation(self, linearisation_pt, l0, cache, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * l0)).T,
+            R1=(self.a @ (p_inv[:, None] * p0.cov_sqrtm_lower)).T,
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
@@ -162,11 +162,11 @@ class VectIBM(_collections.AbstractExtrapolation):
         shape = linearisation_pt.target_shape
         return _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
 
-    def revert_markov_kernel(self, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.mean
 
-        l0_p = p_inv[:, None] * l0
+        l0_p = p_inv[:, None] * p0.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
