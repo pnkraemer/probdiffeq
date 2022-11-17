@@ -64,7 +64,7 @@ plugins:
         glob:
           - "examples/*.md"
           - "advanced_examples/*.md"
-          - "benchmarks/probdiffeq_only.md"
+          - "benchmarks/internal_only.md"
           - "benchmarks/nonstiff_multiple_frameworks.md"
     - mkdocs-jupyter:
         include: ["examples/*.ipynb","advanced_examples/*.ipynb", "benchmarks/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
@@ -103,5 +103,5 @@ nav:
         - "dev_docs/on_the_edges.md"
     - Benchmarks:
         - "benchmarks/insights.md"
-        - "benchmarks/probdiffeq_only.ipynb"
+        - "benchmarks/internal_only.ipynb"
         - "benchmarks/nonstiff_multiple_frameworks.ipynb"
