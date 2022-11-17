@@ -46,9 +46,6 @@ class BatchMomentMatching(_collections.AbstractCorrection):
         return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
 
     def begin_correction(self, extrapolated, /, vector_field, t, p):
-        # Unvmap
-        # extrapolated = x.to_normal()
-
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         cache = (vmap_f,)
@@ -69,8 +66,6 @@ class BatchMomentMatching(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
-        # Unvmap
-        # extra = extrapolated.to_normal()
         (vmap_f,) = cache
 
         H, noise = self.linearize(extrapolated, vmap_f)
