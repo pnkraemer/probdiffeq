@@ -3,12 +3,12 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _sqrtm
-from probdiffeq.implementations.iso import _ssv
+from probdiffeq.implementations.iso import _vars
 
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_collections.AbstractCorrection):
-    def begin_correction(self, x: _ssv.IsoNormal, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.IsoNormal, /, vector_field, t, p):
         m = x.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -38,10 +38,10 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         )
         c_obs = l_obs_scalar**2
 
-        observed = _ssv.IsoNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = _vars.IsoNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * bias[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = _ssv.IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = _vars.IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (corrected, g)
