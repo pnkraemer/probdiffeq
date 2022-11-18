@@ -5,11 +5,17 @@ from typing import Generic, Tuple, TypeVar
 
 import jax
 
-# todo: AbstractNormal, StateSpaceVariable, and AbstractConditional are rarely (never?) instantiated by the user.
+# todo: AbstractNormal, StateSpaceVariable,
+#  and AbstractConditional are rarely (never?) instantiated by the user.
 #  Why do we have these interfaces then?
 
 
 class AbstractNormal(abc.ABC):
+    """Random variables.
+
+    Means, covariances, log-probability-density functions, sampling, and so on.
+    """
+
     def __init__(self, mean, cov_sqrtm_lower):
         self.mean = mean
         self.cov_sqrtm_lower = cov_sqrtm_lower
@@ -54,8 +60,17 @@ class AbstractNormal(abc.ABC):
         return self.mean.shape
 
 
-# todo: make "u" a property?
 class StateSpaceVariable(abc.ABC):
+    """State-space variables.
+
+    Hidden states, and knowledge about extracting a quantity of interest.
+
+    For example, the state-space variable of an integrated Wiener process is (x, x'),
+    whereas the quantity of interest is (x, x') -> x.
+    Or, the sum of the output of two integrated Wiener processes tracks (x, x', y, y'),
+    and the quantity of interest is (x, x', y, y') -> x+y
+    """
+
     def __init__(self, hidden_state):
         self.hidden_state = hidden_state
 
