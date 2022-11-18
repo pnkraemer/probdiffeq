@@ -483,9 +483,9 @@ class IBM(_collections.AbstractExtrapolation):
         extrapolated = Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return StateSpaceVar(extrapolated), bw_model
 
-    def init_conditional(self, rv_proto):
+    def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
+        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
         return Conditional(op, noise=noi)
 
     def _init_backward_transition(self):

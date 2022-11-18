@@ -104,12 +104,12 @@ class IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
         return _vars.IsoStateSpaceVar(rv)
 
-    def init_rv(self, ode_shape):
+    def init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoNormal(m0, c0)
+        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m0, c0))
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -173,9 +173,9 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return _vars.IsoStateSpaceVar(extrapolated), bw_model
 
     # todo: should this be a classmethod in IsoConditional?
-    def init_conditional(self, rv_proto):
+    def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
+        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
         return IsoConditional(op, noise=noi)
 
     def _init_backward_transition(self):

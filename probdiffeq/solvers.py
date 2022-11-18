@@ -415,7 +415,6 @@ class MLESolver(_AbstractSolver):
 
     @staticmethod
     def _rescale(*, scale_sqrtm, marginals_unscaled, state):
-
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.

@@ -54,8 +54,8 @@ class BatchIBM(_collections.AbstractExtrapolation):
         fn = jax.vmap(_scalar.IBM.complete_extrapolation)
         return fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
 
-    def init_conditional(self, rv_proto):
-        return jax.vmap(_scalar.IBM.init_conditional)(self.ibm, rv_proto)
+    def init_conditional(self, ssv_proto):
+        return jax.vmap(_scalar.IBM.init_conditional)(self.ibm, ssv_proto)
 
     def init_corrected(self, taylor_coefficients):
         return jax.vmap(_scalar.IBM.init_corrected)(self.ibm, taylor_coefficients)
