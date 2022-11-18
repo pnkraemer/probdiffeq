@@ -34,6 +34,7 @@ def test_getitem_raises_error_for_nonbatched_solutions(solution_solve):
 def test_loop_over_solution_is_possible(solution_solve):
     solution, _ = solution_solve
 
+    i = 0
     for i, sol in zip(range(2 * len(solution)), solution):
         assert isinstance(sol, type(solution))
 

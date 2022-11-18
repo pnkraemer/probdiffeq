@@ -28,7 +28,7 @@ def fixture_ode_problem():
     t1 = 2.0
 
     @jax.jit
-    def vf(x, *, t, p):
+    def vf(x, *, t, p):  # pylint: disable=unused-argument
         return f(x, *p)
 
     # Only very short time-intervals are sufficient for a unit test.

@@ -6,7 +6,8 @@ from diffeqzoo import backend
 from jax.config import config
 
 # ODE examples must be in JAX
-backend.select("jax")
+# todo: raise issue in diffeqzoo about this pylint-disable
+backend.select("jax")  # pylint: disable=no-value-for-parameter
 
 # All warnings shall be errors
 warnings.filterwarnings("error")

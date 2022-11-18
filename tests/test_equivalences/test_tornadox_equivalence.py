@@ -34,7 +34,7 @@ def fixture_ivp_tornadox(vanderpol):
     f, u0, (t0, t1), f_args = vanderpol
 
     @jax.jit
-    def vf_tor(t, y):
+    def vf_tor(t, y):  # pylint: disable=unused-argument
         return f(y, *f_args)
 
     return ivp.InitialValueProblem(
@@ -48,7 +48,7 @@ def fixture_ivp_probdiffeq(vanderpol):
 
     # ODE-filter
     @jax.jit
-    def vf_ode(y, *, t, p):
+    def vf_ode(y, *, t, p):  # pylint: disable=unused-argument
         return f(y, *p)
 
     return vf_ode, (u0,), (t0, t1), f_args
