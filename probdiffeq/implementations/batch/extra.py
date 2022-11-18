@@ -17,7 +17,7 @@ class BatchIBM(_collections.AbstractExtrapolation):
 
     def __repr__(self):
         name = self.__class__.__name__
-        return f"{name}(a={self.a}, q_sqrtm_lower={self.q_sqrtm_lower})"
+        return f"{name}(a={self.ibm.a}, q_sqrtm_lower={self.ibm.q_sqrtm_lower})"
 
     @property
     def num_derivatives(self):
@@ -50,9 +50,9 @@ class BatchIBM(_collections.AbstractExtrapolation):
         fn = jax.vmap(_scalar.IBM.begin_extrapolation, in_axes=(0, 0, None))
         return fn(self.ibm, p0, dt)
 
-    def complete_extrapolation(self, linearisation_pt, cache, p0, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         fn = jax.vmap(_scalar.IBM.complete_extrapolation)
-        return fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
+        return fn(self.ibm, linearisation_pt, p0, cache, output_scale_sqrtm)
 
     def init_conditional(self, ssv_proto):
         return jax.vmap(_scalar.IBM.init_conditional)(self.ibm, ssv_proto)
@@ -68,7 +68,7 @@ class BatchIBM(_collections.AbstractExtrapolation):
     def init_output_scale_sqrtm(self):
         return jax.vmap(_scalar.IBM.init_output_scale_sqrtm)(self.ibm)
 
-    def revert_markov_kernel(self, linearisation_pt, p0, output_scale_sqrtm, cache):
+    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         fn = jax.vmap(_scalar.IBM.revert_markov_kernel)
         return fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
 

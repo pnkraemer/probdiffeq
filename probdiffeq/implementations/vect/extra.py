@@ -168,7 +168,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         rv = _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.VectStateSpaceVar(rv, target_shape=shape)
 
-    def revert_markov_kernel(self, linearisation_pt, cache, p0, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
 

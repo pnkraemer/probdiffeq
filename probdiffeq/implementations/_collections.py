@@ -125,18 +125,18 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_conditional(self, rv_proto):
+    def init_conditional(self, ssv_proto):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, m0, /, dt) -> Tuple[SSVTypeVar, CacheTypeVar]:
+    def begin_extrapolation(self, p0, /, dt) -> Tuple[SSVTypeVar, CacheTypeVar]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
         self,
         linearisation_pt: SSVTypeVar,
-        l0,
+        p0,
         cache: CacheTypeVar,
         output_scale_sqrtm,
     ):
@@ -146,7 +146,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def revert_markov_kernel(
         self,
         linearisation_pt: SSVTypeVar,
-        l0,
+        p0,
         cache: CacheTypeVar,
         output_scale_sqrtm,
     ):

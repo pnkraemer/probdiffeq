@@ -1,3 +1,5 @@
+"""Variables with vectorised structure."""
+
 import functools
 
 import jax

@@ -6,33 +6,12 @@ import jax.numpy as jnp
 from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 
+# todo: make public and split into submodules
+
 
 @jax.tree_util.register_pytree_node_class
-class ScalarNormal(_collections.StateSpaceVar):
+class ScalarNormal(_collections.AbstractNormal):
     # Normal RV. Shapes (), (). No QOI.
-
-    def __init__(self, mean, cov_sqrtm_lower):
-        self.mean = mean
-        self.cov_sqrtm_lower = cov_sqrtm_lower
-
-    def __repr__(self):
-        name = f"{self.__class__.__name__}"
-        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
-        return f"{name}({args})"
-
-    def tree_flatten(self):
-        children = self.mean, self.cov_sqrtm_lower
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        mean, cov_sqrtm_lower = children
-        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
-
-    @property
-    def sample_shape(self):
-        return self.mean.shape
 
     def transform_unit_sample(self, base, /):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
@@ -447,7 +426,7 @@ class IBM(_collections.AbstractExtrapolation):
             dt=dt, num_derivatives=self.num_derivatives
         )
 
-    def complete_extrapolation(self, linearisation_pt, cache, p0, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
@@ -457,7 +436,7 @@ class IBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
         return StateSpaceVar(Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
 
-    def revert_markov_kernel(self, linearisation_pt, cache, p0, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
 
