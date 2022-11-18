@@ -196,7 +196,7 @@ class VectIBM(_collections.AbstractExtrapolation):
         extrapolated = _vars.VectStateSpaceVar(rv, target_shape=shape)
         return extrapolated, bw_model
 
-    def init_conditional(self, *, ssv_proto):
+    def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
         return VectConditional(op, noise=noi, target_shape=ssv_proto.target_shape)
