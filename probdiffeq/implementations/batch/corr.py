@@ -9,8 +9,6 @@ from probdiffeq.implementations import _collections, _scalar
 _MM1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
 
-# todo: batchVariable, BatchNormal, and BatchIBM are kinda useless...
-
 
 @jax.tree_util.register_pytree_node_class
 class BatchMomentMatching(_collections.AbstractCorrection):

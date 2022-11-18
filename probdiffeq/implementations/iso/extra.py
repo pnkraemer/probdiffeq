@@ -31,7 +31,7 @@ class IsoConditional(_collections.AbstractConditional):
 
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        return _vars.IsoVariable(_vars.IsoNormal(m, self.noise.cov_sqrtm_lower))
+        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m, self.noise.cov_sqrtm_lower))
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -52,7 +52,7 @@ class IsoConditional(_collections.AbstractConditional):
         bw_model = IsoConditional(g, noise=noise)
         return bw_model
 
-    def marginalise(self, rv: _vars.IsoVariable, /) -> _vars.IsoVariable:
+    def marginalise(self, rv: _vars.IsoStateSpaceVar, /) -> _vars.IsoStateSpaceVar:
         """Marginalise the output of a linear model."""
         # Read
         m0 = rv.hidden_state.mean
@@ -64,7 +64,9 @@ class IsoConditional(_collections.AbstractConditional):
             R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
         ).T
 
-        return _vars.IsoVariable(_vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new))
+        return _vars.IsoStateSpaceVar(
+            _vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -100,7 +102,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         rv = _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        return _vars.IsoVariable(rv)
+        return _vars.IsoStateSpaceVar(rv)
 
     def init_rv(self, ode_shape):
         assert len(ode_shape) == 1
@@ -116,8 +118,8 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return 1.0
 
     def begin_extrapolation(
-        self, p0: _vars.IsoVariable, /, dt
-    ) -> Tuple[_vars.IsoVariable, Any]:
+        self, p0: _vars.IsoStateSpaceVar, /, dt
+    ) -> Tuple[_vars.IsoStateSpaceVar, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * p0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -125,7 +127,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.IsoNormal(m_ext, q_sqrtm)
-        return _vars.IsoVariable(ext), (m_ext_p, m0_p, p, p_inv)
+        return _vars.IsoStateSpaceVar(ext), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -142,7 +144,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.IsoVariable(_vars.IsoNormal(m_ext, l_ext))
+        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m_ext, l_ext))
 
     def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
@@ -168,7 +170,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = IsoConditional(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoVariable(extrapolated), bw_model
+        return _vars.IsoStateSpaceVar(extrapolated), bw_model
 
     # todo: should this be a classmethod in IsoConditional?
     def init_conditional(self, rv_proto):

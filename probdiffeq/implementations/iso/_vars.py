@@ -5,7 +5,7 @@ from probdiffeq.implementations import _collections, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoVariable(_collections.StateSpaceVariable):
+class IsoStateSpaceVar(_collections.StateSpaceVar):
     def condition_on_qoi_observation(self, u, /, observation_std):
         hc = self.hidden_state.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.hidden_state.mean[0, ...]
@@ -16,7 +16,10 @@ class IsoVariable(_collections.StateSpaceVariable):
         )
         m_cor = self.hidden_state.mean - gain * (m_obs - u)[None, :]
 
-        return IsoNormal(m_obs, r_obs.T), (IsoVariable(IsoNormal(m_cor, r_cor.T)), gain)
+        return IsoNormal(m_obs, r_obs.T), (
+            IsoStateSpaceVar(IsoNormal(m_cor, r_cor.T)),
+            gain,
+        )
 
     def extract_qoi(self) -> jax.Array:
         m = self.hidden_state.mean[..., 0, :]
@@ -26,7 +29,9 @@ class IsoVariable(_collections.StateSpaceVariable):
         return u[..., 0, :]
 
     def scale_covariance(self, scale_sqrtm):
-        return IsoVariable(self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm))
+        return IsoStateSpaceVar(
+            self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+        )
 
 
 @jax.tree_util.register_pytree_node_class

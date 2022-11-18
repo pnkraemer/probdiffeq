@@ -10,7 +10,7 @@ from probdiffeq.implementations.iso import _vars
 
 @jax.tree_util.register_pytree_node_class
 class IsoTaylorZerothOrder(_collections.AbstractCorrection):
-    def begin_correction(self, x: _vars.IsoVariable, /, vector_field, t, p):
+    def begin_correction(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -30,8 +30,8 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
 
     def complete_correction(
-        self, extrapolated: _vars.IsoVariable, cache
-    ) -> Tuple[_vars.IsoNormal, Tuple[_vars.IsoVariable, jax.Array]]:
+        self, extrapolated: _vars.IsoStateSpaceVar, cache
+    ) -> Tuple[_vars.IsoNormal, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
         (bias,) = cache
 
         m_ext, l_ext = (
@@ -51,4 +51,4 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = m_ext - g[:, None] * bias[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
         corrected = _vars.IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, (_vars.IsoVariable(corrected), g)
+        return observed, (_vars.IsoStateSpaceVar(corrected), g)

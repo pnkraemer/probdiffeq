@@ -7,7 +7,7 @@ from probdiffeq.implementations import _collections, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class VectNormal(_collections.StateSpaceVariable):
+class VectNormal(_collections.StateSpaceVar):
     """Vector-normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.

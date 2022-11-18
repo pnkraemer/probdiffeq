@@ -5,7 +5,7 @@ from typing import Generic, Tuple, TypeVar
 
 import jax
 
-# todo: AbstractNormal, StateSpaceVariable,
+# todo: AbstractNormal, StateSpaceVar,
 #  and AbstractConditional are rarely (never?) instantiated by the user.
 #  Why do we have these interfaces then?
 
@@ -60,7 +60,7 @@ class AbstractNormal(abc.ABC):
         return self.mean.shape
 
 
-class StateSpaceVariable(abc.ABC):
+class StateSpaceVar(abc.ABC):
     """State-space variables.
 
     Hidden states, and knowledge about extracting a quantity of interest.
@@ -104,7 +104,7 @@ class StateSpaceVariable(abc.ABC):
         raise NotImplementedError
 
 
-SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVariable)
+SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVar)
 """A type-variable to alias appropriate state-space variable types."""
 
 CacheTypeVar = TypeVar("CacheTypeVar")

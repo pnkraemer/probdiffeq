@@ -8,7 +8,7 @@ from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class ScalarNormal(_collections.StateSpaceVariable):
+class ScalarNormal(_collections.StateSpaceVar):
     # Normal RV. Shapes (), (). No QOI.
 
     def __init__(self, mean, cov_sqrtm_lower):
@@ -69,7 +69,7 @@ class ScalarNormal(_collections.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class Variable(_collections.StateSpaceVariable):
+class StateSpaceVar(_collections.StateSpaceVar):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
     def extract_qoi(self):
@@ -78,7 +78,7 @@ class Variable(_collections.StateSpaceVariable):
     def condition_on_qoi_observation(self, u, /, observation_std):
         if self.hidden_state.cov_sqrtm_lower.ndim > 2:
             return jax.vmap(
-                Variable.condition_on_qoi_observation, in_axes=(0, 0, None)
+                StateSpaceVar.condition_on_qoi_observation, in_axes=(0, 0, None)
             )(self, u, observation_std)
 
         hc = self.hidden_state.cov_sqrtm_lower[0]
@@ -97,7 +97,7 @@ class Variable(_collections.StateSpaceVariable):
 
         obs = ScalarNormal(m_obs, r_obs.T)
         cor = Normal(m_cor, r_cor.T)
-        return obs, (Variable(cor), gain)
+        return obs, (StateSpaceVar(cor), gain)
 
     def extract_qoi_from_sample(self, u, /):
         if u.ndim == 1:
@@ -105,7 +105,9 @@ class Variable(_collections.StateSpaceVariable):
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
     def scale_covariance(self, scale_sqrtm):
-        return Variable(self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm))
+        return StateSpaceVar(
+            self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -140,7 +142,7 @@ class Normal(_collections.AbstractNormal):
 
 @jax.tree_util.register_pytree_node_class
 class TaylorZerothOrder(_collections.AbstractCorrection):
-    def begin_correction(self, x: Variable, /, vector_field, t, p):
+    def begin_correction(self, x: StateSpaceVar, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
@@ -178,7 +180,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = m_ext - gain * b
 
         observed = ScalarNormal(mean=b, cov_sqrtm_lower=r_obs.T)
-        corrected = Variable(Normal(mean=m_cor, cov_sqrtm_lower=r_cor.T))
+        corrected = StateSpaceVar(Normal(mean=m_cor, cov_sqrtm_lower=r_cor.T))
         return observed, (corrected, gain)
 
 
@@ -316,7 +318,7 @@ class MomentMatching(_collections.AbstractCorrection):
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain * m_marg
-        cor = Variable(Normal(m_bw, r_bw.T))
+        cor = StateSpaceVar(Normal(m_bw, r_bw.T))
         return obs, (cor, gain)
 
 
@@ -345,7 +347,7 @@ class Conditional(_collections.AbstractConditional):
             return jax.vmap(Conditional.__call__)(self, x)
 
         m = self.transition @ x + self.noise.mean
-        return Variable(Normal(m, self.noise.cov_sqrtm_lower))
+        return StateSpaceVar(Normal(m, self.noise.cov_sqrtm_lower))
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -382,7 +384,7 @@ class Conditional(_collections.AbstractConditional):
             R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
         ).T
 
-        return Variable(Normal(m_new, l_new))
+        return StateSpaceVar(Normal(m_new, l_new))
 
 
 @jax.tree_util.register_pytree_node_class
@@ -421,7 +423,7 @@ class IBM(_collections.AbstractExtrapolation):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return Variable(
+        return StateSpaceVar(
             Normal(
                 mean=m0_corrected,
                 cov_sqrtm_lower=c_sqrtm0_corrected,
@@ -438,7 +440,7 @@ class IBM(_collections.AbstractExtrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = Normal(m_ext, q_sqrtm)
-        return Variable(extrapolated), (m_ext_p, m0_p, p, p_inv)
+        return StateSpaceVar(extrapolated), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -453,7 +455,7 @@ class IBM(_collections.AbstractExtrapolation):
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return Variable(Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
+        return StateSpaceVar(Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
 
     def revert_markov_kernel(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
@@ -479,7 +481,7 @@ class IBM(_collections.AbstractExtrapolation):
         backward_noise = Normal(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = Conditional(g_bw, noise=backward_noise)
         extrapolated = Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return Variable(extrapolated), bw_model
+        return StateSpaceVar(extrapolated), bw_model
 
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
