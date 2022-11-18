@@ -85,7 +85,7 @@ def test_grid_samples(solution_save_at, shape):
             key, solution=solution, solver=solver, shape=shape
         )
         assert u.shape == shape + solution.u.shape
-        assert samples.shape == shape + solution.marginals.mean.shape
+        assert samples.shape == shape + solution.marginals.hidden_state.sample_shape
 
         # Todo: test values of the samples by checking a chi2 statistic
         #  in terms of the joint posterior. But this requires a joint_posterior()

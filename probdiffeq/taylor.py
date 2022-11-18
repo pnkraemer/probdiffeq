@@ -159,20 +159,20 @@ def _runge_kutta_starter_fn(
     extrapolation = _impl.extrapolation
 
     # Initialise
-    init_rv = extrapolation.init_rv(ode_shape=initial_values[0].shape)
+    init_ssv = extrapolation.init_ssv(ode_shape=initial_values[0].shape)
 
     # Estimate
-    u0_full = _runge_kutta_starter_improve(init_rv, extrapolation, ys=ys, dt=dt0)
+    u0_full = _runge_kutta_starter_improve(init_ssv, extrapolation, ys=ys, dt=dt0)
 
     # Turn the mean into a tuple of arrays and return
-    taylor_coefficients = tuple(u0_full.mean)
+    taylor_coefficients = tuple(u0_full.hidden_state.mean)
     return taylor_coefficients
 
 
-def _runge_kutta_starter_improve(init_rv, extrapolation, ys, dt):
+def _runge_kutta_starter_improve(init_ssv, extrapolation, ys, dt):
     # Initialise backward-transitions
-    init_bw = extrapolation.init_conditional(rv_proto=init_rv)
-    init_val = init_rv, init_bw
+    init_bw = extrapolation.init_conditional(ssv_proto=init_ssv)
+    init_val = init_ssv, init_bw
 
     # Scan
     fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
@@ -186,12 +186,11 @@ def _runge_kutta_starter_improve(init_rv, extrapolation, ys, dt):
 def _rk_filter_step(carry, y, extrapolation, dt):
     # Read
     (rv, bw_old) = carry
-    m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
     # Extrapolate (with fixed-point-style merging)
-    lin_pt, extra_cache = extrapolation.begin_extrapolation(m0, dt=dt)
+    lin_pt, extra_cache = extrapolation.begin_extrapolation(rv, dt=dt)
     extra, bw_model = extrapolation.revert_markov_kernel(
-        linearisation_pt=lin_pt, l0=l0, cache=extra_cache, output_scale_sqrtm=1.0
+        linearisation_pt=lin_pt, p0=rv, cache=extra_cache, output_scale_sqrtm=1.0
     )
     bw_new = bw_old.merge_with_incoming_conditional(bw_model)
 

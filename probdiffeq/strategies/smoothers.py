@@ -54,14 +54,15 @@ class MarkovSequence(Generic[SSVTypeVar]):
             _, samp_prev = carry
             conditional, base = conditionals_and_base_samples
 
-            samp = conditional(samp_prev).transform_unit_sample(base)
-            qoi = init.extract_qoi_from_sample(samp)
+            cond = conditional(samp_prev)
+            samp = cond.hidden_state.transform_unit_sample(base)
+            qoi = cond.extract_qoi_from_sample(samp)
 
             return (qoi, samp), (qoi, samp)
 
         # Compute a sample at the terminal value
         init = jax.tree_util.tree_map(lambda s: s[-1, ...], self.init)
-        init_sample = init.transform_unit_sample(base_sample[-1])
+        init_sample = init.hidden_state.transform_unit_sample(base_sample[-1])
         init_qoi = init.extract_qoi_from_sample(init_sample)
         init_val = (init_qoi, init_sample)
 
@@ -126,12 +127,12 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
         init_bw_model = self.implementation.extrapolation.init_conditional
-        bw_model = init_bw_model(rv_proto=corrected)
+        bw_model = init_bw_model(ssv_proto=corrected)
         return MarkovSequence(init=corrected, backward_model=bw_model)
 
     def begin_extrapolation(self, *, posterior, dt):
         return self.implementation.extrapolation.begin_extrapolation(
-            posterior.init.mean, dt=dt
+            posterior.init, dt=dt
         )
 
     def complete_correction(self, *, extrapolated, cache_obs):
@@ -167,11 +168,11 @@ class _SmootherCommon(_strategy.Strategy):
     def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
         linearisation_pt, cache = self.implementation.extrapolation.begin_extrapolation(
-            rv.mean, dt=dt
+            rv, dt=dt
         )
         extrapolated, bw_model = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
-            l0=rv.cov_sqrtm_lower,
+            p0=rv,
             output_scale_sqrtm=output_scale_sqrtm,
             cache=cache,
         )
@@ -179,9 +180,8 @@ class _SmootherCommon(_strategy.Strategy):
 
     # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, *, posterior):
-        bw_model = self.implementation.extrapolation.init_conditional(
-            rv_proto=posterior.backward_model.noise
-        )
+        init_conditional_fn = self.implementation.extrapolation.init_conditional
+        bw_model = init_conditional_fn(ssv_proto=posterior.init)
         return MarkovSequence(init=posterior.init, backward_model=bw_model)
 
 
@@ -194,7 +194,7 @@ class Smoother(_SmootherCommon):
     ):
         extrapolated, bw_model = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
-            l0=posterior_previous.init.cov_sqrtm_lower,
+            p0=posterior_previous.init,
             cache=cache,
             output_scale_sqrtm=output_scale_sqrtm,
         )
@@ -253,7 +253,7 @@ class FixedPointSmoother(_SmootherCommon):
     ):
         _temp = self.implementation.extrapolation.revert_markov_kernel(
             linearisation_pt=linearisation_pt,
-            l0=posterior_previous.init.cov_sqrtm_lower,
+            p0=posterior_previous.init,
             output_scale_sqrtm=output_scale_sqrtm,
             cache=cache,
         )

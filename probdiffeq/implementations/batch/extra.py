@@ -5,64 +5,13 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _ibm_util, _scalar
-from probdiffeq.implementations.batch import _vars
 
 _IBMCacheType = Tuple[jax.Array]  # Cache type
 """Type of the extrapolation-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchConditional(_collections.AbstractConditional):
-    def __init__(self, transition, noise):
-        noise = _scalar.Normal(noise.mean, noise.cov_sqrtm_lower)
-        self.conditional = _scalar.Conditional(transition, noise=noise)
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        return f"{name}(transition={self.transition}, noise={self.noise})"
-
-    @property
-    def transition(self):
-        return self.conditional.transition
-
-    @property
-    def noise(self):
-        return self.conditional.noise
-
-    def tree_flatten(self):
-        children = (self.conditional,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (conditional,) = children
-        return cls(transition=conditional.transition, noise=conditional.noise)
-
-    def __call__(self, x, /):
-        out = jax.vmap(_scalar.Conditional.__call__)(self.conditional, x)
-        return _vars.BatchNormal(out.mean, out.cov_sqrtm_lower)
-
-    def scale_covariance(self, scale_sqrtm):
-        out = jax.vmap(_scalar.Conditional.scale_covariance)(
-            self.conditional, scale_sqrtm
-        )
-        noise = _vars.BatchNormal(out.noise.mean, out.noise.cov_sqrtm_lower)
-        return BatchConditional(transition=out.transition, noise=noise)
-
-    def merge_with_incoming_conditional(self, incoming, /):
-        fn = jax.vmap(_scalar.Conditional.merge_with_incoming_conditional)
-        merged = fn(self.conditional, incoming.conditional)
-        noise = _vars.BatchNormal(merged.noise.mean, merged.noise.cov_sqrtm_lower)
-        return BatchConditional(transition=merged.transition, noise=noise)
-
-    def marginalise(self, rv, /):
-        marginalised = jax.vmap(_scalar.Conditional.marginalise)(self.conditional, rv)
-        return _vars.BatchNormal(marginalised.mean, marginalised.cov_sqrtm_lower)
-
-
-@jax.tree_util.register_pytree_node_class
-class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheType]):
+class BatchIBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower):
         self.ibm = _scalar.IBM(a, q_sqrtm_lower)
 
@@ -76,9 +25,8 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
 
     @property
     def ode_shape(self):
-        return (
-            self.ibm.a.shape[0],
-        )  # todo: this does not scale to matrix-valued problems
+        # todo: this does not scale to matrix-valued problems
+        return self.ibm.a.shape[0]
 
     def tree_flatten(self):
         children = (self.ibm,)
@@ -98,25 +46,19 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
         a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
         return cls(a=a_stack, q_sqrtm_lower=q_sqrtm_stack)
 
-    def begin_extrapolation(self, m0, /, dt):
+    def begin_extrapolation(self, p0, /, dt):
         fn = jax.vmap(_scalar.IBM.begin_extrapolation, in_axes=(0, 0, None))
-        extra, cache = fn(self.ibm, m0, dt)
-        extra_batch = _vars.BatchNormal(extra.mean, extra.cov_sqrtm_lower)
-        return extra_batch, cache
+        return fn(self.ibm, p0, dt)
 
-    def complete_extrapolation(self, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         fn = jax.vmap(_scalar.IBM.complete_extrapolation)
-        ext = fn(self.ibm, linearisation_pt, cache, l0, output_scale_sqrtm)
-        return _vars.BatchNormal(ext.mean, ext.cov_sqrtm_lower)
+        return fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
 
-    def init_conditional(self, rv_proto):
-        cond = jax.vmap(_scalar.IBM.init_conditional)(self.ibm, rv_proto)
-        noise = _vars.BatchNormal(cond.noise.mean, cond.noise.cov_sqrtm_lower)
-        return BatchConditional(cond.transition, noise=noise)
+    def init_conditional(self, ssv_proto):
+        return jax.vmap(_scalar.IBM.init_conditional)(self.ibm, ssv_proto)
 
     def init_corrected(self, taylor_coefficients):
-        cor = jax.vmap(_scalar.IBM.init_corrected)(self.ibm, taylor_coefficients)
-        return _vars.BatchNormal(cor.mean, cor.cov_sqrtm_lower)
+        return jax.vmap(_scalar.IBM.init_corrected)(self.ibm, taylor_coefficients)
 
     # todo: move to correction?
     def init_error_estimate(self):
@@ -126,16 +68,9 @@ class BatchIBM(_collections.AbstractExtrapolation[_vars.BatchNormal, _IBMCacheTy
     def init_output_scale_sqrtm(self):
         return jax.vmap(_scalar.IBM.init_output_scale_sqrtm)(self.ibm)
 
-    def revert_markov_kernel(self, linearisation_pt, l0, output_scale_sqrtm, cache):
+    def revert_markov_kernel(self, linearisation_pt, p0, output_scale_sqrtm, cache):
         fn = jax.vmap(_scalar.IBM.revert_markov_kernel)
-        ext, bw_model = fn(self.ibm, linearisation_pt, cache, l0, output_scale_sqrtm)
-
-        ext_batched = _vars.BatchNormal(ext.mean, ext.cov_sqrtm_lower)
-        bw_noise = _vars.BatchNormal(
-            bw_model.noise.mean, bw_model.noise.cov_sqrtm_lower
-        )
-        bw_model_batched = BatchConditional(bw_model.transition, bw_noise)
-        return ext_batched, bw_model_batched
+        return fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
 
 
 def _tree_stack_duplicates(tree, n):

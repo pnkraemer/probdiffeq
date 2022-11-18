@@ -57,9 +57,7 @@ class Filter(_strategy.Strategy):
         return posterior.extract_qoi()
 
     def begin_extrapolation(self, *, posterior, dt):
-        return self.implementation.extrapolation.begin_extrapolation(
-            posterior.mean, dt=dt
-        )
+        return self.implementation.extrapolation.begin_extrapolation(posterior, dt=dt)
 
     def complete_extrapolation(
         self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
@@ -67,7 +65,7 @@ class Filter(_strategy.Strategy):
         return self.implementation.extrapolation.complete_extrapolation(
             linearisation_pt=linearisation_pt,
             cache=cache,
-            l0=posterior_previous.cov_sqrtm_lower,
+            p0=posterior_previous,
             output_scale_sqrtm=output_scale_sqrtm,
         )
 

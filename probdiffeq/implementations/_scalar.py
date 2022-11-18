@@ -8,7 +8,7 @@ from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class ScalarNormal(_collections.StateSpaceVariable):
+class ScalarNormal(_collections.StateSpaceVar):
     # Normal RV. Shapes (), (). No QOI.
 
     def __init__(self, mean, cov_sqrtm_lower):
@@ -69,32 +69,49 @@ class ScalarNormal(_collections.StateSpaceVariable):
 
 
 @jax.tree_util.register_pytree_node_class
-class Normal(_collections.StateSpaceVariable):
+class StateSpaceVar(_collections.StateSpaceVar):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
-    def __init__(self, mean, cov_sqrtm_lower):
-        self.mean = mean
-        self.cov_sqrtm_lower = cov_sqrtm_lower
+    def extract_qoi(self):
+        return self.hidden_state.mean[..., 0]
 
-    def __repr__(self):
-        name = f"{self.__class__.__name__}"
-        args = f"mean={self.mean}, cov_sqrtm_lower={self.cov_sqrtm_lower}"
-        return f"{name}({args})"
+    def condition_on_qoi_observation(self, u, /, observation_std):
+        if self.hidden_state.cov_sqrtm_lower.ndim > 2:
+            return jax.vmap(
+                StateSpaceVar.condition_on_qoi_observation, in_axes=(0, 0, None)
+            )(self, u, observation_std)
 
-    def tree_flatten(self):
-        children = self.mean, self.cov_sqrtm_lower
-        aux = ()
-        return children, aux
+        hc = self.hidden_state.cov_sqrtm_lower[0]
+        m_obs = self.hidden_state.mean[0]
 
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        mean, cov_sqrtm_lower = children
-        return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
+        r_yx = observation_std  # * jnp.eye(1)
+        r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional(
+            R_X=self.hidden_state.cov_sqrtm_lower.T,
+            R_X_F=hc[:, None],
+            R_YX=r_yx[None, None],
+        )
+        r_obs = jnp.reshape(r_obs_mat, ())
+        gain = jnp.reshape(gain_mat, (-1,))
 
-    @property
-    def sample_shape(self):
-        return self.mean.shape
+        m_cor = self.hidden_state.mean - gain * (m_obs - u)
 
+        obs = ScalarNormal(m_obs, r_obs.T)
+        cor = Normal(m_cor, r_cor.T)
+        return obs, (StateSpaceVar(cor), gain)
+
+    def extract_qoi_from_sample(self, u, /):
+        if u.ndim == 1:
+            return u[0]
+        return jax.vmap(self.extract_qoi_from_sample)(u)
+
+    def scale_covariance(self, scale_sqrtm):
+        return StateSpaceVar(
+            self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+class Normal(_collections.AbstractNormal):
     def logpdf(self, u, /):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
         res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
@@ -109,44 +126,10 @@ class Normal(_collections.StateSpaceVariable):
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
-    def condition_on_qoi_observation(self, u, /, observation_std):
-        hc = self.cov_sqrtm_lower[0]
-        m_obs = self.mean[0]
-
-        r_yx = observation_std  # * jnp.eye(1)
-        r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional(
-            R_X=self.cov_sqrtm_lower.T, R_X_F=hc[:, None], R_YX=r_yx[None, None]
-        )
-        r_obs = jnp.reshape(r_obs_mat, ())
-        gain = jnp.reshape(gain_mat, (-1,))
-
-        m_cor = self.mean - gain * (m_obs - u)
-
-        obs = ScalarNormal(m_obs, r_obs.T)
-        cor = Normal(m_cor, r_cor.T)
-        return obs, (cor, gain)
-
-    def extract_qoi(self):
-        return self.mean[..., 0]
-
-    def extract_qoi_from_sample(self, u, /):
-
-        if u.ndim == 1:
-            return u[0]
-        return jax.vmap(self.extract_qoi_from_sample)(u)
-
     def scale_covariance(self, scale_sqrtm):
-        # todo: this if should not be necessary
-        #  whether this function is called in batch mode or not should
-        #  be the caller's concern.
-        if jnp.ndim(scale_sqrtm) == 0:
-            return Normal(
-                mean=self.mean,
-                cov_sqrtm_lower=scale_sqrtm * self.cov_sqrtm_lower,
-            )
         return Normal(
             mean=self.mean,
-            cov_sqrtm_lower=scale_sqrtm[:, None, None] * self.cov_sqrtm_lower,
+            cov_sqrtm_lower=scale_sqrtm[..., None, None] * self.cov_sqrtm_lower,
         )
 
     def transform_unit_sample(self, base, /):
@@ -159,10 +142,10 @@ class Normal(_collections.StateSpaceVariable):
 
 @jax.tree_util.register_pytree_node_class
 class TaylorZerothOrder(_collections.AbstractCorrection):
-    def begin_correction(self, x: Normal, /, vector_field, t, p):
-        m0, m1 = self.select_derivatives(x)
+    def begin_correction(self, x: StateSpaceVar, /, vector_field, t, p):
+        m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
-        cache, observed = self.marginalise_observation(fx, m1, x)
+        cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
 
         output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
         error_estimate = observed.cov_sqrtm_lower
@@ -183,18 +166,21 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
 
     def complete_correction(self, extrapolated, cache):
         (b,) = cache
-        m_ext, l_ext = extrapolated.mean, extrapolated.cov_sqrtm_lower
+        m_ext, l_ext = (
+            extrapolated.hidden_state.mean,
+            extrapolated.hidden_state.cov_sqrtm_lower,
+        )
 
         l_obs_nonsquare = l_ext[self.ode_order, :]
         r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare[:, None], R_X=l_ext.T
         )
-        r_obs = jnp.reshape(r_obs_mat, (-1,))
+        r_obs = jnp.reshape(r_obs_mat, ())
         gain = jnp.reshape(gain_mat, (-1,))
         m_cor = m_ext - gain * b
 
         observed = ScalarNormal(mean=b, cov_sqrtm_lower=r_obs.T)
-        corrected = Normal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        corrected = StateSpaceVar(Normal(mean=m_cor, cov_sqrtm_lower=r_cor.T))
         return observed, (corrected, gain)
 
 
@@ -226,22 +212,6 @@ class MomentMatching(_collections.AbstractCorrection):
         return cls(ode_order=ode_order, cubature=cubature)
 
     def begin_correction(self, x: Normal, /, vector_field, t, p):
-        # # Vmap relevant functions
-        # vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
-        # cache = (vmap_f,)
-        #
-        # # Transform sigma-points (Shape: (S,))
-        # sigma_points, _, _ = self.transform_sigma_points(x)
-        #
-        # # Evaluate vector field at sigma points
-        # # Assumes a vector field that maps () -> ().
-        # fx = vmap_f(sigma_points)
-        # _, _, fx_centered_normed = self.center(fx)
-        #
-        # # Compute the error estimate and the output scale
-        # # from the vector-field evaluations
-        # error_estimate, output_scale_sqrtm = self.calibrate(fx_centered_normed, x)
-        # return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
         raise NotImplementedError
 
     def calibrate(
@@ -267,17 +237,11 @@ class MomentMatching(_collections.AbstractCorrection):
         return error_estimate, output_scale_sqrtm
 
     def complete_correction(self, extrapolated, cache):
-        # vmap_f, *_ = cache
-        #
-        # # Compute the linearization as in
-        # # Eq. (9) in https://arxiv.org/abs/2102.00514
-        # linop, noise = self.linearize(x=extrapolated, vmap_f=vmap_f)
-        # return self.complete_correction_post_linearize(linop, extrapolated, noise)
         raise NotImplementedError
 
     def linearize(self, rv, vmap_f):
         # Create sigma points
-        pts, _, pts_centered_normed = self.transform_sigma_points(rv)
+        pts, _, pts_centered_normed = self.transform_sigma_points(rv.hidden_state)
 
         # Evaluate the vector-field
         fx = vmap_f(pts)
@@ -354,7 +318,7 @@ class MomentMatching(_collections.AbstractCorrection):
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain * m_marg
-        cor = Normal(m_bw, r_bw.T)
+        cor = StateSpaceVar(Normal(m_bw, r_bw.T))
         return obs, (cor, gain)
 
 
@@ -379,14 +343,21 @@ class Conditional(_collections.AbstractConditional):
         return cls(transition=transition, noise=noise)
 
     def __call__(self, x, /):
+        if self.transition.ndim > 2:
+            return jax.vmap(Conditional.__call__)(self, x)
+
         m = self.transition @ x + self.noise.mean
-        return Normal(m, self.noise.cov_sqrtm_lower)
+        return StateSpaceVar(Normal(m, self.noise.cov_sqrtm_lower))
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         return Conditional(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):
+
+        if self.transition.ndim > 2:
+            return jax.vmap(Conditional.merge_with_incoming_conditional)(self, incoming)
+
         A = self.transition
         (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
 
@@ -401,14 +372,19 @@ class Conditional(_collections.AbstractConditional):
         return Conditional(g, noise=noise)
 
     def marginalise(self, rv, /):
-        m0, l0 = rv.mean, rv.cov_sqrtm_lower
+        # Todo: this auto-batch is a bit hacky,
+        #  but single-handedly replaces the entire BatchConditional class
+        if rv.hidden_state.mean.ndim > 1:
+            return jax.vmap(Conditional.marginalise)(self, rv)
+
+        m0, l0 = rv.hidden_state.mean, rv.hidden_state.cov_sqrtm_lower
 
         m_new = self.transition @ m0 + self.noise.mean
         l_new = _sqrtm.sum_of_sqrtm_factors(
             R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
         ).T
 
-        return Normal(m_new, l_new)
+        return StateSpaceVar(Normal(m_new, l_new))
 
 
 @jax.tree_util.register_pytree_node_class
@@ -447,43 +423,45 @@ class IBM(_collections.AbstractExtrapolation):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return Normal(
-            mean=m0_corrected,
-            cov_sqrtm_lower=c_sqrtm0_corrected,
+        return StateSpaceVar(
+            Normal(
+                mean=m0_corrected,
+                cov_sqrtm_lower=c_sqrtm0_corrected,
+            )
         )
 
     def init_error_estimate(self):
         return jnp.zeros(())
 
-    def begin_extrapolation(self, m0, /, dt):
+    def begin_extrapolation(self, p0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv * m0
+        m0_p = p_inv * p0.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = Normal(m_ext, q_sqrtm)
-        return extrapolated, (m_ext_p, m0_p, p, p_inv)
+        return StateSpaceVar(extrapolated), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
             dt=dt, num_derivatives=self.num_derivatives
         )
 
-    def complete_extrapolation(self, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         _, _, p, p_inv = cache
-        m_ext = linearisation_pt.mean
+        m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * l0)).T,
+            R1=(self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
-        return Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return StateSpaceVar(Normal(mean=m_ext, cov_sqrtm_lower=l_ext))
 
-    def revert_markov_kernel(self, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
-        m_ext = linearisation_pt.mean
+        m_ext = linearisation_pt.hidden_state.mean
 
-        l0_p = p_inv[:, None] * l0
+        l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -503,11 +481,11 @@ class IBM(_collections.AbstractExtrapolation):
         backward_noise = Normal(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = Conditional(g_bw, noise=backward_noise)
         extrapolated = Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return extrapolated, bw_model
+        return StateSpaceVar(extrapolated), bw_model
 
-    def init_conditional(self, rv_proto):
+    def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
+        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
         return Conditional(op, noise=noi)
 
     def _init_backward_transition(self):

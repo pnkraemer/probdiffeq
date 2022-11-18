@@ -6,35 +6,42 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 from probdiffeq.implementations.vect import _vars
 
+# todo: init_corrected should be init_hidden_state?
+
 
 @jax.tree_util.register_pytree_node_class
 class VectConditional(_collections.AbstractConditional):
-    def __init__(self, transition, noise):
+    def __init__(self, transition, noise, target_shape):
         self.transition = transition
         self.noise = noise
+        self.target_shape = target_shape
 
     def __repr__(self):
         name = self.__class__.__name__
-        return f"{name}(transition={self.transition}, noise={self.noise})"
+        args1 = f"transition={self.transition}, noise={self.noise}"
+        args2 = f"target_shape={self.target_shape}"
+        return f"{name}({args1}, {args2})"
 
     def tree_flatten(self):
         children = self.transition, self.noise
-        aux = ()
+        aux = (self.target_shape,)
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, _aux, children):
+    def tree_unflatten(cls, aux, children):
         transition, noise = children
-        return cls(transition=transition, noise=noise)
+        (target_shape,) = aux
+        return cls(transition=transition, noise=noise, target_shape=target_shape)
 
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        shape = self.noise.target_shape
-        return _vars.VectNormal(m, self.noise.cov_sqrtm_lower, target_shape=shape)
+        cond = _vars.VectNormal(m, self.noise.cov_sqrtm_lower)
+        return _vars.VectStateSpaceVar(cond, target_shape=self.target_shape)
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return VectConditional(transition=self.transition, noise=noise)
+        shape = self.target_shape
+        return VectConditional(self.transition, noise=noise, target_shape=shape)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -47,14 +54,13 @@ class VectConditional(_collections.AbstractConditional):
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
 
-        shape = self.noise.target_shape
-        noise = _vars.VectNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=shape)
-        return VectConditional(g, noise=noise)
+        noise = _vars.VectNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return VectConditional(g, noise=noise, target_shape=self.target_shape)
 
     def marginalise(self, rv, /):
         # Pull into preconditioned space
-        m0_p = rv.mean
-        l0_p = rv.cov_sqrtm_lower
+        m0_p = rv.hidden_state.mean
+        l0_p = rv.hidden_state.cov_sqrtm_lower
 
         # Apply transition
         m_new_p = self.transition @ m0_p + self.noise.mean
@@ -66,7 +72,8 @@ class VectConditional(_collections.AbstractConditional):
         m_new = m_new_p
         l_new = l_new_p
 
-        return _vars.VectNormal(m_new, l_new, target_shape=rv.target_shape)
+        marg = _vars.VectNormal(m_new, l_new)
+        return _vars.VectStateSpaceVar(marg, target_shape=rv.target_shape)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -120,26 +127,24 @@ class VectIBM(_collections.AbstractExtrapolation):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return _vars.VectNormal(
-            mean=m0_corrected,
-            cov_sqrtm_lower=c_sqrtm0_corrected,
-            target_shape=m0_matrix.shape,
-        )
+        corr = _vars.VectNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _vars.VectStateSpaceVar(corr, target_shape=m0_matrix.shape)
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
-    def begin_extrapolation(self, m0, /, dt):
+    def begin_extrapolation(self, p0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv * m0
+        m0_p = p_inv * p0.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        extrapolated = _vars.VectNormal(m_ext, q_sqrtm, target_shape=shape)
-        return extrapolated, (m_ext_p, m0_p, p, p_inv)
+        extrapolated = _vars.VectNormal(m_ext, q_sqrtm)
+        ssv = _vars.VectStateSpaceVar(extrapolated, target_shape=shape)
+        return ssv, (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
@@ -150,23 +155,24 @@ class VectIBM(_collections.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_extrapolation(self, linearisation_pt, l0, cache, output_scale_sqrtm):
+    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
-        m_ext = linearisation_pt.mean
+        m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * l0)).T,
+            R1=(self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
             R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
         ).T
         l_ext = p[:, None] * l_ext_p
 
         shape = linearisation_pt.target_shape
-        return _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
+        rv = _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return _vars.VectStateSpaceVar(rv, target_shape=shape)
 
-    def revert_markov_kernel(self, linearisation_pt, cache, l0, output_scale_sqrtm):
+    def revert_markov_kernel(self, linearisation_pt, cache, p0, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
-        m_ext = linearisation_pt.mean
+        m_ext = linearisation_pt.hidden_state.mean
 
-        l0_p = p_inv[:, None] * l0
+        l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -184,19 +190,16 @@ class VectIBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         shape = linearisation_pt.target_shape
-        backward_noise = _vars.VectNormal(
-            mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=shape
-        )
-        bw_model = VectConditional(g_bw, noise=backward_noise)
-        extrapolated = _vars.VectNormal(
-            mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape
-        )
+        backward_noise = _vars.VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = VectConditional(g_bw, noise=backward_noise, target_shape=shape)
+        rv = _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        extrapolated = _vars.VectStateSpaceVar(rv, target_shape=shape)
         return extrapolated, bw_model
 
-    def init_conditional(self, rv_proto):
+    def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
-        return VectConditional(op, noise=noi)
+        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
+        return VectConditional(op, noise=noi, target_shape=ssv_proto.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape
@@ -208,7 +211,6 @@ class VectIBM(_collections.AbstractExtrapolation):
         return _vars.VectNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-            target_shape=rv_proto.target_shape,
         )
 
     def init_output_scale_sqrtm(self):
