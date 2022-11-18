@@ -5,10 +5,6 @@ from typing import Generic, Tuple, TypeVar
 
 import jax
 
-# todo: AbstractNormal, StateSpaceVar,
-#  and AbstractConditional are rarely (never?) instantiated by the user.
-#  Why do we have these interfaces then?
-
 
 class AbstractNormal(abc.ABC):
     """Random variables.

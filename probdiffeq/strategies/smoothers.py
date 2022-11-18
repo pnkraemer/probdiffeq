@@ -127,7 +127,7 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
         init_bw_model = self.implementation.extrapolation.init_conditional
-        bw_model = init_bw_model(rv_proto=corrected.hidden_state)
+        bw_model = init_bw_model(ssv_proto=corrected)
         return MarkovSequence(init=corrected, backward_model=bw_model)
 
     def begin_extrapolation(self, *, posterior, dt):
@@ -180,9 +180,8 @@ class _SmootherCommon(_strategy.Strategy):
 
     # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, *, posterior):
-        bw_model = self.implementation.extrapolation.init_conditional(
-            rv_proto=posterior.backward_model.noise
-        )
+        init_conditional_fn = self.implementation.extrapolation.init_conditional
+        bw_model = init_conditional_fn(ssv_proto=posterior.init)
         return MarkovSequence(init=posterior.init, backward_model=bw_model)
 
 

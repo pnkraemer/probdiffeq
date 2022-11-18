@@ -415,6 +415,24 @@ class MLESolver(_AbstractSolver):
 
     @staticmethod
     def _rescale(*, scale_sqrtm, marginals_unscaled, state):
+
+        # todo: these calls to *.scale_covariance are a bit cumbersome,
+        #  because we need to add this
+        #  method to all sorts of classes.
+        #  Instead, we could move the collections.AbstractNormal
+        #  to the top-level and implement this via tree_map:
+        #  def scale_cov(tree):
+        #      def is_leaf(x):
+        #          return isinstance(x, AbstractNormal)
+        #      def fn(x: AbstractNormal):
+        #          return x.scale_covariance(scale_sqrtm)
+        #      return tree_map(fn, tree, is_leaf=is_leaf)
+        #  marginals = scale_cov(marginals_unscaled)
+        #  posterior = scale_cov(state.posterior)
+        #  Which would avoid having to do this over and over again
+        #  in intermediate objects
+        #  (Conditionals, Posteriors, StateSpaceVars, ...)
+
         marginals = marginals_unscaled.scale_covariance(scale_sqrtm=scale_sqrtm)
         posterior = state.posterior.scale_covariance(scale_sqrtm=scale_sqrtm)
         u = marginals.extract_qoi()
