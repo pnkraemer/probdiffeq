@@ -70,7 +70,7 @@ class BatchIBM(_collections.AbstractExtrapolation):
 
     def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         fn = jax.vmap(_scalar.IBM.revert_markov_kernel)
-        return fn(self.ibm, linearisation_pt, cache, p0, output_scale_sqrtm)
+        return fn(self.ibm, linearisation_pt, p0, cache, output_scale_sqrtm)
 
 
 def _tree_stack_duplicates(tree, n):

@@ -43,9 +43,8 @@ class _PositiveCubatureRule:
 
         # Alright, so what do we do here?
         # Make a _PositiveCubatureRule(points.shape=(S, d), weights.shape=(S,))
-        instance = cls.from_params(
-            input_shape=input_shape, **kwargs
-        )  # pylint: disable=no-member
+        # pylint: disable=no-member
+        instance = cls.from_params(input_shape=input_shape, **kwargs)
 
         d, *_ = input_shape
         points = instance.points.T  # (d, S)
