@@ -137,8 +137,8 @@ def case_solver_pair_kronecker_ek0(
     )
     solution_probdiffeq = (
         solution_probdiffeq.t,
-        solution_probdiffeq.marginals.mean,
-        kroncov(solution_probdiffeq.marginals.cov_sqrtm_lower),
+        solution_probdiffeq.marginals.hidden_state.mean,
+        kroncov(solution_probdiffeq.marginals.hidden_state.cov_sqrtm_lower),
     )
     return output_tornadox, solution_probdiffeq
 
@@ -203,8 +203,8 @@ def case_solver_pair_reference_ek1(
     )
     solution_probdiffeq = (
         solution_probdiffeq.t,
-        solution_probdiffeq.marginals.mean,
-        cov(solution_probdiffeq.marginals.cov_sqrtm_lower),
+        solution_probdiffeq.marginals.hidden_state.mean,
+        cov(solution_probdiffeq.marginals.hidden_state.cov_sqrtm_lower),
     )
     return output_tornadox, solution_probdiffeq
 
