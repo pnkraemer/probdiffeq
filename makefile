@@ -30,8 +30,8 @@ lint:
 	nbqa flake8 docs/advanced_examples/
 	nbqa flake8 docs/benchmarks/
 	# Opt-in for specific pylint checks that flake8 can't detect
-	pylint probdiffeq/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
-	pylint tests/ --disable=all --enable=arguments-differ,unused-variable,unnecessary-comprehension,redefined-builtin
+	pylint probdiffeq/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-locals,duplicate-code,too-many-arguments
+	pylint tests/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-arguments,duplicate-code,too-many-locals
 	# A very soft mypy check to detect obvious problems
 	mypy probdiffeq --disable-error-code=var-annotated
 test:

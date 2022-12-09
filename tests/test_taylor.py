@@ -25,7 +25,7 @@ def case_runge_kutta_starter():
 def pb_three_body_first():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
 
-    def vf(u, *, t, p):
+    def vf(u, *, t, p):  # pylint: disable=unused-argument
         return f(u, *p)
 
     return vf, (u0,), t0, f_args
@@ -35,7 +35,7 @@ def pb_three_body_first():
 def pb_van_der_pol_second_order():
     f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
 
-    def vf(u, du, *, t, p):
+    def vf(u, du, *, t, p):  # pylint: disable=unused-argument
         return f(u, du, *p)
 
     return vf, (u0, du0), t0, f_args

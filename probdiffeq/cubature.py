@@ -40,8 +40,10 @@ class _PositiveCubatureRule:
         #  Currently it does. If we simply stacked 'd' 1-dimensional rules
         #  on top of each other, the complexity reduces
         #  (but the solver seems to suffer a lot...)
+
         # Alright, so what do we do here?
         # Make a _PositiveCubatureRule(points.shape=(S, d), weights.shape=(S,))
+        # pylint: disable=no-member
         instance = cls.from_params(input_shape=input_shape, **kwargs)
 
         d, *_ = input_shape
