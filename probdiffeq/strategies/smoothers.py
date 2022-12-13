@@ -2,7 +2,7 @@
 
 import abc
 import functools
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -13,12 +13,14 @@ from probdiffeq.strategies import _strategy
 SSVTypeVar = TypeVar("SSVTypeVar")
 """A type-variable to alias appropriate state-space variable types."""
 
+# todo: markov sequences should not necessarily be backwards
+
 
 @jax.tree_util.register_pytree_node_class
 class MarkovSequence(Generic[SSVTypeVar]):
     """Markov sequence."""
 
-    def __init__(self, *, init: SSVTypeVar, backward_model: Any):
+    def __init__(self, *, init: SSVTypeVar, backward_model):
         self.init = init
         self.backward_model = backward_model
 

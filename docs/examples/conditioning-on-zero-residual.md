@@ -78,7 +78,7 @@ solution = ivpsolve.solve(
 # Evalate the posterior on a dense grid
 
 eps = 1e-4
-mesh = jnp.linspace(t0 + eps, t1 - eps, num=500, endpoint=True)
+mesh = jnp.linspace(t0 + eps, t1 - eps, num=50, endpoint=True)
 _, marginals = dense_output.offgrid_marginals_searchsorted(
     ts=mesh, solution=solution, solver=solver
 )
@@ -109,6 +109,24 @@ def extrapolate_fn(rv, model, dt, scale_sqrtm):
 
 prior_u = []
 prior_du = []
+rv = extrapolation_model.init_corrected(taylor_coefficients)
+for t_old, t_new in zip(mesh[:-1], mesh[1:]):
+
+    prior_u.append(rv.marginal_nth_derivative(0).mean)
+    prior_du.append(rv.marginal_nth_derivative(1).mean)
+
+    dt = t_new - t_old
+    rv = extrapolate_fn(rv, extrapolation_model, dt, solution.output_scale_sqrtm.mean())
+
+prior_u.append(rv.marginal_nth_derivative(0).mean)
+prior_du.append(rv.marginal_nth_derivative(1).mean)
+
+prior_u = jnp.asarray(prior_u)
+prior_du = jnp.asarray(prior_du)
+
+# Semi-prior/posterior
+semiprior_u = []
+semiprior_du = []
 rv = extrapolation_model.init_corrected(taylor_coefficients)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
 
@@ -171,7 +189,7 @@ ax0.set_xlim((t0, t1))
 ax0.legend()
 plt.tight_layout()
 fig.align_ylabels()
-plt.savefig("Figure.pdf")
+# plt.savefig("Figure.pdf")
 plt.show()
 ```
 
