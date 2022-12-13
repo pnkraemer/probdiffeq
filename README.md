@@ -33,56 +33,6 @@ Consult the examples first. They show how to interact with the API, and explain 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
 
 
-## Development
-
-### Installation
-To install all development-relevant dependencies, install either of
-```
-pip install probdiffeq[test]  # pytest, ...
-pip install probdiffeq[lint]  # black, isort, ...
-pip install probdiffeq[example]  # tueplots, diffrax, blackjax, ...
-pip install probdiffeq[doc]  # mkdocs, ...
-pip install probdiffeq[full]  # all of the above
-```
-
-### Continuous integration
-Run the checks with a makefile, use either of the below
-```
-make format
-make lint
-make test
-make example
-make pre-commit
-make doc
-```
-Remove auxiliary files with 
-```
-make clean
-```
-### Pre-commit hook
-To ensure that all commits satisfy most of the linters, no big files are addedd accidentally, and so on, use a pre-commit hook
-```
-pip install pre-commit  # included in `pip install -e .[full]`
-pre-commit install
-```
-You may verify the installation by running
-```commandline
-pre-commit run
-```
-
-### Creating an example notebook
-
-To embed a new example notebook into the docs, follow the steps:
-
-1. Create a jupyter notebook, preferrably in `docs/examples/` or `docs/advanced_examples/` and fill it with content.
-   If you are wondering which folder is more appropriate: if your notebook introduces an external dependency (for example, an optimisation or sampling library), it is an advanced example.
-2. Sync the notebook to a markdown file via jupytext
-3. Include the notebook into the docs by mentioning it in the `nav` section of `mkdocs.yml`
-4. If the notebook is not in `examples/` or in `advanced_examples/`, consider updating the makefile
-5. Enjoy.
-
-The same steps kind-of apply to the benchmarks, too.
-
 
 ## Features include
 
@@ -166,6 +116,58 @@ and many more.
 - [ ] 100-dimensional linear ODE
 - [ ] 1000-dimensional linear ODE?
 - [ ] HIRES
+
+
+## Development
+
+### Installation
+To install all development-relevant dependencies, install either of
+```
+pip install probdiffeq[test]  # pytest, ...
+pip install probdiffeq[lint]  # black, isort, ...
+pip install probdiffeq[example]  # tueplots, diffrax, blackjax, ...
+pip install probdiffeq[doc]  # mkdocs, ...
+pip install probdiffeq[full]  # all of the above
+```
+
+### Continuous integration
+Run the checks with a makefile, use either of the below
+```
+make format
+make lint
+make test
+make example
+make pre-commit
+make doc
+```
+Remove auxiliary files with 
+```
+make clean
+```
+### Pre-commit hook
+To ensure that all commits satisfy most of the linters, no big files are addedd accidentally, and so on, use a pre-commit hook
+```
+pip install pre-commit  # included in `pip install -e .[full]`
+pre-commit install
+```
+You may verify the installation by running
+```commandline
+pre-commit run
+```
+
+### Creating an example notebook
+
+To embed a new example notebook into the docs, follow the steps:
+
+1. Create a jupyter notebook, preferrably in `docs/examples/` or `docs/advanced_examples/` and fill it with content.
+   If you are wondering which folder is more appropriate: if your notebook introduces an external dependency (for example, an optimisation or sampling library), it is an advanced example.
+2. Sync the notebook to a markdown file via jupytext
+3. Include the notebook into the docs by mentioning it in the `nav` section of `mkdocs.yml`
+4. If the notebook is not in `examples/` or in `advanced_examples/`, consider updating the makefile
+5. Enjoy.
+
+The same steps kind-of apply to the benchmarks, too.
+
 
 
 ## Similar projects
