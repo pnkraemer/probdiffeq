@@ -24,7 +24,43 @@ Or directly from GitHub:
 pip install git+https://github.com/pnkraemer/probdiffeq.git
 ```
 
-Read more about installing this package [here](https://probdiffeq.readthedocs.io/en/latest/getting_started/installation.html).
+## Development
+
+### Installation
+To install all development-relevant dependencies, install either of
+```
+pip install probdiffeq[test]  # pytest, ...
+pip install probdiffeq[lint]  # black, isort, ...
+pip install probdiffeq[example]  # tueplots, diffrax, blackjax, ...
+pip install probdiffeq[doc]  # mkdocs, ...
+pip install probdiffeq[full]  # all of the above
+```
+
+### Continuous integration
+Run the checks with a makefile, use either of the below
+```
+make format
+make lint
+make test
+make example
+make pre-commit
+make doc
+```
+Remove auxiliary files with 
+```
+make clean
+```
+### Pre-commit hook
+To ensure that all commits satisfy most of the linters, no big files are addedd accidentally, and so on, use a pre-commit hook
+```
+pip install pre-commit  # included in `pip install -e .[full]`
+pre-commit install
+```
+You may verify the installation by running
+```commandline
+pre-commit run
+```
+
 
 
 ## Features include
