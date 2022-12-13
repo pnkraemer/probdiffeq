@@ -24,15 +24,6 @@ Or directly from GitHub:
 pip install git+https://github.com/pnkraemer/probdiffeq.git
 ```
 
-## Examples
-
-There are examples and there are advanced examples.
-
-Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
-
-The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
-
-
 
 ## Features include
 
@@ -116,6 +107,15 @@ and many more.
 - [ ] 100-dimensional linear ODE
 - [ ] 1000-dimensional linear ODE?
 - [ ] HIRES
+
+
+## Examples
+
+There are examples and there are advanced examples.
+
+Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
+
+The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
 
 
 ## Development
