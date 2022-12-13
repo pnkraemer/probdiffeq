@@ -18,14 +18,11 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         )
         m_cor = self.hidden_state.mean - gain * (m_obs - u)[None, :]
 
-        return IsoNormal(m_obs, r_obs.T), (
-            IsoStateSpaceVar(IsoNormal(m_cor, r_cor.T)),
-            gain,
-        )
+        ssv = IsoStateSpaceVar(IsoNormal(m_cor, r_cor.T))
+        return IsoNormal(m_obs, r_obs.T), (ssv, gain)
 
     def extract_qoi(self) -> jax.Array:
-        m = self.hidden_state.mean[..., 0, :]
-        return m
+        return self.marginal_nth_derivative(0).mean
 
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
         return u[..., 0, :]
@@ -34,6 +31,24 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         return IsoStateSpaceVar(
             self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
         )
+
+    def marginal_nth_derivative(self, n):
+        if self.hidden_state.mean.ndim > 2:
+            # if the variable has batch-axes, vmap the result
+            fn = IsoStateSpaceVar.marginal_nth_derivative
+            vect_fn = jax.vmap(fn, in_axes=(0, None))
+            return vect_fn(self, n)
+
+        if n >= self.hidden_state.mean.shape[0]:
+            msg = f"The {n}th derivative not available in the state-space variable."
+            raise ValueError(msg)
+
+        mean = self.hidden_state.mean[n, :]
+        cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
+        cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
+            R=cov_sqrtm_lower_nonsquare[:, None]
+        ).T
+        return IsoNormal(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
 
 
 @jax.tree_util.register_pytree_node_class
