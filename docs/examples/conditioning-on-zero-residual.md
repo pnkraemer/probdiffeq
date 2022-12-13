@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import dense_output, ivpsolve, solvers, controls
+from probdiffeq import controls, dense_output, ivpsolve, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -96,6 +96,7 @@ taylor_coefficients = jnp.reshape(
     solution.marginals.target_shape,
     order="F",
 )
+
 
 @jax.jit
 def extrapolate_fn(rv, model, dt, scale_sqrtm):
