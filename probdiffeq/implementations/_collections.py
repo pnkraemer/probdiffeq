@@ -100,7 +100,7 @@ class StateSpaceVar(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginal_nth_derivative(self, n) -> AbstractNormal:
+    def marginal_nth_derivative(self, n):
         raise NotImplementedError
 
 
