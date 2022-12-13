@@ -24,6 +24,15 @@ Or directly from GitHub:
 pip install git+https://github.com/pnkraemer/probdiffeq.git
 ```
 
+## Examples
+
+There are examples and there are advanced examples.
+
+Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
+
+The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
+
+
 ## Development
 
 ### Installation
@@ -61,6 +70,18 @@ You may verify the installation by running
 pre-commit run
 ```
 
+### Creating an example notebook
+
+To embed a new example notebook into the docs, follow the steps:
+
+1. Create a jupyter notebook, preferrably in `docs/examples/` or `docs/advanced_examples/` and fill it with content.
+   If you are wondering which folder is more appropriate: if your notebook introduces an external dependency (for example, an optimisation or sampling library), it is an advanced example.
+2. Sync the notebook to a markdown file via jupytext
+3. Include the notebook into the docs by mentioning it in the `nav` section of `mkdocs.yml`
+4. If the notebook is not in `examples/` or in `advanced_examples/`, consider updating the makefile
+5. Enjoy.
+
+The same steps kind-of apply to the benchmarks, too.
 
 
 ## Features include
