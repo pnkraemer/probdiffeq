@@ -81,6 +81,7 @@ nav:
         - "examples/smoothing.ipynb"
         - "examples/solution_object.ipynb"
         - "examples/dynamic_output_scales.ipynb"
+        - "examples/conditioning-on-zero-residual.ipynb"
     - Advanced Examples:
         - "advanced_examples/physics_enhanced_regression_1.ipynb"
         - "advanced_examples/physics_enhanced_regression_2.ipynb"
