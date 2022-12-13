@@ -121,26 +121,7 @@ for t_old, t_new in zip(mesh[:-1], mesh[1:]):
 prior_u.append(rv.marginal_nth_derivative(0).mean)
 prior_du.append(rv.marginal_nth_derivative(1).mean)
 
-prior_u = jnp.asarray(prior_u)
-prior_du = jnp.asarray(prior_du)
 
-# Semi-prior/posterior
-semiprior_u = []
-semiprior_du = []
-rv = extrapolation_model.init_corrected(taylor_coefficients)
-for t_old, t_new in zip(mesh[:-1], mesh[1:]):
-
-    prior_u.append(rv.marginal_nth_derivative(0).mean)
-    prior_du.append(rv.marginal_nth_derivative(1).mean)
-
-    dt = t_new - t_old
-    rv = extrapolate_fn(rv, extrapolation_model, dt, solution.output_scale_sqrtm.mean())
-
-prior_u.append(rv.marginal_nth_derivative(0).mean)
-prior_du.append(rv.marginal_nth_derivative(1).mean)
-
-prior_u = jnp.asarray(prior_u)
-prior_du = jnp.asarray(prior_du)
 ```
 
 ```python
