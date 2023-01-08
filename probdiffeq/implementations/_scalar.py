@@ -88,6 +88,24 @@ class StateSpaceVar(_collections.StateSpaceVar):
             self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
         )
 
+    def marginal_nth_derivative(self, n):
+        if self.hidden_state.mean.ndim > 1:
+            # if the variable has batch-axes, vmap the result
+            fn = StateSpaceVar.marginal_nth_derivative
+            vect_fn = jax.vmap(fn, in_axes=(0, None))
+            return vect_fn(self, n)
+
+        if n >= self.hidden_state.mean.shape[0]:
+            msg = f"The {n}th derivative not available in the state-space variable."
+            raise ValueError(msg)
+
+        mean = self.hidden_state.mean[n]
+        cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
+        cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
+            R=cov_sqrtm_lower_nonsquare[:, None]
+        ).T
+        return ScalarNormal(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
+
 
 @jax.tree_util.register_pytree_node_class
 class Normal(_collections.AbstractNormal):
@@ -402,12 +420,9 @@ class IBM(_collections.AbstractExtrapolation):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return StateSpaceVar(
-            Normal(
-                mean=m0_corrected,
-                cov_sqrtm_lower=c_sqrtm0_corrected,
-            )
-        )
+
+        rv = Normal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return StateSpaceVar(rv)
 
     def init_error_estimate(self):
         return jnp.zeros(())

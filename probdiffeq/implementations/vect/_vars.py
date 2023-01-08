@@ -60,6 +60,26 @@ class VectStateSpaceVar(_collections.StateSpaceVar):
         hidden_state_scaled = self.hidden_state.scale_covariance(scale_sqrtm)
         return VectStateSpaceVar(hidden_state_scaled, target_shape=self.target_shape)
 
+    def marginal_nth_derivative(self, n):
+        if self.hidden_state.mean.ndim > 1:
+            # if the variable has batch-axes, vmap the result
+            fn = VectStateSpaceVar.marginal_nth_derivative
+            vect_fn = jax.vmap(fn, in_axes=(0, None))
+            return vect_fn(self, n)
+
+        if n >= self.target_shape[0]:
+            msg = f"The {n}th derivative not available in the state-space variable."
+            raise ValueError(msg)
+
+        mean = self._select_derivative(self.hidden_state.mean, n)
+        cov_sqrtm_lower_nonsquare = self._select_derivative_vect(
+            self.hidden_state.cov_sqrtm_lower, n
+        )
+        cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
+            R=cov_sqrtm_lower_nonsquare.T
+        ).T
+        return VectNormal(mean, cov_sqrtm_lower)
+
     def _select_derivative_vect(self, x, i):
         fn = functools.partial(self._select_derivative, i=i)
         select = jax.vmap(fn, in_axes=1, out_axes=1)

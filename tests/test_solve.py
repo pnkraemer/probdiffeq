@@ -39,3 +39,17 @@ def test_loop_over_solution_is_possible(solution_solve):
         assert isinstance(sol, type(solution))
 
     assert i == len(solution) - 1
+
+
+# Maybe this test should be in a different test suite, but it does not really matter...
+def test_marginal_nth_derivative_of_solution(solution_solve):
+    solution, _ = solution_solve
+
+    # Assert that the marginals have the same shape as the qoi.
+    for i in (0, 1):
+        derivatives = solution.marginals.marginal_nth_derivative(i)
+        assert derivatives.mean.shape == solution.u.shape
+
+    # if the requested derivative is not in the state-space model, raise a ValueError
+    with pytest.raises(ValueError):
+        solution.marginals.marginal_nth_derivative(100)

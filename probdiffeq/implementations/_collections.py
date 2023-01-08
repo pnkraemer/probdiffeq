@@ -99,6 +99,10 @@ class StateSpaceVar(abc.ABC):
     def scale_covariance(self, scale_sqrtm):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def marginal_nth_derivative(self, n):
+        raise NotImplementedError
+
 
 SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVar)
 """A type-variable to alias appropriate state-space variable types."""
