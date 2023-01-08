@@ -111,7 +111,7 @@ ode_shape = u0.shape
 tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
 
 workprecision_diagram = functools.partial(
-    workprecision_make, number=1, repeat=1, tols=tolerances
+    workprecision_make, number=3, repeat=3, tols=tolerances
 )
 ```
 
@@ -174,7 +174,7 @@ mm1_gh_solver = correction_to_solver(mm1_gh)
 
 solve_fns = [
     (ts0_solver, f"TS0({num_derivatives})"),
-    # (ts1_solver, f"TS1({num_derivatives})"),
+    (ts1_solver, f"TS1({num_derivatives})"),
     (mm0_sci_solver, f"MM0({num_derivatives}, SCI)"),
     (mm1_sci_solver, f"MM1({num_derivatives}, SCI)"),
     (mm0_ut_solver, f"MM0({num_derivatives}, UT)"),
@@ -196,7 +196,7 @@ fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
 plt.show()
 ```
 
-The Taylor-series based method is more efficient. The cubature rule has little effect on the efficiency of the moment-matching solver.
+The Taylor-series based method is more efficient than the moment-batching based method. The cubature rule itself has little effect on the efficiency of the moment-matching solver.
 
 
 ### Which factorisation?

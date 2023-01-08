@@ -354,16 +354,7 @@ class VectMomentMatchingZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
-        # The correction step for the cubature Kalman filter implementation
-        # is quite complicated. The reason is that the observation model
-        # is x -> e1(x) - f(e0(x)), i.e., a composition of a linear/nonlinear/linear
-        # model, and that we _only_ want to cubature-linearise the nonlinearity.
-        # So what we do is that we compute marginals, gains, and posteriors
-        # for each of the three transitions and merge them in the end.
-        # This uses the fewest sigma-points possible, and ultimately should
-        # lead to the fastest, most stable implementation.
-
-        # zeroth order linearisation
+        # Zeroth order linearisation
         noise = self._linearize(x=extrapolated, cache=cache)
 
         # Compute the CKF correction
