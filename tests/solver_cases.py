@@ -64,6 +64,13 @@ def case_mle_filter_mm1_vect():
 
 
 @pytest_cases.case(tags=["filter"])
+def case_mle_filter_mm0_vect():
+    implementation = recipes.VectMM0.from_params(ode_shape=(2,))
+    strategy = filters.Filter(implementation=implementation)
+    return solvers.MLESolver(strategy=strategy)
+
+
+@pytest_cases.case(tags=["filter"])
 def case_dynamic_filter_mm1_ut_vect():
     cube = cubature.UnscentedTransform.from_params(input_shape=(2,))
     implementation = recipes.VectMM1.from_params(cubature=cube, ode_shape=(2,))
