@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.14.1
+      jupytext_version: 1.14.4
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -108,10 +108,10 @@ def _solve(*, solver, tol):
 
 ode_shape = u0.shape
 
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
+tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=1.0)
 
 workprecision_diagram = functools.partial(
-    workprecision_make, number=3, repeat=3, tols=tolerances
+    workprecision_make, number=1, repeat=1, tols=tolerances
 )
 ```
 
@@ -126,19 +126,36 @@ def correction_to_solver(implementation):
 
 
 num_derivatives = 4
+ts0 = recipes.VectTS0.from_params(ode_shape=ode_shape)
 ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape)
+
+mm0_sci = recipes.VectMM0.from_params(
+    ode_shape=ode_shape,
+    num_derivatives=num_derivatives,
+    cubature=cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape),
+)
 mm1_sci = recipes.VectMM1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape),
 )
 
+mm0_ut = recipes.VectMM0.from_params(
+    ode_shape=ode_shape,
+    num_derivatives=num_derivatives,
+    cubature=cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0),
+)
 mm1_ut = recipes.VectMM1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0),
 )
 
+mm0_gh = recipes.VectMM0.from_params(
+    ode_shape=ode_shape,
+    num_derivatives=num_derivatives,
+    cubature=cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3),
+)
 mm1_gh = recipes.VectMM1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
@@ -146,15 +163,23 @@ mm1_gh = recipes.VectMM1.from_params(
 )
 
 
+ts0_solver = correction_to_solver(ts0)
 ts1_solver = correction_to_solver(ts1)
+mm0_sci_solver = correction_to_solver(mm0_sci)
 mm1_sci_solver = correction_to_solver(mm1_sci)
+mm0_ut_solver = correction_to_solver(mm0_ut)
 mm1_ut_solver = correction_to_solver(mm1_ut)
+mm0_gh_solver = correction_to_solver(mm0_gh)
 mm1_gh_solver = correction_to_solver(mm1_gh)
 
 solve_fns = [
-    (ts1_solver, f"TS1({num_derivatives})"),
+    (ts0_solver, f"TS0({num_derivatives})"),
+    # (ts1_solver, f"TS1({num_derivatives})"),
+    (mm0_sci_solver, f"MM0({num_derivatives}, SCI)"),
     (mm1_sci_solver, f"MM1({num_derivatives}, SCI)"),
+    (mm0_ut_solver, f"MM0({num_derivatives}, UT)"),
     (mm1_ut_solver, f"MM1({num_derivatives}, UT)"),
+    (mm0_gh_solver, f"MM0({num_derivatives}, GH)"),
     (mm1_gh_solver, f"MM1({num_derivatives}, GH)"),
 ]
 ```
