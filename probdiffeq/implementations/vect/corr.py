@@ -292,6 +292,8 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class VectMomentMatchingZerothOrder(_collections.AbstractCorrection):
+    """Zeroth-order moment matching."""
+
     def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -324,63 +326,7 @@ class VectMomentMatchingZerothOrder(_collections.AbstractCorrection):
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         cache = (vmap_f,)
 
-        # 1. x -> (e0x, e1x)
-        R_X = x.hidden_state.cov_sqrtm_lower.T
-        L0 = self._select_derivative_vect(R_X.T, 0)
-        r_marg1_x = _sqrtm.sqrtm_to_upper_triangular(R=L0.T)
-        m_marg1_x = self._select_derivative(x.hidden_state.mean, 0)
-        m_marg1_y = self._select_derivative(x.hidden_state.mean, 1)
-
-        # 2. (x, y) -> (f(x), y)
-        x_centered = self.cubature.points @ r_marg1_x
-        sigma_points = m_marg1_x[None, :] + x_centered
-        fx = vmap_f(sigma_points)
-        m_marg2 = self.cubature.weights_sqrtm**2 @ fx
-        fx_centered = fx - m_marg2[None, :]
-        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
-
-        # 3. (x, y) -> y - x (last one)
-        m_marg = m_marg1_y - m_marg2
-        R1 = self._select_derivative_vect(R_X.T, 1).T
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=fx_centered_normed).T
-
-        # Summarise
-        marginals = _vars.VectNormal(m_marg, l_marg)
-        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
-
-        # Compute error estimate
-        l_obs = marginals.cov_sqrtm_lower
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
-
-    def complete_correction(self, extrapolated, cache):
-        # Zeroth order linearisation
-        noise = self._linearize(x=extrapolated, cache=cache)
-
-        # Compute the CKF correction
-        L = extrapolated.hidden_state.cov_sqrtm_lower
-        L1 = self._select_derivative_vect(L, 1)
-        r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
-            R_X_F=L1.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
-        )
-
-        # Catch up the marginals
-        x = extrapolated  # alias for readability in this code-block
-        x1 = self._select_derivative(x.hidden_state.mean, 1)
-        m_marg = x1 - noise.mean  # (H @ x0 + noise.mean)
-        marginals = _vars.VectNormal(m_marg, r_marg.T)
-
-        # Catch up the correction and return result
-        m_bw = extrapolated.hidden_state.mean - gain @ m_marg
-        rv = _vars.VectNormal(m_bw, r_bw.T)
-        shape = extrapolated.target_shape
-        corrected = _vars.VectStateSpaceVar(rv, target_shape=shape)
-        return marginals, (corrected, gain)
-
-    def _linearize(self, x, cache):
-        vmap_f, *_ = cache
-
-        # Create sigma points
+        # Construct sigma-points
         m_0 = self._select_derivative(x.hidden_state.mean, 0)
         r_0 = self._select_derivative_vect(x.hidden_state.cov_sqrtm_lower, 0).T
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
@@ -392,9 +338,53 @@ class VectMomentMatchingZerothOrder(_collections.AbstractCorrection):
 
         # Compute zeroth order approximation
         fx_mean = self.cubature.weights_sqrtm**2 @ fx
-        fx_centered = fx - fx_mean[None, :]
-        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
-        return _vars.VectNormal(fx_mean, fx_centered_normed.T)
+
+        # Complete estimation
+        m1 = self._select_derivative(x.hidden_state.mean, self.ode_order)
+        b = m1 - fx_mean
+        cov_sqrtm_lower = self._select_derivative_vect(
+            x.hidden_state.cov_sqrtm_lower, 1
+        )
+
+        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        observed = _vars.VectNormal(b, l_obs_raw)
+        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
+        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+
+    def complete_correction(self, extrapolated, cache):
+        vmap_f, *_ = cache
+        m_ext, l_ext = (
+            extrapolated.hidden_state.mean,
+            extrapolated.hidden_state.cov_sqrtm_lower,
+        )
+
+        # Create sigma points
+        m_0 = self._select_derivative(m_ext, 0)
+        r_0 = self._select_derivative_vect(l_ext, 0).T
+        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        pts_centered = self.cubature.points @ r_0_square
+        pts = m_0[None, :] + pts_centered
+
+        # Evaluate the vector-field
+        fx = vmap_f(pts)
+
+        # Compute zeroth order approximation
+        m_1 = self._select_derivative(m_ext, 1)
+        b = m_1 - self.cubature.weights_sqrtm**2 @ fx
+
+        # Complete correction
+        l_obs_nonsquare = self._select_derivative_vect(l_ext, self.ode_order)
+        r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
+            R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
+        )
+        m_cor = m_ext - gain @ b
+
+        _shape = extrapolated.target_shape
+        observed = _vars.VectNormal(mean=b, cov_sqrtm_lower=r_obs.T)
+        rv = _vars.VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        corrected = _vars.VectStateSpaceVar(rv, target_shape=_shape)
+        return observed, (corrected, gain)
 
     def _select_derivative_vect(self, x, i):
         select = jax.vmap(
