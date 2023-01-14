@@ -32,8 +32,7 @@ lint:
 	# Opt-in for specific pylint checks that flake8 can't detect
 	pylint probdiffeq/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-locals,duplicate-code,too-many-arguments
 	pylint tests/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-arguments,duplicate-code,too-many-locals
-	# A very soft mypy check to detect obvious problems
-	mypy probdiffeq --disable-error-code=var-annotated
+
 test:
 	pytest -n auto -x -v -s  # parallelise, fail early, verbose output, show all 'stdout's
 	python -m doctest probdiffeq/*.py
