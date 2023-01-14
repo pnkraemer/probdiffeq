@@ -189,14 +189,14 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class VectMomentMatching(_collections.AbstractCorrection):
-    def __init__(self, ode_shape, ode_order, cubature):
+    def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
-        self.cubature = cubature
+        self.linearise_fn = linearise_fn
 
         # Selection matrices
         fn, fn_vect = _select_derivative, _select_derivative_vect
@@ -208,22 +208,23 @@ class VectMomentMatching(_collections.AbstractCorrection):
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
 
     @classmethod
-    def from_params(cls, ode_shape, ode_order):
-        sci_fn = cubature_module.ThirdOrderSpherical.from_params
-        cubature = sci_fn(input_shape=ode_shape)
-        return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
+    def from_params(cls, ode_shape, ode_order, cubature=None):
+        if cubature is None:
+            sci_fn = cubature_module.ThirdOrderSpherical.from_params
+            cubature = sci_fn(input_shape=ode_shape)
+        linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature)
+        return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
-        children = (self.cubature,)
-        aux = self.ode_order, self.ode_shape
+        children = ()
+        aux = self.ode_order, self.ode_shape, self.linearise_fn
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
-        (cubature,) = children
-        ode_order, ode_shape = aux
-        return cls(ode_order=ode_order, ode_shape=ode_shape, cubature=cubature)
+    def tree_unflatten(cls, aux, _children):
+        ode_order, ode_shape, linearise_fn = aux
+        return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
         # Extract the linearisation point
@@ -234,7 +235,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Apply statistical linear regression to the ODE vector field
         f_p = jax.tree_util.Partial(vector_field, t=t, p=p)
-        H, noise = linearise_slr1(fn=f_p, x=lin_pt, cubature_rule=self.cubature)
+        H, noise = self.linearise_fn(fn=f_p, x=lin_pt)
         cache = (f_p,)
 
         # Compute the marginal observation
@@ -262,7 +263,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Apply statistical linear regression to the ODE vector field
         f_p, *_ = cache
-        H, noise = linearise_slr1(fn=f_p, x=lin_pt, cubature_rule=self.cubature)
+        H, noise = self.linearise_fn(fn=f_p, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower

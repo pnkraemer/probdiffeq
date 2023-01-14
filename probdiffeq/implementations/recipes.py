@@ -117,14 +117,9 @@ class VectTS0(
 class VectMM1(AbstractImplementation[vect_corr.VectMomentMatching, vect_extra.VectIBM]):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
-        if cubature is None:
-            correction = vect_corr.VectMomentMatching.from_params(
-                ode_shape=ode_shape, ode_order=ode_order
-            )
-        else:
-            correction = vect_corr.VectMomentMatching(
-                ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
-            )
+        correction = vect_corr.VectMomentMatching.from_params(
+            ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
+        )
         extrapolation = vect_extra.VectIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
