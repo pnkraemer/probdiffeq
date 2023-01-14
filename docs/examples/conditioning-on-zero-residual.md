@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.14.1
+      jupytext_version: 1.14.4
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -54,7 +54,7 @@ def vector_field(y, *, t, p):
 
 # Make a solver
 solver = solvers.MLESolver(
-    smoothers.Smoother(recipes.VectMM1.from_params(ode_shape=(1,), num_derivatives=1))
+    smoothers.Smoother(recipes.VectSLR1.from_params(ode_shape=(1,), num_derivatives=1))
 )
 ```
 

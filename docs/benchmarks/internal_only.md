@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.14.1
+      jupytext_version: 1.14.4
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -127,19 +127,19 @@ def correction_to_solver(implementation):
 
 num_derivatives = 4
 ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape)
-mm1_sci = recipes.VectMM1.from_params(
+slr1_sci = recipes.VectSLR1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape),
 )
 
-mm1_ut = recipes.VectMM1.from_params(
+slr1_ut = recipes.VectSLR1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0),
 )
 
-mm1_gh = recipes.VectMM1.from_params(
+slr1_gh = recipes.VectSLR1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3),
@@ -147,15 +147,15 @@ mm1_gh = recipes.VectMM1.from_params(
 
 
 ts1_solver = correction_to_solver(ts1)
-mm1_sci_solver = correction_to_solver(mm1_sci)
-mm1_ut_solver = correction_to_solver(mm1_ut)
-mm1_gh_solver = correction_to_solver(mm1_gh)
+slr1_sci_solver = correction_to_solver(slr1_sci)
+slr1_ut_solver = correction_to_solver(slr1_ut)
+slr1_gh_solver = correction_to_solver(slr1_gh)
 
 solve_fns = [
     (ts1_solver, f"TS1({num_derivatives})"),
-    (mm1_sci_solver, f"MM1({num_derivatives}, SCI)"),
-    (mm1_ut_solver, f"MM1({num_derivatives}, UT)"),
-    (mm1_gh_solver, f"MM1({num_derivatives}, GH)"),
+    (slr1_sci_solver, f"SLR1({num_derivatives}, SCI)"),
+    (slr1_ut_solver, f"SLR1({num_derivatives}, UT)"),
+    (slr1_gh_solver, f"SLR1({num_derivatives}, GH)"),
 ]
 ```
 
@@ -360,7 +360,7 @@ ts1_medium = recipes.VectTS1.from_params(
 ts1_high = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
 
-mm1_high = recipes.VectMM1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
+slr1_high = recipes.VectSLR1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
 solve_fns = [
     (impl_to_mle_solver_filter(ts0_iso_low), f"IsoTS0({num_low}), MLE"),
@@ -368,7 +368,7 @@ solve_fns = [
     (impl_to_dynamic_solver_filter(ts1_low), f"VectTS1({num_low}), Dynamic"),
     (impl_to_mle_solver_filter(ts1_medium), f"VectTS1({num_medium}), MLE"),
     (impl_to_mle_solver_filter(ts1_high), f"VectTS1({num_high}), MLE"),
-    (impl_to_mle_solver_filter(mm1_high), f"VectMM1({num_high}), MLE"),
+    (impl_to_mle_solver_filter(slr1_high), f"VectSLR1({num_high}), MLE"),
 ]
 ```
 

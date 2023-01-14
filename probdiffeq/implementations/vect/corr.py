@@ -188,7 +188,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class VectMomentMatching(_collections.AbstractCorrection):
+class VectStatisticalFirstorder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError

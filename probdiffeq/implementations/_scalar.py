@@ -182,7 +182,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class MomentMatching(_collections.AbstractCorrection):
+class StatisticalFirstorder(_collections.AbstractCorrection):
     def __init__(self, ode_order, cubature):
         if ode_order > 1:
             raise ValueError

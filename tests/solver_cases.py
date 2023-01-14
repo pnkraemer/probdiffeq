@@ -57,39 +57,39 @@ def case_dynamic_filter_ts1_vect():
 
 
 @pytest_cases.case(tags=["filter"])
-def case_mle_filter_mm1_vect():
-    implementation = recipes.VectMM1.from_params(ode_shape=(2,))
+def case_mle_filter_slr1_vect():
+    implementation = recipes.VectSLR1.from_params(ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_mm1_ut_vect():
+def case_dynamic_filter_slr1_ut_vect():
     cube = cubature.UnscentedTransform.from_params(input_shape=(2,))
-    implementation = recipes.VectMM1.from_params(cubature=cube, ode_shape=(2,))
+    implementation = recipes.VectSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_mm1_ut_batch():
+def case_dynamic_filter_slr1_ut_batch():
     cube = cubature.UnscentedTransform.from_params_batch(input_shape=(2,))
-    implementation = recipes.BatchMM1.from_params(cubature=cube, ode_shape=(2,))
+    implementation = recipes.BatchSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_mm1_batch():
-    implementation = recipes.BatchMM1.from_params(ode_shape=(2,))
+def case_dynamic_filter_slr1_batch():
+    implementation = recipes.BatchSLR1.from_params(ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=["filter"])
-def case_dynamic_filter_mm1_gh_vect():
+def case_dynamic_filter_slr1_gh_vect():
     cube = cubature.GaussHermite.from_params(input_shape=(2,))
-    implementation = recipes.VectMM1.from_params(cubature=cube, ode_shape=(2,))
+    implementation = recipes.VectSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
