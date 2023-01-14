@@ -8,6 +8,37 @@ from probdiffeq.implementations import _collections, _sqrtm
 from probdiffeq.implementations.vect import _vars
 
 
+def linearise_ts0(fn, m):
+    return fn(m)
+
+
+def linearise_ts1(fn, m):
+    b, jvp_fn = jax.linearize(fn, m)
+    return jvp_fn, (b,)
+
+
+def linearise_slr1(fn, x, cubature_rule):
+    # Create sigma points
+    pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
+    pts = x.mean[None, :] + pts_centered
+
+    # Evaluate the vector-field
+    fx = jax.vmap(fn)(pts)
+    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
+    fx_centered = fx - fx_mean[None, :]
+
+    # Create matrices for statistical linear regression
+    pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
+    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
+    _, (r_cond_rev, linop) = _sqrtm.revert_conditional_noisefree(
+        R_X_F=pts_centered_normed, R_X=fx_centered_normed
+    )
+
+    # Catch up the transition-mean and return the result
+    d = fx_mean - linop @ x.mean
+    return linop, _vars.VectNormal(d, r_cond_rev.T)
+
+
 @jax.tree_util.register_pytree_node_class
 class VectTaylorZerothOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order):
@@ -28,7 +59,10 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
         m0 = self._select_derivative(x.hidden_state.mean, slice(0, self.ode_order))
         m1 = self._select_derivative(x.hidden_state.mean, self.ode_order)
-        b = m1 - vector_field(*m0, t=t, p=p)
+
+        fx = linearise_ts0(lambda s: vector_field(s, t=t, p=p), *m0)
+
+        b = m1 - fx
         cov_sqrtm_lower = self._select_derivative_vect(
             x.hidden_state.cov_sqrtm_lower, 1
         )
@@ -89,7 +123,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
         vf_p = jax.tree_util.Partial(self._res, vector_field=vector_field, t=t, p=p)
-        b, fn = jax.linearize(vf_p, x.hidden_state.mean)
+        b, fn = linearise_ts1(vf_p, x.hidden_state.mean)
 
         cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(b, fn), cov_sqrtm_lower=x.hidden_state.cov_sqrtm_lower
@@ -133,9 +167,10 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         return x1 - fx0
 
     def _select_derivative_vect(self, x, i):
-        select = jax.vmap(
-            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
-        )
+        def select_fn(s):
+            return self._select_derivative_vect(s, i)
+
+        select = jax.vmap(select_fn, in_axes=1, out_axes=1)
         return select(x)
 
     def _select_derivative(self, x, i):
@@ -174,30 +209,22 @@ class VectMomentMatching(_collections.AbstractCorrection):
         return cls(ode_order=ode_order, ode_shape=ode_shape, cubature=cubature)
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
+        # Extract the linearisation point
+        m_0 = self._select_derivative(x.hidden_state.mean, 0)
+        r_0 = self._select_derivative_vect(x.hidden_state.cov_sqrtm_lower, 0).T
+        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
-        # Vmap relevant functions
-        vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
-        cache = (vmap_f,)
+        # Apply statistical linear regression to the ODE vector field
+        f_p = jax.tree_util.Partial(vector_field, t=t, p=p)
+        H, noise = linearise_slr1(f_p, lin_pt, cubature_rule=self.cubature)
+        cache = (f_p,)
 
-        # 1. x -> (e0x, e1x)
-        R_X = x.hidden_state.cov_sqrtm_lower.T
-        L0 = self._select_derivative_vect(R_X.T, 0)
-        r_marg1_x = _sqrtm.sqrtm_to_upper_triangular(R=L0.T)
-        m_marg1_x = self._select_derivative(x.hidden_state.mean, 0)
-        m_marg1_y = self._select_derivative(x.hidden_state.mean, 1)
-
-        # 2. (x, y) -> (f(x), y)
-        x_centered = self.cubature.points @ r_marg1_x
-        sigma_points = m_marg1_x[None, :] + x_centered
-        fx = vmap_f(sigma_points)
-        m_marg2 = self.cubature.weights_sqrtm**2 @ fx
-        fx_centered = fx - m_marg2[None, :]
-        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
-
-        # 3. (x, y) -> y - x (last one)
-        m_marg = m_marg1_y - m_marg2
-        R1 = self._select_derivative_vect(R_X.T, 1).T
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=fx_centered_normed).T
+        # Compute the marginal observation
+        m_1 = self._select_derivative(x.hidden_state.mean, 1)
+        m_marg = m_1 - H @ m_0 - noise.mean
+        R1 = self._select_derivative_vect(x.hidden_state.cov_sqrtm_lower, 1).T
+        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=r_0_square @ H.T).T
 
         # Summarise
         marginals = _vars.VectNormal(m_marg, l_marg)
@@ -209,20 +236,18 @@ class VectMomentMatching(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
-        # The correction step for the cubature Kalman filter implementation
-        # is quite complicated. The reason is that the observation model
-        # is x -> e1(x) - f(e0(x)), i.e., a composition of a linear/nonlinear/linear
-        # model, and that we _only_ want to cubature-linearise the nonlinearity.
-        # So what we do is that we compute marginals, gains, and posteriors
-        # for each of the three transitions and merge them in the end.
-        # This uses the fewest sigma-points possible, and ultimately should
-        # lead to the fastest, most stable implementation.
+        # Extract the linearisation point
+        _x = extrapolated  # readability in current code block
+        m_0 = self._select_derivative(_x.hidden_state.mean, 0)
+        r_0 = self._select_derivative_vect(_x.hidden_state.cov_sqrtm_lower, 0).T
+        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
-        # Compute the linearisation as in
-        # Eq. (9) in https://arxiv.org/abs/2102.00514
-        H, noise = self._linearize(x=extrapolated, cache=cache)
+        # Apply statistical linear regression to the ODE vector field
+        f_p, *_ = cache
+        H, noise = linearise_slr1(f_p, lin_pt, cubature_rule=self.cubature)
 
-        # Compute the CKF correction
+        # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
         L0 = self._select_derivative_vect(L, 0)
         L1 = self._select_derivative_vect(L, 1)
@@ -231,57 +256,27 @@ class VectMomentMatching(_collections.AbstractCorrection):
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
 
-        # Catch up the marginals
-        x = extrapolated  # alias for readability in this code-block
-        x0 = self._select_derivative(x.hidden_state.mean, 0)
-        x1 = self._select_derivative(x.hidden_state.mean, 1)
+        # Compute the marginal mean
+        _x = extrapolated  # readability in current code block
+        x0 = self._select_derivative(_x.hidden_state.mean, 0)
+        x1 = self._select_derivative(_x.hidden_state.mean, 1)
         m_marg = x1 - (H @ x0 + noise.mean)
         shape = extrapolated.target_shape
         marginals = _vars.VectNormal(m_marg, r_marg.T)
 
-        # Catch up the correction and return result
+        # Compute the corrected mean
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.VectNormal(m_bw, r_bw.T)
         corrected = _vars.VectStateSpaceVar(rv, target_shape=shape)
+
+        # Return results
         return marginals, (corrected, gain)
 
-    def _linearize(self, x, cache):
-        vmap_f, *_ = cache
-
-        # Create sigma points
-        m_0 = self._select_derivative(x.hidden_state.mean, 0)
-        r_0 = self._select_derivative_vect(x.hidden_state.cov_sqrtm_lower, 0).T
-        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
-        pts_centered = self.cubature.points @ r_0_square
-        pts = m_0[None, :] + pts_centered
-
-        # Evaluate the vector-field
-        fx = vmap_f(pts)
-        fx_mean = self.cubature.weights_sqrtm**2 @ fx
-        fx_centered = fx - fx_mean[None, :]
-
-        # Revert the transition to get H and Omega
-        # This is a pure sqrt-implementation of
-        # Eq. (9) in https://arxiv.org/abs/2102.00514
-        # It seems to be different to Section VI.B in
-        # https://arxiv.org/pdf/2207.00426.pdf,
-        # because the implementation below avoids sqrt-down-dates
-        pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
-        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm[:, None]
-        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
-        #  (but would it still be valid?)
-        _, (r_Om, H) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=pts_centered_normed, R_X=fx_centered_normed
-        )
-
-        # Catch up the transition-mean and return the result
-        d = fx_mean - H @ m_0
-        return H, _vars.VectNormal(d, r_Om.T)
-
     def _select_derivative_vect(self, x, i):
-        select = jax.vmap(
-            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
-        )
+        def select_fn(s):
+            return self._select_derivative(s, i)
+
+        select = jax.vmap(select_fn, in_axes=1, out_axes=1)
         return select(x)
 
     def _select_derivative(self, x, i):
