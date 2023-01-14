@@ -6,12 +6,12 @@ import jax
 from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _scalar
 
-_MM1CacheType = Tuple[Callable]
+_SLR1CacheType = Tuple[Callable]
 """Type of the correction-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchMomentMatching(_collections.AbstractCorrection):
+class BatchStatisticalFirstorder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -19,7 +19,7 @@ class BatchMomentMatching(_collections.AbstractCorrection):
         super().__init__(ode_order=ode_order)
         self.ode_shape = ode_shape
 
-        self._mm = _scalar.MomentMatching(ode_order=ode_order, cubature=cubature)
+        self._mm = _scalar.StatisticalFirstorder(ode_order=ode_order, cubature=cubature)
 
     @property
     def cubature(self):
@@ -49,15 +49,15 @@ class BatchMomentMatching(_collections.AbstractCorrection):
         cache = (vmap_f,)
 
         # Evaluate vector field at sigma-points
-        sigma_points_fn = jax.vmap(_scalar.MomentMatching.transform_sigma_points)
+        sigma_points_fn = jax.vmap(_scalar.StatisticalFirstorder.transform_sigma_points)
         sigma_points, _, _ = sigma_points_fn(self._mm, extrapolated.hidden_state)
 
         fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
-        center_fn = jax.vmap(_scalar.MomentMatching.center)
+        center_fn = jax.vmap(_scalar.StatisticalFirstorder.center)
         fx_mean, _, fx_centered_normed = center_fn(self._mm, fx)
 
         # Compute output scale and error estimate
-        calibrate_fn = jax.vmap(_scalar.MomentMatching.calibrate)
+        calibrate_fn = jax.vmap(_scalar.StatisticalFirstorder.calibrate)
         error_estimate, output_scale_sqrtm = calibrate_fn(
             self._mm, fx_mean, fx_centered_normed, extrapolated.hidden_state
         )
@@ -68,23 +68,23 @@ class BatchMomentMatching(_collections.AbstractCorrection):
 
         H, noise = self.linearize(extrapolated, vmap_f)
 
-        fn = jax.vmap(_scalar.MomentMatching.complete_correction_post_linearize)
+        fn = jax.vmap(_scalar.StatisticalFirstorder.complete_correction_post_linearize)
         return fn(self._mm, H, extrapolated.hidden_state, noise)
 
     def linearize(self, extrapolated, vmap_f):
         # Transform the sigma-points
-        sigma_points_fn = jax.vmap(_scalar.MomentMatching.transform_sigma_points)
+        sigma_points_fn = jax.vmap(_scalar.StatisticalFirstorder.transform_sigma_points)
         sigma_points, _, sigma_points_centered_normed = sigma_points_fn(
             self._mm, extrapolated.hidden_state
         )
 
         # Evaluate the vector field at the sigma-points
         fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
-        center_fn = jax.vmap(_scalar.MomentMatching.center)
+        center_fn = jax.vmap(_scalar.StatisticalFirstorder.center)
         fx_mean, _, fx_centered_normed = center_fn(self._mm, fx)
 
         # Complete the linearization
-        lin_fn = jax.vmap(_scalar.MomentMatching.linearization_matrices)
+        lin_fn = jax.vmap(_scalar.StatisticalFirstorder.linearization_matrices)
         return lin_fn(
             self._mm,
             fx_centered_normed,

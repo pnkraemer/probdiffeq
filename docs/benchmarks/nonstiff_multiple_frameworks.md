@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.14.1
+      jupytext_version: 1.14.4
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -167,7 +167,7 @@ def scipy_solve_ivp_dop853(*, tol):
 ode_shape = u0.shape
 ts0 = recipes.IsoTS0.from_params(num_derivatives=4)
 ts0_batch = recipes.BatchTS0.from_params(ode_shape=ode_shape, num_derivatives=5)
-mm1_batch = recipes.BatchMM1.from_params(ode_shape=ode_shape, num_derivatives=6)
+slr1_batch = recipes.BatchSLR1.from_params(ode_shape=ode_shape, num_derivatives=6)
 ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=7)
 
 solve_fns = [
@@ -176,7 +176,7 @@ solve_fns = [
     (jax_solve, "Dormand-Prince (jax.experimental)"),
     (solver_to_solve(solvers.MLESolver(filters.Filter(ts0))), "IsoTS0(n=4)"),
     (solver_to_solve(solvers.MLESolver(filters.Filter(ts0_batch))), "BatchTS0(n=5)"),
-    (solver_to_solve(solvers.MLESolver(filters.Filter(mm1_batch))), "BatchMM1(n=6)"),
+    (solver_to_solve(solvers.MLESolver(filters.Filter(slr1_batch))), "BatchSLR1(n=6)"),
     (solver_to_solve(solvers.MLESolver(filters.Filter(ts1))), "VectTS1(n=7)"),
 ]
 ```
