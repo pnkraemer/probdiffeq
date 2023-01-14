@@ -57,15 +57,18 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
-        m0 = self._select_derivative(x.hidden_state.mean, slice(0, self.ode_order))
-        m1 = self._select_derivative(x.hidden_state.mean, self.ode_order)
+        m0 = _select_derivative(
+            x.hidden_state.mean, slice(0, self.ode_order), ode_shape=self.ode_shape
+        )
+        m1 = _select_derivative(
+            x.hidden_state.mean, self.ode_order, ode_shape=self.ode_shape
+        )
 
         fx = linearise_ts0(lambda s: vector_field(s, t=t, p=p), *m0)
 
         b = m1 - fx
-        cov_sqrtm_lower = self._select_derivative_vect(
-            x.hidden_state.cov_sqrtm_lower, 1
-        )
+        _cov = x.hidden_state.cov_sqrtm_lower
+        cov_sqrtm_lower = _select_derivative_vect(_cov, 1, ode_shape=self.ode_shape)
 
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         observed = _vars.VectNormal(b, l_obs_raw)
@@ -80,7 +83,9 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
             extrapolated.hidden_state.cov_sqrtm_lower,
         )
 
-        l_obs_nonsquare = self._select_derivative_vect(l_ext, self.ode_order)
+        l_obs_nonsquare = _select_derivative_vect(
+            l_ext, self.ode_order, ode_shape=self.ode_shape
+        )
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
         )
@@ -91,17 +96,6 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         rv = _vars.VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         corrected = _vars.VectStateSpaceVar(rv, target_shape=_shape)
         return observed, (corrected, gain)
-
-    def _select_derivative_vect(self, x, i):
-        select = jax.vmap(
-            lambda s: self._select_derivative(s, i), in_axes=1, out_axes=1
-        )
-        return select(x)
-
-    def _select_derivative(self, x, i):
-        (d,) = self.ode_shape
-        x_reshaped = jnp.reshape(x, (-1, d), order="F")
-        return x_reshaped[i, ...]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -123,7 +117,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
         vf_p = jax.tree_util.Partial(self._res, vector_field=vector_field, t=t, p=p)
-        b, fn = linearise_ts1(vf_p, x.hidden_state.mean)
+        fn, (b,) = linearise_ts1(vf_p, x.hidden_state.mean)
 
         cov_sqrtm_lower = self._cov_sqrtm_lower(
             cache=(b, fn), cov_sqrtm_lower=x.hidden_state.cov_sqrtm_lower
@@ -161,22 +155,10 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
 
     def _res(self, x, vector_field, t, p):
-        x0 = self._select_derivative(x, slice(0, self.ode_order))
-        x1 = self._select_derivative(x, self.ode_order)
+        x0 = _select_derivative(x, slice(0, self.ode_order), ode_shape=self.ode_shape)
+        x1 = _select_derivative(x, self.ode_order, ode_shape=self.ode_shape)
         fx0 = vector_field(*x0, t=t, p=p)
         return x1 - fx0
-
-    def _select_derivative_vect(self, x, i):
-        def select_fn(s):
-            return self._select_derivative_vect(s, i)
-
-        select = jax.vmap(select_fn, in_axes=1, out_axes=1)
-        return select(x)
-
-    def _select_derivative(self, x, i):
-        (d,) = self.ode_shape
-        x_reshaped = jnp.reshape(x, (-1, d), order="F")
-        return x_reshaped[i, ...]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -210,8 +192,10 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
         # Extract the linearisation point
-        m_0 = self._select_derivative(x.hidden_state.mean, 0)
-        r_0 = self._select_derivative_vect(x.hidden_state.cov_sqrtm_lower, 0).T
+        m_0 = _select_derivative(x.hidden_state.mean, 0, ode_shape=self.ode_shape)
+        r_0 = _select_derivative_vect(
+            x.hidden_state.cov_sqrtm_lower, 0, ode_shape=self.ode_shape
+        ).T
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
@@ -221,9 +205,11 @@ class VectMomentMatching(_collections.AbstractCorrection):
         cache = (f_p,)
 
         # Compute the marginal observation
-        m_1 = self._select_derivative(x.hidden_state.mean, 1)
+        m_1 = _select_derivative(x.hidden_state.mean, 1, ode_shape=self.ode_shape)
         m_marg = m_1 - H @ m_0 - noise.mean
-        R1 = self._select_derivative_vect(x.hidden_state.cov_sqrtm_lower, 1).T
+        R1 = _select_derivative_vect(
+            x.hidden_state.cov_sqrtm_lower, 1, ode_shape=self.ode_shape
+        ).T
         l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=r_0_square @ H.T).T
 
         # Summarise
@@ -238,8 +224,10 @@ class VectMomentMatching(_collections.AbstractCorrection):
     def complete_correction(self, extrapolated, cache):
         # Extract the linearisation point
         _x = extrapolated  # readability in current code block
-        m_0 = self._select_derivative(_x.hidden_state.mean, 0)
-        r_0 = self._select_derivative_vect(_x.hidden_state.cov_sqrtm_lower, 0).T
+        m_0 = _select_derivative(_x.hidden_state.mean, 0, ode_shape=self.ode_shape)
+        r_0 = _select_derivative_vect(
+            _x.hidden_state.cov_sqrtm_lower, 0, ode_shape=self.ode_shape
+        ).T
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
@@ -249,8 +237,8 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
-        L0 = self._select_derivative_vect(L, 0)
-        L1 = self._select_derivative_vect(L, 1)
+        L0 = _select_derivative_vect(L, 0, ode_shape=self.ode_shape)
+        L1 = _select_derivative_vect(L, 1, ode_shape=self.ode_shape)
         HL = L1 - H @ L0
         r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
@@ -258,8 +246,8 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Compute the marginal mean
         _x = extrapolated  # readability in current code block
-        x0 = self._select_derivative(_x.hidden_state.mean, 0)
-        x1 = self._select_derivative(_x.hidden_state.mean, 1)
+        x0 = _select_derivative(_x.hidden_state.mean, 0, ode_shape=self.ode_shape)
+        x1 = _select_derivative(_x.hidden_state.mean, 1, ode_shape=self.ode_shape)
         m_marg = x1 - (H @ x0 + noise.mean)
         shape = extrapolated.target_shape
         marginals = _vars.VectNormal(m_marg, r_marg.T)
@@ -272,14 +260,16 @@ class VectMomentMatching(_collections.AbstractCorrection):
         # Return results
         return marginals, (corrected, gain)
 
-    def _select_derivative_vect(self, x, i):
-        def select_fn(s):
-            return self._select_derivative(s, i)
 
-        select = jax.vmap(select_fn, in_axes=1, out_axes=1)
-        return select(x)
+def _select_derivative_vect(x, i, *, ode_shape):
+    def select_fn(s):
+        return _select_derivative(s, i, ode_shape=ode_shape)
 
-    def _select_derivative(self, x, i):
-        (d,) = self.ode_shape
-        x_reshaped = jnp.reshape(x, (-1, d), order="F")
-        return x_reshaped[i, ...]
+    select = jax.vmap(select_fn, in_axes=1, out_axes=1)
+    return select(x)
+
+
+def _select_derivative(x, i, *, ode_shape):
+    (d,) = ode_shape
+    x_reshaped = jnp.reshape(x, (-1, d), order="F")
+    return x_reshaped[i, ...]
