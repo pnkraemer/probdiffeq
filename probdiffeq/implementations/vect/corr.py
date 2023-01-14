@@ -9,19 +9,25 @@ from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _sqrtm
 from probdiffeq.implementations.vect import _vars
 
+# todo:
+#  statistical linear regression (zeroth order)
+#  statistical linear regression (cov-free)
+#  statistical linear regression (Jacobian)
+#  statistical linear regression (Bayesian cubature)
 
-def linearise_ts0(fn, m):
+
+def linearise_ts0(*, fn, m):
     """Linearise a function with a zeroth-order Taylor series."""
     return fn(m)
 
 
-def linearise_ts1(fn, m):
+def linearise_ts1(*, fn, m):
     """Linearise a function with a first-order Taylor series."""
     b, jvp_fn = jax.linearize(fn, m)
     return jvp_fn, (b,)
 
 
-def linearise_slr1(fn, x, cubature_rule):
+def linearise_slr1(*, fn, x, cubature_rule):
     """Linearise a function with first-order statistical linear regression."""
     # Create sigma points
     pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
@@ -51,6 +57,9 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
 
+        # Turn this into an argument if other linearisation functions apply
+        self.linearise_fn = linearise_ts0
+
         # Selection matrices
         fn, fn_vect = _select_derivative, _select_derivative_vect
         select = functools.partial(fn, ode_shape=self.ode_shape)
@@ -74,7 +83,17 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         m1 = self.e1(x.hidden_state.mean)
         cov_sqrtm_lower = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
 
-        fx = linearise_ts0(lambda s: vector_field(s, t=t, p=p), *m0)
+        def f_wrapped(s):
+            """Evaluate the ODE vector field at (x, Dx, D^2x, ...).
+
+            The time-point and the parameter are fixed.
+            If the vector field depends on x and Dx, this wrapper receives the
+            stack (x, Dx) as an input (instead of, e.g., a tuple).
+            """
+            return vector_field(*s, t=t, p=p)
+
+        fx = self.linearise_fn(fn=f_wrapped, m=m0)
+
         b = m1 - fx
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         observed = _vars.VectNormal(b, l_obs_raw)
@@ -125,7 +144,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
         vf_p = jax.tree_util.Partial(self._res, vector_field=vector_field, t=t, p=p)
-        fn, (b,) = linearise_ts1(vf_p, x.hidden_state.mean)
+        fn, (b,) = linearise_ts1(fn=vf_p, m=x.hidden_state.mean)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         cov_sqrtm_lower = self._jvp_cov_sqrtm_lower(
@@ -215,7 +234,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Apply statistical linear regression to the ODE vector field
         f_p = jax.tree_util.Partial(vector_field, t=t, p=p)
-        H, noise = linearise_slr1(f_p, lin_pt, cubature_rule=self.cubature)
+        H, noise = linearise_slr1(fn=f_p, x=lin_pt, cubature_rule=self.cubature)
         cache = (f_p,)
 
         # Compute the marginal observation
@@ -243,7 +262,7 @@ class VectMomentMatching(_collections.AbstractCorrection):
 
         # Apply statistical linear regression to the ODE vector field
         f_p, *_ = cache
-        H, noise = linearise_slr1(f_p, lin_pt, cubature_rule=self.cubature)
+        H, noise = linearise_slr1(fn=f_p, x=lin_pt, cubature_rule=self.cubature)
 
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
