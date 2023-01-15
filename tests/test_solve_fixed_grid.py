@@ -24,9 +24,8 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 @pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
-    vf, u0, _, _, f_args = ode_problem
 
-    # Low order because it traces/differentiates faster
+    # Low order because it traces & differentiates faster
     filter_or_smoother = strategy(
         implementation=recipes.IsoTS0.from_params(num_derivatives=1)
     )
@@ -36,16 +35,16 @@ def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
         _parameter_to_solution,
         solver=solver,
         fixed_grid=fixed_grid,
-        vf=vf,
-        parameters=f_args,
+        vf=ode_problem.vector_field,
+        parameters=ode_problem.args,
     )
 
-    fx = fn(u0[0])
-    dfx_fwd = jax.jit(jax.jacfwd(fn, argnums=0))(u0[0])
-    dfx_rev = jax.jit(jax.jacrev(fn, argnums=0))(u0[0])
+    fx = fn(ode_problem.initial_values[0])
+    dfx_fwd = jax.jit(jax.jacfwd(fn, argnums=0))(ode_problem.initial_values[0])
+    dfx_rev = jax.jit(jax.jacrev(fn, argnums=0))(ode_problem.initial_values[0])
 
     out_shape = _tree_shape(fx)
-    in_shape = _tree_shape(u0[0])
+    in_shape = _tree_shape(ode_problem.initial_values[0])
     assert _tree_all_tree_map(jnp.allclose, dfx_fwd, dfx_rev)
     assert _tree_shape(dfx_fwd) == out_shape + in_shape
 

@@ -51,20 +51,8 @@ def fixture_tolerances():
 
 @pytest_cases.fixture(scope="session", name="reference_terminal_values")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_reference_terminal_values(ode_problem, tolerances):
-    vf, (u0,), t0, t1, f_args = ode_problem
-    atol, rtol = tolerances
-
-    @jax.jit
-    def func(y, t, *p):
-        return vf(y, t=t, p=p)
-
-    ts = jnp.asarray([t0, t1])
-    odeint_solution = jax.experimental.ode.odeint(
-        func, u0, ts, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol
-    )
-    ys_reference = odeint_solution[-1, :]
-    return t1, ys_reference
+def fixture_reference_terminal_values(ode_problem):
+    return ode_problem.t1, ode_problem.solution(ode_problem.t1)
 
 
 @pytest_cases.fixture(scope="session", name="solution_terminal_values")
@@ -73,14 +61,13 @@ def fixture_reference_terminal_values(ode_problem, tolerances):
     "solver", cases=".solver_cases", filter=can_simulate_terminal_values
 )
 def fixture_solution_terminal_values(ode_problem, tolerances, solver):
-    vf, u0, t0, t1, f_args = ode_problem
     atol, rtol = tolerances
     solution = ivpsolve.simulate_terminal_values(
-        vf,
-        u0,
-        t0=t0,
-        t1=t1,
-        parameters=f_args,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
         solver=solver,
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
@@ -95,24 +82,13 @@ def fixture_solution_terminal_values(ode_problem, tolerances, solver):
 @pytest_cases.fixture(scope="session", name="checkpoint_grid")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_checkpoint_grid(ode_problem):
-    _, _, t0, t1, _ = ode_problem
-    return jnp.linspace(t0, t1, endpoint=True, num=5)
+    return jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=5)
 
 
 @pytest_cases.fixture(scope="session", name="reference_checkpoints")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_reference_and_save_at(ode_problem, tolerances, checkpoint_grid):
-    vf, (u0,), _, _, f_args = ode_problem
-    atol, rtol = tolerances
-
-    @jax.jit
-    def func(y, t, *p):
-        return vf(y, t=t, p=p)
-
-    odeint_solution = jax.experimental.ode.odeint(
-        func, u0, checkpoint_grid, *f_args, atol=1e-1 * atol, rtol=1e-1 * rtol
-    )
-    return checkpoint_grid, odeint_solution
+def fixture_reference_and_save_at(ode_problem, checkpoint_grid):
+    return checkpoint_grid, jax.vmap(ode_problem.solution)(checkpoint_grid)
 
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
@@ -121,13 +97,12 @@ def fixture_reference_and_save_at(ode_problem, tolerances, checkpoint_grid):
 )
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_save_at(ode_problem, tolerances, solver, checkpoint_grid):
-    vf, u0, _, _, f_args = ode_problem
     atol, rtol = tolerances
     solution = ivpsolve.solve_and_save_at(
-        vf,
-        u0,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
         save_at=checkpoint_grid,
-        parameters=f_args,
+        parameters=ode_problem.args,
         solver=solver,
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
@@ -143,14 +118,13 @@ def fixture_solution_save_at(ode_problem, tolerances, solver, checkpoint_grid):
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_solve(ode_problem, tolerances, solver):
-    vf, u0, t0, t1, f_args = ode_problem
     atol, rtol = tolerances
     solution = ivpsolve.solve(
-        vf,
-        u0,
-        t0=t0,
-        t1=t1,
-        parameters=f_args,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
         solver=solver,
         atol=1e-1 * atol,
         rtol=1e-1 * rtol,
@@ -165,20 +139,18 @@ def fixture_solution_solve(ode_problem, tolerances, solver):
 @pytest_cases.fixture(scope="session", name="fixed_grid")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_fixed_grid(ode_problem):
-    _, _, t0, t1, _ = ode_problem
-    return jnp.linspace(t0, t1, endpoint=True, num=10)
+    return jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=10)
 
 
 @pytest_cases.fixture(scope="session", name="solution_fixed_grid")
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
-    vf, u0, _, _, f_args = ode_problem
     solution = ivpsolve.solve_fixed_grid(
-        vf,
-        u0,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
         grid=fixed_grid,
-        parameters=f_args,
+        parameters=ode_problem.args,
         solver=solver,
         taylor_fn=taylor.taylor_mode_fn,
     )

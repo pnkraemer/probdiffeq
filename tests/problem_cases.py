@@ -1,6 +1,7 @@
 """Test cases for ODE problems."""
 
 
+import dataclasses
 from typing import Callable, Literal, NamedTuple, Tuple
 
 import diffeqzoo.ivps
@@ -16,7 +17,11 @@ class Tag(NamedTuple):
     stiff: Literal[True, False]
 
 
-class ODEProblem(NamedTuple):
+# todo: turn into a dataclass, which _has_ to be accessed as problem.t0, problem.u0,
+#  etc.. Remove "args" field to ensure that the reference solution
+#  always matches the problem. Otherwise, it might get hard to debug...
+@dataclasses.dataclass
+class ODEProblem:
     vector_field: Callable
     initial_values: Tuple
     t0: float
