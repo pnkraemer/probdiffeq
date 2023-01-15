@@ -11,21 +11,25 @@ from probdiffeq.strategies import filters, smoothers
 
 
 def test_solve_fixed_grid_computes_terminal_values_correctly(
-    reference_terminal_values, solution_fixed_grid, tolerances
+    reference_terminal_values, solution_fixed_grid, solver_config
 ):
     t_ref, u_ref = reference_terminal_values
-    atol, rtol = tolerances
     solution, _ = solution_fixed_grid
 
     assert jnp.allclose(solution.t[-1], t_ref)
-    assert jnp.allclose(solution.u[-1], u_ref, atol=atol, rtol=rtol)
+    assert jnp.allclose(
+        solution.u[-1],
+        u_ref,
+        atol=solver_config.atol_assert,
+        rtol=solver_config.rtol_assert,
+    )
 
 
 @pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
-def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
-    vf, u0, _, _, f_args = ode_problem
+@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+def test_solve_fixed_grid_differentiable(ode_problem, solver_config, strategy):
 
-    # Low order because it traces/differentiates faster
+    # Low order because it traces & differentiates faster
     filter_or_smoother = strategy(
         implementation=recipes.IsoTS0.from_params(num_derivatives=1)
     )
@@ -34,17 +38,17 @@ def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
     fn = functools.partial(
         _parameter_to_solution,
         solver=solver,
-        fixed_grid=fixed_grid,
-        vf=vf,
-        parameters=f_args,
+        fixed_grid=solver_config.grid_for_fixed_grid,
+        vf=ode_problem.vector_field,
+        parameters=ode_problem.args,
     )
 
-    fx = fn(u0[0])
-    dfx_fwd = jax.jit(jax.jacfwd(fn, argnums=0))(u0[0])
-    dfx_rev = jax.jit(jax.jacrev(fn, argnums=0))(u0[0])
+    fx = fn(ode_problem.initial_values[0])
+    dfx_fwd = jax.jit(jax.jacfwd(fn, argnums=0))(ode_problem.initial_values[0])
+    dfx_rev = jax.jit(jax.jacrev(fn, argnums=0))(ode_problem.initial_values[0])
 
     out_shape = _tree_shape(fx)
-    in_shape = _tree_shape(u0[0])
+    in_shape = _tree_shape(ode_problem.initial_values[0])
     assert _tree_all_tree_map(jnp.allclose, dfx_fwd, dfx_rev)
     assert _tree_shape(dfx_fwd) == out_shape + in_shape
 

@@ -21,20 +21,24 @@ def smoother_pair_smoother_and_fixedpoint():
 
 @pytest_cases.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
 @pytest_cases.parametrize("k", [1, 3])  # k * N // 2 off-grid points
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""
-    vf, u0, t0, t1, p = ode_problem
     # smo_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
 
-    args = (vf, u0)
-    kwargs = {"parameters": p, "atol": 1e-1, "rtol": 1e-1}
+    args = (ode_problem.vector_field, ode_problem.initial_values)
+    kwargs = {"parameters": ode_problem.args, "atol": 1e-1, "rtol": 1e-1}
     smo_sol = ivpsolve.solve(
-        *args, t0=t0, t1=t1, solver=solvers.DynamicSolver(strategy=smo), **kwargs
+        *args,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        solver=solvers.DynamicSolver(strategy=smo),
+        **kwargs
     )
-    ts = jnp.linspace(t0, t1, num=k * len(smo_sol.t) // 2)
+    ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=k * len(smo_sol.t) // 2)
     u, dense = dense_output.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=smo_sol, solver=solvers.DynamicSolver(strategy=smo)
     )
