@@ -9,13 +9,16 @@ from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
 
-def test_save_at_solved_correctly(reference_checkpoints, solution_save_at, tolerances):
+def test_save_at_solved_correctly(
+    reference_checkpoints, solution_save_at, solver_config
+):
     t_ref, u_ref = reference_checkpoints
-    atol, rtol = tolerances
     solution, _ = solution_save_at
 
     assert jnp.allclose(solution.t, t_ref)
-    assert jnp.allclose(solution.u, u_ref, atol=atol, rtol=rtol)
+    assert jnp.allclose(
+        solution.u, u_ref, atol=solver_config.atol, rtol=solver_config.rtol
+    )
 
 
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")

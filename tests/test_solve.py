@@ -4,14 +4,15 @@ import pytest
 
 
 def test_solve_computes_correct_terminal_value(
-    reference_terminal_values, solution_solve, tolerances
+    reference_terminal_values, solution_solve, solver_config
 ):
-    atol, rtol = tolerances
     t_ref, u_ref = reference_terminal_values
     solution, _ = solution_solve
 
     assert jnp.allclose(solution.t[-1], t_ref)
-    assert jnp.allclose(solution.u[-1], u_ref, atol=atol, rtol=rtol)
+    assert jnp.allclose(
+        solution.u[-1], u_ref, atol=solver_config.atol, rtol=solver_config.rtol
+    )
 
 
 def test_solution_is_iterable(solution_solve):

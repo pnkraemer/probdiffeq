@@ -55,14 +55,13 @@ def fixture_ivp_probdiffeq(vanderpol):
 
 
 @pytest_cases.fixture(scope="session", name="steprule_tornadox")
-def fixture_steprule_tornadox(tolerances, control_params):
-    atol, rtol = tolerances
+def fixture_steprule_tornadox(solver_config, control_params):
     factor_min, factor_max, safety = control_params
     return step.AdaptiveSteps(
         max_changes=(factor_min, factor_max),
         safety_scale=safety,
-        abstol=atol,
-        reltol=rtol,
+        abstol=solver_config.atol,
+        reltol=solver_config.rtol,
     )
 
 
@@ -92,7 +91,7 @@ def fixture_solver_probdiffeq_kronecker_ek0(num):
 
 @pytest_cases.case
 def case_solver_pair_kronecker_ek0(
-    tolerances,
+    solver_config,
     ivp_tornadox,
     ivp_probdiffeq,
     solver_tornadox_kronecker_ek0,
@@ -103,7 +102,6 @@ def case_solver_pair_kronecker_ek0(
     solution_tornadox = solver_tornadox_kronecker_ek0.solve(ivp_tornadox)
 
     # Solve with probdiffeq
-    atol, rtol = tolerances
     vf_ode, u0, (t0, t1), f_args = ivp_probdiffeq
     solution_probdiffeq = ivpsolve.solve(
         vf_ode,
@@ -111,8 +109,8 @@ def case_solver_pair_kronecker_ek0(
         t0=t0,
         t1=t1,
         solver=solver_probdiffeq_kronecker_ek0,
-        atol=atol,
-        rtol=rtol,
+        atol=solver_config.atol,
+        rtol=solver_config.rtol,
         control=controller_probdiffeq,
         parameters=f_args,
         reference_state_fn=lambda x, y: jnp.abs(x),
@@ -161,7 +159,7 @@ def fixture_solver_probdiffeq_reference_ek1(num):
 
 @pytest_cases.case
 def case_solver_pair_reference_ek1(
-    tolerances,
+    solver_config,
     ivp_tornadox,
     ivp_probdiffeq,
     solver_tornadox_reference_ek1,
@@ -172,7 +170,6 @@ def case_solver_pair_reference_ek1(
     solution_tornadox = solver_tornadox_reference_ek1.solve(ivp_tornadox)
 
     # Solve with probdiffeq
-    atol, rtol = tolerances
     vf_ode, u0, (t0, t1), f_args = ivp_probdiffeq
     solution_probdiffeq = ivpsolve.solve(
         vf_ode,
@@ -180,8 +177,8 @@ def case_solver_pair_reference_ek1(
         t0=t0,
         t1=t1,
         solver=solver_probdiffeq_reference_ek1,
-        atol=atol,
-        rtol=rtol,
+        atol=solver_config.atol,
+        rtol=solver_config.rtol,
         control=controller_probdiffeq,
         parameters=f_args,
     )

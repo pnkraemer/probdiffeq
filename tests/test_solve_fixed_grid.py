@@ -11,19 +11,20 @@ from probdiffeq.strategies import filters, smoothers
 
 
 def test_solve_fixed_grid_computes_terminal_values_correctly(
-    reference_terminal_values, solution_fixed_grid, tolerances
+    reference_terminal_values, solution_fixed_grid, solver_config
 ):
     t_ref, u_ref = reference_terminal_values
-    atol, rtol = tolerances
     solution, _ = solution_fixed_grid
 
     assert jnp.allclose(solution.t[-1], t_ref)
-    assert jnp.allclose(solution.u[-1], u_ref, atol=atol, rtol=rtol)
+    assert jnp.allclose(
+        solution.u[-1], u_ref, atol=solver_config.atol, rtol=solver_config.rtol
+    )
 
 
 @pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
+def test_solve_fixed_grid_differentiable(ode_problem, solver_config, strategy):
 
     # Low order because it traces & differentiates faster
     filter_or_smoother = strategy(
@@ -34,7 +35,7 @@ def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
     fn = functools.partial(
         _parameter_to_solution,
         solver=solver,
-        fixed_grid=fixed_grid,
+        fixed_grid=solver_config.grid_for_fixed_grid,
         vf=ode_problem.vector_field,
         parameters=ode_problem.args,
     )
