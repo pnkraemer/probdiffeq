@@ -51,13 +51,17 @@ class SolverConfiguration:
     atol: float
     rtol: float
     grid_for_fixed_grid: jax.Array
+    grid_for_save_at: jax.Array
 
 
 @pytest_cases.fixture(scope="session", name="solver_config")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solver_config(ode_problem):
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=10)
-    return SolverConfiguration(atol=1e-5, rtol=1e-3, grid_for_fixed_grid=grid)
+    save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=5)
+    return SolverConfiguration(
+        atol=1e-5, rtol=1e-3, grid_for_fixed_grid=grid, grid_for_save_at=save_at
+    )
 
 
 # Terminal value fixtures
@@ -92,16 +96,11 @@ def fixture_solution_terminal_values(ode_problem, solver_config, solver):
 # Checkpoint fixtures
 
 
-@pytest_cases.fixture(scope="session", name="checkpoint_grid")
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_checkpoint_grid(ode_problem):
-    return jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=5)
-
-
 @pytest_cases.fixture(scope="session", name="reference_checkpoints")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_reference_and_save_at(ode_problem, checkpoint_grid):
-    return checkpoint_grid, jax.vmap(ode_problem.solution)(checkpoint_grid)
+def fixture_reference_and_save_at(ode_problem, solver_config):
+    xs = solver_config.grid_for_save_at
+    return xs, jax.vmap(ode_problem.solution)(xs)
 
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
@@ -109,11 +108,11 @@ def fixture_reference_and_save_at(ode_problem, checkpoint_grid):
     "solver", cases=".solver_cases", filter=can_solve_and_save_at
 )
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_solution_save_at(ode_problem, solver_config, solver, checkpoint_grid):
+def fixture_solution_save_at(ode_problem, solver_config, solver):
     solution = ivpsolve.solve_and_save_at(
         ode_problem.vector_field,
         ode_problem.initial_values,
-        save_at=checkpoint_grid,
+        save_at=solver_config.grid_for_save_at,
         parameters=ode_problem.args,
         solver=solver,
         atol=1e-1 * solver_config.atol,
