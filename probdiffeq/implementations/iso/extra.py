@@ -46,7 +46,7 @@ class IsoConditional(_collections.AbstractConditional):
 
         g = A @ C
         xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
         noise = _vars.IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
         bw_model = IsoConditional(g, noise=noise)
@@ -61,7 +61,7 @@ class IsoConditional(_collections.AbstractConditional):
         # Apply transition
         m_new = self.transition @ m0 + self.noise.mean
         l_new = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
+            R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
         return _vars.IsoStateSpaceVar(
@@ -140,8 +140,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ l0_p).T,
-            R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
+            R_stack=((self.a @ l0_p).T, (output_scale_sqrtm * self.q_sqrtm_lower).T)
         ).T
         l_ext = p[:, None] * l_ext_p
         return _vars.IsoStateSpaceVar(_vars.IsoNormal(m_ext, l_ext))

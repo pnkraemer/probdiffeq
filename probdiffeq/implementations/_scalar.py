@@ -182,7 +182,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class StatisticalFirstorder(_collections.AbstractCorrection):
+class StatisticalFirstOrder(_collections.AbstractCorrection):
     def __init__(self, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -224,7 +224,7 @@ class StatisticalFirstorder(_collections.AbstractCorrection):
         # Marginal covariance
         R1 = jnp.reshape(extrapolated.cov_sqrtm_lower[1, :], (n, 1))
         R2 = jnp.reshape(fx_centered_normed, (S, 1))
-        std_marg_mat = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=R2)
+        std_marg_mat = _sqrtm.sum_of_sqrtm_factors(R_stack=(R1, R2))
         std_marg = jnp.reshape(std_marg_mat, ())
 
         # Extract error estimate and output scale from marginals
@@ -363,7 +363,7 @@ class Conditional(_collections.AbstractConditional):
 
         g = A @ C
         xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
         noise = Normal(mean=xi, cov_sqrtm_lower=Xi)
         return Conditional(g, noise=noise)
@@ -378,7 +378,7 @@ class Conditional(_collections.AbstractConditional):
 
         m_new = self.transition @ m0 + self.noise.mean
         l_new = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.transition @ l0).T, R2=self.noise.cov_sqrtm_lower.T
+            R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
         return StateSpaceVar(Normal(m_new, l_new))
@@ -445,8 +445,10 @@ class IBM(_collections.AbstractExtrapolation):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
-            R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
+            R_stack=(
+                (self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
+                (output_scale_sqrtm * self.q_sqrtm_lower).T,
+            )
         ).T
         l_ext = p[:, None] * l_ext_p
         return StateSpaceVar(Normal(mean=m_ext, cov_sqrtm_lower=l_ext))

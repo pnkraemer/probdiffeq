@@ -19,6 +19,8 @@ manipulation of square root matrices.
     is more natural.
 
 """
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -130,16 +132,17 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
         )
         raise ValueError(msg)
 
-    d_out, d_in = R_YX.shape[0], R_X.shape[1]
     R = jnp.block(
         [
-            [R_YX, jnp.zeros((d_out, d_in))],
+            [R_YX, jnp.zeros((R_YX.shape[0], R_X.shape[1]))],
             [R_X_F, R_X],
         ]
     )
+    # todo: point to sqrtm_to_upper_triangular()
     R = jnp.linalg.qr(R, mode="r")
 
     # ~R_{Y}
+    d_out = R_YX.shape[1]
     R_Y = R[:d_out, :d_out]
 
     # something like the cross-covariance
@@ -153,11 +156,11 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
     return R_Y, (R_XY, G)
 
 
-def sum_of_sqrtm_factors(*, R1, R2):
+def sum_of_sqrtm_factors(*, R_stack: Tuple):
     r"""Compute the matrix square root $R^\top R = R_1^\top R_1 + R_2^\top R_2$."""
-    R = jnp.vstack((R1, R2))
+    R = jnp.vstack(R_stack)
     uppertri = sqrtm_to_upper_triangular(R=R)
-    if jnp.ndim(R1) == 0:
+    if jnp.ndim(R_stack[0]) == 0:
         return jnp.reshape(uppertri, ())
     return uppertri
 
