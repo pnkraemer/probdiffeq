@@ -14,23 +14,6 @@ from probdiffeq.strategies import smoothers
 #  to match the signature of the vector field?
 
 
-class ODEFunction:
-    def __init__(
-        self, vector_field, /, *, jvp=None, jvp_diagonal=None, jvp_scalar=None
-    ):
-        if jvp is not None:
-            jax.custom_jvp(vector_field)
-            vector_field.defjvp(jvp)
-
-        self._vector_field = vector_field
-        self._jvp_diagonal = jvp_diagonal
-        self._jvp_scalar = jvp_scalar
-        print("Wrapped ODE")
-
-    def __call__(self, *args, **kwargs):
-        return self._vector_field(*args, **kwargs)
-
-
 def simulate_terminal_values(
     vector_field,
     initial_values,
@@ -43,8 +26,6 @@ def simulate_terminal_values(
 ):
     """Simulate the terminal values of an initial value problem."""
     _assert_tuple(initial_values)
-    if not isinstance(vector_field, ODEFunction):
-        vector_field = ODEFunction(vector_field)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -77,8 +58,6 @@ def solve_and_save_at(
 ):
     """Solve an IVP and return the solution at checkpoints."""
     _assert_tuple(initial_values)
-    if not isinstance(vector_field, ODEFunction):
-        vector_field = ODEFunction(vector_field)
 
     if isinstance(solver.strategy, smoothers.Smoother):
         msg = (
@@ -126,8 +105,6 @@ def solve(
         Not JITable, not reverse-mode-differentiable.
     """
     _assert_tuple(initial_values)
-    if not isinstance(vector_field, ODEFunction):
-        vector_field = ODEFunction(vector_field)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -165,8 +142,6 @@ def solve_fixed_grid(
         Not JITable, not reverse-mode-differentiable.
     """
     _assert_tuple(initial_values)
-    if not isinstance(vector_field, ODEFunction):
-        vector_field = ODEFunction(vector_field)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
