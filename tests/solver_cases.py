@@ -1,5 +1,5 @@
 """Solver test cases."""
-from typing import Literal, NamedTuple, Tuple
+from typing import Literal, NamedTuple
 
 import pytest_cases
 
@@ -11,8 +11,8 @@ from probdiffeq.strategies import filters, smoothers
 class Tag(NamedTuple):
     strategy: Literal["filter", "smoother", "fixedpoint"]
     linearisation_order: Literal["zeroth", "first"]
-    ode_shape: Tuple[int]
-    ode_order: int  # todo: second-order problems
+    ode_shape: Literal[(2,)]  # todo: scalar problems
+    ode_order: Literal[1]  # todo: second-order problems
 
 
 @pytest_cases.case(tags=Tag("filter", "zeroth", ode_shape=(2,), ode_order=1))
