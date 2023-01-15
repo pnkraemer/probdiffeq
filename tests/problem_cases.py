@@ -13,6 +13,12 @@ import pytest_cases.filters
 
 @dataclasses.dataclass
 class Tag:
+    """Tags for ODE problem classes.
+
+    These tags are used to match compatible solvers and ODEs.
+    Solvers have a similar set of tags.
+    """
+
     shape: Literal[(2,)]  # todo: scalar problems
     order: Literal[1]  # todo: second-order problems
     stiff: Literal[True, False]
@@ -22,6 +28,11 @@ class Tag:
 #  always matches the problem. Otherwise, it might get hard to debug...
 @dataclasses.dataclass
 class ODEProblem:
+    """ODE problem.
+
+    Bundle information about an ODE (and its solution).
+    """
+
     vector_field: Callable
     initial_values: Tuple
     t0: float
@@ -33,12 +44,14 @@ class ODEProblem:
 @pytest_cases.case(tags=(Tag(shape=(2,), order=1, stiff=False),))
 def case_lotka_volterra():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 2.0
+    t1 = 2.0  # Short time-intervals are sufficient for a unit test.
 
     @jax.jit
     def vf(x, *, t, p):  # pylint: disable=unused-argument
         return f(x, *p)
 
+    # Solve the IVP
+    @jax.jit
     def vf_diffrax(t, y, args):
         return vf(y, t=t, p=args)
 
@@ -60,5 +73,11 @@ def case_lotka_volterra():
     def solution(t):
         return solution_object.evaluate(t)
 
-    # Only very short time-intervals are sufficient for a unit test.
-    return ODEProblem(vf, (u0,), t0, t1, args=f_args, solution=solution)
+    return ODEProblem(
+        vector_field=vf,
+        initial_values=(u0,),
+        t0=t0,
+        t1=t1,
+        args=f_args,
+        solution=solution,
+    )

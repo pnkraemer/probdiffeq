@@ -11,6 +11,12 @@ from probdiffeq.strategies import filters, smoothers
 
 @dataclasses.dataclass
 class Tag:
+    """Tags for IVP solvers.
+
+    These tags are used to match compatible solvers and ODEs.
+    ODEs have a similar set of tags.
+    """
+
     strategy: Literal["filter", "smoother", "fixedpoint"]
     linearisation_order: Literal["zeroth", "first"]
     ode_shape: Literal[(2,)]  # todo: scalar problems
