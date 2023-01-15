@@ -52,7 +52,7 @@ class VectConditional(_collections.AbstractConditional):
 
         g = A @ C
         xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R1=(A @ D_sqrtm).T, R2=B_sqrtm.T).T
+        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
         noise = _vars.VectNormal(mean=xi, cov_sqrtm_lower=Xi)
         return VectConditional(g, noise=noise, target_shape=self.target_shape)
@@ -65,7 +65,7 @@ class VectConditional(_collections.AbstractConditional):
         # Apply transition
         m_new_p = self.transition @ m0_p + self.noise.mean
         l_new_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.transition @ l0_p).T, R2=self.noise.cov_sqrtm_lower.T
+            R_stack=((self.transition @ l0_p).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
         # Push back into non-preconditioned space
@@ -159,8 +159,10 @@ class VectIBM(_collections.AbstractExtrapolation):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R1=(self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
-            R2=(output_scale_sqrtm * self.q_sqrtm_lower).T,
+            R_stack=(
+                (self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
+                (output_scale_sqrtm * self.q_sqrtm_lower).T,
+            )
         ).T
         l_ext = p[:, None] * l_ext_p
 

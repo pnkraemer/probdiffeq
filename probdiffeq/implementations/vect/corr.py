@@ -252,8 +252,8 @@ class VectStatisticalFirstOrder(_collections.AbstractCorrection):
         m_1 = self.e1(x.hidden_state.mean)
         r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
         m_marg = m_1 - (linop @ m_0 + noise.mean)
-        l_marg = _sqrtm.sum_of_sqrtm_factors_three(
-            R1=r_1, R2=r_0_square @ linop.T, R3=noise.cov_sqrtm_lower.T
+        l_marg = _sqrtm.sum_of_sqrtm_factors(
+            R_stack=(r_1, r_0_square @ linop.T, noise.cov_sqrtm_lower.T)
         ).T
 
         # Summarise
