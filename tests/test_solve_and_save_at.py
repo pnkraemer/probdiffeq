@@ -17,7 +17,10 @@ def test_save_at_solved_correctly(
 
     assert jnp.allclose(solution.t, t_ref)
     assert jnp.allclose(
-        solution.u, u_ref, atol=solver_config.atol, rtol=solver_config.rtol
+        solution.u,
+        u_ref,
+        atol=solver_config.atol_assert,
+        rtol=solver_config.rtol_assert,
     )
 
 

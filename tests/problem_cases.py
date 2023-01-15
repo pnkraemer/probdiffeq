@@ -2,7 +2,7 @@
 
 
 import dataclasses
-from typing import Callable, Literal, NamedTuple, Tuple
+from typing import Callable, Literal, Tuple
 
 import diffeqzoo.ivps
 import diffrax
@@ -11,14 +11,14 @@ import pytest_cases
 import pytest_cases.filters
 
 
-class Tag(NamedTuple):
+@dataclasses.dataclass
+class Tag:
     shape: Literal[(2,)]  # todo: scalar problems
     order: Literal[1]  # todo: second-order problems
     stiff: Literal[True, False]
 
 
-# todo: turn into a dataclass, which _has_ to be accessed as problem.t0, problem.u0,
-#  etc.. Remove "args" field to ensure that the reference solution
+# todo: Remove "args" field to ensure that the reference solution
 #  always matches the problem. Otherwise, it might get hard to debug...
 @dataclasses.dataclass
 class ODEProblem:
@@ -61,4 +61,4 @@ def case_lotka_volterra():
         return solution_object.evaluate(t)
 
     # Only very short time-intervals are sufficient for a unit test.
-    return ODEProblem(vf, (u0,), t0, t1, f_args, solution)
+    return ODEProblem(vf, (u0,), t0, t1, args=f_args, solution=solution)

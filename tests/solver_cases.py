@@ -1,5 +1,6 @@
 """Solver test cases."""
-from typing import Literal, NamedTuple
+import dataclasses
+from typing import Literal
 
 import pytest_cases
 
@@ -8,7 +9,8 @@ from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
-class Tag(NamedTuple):
+@dataclasses.dataclass
+class Tag:
     strategy: Literal["filter", "smoother", "fixedpoint"]
     linearisation_order: Literal["zeroth", "first"]
     ode_shape: Literal[(2,)]  # todo: scalar problems

@@ -48,10 +48,18 @@ def can_solve(cf):
 
 @dataclasses.dataclass
 class SolverConfiguration:
-    atol: float
-    rtol: float
+    atol_solve: float
+    rtol_solve: float
     grid_for_fixed_grid: jax.Array
     grid_for_save_at: jax.Array
+
+    @property
+    def atol_assert(self):
+        return 10 * self.atol_solve
+
+    @property
+    def rtol_assert(self):
+        return 10 * self.rtol_solve
 
 
 @pytest_cases.fixture(scope="session", name="solver_config")
@@ -60,7 +68,10 @@ def fixture_solver_config(ode_problem):
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=10)
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=5)
     return SolverConfiguration(
-        atol=1e-5, rtol=1e-3, grid_for_fixed_grid=grid, grid_for_save_at=save_at
+        atol_solve=1e-5,
+        rtol_solve=1e-3,
+        grid_for_fixed_grid=grid,
+        grid_for_save_at=save_at,
     )
 
 
@@ -86,8 +97,8 @@ def fixture_solution_terminal_values(ode_problem, solver_config, solver):
         t1=ode_problem.t1,
         parameters=ode_problem.args,
         solver=solver,
-        atol=1e-1 * solver_config.atol,
-        rtol=1e-1 * solver_config.rtol,
+        atol=solver_config.atol_solve,
+        rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver
@@ -98,7 +109,7 @@ def fixture_solution_terminal_values(ode_problem, solver_config, solver):
 
 @pytest_cases.fixture(scope="session", name="reference_checkpoints")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_reference_and_save_at(ode_problem, solver_config):
+def fixture_reference_save_at(ode_problem, solver_config):
     xs = solver_config.grid_for_save_at
     return xs, jax.vmap(ode_problem.solution)(xs)
 
@@ -115,8 +126,8 @@ def fixture_solution_save_at(ode_problem, solver_config, solver):
         save_at=solver_config.grid_for_save_at,
         parameters=ode_problem.args,
         solver=solver,
-        atol=1e-1 * solver_config.atol,
-        rtol=1e-1 * solver_config.rtol,
+        atol=solver_config.atol_solve,
+        rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver
@@ -136,8 +147,8 @@ def fixture_solution_solve(ode_problem, solver_config, solver):
         t1=ode_problem.t1,
         parameters=ode_problem.args,
         solver=solver,
-        atol=1e-1 * solver_config.atol,
-        rtol=1e-1 * solver_config.rtol,
+        atol=solver_config.atol_solve,
+        rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
     )
     return solution, solver

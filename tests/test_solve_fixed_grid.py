@@ -18,7 +18,10 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 
     assert jnp.allclose(solution.t[-1], t_ref)
     assert jnp.allclose(
-        solution.u[-1], u_ref, atol=solver_config.atol, rtol=solver_config.rtol
+        solution.u[-1],
+        u_ref,
+        atol=solver_config.atol_assert,
+        rtol=solver_config.rtol_assert,
     )
 
 

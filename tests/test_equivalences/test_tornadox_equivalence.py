@@ -60,8 +60,8 @@ def fixture_steprule_tornadox(solver_config, control_params):
     return step.AdaptiveSteps(
         max_changes=(factor_min, factor_max),
         safety_scale=safety,
-        abstol=solver_config.atol,
-        reltol=solver_config.rtol,
+        abstol=solver_config.atol_solve,
+        reltol=solver_config.rtol_solve,
     )
 
 
@@ -109,8 +109,8 @@ def case_solver_pair_kronecker_ek0(
         t0=t0,
         t1=t1,
         solver=solver_probdiffeq_kronecker_ek0,
-        atol=solver_config.atol,
-        rtol=solver_config.rtol,
+        atol=solver_config.atol_solve,
+        rtol=solver_config.rtol_solve,
         control=controller_probdiffeq,
         parameters=f_args,
         reference_state_fn=lambda x, y: jnp.abs(x),
@@ -177,8 +177,8 @@ def case_solver_pair_reference_ek1(
         t0=t0,
         t1=t1,
         solver=solver_probdiffeq_reference_ek1,
-        atol=solver_config.atol,
-        rtol=solver_config.rtol,
+        atol=solver_config.atol_solve,
+        rtol=solver_config.rtol_solve,
         control=controller_probdiffeq,
         parameters=f_args,
     )
