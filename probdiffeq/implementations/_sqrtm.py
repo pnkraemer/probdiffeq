@@ -132,10 +132,9 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
         )
         raise ValueError(msg)
 
-    d_out, d_in = R_YX.shape[0], R_X.shape[1]
     R = jnp.block(
         [
-            [R_YX, jnp.zeros((d_out, d_in))],
+            [R_YX, jnp.zeros((R_YX.shape[0], R_X.shape[1]))],
             [R_X_F, R_X],
         ]
     )
@@ -143,6 +142,7 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
     R = jnp.linalg.qr(R, mode="r")
 
     # ~R_{Y}
+    d_out = R_YX.shape[1]
     R_Y = R[:d_out, :d_out]
 
     # something like the cross-covariance

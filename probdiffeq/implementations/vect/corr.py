@@ -48,6 +48,20 @@ def linearise_slr1(*, fn, x, cubature_rule):
     return linop_cond, _vars.VectNormal(mean_cond, cov_sqrtm_cond.T)
 
 
+def linearise_slr0(*, fn, x, cubature_rule):
+    """Linearise a function with zeroth-order statistical linear regression."""
+    # Create sigma-points
+    pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
+    pts = x.mean[None, :] + pts_centered
+
+    # Evaluate the nonlinear function
+    fx = jax.vmap(fn)(pts)
+    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
+    fx_centered = fx - fx_mean[None, :]
+    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
+    return _vars.VectNormal(fx_mean, fx_centered_normed.T)
+
+
 @jax.tree_util.register_pytree_node_class
 class VectTaylorZerothOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order):
@@ -198,7 +212,6 @@ class VectStatisticalZerothOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError
-        assert False
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
@@ -219,7 +232,7 @@ class VectStatisticalZerothOrder(_collections.AbstractCorrection):
             make_rule_fn = cubature_module.ThirdOrderSpherical.from_params
             cubature = make_rule_fn(input_shape=ode_shape)
 
-        linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature)
+        linearise_fn = functools.partial(linearise_slr0, cubature_rule=cubature)
         return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
@@ -245,16 +258,14 @@ class VectStatisticalZerothOrder(_collections.AbstractCorrection):
             return vector_field(s, t=t, p=p)
 
         # Apply statistical linear regression to the ODE vector field
-        linop, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
+        noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
         cache = (f_wrapped,)
 
         # Compute the marginal observation
         m_1 = self.e1(x.hidden_state.mean)
         r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
-        m_marg = m_1 - (linop @ m_0 + noise.mean)
-        l_marg = _sqrtm.sum_of_sqrtm_factors(
-            R_stack=(r_1, r_0_square @ linop.T, noise.cov_sqrtm_lower.T)
-        ).T
+        m_marg = m_1 - noise.mean
+        l_marg = _sqrtm.sum_of_sqrtm_factors(R_stack=(r_1, noise.cov_sqrtm_lower.T)).T
         marginals = _vars.VectNormal(m_marg, l_marg)
 
         # Compute output scale and error estimate
@@ -266,6 +277,7 @@ class VectStatisticalZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
+
         # Select the required derivatives
         _x = extrapolated  # readability in current code block
         m_0 = self.e0(_x.hidden_state.mean)
@@ -279,17 +291,16 @@ class VectStatisticalZerothOrder(_collections.AbstractCorrection):
 
         # Apply statistical linear regression to the ODE vector field
         f_wrapped, *_ = cache
-        H, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
+        noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
-        HL = r_1.T - H @ r_0.T
+        HL = r_1.T
         r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
-
         # Compute the marginal mean and gather the marginals
-        m_marg = m_1 - (H @ m_0 + noise.mean)
+        m_marg = m_1 - noise.mean
         marginals = _vars.VectNormal(m_marg, r_marg.T)
 
         # Compute the corrected mean and gather the correction
