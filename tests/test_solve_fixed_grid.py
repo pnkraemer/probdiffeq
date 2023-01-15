@@ -22,6 +22,7 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 
 
 @pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
+@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def test_solve_fixed_grid_differentiable(ode_problem, fixed_grid, strategy):
     vf, u0, _, _, f_args = ode_problem
 

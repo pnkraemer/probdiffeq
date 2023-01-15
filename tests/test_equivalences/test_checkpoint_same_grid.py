@@ -36,6 +36,7 @@ def smoother_pair_two_smoothers():
 @pytest.mark.filterwarnings("ignore:A conventional smoother")
 @pytest_cases.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
 @pytest_cases.parametrize("tol", [1e-2])
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""

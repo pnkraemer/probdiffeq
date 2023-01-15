@@ -23,6 +23,7 @@ def strategy_pair_fixedpoint_smoother():
 
 
 @pytest_cases.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_final_state_equal_to_filter(ode_problem, fil, smo):
     """Filters and smoothers should compute the same terminal values."""
     vf, u0, t0, t1, p = ode_problem
