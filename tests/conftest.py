@@ -12,26 +12,29 @@ from probdiffeq import ivpsolve, taylor
 
 
 def is_filter(cf):
-    return pytest_cases.filters.has_tags("filter")(cf)
+    (case_tags,) = pytest_cases.filters.get_case_tags(cf)
+    return case_tags.strategy == "filter"
 
 
 def is_smoother(cf):
-    return pytest_cases.filters.has_tags("smoother")(cf)
+    (case_tags,) = pytest_cases.filters.get_case_tags(cf)
+    return case_tags.strategy == "smoother"
 
 
 def is_fixedpoint(cf):
-    return pytest_cases.filters.has_tags("fixedpoint")(cf)
+    (case_tags,) = pytest_cases.filters.get_case_tags(cf)
+    return case_tags.strategy == "fixedpoint"
 
 
-def can_terminal_value(cf):
+def can_simulate_terminal_values(cf):
     return is_filter(cf) | is_fixedpoint(cf) | is_smoother(cf)
 
 
-def can_save_at(cf):
+def can_solve_and_save_at(cf):
     return is_filter(cf) | is_fixedpoint(cf)
 
 
-def can_solve_adaptively(cf):
+def can_solve(cf):
     return is_filter(cf) | is_smoother(cf)
 
 
@@ -67,7 +70,7 @@ def fixture_reference_terminal_values(ode_problem, tolerances):
 @pytest_cases.fixture(scope="session", name="solution_terminal_values")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 @pytest_cases.parametrize_with_cases(
-    "solver", cases=".solver_cases", filter=can_terminal_value
+    "solver", cases=".solver_cases", filter=can_simulate_terminal_values
 )
 def fixture_solution_terminal_values(ode_problem, tolerances, solver):
     vf, u0, t0, t1, f_args = ode_problem
@@ -114,7 +117,7 @@ def fixture_reference_and_save_at(ode_problem, tolerances, checkpoint_grid):
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
 @pytest_cases.parametrize_with_cases(
-    "solver", cases=".solver_cases", filter=can_save_at
+    "solver", cases=".solver_cases", filter=can_solve_and_save_at
 )
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_save_at(ode_problem, tolerances, solver, checkpoint_grid):
@@ -137,9 +140,7 @@ def fixture_solution_save_at(ode_problem, tolerances, solver, checkpoint_grid):
 
 
 @pytest_cases.fixture(scope="session", name="solution_solve")
-@pytest_cases.parametrize_with_cases(
-    "solver", cases=".solver_cases", filter=can_solve_adaptively
-)
+@pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_solve(ode_problem, tolerances, solver):
     vf, u0, t0, t1, f_args = ode_problem
@@ -169,9 +170,7 @@ def fixture_fixed_grid(ode_problem):
 
 
 @pytest_cases.fixture(scope="session", name="solution_fixed_grid")
-@pytest_cases.parametrize_with_cases(
-    "solver", cases=".solver_cases", filter=can_solve_adaptively
-)
+@pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_fixed_grid(ode_problem, solver, fixed_grid):
     vf, u0, _, _, f_args = ode_problem
