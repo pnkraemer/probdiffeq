@@ -126,3 +126,18 @@ class VectSLR1(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
+
+
+@jax.tree_util.register_pytree_node_class
+class VectSLR0(
+    AbstractImplementation[vect_corr.VectStatisticalZerothOrder, vect_extra.VectIBM]
+):
+    @classmethod
+    def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
+        correction = vect_corr.VectStatisticalZerothOrder.from_params(
+            ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
+        )
+        extrapolation = vect_extra.VectIBM.from_params(
+            ode_shape=ode_shape, num_derivatives=num_derivatives
+        )
+        return cls(correction=correction, extrapolation=extrapolation)
