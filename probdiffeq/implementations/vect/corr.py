@@ -194,7 +194,7 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class VectStatisticalFirstorder(_collections.AbstractCorrection):
+class VectStatisticalFirstOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError
@@ -216,8 +216,9 @@ class VectStatisticalFirstorder(_collections.AbstractCorrection):
     @classmethod
     def from_params(cls, ode_shape, ode_order, cubature=None):
         if cubature is None:
-            sci_fn = cubature_module.ThirdOrderSpherical.from_params
-            cubature = sci_fn(input_shape=ode_shape)
+            make_rule_fn = cubature_module.ThirdOrderSpherical.from_params
+            cubature = make_rule_fn(input_shape=ode_shape)
+
         linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature)
         return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
@@ -233,22 +234,27 @@ class VectStatisticalFirstorder(_collections.AbstractCorrection):
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
-        # Extract the linearisation point
+        # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
+        def f_wrapped(s):
+            return vector_field(s, t=t, p=p)
+
         # Apply statistical linear regression to the ODE vector field
-        f_p = jax.tree_util.Partial(vector_field, t=t, p=p)
-        H, noise = self.linearise_fn(fn=f_p, x=lin_pt)
-        cache = (f_p,)
+        # todo: higher-order ODEs
+        linop, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
+        cache = (f_wrapped,)
 
         # Compute the marginal observation
         m_1 = self.e1(x.hidden_state.mean)
-        m_marg = m_1 - H @ m_0 - noise.mean
-        R1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R1=R1, R2=r_0_square @ H.T).T
+        r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
+        m_marg = m_1 - (linop @ m_0 + noise.mean)
+        l_marg = _sqrtm.sum_of_sqrtm_factors_three(
+            R1=r_1, R2=r_0_square @ linop.T, R3=noise.cov_sqrtm_lower.T
+        ).T
 
         # Summarise
         marginals = _vars.VectNormal(m_marg, l_marg)

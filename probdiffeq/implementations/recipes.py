@@ -52,16 +52,16 @@ class IsoTS0(AbstractImplementation[iso_corr.IsoTaylorZerothOrder, iso_extra.Iso
 
 @jax.tree_util.register_pytree_node_class
 class BatchSLR1(
-    AbstractImplementation[batch_corr.BatchStatisticalFirstorder, batch_extra.BatchIBM]
+    AbstractImplementation[batch_corr.BatchStatisticalFirstOrder, batch_extra.BatchIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
-            correction = batch_corr.BatchStatisticalFirstorder.from_params(
+            correction = batch_corr.BatchStatisticalFirstOrder.from_params(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
-            correction = batch_corr.BatchStatisticalFirstorder(
+            correction = batch_corr.BatchStatisticalFirstOrder(
                 ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
             )
         extrapolation = batch_extra.BatchIBM.from_params(
@@ -72,7 +72,7 @@ class BatchSLR1(
 
 @jax.tree_util.register_pytree_node_class
 class BatchTS0(
-    AbstractImplementation[batch_corr.BatchStatisticalFirstorder, batch_extra.BatchIBM]
+    AbstractImplementation[batch_corr.BatchStatisticalFirstOrder, batch_extra.BatchIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
@@ -115,11 +115,11 @@ class VectTS0(
 
 @jax.tree_util.register_pytree_node_class
 class VectSLR1(
-    AbstractImplementation[vect_corr.VectStatisticalFirstorder, vect_extra.VectIBM]
+    AbstractImplementation[vect_corr.VectStatisticalFirstOrder, vect_extra.VectIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
-        correction = vect_corr.VectStatisticalFirstorder.from_params(
+        correction = vect_corr.VectStatisticalFirstOrder.from_params(
             ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
         )
         extrapolation = vect_extra.VectIBM.from_params(

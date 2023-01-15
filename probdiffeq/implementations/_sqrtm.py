@@ -162,6 +162,14 @@ def sum_of_sqrtm_factors(*, R1, R2):
     return uppertri
 
 
+def sum_of_sqrtm_factors_three(*, R1, R2, R3):
+    R = jnp.vstack((R1, R2, R3))
+    uppertri = sqrtm_to_upper_triangular(R=R)
+    if jnp.ndim(R1) == 0:
+        return jnp.reshape(uppertri, ())
+    return uppertri
+
+
 def sqrtm_to_upper_triangular(*, R):
     """Transform a right matrix square root to a Cholesky factor."""
     upper_sqrtm = jnp.linalg.qr(R, mode="r")
