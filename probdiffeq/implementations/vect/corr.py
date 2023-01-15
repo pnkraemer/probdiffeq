@@ -240,11 +240,11 @@ class VectStatisticalFirstOrder(_collections.AbstractCorrection):
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
+        # todo: higher-order ODEs
         def f_wrapped(s):
             return vector_field(s, t=t, p=p)
 
         # Apply statistical linear regression to the ODE vector field
-        # todo: higher-order ODEs
         linop, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
         cache = (f_wrapped,)
 
@@ -255,51 +255,50 @@ class VectStatisticalFirstOrder(_collections.AbstractCorrection):
         l_marg = _sqrtm.sum_of_sqrtm_factors(
             R_stack=(r_1, r_0_square @ linop.T, noise.cov_sqrtm_lower.T)
         ).T
-
-        # Summarise
         marginals = _vars.VectNormal(m_marg, l_marg)
-        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
 
-        # Compute error estimate
+        # Compute output scale and error estimate
+        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
         l_obs = marginals.cov_sqrtm_lower
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
+
+        # Return scaled error estimate and other quantities
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
-        # Extract the linearisation point
+        # Select the required derivatives
         _x = extrapolated  # readability in current code block
         m_0 = self.e0(_x.hidden_state.mean)
+        m_1 = self.e1(_x.hidden_state.mean)
         r_0 = self.e0_vect(_x.hidden_state.cov_sqrtm_lower).T
+        r_1 = self.e1_vect(_x.hidden_state.cov_sqrtm_lower).T
+
+        # Extract the linearisation point
         r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.VectNormal(m_0, r_0_square.T)
 
         # Apply statistical linear regression to the ODE vector field
-        f_p, *_ = cache
-        H, noise = self.linearise_fn(fn=f_p, x=lin_pt)
+        f_wrapped, *_ = cache
+        H, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
-        L0 = self.e0_vect(L)
-        L1 = self.e1_vect(L)
-        HL = L1 - H @ L0
+        HL = r_1.T - H @ r_0.T
         r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
 
-        # Compute the marginal mean
-        _x = extrapolated  # readability in current code block
-        x0 = self.e0(_x.hidden_state.mean)
-        x1 = self.e1(_x.hidden_state.mean)
-        m_marg = x1 - (H @ x0 + noise.mean)
-        shape = extrapolated.target_shape
+        # Compute the marginal mean and gather the marginals
+        m_marg = m_1 - (H @ m_0 + noise.mean)
         marginals = _vars.VectNormal(m_marg, r_marg.T)
 
-        # Compute the corrected mean
+        # Compute the corrected mean and gather the correction
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.VectNormal(m_bw, r_bw.T)
-        corrected = _vars.VectStateSpaceVar(rv, target_shape=shape)
+        _shape = extrapolated.target_shape
+        corrected = _vars.VectStateSpaceVar(rv, target_shape=_shape)
 
-        # Return results
+        # Return the results
         return marginals, (corrected, gain)
 
 
