@@ -26,25 +26,23 @@ def strategy_pair_fixedpoint_smoother():
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_final_state_equal_to_filter(ode_problem, fil, smo):
     """Filters and smoothers should compute the same terminal values."""
-    vf, u0, t0, t1, p = ode_problem
-
     atol, rtol = 1e-2, 1e-1
     filter_solution = ivpsolve.simulate_terminal_values(
-        vf,
-        u0,
-        t0=t0,
-        t1=t1,
-        parameters=p,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
         solver=solvers.DynamicSolver(strategy=fil),
         atol=atol,
         rtol=rtol,
     )
     smoother_solution = ivpsolve.simulate_terminal_values(
-        vf,
-        u0,
-        t0=t0,
-        t1=t1,
-        parameters=p,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
         solver=solvers.DynamicSolver(strategy=smo),
         atol=atol,
         rtol=rtol,

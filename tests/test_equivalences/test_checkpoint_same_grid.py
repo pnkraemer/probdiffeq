@@ -40,23 +40,22 @@ def smoother_pair_two_smoothers():
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve(), the results should be identical."""
-    vf, u0, t0, t1, p = ode_problem
     smo_sol = ivpsolve.solve(
-        vf,
-        u0,
-        t0=t0,
-        t1=t1,
-        parameters=p,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
         solver=solvers.DynamicSolver(strategy=smo),
         atol=1e-2 * tol,
         rtol=tol,
     )
 
     fp_smo_sol = ivpsolve.solve_and_save_at(
-        vf,
-        u0,
+        ode_problem.vector_field,
+        ode_problem.initial_values,
         save_at=smo_sol.t,
-        parameters=p,
+        parameters=ode_problem.args,
         solver=solvers.DynamicSolver(strategy=fp_smo),
         atol=1e-2 * tol,
         rtol=tol,
