@@ -71,7 +71,7 @@ def case_mle_filter_slr1_vect():
 
 
 @pytest_cases.case(tags=Tag("filter", "first", ode_shape=(2,), ode_order=1))
-def case_dynamic_filter_slr1_ut_vect():
+def case_dynamic_filter_slr1_vect_ut():
     cube = cubature.UnscentedTransform.from_params(input_shape=(2,))
     implementation = recipes.VectSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
@@ -94,9 +94,24 @@ def case_dynamic_filter_slr1_batch():
 
 
 @pytest_cases.case(tags=Tag("filter", "first", ode_shape=(2,), ode_order=1))
-def case_dynamic_filter_slr1_gh_vect():
+def case_dynamic_filter_slr1_vect_gh():
     cube = cubature.GaussHermite.from_params(input_shape=(2,))
     implementation = recipes.VectSLR1.from_params(cubature=cube, ode_shape=(2,))
+    strategy = filters.Filter(implementation=implementation)
+    return solvers.DynamicSolver(strategy=strategy)
+
+
+@pytest_cases.case(tags=Tag("filter", "zeroth", ode_shape=(2,), ode_order=1))
+def case_dynamic_filter_slr0_vect():
+    implementation = recipes.VectSLR0.from_params(ode_shape=(2,))
+    strategy = filters.Filter(implementation=implementation)
+    return solvers.DynamicSolver(strategy=strategy)
+
+
+@pytest_cases.case(tags=Tag("filter", "zeroth", ode_shape=(2,), ode_order=1))
+def case_dynamic_filter_slr0_vect_gh():
+    cube = cubature.GaussHermite.from_params(input_shape=(2,))
+    implementation = recipes.VectSLR0.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
