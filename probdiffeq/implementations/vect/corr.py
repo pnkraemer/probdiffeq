@@ -29,25 +29,23 @@ def linearise_ts1(*, fn, m):
 
 def linearise_slr1(*, fn, x, cubature_rule):
     """Linearise a function with first-order statistical linear regression."""
-    # Create sigma points
+    # Create sigma-points
     pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
     pts = x.mean[None, :] + pts_centered
+    pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
 
-    # Evaluate the vector-field
+    # Evaluate the nonlinear function
     fx = jax.vmap(fn)(pts)
     fx_mean = cubature_rule.weights_sqrtm**2 @ fx
     fx_centered = fx - fx_mean[None, :]
-
-    # Create matrices for statistical linear regression
-    pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-    _, (r_cond_rev, linop) = _sqrtm.revert_conditional_noisefree(
+
+    # Compute statistical linear regression matrices
+    _, (cov_sqrtm_cond, linop_cond) = _sqrtm.revert_conditional_noisefree(
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
-
-    # Catch up the transition-mean and return the result
-    d = fx_mean - linop @ x.mean
-    return linop, _vars.VectNormal(d, r_cond_rev.T)
+    mean_cond = fx_mean - linop_cond @ x.mean
+    return linop_cond, _vars.VectNormal(mean_cond, cov_sqrtm_cond.T)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -103,20 +101,22 @@ class VectTaylorZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
 
     def complete_correction(self, extrapolated, cache):
-        (b,) = cache
-        m_ext = extrapolated.hidden_state.mean
-        l_ext = extrapolated.hidden_state.cov_sqrtm_lower
+        ext = extrapolated  # alias for readability
+        l_obs_nonsquare = self.e1_vect(ext.hidden_state.cov_sqrtm_lower)
 
-        l_obs_nonsquare = self.e1_vect(l_ext)
+        # Compute correction according to ext -> obs
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
+            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
         )
+
+        # Gather observation terms
+        (b,) = cache
         observed = _vars.VectNormal(mean=b, cov_sqrtm_lower=r_obs.T)
 
-        _shape = extrapolated.target_shape
-        m_cor = m_ext - gain @ b
-        rv = _vars.VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        corrected = _vars.VectStateSpaceVar(rv, target_shape=_shape)
+        # Gather correction terms
+        m_cor = ext.hidden_state.mean - gain @ b
+        cor = _vars.VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        corrected = _vars.VectStateSpaceVar(cor, target_shape=ext.target_shape)
         return observed, (corrected, gain)
 
 
@@ -143,48 +143,54 @@ class VectTaylorFirstOrder(_collections.AbstractCorrection):
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
     def begin_correction(self, x: _vars.VectStateSpaceVar, /, vector_field, t, p):
-        vf_p = jax.tree_util.Partial(self._res, vector_field=vector_field, t=t, p=p)
-        fn, (b,) = linearise_ts1(fn=vf_p, m=x.hidden_state.mean)
+        def ode_residual(s):
+            x0 = self.e0(s)
+            x1 = self.e1(s)
+            fx0 = vector_field(*x0, t=t, p=p)
+            return x1 - fx0
+
+        # Linearise the ODE residual (not the vector field!)
+        jvp_fn, (b,) = linearise_ts1(fn=ode_residual, m=x.hidden_state.mean)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        cov_sqrtm_lower = self._jvp_cov_sqrtm_lower(
-            cache=(b, fn), cov_sqrtm_lower=x.hidden_state.cov_sqrtm_lower
-        )
+        jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
+        cov_sqrtm_lower = jvp_fn_vect(x.hidden_state.cov_sqrtm_lower)
 
+        # Gather the observed variable
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        output_scale_sqrtm = _vars.VectNormal(
-            b, l_obs_raw
-        ).norm_of_whitened_residual_sqrtm()
+        obs = _vars.VectNormal(b, l_obs_raw)
+
+        # Extract the output scale and the error estimate
+        output_scale_sqrtm = obs.norm_of_whitened_residual_sqrtm()
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b, fn)
+
+        # Return the scaled error estimate and the other quantities
+        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (jvp_fn, (b,))
 
     def complete_correction(self, extrapolated: _vars.VectStateSpaceVar, cache):
-        b, _ = cache
-        m_ext = extrapolated.hidden_state.mean
-        l_ext = extrapolated.hidden_state.cov_sqrtm_lower
+        # Assign short-named variables for readability
+        ext = extrapolated
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        l_obs_nonsquare = self._jvp_cov_sqrtm_lower(cache=cache, cov_sqrtm_lower=l_ext)
+        jvp_fn, (b,) = cache
+        jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
+        l_obs_nonsquare = jvp_fn_vect(ext.hidden_state.cov_sqrtm_lower)
 
+        # Compute the correction matrices
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=l_ext.T
+            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
         )
-        m_cor = m_ext - gain @ b
 
-        shape = extrapolated.target_shape
+        # Gather the observed variable
         observed = _vars.VectNormal(mean=b, cov_sqrtm_lower=r_obs.T)
-        corrected = _vars.VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        return observed, (_vars.VectStateSpaceVar(corrected, target_shape=shape), gain)
 
-    def _jvp_cov_sqrtm_lower(self, cache, cov_sqrtm_lower):
-        _, fn = cache
-        return jax.vmap(fn, in_axes=1, out_axes=1)(cov_sqrtm_lower)
+        # Gather the corrected variable
+        m_cor = ext.hidden_state.mean - gain @ b
+        rv = _vars.VectNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        corrected = _vars.VectStateSpaceVar(rv, target_shape=ext.target_shape)
 
-    def _res(self, x, vector_field, t, p):
-        x0 = self.e0(x)
-        x1 = self.e1(x)
-        fx0 = vector_field(*x0, t=t, p=p)
-        return x1 - fx0
+        # Return the results
+        return observed, (corrected, gain)
 
 
 @jax.tree_util.register_pytree_node_class
