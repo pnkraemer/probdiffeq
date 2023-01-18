@@ -9,12 +9,12 @@ from probdiffeq import taylor
 
 @pytest_cases.case(tags=["first", "higher", "exact"])
 def case_forward_mode():
-    return taylor.taylor_mode_fn
+    return taylor.forward_mode_fn
 
 
 @pytest_cases.case(tags=["first", "higher", "exact"])
 def case_taylor_mode():
-    return taylor.forward_mode_fn
+    return taylor.taylor_mode_fn
 
 
 @pytest_cases.case(tags=["first"])
