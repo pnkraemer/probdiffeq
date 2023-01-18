@@ -17,6 +17,11 @@ def case_taylor_mode():
     return taylor.taylor_mode_fn
 
 
+@pytest_cases.case(tags=["first", "exact"])
+def case_taylor_mode_doubling():
+    return taylor.taylor_mode_doubling_fn
+
+
 @pytest_cases.case(tags=["first"])
 def case_runge_kutta_starter():
     return taylor.make_runge_kutta_starter_fn()
@@ -89,10 +94,12 @@ def test_initialised_correct_shape_first_order(fn, pb, num):
     assert derivatives[0].shape == init[0].shape
 
 
-@pytest_cases.parametrize_with_cases("fn", cases=".", prefix="case_", has_tag=["exact"])
-@pytest_cases.parametrize_with_cases("pb", cases=".", prefix="pb_")
+@pytest_cases.parametrize_with_cases(
+    "fn", cases=".", prefix="case_", has_tag=["first", "exact"]
+)
+@pytest_cases.parametrize_with_cases("pb", cases=".", prefix="pb_", has_tag=["first"])
 @pytest_cases.parametrize("num", [1, 2, 3])
-def test_initialised_exactly(fn, pb, num):
+def test_initialised_exactly_first(fn, pb, num):
     """The approximation should coincide with the reference."""
     f, init, t0, params, solution = pb
 
@@ -103,7 +110,23 @@ def test_initialised_exactly(fn, pb, num):
         assert jnp.allclose(dy, dy_ref)
 
 
-@pytest_cases.parametrize("num", [1, 4])
+@pytest_cases.parametrize_with_cases(
+    "fn", cases=".", prefix="case_", has_tag=["higher", "exact"]
+)
+@pytest_cases.parametrize_with_cases("pb", cases=".", prefix="pb_", has_tag=["higher"])
+@pytest_cases.parametrize("num", [1, 2, 3])
+def test_initialised_exactly_higher(fn, pb, num):
+    """The approximation should coincide with the reference."""
+    f, init, t0, params, solution = pb
+
+    derivatives = fn(
+        vector_field=f, initial_values=init, num=num, t=t0, parameters=params
+    )
+    for dy, dy_ref in zip(derivatives, solution):
+        assert jnp.allclose(dy, dy_ref)
+
+
+@pytest_cases.parametrize("num", [1, 2, 3])
 def test_affine_recursion(num_derivatives_max, num):
     """The approximation should coincide with the reference."""
     f, init, t0, params, solution = _affine_problem(num_derivatives_max)

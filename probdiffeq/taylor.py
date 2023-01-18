@@ -53,7 +53,7 @@ def taylor_mode_fn(
     primals = vf(*initial_values)
     taylor_coeffs = [*initial_values, primals]
     for _ in range(num - 1):
-        series = _subsets(taylor_coeffs[1:], num_arguments)
+        series = _subsets(taylor_coeffs[1:], num_arguments)  # for high-order ODEs
         primals, series_new = jax.experimental.jet.jet(
             vf, primals=initial_values, series=series
         )
@@ -81,6 +81,28 @@ def _subsets(x, /, n):
         return None if i == 0 else i
 
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
+
+
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+def taylor_mode_doubling_fn(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
+    """Taylor-mode AD."""
+    # Number of positional arguments in f
+    num_arguments = len(initial_values)
+
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+
+    # Initial Taylor series (u_0, u_1, ..., u_k)
+    primals = vf(*initial_values)
+    taylor_coeffs = [*initial_values, primals]
+    for _ in range(num - 1):
+        series = taylor_coeffs[1:]  # for high-order ODEs
+        primals, series_new = jax.experimental.jet.jet(
+            vf, primals=initial_values, series=(series,)
+        )
+        taylor_coeffs = [*initial_values, primals, *series_new]
+    return taylor_coeffs
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
