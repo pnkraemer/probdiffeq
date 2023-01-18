@@ -120,6 +120,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 def affine_recursion(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
+    """Compute the exact Taylor series of an affine differential equation."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
 
     fx, jvp_fn = jax.linearize(vf, *initial_values)
