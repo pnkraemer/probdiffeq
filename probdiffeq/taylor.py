@@ -44,6 +44,7 @@ def taylor_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
     """Taylor-mode AD."""
+    # raise RuntimeError("if the vector  field depends on t, we are a bit screwed?")
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
@@ -83,26 +84,178 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+# @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def taylor_mode_doubling_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
     """Taylor-mode AD."""
-    # Number of positional arguments in f
-    num_arguments = len(initial_values)
-
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
 
-    # Initial Taylor series (u_0, u_1, ..., u_k)
-    primals = vf(*initial_values)
-    taylor_coeffs = [*initial_values, primals]
-    for _ in range(num - 1):
-        series = taylor_coeffs[1:]  # for high-order ODEs
-        primals, series_new = jax.experimental.jet.jet(
-            vf, primals=initial_values, series=(series,)
-        )
-        taylor_coeffs = [*initial_values, primals, *series_new]
-    return taylor_coeffs
+    def f_jet_raw(tcoeffs, f, num_zeros):
+        primals, *series = tcoeffs
+        if num_zeros > 0:
+            zeros = [jax.tree_util.tree_map(jnp.zeros_like, primals)] * num_zeros
+            series = [*series, *zeros]
+        primals_new, series_new = jax.experimental.jet.jet(f, (primals,), (series,))
+        return primals_new, *series_new
+
+    fx = vf(*initial_values)
+    # taylor_coefficients = [*initial_values, fx]
+    taylor_coefficients = initial_values
+
+    for s in range(2):
+
+        # s = 0, j = 1 (from 1 to 3 initial values)
+        j = len(taylor_coefficients)
+        jet_fn = jax.tree_util.Partial(f_jet_raw, f=vf, num_zeros=j)
+
+        yhats = jet_fn(taylor_coefficients)
+        assert len(yhats) == 2 * j, len(yhats) - 2 * j
+
+        As_all = jax.jacfwd(jet_fn)(taylor_coefficients)
+        As = [As_all[0][i] for i in range(j)]
+        assert len(As) == j, len(As) - j
+
+        g0, g1 = yhats
+        (G0,) = As
+
+        taylor_coefficients = [*initial_values, g0, g1 + G0 @ g0]
+        print(jnp.stack(taylor_coefficients))
+
+        # s = 1, j = 3 (from 3 to 5 initial values)
+        j = len(taylor_coefficients)
+        jet_fn = jax.tree_util.Partial(f_jet_raw, f=vf, num_zeros=j)
+
+        yhats = jet_fn(taylor_coefficients)
+        assert len(yhats) == 2 * j, len(yhats) - 2 * j
+
+        As_all = jax.jacfwd(jet_fn)(taylor_coefficients)
+        As = [As_all[0][i] for i in range(j)]
+        assert len(As) == j, len(As) - j
+
+        g0, g1, g2, g3, g4, g5 = yhats
+        G0, G1, G2 = As
+
+        taylor_coefficients = [
+            *taylor_coefficients,
+            g2,
+            g3 + G0 @ g2,
+            # g4 + G0 @ g2 + G1 @ (g3 + G0 @ g2),
+            # g5 + G0 @ g2 + G1 @ (g3 + G0 @ g2) + G2 @ (g4 + G0 @ g2 + G1 @ (g3 + G0 @ g2))
+        ]
+        print(jnp.stack(taylor_coefficients))
+
+        # s = 2, j = 7 (from 3 to 5 initial values)
+        j = len(taylor_coefficients)
+        jet_fn = jax.tree_util.Partial(f_jet_raw, f=vf, num_zeros=j)
+
+        yhats = jet_fn(taylor_coefficients)
+        assert len(yhats) == 2 * j, len(yhats) - 2 * j
+
+        As_all = jax.jacfwd(jet_fn)(taylor_coefficients)
+        As = [As_all[0][i] for i in range(j)]
+        assert len(As) == j, len(As) - j
+
+        g0, g1, g2, g3, g4, g5, g6, g7, g8, g9 = yhats
+        G0, G1, G2, G3, G4 = As
+
+        taylor_coefficients = [
+            *taylor_coefficients,
+            g4,
+            g5 + G0 @ g4,
+            # g6 + G0 @ g4 + G1 @ (g5 + G0 @ g4),
+            # g7 + G0 @ g4 + G1 @ (g5 + G0 @ g4) + G2 @ (g6 + G0 @ g4 + G1 @ (g5 + G0 @ g4)),
+            #
+            # g2,
+            # g3 + G0 @ g2,
+            # # g4 + G0 @ g2 + G1 @ (g3 + G0 @ g2),
+            # # g5 + G0 @ g2 + G1 @ (g3 + G0 @ g2) + G2 @ (g4 + G0 @ g2 + G1 @ (g3 + G0 @ g2))
+        ]
+        print(jnp.stack(taylor_coefficients))
+
+        assert False
+
+        for k in range(j):
+            a = yhats[k]
+            b = As[-k]
+            c = taylor_coefficients[-1]
+            yk = a + b @ c  # * _factorial(j+k) / _factorial(j)
+            taylor_coefficients = [*taylor_coefficients, yk]
+            print(j + k, 2 * j, jnp.stack(taylor_coefficients))
+            if k + j >= num:
+                print("kfahsjkfajklshds")
+                return taylor_coefficients
+        # assert False
+        print()
+    #
+    #     assert False
+    #     print(As)
+    #     # print(yhats[0], As[0], yhats[1])
+    #     x0 = yhats[0]
+    #     x1 = As[0][0] @ yhats[1]
+    #     print([*taylor_coefficients, x0, x1])
+    #     print(jax.tree_util.tree_map(jnp.shape, (yhats, As)))
+    #     assert False
+    #     yhats, jvps = jax.linearize(jet_fn, taylor_coefficients)
+    #     """'yhat' is (y_0, ..., y_(2j-1). 'jvps' is (A_0, ..., A_(2j-1)) expresses as linear operators."""
+    #
+    #     for k in range(j, 2*j):
+    #         print("k", k)
+    #         print(taylor_coefficients, j, k+1)
+    #         # print(len(taylor_coefficients), j, k)
+    #         _temp = [taylor_coefficients[i-1] for i in range(j, k+1) ]
+    #         jvp = jvps(_temp)
+    #         # print(jvp)
+    #         taylor_coefficients = [*taylor_coefficients, yhats[k]]
+    #         print(taylor_coefficients)
+    #         # print(taylor_coefficients)
+    #         # print(k, num)
+    #         #
+    #         # if k == num:
+    #         #     print()
+    #         #     break
+    # return taylor_coefficients
+    # # Number of positional arguments in f
+    #
+    #
+    # # Initial Taylor series (u_0, u_1, ..., u_k)
+    # primals = vf(*initial_values)
+    # taylor_coeffs = [*initial_values, primals]
+    # for _ in range(num - 1):
+    #     series = taylor_coeffs[1:]  # for high-order ODEs
+    #     primals, series_new = jax.experimental.jet.jet(
+    #         vf, primals=initial_values, series=(series,)
+    #     )
+    #     taylor_coeffs = [*initial_values, primals, *series_new]
+    # return taylor_coeffs
+
+
+#
+# assert False
+# print(j, taylor_coefficients)
+#
+# print()
+# print()
+# print("jet1")
+# print(f_jet(taylor_coefficients))
+# print()
+# print()
+# print("jet2")
+# yhat, jvp_jet = jax.linearize(f_jet, taylor_coefficients)
+# print(yhat)
+# print()
+# print()
+# for k in range(j-1, 2*j):
+#     print(j, k)
+#     _temp = [_factorial(j-1-k+i) / _factorial(i) * taylor_coefficients[i] for i in range(j, k+1)]
+#     print("jet3 (jvp)")
+#     yk = yhat[k] + _factorial(k) / _factorial(j-1) * jvp_jet(_temp)
+#
+#     taylor_coefficients = [*taylor_coefficients, yk]
+
+
+def _factorial(n, /):
+    return jax.lax.exp(jax.lax.lgamma(n + 1.0))
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
