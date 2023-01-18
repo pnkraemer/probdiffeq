@@ -112,7 +112,6 @@ def test_affine_recursion(num_derivatives_max, num):
         vector_field=f, initial_values=init, num=num, t=t0, parameters=params
     )
     for dy, dy_ref in zip(derivatives, solution):
-        print(dy, dy_ref)
         assert jnp.allclose(dy, dy_ref)
 
 
