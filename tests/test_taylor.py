@@ -87,13 +87,13 @@ def test_initialised_correct_shape_higher_order(fn, pb, num):
 def test_initialised_correct_shape_first_order(fn, pb, num):
     f, init, t0, params, sol = pb
 
-    print(jnp.stack(sol))
+    print()
     print()
     print()
     derivatives = fn(
         vector_field=f, initial_values=init, num=num, t=t0, parameters=params
     )
-
+    print(jnp.stack(sol) / jnp.stack(derivatives))
     assert False
     assert len(derivatives) == len(init) + num
     assert derivatives[0].shape == init[0].shape

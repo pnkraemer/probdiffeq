@@ -103,7 +103,7 @@ def taylor_mode_doubling_fn(
 
     y0 = ys[0]
     y1 = (ys[1] + Js[0][0] @ y0) / 2
-    tcoeffs = [*tcoeffs, y0, 3 * y1]
+    tcoeffs = [*tcoeffs, y0, y1]
 
     # s = 1, j = 3
     j = len(tcoeffs)
@@ -115,9 +115,10 @@ def taylor_mode_doubling_fn(
     y3 = (ys[3] + Js[0][0] @ y2) / 4
     y4 = (ys[4] + Js[1][0] @ y2 + Js[0][0] @ y3) / 5
     y5 = (ys[5] + Js[2][0] @ y2 + Js[1][0] @ y3 + Js[0][0] @ y4) / 6
-    tcoeffs = [*tcoeffs, 4 * y2, 5 * y3, 6 * y4, 7 * y5]
-    print(jnp.stack(tcoeffs))
-    assert False
+    tcoeffs = [*tcoeffs, y2, y3, y4, y5]
+    return _unnormalise(tcoeffs)
+    # print(jnp.stack(tcoeffs))
+    # assert False
 
     print(yhat)
     print(jac)
@@ -152,7 +153,7 @@ def _normalise(tcoeffs):
     primals, *series = tcoeffs
     k = len(series)
     for i in range(k):
-        series[i] = series[i] / _factorial(1 + i)
+        series[i] = series[i] / _fct(1 + i)
     return primals, *series
 
 
@@ -160,11 +161,11 @@ def _unnormalise(tcoeffs):
     primals, *series = tcoeffs
     k = len(series)
     for i in range(k):
-        series[i] = series[i] * _factorial(1 + i)
+        series[i] = series[i] * _fct(1 + i)
     return primals, *series
 
 
-def _factorial(n, /):
+def _fct(n, /):
     return jax.lax.exp(jax.lax.lgamma(n + 1.0))
 
 
