@@ -103,6 +103,142 @@ def taylor_mode_doubling_fn(
     # taylor_coefficients = [*initial_values, fx]
     taylor_coefficients = initial_values
 
+    ############################################################################
+    # prepare
+    ############################################################################
+
+    (x0,) = initial_values
+    zero_term = jnp.zeros_like(x0)
+
+    jet = jax.experimental.jet.jet
+    linearize = jax.linearize
+    _fct = _factorial
+
+    coeffs = jnp.zeros((num + 2,) + x0.shape)
+    coeffs = coeffs.at[0].set(x0)
+    # print("Coeffs", coeffs)
+    ############################################################################
+    # s = 0, j = 1: we compute 2 more coefficients
+    ############################################################################
+    s, j = 0, 1
+
+    def f_jet(a):
+        return jet(vf, (a,), ((zero_term,),))
+
+    (yhat_p, [yhat_s]), jvp_jet = linearize(f_jet, *coeffs[:1])
+
+    for k in range(0, 2):
+        if k < j:
+            yk = yhat_p
+            print("YK", yk)
+        else:
+            _temp = [
+                _fct((j - 1) - (k - i)) / _fct(i) * coeffs[i] for i in range(j, k + 1)
+            ]
+            jac = jvp_jet(*_temp)
+            yk = yhat_s[k - 1] + _fct(k) / _fct(j - 1) * jac[0]
+            print("YK", yk)
+        coeffs = coeffs.at[k + 1].set(yk)
+    print()
+    ############################################################################
+    # s = 1, j = 3: we compute 4 more coefficients to have 7 in total
+    ############################################################################
+    s, j = 1, 3
+
+    def f_jet(a, b, c):
+        return jet(
+            vf,
+            (a,),
+            (
+                (
+                    b,
+                    c,
+                    zero_term,
+                    zero_term,
+                    zero_term,
+                ),
+            ),
+        )
+
+    (yhat_p, yhat_s), jvp_jet = linearize(f_jet, *coeffs[:j])
+
+    for k in range(2, 5):
+        if k < j:
+            yk = yhat_s[k - 1]
+            print("YK", yk)
+        else:
+            # if k == j:
+            #     print(coeffs[k])
+            _temp1 = [
+                _fct((j - 1) - (k - i)) / _fct(i) * coeffs[i] for i in range(j, k + 1)
+            ] + [zero_term] * (2 - (k - j))
+            # _temp1 =   [zero_term]*(2-(k-j)) +  [_fct((j - 1) - (k - i)) / _fct(i) * coeffs[i] for i in range(j, k + 1)]
+            jac1 = jvp_jet(*_temp1)
+            # jac2 = jvp_jet(*_temp2)
+            # print("JAC", jac)
+            yk = yhat_s[k - 1] + _fct(k) / _fct(j - 1) * jac1[0]  # [0]
+
+            print("YK", yk)
+        coeffs = coeffs.at[k + 1].set(yk)
+
+    #
+    # for J in jac[1]:
+    #     print(J)
+    # print(yhat_s[k-1] + _fct(k) / _fct(j - 1) * J)
+
+    print(coeffs)
+
+    assert False
+
+    #
+    #
+    # def f_jet0(a):
+    #         return jax.experimental.jet.jet(vf, (a,), ((zero_term,),))
+    #
+    #     (y0, [y1h]), f_jvp = jax.linearize(f_jet0, x0)
+    #     x1 = y0
+    #     y1 = y1h + f_jvp(x1)[0]
+    #     x2 = y1
+    #     taylor_coefficients = [*taylor_coefficients, x1, x2]
+    #     print(jnp.stack(taylor_coefficients))
+    #     print()
+    #     def f_jet01(a, b):
+    #         return jax.experimental.jet.jet(vf, (a,), ([b, x2] + [zero_term]*3,))
+    #
+    #     (y0, [y1, y2, y3h, y4h, y5h]), f_jvp = jax.linearize(f_jet01, x0, x1)
+    #     y3 = y3h + f_jvp(zero_term, y2)[1][0]
+    #     y4 = y4h + f_jvp(zero_term, y3)[1][0]
+    #     y5 = y5h + f_jvp(y4, zero_term)[1][0]
+    #     x3 = y2
+    #     x4 = y3
+    #     x5 = y4
+    #     x6 = y5
+    #
+    #     taylor_coefficients = [*taylor_coefficients, x3, x4, x5, x6]
+    #     print(jnp.stack(taylor_coefficients))
+    #
+    #
+    #
+    #
+    #
+    #
+    #     assert False
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+
     for s in range(2):
 
         # s = 0, j = 1 (from 1 to 3 initial values)
@@ -119,7 +255,10 @@ def taylor_mode_doubling_fn(
         g0, g1 = yhats
         (G0,) = As
 
-        taylor_coefficients = [*initial_values, g0, g1 + G0 @ g0]
+        x1 = g0
+        x2 = g1 + G0 @ x1
+
+        taylor_coefficients = [*initial_values, x1, x2]
         print(jnp.stack(taylor_coefficients))
 
         # s = 1, j = 3 (from 3 to 5 initial values)
@@ -133,17 +272,25 @@ def taylor_mode_doubling_fn(
         As = [As_all[0][i] for i in range(j)]
         assert len(As) == j, len(As) - j
 
-        g0, g1, g2, g3, g4, g5 = yhats
+        _, _, g2, g3, g4, g5 = yhats
         G0, G1, G2 = As
 
-        taylor_coefficients = [
-            *taylor_coefficients,
-            g2,
-            g3 + G0 @ g2,
-            # g4 + G0 @ g2 + G1 @ (g3 + G0 @ g2),
-            # g5 + G0 @ g2 + G1 @ (g3 + G0 @ g2) + G2 @ (g4 + G0 @ g2 + G1 @ (g3 + G0 @ g2))
-        ]
+        x3 = g2
+        x4 = g3 + G0 @ x3
+        x5 = g4 + _factorial(4) / _factorial(2) * (
+            _factorial(2 - 1) / _factorial(3) * G1 @ x3
+            + _factorial(2 - 0) / _factorial(4) * G0 @ x4
+        )
+        x6 = g5 + _factorial(5) / _factorial(2) * (
+            1 / _factorial(3) * G2 @ x3
+            + _factorial(2 - 1) / _factorial(4) * G1 @ x4
+            + _factorial(2 - 0) / _factorial(5) * G0 @ x5
+        )
+
+        taylor_coefficients = [*taylor_coefficients, x3, x4, x5, x6]
         print(jnp.stack(taylor_coefficients))
+
+        assert False
 
         # s = 2, j = 7 (from 3 to 5 initial values)
         j = len(taylor_coefficients)
