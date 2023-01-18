@@ -117,6 +117,25 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
+def affine_recursion(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+
+    fx, jvp_fn = jax.linearize(vf, *initial_values)
+    ys = [*initial_values, fx]
+    if num == 0:
+        return initial_values
+
+    if num == 1:
+        return ys
+
+    for _ in range(num - 2):
+        fx = jvp_fn(fx)
+        ys = [*ys, fx]
+    return ys
+
+
 def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
     """Create a routine that estimates a Taylor series with a Runge-Kutta starter."""
     return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
