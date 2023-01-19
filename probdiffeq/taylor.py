@@ -233,13 +233,14 @@ def taylor_mode_doubling_fn(
 
     # Compute the recursion in normalised Taylor coefficients.
     # It simplifies extremely.
-    def jet_pad(x):
-        return jet_normalised(vf, x + [zeros] * len(x))
+    def jet_pad(p, *s):
+        tcoeffs_padded = [p, *s] + [zeros] * (len(s) + 1)
+        return jet_normalised(vf, *tcoeffs_padded)
 
     while True:
 
         # todo: turn into linearize()
-        ys, Js = _naive_linearize(jet_pad, tcoeffs)
+        ys, Js = _naive_linearize(jet_pad, *tcoeffs)
 
         # Double the number of Taylor coefficients (compute "k" more)
         j = len(tcoeffs)
@@ -251,8 +252,8 @@ def taylor_mode_doubling_fn(
                 return _unnormalise(*tcoeffs)
 
 
-def _naive_linearize(fn, primals):
-    return fn(primals), jax.jacfwd(fn)(primals)
+def _naive_linearize(fn, *primals):
+    return fn(*primals), jax.jacfwd(fn)(*primals)
 
 
 def _next_coeff(tcoeffs, *, ys, j, k, Js):
@@ -260,19 +261,17 @@ def _next_coeff(tcoeffs, *, ys, j, k, Js):
         return ys[k] / (k + 1)
     summ = 0.0
     for i in range(j, k + 1):  # todo: remove loop
-        summ += Js[k - i][0] @ tcoeffs[i]  # todo: use JVPs
+        summ += Js[k - i] @ tcoeffs[i]  # todo: use JVPs
     return (ys[k] + summ) / (k + 1)
 
 
-def jet_normalised(fn, tcoeffs):
+def jet_normalised(fn, primals, *series):
     """jet(), but without primals & series and in normalised Taylor coefficients."""
-    # todo: while this is nice for not-so-good-at-jvp people,
+    # todo: while this function is nice for not-so-good-at-jvp people like me (N),
     #   this function is unnecessary.
-    tcoeffs = list(tcoeffs)
-    p, *s = _unnormalise(*tcoeffs)
+    p, *s = _unnormalise(primals, *series)
     p_new, s_new = jax.experimental.jet.jet(fn, (p,), (s,))
-    tcoeffs = [p_new, *s_new]
-    return _normalise(*tcoeffs)
+    return _normalise(p_new, *s_new)
 
 
 def _normalise(primals, *series):
