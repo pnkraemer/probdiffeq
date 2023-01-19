@@ -238,14 +238,16 @@ def taylor_mode_doubling_fn(
 
     while True:
 
-        # todo: turn into linearize()
-        ys, Js = _naive_linearize(jet_padded, *tcoeffs)
+        ys, jvp_fn = jax.linearize(jet_padded, *tcoeffs)
 
         # Double the number of Taylor coefficients (compute "k" more)
         j = len(tcoeffs)
         for k in range(j - 1, 2 * j):
             # get x_k and augment tcoeffs as follows:
-            tcoeffs = [*tcoeffs, _next_coeff(tcoeffs, ys=ys, Js=Js, j=j, k=k)]
+            tcoeffs = [
+                *tcoeffs,
+                _next_coeff_jvp(tcoeffs, ys=ys, jvp_fn=jvp_fn, j=j, k=k),
+            ]
 
             if k + 1 == num:
                 return _unnormalise(*tcoeffs)
@@ -264,16 +266,29 @@ def _pad_with_zeros(*x):
     return [*x] + [zeros] * len(x)
 
 
-def _naive_linearize(fn, *primals):
-    return fn(*primals), jax.jacfwd(fn)(*primals)
-
-
 def _next_coeff(tcoeffs, *, ys, j, k, Js):
     if k < j:
         return ys[k] / (k + 1)
     summ = 0.0
     for i in range(j, k + 1):  # todo: remove loop
         summ += Js[k - i] @ tcoeffs[i]  # todo: use JVPs
+    return (ys[k] + summ) / (k + 1)
+
+
+def _next_coeff_jvp(tcoeffs, *, ys, jvp_fn, j, k):
+    if k < j:
+        return ys[k] / (k + 1)
+    summ = 0.0
+
+    # Build my own Jacobian...
+    jvp_fn_vmap = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
+    eyes = [jnp.eye(tcoeffs[0].shape[0])] * j
+    Js = jvp_fn_vmap(*eyes)
+
+    # todo: loop as zip
+    # todo: replace JAC with a direct JVP
+    for i in range(j, k + 1):
+        summ += Js[k - i] @ tcoeffs[i]
     return (ys[k] + summ) / (k + 1)
 
 
