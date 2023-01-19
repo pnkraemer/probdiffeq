@@ -308,7 +308,6 @@ def _pad_with_zeros(*x):
 def _next_coeff(tcoeffs, *, ys, jvp_fn, j, k, Js):
     if k < j:
         return ys[k] / (k + 1)
-    summ = 0.0
 
     # reproduce jvp_fn(*tangent) as jnp.einsum("ijkl,jl->ik", Js, tangent)
     d = len(tcoeffs[0])
@@ -320,8 +319,13 @@ def _next_coeff(tcoeffs, *, ys, jvp_fn, j, k, Js):
     # Compute the sum
     Js_relevant = Js[j - 1][(2 * j - 1 - k) :]
     tcoeffs_relevant = tcoeffs[j:]
-    for i in range(k + 1 - j):  # todo: remove loop
-        summ += Js_relevant[i] @ tcoeffs_relevant[i]  # todo: use JVPs
+    summands = jnp.einsum(
+        "ijk,ik->ij", Js_relevant[: k + 1 - j], tcoeffs_relevant[: k + 1 - j]
+    )
+    # summ = 0.0
+    # for i in range(k + 1 - j):  # todo: remove loop
+    #     summ += Js_relevant[i] @ tcoeffs_relevant[i]  # todo: use JVPs
+    summ = jnp.sum(summands, axis=0)
     return (ys[k] + summ) / (k + 1)
 
 
