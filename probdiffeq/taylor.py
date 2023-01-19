@@ -236,18 +236,15 @@ def taylor_mode_doubling_fn(
     def jet_pad(x):
         return jet_normalised(vf, x + [zeros] * len(x))
 
-    # todo: make into a list
-    # coeffs = jnp.zeros((num + 1,) + tcoeffs[0].shape)
-    # coeffs = coeffs.at[0].set(tcoeffs[0])
-
     for s in range(20):  # todo: change to "while True"
         j = 2 ** (s + 1) - 1
-        ys, Js = _naive_linearize(jet_pad, tcoeffs[:j])
-        # ys = jet_pad(coeffs[:j])
-        # Js = jax.jacfwd(jet_pad)([*coeffs[:j, :]])
+
+        # todo: turn into linearize()
+        ys, Js = _naive_linearize(jet_pad, tcoeffs)
 
         for k in range(j - 1, 2 * j):
-            tcoeffs = [*tcoeffs, _next_coeff(tcoeffs, ys, j, k, Js)]
+            tcoeffs = [*tcoeffs, _next_coeff(tcoeffs, ys=ys, Js=Js, j=j, k=k)]
+
             if k + 1 == num:
                 return _unnormalise(tcoeffs)
 
@@ -256,12 +253,12 @@ def _naive_linearize(fn, primals):
     return fn(primals), jax.jacfwd(fn)(primals)
 
 
-def _next_coeff(coeffs, ys, j, k, Js):
+def _next_coeff(tcoeffs, *, ys, j, k, Js):
     if k < j:
         return ys[k] / (k + 1)
     summ = 0.0
     for i in range(j, k + 1):  # todo: remove loop
-        summ += Js[k - i][0] @ coeffs[i]  # todo: use JVPs
+        summ += Js[k - i][0] @ tcoeffs[i]  # todo: use JVPs
     return (ys[k] + summ) / (k + 1)
 
 
