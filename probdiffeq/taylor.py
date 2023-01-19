@@ -236,12 +236,13 @@ def taylor_mode_doubling_fn(
     def jet_pad(x):
         return jet_normalised(vf, x + [zeros] * len(x))
 
-    for s in range(20):  # todo: change to "while True"
-        j = 2 ** (s + 1) - 1
+    while True:
 
         # todo: turn into linearize()
         ys, Js = _naive_linearize(jet_pad, tcoeffs)
 
+        # Double the number of Taylor coefficients (compute "k" more)
+        j = len(tcoeffs)
         for k in range(j - 1, 2 * j):
             tcoeffs = [*tcoeffs, _next_coeff(tcoeffs, ys=ys, Js=Js, j=j, k=k)]
 
