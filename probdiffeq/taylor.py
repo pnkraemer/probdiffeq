@@ -238,7 +238,7 @@ def taylor_mode_doubling_fn(
 
     while True:
 
-        ys, Js = _naive_linearize(jet_padded, *tcoeffs)
+        ys, Js, jvp_fn = _naive_linearize(jet_padded, *tcoeffs)
         # ys, jvp_fn = jax.linearize(jet_padded, *tcoeffs)
 
         # Double the number of Taylor coefficients (compute "k" more)
@@ -247,7 +247,7 @@ def taylor_mode_doubling_fn(
             # get x_k and augment tcoeffs as follows:
             tcoeffs = [
                 *tcoeffs,
-                _next_coeff(tcoeffs, ys=ys, Js=Js, j=j, k=k),
+                _next_coeff(tcoeffs, ys=ys, Js=Js, jvp_fn=jvp_fn, j=j, k=k),
                 # _next_coeff_jvp(tcoeffs, ys=ys, jvp_fn=jvp_fn, j=j, k=k),
             ]
 
@@ -289,7 +289,7 @@ def _naive_linearize(fn, *x):
     jac = jnp.swapaxes(jvp_evals, axis1=2, axis2=1)
     assert jnp.allclose(jac_test, jac)
 
-    return fx, jac
+    return fx, jac, jvp_fn
 
 
 def _pad_with_zeros(*x):
@@ -305,31 +305,23 @@ def _pad_with_zeros(*x):
     return [*x] + [zeros] * len(x)
 
 
-def _next_coeff(tcoeffs, *, ys, j, k, Js):
-    if k < j:
-        return ys[k] / (k + 1)
-    summ = 0.0
-    for i in range(j, k + 1):  # todo: remove loop
-        summ += Js[j - 1][j - 1 - (k - i)] @ tcoeffs[i]  # todo: use JVPs
-    return (ys[k] + summ) / (k + 1)
-
-
-def _next_coeff_jvp(tcoeffs, *, ys, jvp_fn, j, k):
+def _next_coeff(tcoeffs, *, ys, jvp_fn, j, k, Js):
     if k < j:
         return ys[k] / (k + 1)
     summ = 0.0
 
-    # Build my own Jacobian...
-    jvp_fn_vmap = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-    eyes = [jnp.eye(tcoeffs[0].shape[0])] * j
-    Js = jvp_fn_vmap(*eyes)
+    # reproduce jvp_fn(*tangent) as jnp.einsum("ijkl,jl->ik", Js, tangent)
+    d = len(tcoeffs[0])
+    tangent = jnp.arange(1.0, 1.0 + j * d).reshape(j, d)
+    deriv1 = jnp.einsum("ijkl,jl->ik", Js, tangent)
+    deriv2 = jvp_fn(*tangent)
+    assert jnp.allclose(deriv1, jnp.stack(deriv2))
 
-    # todo: loop as zip
-    # todo: replace JAC with a direct JVP
-    for i, tc in zip(range(j, k + 1), tcoeffs[j : (k + 1)]):
-        summ += Js[j - 1][j - 1 - (k - i)] @ tc
-    # for J, tc in zip(reversed(Js[0:k-j+1]), tcoeffs[j:(k + 1)]):
-    #         summ += J @ tc
+    # Compute the sum
+    Js_relevant = Js[j - 1][(2 * j - 1 - k) :]
+    tcoeffs_relevant = tcoeffs[j:]
+    for i in range(k + 1 - j):  # todo: remove loop
+        summ += Js_relevant[i] @ tcoeffs_relevant[i]  # todo: use JVPs
     return (ys[k] + summ) / (k + 1)
 
 
