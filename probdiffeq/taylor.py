@@ -222,77 +222,59 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     return (corr, bw_new), None
 
 
-# @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def taylor_mode_doubling_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
     """Taylor-mode AD."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    (u0,) = initial_values
+    zeros = jnp.zeros_like(u0)
 
-    # Compute the recursion in normalised Taylor coefficients.
-    # It simplifies extremely.
-    def jet_padded(p, *s):  # "primals" and "series"
-        zeros = jnp.zeros_like(p)
-        tcoeffs_padded = [p, *s] + [zeros] * (len(s) + 1)
-        p, *s = _unnormalise(*tcoeffs_padded)
+    def jet_embedded(*c, degree):
+        """Call a modified jax.experimental.jet().
+
+        The modifications include:
+        * We merge "primals" and "series" into a single set of coefficients
+        * We expect and return _normalised_ Taylor coefficients.
+
+        The reason for the latter is that the doubling-recursion
+        simplifies drastically for normalised coefficients
+        (compared to unnormalised coefficients).
+        """
+        coeffs_emb = [*c] + [zeros] * degree
+        p, *s = _unnormalise(*coeffs_emb)
         p_new, s_new = jax.experimental.jet.jet(vf, (p,), (s,))
         return _normalise(p_new, *s_new)
 
-    taylor_coefficients = list(initial_values)
+    taylor_coefficients = [u0]
     while (deg := len(taylor_coefficients)) < num + 1:
 
-        # Propagate the Taylor coefficients through f
-        # to compute the Taylor series of f(taylor_series).
-        # Assemble the Jacobians of the 'deg'th Taylor coefficient
-        # of the output with respect to the input coefficients.
-        # f_coeff is a (2*deg, ode_dim) array.
-        # df_deg_coeff is a (??, ??) array.
-        # todo: return only f_coeff[deg-1:] because all others are irrelevant.
-        fx, dfx = _linearize(jet_padded, *taylor_coefficients)
-        fx_current, dfx_current = fx, dfx[deg - 1][:deg]
+        jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
+        fx, jvp_fn = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
-        cs = [(fx_current[deg - 1] / deg)]
+        cs = [(fx[deg - 1] / deg)]
         for k in range(deg, min(2 * deg, num)):
 
-            # array([J[-1],]),
-            # array([J[-2], J[-1]]), (...),
-            # array([J[0], ..., J[-1]])
-            df_deg_coeff = dfx_current[(2 * deg - 1 - k) :]
-
-            # Compute the next coefficient
-            # according to Table 13.7 in Griewank/Walther
-            linear_combination = _jvp_recursion(cs, dfx=df_deg_coeff)
-            cs += [(fx_current[k] + linear_combination) / (k + 1)]
+            # The Jacobian of the embedded jet is block-banded,
+            # i.e., of the form (for j=3)
+            # (A0, 0, 0; A1, A0, 0; A2, A1, A0; *, *, *; *, *, *; *, *, *)
+            # Thus, by attaching zeros to the current set of coefficients
+            # until the input and output shapes match, we compute
+            # the convolution-like sum of matrix-vector products with
+            # a single call to the JVP function.
+            # Bettencourt et al. (2019;
+            # "Taylor-mode autodiff for higher-order derivatives in JAX")
+            # explain details.
+            cs_padded = cs + [zeros] * (2 * deg - k - 1)
+            linear_combination = jvp_fn(*cs_padded)[k - deg]
+            cs += [(fx[k] + linear_combination) / (k + 1)]
 
         # Store all new coefficients
         taylor_coefficients.extend(cs)
 
-    # Return only the coefficients that are of interest.
     return _unnormalise(*taylor_coefficients)
-
-
-def _linearize(fn, *x):
-    fx = fn(*x)
-    jac = jax.jacfwd(fn, argnums=tuple(range(len(x))))(*x)
-    return fx, jnp.asarray(jac)
-
-
-def _jvp_recursion(c, *, dfx):
-    """Compute the Jacobian-vector product recursion.
-
-    dfx[-1] @ c[0]                                      (-> c[1])
-    dfx[-2] @ c[0] + dfx[-1] @ c[1]                     (-> c[2])
-    dfx[-3] @ c[0] + dfx[-2] @ c[1] + dfx[-1] @ c[2]    (-> c[3])
-
-    and so on.
-    According to
-    "Taylor-Mode Automatic Differentiation for Higher-Order Derivatives in JAX"
-    by Bettencourt et al. (2019), this could be done in a
-    single Jacobian-vector product.
-    """
-    summands = jnp.einsum("ijk,ik->ij", dfx, jnp.asarray(c))
-    return jnp.sum(summands, axis=0)
 
 
 def _normalise(primals, *series):
