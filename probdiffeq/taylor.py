@@ -84,83 +84,6 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-# @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def taylor_mode_doubling_fn(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
-):
-    """Taylor-mode AD."""
-    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
-    tcoeffs = list(initial_values)
-    zeros = jnp.zeros_like(tcoeffs[0])
-
-    raise RuntimeError(
-        "Next up: s in range(3) -> while True; "
-        "use JVPs; "
-        "make the tests actually test something: "
-        "remove loops."
-    )
-
-    # Compute the recursion in normalised Taylor coefficients.
-    # It simplifies extremely.
-    def jet_pad(x):
-        return jet_normalised(vf, x + [zeros] * len(x))
-
-    coeffs = jnp.zeros((num + 1,) + tcoeffs[0].shape)
-    coeffs = coeffs.at[0].set(tcoeffs[0])
-
-    for s in range(3):
-        # s = 0, j = 1
-        j = 2 ** (s + 1) - 1
-        ys = jet_pad([*coeffs[:j, :]])
-        Js = jax.jacfwd(jet_pad)([*coeffs[:j, :]])
-
-        for k in range(j - 1, 2 * j):
-            if k < j:
-                print(k + 1, k)
-                coeffs = coeffs.at[k + 1].set(ys[k] / (k + 1))
-            else:
-                summ = 0.0
-                for i in range(j, k + 1):
-                    print(k + 1, k, k - i, i)
-                    summ += Js[k - i][0] @ coeffs[i]
-                coeffs = coeffs.at[k + 1].set((ys[k] + summ) / (k + 1))
-            if k == num:
-                break
-
-    return _unnormalise([*coeffs])
-
-
-def jet_normalised(fn, tcoeffs):
-    """jet(), but without primals & series and in normalised Taylor coefficients."""
-    tcoeffs = list(tcoeffs)
-    p, *s = _unnormalise(tcoeffs)
-    p_new, s_new = jax.experimental.jet.jet(fn, (p,), (s,))
-    tcoeffs = [p_new, *s_new]
-    return _normalise(tcoeffs)
-
-
-def _normalise(tcoeffs):
-    """Unnormalised Taylor series to normalised Taylor series."""
-    primals, *series = tcoeffs
-    k = len(series)
-    for i in range(k):
-        series[i] = series[i] / _fct(1 + i)
-    return primals, *series
-
-
-def _unnormalise(tcoeffs):
-    """Normalised Taylor series to unnormalised Taylor series."""
-    primals, *series = tcoeffs
-    k = len(series)
-    for i in range(k):
-        series[i] = series[i] * _fct(1 + i)
-    return primals, *series
-
-
-def _fct(n, /):
-    return jax.lax.exp(jax.lax.lgamma(n + 1.0))
-
-
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def forward_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
@@ -297,3 +220,80 @@ def _rk_filter_step(carry, y, extrapolation, dt):
 
     # Return correction and backward-model
     return (corr, bw_new), None
+
+
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+def taylor_mode_doubling_fn(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
+    """Taylor-mode AD."""
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    tcoeffs = list(initial_values)
+    zeros = jnp.zeros_like(tcoeffs[0])
+    #
+    # raise RuntimeError(
+    #     "Next up: s in range(3) -> while True; "
+    #     "use JVPs; "
+    #     "make the tests actually test something: "
+    #     "remove loops."
+    # )
+
+    # Compute the recursion in normalised Taylor coefficients.
+    # It simplifies extremely.
+    def jet_pad(x):
+        return jet_normalised(vf, x + [zeros] * len(x))
+
+    coeffs = jnp.zeros((num + 1,) + tcoeffs[0].shape)
+    coeffs = coeffs.at[0].set(tcoeffs[0])
+
+    for s in range(3):
+        j = 2 ** (s + 1) - 1
+        ys = jet_pad([*coeffs[:j, :]])
+        Js = jax.jacfwd(jet_pad)([*coeffs[:j, :]])
+
+        for k in range(j - 1, 2 * j):
+            coeffs = _next_coeff(coeffs, ys, j, k, Js)
+            if k + 1 == num:
+                return _unnormalise([*coeffs])
+
+
+def _next_coeff(coeffs, ys, j, k, Js):
+    if k < j:
+        coeffs = coeffs.at[k + 1].set(ys[k] / (k + 1))
+    else:
+        summ = 0.0
+        for i in range(j, k + 1):
+            summ += Js[k - i][0] @ coeffs[i]
+        coeffs = coeffs.at[k + 1].set((ys[k] + summ) / (k + 1))
+    return coeffs
+
+
+def jet_normalised(fn, tcoeffs):
+    """jet(), but without primals & series and in normalised Taylor coefficients."""
+    tcoeffs = list(tcoeffs)
+    p, *s = _unnormalise(tcoeffs)
+    p_new, s_new = jax.experimental.jet.jet(fn, (p,), (s,))
+    tcoeffs = [p_new, *s_new]
+    return _normalise(tcoeffs)
+
+
+def _normalise(tcoeffs):
+    """Unnormalised Taylor series to normalised Taylor series."""
+    primals, *series = tcoeffs
+    k = len(series)
+    for i in range(k):
+        series[i] = series[i] / _fct(1 + i)
+    return primals, *series
+
+
+def _unnormalise(tcoeffs):
+    """Normalised Taylor series to unnormalised Taylor series."""
+    primals, *series = tcoeffs
+    k = len(series)
+    for i in range(k):
+        series[i] = series[i] * _fct(1 + i)
+    return primals, *series
+
+
+def _fct(n, /):
+    return jax.lax.exp(jax.lax.lgamma(n + 1.0))

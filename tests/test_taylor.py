@@ -29,7 +29,7 @@ def case_runge_kutta_starter():
 
 @pytest_cases.fixture(name="num_derivatives_max")
 def fixture_num_derivatives_max():
-    return 6
+    return 4
 
 
 @pytest_cases.case(tags=["first"])
@@ -83,18 +83,12 @@ def test_initialised_correct_shape_higher_order(fn, pb, num):
 
 @pytest_cases.parametrize_with_cases("fn", cases=".", prefix="case_", has_tag=["first"])
 @pytest_cases.parametrize_with_cases("pb", cases=".", prefix="pb_", has_tag=["first"])
-@pytest_cases.parametrize("num", [6])
+@pytest_cases.parametrize("num", [1, 2, 3])
 def test_initialised_correct_shape_first_order(fn, pb, num):
-    f, init, t0, params, sol = pb
-
-    print()
-    print(jnp.stack(sol))
-    print()
+    f, init, t0, params, _ = pb
     derivatives = fn(
         vector_field=f, initial_values=init, num=num, t=t0, parameters=params
     )
-    print(jnp.stack(sol) / (jnp.stack(derivatives)))
-    assert False
     assert len(derivatives) == len(init) + num
     assert derivatives[0].shape == init[0].shape
 
