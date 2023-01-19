@@ -228,19 +228,18 @@ def taylor_mode_doubling_fn(
 ):
     """Taylor-mode AD."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
-    tcoeffs = list(initial_values)
-    zeros = jnp.zeros_like(tcoeffs[0])
+    tcoeffs = initial_values
 
     # Compute the recursion in normalised Taylor coefficients.
     # It simplifies extremely.
-    def jet_pad(p, *s):
-        tcoeffs_padded = [p, *s] + [zeros] * (len(s) + 1)
+    def jet_padded(p, *s):
+        tcoeffs_padded = _pad_with_zeros(p, *s)
         return jet_normalised(vf, *tcoeffs_padded)
 
     while True:
 
         # todo: turn into linearize()
-        ys, Js = _naive_linearize(jet_pad, *tcoeffs)
+        ys, Js = _naive_linearize(jet_padded, *tcoeffs)
 
         # Double the number of Taylor coefficients (compute "k" more)
         j = len(tcoeffs)
@@ -250,6 +249,19 @@ def taylor_mode_doubling_fn(
 
             if k + 1 == num:
                 return _unnormalise(*tcoeffs)
+
+
+def _pad_with_zeros(*x):
+    """Return padded array.
+
+    E.g.
+    (1, 2, 3) -> (1, 2, 3, 0, 0, 0)
+    (1,) -> (1, 0)
+    (1, 1, 1, 1) -> (1, 1, 1, 1, 0, 0, 0, 0),
+    etc.
+    """
+    zeros = jnp.zeros_like(x[0])
+    return [*x] + [zeros] * len(x)
 
 
 def _naive_linearize(fn, *primals):
