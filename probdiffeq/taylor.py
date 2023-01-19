@@ -238,7 +238,8 @@ def taylor_mode_doubling_fn(
 
     while True:
 
-        ys, jvp_fn = jax.linearize(jet_padded, *tcoeffs)
+        ys, Js = _naive_linearize(jet_padded, *tcoeffs)
+        # ys, jvp_fn = jax.linearize(jet_padded, *tcoeffs)
 
         # Double the number of Taylor coefficients (compute "k" more)
         j = len(tcoeffs)
@@ -246,11 +247,49 @@ def taylor_mode_doubling_fn(
             # get x_k and augment tcoeffs as follows:
             tcoeffs = [
                 *tcoeffs,
-                _next_coeff_jvp(tcoeffs, ys=ys, jvp_fn=jvp_fn, j=j, k=k),
+                _next_coeff(tcoeffs, ys=ys, Js=Js, j=j, k=k),
+                # _next_coeff_jvp(tcoeffs, ys=ys, jvp_fn=jvp_fn, j=j, k=k),
             ]
 
             if k + 1 == num:
                 return _unnormalise(*tcoeffs)
+
+
+def _naive_linearize(fn, *x):
+    fx, jvp_fn = jax.linearize(fn, *x)
+    jacfwd = jax.jacfwd(fn, argnums=tuple(range(len(x))))(*x)
+    jac_test = jnp.asarray(jacfwd)
+
+    n, d = len(x), len(x[0])
+    # fn: (n,d) -> (2n, d)
+    # jac(fn): (n, d) -> [(n, d) -> (2n, n, d, d)]
+    # jac(fn)[i][j] is the jacobian of the ith output w.r.t. the jth input
+
+    # we build this jacobian from its JVPs.
+    # jvp(fn) maps n directions with shape (d,) to
+    # 2n directional derivatives with shape (d,).
+    # we can replicate with jnp.einsum().
+    direction = jnp.arange(1.0, 1.0 + n * d).reshape(n, d)
+    deriv1 = jnp.einsum("ijkl,jl->ik", jac_test, direction)
+    deriv2 = jvp_fn(*direction)
+    assert jnp.allclose(deriv1, jnp.stack(deriv2))
+
+    # to compute jac from jvp(fn), we repeat this n*d times
+    # covering "all" directions. To do so, build an identity matrix
+    # with shape (nd,nd). Reshape into n chunks of size (d,n,d).
+    # and double-vmap jvp_fn along the "last" axis.
+    # This gives 2n directional derivatives with shapes (d,n,d)
+    # Stack them into an array with shape (2n,d,n,d)
+    # and swap the first and second axis.
+    id_nd = jnp.eye(n * d)
+    std_basis = id_nd.reshape((n, d, n, d))
+    jvp_fn_vmap = jax.vmap(jvp_fn, in_axes=-1, out_axes=-1)
+    jvp_fn_vmap = jax.vmap(jvp_fn_vmap, in_axes=-1, out_axes=-1)
+    jvp_evals = jnp.stack(jvp_fn_vmap(*std_basis))
+    jac = jnp.swapaxes(jvp_evals, axis1=2, axis2=1)
+    assert jnp.allclose(jac_test, jac)
+
+    return fx, jac
 
 
 def _pad_with_zeros(*x):
@@ -271,7 +310,7 @@ def _next_coeff(tcoeffs, *, ys, j, k, Js):
         return ys[k] / (k + 1)
     summ = 0.0
     for i in range(j, k + 1):  # todo: remove loop
-        summ += Js[k - i] @ tcoeffs[i]  # todo: use JVPs
+        summ += Js[j - 1][j - 1 - (k - i)] @ tcoeffs[i]  # todo: use JVPs
     return (ys[k] + summ) / (k + 1)
 
 
@@ -287,8 +326,10 @@ def _next_coeff_jvp(tcoeffs, *, ys, jvp_fn, j, k):
 
     # todo: loop as zip
     # todo: replace JAC with a direct JVP
-    for i in range(j, k + 1):
-        summ += Js[k - i] @ tcoeffs[i]
+    for i, tc in zip(range(j, k + 1), tcoeffs[j : (k + 1)]):
+        summ += Js[j - 1][j - 1 - (k - i)] @ tc
+    # for J, tc in zip(reversed(Js[0:k-j+1]), tcoeffs[j:(k + 1)]):
+    #         summ += J @ tc
     return (ys[k] + summ) / (k + 1)
 
 

@@ -29,7 +29,7 @@ def case_runge_kutta_starter():
 
 @pytest_cases.fixture(name="num_derivatives_max")
 def fixture_num_derivatives_max():
-    return 4
+    return 6
 
 
 @pytest_cases.case(tags=["first"])
@@ -83,7 +83,7 @@ def test_initialised_correct_shape_higher_order(fn, pb, num):
 
 @pytest_cases.parametrize_with_cases("fn", cases=".", prefix="case_", has_tag=["first"])
 @pytest_cases.parametrize_with_cases("pb", cases=".", prefix="pb_", has_tag=["first"])
-@pytest_cases.parametrize("num", [4])
+@pytest_cases.parametrize("num", [6])
 def test_initialised_correct_shape_first_order(fn, pb, num):
     f, init, t0, params, _ = pb
     derivatives = fn(
@@ -97,7 +97,7 @@ def test_initialised_correct_shape_first_order(fn, pb, num):
     "fn", cases=".", prefix="case_", has_tag=["first", "exact"]
 )
 @pytest_cases.parametrize_with_cases("pb", cases=".", prefix="pb_", has_tag=["first"])
-@pytest_cases.parametrize("num", [4])
+@pytest_cases.parametrize("num", [6])
 def test_initialised_exactly_first(fn, pb, num):
     """The approximation should coincide with the reference."""
     f, init, t0, params, solution = pb
