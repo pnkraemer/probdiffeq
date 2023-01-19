@@ -231,23 +231,22 @@ def taylor_mode_doubling_fn(
 
     # Compute the recursion in normalised Taylor coefficients.
     # It simplifies extremely.
-    def jet_padded(p, *s):
-        tcoeffs_padded = _pad_with_zeros(p, *s)
+    def jet_padded(p, *s):  # "primals" and "series"
+        zeros = jnp.zeros_like(p)
+        tcoeffs_padded = [p, *s] + [zeros] * (len(s) + 1)
         return jet_normalised(vf, *tcoeffs_padded)
 
     tcoeffs = list(initial_values)
-    while len(tcoeffs) < num + 1:
+    while (j := len(tcoeffs)) < num + 1:
 
         # Call jet().
-        # todo: use JVP. But I don't understand how, and the
-        #  looping logic is already quite involved.
         ys, Js = _linearize(jet_padded, *tcoeffs)
 
         # Compute the next set coefficients
-        j = len(tcoeffs)
         cs = [ys[j - 1] / j]
         for k in range(j, min(2 * j, num)):
-            cs += [_next_coeff(cs, ys=ys, Js=Js, j=j, k=k)]
+            Js_relevant = Js[(2 * j - 1 - k) :]
+            cs += [_next_coeff(cs, ys=ys, Js=Js_relevant, j=j, k=k)]
 
         # Store all new coefficients
         tcoeffs.extend(cs)
@@ -265,22 +264,8 @@ def _linearize(fn, *x):
     return fx, jac[n - 1][:n]
 
 
-def _pad_with_zeros(*x):
-    """Return padded array.
-
-    E.g.
-    (1, 2, 3) -> (1, 2, 3, 0, 0, 0)
-    (1,) -> (1, 0)
-    (1, 1, 1, 1) -> (1, 1, 1, 1, 0, 0, 0, 0),
-    etc.
-    """
-    zeros = jnp.zeros_like(x[0])
-    return [*x] + [zeros] * len(x)
-
-
 def _next_coeff(coeffs, *, ys, j, k, Js):
-    Js_relevant = Js[(2 * j - 1 - k) :]
-    summands = jnp.einsum("ijk,ik->ij", Js_relevant, coeffs)
+    summands = jnp.einsum("ijk,ik->ij", Js, coeffs)
     summ = jnp.sum(summands, axis=0)
     return (ys[k] + summ) / (k + 1)
 
