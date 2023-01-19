@@ -228,7 +228,6 @@ def taylor_mode_doubling_fn(
 ):
     """Taylor-mode AD."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
-    tcoeffs = initial_values
 
     # Compute the recursion in normalised Taylor coefficients.
     # It simplifies extremely.
@@ -236,60 +235,34 @@ def taylor_mode_doubling_fn(
         tcoeffs_padded = _pad_with_zeros(p, *s)
         return jet_normalised(vf, *tcoeffs_padded)
 
-    while True:
+    tcoeffs = list(initial_values)
+    while len(tcoeffs) < num + 1:
 
-        ys, Js, jvp_fn = _naive_linearize(jet_padded, *tcoeffs)
-        # ys, jvp_fn = jax.linearize(jet_padded, *tcoeffs)
+        # Call jet().
+        # todo: use JVP. But I don't understand how, and the
+        #  looping logic is already quite involved.
+        ys, Js = _linearize(jet_padded, *tcoeffs)
 
-        # Double the number of Taylor coefficients (compute "k" more)
+        # Compute the next set coefficients
         j = len(tcoeffs)
-        for k in range(j - 1, 2 * j):
-            # get x_k and augment tcoeffs as follows:
-            tcoeffs = [
-                *tcoeffs,
-                _next_coeff(tcoeffs, ys=ys, Js=Js, jvp_fn=jvp_fn, j=j, k=k),
-                # _next_coeff_jvp(tcoeffs, ys=ys, jvp_fn=jvp_fn, j=j, k=k),
-            ]
+        cs = [ys[j - 1] / j]
+        for k in range(j, min(2 * j, num)):
+            cs += [_next_coeff(cs, ys=ys, Js=Js, j=j, k=k)]
 
-            if k + 1 == num:
-                return _unnormalise(*tcoeffs)
+        # Store all new coefficients
+        tcoeffs.extend(cs)
+
+    # Return only the coefficients that are of interest.
+    tcoeffs_unnormalised = _unnormalise(*tcoeffs)
+    return tcoeffs_unnormalised
 
 
-def _naive_linearize(fn, *x):
-    fx, jvp_fn = jax.linearize(fn, *x)
+def _linearize(fn, *x):
+    fx = fn(*x)
     jacfwd = jax.jacfwd(fn, argnums=tuple(range(len(x))))(*x)
-    jac_test = jnp.asarray(jacfwd)
-
-    n, d = len(x), len(x[0])
-    # fn: (n,d) -> (2n, d)
-    # jac(fn): (n, d) -> [(n, d) -> (2n, n, d, d)]
-    # jac(fn)[i][j] is the jacobian of the ith output w.r.t. the jth input
-
-    # we build this jacobian from its JVPs.
-    # jvp(fn) maps n directions with shape (d,) to
-    # 2n directional derivatives with shape (d,).
-    # we can replicate with jnp.einsum().
-    direction = jnp.arange(1.0, 1.0 + n * d).reshape(n, d)
-    deriv1 = jnp.einsum("ijkl,jl->ik", jac_test, direction)
-    deriv2 = jvp_fn(*direction)
-    assert jnp.allclose(deriv1, jnp.stack(deriv2))
-
-    # to compute jac from jvp(fn), we repeat this n*d times
-    # covering "all" directions. To do so, build an identity matrix
-    # with shape (nd,nd). Reshape into n chunks of size (d,n,d).
-    # and double-vmap jvp_fn along the "last" axis.
-    # This gives 2n directional derivatives with shapes (d,n,d)
-    # Stack them into an array with shape (2n,d,n,d)
-    # and swap the first and second axis.
-    id_nd = jnp.eye(n * d)
-    std_basis = id_nd.reshape((n, d, n, d))
-    jvp_fn_vmap = jax.vmap(jvp_fn, in_axes=-1, out_axes=-1)
-    jvp_fn_vmap = jax.vmap(jvp_fn_vmap, in_axes=-1, out_axes=-1)
-    jvp_evals = jnp.stack(jvp_fn_vmap(*std_basis))
-    jac = jnp.swapaxes(jvp_evals, axis1=2, axis2=1)
-    assert jnp.allclose(jac_test, jac)
-
-    return fx, jac, jvp_fn
+    jac = jnp.asarray(jacfwd)
+    n = len(x)
+    return fx, jac[n - 1][:n]
 
 
 def _pad_with_zeros(*x):
@@ -305,21 +278,9 @@ def _pad_with_zeros(*x):
     return [*x] + [zeros] * len(x)
 
 
-def _next_coeff(tcoeffs, *, ys, jvp_fn, j, k, Js):
-    if k < j:
-        return ys[k] / (k + 1)
-
-    # reproduce jvp_fn(*tangent) as jnp.einsum("ijkl,jl->ik", Js, tangent)
-    d = len(tcoeffs[0])
-    tangent = jnp.arange(1.0, 1.0 + j * d).reshape(j, d)
-    deriv1 = jnp.einsum("ijkl,jl->ik", Js, tangent)
-    deriv2 = jvp_fn(*tangent)
-    assert jnp.allclose(deriv1, jnp.stack(deriv2))
-
-    # Compute the sum
-    Js_relevant = Js[j - 1][(2 * j - 1 - k) : j]
-    tcoeffs_relevant = tcoeffs[j : (k + 1)]
-    summands = jnp.einsum("ijk,ik->ij", Js_relevant, tcoeffs_relevant)
+def _next_coeff(coeffs, *, ys, j, k, Js):
+    Js_relevant = Js[(2 * j - 1 - k) :]
+    summands = jnp.einsum("ijk,ik->ij", Js_relevant, coeffs)
     summ = jnp.sum(summands, axis=0)
     return (ys[k] + summ) / (k + 1)
 
