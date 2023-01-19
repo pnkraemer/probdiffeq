@@ -244,10 +244,11 @@ def taylor_mode_doubling_fn(
         # Double the number of Taylor coefficients (compute "k" more)
         j = len(tcoeffs)
         for k in range(j - 1, 2 * j):
+            # get x_k and augment tcoeffs as follows:
             tcoeffs = [*tcoeffs, _next_coeff(tcoeffs, ys=ys, Js=Js, j=j, k=k)]
 
             if k + 1 == num:
-                return _unnormalise(tcoeffs)
+                return _unnormalise(*tcoeffs)
 
 
 def _naive_linearize(fn, primals):
@@ -268,28 +269,22 @@ def jet_normalised(fn, tcoeffs):
     # todo: while this is nice for not-so-good-at-jvp people,
     #   this function is unnecessary.
     tcoeffs = list(tcoeffs)
-    p, *s = _unnormalise(tcoeffs)
+    p, *s = _unnormalise(*tcoeffs)
     p_new, s_new = jax.experimental.jet.jet(fn, (p,), (s,))
     tcoeffs = [p_new, *s_new]
-    return _normalise(tcoeffs)
+    return _normalise(*tcoeffs)
 
 
-def _normalise(tcoeffs):
+def _normalise(primals, *series):
     """Unnormalised Taylor series to normalised Taylor series."""
-    primals, *series = tcoeffs
-    k = len(series)
-    for i in range(k):
-        series[i] = series[i] / _fct(1 + i)
-    return primals, *series
+    series_new = [s / _fct(i + 1) for i, s in enumerate(series)]
+    return primals, *series_new
 
 
-def _unnormalise(tcoeffs):
+def _unnormalise(primals, *series):
     """Normalised Taylor series to unnormalised Taylor series."""
-    primals, *series = tcoeffs
-    k = len(series)
-    for i in range(k):
-        series[i] = series[i] * _fct(1 + i)
-    return primals, *series
+    series_new = [s * _fct(i + 1) for i, s in enumerate(series)]
+    return primals, *series_new
 
 
 def _fct(n, /):
