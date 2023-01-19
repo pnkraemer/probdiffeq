@@ -317,14 +317,9 @@ def _next_coeff(tcoeffs, *, ys, jvp_fn, j, k, Js):
     assert jnp.allclose(deriv1, jnp.stack(deriv2))
 
     # Compute the sum
-    Js_relevant = Js[j - 1][(2 * j - 1 - k) :]
-    tcoeffs_relevant = tcoeffs[j:]
-    summands = jnp.einsum(
-        "ijk,ik->ij", Js_relevant[: k + 1 - j], tcoeffs_relevant[: k + 1 - j]
-    )
-    # summ = 0.0
-    # for i in range(k + 1 - j):  # todo: remove loop
-    #     summ += Js_relevant[i] @ tcoeffs_relevant[i]  # todo: use JVPs
+    Js_relevant = Js[j - 1][(2 * j - 1 - k) : j]
+    tcoeffs_relevant = tcoeffs[j : (k + 1)]
+    summands = jnp.einsum("ijk,ik->ij", Js_relevant, tcoeffs_relevant)
     summ = jnp.sum(summands, axis=0)
     return (ys[k] + summ) / (k + 1)
 
