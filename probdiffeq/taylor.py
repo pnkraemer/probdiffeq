@@ -234,62 +234,78 @@ def taylor_mode_doubling_fn(
     def jet_padded(p, *s):  # "primals" and "series"
         zeros = jnp.zeros_like(p)
         tcoeffs_padded = [p, *s] + [zeros] * (len(s) + 1)
-        return jet_normalised(vf, *tcoeffs_padded)
+        p, *s = _unnormalise(*tcoeffs_padded)
+        p_new, s_new = jax.experimental.jet.jet(vf, (p,), (s,))
+        return _normalise(p_new, *s_new)
 
-    tcoeffs = list(initial_values)
-    while (j := len(tcoeffs)) < num + 1:
+    taylor_coefficients = list(initial_values)
+    while (deg := len(taylor_coefficients)) < num + 1:
 
-        # Call jet().
-        ys, Js = _linearize(jet_padded, *tcoeffs)
+        # Propagate the Taylor coefficients through f
+        # to compute the Taylor series of f(taylor_series).
+        # Assemble the Jacobians of the 'deg'th Taylor coefficient
+        # of the output with respect to the input coefficients.
+        # f_coeff is a (2*deg, ode_dim) array.
+        # df_deg_coeff is a (??, ??) array.
+        # todo: return only f_coeff[deg-1:] because all others are irrelevant.
+        fx, dfx = _linearize(jet_padded, *taylor_coefficients)
+        fx_current, dfx_current = fx, dfx[deg - 1][:deg]
 
-        # Compute the next set coefficients
-        cs = [ys[j - 1] / j]
-        for k in range(j, min(2 * j, num)):
-            Js_relevant = Js[(2 * j - 1 - k) :]
-            cs += [_next_coeff(cs, ys=ys, Js=Js_relevant, j=j, k=k)]
+        # Compute the next set of coefficients.
+        cs = [(fx_current[deg - 1] / deg)]
+        for k in range(deg, min(2 * deg, num)):
+
+            # array([J[-1],]),
+            # array([J[-2], J[-1]]), (...),
+            # array([J[0], ..., J[-1]])
+            df_deg_coeff = dfx_current[(2 * deg - 1 - k) :]
+
+            # Compute the next coefficient
+            # according to Table 13.7 in Griewank/Walther
+            linear_combination = _jvp_recursion(cs, dfx=df_deg_coeff)
+            cs += [(fx_current[k] + linear_combination) / (k + 1)]
 
         # Store all new coefficients
-        tcoeffs.extend(cs)
+        taylor_coefficients.extend(cs)
 
     # Return only the coefficients that are of interest.
-    tcoeffs_unnormalised = _unnormalise(*tcoeffs)
-    return tcoeffs_unnormalised
+    return _unnormalise(*taylor_coefficients)
 
 
 def _linearize(fn, *x):
     fx = fn(*x)
-    jacfwd = jax.jacfwd(fn, argnums=tuple(range(len(x))))(*x)
-    jac = jnp.asarray(jacfwd)
-    n = len(x)
-    return fx, jac[n - 1][:n]
+    jac = jax.jacfwd(fn, argnums=tuple(range(len(x))))(*x)
+    return fx, jnp.asarray(jac)
 
 
-def _next_coeff(coeffs, *, ys, j, k, Js):
-    summands = jnp.einsum("ijk,ik->ij", Js, coeffs)
-    summ = jnp.sum(summands, axis=0)
-    return (ys[k] + summ) / (k + 1)
+def _jvp_recursion(c, *, dfx):
+    """Compute the Jacobian-vector product recursion.
 
+    dfx[-1] @ c[0]                                      (-> c[1])
+    dfx[-2] @ c[0] + dfx[-1] @ c[1]                     (-> c[2])
+    dfx[-3] @ c[0] + dfx[-2] @ c[1] + dfx[-1] @ c[2]    (-> c[3])
 
-def jet_normalised(fn, primals, *series):
-    """jet(), but without primals & series and in normalised Taylor coefficients."""
-    # todo: while this function is nice for not-so-good-at-jvp people like me (N),
-    #   this function is unnecessary.
-    p, *s = _unnormalise(primals, *series)
-    p_new, s_new = jax.experimental.jet.jet(fn, (p,), (s,))
-    return _normalise(p_new, *s_new)
+    and so on.
+    According to
+    "Taylor-Mode Automatic Differentiation for Higher-Order Derivatives in JAX"
+    by Bettencourt et al. (2019), this could be done in a
+    single Jacobian-vector product.
+    """
+    summands = jnp.einsum("ijk,ik->ij", dfx, jnp.asarray(c))
+    return jnp.sum(summands, axis=0)
 
 
 def _normalise(primals, *series):
-    """Unnormalised Taylor series to normalised Taylor series."""
+    """Un-normalised Taylor series to normalised Taylor series."""
     series_new = [s / _fct(i + 1) for i, s in enumerate(series)]
     return primals, *series_new
 
 
 def _unnormalise(primals, *series):
-    """Normalised Taylor series to unnormalised Taylor series."""
+    """Normalised Taylor series to un-normalised Taylor series."""
     series_new = [s * _fct(i + 1) for i, s in enumerate(series)]
     return primals, *series_new
 
 
-def _fct(n, /):
+def _fct(n, /):  # factorial
     return jax.lax.exp(jax.lax.lgamma(n + 1.0))
