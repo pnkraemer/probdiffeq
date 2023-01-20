@@ -117,24 +117,20 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def affine_recursion(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
     """Compute the exact Taylor series of an affine differential equation."""
-    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
-
-    fx, jvp_fn = jax.linearize(vf, *initial_values)
-    ys = [*initial_values, fx]
     if num == 0:
         return initial_values
 
-    if num == 1:
-        return ys
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    fx, jvp_fn = jax.linearize(vf, *initial_values)
 
-    for _ in range(num - 1):
-        fx = jvp_fn(fx)
-        ys = [*ys, fx]
-    return ys
+    fx_rec = fx
+    fx_evaluations = [fx_rec := jvp_fn(fx_rec) for _ in range(num - 1)]  # noqa: F841
+    return [*initial_values, fx, *fx_evaluations]
 
 
 def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
@@ -142,7 +138,7 @@ def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
     return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
 
 
-# atol and rtol are static bc. of odeint...
+# atol and rtol must be static bc. of jax.odeint...
 @functools.partial(jax.jit, static_argnames=["vector_field", "num", "atol", "rtol"])
 def _runge_kutta_starter_fn(
     *, vector_field, initial_values, num: int, t, parameters, dt0, atol, rtol
@@ -167,6 +163,7 @@ def _runge_kutta_starter_fn(
     def func(y, t, *p):
         return vector_field(y, t=t, p=p)
 
+    # todo: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
     ys = jax.experimental.ode.odeint(
@@ -190,6 +187,10 @@ def _runge_kutta_starter_fn(
 
 
 def _runge_kutta_starter_improve(init_ssv, extrapolation, ys, dt):
+    """Improve the current guess.
+
+    Fit a Gauss-Markov process to observations of the ODE solution.
+    """
     # Initialise backward-transitions
     init_bw = extrapolation.init_conditional(ssv_proto=init_ssv)
     init_val = init_ssv, init_bw
@@ -212,7 +213,7 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     extra, bw_model = extrapolation.revert_markov_kernel(
         linearisation_pt=lin_pt, p0=rv, cache=extra_cache, output_scale_sqrtm=1.0
     )
-    bw_new = bw_old.merge_with_incoming_conditional(bw_model)
+    bw_new = bw_old.merge_with_incoming_conditional(bw_model)  # sqrt-fp-smoother!
 
     # Correct
     _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
