@@ -44,7 +44,6 @@ def taylor_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
     """Taylor-mode AD."""
-    # raise RuntimeError("if the vector  field depends on t, we are a bit screwed?")
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
