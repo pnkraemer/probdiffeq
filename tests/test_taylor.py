@@ -133,6 +133,11 @@ def test_affine_recursion(num_derivatives_max, num):
     derivatives = taylor.affine_recursion(
         vector_field=f, initial_values=init, num=num, t=t0, parameters=params
     )
+
+    # check shape
+    assert len(derivatives) == len(init) + num
+
+    # check values
     for dy, dy_ref in zip(derivatives, solution):
         assert jnp.allclose(dy, dy_ref)
 

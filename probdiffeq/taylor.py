@@ -131,7 +131,7 @@ def affine_recursion(
     if num == 1:
         return ys
 
-    for _ in range(num - 2):
+    for _ in range(num - 1):
         fx = jvp_fn(fx)
         ys = [*ys, fx]
     return ys
@@ -147,9 +147,9 @@ def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
 def _runge_kutta_starter_fn(
     *, vector_field, initial_values, num: int, t, parameters, dt0, atol, rtol
 ):
-    # todo [INACCURATE]: the initial-value uncertainty is discarded
-    # todo [FEATURE]: allow implementations other than IsoIBM?
-    # todo [FEATURE]: higher-order ODEs
+    # todo [inaccuracy]: the initial-value uncertainty is discarded
+    # todo [feature]: allow implementations other than IsoIBM?
+    # todo [feature]: higher-order ODEs
 
     # Assertions and early exits
 
