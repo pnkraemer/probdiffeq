@@ -53,7 +53,7 @@ def taylor_mode_fn(
     primals = vf(*initial_values)
     taylor_coeffs = [*initial_values, primals]
     for _ in range(num - 1):
-        series = _subsets(taylor_coeffs[1:], num_arguments)
+        series = _subsets(taylor_coeffs[1:], num_arguments)  # for high-order ODEs
         primals, series_new = jax.experimental.jet.jet(
             vf, primals=initial_values, series=series
         )
@@ -117,19 +117,35 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+def affine_recursion(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
+    """Compute the exact Taylor series of an affine differential equation."""
+    if num == 0:
+        return initial_values
+
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    fx, jvp_fn = jax.linearize(vf, *initial_values)
+
+    fx_rec = fx
+    fx_evaluations = [fx_rec := jvp_fn(fx_rec) for _ in range(num - 1)]  # noqa: F841
+    return [*initial_values, fx, *fx_evaluations]
+
+
 def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
     """Create a routine that estimates a Taylor series with a Runge-Kutta starter."""
     return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
 
 
-# atol and rtol are static bc. of odeint...
+# atol and rtol must be static bc. of jax.odeint...
 @functools.partial(jax.jit, static_argnames=["vector_field", "num", "atol", "rtol"])
 def _runge_kutta_starter_fn(
     *, vector_field, initial_values, num: int, t, parameters, dt0, atol, rtol
 ):
-    # todo [INACCURATE]: the initial-value uncertainty is discarded
-    # todo [FEATURE]: allow implementations other than IsoIBM?
-    # todo [FEATURE]: higher-order ODEs
+    # todo [inaccuracy]: the initial-value uncertainty is discarded
+    # todo [feature]: allow implementations other than IsoIBM?
+    # todo [feature]: higher-order ODEs
 
     # Assertions and early exits
 
@@ -147,6 +163,7 @@ def _runge_kutta_starter_fn(
     def func(y, t, *p):
         return vector_field(y, t=t, p=p)
 
+    # todo: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
     ys = jax.experimental.ode.odeint(
@@ -170,6 +187,10 @@ def _runge_kutta_starter_fn(
 
 
 def _runge_kutta_starter_improve(init_ssv, extrapolation, ys, dt):
+    """Improve the current guess.
+
+    Fit a Gauss-Markov process to observations of the ODE solution.
+    """
     # Initialise backward-transitions
     init_bw = extrapolation.init_conditional(ssv_proto=init_ssv)
     init_val = init_ssv, init_bw
@@ -192,10 +213,81 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     extra, bw_model = extrapolation.revert_markov_kernel(
         linearisation_pt=lin_pt, p0=rv, cache=extra_cache, output_scale_sqrtm=1.0
     )
-    bw_new = bw_old.merge_with_incoming_conditional(bw_model)
+    bw_new = bw_old.merge_with_incoming_conditional(bw_model)  # sqrt-fp-smoother!
 
     # Correct
     _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
 
     # Return correction and backward-model
     return (corr, bw_new), None
+
+
+@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
+def taylor_mode_doubling_fn(
+    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+):
+    """Taylor-mode AD."""
+    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    (u0,) = initial_values
+    zeros = jnp.zeros_like(u0)
+
+    def jet_embedded(*c, degree):
+        """Call a modified jax.experimental.jet().
+
+        The modifications include:
+        * We merge "primals" and "series" into a single set of coefficients
+        * We expect and return _normalised_ Taylor coefficients.
+
+        The reason for the latter is that the doubling-recursion
+        simplifies drastically for normalised coefficients
+        (compared to unnormalised coefficients).
+        """
+        coeffs_emb = [*c] + [zeros] * degree
+        p, *s = _unnormalise(*coeffs_emb)
+        p_new, s_new = jax.experimental.jet.jet(vf, (p,), (s,))
+        return _normalise(p_new, *s_new)
+
+    taylor_coefficients = [u0]
+    while (deg := len(taylor_coefficients)) < num + 1:
+
+        jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
+        fx, jvp_fn = jax.linearize(jet_embedded_deg, *taylor_coefficients)
+
+        # Compute the next set of coefficients.
+        cs = [(fx[deg - 1] / deg)]
+        for k in range(deg, min(2 * deg, num)):
+
+            # The Jacobian of the embedded jet is block-banded,
+            # i.e., of the form (for j=3)
+            # (A0, 0, 0; A1, A0, 0; A2, A1, A0; *, *, *; *, *, *; *, *, *)
+            # Thus, by attaching zeros to the current set of coefficients
+            # until the input and output shapes match, we compute
+            # the convolution-like sum of matrix-vector products with
+            # a single call to the JVP function.
+            # Bettencourt et al. (2019;
+            # "Taylor-mode autodiff for higher-order derivatives in JAX")
+            # explain details.
+            cs_padded = cs + [zeros] * (2 * deg - k - 1)
+            linear_combination = jvp_fn(*cs_padded)[k - deg]
+            cs += [(fx[k] + linear_combination) / (k + 1)]
+
+        # Store all new coefficients
+        taylor_coefficients.extend(cs)
+
+    return _unnormalise(*taylor_coefficients)
+
+
+def _normalise(primals, *series):
+    """Un-normalised Taylor series to normalised Taylor series."""
+    series_new = [s / _fct(i + 1) for i, s in enumerate(series)]
+    return primals, *series_new
+
+
+def _unnormalise(primals, *series):
+    """Normalised Taylor series to un-normalised Taylor series."""
+    series_new = [s * _fct(i + 1) for i, s in enumerate(series)]
+    return primals, *series_new
+
+
+def _fct(n, /):  # factorial
+    return jax.lax.exp(jax.lax.lgamma(n + 1.0))
