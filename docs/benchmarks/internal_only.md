@@ -176,7 +176,7 @@ The Taylor-series based method is more efficient. The cubature rule has little e
 
 ### Which factorisation?
 
-What is the performance difference between an `IsoTaylorZerothOrder`, a `BatchTaylorZerothOrder`, and a `TaylorZerothOrder`?
+What is the performance difference between an `IsoTaylorZerothOrder`, a `BlockDiagTaylorZerothOrder`, and a `TaylorZerothOrder`?
 
 ```python
 def solver(implementation):
@@ -188,7 +188,9 @@ def solver(implementation):
 num_derivatives = 4
 iso_solver = solver(recipes.IsoTS0.from_params(num_derivatives=num_derivatives))
 batch_solver = solver(
-    recipes.BatchTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
+    recipes.BlockDiagTS0.from_params(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
 )
 dense_solver = solver(
     recipes.DenseTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
@@ -197,7 +199,7 @@ dense_solver = solver(
 
 solve_fns = [
     (iso_solver, f"IsoTS0({num_derivatives})"),
-    (batch_solver, f"BatchTS0({num_derivatives})"),
+    (batch_solver, f"BlockDiagTS0({num_derivatives})"),
     (dense_solver, f"DenseTS0({num_derivatives})"),
 ]
 ```

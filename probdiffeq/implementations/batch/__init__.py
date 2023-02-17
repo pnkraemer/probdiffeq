@@ -1,1 +1,0 @@
-"""Batch-style implementations."""

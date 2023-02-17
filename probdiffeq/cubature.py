@@ -32,7 +32,7 @@ class _PositiveCubatureRule:
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
     @classmethod
-    def from_params_batch(cls, input_shape, **kwargs):
+    def from_params_blockdiag(cls, input_shape, **kwargs):
         # Todo: is this what _we want_?
         #  It is what we had so far, but how does the complexity of this mess
         #  scale with the dimensionality of the problem?

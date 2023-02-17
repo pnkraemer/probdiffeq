@@ -1,4 +1,4 @@
-"""Batch-style extrapolations."""
+"""BlockDiag-style extrapolations."""
 from typing import Tuple
 
 import jax
@@ -11,7 +11,7 @@ _IBMCacheType = Tuple[jax.Array]  # Cache type
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchIBM(_collections.AbstractExtrapolation):
+class BlockDiagIBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower):
         self.ibm = _scalar.IBM(a, q_sqrtm_lower)
 

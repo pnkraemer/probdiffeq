@@ -1,0 +1,1 @@
+"""BlockDiag-style implementations."""
