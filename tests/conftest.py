@@ -139,8 +139,8 @@ def fixture_solution_save_at(ode_problem, solver_config, solver):
 @pytest_cases.fixture(scope="session", name="solution_solve")
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_solution_solve(ode_problem, solver_config, solver):
-    solution = ivpsolve.solve(
+def fixture_solution_solve_with_python_while_loop(ode_problem, solver_config, solver):
+    solution = ivpsolve.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,

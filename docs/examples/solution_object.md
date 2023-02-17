@@ -54,7 +54,7 @@ solver = solvers.DynamicSolver(
 
 ```python tags=[]
 %%time
-solution = ivpsolve.solve(
+solution = ivpsolve.solve_with_python_while_loop(
     vector_field,
     initial_values=(u0,),
     t0=t0,

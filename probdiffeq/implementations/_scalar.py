@@ -351,7 +351,6 @@ class Conditional(_collections.AbstractConditional):
         return Conditional(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):
-
         if self.transition.ndim > 2:
             return jax.vmap(Conditional.merge_with_incoming_conditional)(self, incoming)
 

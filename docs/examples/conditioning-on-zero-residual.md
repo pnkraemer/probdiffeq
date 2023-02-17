@@ -62,7 +62,7 @@ solver = solvers.MLESolver(
 %%time
 
 # Solve the ODE with low precision
-solution = ivpsolve.solve(
+solution = ivpsolve.solve_with_python_while_loop(
     vector_field,
     initial_values=(u0[None],),
     t0=t0,
@@ -111,7 +111,6 @@ prior_u = []
 prior_du = []
 rv = extrapolation_model.init_corrected(taylor_coefficients)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
-
     prior_u.append(rv.marginal_nth_derivative(0).mean)
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 

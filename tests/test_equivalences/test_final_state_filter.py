@@ -1,6 +1,6 @@
 """There are too many ways to smooth. We assert they all do the same."""
 
-# todo: reuse solve() calls with default smoothers.
+# todo: reuse solve_with_python_while_loop() calls with default smoothers.
 import jax
 import jax.numpy as jnp
 import pytest_cases

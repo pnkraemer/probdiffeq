@@ -9,7 +9,7 @@ from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call
-#  solve(... solver=smo) and solve_and_save_at(solver=fp_smo)
+#  solve_with_python_while_loop(... solver=smo) and solve_and_save_at(solver=fp_smo)
 #  this redundancy should be eliminated
 
 
@@ -24,14 +24,15 @@ def smoother_pair_smoother_and_fixedpoint():
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
-     of a previous call to solve(), the results should be identical."""
+     of a previous call to solve_with_python_while_loop(), \
+     the results should be identical."""
     # smo_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
 
     args = (ode_problem.vector_field, ode_problem.initial_values)
     kwargs = {"parameters": ode_problem.args, "atol": 1e-1, "rtol": 1e-1}
-    smo_sol = ivpsolve.solve(
+    smo_sol = ivpsolve.solve_with_python_while_loop(
         *args,
         t0=ode_problem.t0,
         t1=ode_problem.t1,

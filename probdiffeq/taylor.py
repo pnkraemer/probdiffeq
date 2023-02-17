@@ -249,14 +249,12 @@ def taylor_mode_doubling_fn(
 
     taylor_coefficients = [u0]
     while (deg := len(taylor_coefficients)) < num + 1:
-
         jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
         fx, jvp_fn = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
         cs = [(fx[deg - 1] / deg)]
         for k in range(deg, min(2 * deg, num)):
-
             # The Jacobian of the embedded jet is block-banded,
             # i.e., of the form (for j=3)
             # (A0, 0, 0; A1, A0, 0; A2, A1, A0; *, *, *; *, *, *; *, *, *)

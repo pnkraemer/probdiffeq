@@ -277,7 +277,6 @@ class VectStatisticalZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
-
         # Select the required derivatives
         _x = extrapolated  # readability in current code block
         m_0 = self.e0(_x.hidden_state.mean)

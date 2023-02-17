@@ -58,6 +58,7 @@ clean:
 	rm -rf dist site build
 	rm -rf *.ipynb_checkpoints
 	rm -rf docs/benchmarks/__pycache__
+	rm -rf docs/benchmarks/.ipynb_checkpoints
 
 doc:
 	mkdocs build

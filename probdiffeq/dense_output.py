@@ -73,7 +73,6 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution):
     init = jax.tree_util.tree_map(lambda x: x[-1, ...], solution.posterior.init)
 
     def filter_step(carry, x):
-
         # Read
         rv, num_data, nmll_prev = carry.rv, carry.num_data, carry.nmll
         bw_model, obs_std, data = x

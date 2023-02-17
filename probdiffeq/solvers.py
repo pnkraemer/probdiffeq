@@ -326,7 +326,6 @@ class DynamicSolver(_AbstractSolver):
         return smoothing_solution, dt * error
 
     def extract_fn(self, *, state):
-
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = marginals.extract_qoi()
 

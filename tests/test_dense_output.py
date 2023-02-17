@@ -98,7 +98,6 @@ def test_negative_marginal_log_likelihood(solution_save_at):
 
     # todo: this is hacky. But the tests get faster?
     if isinstance(solver.strategy, smoothers.FixedPointSmoother):
-
         data = solution.u + 0.005
         k = solution.u.shape[0]
 

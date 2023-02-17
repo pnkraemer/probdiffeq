@@ -77,7 +77,6 @@ class _ProportionalIntegralCommon(AbstractControl):
     def control_fn(
         self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
-
         n1 = self.power_integral_unscaled / error_contraction_rate
         n2 = self.power_proportional_unscaled / error_contraction_rate
 
@@ -121,7 +120,6 @@ class ClippedProportionalIntegral(_ProportionalIntegralCommon):
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class _IntegralCommon(AbstractControl):
-
     safety: float = 0.95
     factor_min: float = 0.2
     factor_max: float = 10.0

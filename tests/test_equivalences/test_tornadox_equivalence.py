@@ -103,7 +103,7 @@ def case_solver_pair_kronecker_ek0(
 
     # Solve with probdiffeq
     vf_ode, u0, (t0, t1), f_args = ivp_probdiffeq
-    solution_probdiffeq = ivpsolve.solve(
+    solution_probdiffeq = ivpsolve.solve_with_python_while_loop(
         vf_ode,
         initial_values=u0,
         t0=t0,
@@ -171,7 +171,7 @@ def case_solver_pair_reference_ek1(
 
     # Solve with probdiffeq
     vf_ode, u0, (t0, t1), f_args = ivp_probdiffeq
-    solution_probdiffeq = ivpsolve.solve(
+    solution_probdiffeq = ivpsolve.solve_with_python_while_loop(
         vf_ode,
         initial_values=u0,
         t0=t0,
