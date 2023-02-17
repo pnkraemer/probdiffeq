@@ -126,20 +126,20 @@ def correction_to_solver(implementation):
 
 
 num_derivatives = 4
-ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape)
-slr1_sci = recipes.VectSLR1.from_params(
+ts1 = recipes.DenseTS1.from_params(ode_shape=ode_shape)
+slr1_sci = recipes.DenseSLR1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape),
 )
 
-slr1_ut = recipes.VectSLR1.from_params(
+slr1_ut = recipes.DenseSLR1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0),
 )
 
-slr1_gh = recipes.VectSLR1.from_params(
+slr1_gh = recipes.DenseSLR1.from_params(
     ode_shape=ode_shape,
     num_derivatives=num_derivatives,
     cubature=cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3),
@@ -191,14 +191,14 @@ batch_solver = solver(
     recipes.BatchTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
 )
 dense_solver = solver(
-    recipes.VectTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
+    recipes.DenseTS0.from_params(ode_shape=ode_shape, num_derivatives=num_derivatives)
 )
 
 
 solve_fns = [
     (iso_solver, f"IsoTS0({num_derivatives})"),
     (batch_solver, f"BatchTS0({num_derivatives})"),
-    (dense_solver, f"VectTS0({num_derivatives})"),
+    (dense_solver, f"DenseTS0({num_derivatives})"),
 ]
 ```
 
@@ -237,13 +237,13 @@ filter_ts0_iso_medium = filters.Filter(recipes.IsoTS0.from_params(num_derivative
 filter_ts0_iso_high = filters.Filter(recipes.IsoTS0.from_params(num_derivatives=5))
 
 filter_ts1_low = filters.Filter(
-    recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=3)
+    recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=3)
 )
 filter_ts1_medium = filters.Filter(
-    recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=5)
+    recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=5)
 )
 filter_ts1_high = filters.Filter(
-    recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=8)
+    recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=8)
 )
 
 
@@ -252,9 +252,9 @@ for strat, label in [
     (filter_ts0_iso_low, "IsoTS0(2)"),
     (filter_ts0_iso_medium, "IsoTS0(3)"),
     (filter_ts0_iso_high, "IsoTS0(5)"),
-    (filter_ts1_low, "VectTS1(3)"),
-    (filter_ts1_medium, "VectTS1(5)"),
-    (filter_ts1_high, "VectTS1(8)"),
+    (filter_ts1_low, "DenseTS1(3)"),
+    (filter_ts1_medium, "DenseTS1(5)"),
+    (filter_ts1_high, "DenseTS1(8)"),
 ]:
     dynamic_solver = strategy_to_dynamic_solver(strat)
     mle_solver = strategy_to_mle_solver(strat)
@@ -353,22 +353,22 @@ num_low, num_medium, num_high = 3, 5, 8
 ts0_iso_low = recipes.IsoTS0.from_params(num_derivatives=num_low)
 ts0_iso_medium = recipes.IsoTS0.from_params(num_derivatives=num_medium)
 
-ts1_low = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=num_low)
-ts1_medium = recipes.VectTS1.from_params(
+ts1_low = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_low)
+ts1_medium = recipes.DenseTS1.from_params(
     ode_shape=ode_shape, num_derivatives=num_medium
 )
-ts1_high = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
+ts1_high = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
 
-slr1_high = recipes.VectSLR1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
+slr1_high = recipes.DenseSLR1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
 solve_fns = [
     (impl_to_mle_solver_filter(ts0_iso_low), f"IsoTS0({num_low}), MLE"),
     (impl_to_mle_solver_filter(ts0_iso_medium), f"IsoTS0({num_medium}), MLE"),
-    (impl_to_dynamic_solver_filter(ts1_low), f"VectTS1({num_low}), Dynamic"),
-    (impl_to_mle_solver_filter(ts1_medium), f"VectTS1({num_medium}), MLE"),
-    (impl_to_mle_solver_filter(ts1_high), f"VectTS1({num_high}), MLE"),
-    (impl_to_mle_solver_filter(slr1_high), f"VectSLR1({num_high}), MLE"),
+    (impl_to_dynamic_solver_filter(ts1_low), f"DenseTS1({num_low}), Dynamic"),
+    (impl_to_mle_solver_filter(ts1_medium), f"DenseTS1({num_medium}), MLE"),
+    (impl_to_mle_solver_filter(ts1_high), f"DenseTS1({num_high}), MLE"),
+    (impl_to_mle_solver_filter(slr1_high), f"DenseSLR1({num_high}), MLE"),
 ]
 ```
 

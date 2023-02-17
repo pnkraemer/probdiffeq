@@ -65,23 +65,23 @@ def case_mle_fixedpoint_ts0_batch():
 
 
 @pytest_cases.case(tags=(Tag("filter", "first", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_ts1_vect():
-    implementation = recipes.VectTS1.from_params(ode_shape=(2,))
+def case_dynamic_filter_ts1_dense():
+    implementation = recipes.DenseTS1.from_params(ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("filter", "first", ode_shape=(2,), ode_order=1),))
-def case_mle_filter_slr1_vect():
-    implementation = recipes.VectSLR1.from_params(ode_shape=(2,))
+def case_mle_filter_slr1_dense():
+    implementation = recipes.DenseSLR1.from_params(ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("filter", "first", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_slr1_vect_ut():
+def case_dynamic_filter_slr1_dense_ut():
     cube = cubature.UnscentedTransform.from_params(input_shape=(2,))
-    implementation = recipes.VectSLR1.from_params(cubature=cube, ode_shape=(2,))
+    implementation = recipes.DenseSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
@@ -102,44 +102,44 @@ def case_dynamic_filter_slr1_batch():
 
 
 @pytest_cases.case(tags=(Tag("filter", "first", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_slr1_vect_gh():
+def case_dynamic_filter_slr1_dense_gh():
     cube = cubature.GaussHermite.from_params(input_shape=(2,))
-    implementation = recipes.VectSLR1.from_params(cubature=cube, ode_shape=(2,))
+    implementation = recipes.DenseSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("filter", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_slr0_vect():
-    implementation = recipes.VectSLR0.from_params(ode_shape=(2,))
+def case_dynamic_filter_slr0_dense():
+    implementation = recipes.DenseSLR0.from_params(ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("filter", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_slr0_vect_gh():
+def case_dynamic_filter_slr0_dense_gh():
     cube = cubature.GaussHermite.from_params(input_shape=(2,))
-    implementation = recipes.VectSLR0.from_params(cubature=cube, ode_shape=(2,))
+    implementation = recipes.DenseSLR0.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("smoother", "first", ode_shape=(2,), ode_order=1),))
-def case_mle_smoother_ts1_vect():
-    implementation = recipes.VectTS1.from_params(ode_shape=(2,))
+def case_mle_smoother_ts1_dense():
+    implementation = recipes.DenseTS1.from_params(ode_shape=(2,))
     strategy = smoothers.Smoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("fixedpoint", "first", ode_shape=(2,), ode_order=1),))
-def case_mle_fixedpoint_ts1_vect():
-    implementation = recipes.VectTS1.from_params(ode_shape=(2,))
+def case_mle_fixedpoint_ts1_dense():
+    implementation = recipes.DenseTS1.from_params(ode_shape=(2,))
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("fixedpoint", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_mle_fixedpoint_ts0_vect():
-    implementation = recipes.VectTS0.from_params(ode_shape=(2,))
+def case_mle_fixedpoint_ts0_dense():
+    implementation = recipes.DenseTS0.from_params(ode_shape=(2,))
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)

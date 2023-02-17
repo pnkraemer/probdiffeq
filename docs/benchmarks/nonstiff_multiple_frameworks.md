@@ -168,7 +168,7 @@ ode_shape = u0.shape
 ts0 = recipes.IsoTS0.from_params(num_derivatives=4)
 ts0_batch = recipes.BatchTS0.from_params(ode_shape=ode_shape, num_derivatives=5)
 slr1_batch = recipes.BatchSLR1.from_params(ode_shape=ode_shape, num_derivatives=6)
-ts1 = recipes.VectTS1.from_params(ode_shape=ode_shape, num_derivatives=7)
+ts1 = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=7)
 
 solve_fns = [
     (scipy_solve_ivp_rk45, "RK45 (scipy.integrate)"),
@@ -177,7 +177,7 @@ solve_fns = [
     (solver_to_solve(solvers.MLESolver(filters.Filter(ts0))), "IsoTS0(n=4)"),
     (solver_to_solve(solvers.MLESolver(filters.Filter(ts0_batch))), "BatchTS0(n=5)"),
     (solver_to_solve(solvers.MLESolver(filters.Filter(slr1_batch))), "BatchSLR1(n=6)"),
-    (solver_to_solve(solvers.MLESolver(filters.Filter(ts1))), "VectTS1(n=7)"),
+    (solver_to_solve(solvers.MLESolver(filters.Filter(ts1))), "DenseTS1(n=7)"),
 ]
 ```
 

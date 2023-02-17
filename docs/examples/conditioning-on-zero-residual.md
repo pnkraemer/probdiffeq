@@ -54,7 +54,7 @@ def vector_field(y, *, t, p):
 
 # Make a solver
 solver = solvers.MLESolver(
-    smoothers.Smoother(recipes.VectSLR1.from_params(ode_shape=(1,), num_derivatives=1))
+    smoothers.Smoother(recipes.DenseSLR1.from_params(ode_shape=(1,), num_derivatives=1))
 )
 ```
 

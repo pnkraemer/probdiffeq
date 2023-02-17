@@ -1,16 +1,16 @@
-"""Vectorised extrapolations."""
+"""Denseorised extrapolations."""
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
-from probdiffeq.implementations.vect import _vars
+from probdiffeq.implementations.dense import _vars
 
 # todo: init_corrected should be init_hidden_state?
 
 
 @jax.tree_util.register_pytree_node_class
-class VectConditional(_collections.AbstractConditional):
+class DenseConditional(_collections.AbstractConditional):
     def __init__(self, transition, noise, target_shape):
         self.transition = transition
         self.noise = noise
@@ -35,13 +35,13 @@ class VectConditional(_collections.AbstractConditional):
 
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        cond = _vars.VectNormal(m, self.noise.cov_sqrtm_lower)
-        return _vars.VectStateSpaceVar(cond, target_shape=self.target_shape)
+        cond = _vars.DenseNormal(m, self.noise.cov_sqrtm_lower)
+        return _vars.DenseStateSpaceVar(cond, target_shape=self.target_shape)
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
         shape = self.target_shape
-        return VectConditional(self.transition, noise=noise, target_shape=shape)
+        return DenseConditional(self.transition, noise=noise, target_shape=shape)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -54,8 +54,8 @@ class VectConditional(_collections.AbstractConditional):
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
-        noise = _vars.VectNormal(mean=xi, cov_sqrtm_lower=Xi)
-        return VectConditional(g, noise=noise, target_shape=self.target_shape)
+        noise = _vars.DenseNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return DenseConditional(g, noise=noise, target_shape=self.target_shape)
 
     def marginalise(self, rv, /):
         # Pull into preconditioned space
@@ -72,12 +72,12 @@ class VectConditional(_collections.AbstractConditional):
         m_new = m_new_p
         l_new = l_new_p
 
-        marg = _vars.VectNormal(m_new, l_new)
-        return _vars.VectStateSpaceVar(marg, target_shape=rv.target_shape)
+        marg = _vars.DenseNormal(m_new, l_new)
+        return _vars.DenseStateSpaceVar(marg, target_shape=rv.target_shape)
 
 
 @jax.tree_util.register_pytree_node_class
-class VectIBM(_collections.AbstractExtrapolation):
+class DenseIBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower, num_derivatives, ode_shape):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
@@ -127,8 +127,8 @@ class VectIBM(_collections.AbstractExtrapolation):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        corr = _vars.VectNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        return _vars.VectStateSpaceVar(corr, target_shape=m0_matrix.shape)
+        corr = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _vars.DenseStateSpaceVar(corr, target_shape=m0_matrix.shape)
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
@@ -142,8 +142,8 @@ class VectIBM(_collections.AbstractExtrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        extrapolated = _vars.VectNormal(m_ext, q_sqrtm)
-        ssv = _vars.VectStateSpaceVar(extrapolated, target_shape=shape)
+        extrapolated = _vars.DenseNormal(m_ext, q_sqrtm)
+        ssv = _vars.DenseStateSpaceVar(extrapolated, target_shape=shape)
         return ssv, (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
@@ -167,8 +167,8 @@ class VectIBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
 
         shape = linearisation_pt.target_shape
-        rv = _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.VectStateSpaceVar(rv, target_shape=shape)
+        rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return _vars.DenseStateSpaceVar(rv, target_shape=shape)
 
     def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
@@ -192,16 +192,16 @@ class VectIBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         shape = linearisation_pt.target_shape
-        backward_noise = _vars.VectNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = VectConditional(g_bw, noise=backward_noise, target_shape=shape)
-        rv = _vars.VectNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        extrapolated = _vars.VectStateSpaceVar(rv, target_shape=shape)
+        backward_noise = _vars.DenseNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = DenseConditional(g_bw, noise=backward_noise, target_shape=shape)
+        rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        extrapolated = _vars.DenseStateSpaceVar(rv, target_shape=shape)
         return extrapolated, bw_model
 
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return VectConditional(op, noise=noi, target_shape=ssv_proto.target_shape)
+        return DenseConditional(op, noise=noi, target_shape=ssv_proto.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape
@@ -210,7 +210,7 @@ class VectIBM(_collections.AbstractExtrapolation):
 
     @staticmethod
     def _init_backward_noise(rv_proto):
-        return _vars.VectNormal(
+        return _vars.DenseNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
