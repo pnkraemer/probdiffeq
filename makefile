@@ -1,5 +1,5 @@
 
-.PHONY: format lint test pre-commit doc clean
+.PHONY: format lint test doc clean
 
 format:
 	isort .
@@ -15,26 +15,6 @@ format:
 	jupytext --sync docs/benchmarks/*
 
 lint:
-	# The fail-fast linters
-	isort --check --diff .
-	black --check --diff .
-	flake8
-	# Apply the basics to the notebooks
-	nbqa isort --check --diff docs/examples/
-	nbqa isort --check --diff docs/advanced_examples/
-	nbqa isort --check --diff docs/benchmarks/
-	nbqa black --check --diff docs/examples/
-	nbqa black --check --diff docs/advanced_examples/
-	nbqa black --check --diff docs/benchmarks/
-	nbqa flake8 docs/examples/
-	nbqa flake8 docs/advanced_examples/
-	nbqa flake8 docs/benchmarks/
-	# Opt-in for specific pylint checks that flake8 can't detect
-	pylint probdiffeq/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-locals,duplicate-code,too-many-arguments
-	pylint tests/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-arguments,duplicate-code,too-many-locals
-
-pre-commit:
-	pre-commit autoupdate
 	pre-commit run --all-files
 
 test:
