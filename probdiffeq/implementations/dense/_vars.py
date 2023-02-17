@@ -9,7 +9,7 @@ from probdiffeq.implementations import _collections, _sqrtm
 
 
 @jax.tree_util.register_pytree_node_class
-class VectStateSpaceVar(_collections.StateSpaceVar):
+class DenseStateSpaceVar(_collections.StateSpaceVar):
     def __init__(self, hidden_state, *, target_shape):
         super().__init__(hidden_state=hidden_state)
         self.target_shape = target_shape
@@ -38,9 +38,9 @@ class VectStateSpaceVar(_collections.StateSpaceVar):
         )
         m_cor = self.hidden_state.mean - gain @ (m_obs - u)
 
-        obs = VectNormal(m_obs, r_obs.T)
-        cor = VectStateSpaceVar(
-            VectNormal(m_cor, r_cor.T), target_shape=self.target_shape
+        obs = DenseNormal(m_obs, r_obs.T)
+        cor = DenseStateSpaceVar(
+            DenseNormal(m_cor, r_cor.T), target_shape=self.target_shape
         )
         return obs, (cor, gain)
 
@@ -58,12 +58,12 @@ class VectStateSpaceVar(_collections.StateSpaceVar):
 
     def scale_covariance(self, scale_sqrtm):
         hidden_state_scaled = self.hidden_state.scale_covariance(scale_sqrtm)
-        return VectStateSpaceVar(hidden_state_scaled, target_shape=self.target_shape)
+        return DenseStateSpaceVar(hidden_state_scaled, target_shape=self.target_shape)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
             # if the variable has batch-axes, vmap the result
-            fn = VectStateSpaceVar.marginal_nth_derivative
+            fn = DenseStateSpaceVar.marginal_nth_derivative
             vect_fn = jax.vmap(fn, in_axes=(0, None))
             return vect_fn(self, n)
 
@@ -78,7 +78,7 @@ class VectStateSpaceVar(_collections.StateSpaceVar):
         cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
             R=cov_sqrtm_lower_nonsquare.T
         ).T
-        return VectNormal(mean, cov_sqrtm_lower)
+        return DenseNormal(mean, cov_sqrtm_lower)
 
     def _select_derivative_vect(self, x, i):
         fn = functools.partial(self._select_derivative, i=i)
@@ -91,8 +91,8 @@ class VectStateSpaceVar(_collections.StateSpaceVar):
 
 
 @jax.tree_util.register_pytree_node_class
-class VectNormal(_collections.AbstractNormal):
-    """Vector-normal distribution.
+class DenseNormal(_collections.AbstractNormal):
+    """Denseor-normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.
     But in fact, it is more of a matrix-normal distribution.
@@ -130,7 +130,7 @@ class VectNormal(_collections.AbstractNormal):
 
     def scale_covariance(self, scale_sqrtm):
         cov_scaled = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
-        return VectNormal(mean=self.mean, cov_sqrtm_lower=cov_scaled)
+        return DenseNormal(mean=self.mean, cov_sqrtm_lower=cov_scaled)
 
     # automatically batched because of numpy's broadcasting rules?
     def transform_unit_sample(self, base, /):

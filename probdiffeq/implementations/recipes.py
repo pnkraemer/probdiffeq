@@ -7,10 +7,10 @@ import jax
 from probdiffeq.implementations import _collections
 from probdiffeq.implementations.batch import corr as batch_corr
 from probdiffeq.implementations.batch import extra as batch_extra
+from probdiffeq.implementations.dense import corr as dense_corr
+from probdiffeq.implementations.dense import extra as dense_extra
 from probdiffeq.implementations.iso import corr as iso_corr
 from probdiffeq.implementations.iso import extra as iso_extra
-from probdiffeq.implementations.vect import corr as vect_corr
-from probdiffeq.implementations.vect import extra as vect_extra
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
 """Extrapolation style."""
@@ -84,60 +84,60 @@ class BatchTS0(
 
 
 @jax.tree_util.register_pytree_node_class
-class VectTS1(
-    AbstractImplementation[vect_corr.VectTaylorFirstOrder, vect_extra.VectIBM]
+class DenseTS1(
+    AbstractImplementation[dense_corr.DenseTaylorFirstOrder, dense_extra.DenseIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = vect_corr.VectTaylorFirstOrder(
+        correction = dense_corr.DenseTaylorFirstOrder(
             ode_shape=ode_shape, ode_order=ode_order
         )
-        extrapolation = vect_extra.VectIBM.from_params(
+        extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class VectTS0(
-    AbstractImplementation[vect_corr.VectTaylorZerothOrder, vect_extra.VectIBM]
+class DenseTS0(
+    AbstractImplementation[dense_corr.DenseTaylorZerothOrder, dense_extra.DenseIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = vect_corr.VectTaylorZerothOrder(
+        correction = dense_corr.DenseTaylorZerothOrder(
             ode_shape=ode_shape, ode_order=ode_order
         )
-        extrapolation = vect_extra.VectIBM.from_params(
+        extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class VectSLR1(
-    AbstractImplementation[vect_corr.VectStatisticalFirstOrder, vect_extra.VectIBM]
+class DenseSLR1(
+    AbstractImplementation[dense_corr.DenseStatisticalFirstOrder, dense_extra.DenseIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
-        correction = vect_corr.VectStatisticalFirstOrder.from_params(
+        correction = dense_corr.DenseStatisticalFirstOrder.from_params(
             ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
         )
-        extrapolation = vect_extra.VectIBM.from_params(
+        extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class VectSLR0(
-    AbstractImplementation[vect_corr.VectStatisticalZerothOrder, vect_extra.VectIBM]
+class DenseSLR0(
+    AbstractImplementation[dense_corr.DenseStatisticalZerothOrder, dense_extra.DenseIBM]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
-        correction = vect_corr.VectStatisticalZerothOrder.from_params(
+        correction = dense_corr.DenseStatisticalZerothOrder.from_params(
             ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
         )
-        extrapolation = vect_extra.VectIBM.from_params(
+        extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
