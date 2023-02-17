@@ -101,4 +101,4 @@ But a true pro calls the ODE filter the way it is supposed to be called.
 ::: probdiffeq.ivpsolve.solve_and_save_at
 
 ### Adaptive simulation using native Python control flow
-::: probdiffeq.ivpsolve.solve
+::: probdiffeq.ivpsolve.solve_with_python_while_loop

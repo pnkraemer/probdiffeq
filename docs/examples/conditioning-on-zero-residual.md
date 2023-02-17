@@ -62,7 +62,7 @@ solver = solvers.MLESolver(
 %%time
 
 # Solve the ODE with low precision
-solution = ivpsolve.solve(
+solution = ivpsolve.solve_with_python_while_loop(
     vector_field,
     initial_values=(u0[None],),
     t0=t0,

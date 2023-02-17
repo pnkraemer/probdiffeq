@@ -68,7 +68,7 @@ If you are used to calling traditional solve() methods, use one of the conventio
 
 ```python
 eks0 = solvers.MLESolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
-eks0sol = ivpsolve.solve(
+eks0sol = ivpsolve.solve_with_python_while_loop(
     vf,
     initial_values=(u0,),
     t0=t0,
