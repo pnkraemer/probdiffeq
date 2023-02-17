@@ -50,5 +50,8 @@ repos:
     rev: 1.6.3
     hooks:
      - id: nbqa-black
+       additional_dependencies: [black]
      - id: nbqa-isort
+       additional_dependencies: [isort]
      - id: nbqa-flake8
+       additional_dependencies: [flake8]
