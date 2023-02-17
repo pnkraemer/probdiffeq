@@ -1,6 +1,6 @@
 # Priors with block-diagonal covariance structure
 
-::: probdiffeq.implementations.batch
+::: probdiffeq.implementations.blockdiag
 
-::: probdiffeq.implementations.batch.corr
-::: probdiffeq.implementations.batch.extra
+::: probdiffeq.implementations.blockdiag.corr
+::: probdiffeq.implementations.blockdiag.extra

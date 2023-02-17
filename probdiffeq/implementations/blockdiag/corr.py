@@ -1,4 +1,4 @@
-"""Batch-style corrections."""
+"""BlockDiag-style corrections."""
 from typing import Callable, Tuple
 
 import jax
@@ -11,7 +11,7 @@ _SLR1CacheType = Tuple[Callable]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchStatisticalFirstOrder(_collections.AbstractCorrection):
+class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
             raise ValueError
@@ -39,7 +39,7 @@ class BatchStatisticalFirstOrder(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, ode_shape, ode_order):
-        cubature_fn = cubature_module.ThirdOrderSpherical.from_params_batch
+        cubature_fn = cubature_module.ThirdOrderSpherical.from_params_blockdiag
         cubature = cubature_fn(input_shape=ode_shape)
         return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
 
@@ -98,7 +98,7 @@ _TS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTaylorZerothOrder(_collections.AbstractCorrection):
+class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ts0 = _scalar.TaylorZerothOrder(*args, **kwargs)

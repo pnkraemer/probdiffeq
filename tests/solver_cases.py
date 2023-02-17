@@ -44,22 +44,22 @@ def case_fixedpoint_ts0_iso():
 
 
 @pytest_cases.case(tags=(Tag("filter", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_ts0_batch():
-    implementation = recipes.BatchTS0.from_params(ode_shape=(2,), num_derivatives=3)
+def case_dynamic_filter_ts0_blockdiag():
+    implementation = recipes.BlockDiagTS0.from_params(ode_shape=(2,), num_derivatives=3)
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("smoother", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_mle_smoother_ts0_batch():
-    implementation = recipes.BatchTS0.from_params(ode_shape=(2,))
+def case_mle_smoother_ts0_blockdiag():
+    implementation = recipes.BlockDiagTS0.from_params(ode_shape=(2,))
     strategy = smoothers.Smoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("fixedpoint", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_mle_fixedpoint_ts0_batch():
-    implementation = recipes.BatchTS0.from_params(ode_shape=(2,))
+def case_mle_fixedpoint_ts0_blockdiag():
+    implementation = recipes.BlockDiagTS0.from_params(ode_shape=(2,))
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
     return solvers.MLESolver(strategy=strategy)
 
@@ -87,16 +87,16 @@ def case_dynamic_filter_slr1_dense_ut():
 
 
 @pytest_cases.case(tags=(Tag("filter", "first", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_slr1_ut_batch():
-    cube = cubature.UnscentedTransform.from_params_batch(input_shape=(2,))
-    implementation = recipes.BatchSLR1.from_params(cubature=cube, ode_shape=(2,))
+def case_dynamic_filter_slr1_ut_blockdiag():
+    cube = cubature.UnscentedTransform.from_params_blockdiag(input_shape=(2,))
+    implementation = recipes.BlockDiagSLR1.from_params(cubature=cube, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case(tags=(Tag("filter", "first", ode_shape=(2,), ode_order=1),))
-def case_dynamic_filter_slr1_batch():
-    implementation = recipes.BatchSLR1.from_params(ode_shape=(2,))
+def case_dynamic_filter_slr1_blockdiag():
+    implementation = recipes.BlockDiagSLR1.from_params(ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return solvers.DynamicSolver(strategy=strategy)
 

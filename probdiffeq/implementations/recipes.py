@@ -5,8 +5,8 @@ from typing import Generic, TypeVar
 import jax
 
 from probdiffeq.implementations import _collections
-from probdiffeq.implementations.batch import corr as batch_corr
-from probdiffeq.implementations.batch import extra as batch_extra
+from probdiffeq.implementations.blockdiag import corr as blockdiag_corr
+from probdiffeq.implementations.blockdiag import extra as blockdiag_extra
 from probdiffeq.implementations.dense import corr as dense_corr
 from probdiffeq.implementations.dense import extra as dense_extra
 from probdiffeq.implementations.iso import corr as iso_corr
@@ -51,33 +51,37 @@ class IsoTS0(AbstractImplementation[iso_corr.IsoTaylorZerothOrder, iso_extra.Iso
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchSLR1(
-    AbstractImplementation[batch_corr.BatchStatisticalFirstOrder, batch_extra.BatchIBM]
+class BlockDiagSLR1(
+    AbstractImplementation[
+        blockdiag_corr.BlockDiagStatisticalFirstOrder, blockdiag_extra.BlockDiagIBM
+    ]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
-            correction = batch_corr.BatchStatisticalFirstOrder.from_params(
+            correction = blockdiag_corr.BlockDiagStatisticalFirstOrder.from_params(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
-            correction = batch_corr.BatchStatisticalFirstOrder(
+            correction = blockdiag_corr.BlockDiagStatisticalFirstOrder(
                 ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
             )
-        extrapolation = batch_extra.BatchIBM.from_params(
+        extrapolation = blockdiag_extra.BlockDiagIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class BatchTS0(
-    AbstractImplementation[batch_corr.BatchStatisticalFirstOrder, batch_extra.BatchIBM]
+class BlockDiagTS0(
+    AbstractImplementation[
+        blockdiag_corr.BlockDiagStatisticalFirstOrder, blockdiag_extra.BlockDiagIBM
+    ]
 ):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = batch_corr.BatchTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = batch_extra.BatchIBM.from_params(
+        correction = blockdiag_corr.BlockDiagTaylorZerothOrder(ode_order=ode_order)
+        extrapolation = blockdiag_extra.BlockDiagIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
