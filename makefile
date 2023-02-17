@@ -52,6 +52,7 @@ example:
 	jupytext --sync docs/benchmarks/*
 
 clean:
+	pre-commit clean
 	rm -rf .pytest_cache
 	rm -rf .mypy_cache
 	rm -rf *.egg-info
