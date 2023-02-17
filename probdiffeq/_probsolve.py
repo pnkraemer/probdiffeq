@@ -73,7 +73,9 @@ def _advance_ivp_solution_adaptively(
     return sol
 
 
-def solve(vector_field, taylor_coefficients, t0, t1, solver, parameters, **options):
+def solve_with_python_while_loop(
+    vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
+):
     """Solve an initial value problem.
 
     !!! warning

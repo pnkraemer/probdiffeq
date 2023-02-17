@@ -115,7 +115,7 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
 
-    return _probsolve.solve(
+    return _probsolve.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
