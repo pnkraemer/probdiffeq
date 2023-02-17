@@ -28,7 +28,6 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 @pytest_cases.parametrize("strategy", [smoothers.Smoother, filters.Filter])
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def test_solve_fixed_grid_differentiable(ode_problem, solver_config, strategy):
-
     # Low order because it traces & differentiates faster
     filter_or_smoother = strategy(
         implementation=recipes.IsoTS0.from_params(num_derivatives=1)

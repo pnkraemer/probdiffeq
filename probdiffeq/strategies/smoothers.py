@@ -203,7 +203,6 @@ class Smoother(_SmootherCommon):
         return MarkovSequence(init=extrapolated, backward_model=bw_model)
 
     def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
-
         # todo: is this duplication unnecessary?
         accepted = self._duplicate_with_unit_backward_model(posterior=p1)
 
@@ -267,7 +266,6 @@ class FixedPointSmoother(_SmootherCommon):
         return MarkovSequence(init=extrapolated, backward_model=backward_model)
 
     def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
-
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
         merge_fn = p0.backward_model.merge_with_incoming_conditional

@@ -14,7 +14,6 @@ _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 
 @pytest_cases.parametrize("HCshape, Cshape, Xshape", _SHAPES)
 def test_revert_kernel_scalar(HCshape, Cshape, Xshape):
-
     HC = _some_array(HCshape) + 1.0
     C = _some_array(Cshape) + 2.0
     X = _some_array(Xshape) + 3.0 + jnp.eye(*Xshape)
@@ -35,7 +34,6 @@ def test_revert_kernel_scalar(HCshape, Cshape, Xshape):
 
 @pytest_cases.parametrize("Cshape, HCshape", ([(3, 3), (2, 3)],))
 def test_revert_kernel_noisefree(Cshape, HCshape):
-
     C = _some_array(Cshape) + 1.0
     HC = _some_array(HCshape) + 2.0
 

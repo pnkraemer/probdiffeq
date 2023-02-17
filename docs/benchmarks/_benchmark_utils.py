@@ -28,7 +28,6 @@ def plot_config():
 
 
 def print_info():
-
     commit = _most_recent_commit(abbrev=6)
 
     print(f"probdiffeq version:\n\t{probdiffeq_version}")
@@ -46,7 +45,6 @@ def _most_recent_commit(*, abbrev=21):
 def workprecision_make(*, solve_fns, tols, **kwargs):
     results = {}
     for solve_fn, label in tqdm(solve_fns):
-
         times, errors = [], []
 
         for rtol in tols:

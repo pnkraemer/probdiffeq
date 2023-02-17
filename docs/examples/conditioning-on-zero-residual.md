@@ -111,7 +111,6 @@ prior_u = []
 prior_du = []
 rv = extrapolation_model.init_corrected(taylor_coefficients)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
-
     prior_u.append(rv.marginal_nth_derivative(0).mean)
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 
