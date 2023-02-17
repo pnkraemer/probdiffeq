@@ -33,6 +33,10 @@ lint:
 	pylint probdiffeq/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-locals,duplicate-code,too-many-arguments
 	pylint tests/ --disable=invalid-name,missing-function-docstring,missing-class-docstring,fixme,too-many-arguments,duplicate-code,too-many-locals
 
+pre-commit:
+	pre-commit autoupdate
+	pre-commit run --all-files
+
 test:
 	pytest -n auto -x -v -s  # parallelise, fail early, verbose output, show all 'stdout's
 	python -m doctest probdiffeq/*.py
@@ -46,10 +50,6 @@ example:
 	jupytext --sync docs/advanced_examples/*
 	# No --execute for advanced examples and benchmarks (takes too long)
 	jupytext --sync docs/benchmarks/*
-
-pre-commit:
-	pre-commit autoupdate
-	pre-commit run --all-files
 
 clean:
 	rm -rf .pytest_cache
