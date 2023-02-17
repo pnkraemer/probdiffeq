@@ -137,7 +137,6 @@ make format
 make lint
 make test
 make example
-make pre-commit
 make doc
 ```
 Remove auxiliary files with 
