@@ -88,7 +88,7 @@ def solve_and_save_at(
 # Full solver routines
 
 
-def solve(
+def solve_with_python_while_loop(
     vector_field,
     initial_values,
     t0,
