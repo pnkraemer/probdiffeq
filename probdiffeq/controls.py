@@ -96,7 +96,7 @@ class ProportionalIntegral(_ProportionalIntegralCommon):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class ClippedProportionalIntegral(_ProportionalIntegralCommon):
+class ProportionalIntegralClipped(_ProportionalIntegralCommon):
     r"""Proportional-integral (PI) controller.
 
     Suggested time-steps are always clipped to $\min(\Delta t, t_1-t)$.
@@ -153,7 +153,7 @@ class Integral(_IntegralCommon):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class ClippedIntegral(_IntegralCommon):
+class IntegralClipped(_IntegralCommon):
     r"""Integral (I) controller.
 
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
