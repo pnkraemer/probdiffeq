@@ -12,6 +12,17 @@ _SLR1CacheType = Tuple[Callable]
 
 @jax.tree_util.register_pytree_node_class
 class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
+    """First-order statistical linear regression in state-space models \
+     with block-diagonal covariance structure.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
+
     def __init__(self, ode_shape, ode_order, cubature):
         if ode_order > 1:
             raise ValueError

@@ -56,6 +56,17 @@ class BlockDiagSLR1(
         blockdiag_corr.BlockDiagStatisticalFirstOrder, blockdiag_extra.BlockDiagIBM
     ]
 ):
+    """First-order statistical linear regression in state-space models \
+     with a block-diagonal structure.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
+
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         if cubature is None:
@@ -136,6 +147,17 @@ class DenseSLR1(
 class DenseSLR0(
     AbstractImplementation[dense_corr.DenseStatisticalZerothOrder, dense_extra.DenseIBM]
 ):
+    """Zeroth-order statistical linear regression in state-space models \
+     with dense covariance structure.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
+
     @classmethod
     def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
         correction = dense_corr.DenseStatisticalZerothOrder.from_params(

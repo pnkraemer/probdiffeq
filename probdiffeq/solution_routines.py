@@ -57,7 +57,15 @@ def solve_and_save_at(
     **options,
 ):
     """Solve an initial value problem \
-     and return the solution at a pre-determined grid."""
+     and return the solution at a pre-determined grid.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
     _assert_tuple(initial_values)
 
     if isinstance(solver.strategy, smoothers.Smoother):
