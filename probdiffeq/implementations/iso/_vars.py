@@ -1,4 +1,4 @@
-"""Variables with isotropic structure."""
+"""Variables."""
 
 import jax
 import jax.numpy as jnp

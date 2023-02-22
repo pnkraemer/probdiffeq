@@ -1,4 +1,4 @@
-"""Collections of interfaces."""
+"""Various interfaces."""
 
 import abc
 from typing import Generic, Tuple, TypeVar
@@ -7,7 +7,7 @@ import jax
 
 
 class AbstractNormal(abc.ABC):
-    """Random variables.
+    """Normal-distributed random variables.
 
     Means, covariances, log-probability-density functions, sampling, and so on.
     """
@@ -108,6 +108,7 @@ SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVar)
 """A type-variable to alias appropriate state-space variable types."""
 
 CacheTypeVar = TypeVar("CacheTypeVar")
+"""A type-variable to alias extrapolation- and correction-caches."""
 
 
 class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
@@ -158,7 +159,10 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
 
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
-    """Backward model for backward-Gauss--Markov process representations."""
+    """Conditional distribution interface.
+
+    Used as a backward model for backward-Gauss--Markov process representations.
+    """
 
     @abc.abstractmethod
     def __call__(self, x, /):

@@ -91,7 +91,7 @@ nav:
         - Estimation strategies:
           - "api_docs/strategies/filters.md"
           - "api_docs/strategies/smoothers.md"
-        - Solver implementations:
+        - State-space model implementations:
           - "api_docs/implementations/recipes.md"
           - "api_docs/implementations/vect.md"
           - "api_docs/implementations/iso.md"

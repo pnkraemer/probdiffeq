@@ -1,4 +1,4 @@
-"""Variables with vectorised structure."""
+"""Variables."""
 
 import functools
 
@@ -92,12 +92,11 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
 
 @jax.tree_util.register_pytree_node_class
 class DenseNormal(_collections.AbstractNormal):
-    """Denseor-normal distribution.
+    """Random variables with a normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.
-    But in fact, it is more of a matrix-normal distribution.
-    This means that the mean vector is a (d*n,)-shaped array but
-    represents a (d,n)-shaped matrix.
+    However, it is more of a matrix-normal distribution:
+    The mean is a (d*n,)-shaped array that represents a (d,n)-shaped matrix.
     """
 
     # todo: extract _whiten() method?!
@@ -117,16 +116,6 @@ class DenseNormal(_collections.AbstractNormal):
         res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
-
-    #
-    # def _select_derivative_vect(self, x, i):
-    #     fn = functools.partial(self._select_derivative, i=i)
-    #     select = jax.vmap(fn, in_axes=1, out_axes=1)
-    #     return select(x)
-    #
-    # def _select_derivative(self, x, i):
-    #     x_reshaped = jnp.reshape(x, self.target_shape, order="F")
-    #     return x_reshaped[i, ...]
 
     def scale_covariance(self, scale_sqrtm):
         cov_scaled = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower

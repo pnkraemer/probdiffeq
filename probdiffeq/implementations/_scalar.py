@@ -1,4 +1,4 @@
-"""Scalar implementations."""
+"""Implementations for scalar initial value problems."""
 
 import jax
 import jax.numpy as jnp
@@ -406,7 +406,6 @@ class IBM(_collections.AbstractExtrapolation):
 
     @classmethod
     def from_params(cls, num_derivatives):
-        """Create a strategy from hyperparameters."""
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         return cls(a=a, q_sqrtm_lower=q_sqrtm)
 
@@ -415,7 +414,6 @@ class IBM(_collections.AbstractExtrapolation):
         return self.a.shape[0] - 1
 
     def init_corrected(self, taylor_coefficients):
-        """Initialise the "corrected" RV by stacking Taylor coefficients."""
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)

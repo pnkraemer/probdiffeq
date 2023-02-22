@@ -1,4 +1,4 @@
-"""Denseorised extrapolations."""
+"""Extrapolations."""
 
 import jax
 import jax.numpy as jnp
@@ -106,7 +106,6 @@ class DenseIBM(_collections.AbstractExtrapolation):
 
     @classmethod
     def from_params(cls, ode_shape, num_derivatives):
-        """Create a strategy from hyperparameters."""
         assert len(ode_shape) == 1
         (d,) = ode_shape
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
@@ -119,7 +118,6 @@ class DenseIBM(_collections.AbstractExtrapolation):
         )
 
     def init_corrected(self, taylor_coefficients):
-        """Initialise the "corrected" RV by stacking Taylor coefficients."""
         if taylor_coefficients[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)

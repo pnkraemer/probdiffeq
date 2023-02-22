@@ -1,4 +1,4 @@
-"""Isotropic-style corrections."""
+"""Corrections."""
 from typing import Tuple
 
 import jax

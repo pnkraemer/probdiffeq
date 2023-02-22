@@ -1,1 +1,1 @@
-"""ODE filter implementations."""
+"""State-space model implementations."""

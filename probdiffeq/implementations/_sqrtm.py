@@ -67,46 +67,10 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
 
     _The present function provides the machinery to change the covariance
     parametrisation from $p(Y \mid X) p(X)$ to $p(X \mid Y) p(Y)$._
-    Let $p(X) = N(*, R_X^\top R_X)$
-    (the mean of the distribution does not matter)
-    and $p(Y \mid X) = N(F^\top X, R_{Y \mid X}^\top R_{Y \mid X}).$
-    Then, the joint covariance of $X$ and $Y$ is
-
-    $$
-    \mathrm{cov}(X, Y) =
-    \begin{pmatrix}
-        R_X^\top R_X & R_X^\top (R_X F) \\
-        (R_X F)^\top R_X & (R_X F)^\top (R_X F) + R_{Y \mid X}^\top R_{Y \mid X}
-    \end{pmatrix}
-    $$
-
-    The marginal
-
-    $$
-    p(Y) = N(*, R_{Y}^\top R_{Y}) =
-    N(..., (R_X R_F)^\top R_X R_F + R_{Y \mid X}^\top R_{Y \mid X})
-    $$
-
-    could also be the starting point of a different parametrisation;
-    let $p(X \mid Y) = N(G^\top Y, R_{X \mid Y}^\top R_{X \mid Y})$,
-    then the joint covariance of $X$ and $Y$ is
-
-    $$
-    \mathrm{cov}(X, Y) =
-    \begin{pmatrix}
-        (R_{Y} G)^\top (R_{Y} G)
-        + R_{X \mid Y}^\top R_{X \mid Y} & R_{Y}^\top (R_{Y} G) \\
-        (R_{Y} G)^\top R_{Y} &  R_{Y}^\top R_{Y}
-    \end{pmatrix}
-    $$
-
-    This "change of direction" is useful to compute the smoothing gains
-    of a Rauch-Tung-Striebel smoother during the forward-filtering pass.
-    This function implements such a "change of direction".
 
     !!! note "Application"
 
-        This function is absolutely crucial to compute the backward transitions
+        This function is crucial to compute the backward transitions
         in Kalman-smoothing-like applications.
 
 
@@ -157,7 +121,7 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
 
 
 def sum_of_sqrtm_factors(*, R_stack: Tuple):
-    r"""Compute the matrix square root $R^\top R = R_1^\top R_1 + R_2^\top R_2$."""
+    r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
     R = jnp.vstack(R_stack)
     uppertri = sqrtm_to_upper_triangular(R=R)
     if jnp.ndim(R_stack[0]) == 0:
@@ -167,5 +131,6 @@ def sum_of_sqrtm_factors(*, R_stack: Tuple):
 
 def sqrtm_to_upper_triangular(*, R):
     """Transform a right matrix square root to a Cholesky factor."""
+    # todo: enforce positive diagonals?
     upper_sqrtm = jnp.linalg.qr(R, mode="r")
     return upper_sqrtm
