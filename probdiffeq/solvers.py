@@ -1,4 +1,4 @@
-"""Inference interface."""
+"""Initial value problem (IVP) solvers and solutions."""
 
 import abc
 from typing import Generic, TypeVar
@@ -6,15 +6,16 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-T = TypeVar("T")
+RVTypeVar = TypeVar("RVTypeVar")
+"""Random-variable type-variable for generic IVP solutions."""
 
 
 @jax.tree_util.register_pytree_node_class
-class Solution(Generic[T]):
-    """Inferred solutions."""
+class Solution(Generic[RVTypeVar]):
+    """Estimated IVP solution."""
 
     def __init__(
-        self, t, u, output_scale_sqrtm, marginals: T, posterior, num_data_points
+        self, t, u, output_scale_sqrtm, marginals: RVTypeVar, posterior, num_data_points
     ):
         self.t = t
         self.u = u
@@ -60,16 +61,11 @@ class Solution(Generic[T]):
         )
 
     def __len__(self):
-        """Length of a solution object.
-
-        Depends on the length of the underlying :attr:`t` attribute.
-        """
         if jnp.ndim(self.t) < 1:
             raise ValueError("Solution object not batched :(")
         return self.t.shape[0]
 
     def __getitem__(self, item):
-        """Access the `i`-th sub-solution."""
         if jnp.ndim(self.t) < 1:
             raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
         if isinstance(item, tuple) and len(item) > jnp.ndim(self.t):
@@ -87,14 +83,13 @@ class Solution(Generic[T]):
         )
 
     def __iter__(self):
-        """Iterate through the filtering solution."""
         for i in range(self.t.shape[0]):
             yield self[i]
 
 
 @jax.tree_util.register_pytree_node_class
 class _AbstractSolver(abc.ABC):
-    """Inference strategy interface."""
+    """Interface for IVP solvers."""
 
     def __init__(self, strategy):
         self.strategy = strategy
@@ -207,6 +202,8 @@ class _AbstractSolver(abc.ABC):
 
 @jax.tree_util.register_pytree_node_class
 class Solver(_AbstractSolver):
+    """IVP solver."""
+
     def __init__(self, strategy, *, output_scale_sqrtm):
         super().__init__(strategy=strategy)
 
@@ -214,7 +211,6 @@ class Solver(_AbstractSolver):
         self._output_scale_sqrtm = output_scale_sqrtm
 
     def step_fn(self, *, state, vector_field, dt, parameters):
-        """Step."""
         # Pre-error-estimate steps
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -290,7 +286,7 @@ class Solver(_AbstractSolver):
 
 @jax.tree_util.register_pytree_node_class
 class DynamicSolver(_AbstractSolver):
-    """Dynamic calibration."""
+    """IVP solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
@@ -354,10 +350,9 @@ class DynamicSolver(_AbstractSolver):
 
 @jax.tree_util.register_pytree_node_class
 class MLESolver(_AbstractSolver):
-    """Standard calibration. Nothing dynamic."""
+    """IVP solver with (quasi-)maximum-likelihood calibration of the output-scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
-        """Step."""
         # Pre-error-estimate steps
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
