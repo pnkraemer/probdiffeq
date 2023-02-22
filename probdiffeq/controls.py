@@ -1,4 +1,4 @@
-"""Controllers / control algorithms."""
+"""Step-size control algorithms."""
 
 import abc
 import dataclasses
@@ -9,8 +9,6 @@ import jax.numpy as jnp
 
 
 class AbstractControl(abc.ABC):
-    """Interface for control algorithms."""
-
     @abc.abstractmethod
     def init_fn(self):
         """Initialise the controller state."""
@@ -20,14 +18,7 @@ class AbstractControl(abc.ABC):
     def control_fn(
         self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
-        r"""Propose a time-step $\Delta t$.
-
-        A good time-step $\Delta t$ is as large as possible
-        such that the normalised error is smaller than 1.
-        This is commonly a function of previous error estimates,
-        the current normalised error, and some expected error
-        contraction rate.
-        """
+        r"""Propose a time-step $\Delta t$."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -44,8 +35,6 @@ class _PIState(NamedTuple):
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class _ProportionalIntegralCommon(AbstractControl):
-    """Proportional-integral (PI) controller."""
-
     safety: float = 0.95
     factor_min: float = 0.2
     factor_max: float = 10.0
@@ -110,7 +99,7 @@ class ProportionalIntegral(_ProportionalIntegralCommon):
 class ClippedProportionalIntegral(_ProportionalIntegralCommon):
     r"""Proportional-integral (PI) controller.
 
-    Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
+    Suggested time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
     def clip_fn(self, *, state, dt, t1):
@@ -156,10 +145,7 @@ class _IntegralCommon(AbstractControl):
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class Integral(_IntegralCommon):
-    r"""Integral (I) controller.
-
-    Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
-    """
+    r"""Integral (I) controller."""
 
     def clip_fn(self, *, state, dt, t1):
         return dt
