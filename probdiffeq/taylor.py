@@ -1,32 +1,4 @@
-r"""Compute the Taylor series of the solution of a differential equation.
-
-Commonly, this is done with recursive automatic differentiation
-and used for the consistent initialisation of ODE filters.
-
-More specifically:
-ODE filters require an initialisation of the state
-and its first $\nu$ derivatives, and numerical stability
-requires an accurate initialisation.
-The gold standard is Taylor-mode differentiation, but others can be
-useful, too.
-
-The general interface of these differentiation functions is as follows:
-
-\begin{align*}
-(u_0, \dot u_0, \ddot u_0, ...) &= G(f, (u_0,), n), \\
-(u_0, \dot u_0, \ddot u_0, ...) &= G(f, (u_0, \dot u_0), n), \\
-(u_0, \dot u_0, \ddot u_0, ...) &= G(f, (u_0, \dot u_0, ...), n).
-\end{align*}
-
-The inputs are vector fields, initial conditions, and an integer;
-the outputs are unnormalised Taylor coefficients (or equivalently,
-higher-order derivatives of the initial condition).
-$f = f(u, du, ...)$ is an autonomous vector field of a
-potentially high-order differential equation; $(u_0, \dot u_0, ...)$
-is a tuple of initial conditions that matches the signature of the vector field;
-and $n$ is the number of recursions, which commonly describes how many
-derivatives to "add" to the existing initial conditions.
-"""
+r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 import functools
 from typing import Callable, Tuple
@@ -43,7 +15,7 @@ from probdiffeq.implementations import recipes
 def taylor_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Taylor-mode AD."""
+    """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
@@ -62,7 +34,7 @@ def taylor_mode_fn(
 
 
 def _subsets(x, /, n):
-    """Compute specific subsets until exhausted.
+    """Compute staggered subsets.
 
     See example below.
 
@@ -87,7 +59,7 @@ def _subsets(x, /, n):
 def forward_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Forward-mode AD."""
+    """Taylor-expand the solution of an IVP with forward-mode differentiation."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
 
     g_n, g_0 = vf, vf
@@ -102,11 +74,6 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     r"""Increment $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$."""
 
     def df(*args):
-        r"""Differentiate with a general version of the chain rule.
-
-        More specifically, this function implements a generalised
-        call $F(x) = \langle (Jf)(x), f_0(x)\rangle$.
-        """
         # Assign primals and tangents for the JVP
         vals = (*args, fun_0(*args))
         primals_in, tangents_in = vals[:-1], vals[1:]
@@ -121,7 +88,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 def affine_recursion(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Compute the exact Taylor series of an affine differential equation."""
+    """Evaluate the Taylor series of an affine differential equation."""
     if num == 0:
         return initial_values
 
@@ -134,7 +101,8 @@ def affine_recursion(
 
 
 def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
-    """Create a routine that estimates a Taylor series with a Runge-Kutta starter."""
+    """Create a routine that Taylor-expands an \
+     IVP solution with a Runge-Kutta starter."""
     return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
 
 
@@ -187,7 +155,7 @@ def _runge_kutta_starter_fn(
 
 
 def _runge_kutta_starter_improve(init_ssv, extrapolation, ys, dt):
-    """Improve the current guess.
+    """Improve the current estimate of a Runge-Kutta starter.
 
     Fit a Gauss-Markov process to observations of the ODE solution.
     """
@@ -226,7 +194,8 @@ def _rk_filter_step(carry, y, extrapolation, dt):
 def taylor_mode_doubling_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Taylor-mode AD."""
+    """Taylor-expand the solution of an IVP \
+     with Taylor-mode differentiation and doubling."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
     (u0,) = initial_values
     zeros = jnp.zeros_like(u0)
