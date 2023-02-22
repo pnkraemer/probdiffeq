@@ -1,4 +1,4 @@
-"""Do fun stuff with the solution objects."""
+"""Interact with estimated initial value problem (IVP) solutions on dense grids."""
 
 from typing import Any, NamedTuple
 
@@ -14,17 +14,18 @@ def sample(key, *, solution, solver, shape=()):
 
 
 def offgrid_marginals_searchsorted(*, ts, solution, solver):
-    """Dense output for a whole grid via jax.numpy.searchsorted.
+    """Compute off-grid marginals on a dense grid via jax.numpy.searchsorted.
 
     !!! warning
         The elements in ts and the elements in the solution grid must be disjoint.
         Otherwise, anything can happen and the solution will be incorrect.
-        We do not check for this case! (Because we want to jit!)
+        At the moment, we do not check this.
 
     !!! warning
         The elements in ts must be strictly in (t0, t1).
-        Again there is no check and anything can happen if you don't follow
-        this rule.
+        They must not lie outside the interval, and they must not coincide
+        with the interval boundaries.
+        At the moment, we do not check this.
     """
     # todo: support "method" argument to be passed to searchsorted.
 
@@ -64,7 +65,8 @@ class _NMLLState(NamedTuple):
 
 
 def negative_marginal_log_likelihood(*, observation_std, u, solution):
-    """Compute the negative marginal log-likelihood of observations."""
+    """Compute the negative marginal log-likelihood of \
+     observations of the IVP solution."""
     # todo: complain if it is used with a filter, not a smoother?
 
     bw_models = jax.tree_util.tree_map(

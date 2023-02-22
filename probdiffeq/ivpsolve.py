@@ -1,4 +1,4 @@
-"""ODE solver routines."""
+"""Routines for estimating IVP solutions."""
 
 
 import warnings
@@ -56,7 +56,7 @@ def solve_and_save_at(
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
-    """Solve an IVP and return the solution at checkpoints."""
+    """Solve an IVP and return the solution at a pre-determined grid."""
     _assert_tuple(initial_values)
 
     if isinstance(solver.strategy, smoothers.Smoother):
@@ -98,10 +98,9 @@ def solve_with_python_while_loop(
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
-    """Solve an initial value problem.
+    """Solve an initial value problem with a native-Python while loop.
 
     !!! warning
-        Uses native python control flow.
         Not JITable, not reverse-mode-differentiable.
     """
     _assert_tuple(initial_values)
@@ -135,12 +134,7 @@ def solve_fixed_grid(
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
-    """Solve an initial value problem.
-
-    !!! warning
-        Uses native python control flow.
-        Not JITable, not reverse-mode-differentiable.
-    """
+    """Solve an initial value problem on a fixed, pre-determined grid."""
     _assert_tuple(initial_values)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
@@ -163,7 +157,7 @@ def solve_fixed_grid(
 
 
 def _assert_tuple(x, /):
-    """Verify the initial conditions a tuple of arrays.
+    """Verify that the initial conditions are a tuple of arrays.
 
     todo: allow other containers.
     """
