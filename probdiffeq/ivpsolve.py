@@ -1,4 +1,4 @@
-"""Routines for estimating IVP solutions."""
+"""Routines for estimating solutions of initial value problems."""
 
 
 import warnings
@@ -56,7 +56,8 @@ def solve_and_save_at(
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
-    """Solve an IVP and return the solution at a pre-determined grid."""
+    """Solve an initial value problem \
+     and return the solution at a pre-determined grid."""
     _assert_tuple(initial_values)
 
     if isinstance(solver.strategy, smoothers.Smoother):

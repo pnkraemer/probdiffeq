@@ -1,4 +1,4 @@
-"""Initial value problem (IVP) solvers and solutions."""
+"""Initial value problem solvers and solutions."""
 
 import abc
 from typing import Generic, TypeVar
@@ -7,12 +7,13 @@ import jax
 import jax.numpy as jnp
 
 RVTypeVar = TypeVar("RVTypeVar")
-"""Random-variable type-variable for generic IVP solutions."""
+"""Type-variable for random variables used in \
+ generic initial value problem solutions."""
 
 
 @jax.tree_util.register_pytree_node_class
 class Solution(Generic[RVTypeVar]):
-    """Estimated IVP solution."""
+    """Estimated initial value problem solution."""
 
     def __init__(
         self, t, u, output_scale_sqrtm, marginals: RVTypeVar, posterior, num_data_points
@@ -89,7 +90,7 @@ class Solution(Generic[RVTypeVar]):
 
 @jax.tree_util.register_pytree_node_class
 class _AbstractSolver(abc.ABC):
-    """Interface for IVP solvers."""
+    """Interface for initial value problem solvers."""
 
     def __init__(self, strategy):
         self.strategy = strategy
@@ -202,7 +203,7 @@ class _AbstractSolver(abc.ABC):
 
 @jax.tree_util.register_pytree_node_class
 class Solver(_AbstractSolver):
-    """IVP solver."""
+    """Initial value problem solver."""
 
     def __init__(self, strategy, *, output_scale_sqrtm):
         super().__init__(strategy=strategy)
@@ -286,7 +287,7 @@ class Solver(_AbstractSolver):
 
 @jax.tree_util.register_pytree_node_class
 class DynamicSolver(_AbstractSolver):
-    """IVP solver with dynamic calibration of the output scale."""
+    """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
@@ -350,7 +351,8 @@ class DynamicSolver(_AbstractSolver):
 
 @jax.tree_util.register_pytree_node_class
 class MLESolver(_AbstractSolver):
-    """IVP solver with (quasi-)maximum-likelihood calibration of the output-scale."""
+    """Initial value problem solver with (quasi-)maximum-likelihood \
+     calibration of the output-scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
         # Pre-error-estimate steps
