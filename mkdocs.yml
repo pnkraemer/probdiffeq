@@ -98,6 +98,7 @@ nav:
         - "api_docs/dense_output.md"
         - "api_docs/taylor.md"
         - "api_docs/controls.md"
+        - "api_docs/cubature.md"
     - Developer Documentation:
         - "dev_docs/init_apply_extract.md"
         - "dev_docs/on_the_edges.md"
