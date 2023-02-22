@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -27,7 +27,7 @@ def strategy_pair_fixedpoint_smoother():
 def test_final_state_equal_to_filter(ode_problem, fil, smo):
     """Filters and smoothers should compute the same terminal values."""
     atol, rtol = 1e-2, 1e-1
-    filter_solution = ivpsolve.simulate_terminal_values(
+    filter_solution = solution_routines.simulate_terminal_values(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,
@@ -37,7 +37,7 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
         atol=atol,
         rtol=rtol,
     )
-    smoother_solution = ivpsolve.simulate_terminal_values(
+    smoother_solution = solution_routines.simulate_terminal_values(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,

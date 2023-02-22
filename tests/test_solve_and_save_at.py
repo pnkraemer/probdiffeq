@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 import pytest_cases
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -32,7 +32,7 @@ def test_smoother_warning(ode_problem):
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with pytest.warns():
-        ivpsolve.solve_and_save_at(
+        solution_routines.solve_and_save_at(
             ode_problem.vector_field,
             ode_problem.initial_values,
             save_at=ts,

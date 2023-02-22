@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import dense_output, ivpsolve, solvers
+from probdiffeq import dense_output, solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -32,7 +32,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
 
     args = (ode_problem.vector_field, ode_problem.initial_values)
     kwargs = {"parameters": ode_problem.args, "atol": 1e-1, "rtol": 1e-1}
-    smo_sol = ivpsolve.solve_with_python_while_loop(
+    smo_sol = solution_routines.solve_with_python_while_loop(
         *args,
         t0=ode_problem.t0,
         t1=ode_problem.t1,
@@ -44,7 +44,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
         ts=ts[1:-1], solution=smo_sol, solver=solvers.DynamicSolver(strategy=smo)
     )
 
-    fp_smo_sol = ivpsolve.solve_and_save_at(
+    fp_smo_sol = solution_routines.solve_and_save_at(
         *args, save_at=ts, solver=solvers.DynamicSolver(strategy=fp_smo), **kwargs
     )
     fixedpoint_smo_sol = fp_smo_sol[1:-1]  # reference is defined only on the interior
