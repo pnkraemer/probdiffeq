@@ -175,8 +175,8 @@ The same steps kind-of apply to the benchmarks, too.
 * ProbNum
 * Tornadox
 * ProbNumDiffEq.jl
-* Tornadox
+* Diffrax
 
-
+Check out how to transition from those packages (-> quickstart).
 
 Anything missing in this list? Please open an issue or make a pull request.
