@@ -1,4 +1,4 @@
-"""Strategy interface."""
+"""Interface for estimation strategies."""
 
 import abc
 

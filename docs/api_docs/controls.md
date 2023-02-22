@@ -1,3 +1,1 @@
-# Control algorithms
-
 ::: probdiffeq.controls

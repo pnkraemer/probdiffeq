@@ -1,2 +1,1 @@
-# Taylor series
 ::: probdiffeq.taylor

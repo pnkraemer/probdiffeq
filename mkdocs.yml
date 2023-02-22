@@ -88,7 +88,7 @@ nav:
     - API Documentation:
         - "api_docs/ivpsolve.md"
         - "api_docs/solvers.md"
-        - Inference strategies:
+        - Estimation strategies:
           - "api_docs/strategies/filters.md"
           - "api_docs/strategies/smoothers.md"
         - Solver implementations:

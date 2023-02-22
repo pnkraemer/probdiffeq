@@ -1,4 +1,4 @@
-"""Inference via smoothing."""
+"""''Global'' estimation: smoothing."""
 
 import abc
 import functools
@@ -18,7 +18,7 @@ SSVTypeVar = TypeVar("SSVTypeVar")
 
 @jax.tree_util.register_pytree_node_class
 class MarkovSequence(Generic[SSVTypeVar]):
-    """Markov sequence."""
+    """Markov sequence. A discretised Markov process."""
 
     def __init__(self, *, init: SSVTypeVar, backward_model):
         self.init = init
@@ -99,8 +99,6 @@ class MarkovSequence(Generic[SSVTypeVar]):
 
 
 class _SmootherCommon(_strategy.Strategy):
-    """Common functionality for smoothers."""
-
     # Inherited abstract methods
 
     @abc.abstractmethod
@@ -247,7 +245,7 @@ class Smoother(_SmootherCommon):
 
 @jax.tree_util.register_pytree_node_class
 class FixedPointSmoother(_SmootherCommon):
-    """Fixed-point smoother."""
+    """Fixed-point smoother. Used for checkpointing."""
 
     def complete_extrapolation(
         self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm

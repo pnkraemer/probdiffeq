@@ -1,1 +1,1 @@
-"""ODE-filter inference strategies."""
+"""IVP solver estimation strategies."""
