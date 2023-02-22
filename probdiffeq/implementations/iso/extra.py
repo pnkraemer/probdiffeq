@@ -1,4 +1,4 @@
-"""Isotropic-style extrapolations."""
+"""Extrapolations."""
 
 from typing import Any, Tuple
 

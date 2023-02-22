@@ -1,4 +1,4 @@
-"""Denseorised corrections."""
+"""Corrections."""
 
 import functools
 

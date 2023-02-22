@@ -1,4 +1,4 @@
-"""Implementations."""
+"""State-space model implementations."""
 
 from typing import Generic, TypeVar
 
@@ -13,17 +13,17 @@ from probdiffeq.implementations.iso import corr as iso_corr
 from probdiffeq.implementations.iso import extra as iso_extra
 
 ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
-"""Extrapolation style."""
+"""A type-variable for an extrapolation style."""
 
 
 CorrType = TypeVar("CorrType", bound=_collections.AbstractCorrection)
-"""Correction style."""
+"""A type-variable for a correction style."""
 
 
 class AbstractImplementation(Generic[CorrType, ExtraType]):
-    """Solver / inference implementations.
+    """State-space model implementation.
 
-    Mostly a container for an extrapolation method and a correction method.
+    Mostly a container for an extrapolation style and a correction style.
     """
 
     def __init__(self, *, correction: CorrType, extrapolation: ExtraType):

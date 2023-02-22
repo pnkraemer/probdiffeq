@@ -1,4 +1,4 @@
-"""Adaptive solvers."""
+"""Adaptive solvers for initial value problems (IVPs)."""
 from typing import Generic, TypeVar
 
 import jax
@@ -6,26 +6,26 @@ import jax.numpy as jnp
 
 from probdiffeq import controls
 
-T = TypeVar("T")
-"""A generic ODE Filter state."""
+StateTypeVar = TypeVar("StateTypeVar")
+"""A type-variable for generic (probabilistic) IVP solver states."""
 
-R = TypeVar("R")
-"""A generic ODE Filter strategy."""
+SolverTypeVar = TypeVar("SolverTypeVar")
+"""A type-variable for non-adaptive (probabilistic) IVP solvers."""
 
 
 @jax.tree_util.register_pytree_node_class
-class AdaptiveODEFilterState(Generic[T]):
-    """Solver state."""
+class AdaptiveODEFilterState(Generic[StateTypeVar]):
+    """Adaptive IVP solver state."""
 
     def __init__(
         self,
         dt_proposed,
         error_norm_proposed,
         control,
-        proposed,
-        accepted,
-        solution,
-        previous,
+        proposed: StateTypeVar,
+        accepted: StateTypeVar,
+        solution: StateTypeVar,
+        previous: StateTypeVar,
     ):
         self.dt_proposed = dt_proposed
         self.error_norm_proposed = error_norm_proposed
@@ -88,12 +88,12 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 
 @jax.tree_util.register_pytree_node_class
-class AdaptiveODEFilter(Generic[R]):
-    """Make an adaptive ODE filter."""
+class AdaptiveODEFilter(Generic[SolverTypeVar]):
+    """Adaptive IVP solvers."""
 
     def __init__(
         self,
-        solver,
+        solver: SolverTypeVar,
         atol=1e-4,
         rtol=1e-2,
         control=controls.ProportionalIntegral(),
@@ -190,7 +190,7 @@ class AdaptiveODEFilter(Generic[R]):
 
     @jax.jit
     def step_fn(self, state, vector_field, t1, parameters):
-        """Perform a step."""
+        """Perform a full step (including acceptance/rejection)."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,

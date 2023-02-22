@@ -1,4 +1,4 @@
-"""ODE filter strategy implementations."""
+"""Integrated Brownian motion (IBM) utilities."""
 
 import jax
 import jax.numpy as jnp
@@ -14,7 +14,7 @@ def system_matrices_1d(*, num_derivatives):
 
 
 def preconditioner_diagonal(*, dt, num_derivatives):
-    """Construct the diagonal of the IBM preconditioner."""
+    """Construct the diagonal IBM preconditioner."""
     powers = jnp.arange(num_derivatives, -1, -1)
 
     scales = _factorial(powers)
