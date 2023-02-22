@@ -15,7 +15,7 @@ jupyter:
 
 # Smooooooothing
 
-There are many ways to skin the cat, and there are even more options to use smoothing for ODE filtering.
+There are many ways to skin the cat, and there are even more options to use smoothing for probabilistic IVP solvering.
 Here is how.
 
 

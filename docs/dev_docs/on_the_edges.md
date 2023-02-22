@@ -28,7 +28,7 @@ The ``proposed`` state is refined until some error criterion is satisfied,
 and then the ``proposed`` state becomes the ``accepted`` state.
 
 To implement this overstepping behaviour, we need to be super careful:
-Smoothing-based ODE filters finalise the function call with a backward pass
+Smoothing-based probabilistic IVP solvers finalise the function call with a backward pass
 after the forward-solve, and the state-space model for this backward pass
 is implemented during the forward pass.
 But overstepping-interpolating changes the backward model quite drastically:
