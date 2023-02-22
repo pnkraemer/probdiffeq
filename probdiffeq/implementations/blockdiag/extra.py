@@ -1,4 +1,4 @@
-"""BlockDiag-style extrapolations."""
+"""Extrapolations."""
 from typing import Tuple
 
 import jax
@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _ibm_util, _scalar
 
 _IBMCacheType = Tuple[jax.Array]  # Cache type
-"""Type of the extrapolation-cache."""
+"""Type-variable for the extrapolation-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
@@ -39,7 +39,6 @@ class BlockDiagIBM(_collections.AbstractExtrapolation):
 
     @classmethod
     def from_params(cls, ode_shape, num_derivatives):
-        """Create a strategy from hyperparameters."""
         assert len(ode_shape) == 1
         (n,) = ode_shape
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)

@@ -1,4 +1,4 @@
-"""BlockDiag-style corrections."""
+"""Corrections."""
 from typing import Callable, Tuple
 
 import jax
@@ -7,7 +7,7 @@ from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _scalar
 
 _SLR1CacheType = Tuple[Callable]
-"""Type of the correction-cache."""
+"""Type-variable for the correction-cache."""
 
 
 @jax.tree_util.register_pytree_node_class
