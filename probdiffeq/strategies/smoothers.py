@@ -245,7 +245,15 @@ class Smoother(_SmootherCommon):
 
 @jax.tree_util.register_pytree_node_class
 class FixedPointSmoother(_SmootherCommon):
-    """Fixed-point smoother. Used for checkpointing."""
+    """Fixed-point smoother.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
 
     def complete_extrapolation(
         self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm

@@ -49,7 +49,15 @@ def linearise_slr1(*, fn, x, cubature_rule):
 
 
 def linearise_slr0(*, fn, x, cubature_rule):
-    """Linearise a function with zeroth-order statistical linear regression."""
+    """Linearise a function with zeroth-order statistical linear regression.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
     # Create sigma-points
     pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
     pts = x.mean[None, :] + pts_centered
@@ -209,6 +217,17 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
+    """Zeroth-order statistical linear regression in state-space models \
+     with dense covariance structure.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
+
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError

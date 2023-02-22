@@ -33,7 +33,7 @@ def scan_with_init(*, f, init, xs, reverse=False):
     return carry, ys_stacked
 
 
-# todo: should this public or not?
+# todo: should this be public or not?
 def tree_stack(list_of_trees):
     """Apply  tree_transpose and jnp.stack() to a list of PyTrees."""
     tree_of_lists = _tree_transpose(list_of_trees)
