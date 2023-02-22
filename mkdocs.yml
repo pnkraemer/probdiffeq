@@ -66,8 +66,7 @@ plugins:
           - "advanced_examples/*.md"
           - "benchmarks/internal_only.md"
           - "benchmarks/nonstiff_multiple_frameworks.md"
-    - mkdocs-jupyter:
-        include: ["examples/*.ipynb","advanced_examples/*.ipynb", "benchmarks/*.ipynb"]  # Default: ["*.py", "*.ipynb"]
+    - mknotebooks
 
 
 nav:
