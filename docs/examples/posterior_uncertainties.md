@@ -34,6 +34,8 @@ if not backend.has_been_selected:
 
 Set an example problem.
 
+Solve the problem on a low resolution and short time-span to achieve large uncertainty.
+
 ```python
 f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
@@ -44,9 +46,6 @@ def vf(*ys, t, p):
 ```
 
 ## Filter
-
-
-Low resolution and short time-span to achieve large uncertainty and only few steps.
 
 ```python
 ts0 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
@@ -61,8 +60,8 @@ solution = solution_routines.solve_and_save_at(
     initial_values=(u0,),
     save_at=ts,
     solver=ts0,
-    rtol=1e-1,
-    atol=1e-1,
+    rtol=1e-2,
+    atol=1e-2,
     parameters=f_args,
 )
 ```
@@ -121,8 +120,8 @@ solution = solution_routines.solve_and_save_at(
     initial_values=(u0,),
     save_at=ts,
     solver=ts0,
-    rtol=1e-1,
-    atol=1e-1,
+    rtol=1e-2,
+    atol=1e-2,
     parameters=f_args,
 )
 ```
@@ -173,6 +172,6 @@ for i, axes_cols in enumerate(axes_all.T):
 plt.show()
 ```
 
-The marginal standard deviations obviously show how the filter is forward-only, whereas the smoother is a global estimate.
+The marginal standard deviations (bottom row) show how the filter is forward-only, whereas the smoother is a global estimate.
 
 This is why you should use a filter for terminal-value simulation and a smoother if you want "global" solutions.
