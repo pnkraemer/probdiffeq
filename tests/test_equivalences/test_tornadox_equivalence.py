@@ -68,7 +68,7 @@ def fixture_steprule_tornadox(solver_config, control_params):
 @pytest_cases.fixture(scope="session", name="controller_probdiffeq")
 def fixture_controller_probdiffeq(control_params):
     factor_min, factor_max, safety = control_params
-    return controls.ClippedIntegral(
+    return controls.IntegralClipped(
         safety=safety, factor_min=factor_min, factor_max=factor_max
     )
 

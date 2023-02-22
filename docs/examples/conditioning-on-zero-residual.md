@@ -70,7 +70,7 @@ solution = solution_routines.solve_with_python_while_loop(
     rtol=1e-2,
     solver=solver,
     parameters=f_args,
-    control=controls.ClippedIntegral(),
+    control=controls.IntegralClipped(),
 )
 ```
 
