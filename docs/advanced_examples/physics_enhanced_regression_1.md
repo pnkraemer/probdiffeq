@@ -59,7 +59,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 strategy = smoothers.Smoother(
     recipes.IsoTS0.from_params(num_derivatives=1),
 )
-solver = solvers.Solver(strategy, output_scale_sqrtm=10.0)
+solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=10.0)
 
 
 solution_true = solution_routines.solve_fixed_grid(

@@ -202,8 +202,11 @@ class _AbstractSolver(abc.ABC):
 
 
 @jax.tree_util.register_pytree_node_class
-class Solver(_AbstractSolver):
-    """Initial value problem solver."""
+class CalibrationFreeSolver(_AbstractSolver):
+    """Initial value problem solver.
+
+    No automatic output-scale calibration.
+    """
 
     def __init__(self, strategy, *, output_scale_sqrtm):
         super().__init__(strategy=strategy)

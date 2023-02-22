@@ -32,7 +32,9 @@ def test_solve_fixed_grid_differentiable(ode_problem, solver_config, strategy):
     filter_or_smoother = strategy(
         implementation=recipes.IsoTS0.from_params(num_derivatives=1)
     )
-    solver = solvers.Solver(strategy=filter_or_smoother, output_scale_sqrtm=1.0)
+    solver = solvers.CalibrationFreeSolver(
+        strategy=filter_or_smoother, output_scale_sqrtm=1.0
+    )
 
     fn = functools.partial(
         _parameter_to_solution,
