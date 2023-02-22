@@ -1,4 +1,9 @@
-"""ODE-filter routines."""
+"""Routines for estimating solutions of differential equations \
+ constrained by Taylor-series initial information.
+
+Essentially, these functions implement the IVP solution routines after
+initialisation of the Taylor coefficients.
+"""
 
 import jax
 
@@ -8,7 +13,6 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
-    """Simulate the terminal values of an ODE with an ODE filter."""
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
@@ -26,7 +30,6 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field, taylor_coefficients, save_at, solver, parameters, **options
 ):
-    """Simulate checkpoints of an ODE solution with an ODE filter."""
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     def advance_to_next_checkpoint(s, t_next):
@@ -54,7 +57,7 @@ def solve_and_save_at(
 def _advance_ivp_solution_adaptively(
     vector_field, t1, state0, adaptive_solver, parameters
 ):
-    """Advance an IVP solution from an initial state to a terminal state."""
+    """Advance an IVP solution to the next state."""
 
     def cond_fun(s):
         return s.solution.t < t1
@@ -76,12 +79,6 @@ def _advance_ivp_solution_adaptively(
 def solve_with_python_while_loop(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
-    """Solve an initial value problem.
-
-    !!! warning
-        Uses native python control flow.
-        Not JITable, not reverse-mode-differentiable.
-    """
     adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
 
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
@@ -97,7 +94,7 @@ def solve_with_python_while_loop(
 
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
-    """Generate an ODE filter solution iteratively."""
+    """Generate a probabilistic IVP solution iteratively."""
     while state.solution.t < t1:
         yield state
         state = adaptive_solver.step_fn(
@@ -108,12 +105,6 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
 
 
 def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters):
-    """Solve an initial value problem.
-
-    !!! warning
-        Uses native python control flow.
-        Not JITable, not reverse-mode-differentiable.
-    """
     # todo: annoying that the error estimate is not part of the state...
     t0 = grid[0]
     state, _ = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
