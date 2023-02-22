@@ -195,7 +195,7 @@ def taylor_mode_doubling_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
     """Taylor-expand the solution of an IVP \
-     with Taylor-mode differentiation and doubling."""
+     with Taylor-mode differentiation and Newton's doubling."""
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
     (u0,) = initial_values
     zeros = jnp.zeros_like(u0)
