@@ -14,7 +14,7 @@ SolverTypeVar = TypeVar("SolverTypeVar")
 
 
 @jax.tree_util.register_pytree_node_class
-class AdaptiveODEFilterState(Generic[StateTypeVar]):
+class AdaptiveIVPSolverState(Generic[StateTypeVar]):
     """Adaptive IVP solver state."""
 
     def __init__(
@@ -88,7 +88,7 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 
 @jax.tree_util.register_pytree_node_class
-class AdaptiveODEFilter(Generic[SolverTypeVar]):
+class AdaptiveIVPSolver(Generic[SolverTypeVar]):
     """Adaptive IVP solvers."""
 
     def __init__(
@@ -171,7 +171,7 @@ class AdaptiveODEFilter(Generic[SolverTypeVar]):
             norm_ord=self.norm_ord,
         )
         dt_proposed = self._propose_first_dt(taylor_coefficients=taylor_coefficients)
-        return AdaptiveODEFilterState(
+        return AdaptiveIVPSolverState(
             dt_proposed=dt_proposed,
             error_norm_proposed=error_norm_proposed,
             solution=posterior,
@@ -225,7 +225,7 @@ class AdaptiveODEFilter(Generic[SolverTypeVar]):
             return True, s
 
         _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
-        return AdaptiveODEFilterState(
+        return AdaptiveIVPSolverState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
@@ -263,7 +263,7 @@ class AdaptiveODEFilter(Generic[SolverTypeVar]):
             error_contraction_rate=self.error_contraction_rate,
             dt_previous=state.dt_proposed,
         )
-        return AdaptiveODEFilterState(
+        return AdaptiveIVPSolverState(
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
@@ -283,7 +283,7 @@ class AdaptiveODEFilter(Generic[SolverTypeVar]):
         accepted, solution, previous = self.solver.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
-        return AdaptiveODEFilterState(
+        return AdaptiveIVPSolverState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             proposed=_inf_like(state.proposed),
