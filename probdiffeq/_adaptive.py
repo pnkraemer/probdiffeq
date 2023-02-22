@@ -1,4 +1,4 @@
-"""Adaptive IVP solvers."""
+"""Adaptive solvers for initial value problems (IVPs)."""
 from typing import Generic, TypeVar
 
 import jax
@@ -15,7 +15,7 @@ SolverTypeVar = TypeVar("SolverTypeVar")
 
 @jax.tree_util.register_pytree_node_class
 class AdaptiveODEFilterState(Generic[StateTypeVar]):
-    """Solver state."""
+    """Adaptive IVP solver state."""
 
     def __init__(
         self,
@@ -89,7 +89,7 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 @jax.tree_util.register_pytree_node_class
 class AdaptiveODEFilter(Generic[SolverTypeVar]):
-    """Make an adaptive ODE filter."""
+    """Adaptive IVP solvers."""
 
     def __init__(
         self,
@@ -190,7 +190,7 @@ class AdaptiveODEFilter(Generic[SolverTypeVar]):
 
     @jax.jit
     def step_fn(self, state, vector_field, t1, parameters):
-        """Perform a step."""
+        """Perform a full step (including acceptance/rejection)."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
