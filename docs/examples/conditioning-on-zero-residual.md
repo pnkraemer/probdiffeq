@@ -38,10 +38,6 @@ config.update("jax_platform_name", "cpu")
 ```
 
 ```python
-
-```
-
-```python
 # Make a problem
 f, u0, (t0, t1), f_args = ivps.affine_independent()
 f_vect = jax.vmap(f, in_axes=(0, None, None))

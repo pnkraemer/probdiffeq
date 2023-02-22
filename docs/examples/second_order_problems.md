@@ -114,4 +114,6 @@ plt.plot(solution.u[:, 0], solution.u[:, 1])
 plt.show()
 ```
 
-The second-order solver seems faster and more accurate (which has to be confirmed in a work-precision diagram; TBC).
+The results are indistinguishable from the plot. While the runtimes of both solvers are similar, the error of the second-order solver is much lower. 
+
+See the benchmarks for more quantitative versions of this statement.

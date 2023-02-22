@@ -17,7 +17,10 @@ jupyter:
 
 **Terminal-value data, and sampling with ``blackjax``.**
 
-We create some fake-observational data, compute the marginal likelihood of this fake data _under the ODE posterior_ (which is something you cannot do with non-probabilistic solvers!), and optimize the parameters with `optax`. Tronarp, Bosch, and Hennig call this "physics-enhanced regression".
+We create some fake-observational data, compute the marginal likelihood of this fake data _under the ODE posterior_ (which is something you cannot do with non-probabilistic solvers!), and sample from the posterior with `blackjax`. 
+
+This assumes that you are  familiar with the first part of this tutorial.
+
 
 ```python
 import blackjax
@@ -153,9 +156,9 @@ initial = u0_to_sol(u0_guess)
 
 ```python
 for sol in solutions:
-    plt.plot(ts, sol, alpha=0.7)
-    plt.plot(ts[0], sol[0][None, :], "P", markersize=2, color="gray")
-    plt.plot(ts[-1], sol[-1][None, :], "P", markersize=2, color="gray")
+    plt.plot(ts, sol, color="C0", linewidth=0.05, alpha=0.7)
+    plt.plot(ts[0], sol[0][None, :], "P", markersize=1, color="C0")
+    plt.plot(ts[-1], sol[-1][None, :], "P", markersize=1, color="C0")
 
 
 plt.title("Posterior samples (ODE-solution space)")

@@ -13,9 +13,9 @@ jupyter:
     name: python3
 ---
 
-# Smooooooothing
+# Smoothing
 
-There are many ways to skin the cat, and there are even more options to use smoothing for probabilistic IVP solving.
+There are many options to use smoothing for probabilistic IVP solving.
 Here is how.
 
 
@@ -47,7 +47,7 @@ def vf(*ys, t, p):
 ## Terminal-value simulation
 
 If you are interested in the terminal value of the ODE solution, you can use filters and smoothers interchangeably.
-But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient.
+But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient here.
 
 ```python
 ekf0 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
@@ -64,7 +64,7 @@ print(ekf0sol.t, ekf0sol.u)
 
 ## Traditional simulation
 
-If you are used to calling traditional solve() methods, use one of the conventional smoothers (i.e. not the fixed-point smoothers).
+If you are used to calling traditional solve() methods, use one a conventional smoother (i.e. not the fixed-point smoother).
 
 ```python
 eks0 = solvers.MLESolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
@@ -115,6 +115,10 @@ plt.show()
 
 If you know in advance that you like to have the solution at a pre-specified set of points only,
 use the solve_and_save_at function together with a fixed-point smoother.
+
+
+    !!! "Warning: EXPERIMENTAL feature!" !!!
+
 
 ```python
 eks0_fixpt = solvers.MLESolver(

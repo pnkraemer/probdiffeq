@@ -15,8 +15,8 @@ jupyter:
 
 # Exploring the solution object
 
-probabilistic IVP solvers are probabilistic numerical algorithms, which means they compute probability distributions over possible solutions instead of simple point estimates.
-A probabilistic description is much richer than a non-probabilistic description, so the solution objects returned by the probabilistic IVP solver are a lot of fun.
+Probabilistic IVP solvers are probabilistic numerical algorithms, which means they compute probability distributions over possible solutions instead of simple point estimates.
+A probabilistic description is much richer than a non-probabilistic description, so the solution objects returned by the probabilistic IVP solver are worth investigating:
 
 ```python tags=[]
 import jax
@@ -82,15 +82,15 @@ plt.show()
 
 But we can also look at the underlying distribution.
 For starters, maybe we want to compute the marginal distribution over the solution away from
-the grid points. This is similar to dense output, but waaaay cooler: there is not _one_ way of dense output with
-probabilistic solvers, but there are
+the grid points. This is similar to dense output, but, arguably, way cooler: there is not _one_ way of dense output with probabilistic solvers, but there many ways:
 
 * marginals on off-grid points (most similar to traditional dense output)
 * joint distributions on grid points and away from the grid points
 * joint samples from the posterior
 
 and many more options.
-Look at this:
+
+Check this out:
 
 ```python tags=[]
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
