@@ -5,7 +5,7 @@ import warnings
 
 import jax
 
-from probdiffeq import _probsolve, taylor
+from probdiffeq import _solution_routines_impl, taylor
 from probdiffeq.strategies import smoothers
 
 # The high-level checkpoint-style routines
@@ -36,7 +36,7 @@ def simulate_terminal_values(
         parameters=parameters,
     )
 
-    return _probsolve.simulate_terminal_values(
+    return _solution_routines_impl.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -76,7 +76,7 @@ def solve_and_save_at(
         parameters=parameters,
     )
 
-    return _probsolve.solve_and_save_at(
+    return _solution_routines_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         save_at=save_at,
@@ -115,7 +115,7 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
 
-    return _probsolve.solve_with_python_while_loop(
+    return _solution_routines_impl.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
@@ -147,7 +147,7 @@ def solve_fixed_grid(
         parameters=parameters,
     )
 
-    return _probsolve.solve_fixed_grid(
+    return _solution_routines_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         grid=grid,
