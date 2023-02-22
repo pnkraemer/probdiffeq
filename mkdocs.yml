@@ -101,8 +101,7 @@ nav:
         - "api_docs/controls.md"
         - "api_docs/cubature.md"
     - Developer Documentation:
-        - "dev_docs/init_apply_extract.md"
-        - "dev_docs/on_the_edges.md"
+        - "dev_docs/creating_example_notebook.md"
     - Benchmarks:
         - "benchmarks/insights.md"
         - "benchmarks/internal_only.ipynb"
