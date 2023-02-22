@@ -73,7 +73,7 @@ plugins:
 nav:
     - index.md
     - Quickstart:
-        - "quickstart/quickstart.md"
+        - "quickstart/quickstart.ipynb"
         - "quickstart/transitioning_from_other_packages.md"
     - Examples:
         - "examples/posterior_uncertainties.ipynb"
@@ -102,6 +102,7 @@ nav:
         - "api_docs/cubature.md"
     - Developer Documentation:
         - "dev_docs/creating_example_notebook.md"
+        - "dev_docs/continuous_integration.md"
     - Benchmarks:
         - "benchmarks/insights.md"
         - "benchmarks/internal_only.ipynb"
