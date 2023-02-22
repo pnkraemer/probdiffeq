@@ -2,36 +2,39 @@
 
 ```python
 import jax
-import jax.numpy as jnp
+from diffeqzoo import backend, ivps
 
-from diffeqzoo import ivps, backend
-from jax.config import config
+from probdiffeq import solution_routines, solvers
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import smoothers
 
-from probdiffeq import solution_routines, recipes, controls
-
-backend.select("jax")  # ivp examples in jax
-
-
-config.update("jax_enable_x64", True)
+if not backend.has_been_selected:
+    backend.select("jax")  # ivp examples in jax
 
 # Make a problem
-f, u0, (t0, t1), f_args = ivps.van_der_pol_first_order(stiffness_constant=1.)
+f, u0, (t0, t1), f_args = ivps.van_der_pol_first_order(stiffness_constant=1.0)
+
 
 @jax.jit
-def vector_field(t, y):
-    return f(y, *f_args)
+def vector_field(y, *, t, p):
+    return f(y, *p)
 
-# Make a solver
-ekf0, info_op = recipes.dynamic_isotropic_eks0(num_derivatives=5)
+
+# Make a solver:
+#     DenseTS1: dense covariance structure with first-order Taylor linearisation
+#     Smoother: Compute a global estimate of the solution
+#     MLESolver: Calibrate unknown parameters with (quasi-)maximum-likelihood estimation
+implementation = recipes.DenseTS1.from_params(ode_shape=(2,))
+strategy = smoothers.Smoother(implementation)
+solver = solvers.MLESolver(strategy)
+
 
 # Solve
-with jax.disable_jit():
-    solution = solution_routines.solve_with_python_while_loop(
-        vector_field, initial_values=(u0,), t0=t0, t1=t1,
-        solver=ekf0, info_op=info_op, control=controls.Integral(safety=.95)
-    )
-# Look at the solution
-print(len(solution))
+solution = solution_routines.solve_with_python_while_loop(
+    vector_field, initial_values=(u0,), t0=t0, t1=t1, solver=solver, parameters=f_args
+)
 
-print(solution.t, solution.u)
+
+# Look at the solution
+print("u =", solution.u)
 ```
