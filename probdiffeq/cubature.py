@@ -123,7 +123,7 @@ def _ut_points_and_weights_sqrtm(d, *, r):
 
 @jax.tree_util.register_pytree_node_class
 class GaussHermite(_PositiveCubatureRule):
-    """Gauss-Hermite cubature."""
+    """(Statistician's) Gauss-Hermite cubature."""
 
     @classmethod
     def from_params(cls, *, input_shape, degree=5):
