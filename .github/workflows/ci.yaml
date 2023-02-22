@@ -34,7 +34,7 @@ jobs:
       run: |
         sudo apt-get install pandoc
         pip install --upgrade pip
-        pip install .[lint]
+        pip install .[cpu,lint]
     - name: Apply linter
       run:
         make lint
@@ -57,7 +57,7 @@ jobs:
     - name: Install dependencies
       run:
         pip install --upgrade pip
-        pip install .[test]
+        pip install .[cpu,test]
     - name: Run tests
       run:
         make test
@@ -80,7 +80,7 @@ jobs:
     - name: Install dependencies
       run:
         pip install --upgrade pip
-        pip install .[example]
+        pip install .[cpu,example]
     - name: Sync and execute notebooks
       run:
         make example
@@ -104,7 +104,7 @@ jobs:
       run: |
         sudo apt-get install pandoc
         pip install --upgrade pip
-        pip install .[doc]
+        pip install .[cpu,doc]
     - name: Build the HTML docs
       run:
         make doc

@@ -17,9 +17,11 @@ Get the most recent stable version from PyPi:
 ```
 pip install probdiffeq
 ```
-Or directly from GitHub:
-```
-pip install git+https://github.com/pnkraemer/probdiffeq.git
+This installation assumes that JAX is already available.
+
+To install `probdiffeq` with `jax[cpu]`, run
+```commandline
+pip install probdiffeq[cpu]
 ```
 
 
