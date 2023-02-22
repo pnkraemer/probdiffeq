@@ -15,8 +15,8 @@ jupyter:
 
 # Exploring the solution object
 
-ODE filters are probabilistic numerical algorithms, which means they compute probability distributions over possible solutions instead of simple point estimates.
-A probabilistic description is much richer than a non-probabilistic description, so the solution objects returned by the ODE filter are a lot of fun.
+probabilistic IVP solvers are probabilistic numerical algorithms, which means they compute probability distributions over possible solutions instead of simple point estimates.
+A probabilistic description is much richer than a non-probabilistic description, so the solution objects returned by the probabilistic IVP solver are a lot of fun.
 
 ```python tags=[]
 import jax

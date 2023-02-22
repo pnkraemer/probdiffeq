@@ -82,7 +82,7 @@ plt.show()
 ```
 
 ## Internal solvers
-Let's start with finding the fastest ODE filter.
+Let's start with finding the fastest probabilistic IVP solver.
 
 
 ```python

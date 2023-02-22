@@ -13,7 +13,7 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
-    adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
@@ -30,7 +30,7 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field, taylor_coefficients, save_at, solver, parameters, **options
 ):
-    adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
@@ -79,7 +79,7 @@ def _advance_ivp_solution_adaptively(
 def solve_with_python_while_loop(
     vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
 ):
-    adaptive_solver = _adaptive.AdaptiveODEFilter(solver=solver, **options)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
     generator = _solution_generator(
