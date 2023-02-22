@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
@@ -61,7 +61,7 @@ strategy = filters.Filter(
 solver = solvers.Solver(strategy, output_scale_sqrtm=10.0)
 
 # Compute a bunch of solutions
-solution_true = ivpsolve.solve_fixed_grid(
+solution_true = solution_routines.solve_fixed_grid(
     vf, initial_values=(u0_true,), grid=ts, solver=solver, parameters=f_args
 )
 data = solution_true.u[-1, :]
@@ -73,7 +73,7 @@ plt.show()
 Make a (poor) initial guess
 
 ```python
-solution_guess = ivpsolve.solve_fixed_grid(
+solution_guess = solution_routines.solve_fixed_grid(
     vf, initial_values=(u0_guess,), grid=ts, solver=solver, parameters=f_args
 )
 plt.plot(ts, solution_guess.u, "-")
@@ -85,7 +85,7 @@ Set up a logprob function to sample from: the likelihood of the data under the O
 
 ```python
 def logprob_fn(u0):
-    solution_guess = ivpsolve.solve_fixed_grid(
+    solution_guess = solution_routines.solve_fixed_grid(
         vf, initial_values=(u0,), grid=ts, solver=solver, parameters=f_args
     )
     posterior = solution_guess.posterior
@@ -140,7 +140,7 @@ Compute the ODE solution for all the samples and plot the results.
 
 ```python
 def u0_to_sol(u0):
-    solution_guess = ivpsolve.solve_fixed_grid(
+    solution_guess = solution_routines.solve_fixed_grid(
         vf, initial_values=(u0,), grid=ts, solver=solver, parameters=f_args
     )
     return solution_guess.u

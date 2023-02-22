@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
@@ -50,7 +50,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```python
 %%time
 
-solution = ivpsolve.solve_and_save_at(
+solution = solution_routines.solve_and_save_at(
     vf_1,
     initial_values=(u0,),
     save_at=ts,
@@ -97,7 +97,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```python
 %%time
 
-solution = ivpsolve.solve_and_save_at(
+solution = solution_routines.solve_and_save_at(
     vf_2,
     initial_values=(u0, du0),
     save_at=ts,

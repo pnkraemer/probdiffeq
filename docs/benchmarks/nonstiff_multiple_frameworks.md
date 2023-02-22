@@ -34,7 +34,7 @@ from _benchmark_utils import (
 from diffeqzoo import backend, ivps
 from jax import config
 
-from probdiffeq import controls, ivpsolve, solvers
+from probdiffeq import controls, solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
@@ -109,7 +109,7 @@ def solver_to_solve(solver):
 
 
 def _solve(*, solver, tol):
-    solution = ivpsolve.simulate_terminal_values(
+    solution = solution_routines.simulate_terminal_values(
         vf,
         initial_values=(u0,),
         t0=t0,

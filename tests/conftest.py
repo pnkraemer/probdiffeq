@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import pytest_cases
 import pytest_cases.filters
 
-from probdiffeq import ivpsolve, taylor
+from probdiffeq import solution_routines, taylor
 
 # Set some test filters
 
@@ -90,7 +90,7 @@ def fixture_reference_terminal_values(ode_problem):
     "solver", cases=".solver_cases", filter=can_simulate_terminal_values
 )
 def fixture_solution_terminal_values(ode_problem, solver_config, solver):
-    solution = ivpsolve.simulate_terminal_values(
+    solution = solution_routines.simulate_terminal_values(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,
@@ -120,7 +120,7 @@ def fixture_reference_save_at(ode_problem, solver_config):
 )
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_save_at(ode_problem, solver_config, solver):
-    solution = ivpsolve.solve_and_save_at(
+    solution = solution_routines.solve_and_save_at(
         ode_problem.vector_field,
         ode_problem.initial_values,
         save_at=solver_config.grid_for_save_at,
@@ -140,7 +140,7 @@ def fixture_solution_save_at(ode_problem, solver_config, solver):
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_solve_with_python_while_loop(ode_problem, solver_config, solver):
-    solution = ivpsolve.solve_with_python_while_loop(
+    solution = solution_routines.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,
@@ -161,7 +161,7 @@ def fixture_solution_solve_with_python_while_loop(ode_problem, solver_config, so
 @pytest_cases.parametrize_with_cases("solver", cases=".solver_cases", filter=can_solve)
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 def fixture_solution_fixed_grid(ode_problem, solver, solver_config):
-    solution = ivpsolve.solve_fixed_grid(
+    solution = solution_routines.solve_fixed_grid(
         ode_problem.vector_field,
         ode_problem.initial_values,
         grid=solver_config.grid_for_fixed_grid,

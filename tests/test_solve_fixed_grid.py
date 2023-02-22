@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -53,7 +53,7 @@ def test_solve_fixed_grid_differentiable(ode_problem, solver_config, strategy):
 
 
 def _parameter_to_solution(u0, parameters, vf, solver, fixed_grid):
-    solution = ivpsolve.solve_fixed_grid(
+    solution = solution_routines.solve_fixed_grid(
         vf, (u0,), grid=fixed_grid, parameters=parameters, solver=solver
     )
     return solution.u

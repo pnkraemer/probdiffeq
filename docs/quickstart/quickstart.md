@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from diffeqzoo import ivps, backend
 from jax.config import config
 
-from probdiffeq import ivpsolve, recipes, controls
+from probdiffeq import solution_routines, recipes, controls
 
 backend.select("jax")  # ivp examples in jax
 
@@ -26,7 +26,7 @@ ekf0, info_op = recipes.dynamic_isotropic_eks0(num_derivatives=5)
 
 # Solve
 with jax.disable_jit():
-    solution = ivpsolve.solve_with_python_while_loop(
+    solution = solution_routines.solve_with_python_while_loop(
         vector_field, initial_values=(u0,), t0=t0, t1=t1,
         solver=ekf0, info_op=info_op, control=controls.Integral(safety=.95)
     )
