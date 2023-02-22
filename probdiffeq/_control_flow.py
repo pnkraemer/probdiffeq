@@ -1,4 +1,4 @@
-"""Custom control flow. Extends jax.lax."""
+"""Custom control flow. Extends the functionality of jax.lax."""
 
 import jax
 import jax.numpy as jnp
@@ -10,7 +10,9 @@ import jax.numpy as jnp
 def scan_with_init(*, f, init, xs, reverse=False):
     """Scan, but include the ``init`` parameter into the output.
 
-    Needed to compute checkpoint-ODE-solutions.
+    Often, we loop over grid-points but the initial state is part of
+    what we consider a solution. For instance, solve_and_save_at does this.
+    But backwards-marginalisation or sampling do as well.
     """
     carry, ys = jax.lax.scan(f=f, init=init, xs=xs, reverse=reverse)
     init_broadcast = jax.tree_util.tree_map(lambda x: jnp.asarray(x)[None, ...], init)
@@ -31,6 +33,7 @@ def scan_with_init(*, f, init, xs, reverse=False):
     return carry, ys_stacked
 
 
+# todo: should this public or not?
 def tree_stack(list_of_trees):
     """Apply  tree_transpose and jnp.stack() to a list of PyTrees."""
     tree_of_lists = _tree_transpose(list_of_trees)
