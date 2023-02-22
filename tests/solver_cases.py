@@ -40,7 +40,7 @@ def case_dynamic_smoother_ts0_iso():
 def case_fixedpoint_ts0_iso():
     implementation = recipes.IsoTS0.from_params()
     strategy = smoothers.FixedPointSmoother(implementation=implementation)
-    return solvers.Solver(strategy=strategy, output_scale_sqrtm=100.0)
+    return solvers.CalibrationFreeSolver(strategy=strategy, output_scale_sqrtm=100.0)
 
 
 @pytest_cases.case(tags=(Tag("filter", "zeroth", ode_shape=(2,), ode_order=1),))
