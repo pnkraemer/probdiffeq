@@ -29,6 +29,7 @@ and many more.
 
 * **QUICKSTART:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/quickstart/)
 * **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples/posterior_uncertainties/)
+* **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/#choosing-a-solver)
 * **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
 * **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
@@ -58,7 +59,7 @@ Consult the examples first. They show how to interact with the API, and explain 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
 For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine `probdiffeq` with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
 
-Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation
+Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
 
 
 
