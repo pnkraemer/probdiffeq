@@ -1,0 +1,23 @@
+# Inspired by https://blog.elmah.io/deploying-a-mkdocs-documentation-site-with-github-actions/
+
+name: doc-publish
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - run:
+          pip install --upgrade pip
+          pip install .[cpu,doc,example]
+      - run: mkdocs gh-deploy --force --clean --verbose
