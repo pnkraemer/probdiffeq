@@ -1,5 +1,3 @@
-# Inspired by https://blog.elmah.io/deploying-a-mkdocs-documentation-site-with-github-actions/
-
 name: doc-publish
 on:
   push:
