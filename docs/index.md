@@ -70,10 +70,10 @@ If you have a feature that you would like to see implemented, create an issue!
 
 ## Similar projects
 
-* ProbNum
-* Tornadox
-* ProbNumDiffEq.jl
-* Diffrax
+* [Tornadox](https://github.com/pnkraemer/tornadox)
+* [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/)
+* [ProbNum](https://probnum.readthedocs.io/en/latest/)
+* [Diffrax](https://docs.kidger.site/diffrax/)
 
 Check out how to transition from those packages (-> quickstart).
 
