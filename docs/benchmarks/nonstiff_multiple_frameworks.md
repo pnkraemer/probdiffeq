@@ -195,7 +195,7 @@ results = workprecision_make(solve_fns=solve_fns, number=1, repeat=3, tols=toler
 ```
 
 ```python
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots(figsize=(5, 5))
 
 fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
 
