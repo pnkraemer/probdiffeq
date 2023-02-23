@@ -70,10 +70,10 @@ If you have a feature that you would like to see implemented, create an issue!
 
 ## Similar projects
 
-* ProbNum
-* Tornadox
-* ProbNumDiffEq.jl
-* Diffrax
+* [Tornadox](https://github.com/pnkraemer/tornadox)
+* [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/)
+* [ProbNum](https://probnum.readthedocs.io/en/latest/)
+* [Diffrax](https://docs.kidger.site/diffrax/)
 
 Check out how to transition from those packages (-> quickstart).
 
@@ -81,5 +81,7 @@ Anything missing in this list? Please open an issue or make a pull request.
 
 ## You might also like:
 
-* `diffeqzoo`: A library for example implementations of differential equations in NumPy and JAX
-* `probfindiff`: Probabilistic numerical finite differences, in JAX.
+* [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): 
+  A library for example implementations of differential equations in NumPy and JAX
+* [probfindiff](https://probfindiff.readthedocs.io/en/latest/): 
+  Probabilistic numerical finite differences, in JAX.
