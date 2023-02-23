@@ -81,5 +81,7 @@ Anything missing in this list? Please open an issue or make a pull request.
 
 ## You might also like:
 
-* `diffeqzoo`: A library for example implementations of differential equations in NumPy and JAX
-* `probfindiff`: Probabilistic numerical finite differences, in JAX.
+* [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): 
+  A library for example implementations of differential equations in NumPy and JAX
+* [probfindiff](https://probfindiff.readthedocs.io/en/latest/): 
+  Probabilistic numerical finite differences, in JAX.
