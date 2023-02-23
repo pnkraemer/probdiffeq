@@ -6,7 +6,7 @@
 # Source:
 #   https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
 
-name: Upload Python Package
+name: pypi-publish
 
 on:
   release:
