@@ -1,7 +1,7 @@
 # probdiffeq
 
 
-
+[![PyPi Version](https://img.shields.io/pypi/v/probdiffeq.svg?style=flat-square)](https://pypi.org/project/probdiffeq/)
 [![GitHub stars](https://img.shields.io/github/stars/pnkraemer/probdiffeq.svg?style=flat-square&logo=github&label=Stars&logoColor=white)](https://github.com/pnkraemer/probdiffeq)
 [![gh-actions](https://img.shields.io/github/actions/workflow/status/pnkraemer/probdiffeq/ci.yaml?branch=main&style=flat-square)](https://github.com/pnkraemer/probdiffeq/actions?query=workflow%3Aci)
 <a href="https://github.com/pnkraemer/probdiffeq/blob/master/LICENSE"><img src="https://img.shields.io/github/license/pnkraemer/probdiffeq?style=flat-square&color=2b9348" alt="License Badge"/></a>
@@ -27,10 +27,11 @@ and many more.
 
 
 
-* **TUTORIALS:** TBD
-* **API DOCUMENTATION:** TBD
+* **QUICKSTART:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/quickstart/)
+* **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples/posterior_uncertainties/)
+* **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
-* **BENCHMARKS:** TBD
+* **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 
 
 ## Installation
@@ -40,7 +41,7 @@ Get the most recent stable version from PyPi:
 ```
 pip install probdiffeq
 ```
-This installation assumes that JAX is already available.
+This installation assumes that [JAX](https://jax.readthedocs.io/en/latest/) is already available.
 
 To install `probdiffeq` with `jax[cpu]`, run
 ```commandline
@@ -55,6 +56,7 @@ There are examples and there are advanced examples.
 Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
+For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine `probdiffeq` with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
 
 Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation
 
