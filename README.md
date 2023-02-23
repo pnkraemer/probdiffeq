@@ -27,10 +27,12 @@ and many more.
 
 
 
-* **TUTORIALS:** TBD
-* **API DOCUMENTATION:** TBD
+* **QUICKSTART:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/quickstart/)
+* **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples/posterior_uncertainties/)
+* **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/#choosing-a-solver)
+* **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
-* **BENCHMARKS:** TBD
+* **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 
 
 ## Installation
@@ -40,7 +42,7 @@ Get the most recent stable version from PyPi:
 ```
 pip install probdiffeq
 ```
-This installation assumes that JAX is already available.
+This installation assumes that [JAX](https://jax.readthedocs.io/en/latest/) is already available.
 
 To install `probdiffeq` with `jax[cpu]`, run
 ```commandline
@@ -55,8 +57,9 @@ There are examples and there are advanced examples.
 Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
+For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine `probdiffeq` with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
 
-Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation
+Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
 
 
 
@@ -81,5 +84,7 @@ Anything missing in this list? Please open an issue or make a pull request.
 
 ## You might also like:
 
-* `diffeqzoo`: A library for example implementations of differential equations in NumPy and JAX
-* `probfindiff`: Probabilistic numerical finite differences, in JAX.
+* [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): 
+  A library for example implementations of differential equations in NumPy and JAX
+* [probfindiff](https://probfindiff.readthedocs.io/en/latest/): 
+  Probabilistic numerical finite differences, in JAX.
