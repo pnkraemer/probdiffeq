@@ -1,45 +1,8 @@
 """Benchmark utils."""
 
-import subprocess
 import timeit
 
-import jax
-import numpy as np
 from tqdm import tqdm
-from tueplots import axes, bundles, cycler, markers
-
-from probdiffeq import __version__ as probdiffeq_version
-
-
-def plot_config():
-    colors = ["cornflowerblue", "salmon", "mediumseagreen", "crimson", "darkorchid"]
-    markers_ = ["o", "v", "P", "^", "X", "d"]
-    return {
-        **bundles.beamer_moml(rel_width=1.0, rel_height=1.0),
-        **axes.color(base="black"),
-        **axes.grid(),
-        **cycler.cycler(
-            marker=np.tile(markers_, 9)[:15],
-            color=np.tile(colors, 10)[:15],
-        ),
-        **markers.with_edge(),
-        "figure.dpi": 150,
-    }
-
-
-def print_info():
-    commit = _most_recent_commit(abbrev=6)
-
-    print(f"probdiffeq version:\n\t{probdiffeq_version}")
-    print(f"Most recent commit:\n\t{commit}")
-    print()
-    jax.print_environment_info()
-
-
-def _most_recent_commit(*, abbrev=21):
-    return subprocess.check_output(
-        ["git", "describe", "--always", f"--abbrev={abbrev}"]
-    )
 
 
 def workprecision_make(*, solve_fns, tols, **kwargs):

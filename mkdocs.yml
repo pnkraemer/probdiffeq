@@ -65,10 +65,11 @@ plugins:
                     show_root_heading: true
     - exclude:
         glob:
+          - "quickstart/quickstart.md"
           - "examples/*.md"
           - "advanced_examples/*.md"
-          - "benchmarks/internal_only.md"
           - "benchmarks/nonstiff_multiple_frameworks.md"
+          - "benchmarks/probdiffeq_only.md"
     - mknotebooks
 
 
@@ -107,5 +108,5 @@ nav:
         - "dev_docs/continuous_integration.md"
     - Benchmarks:
         - "benchmarks/insights.md"
-        - "benchmarks/internal_only.ipynb"
+        - "benchmarks/probdiffeq_only.ipynb"
         - "benchmarks/nonstiff_multiple_frameworks.ipynb"

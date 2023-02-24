@@ -25,19 +25,16 @@ import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import scipy.integrate
-from _benchmark_utils import (
-    plot_config,
-    print_info,
-    workprecision_make,
-    workprecision_plot,
-)
 from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq import controls, solution_routines, solvers
+from probdiffeq.doc_util import benchmark, info, notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
+```
 
+```python
 # x64 precision
 config.update("jax_enable_x64", True)
 
@@ -49,10 +46,10 @@ if not backend.has_been_selected:
     backend.select("jax")
 
 # Nice-looking plots
-plt.rcParams.update(plot_config())
+plt.rcParams.update(notebook.plot_config())
 
 # Which version of the softwares are we using?
-print_info()
+info.print_info()
 ```
 
 ```python
@@ -191,13 +188,17 @@ solve_fns = [
 %%time
 tolerances = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12]
 
-results = workprecision_make(solve_fns=solve_fns, number=1, repeat=3, tols=tolerances)
+results = benchmark.workprecision_make(
+    solve_fns=solve_fns, number=1, repeat=3, tols=tolerances
+)
 ```
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 5))
 
-fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
+fig, ax = benchmark.workprecision_plot(
+    results=results, fig=fig, ax=ax, ode_name=ODE_NAME
+)
 
 plt.show()
 ```

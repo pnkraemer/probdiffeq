@@ -26,14 +26,19 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
+```
+
+```python
+plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
-
 config.update("jax_enable_x64", True)
+config.update("jax_platform_name", "cpu")
 ```
 
 ```python tags=[]
@@ -107,11 +112,11 @@ for i in [0, 1, 2]:  # ["S", "I", "R"]
     # Exaggerate the uncertainty (for plotting reasons)
     stds = 10 * jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
-    ax[0].plot(ts, ms)
+    ax[0].plot(ts, ms, marker="None")
     ax[0].fill_between(ts, ms - 1.96 * stds, ms + 1.96 * stds, alpha=0.3)
     ax[0].set_ylabel("Posterior credible intervals")
 
-    ax[1].semilogy(ts, stds)
+    ax[1].semilogy(ts, stds, marker="None")
     ax[1].set_ylabel("Standard deviation")
 
 ax[1].set_xlabel("Time")

@@ -26,12 +26,16 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import controls, dense_output, solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
+```
+
+```python
+plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
-
 
 config.update("jax_enable_x64", True)
 config.update("jax_platform_name", "cpu")
@@ -55,7 +59,7 @@ solver = solvers.MLESolver(
 ```
 
 ```python
-%%time
+# %#%time
 
 # Solve the ODE with low precision
 solution = solution_routines.solve_with_python_while_loop(
@@ -127,46 +131,43 @@ fig, axes = plt.subplots(nrows=3, ncols=2, sharex=True, sharey="row")
 ((ax0, ax1), (ax2, ax3), (ax4, ax5)) = axes
 
 
-ax0.set_title("Prior")
-ax1.set_title("Posterior")
-
+#######################
 ax0.set_ylabel("State")
+
+ax0.set_title("Prior")
+ax0.plot(mesh, prior_u, marker="None", label="Estimate")
+ax0.plot(
+    mesh, posterior_u, marker="None", linestyle="dotted", color="C1", label="Target"
+)
+
+ax1.set_title("Posterior")
+ax1.plot(mesh, posterior_u, marker="None")
+ax1.plot(mesh, posterior_u, marker="None", linestyle="dotted", color="C1")
+
+
+#######################
 ax2.set_ylabel("Residual")
+
+ax2.plot(mesh, prior_du - f_vect(prior_u, *f_args), marker="None")
+ax2.axhline(0.0, linestyle="dotted", color="C1", marker="None")
+ax3.plot(mesh, posterior_du - f_vect(posterior_u, *f_args), marker="None")
+ax3.axhline(0.0, linestyle="dotted", color="C1", marker="None")
+
+
+#######################
 ax4.set_ylabel("|| Residual ||")
 
-
-ax0.plot(mesh, prior_u, label="Estimate")
-ax0.plot(mesh, posterior_u, linestyle="dotted", color="C1", label="Target")
-ax1.plot(mesh, posterior_u)
-ax1.plot(mesh, posterior_u, linestyle="dotted", color="C1")
-
-ax2.plot(mesh, prior_du - f_vect(prior_u, *f_args))
-ax2.axhline(0.0, linestyle="dotted", color="C1")
-ax3.plot(mesh, posterior_du - f_vect(posterior_u, *f_args))
-ax3.axhline(0.0, linestyle="dotted", color="C1")
-
-# clip = 1e-8
-clip = 0.0
-ax4.semilogy(mesh, jnp.abs(prior_du - f_vect(prior_u, *f_args)) + clip)
-ax5.semilogy(mesh, jnp.abs(posterior_du - f_vect(posterior_u, *f_args)) + clip)
-ax4.axhline(clip, linestyle="dotted", color="C1")
-ax5.axhline(clip, linestyle="dotted", color="C1")
+ax4.semilogy(mesh, jnp.abs(prior_du - f_vect(prior_u, *f_args)), marker="None")
+ax5.semilogy(mesh, jnp.abs(posterior_du - f_vect(posterior_u, *f_args)), marker="None")
+ax4.axhline(0.0, linestyle="dotted", color="C1", marker="None")
+ax5.axhline(0.0, linestyle="dotted", color="C1", marker="None")
 ax4.set_ylim((1e-8, 1e0))
 ax5.set_ylim((1e-8, 1e0))
-# for t in solution.t:
-#     ax5.axvline(t, linestyle="dotted")
-
-# for ax in (ax2, ax3, ax4, ax5):
-#     ax.axhline(0., linestyle="dotted")
 
 
 ax0.set_xlim((t0, t1))
-# ax0.set_ylim((-20, 40))
-# ax2.set_ylim((-100, 100))
 ax0.legend()
-plt.tight_layout()
 fig.align_ylabels()
-# plt.savefig("Figure.pdf")
 plt.show()
 ```
 

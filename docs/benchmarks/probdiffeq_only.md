@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# Internal solvers only
+# Only probdiffeq-solvers
 
 Let's find the fastest solver of the Lotka--Volterra problem, a standard benchmark problem. It is low-dimensional, not stiff, and generally poses no major problems for any numerical solver.
 
@@ -24,19 +24,16 @@ import jax
 import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from _benchmark_utils import (
-    plot_config,
-    print_info,
-    workprecision_make,
-    workprecision_plot,
-)
 from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq import controls, cubature, solution_routines, solvers
+from probdiffeq.doc_util import benchmark, info, notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
+```
 
+```python
 # x64 precision
 config.update("jax_enable_x64", True)
 
@@ -48,10 +45,10 @@ if not backend.has_been_selected:
     backend.select("jax")
 
 # Nice-looking plots
-plt.rcParams.update(plot_config())
+plt.rcParams.update(notebook.plot_config())
 
 # Which version of the softwares are we using?
-print_info()
+info.print_info()
 ```
 
 This is the ODE problem:
@@ -111,7 +108,7 @@ ode_shape = u0.shape
 tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
 
 workprecision_diagram = functools.partial(
-    workprecision_make, number=3, repeat=3, tols=tolerances
+    benchmark.workprecision_make, number=3, repeat=3, tols=tolerances
 )
 ```
 
@@ -167,7 +164,9 @@ results = workprecision_diagram(solve_fns=solve_fns)
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 3))
-fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
+fig, ax = benchmark.workprecision_plot(
+    results=results, fig=fig, ax=ax, ode_name=ODE_NAME
+)
 plt.show()
 ```
 
@@ -212,7 +211,9 @@ results = workprecision_diagram(solve_fns=solve_fns)
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 3))
-fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
+fig, ax = benchmark.workprecision_plot(
+    results=results, fig=fig, ax=ax, ode_name=ODE_NAME
+)
 plt.show()
 ```
 
@@ -278,7 +279,7 @@ results_all = [workprecision_diagram(solve_fns=fns) for fns in solve_fns]
 fig, axes = plt.subplots(figsize=(8, 5), nrows=2, ncols=3, sharex=True, sharey=True)
 
 for ax, results in zip(axes.reshape((-1,)), results_all):
-    fig, ax = workprecision_plot(
+    fig, ax = benchmark.workprecision_plot(
         results=results, fig=fig, ax=ax, title=None, xlabel=None, ylabel=None
     )
 
@@ -318,7 +319,9 @@ results = workprecision_diagram(solve_fns=solve_fns)
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 3))
-fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
+fig, ax = benchmark.workprecision_plot(
+    results=results, fig=fig, ax=ax, ode_name=ODE_NAME
+)
 plt.show()
 ```
 
@@ -382,7 +385,9 @@ results = workprecision_diagram(solve_fns=solve_fns)
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 3))
-fig, ax = workprecision_plot(results=results, fig=fig, ax=ax, ode_name=ODE_NAME)
+fig, ax = benchmark.workprecision_plot(
+    results=results, fig=fig, ax=ax, ode_name=ODE_NAME
+)
 
 plt.show()
 ```

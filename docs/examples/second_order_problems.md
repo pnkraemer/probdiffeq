@@ -23,13 +23,20 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
+```
 
-config.update("jax_enable_x64", True)
+```python
+plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
-    backend.select("jax")
+    backend.select("jax")  # ivp examples in jax
+
+
+config.update("jax_enable_x64", True)
+config.update("jax_platform_name", "cpu")
 ```
 
 Quick refresher: first-order ODEs
@@ -63,7 +70,7 @@ solution = solution_routines.solve_and_save_at(
 
 ```python
 plt.title((solution.u.shape, jnp.linalg.norm(solution.u[-1, ...] - u0)))
-plt.plot(solution.u[:, 0], solution.u[:, 1])
+plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
 plt.show()
 ```
 
@@ -110,7 +117,7 @@ solution = solution_routines.solve_and_save_at(
 
 ```python
 plt.title((solution.u.shape, jnp.linalg.norm(solution.u[-1, ...] - u0)))
-plt.plot(solution.u[:, 0], solution.u[:, 1])
+plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
 plt.show()
 ```
 

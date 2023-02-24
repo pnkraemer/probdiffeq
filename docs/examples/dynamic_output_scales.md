@@ -30,13 +30,20 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
+```
 
-config.update("jax_enable_x64", True)
+```python
+plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
-    backend.select("jax")
+    backend.select("jax")  # ivp examples in jax
+
+
+config.update("jax_enable_x64", True)
+config.update("jax_platform_name", "cpu")
 ```
 
 ```python
@@ -78,13 +85,17 @@ Plot the solution.
 ```python
 fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8, 5))
 
-ax[0][0].plot(ts, solution_dynamic.u, label="Approximation")
-ax[1][0].plot(ts, solution_dynamic.output_scale_sqrtm)
-ax[0][1].plot(ts, solution_mle.u, label="Approximation")
-ax[1][1].plot(ts, solution_mle.output_scale_sqrtm)
+ax[0][0].plot(ts, solution_dynamic.u, label="Approximation", marker="None")
+ax[1][0].plot(ts, solution_dynamic.output_scale_sqrtm, marker="None")
+ax[0][1].plot(ts, solution_mle.u, label="Approximation", marker="None")
+ax[1][1].plot(ts, solution_mle.output_scale_sqrtm, marker="None")
 
-ax[0][0].plot(ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0")
-ax[0][1].plot(ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0")
+ax[0][0].plot(
+    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
+)
+ax[0][1].plot(
+    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
+)
 
 ax[0][0].legend()
 ax[0][1].legend()
@@ -122,13 +133,17 @@ solution_mle = solution_routines.solve_fixed_grid(
 ```python
 fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8, 5))
 
-ax[0][0].semilogy(ts, solution_dynamic.u, label="Approximation")
-ax[1][0].semilogy(ts, solution_dynamic.output_scale_sqrtm)
-ax[0][1].semilogy(ts, solution_mle.u, label="Approximation")
-ax[1][1].semilogy(ts, solution_mle.output_scale_sqrtm)
+ax[0][0].semilogy(ts, solution_dynamic.u, label="Approximation", marker="None")
+ax[1][0].semilogy(ts, solution_dynamic.output_scale_sqrtm, marker="None")
+ax[0][1].semilogy(ts, solution_mle.u, label="Approximation", marker="None")
+ax[1][1].semilogy(ts, solution_mle.output_scale_sqrtm, marker="None")
 
-ax[0][0].semilogy(ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0")
-ax[0][1].semilogy(ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0")
+ax[0][0].semilogy(
+    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
+)
+ax[0][1].semilogy(
+    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
+)
 
 ax[0][0].legend()
 ax[0][1].legend()

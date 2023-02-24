@@ -27,12 +27,26 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
+```
+
+```python
+plt.rcParams.update(notebook.plot_config())
+
+if not backend.has_been_selected:
+    backend.select("jax")  # ivp examples in jax
 
 config.update("jax_enable_x64", True)
-if not backend.has_been_selected:
-    backend.select("jax")
+config.update("jax_platform_name", "cpu")
+```
+
+```python
+def strategy_to_string(strat):
+    name_strategy = strat.__class__.__name__
+    name_impl = strat.implementation.__class__.__name__
+    return f"{name_strategy}({name_impl}(...))"
 ```
 
 ```python
@@ -78,8 +92,8 @@ eks0sol = solution_routines.solve_with_python_while_loop(
 )
 
 plt.subplots(figsize=(5, 3))
-plt.title("EKS0 solution")
-plt.plot(eks0sol.t, eks0sol.u, "o-")
+plt.title(f"{strategy_to_string(eks0.strategy)} solution")
+plt.plot(eks0sol.t, eks0sol.u, ".-")
 plt.show()
 ```
 
@@ -103,10 +117,10 @@ coarse, _ = dense_output.offgrid_marginals_searchsorted(
 fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
 
-ax1.set_title("EKS0 solution (dense)")
+ax1.set_title(f"{strategy_to_string(eks0.strategy)} solution (dense)")
 ax1.plot(ts_dense, dense, ".")
 
-ax2.set_title("EKS0 solution (coarse)")
+ax2.set_title(f"{strategy_to_string(eks0.strategy)} solution (coarse)")
 ax2.plot(ts_coarse, coarse, ".")
 plt.show()
 ```
@@ -133,7 +147,7 @@ fixptsol = solution_routines.solve_and_save_at(
 )
 
 plt.subplots(figsize=(5, 3))
-plt.title("FixedPt-EKS0 solution")
+plt.title(f"{strategy_to_string(eks0_fixpt.strategy)} solution")
 plt.plot(fixptsol.t, fixptsol.u, ".-")
 plt.show()
 ```
