@@ -35,13 +35,19 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
+```
 
-config.update("jax_enable_x64", True)
+```python
+plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
-    backend.select("jax")
+    backend.select("jax")  # ivp examples in jax
+
+config.update("jax_enable_x64", True)
+config.update("jax_platform_name", "cpu")
 ```
 
 Create a problem and some fake-data:

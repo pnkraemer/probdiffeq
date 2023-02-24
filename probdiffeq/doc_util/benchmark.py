@@ -1,27 +1,8 @@
 """Benchmark utils."""
 
-import subprocess
 import timeit
 
-import jax
 from tqdm import tqdm
-
-from probdiffeq import __version__ as probdiffeq_version
-
-
-def print_info():
-    commit = _most_recent_commit(abbrev=6)
-
-    print(f"probdiffeq version:\n\t{probdiffeq_version}")
-    print(f"Most recent commit:\n\t{commit}")
-    print()
-    jax.print_environment_info()
-
-
-def _most_recent_commit(*, abbrev=21):
-    return subprocess.check_output(
-        ["git", "describe", "--always", f"--abbrev={abbrev}"]
-    )
 
 
 def workprecision_make(*, solve_fns, tols, **kwargs):

@@ -23,13 +23,19 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
+```
 
-config.update("jax_enable_x64", True)
+```python
+plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
-    backend.select("jax")
+    backend.select("jax")  # ivp examples in jax
+
+config.update("jax_enable_x64", True)
+config.update("jax_platform_name", "cpu")
 ```
 
 Set an example problem.
@@ -53,7 +59,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
-%%time
+# %#%time
 
 solution = solution_routines.solve_and_save_at(
     vf,
@@ -94,13 +100,13 @@ for i, axes_cols in enumerate(axes_all.T):
     else:
         axes_cols[0].set_title(f"{i}th deriv.")
 
-    axes_cols[0].plot(solution.t, ms)
+    axes_cols[0].plot(solution.t, ms, marker="None")
     for m in ms.T:
         axes_cols[0].fill_between(
             solution.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3
         )
 
-    axes_cols[1].semilogy(solution.t, stds)
+    axes_cols[1].semilogy(solution.t, stds, marker="None")
 
 plt.show()
 ```
@@ -113,7 +119,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
-%%time
+# %#%time
 
 solution = solution_routines.solve_and_save_at(
     vf,
@@ -158,16 +164,20 @@ for i, axes_cols in enumerate(axes_all.T):
     else:
         axes_cols[0].set_title(f"{i}th deriv.")
 
-    axes_cols[0].plot(solution.t, ms)
+    axes_cols[0].plot(solution.t, ms, marker="None")
     for s in samps:
-        axes_cols[0].plot(solution.t, s[..., 0], color="C0", linewidth=0.35)
-        axes_cols[0].plot(solution.t, s[..., 1], color="C1", linewidth=0.35)
+        axes_cols[0].plot(
+            solution.t, s[..., 0], color="C0", linewidth=0.35, marker="None"
+        )
+        axes_cols[0].plot(
+            solution.t, s[..., 1], color="C1", linewidth=0.35, marker="None"
+        )
     for m in ms.T:
         axes_cols[0].fill_between(
             solution.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3
         )
 
-    axes_cols[1].semilogy(solution.t, stds)
+    axes_cols[1].semilogy(solution.t, stds, marker="None")
 
 plt.show()
 ```

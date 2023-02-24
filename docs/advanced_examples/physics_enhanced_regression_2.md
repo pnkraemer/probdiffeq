@@ -31,6 +31,7 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import solution_routines, solvers
+from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
@@ -38,6 +39,16 @@ config.update("jax_enable_x64", True)
 
 if not backend.has_been_selected:
     backend.select("jax")
+```
+
+```python
+plt.rcParams.update(notebook.plot_config())
+
+if not backend.has_been_selected:
+    backend.select("jax")  # ivp examples in jax
+
+config.update("jax_enable_x64", True)
+config.update("jax_platform_name", "cpu")
 ```
 
 Create some fake data by sampling a Lotka-Volterra solution with the incorrect initial value.
@@ -156,13 +167,13 @@ initial = u0_to_sol(u0_guess)
 
 ```python
 for sol in solutions:
-    plt.plot(ts, sol, color="C0", linewidth=0.05, alpha=0.7)
+    plt.plot(ts, sol, color="C0", linewidth=0.05, alpha=0.7, marker="None")
     plt.plot(ts[0], sol[0][None, :], "P", markersize=1, color="C0")
     plt.plot(ts[-1], sol[-1][None, :], "P", markersize=1, color="C0")
 
 
 plt.title("Posterior samples (ODE-solution space)")
-plt.plot(ts, initial, color="k", alpha=0.25, linewidth=4)
+plt.plot(ts, initial, color="k", alpha=0.25, linewidth=4, marker="None")
 plt.plot(ts[0], u0_true[None, :], "P", color="k", markersize=8)
 plt.plot(ts[-1], data[None, :], "P", color="k", markersize=8)
 # plt.ylim((0, 40))
@@ -180,6 +191,6 @@ plt.show()
 
 ```python
 plt.title("Potential energy")
-plt.plot(states.potential_energy)
+plt.plot(states.potential_energy, ".-")
 plt.show()
 ```
