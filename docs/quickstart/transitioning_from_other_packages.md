@@ -123,25 +123,30 @@ Our solvers also naturally work with function transformations such as `vmap`, `j
 
 ## Transitioning from Diffrax
 [Diffrax](https://docs.kidger.site/diffrax/) is a JAX-based library offering numerical differential equation solvers.
-It is fascinating because it unifies implementations of solvers for SDEs, CDEs, and ODEs.
-But `diffrax` does not provide probabilistic numerical algorithms.
+One of its big selling points is that it unifies implementations of solvers for SDEs, CDEs, and ODEs.
 
-Both libraries (`diffrax` and `probdiffeq`) do not serve the same purpose, and no one must choose between either one.
-Nevertheless, they both solve differential equations and can (and will) be part of the same benchmarks.
+The main difference between `probdiffeq` and Diffrax is that Diffrax provides non-probabilistic ODE solvers whereas `probdiffeq` provides probabilistic solvers.
+Both solve differential equations, but they can only be compared to a certain extent.
 
-The main differences are the following:
+Both classes of algorithms solve differential equations and can (and will) be part of the same benchmarks.
+But the sets of methods provided by each package are completely disjoint, and the choice between both toolboxes reduces to the choice between non-probabilistic and probabilistic algorithms.
+(When to choose which one is a subject for another post; some selling points of probabilistic solvers are discussed in the example notebooks.)
 
-* To build a solver in `diffrax`, it usually suffices to call, e.g. `diffrax.Tsit5()`. 
+A user that is familiar with diffrax (or most other traditional ODE solver libraries) should gain familiarity with `probdiffeq`s API fairly quickly.
+The main API differences between the packages are the following:
+
+* To build a solver in Diffrax, it usually suffices to call, e.g. `diffrax.Tsit5()`. 
   In `probdiffeq`, we wrap a solver around an estimation strategy around a state-space model. 
-  Three lines of code are more complex than one line. However, in return, this complexity comes with the ability to fine-tune solver implementations next to all other advantages of probabilistic solvers over non-probabilistic ones.
-* The vector fields in `diffrax` are `diffrax.ODETerm()`s (presumably, because of the joint treatment of ODEs/SDEs); 
+  Three lines of code are more complex than one line. 
+  However, in return, this complexity comes with the ability to fine-tune solver implementations (next to other advantages of probabilistic solvers over non-probabilistic ones).
+* The vector fields in Diffrax are `diffrax.ODETerm()`s (presumably, because of the joint treatment of ODEs/SDEs); 
   in `probdiffeq`, we pass plain functions.
-* `diffrax` offers multiple modes of differentiating the IVP solver. For probabilistic solvers, this is a work in progress.
+* Diffrax offers multiple modes of differentiating the IVP solver. For probabilistic solvers, this is a work in progress.
 
 
-To roughly translate the `diffrax` IVP solvers to `probdiffeq` solvers, consider the following selection of solvers:
+To roughly translate the Diffrax IVP solvers to `probdiffeq` solvers, consider the following selection of solvers:
 
-| In `diffrax`:                                             | In `probdiffeq`:                                                                              | Comments                                                                       | 
+| In Diffrax:                                             | In `probdiffeq`:                                                                              | Comments                                                                       | 
 |-----------------------------------------------------------|-----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
 | `Heun()`, `Midpoint()`, `Ralston()`, `LeapfrogMidpoint()` | e.g. `IsoTS0(num_derivatives=1)`, `BlockDiagTS0(num_derivatives=1)`                           | Use block-diagonal covariances if the ODE dimensions have greatly different scales |
 | `Bosh3()`                                                 | e.g. `IsoTS0(num_derivatives=2)`, `BlockDiagTS0(num_derivatives=2)`                           | See above.                                                                     |
