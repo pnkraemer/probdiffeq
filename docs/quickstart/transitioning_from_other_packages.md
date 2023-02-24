@@ -126,9 +126,9 @@ Our solvers also naturally work with function transformations such as `vmap`, `j
 One of its big selling points is that it unifies implementations of solvers for SDEs, CDEs, and ODEs.
 
 The main difference between `probdiffeq` and Diffrax is that Diffrax provides non-probabilistic ODE solvers whereas `probdiffeq` provides probabilistic solvers.
-Both solve differential equations, but they can only be compared to a certain extent.
+Both solve differential equations, but they can only be compared to a certain extent:
 
-Both classes of algorithms solve differential equations and can (and will) be part of the same benchmarks.
+Yes, both classes of algorithms solve differential equations and can (and will) be part of the same benchmarks.
 But the sets of methods provided by each package are completely disjoint, and the choice between both toolboxes reduces to the choice between non-probabilistic and probabilistic algorithms.
 (When to choose which one is a subject for another post; some selling points of probabilistic solvers are discussed in the example notebooks.)
 
