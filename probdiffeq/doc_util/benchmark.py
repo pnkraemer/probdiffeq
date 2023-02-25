@@ -1,74 +1,115 @@
 """Benchmark utils."""
+import jax
+import jax.experimental.ode
+import jax.numpy as jnp
+import numpy as np
+import scipy.integrate
+from jax.typing import ArrayLike
 
-import timeit
-
-from tqdm import tqdm
-
-
-def workprecision_make(*, solve_fns, tols, **kwargs):
-    results = {}
-    for solve_fn, label in tqdm(solve_fns):
-        times, errors = [], []
-
-        for rtol in tols:
-
-            def bench():
-                return solve_fn(tol=rtol)
-
-            t, error = time(bench, **kwargs)
-
-            times.append(t)
-            errors.append(error)
-
-        results[label] = (times, errors)
-    return results
+from probdiffeq import solution_routines
 
 
-def time(fn, /, *, number=3, repeat=5):
-    res = fn()
-    t = min(timeit.repeat(fn, number=number, repeat=repeat)) / number
-    return t, res
+class FirstOrderIVP:
+    """First-order IVPs in the ProbDiffEq API."""
+
+    def __init__(self, vector_field, initial_values, t0, t1):
+        self.vector_field = vector_field
+        self.initial_values = initial_values
+        self.t0 = t0
+        self.t1 = t1
+
+    def to_jax(self, t):
+        @jax.jit
+        def func(u, t_, *p):
+            return self.vector_field(u, t=t_, p=p)
+
+        return JaxIVP(func, y0=self.initial_values[0], t=t)
+
+    def to_scipy(self, t_eval):
+        @jax.jit
+        def fun(t, u, *p):
+            return self.vector_field(u, t=t, p=p)
+
+        return SciPyIVP(
+            fun,
+            t_span=(self.t0, self.t1),
+            y0=np.asarray(self.initial_values[0]),
+            t_eval=t_eval,
+        )
+
+    @property
+    def args(self):
+        return self.vector_field, self.initial_values, self.t0, self.t1
+
+    @property
+    def kwargs(self):
+        return {}
 
 
-def workprecision_plot(
-    *,
-    results,
-    fig,
-    ax,
-    alpha=0.95,
-    xticks=None,
-    yticks=None,
-    title="Work-precision diagram",
-    ode_name=None,
-    xlabel="Precision",
-    xlabel_unit="RMSE, absolute",
-    ylabel="Work",
-    ylabel_unit="wall time, s",
-    which_grid="both",
-):
-    for solver in results:
-        times, errors = results[solver]
-        ax.loglog(errors, times, label=solver, alpha=alpha)
+class JaxIVP:
+    def __init__(self, func, y0, t):
+        self.func = func
+        self.y0 = y0
+        self.t = t
 
-    if xticks is not None:
-        ax.set_xticks(xticks)
-    if yticks is not None:
-        ax.set_xticks(yticks)
+    @property
+    def args(self):
+        return self.func, self.y0, self.t
 
-    if title is not None:
-        if ode_name is not None:
-            title += f" [{ode_name}]"
-        ax.set_title(title)
-    if xlabel is not None:
-        if ylabel_unit is not None:
-            xlabel += f" [{xlabel_unit}]"
-            ax.set_xlabel(xlabel)
-    if ylabel is not None:
-        if ylabel_unit is not None:
-            ylabel += f" [{ylabel_unit}]"
-            ax.set_ylabel(ylabel)
+    @property
+    def kwargs(self):
+        return {}
 
-    ax.grid(which_grid)
-    ax.legend()
 
-    return fig, ax
+class SciPyIVP:
+    def __init__(self, fun, t_span, y0, t_eval=None):
+        self.fun = fun
+        self.t_span = t_span
+        self.y0 = y0
+        self.t_eval = t_eval
+
+    @property
+    def args(self):
+        return self.fun, self.t_span, self.y0
+
+    @property
+    def kwargs(self):
+        return {"t_eval": self.t_eval}
+
+
+def relative_rmse(*, solution: ArrayLike, atol=1e-5):
+    """Relative root mean-squared error."""
+    solution = jnp.asarray(solution)
+
+    @jax.jit
+    def error_fn(u: ArrayLike, /):
+        ratio = (u - solution) / (atol + solution)
+        return jnp.linalg.norm(ratio) / jnp.sqrt(ratio.size)
+
+    return error_fn
+
+
+def probdiffeq_terminal_values():
+    def solve_fn(*args, atol, rtol, **kwargs):
+        solution = solution_routines.simulate_terminal_values(
+            *args, atol=atol, rtol=rtol, **kwargs
+        )
+        return solution.u
+
+    return solve_fn
+
+
+def jax_terminal_values():
+    def solve_fn(*args, atol, rtol, **kwargs):
+        solution = jax.experimental.ode.odeint(*args, atol=atol, rtol=rtol, **kwargs)
+        return solution[-1, :]
+
+    return solve_fn
+
+
+def scipy_terminal_values():
+    def solve_fn(*args, atol, rtol, **kwargs):
+        solution = scipy.integrate.solve_ivp(*args, atol=atol, rtol=rtol, **kwargs)
+        return solution.y.T[-1, :]
+
+    return solve_fn
