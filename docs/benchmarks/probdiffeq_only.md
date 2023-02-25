@@ -57,14 +57,17 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 50.0))
 
 
 @jax.jit
-def vf(x, *, t, p):
-    return f(x, *p)
+def vf(x, *, t, p=()):
+    return f(x, *f_args)
 
+
+problem = benchmark.FirstOrderIVP(vector_field=vf, initial_values=(u0,), t0=t0, t1=t1)
 
 # Compute a reference solution
 ts = jnp.linspace(t0, t1, num=250)
+problem_jax = problem.to_jax(t=ts)
 odeint_solution = jax.experimental.ode.odeint(
-    lambda u, t, *p: vf(u, t=t, p=p), u0, ts, *f_args, atol=1e-12, rtol=1e-12
+    *problem_jax.args, **problem_jax.kwargs, atol=1e-12, rtol=1e-12
 )
 
 
@@ -74,14 +77,13 @@ atols = 1e-2 * rtols
 num_repeats = 5
 error_fn = benchmark.relative_rmse(solution=odeint_solution[-1, :])
 solve_fn = benchmark.probdiffeq_terminal_values()
-problem = (vf, (u0,), t0, t1)
 
 # Bundle the problem setup
 problem_config = workprecision.ProblemConfig(
     label="Lotka-Volterra (terminal-value simulation)",
-    problem=problem,
+    problems=problem,
     error_fn=error_fn,
-    solve_fn=solve_fn,
+    solve_fns=solve_fn,
     atols=atols,
     rtols=rtols,
     repeat=num_repeats,
@@ -114,7 +116,6 @@ def strategy_to_method_config(strategy, *, label):
 
 def solver_to_method(solver):
     return {
-        "parameters": f_args,
         "solver": solver,
         "control": controls.ProportionalIntegral(),
     }

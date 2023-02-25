@@ -2,50 +2,76 @@
 
 import statistics
 import timeit
-from typing import Any, Callable, Dict, NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jax.typing import ArrayLike
 from tqdm.auto import tqdm
 
 from probdiffeq import _control_flow
 
 
-class MethodConfig(NamedTuple):
+class MethodConfig:
     """Work-precision diagram configuration for a single method."""
 
-    method: Dict
-    label: str
+    def __init__(self, method, label, key=None, jit=True, tols_static=False):
+        self.method = method
+        self.label = label
+        self.key = key if key is not None else "probdiffeq"
+        self.jit = jit
+        self.tols_static = tols_static
 
 
-class ProblemConfig(NamedTuple):
+class ProblemConfig:
     """Work-precision diagram configuration for a given problem."""
 
-    label: str
-    problem: Any
-    solve_fn: Callable
-    error_fn: Callable
-    atols: ArrayLike
-    rtols: ArrayLike
-    repeat: int = 5
+    def __init__(self, label, problems, solve_fns, error_fn, atols, rtols, repeat=5):
+        self.label = label
+
+        if not isinstance(problems, dict):
+            problems = {"probdiffeq": problems}
+        self.problems = problems
+
+        if not isinstance(solve_fns, dict):
+            solve_fns = {"probdiffeq": solve_fns}
+        self.solve_fns = solve_fns
+
+        self.error_fn = error_fn
+
+        self.atols = atols
+        self.rtols = rtols
+
+        self.repeat = repeat
 
 
-class Results(NamedTuple):
+@jax.tree_util.register_pytree_node_class
+class Results:
     """Work-precision diagram results."""
 
-    work: float
-    precision: float
+    def __init__(self, work, precision):
+        self.work = work
+        self.precision = precision
+
+    def tree_flatten(self):
+        children = self.work, self.precision
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        work, precision = children
+        return cls(work=work, precision=precision)
 
 
-class Timings(NamedTuple):
+@jax.tree_util.register_pytree_node_class
+class Timings:
     """Work-precision diagram timings."""
 
-    min: float
-    max: float
-    mean: float
-    stdev: float
-    data: ArrayLike
+    def __init__(self, min, max, mean, stdev, data):
+        self.min = min
+        self.max = max
+        self.mean = mean
+        self.stdev = stdev
+        self.data = jnp.asarray(data)
 
     @classmethod
     def from_list(cls, timings):
@@ -56,6 +82,16 @@ class Timings(NamedTuple):
             stdev=statistics.stdev(timings),
             data=jnp.asarray(timings),
         )
+
+    def tree_flatten(self):
+        children = self.min, self.max, self.mean, self.stdev, self.data
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        min, max, mean, stdev, data = children
+        return cls(min=min, max=max, mean=mean, stdev=stdev, data=data)
 
 
 # Work-precision diagram functionality
@@ -69,18 +105,27 @@ def create(problem, methods):
 
 
 def _evaluate_method(*, method_config, problem_config):
-    problem = problem_config.problem
     method = method_config.method
+    if method_config.key is not None:
+        problem = problem_config.problems[method_config.key]
+        solve_fn = problem_config.solve_fns[method_config.key]
+    else:
+        problem = problem_config.problems
+        solve_fn = problem_config.solve_fns
 
     error_fn = problem_config.error_fn
-    solve_fn = problem_config.solve_fn
     atols = problem_config.atols
     rtols = problem_config.rtols
     repeat = problem_config.repeat
 
-    @jax.jit
     def fn(atol, rtol):
-        return solve_fn(*problem, atol=atol, rtol=rtol, **method)
+        return solve_fn(*problem.args, **problem.kwargs, atol=atol, rtol=rtol, **method)
+
+    if method_config.jit:
+        if method_config.tols_static:
+            fn = jax.jit(fn, static_argnames=("atol", "rtol"))
+        else:
+            fn = jax.jit(fn)
 
     return _control_flow.tree_stack(
         [
@@ -93,9 +138,11 @@ def _evaluate_method(*, method_config, problem_config):
 
 
 def _evaluate_method_and_tolerance(*, error_fn, fn, atol, rtol, repeat):
-    qoi = fn(atol=atol, rtol=rtol)
+    qoi = fn(atol=float(atol), rtol=float(rtol))
     error = error_fn(qoi)
-    timings = timeit.repeat(lambda: fn(atol=atol, rtol=rtol), number=1, repeat=repeat)
+    timings = timeit.repeat(
+        lambda: fn(atol=float(atol), rtol=float(rtol)), number=1, repeat=repeat
+    )
     return Results(work=Timings.from_list(timings), precision=error)
 
 
