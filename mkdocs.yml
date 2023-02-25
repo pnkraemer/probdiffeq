@@ -111,3 +111,5 @@ nav:
           - "benchmarks/lotka_volterra/insights.md"
           - "benchmarks/lotka_volterra/internal.ipynb"
           - "benchmarks/lotka_volterra/external.ipynb"
+        - Pleiades:
+          - "benchmarks/lotka_volterra/external.ipynb"
