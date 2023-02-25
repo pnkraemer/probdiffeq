@@ -1,74 +1,29 @@
 """Benchmark utils."""
 
-import timeit
+import jax
+import jax.numpy as jnp
+from jax.typing import ArrayLike
 
-from tqdm import tqdm
-
-
-def workprecision_make(*, solve_fns, tols, **kwargs):
-    results = {}
-    for solve_fn, label in tqdm(solve_fns):
-        times, errors = [], []
-
-        for rtol in tols:
-
-            def bench():
-                return solve_fn(tol=rtol)
-
-            t, error = time(bench, **kwargs)
-
-            times.append(t)
-            errors.append(error)
-
-        results[label] = (times, errors)
-    return results
+from probdiffeq import solution_routines
 
 
-def time(fn, /, *, number=3, repeat=5):
-    res = fn()
-    t = min(timeit.repeat(fn, number=number, repeat=repeat)) / number
-    return t, res
+def relative_rmse(*, solution: ArrayLike, atol=1e-5):
+    """Relative root mean-squared error."""
+    solution = jnp.asarray(solution)
+
+    @jax.jit
+    def error_fn(u: ArrayLike, /):
+        ratio = (u - solution) / (atol + solution)
+        return jnp.linalg.norm(ratio) / jnp.sqrt(ratio.size)
+
+    return error_fn
 
 
-def workprecision_plot(
-    *,
-    results,
-    fig,
-    ax,
-    alpha=0.95,
-    xticks=None,
-    yticks=None,
-    title="Work-precision diagram",
-    ode_name=None,
-    xlabel="Precision",
-    xlabel_unit="RMSE, absolute",
-    ylabel="Work",
-    ylabel_unit="wall time, s",
-    which_grid="both",
-):
-    for solver in results:
-        times, errors = results[solver]
-        ax.loglog(errors, times, label=solver, alpha=alpha)
+def probdiffeq_terminal_values():
+    def solve_fn(*problem, tol, **method):
+        solution = solution_routines.simulate_terminal_values(
+            *problem, atol=1e-2 * tol, rtol=tol, **method
+        )
+        return solution.u
 
-    if xticks is not None:
-        ax.set_xticks(xticks)
-    if yticks is not None:
-        ax.set_xticks(yticks)
-
-    if title is not None:
-        if ode_name is not None:
-            title += f" [{ode_name}]"
-        ax.set_title(title)
-    if xlabel is not None:
-        if ylabel_unit is not None:
-            xlabel += f" [{xlabel_unit}]"
-            ax.set_xlabel(xlabel)
-    if ylabel is not None:
-        if ylabel_unit is not None:
-            ylabel += f" [{ylabel_unit}]"
-            ax.set_ylabel(ylabel)
-
-    ax.grid(which_grid)
-    ax.legend()
-
-    return fig, ax
+    return solve_fn

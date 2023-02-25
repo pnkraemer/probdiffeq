@@ -28,7 +28,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq import controls, cubature, solution_routines, solvers
-from probdiffeq.doc_util import benchmark, info, notebook
+from probdiffeq.doc_util import benchmark, info, notebook, workprecision
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 ```
@@ -56,7 +56,6 @@ This is the ODE problem:
 ```python
 # Make a problem
 f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 50.0))
-ODE_NAME = "Lotka-Volterra"
 
 
 @jax.jit
@@ -64,15 +63,26 @@ def vf(x, *, t, p):
     return f(x, *p)
 
 
-# Compile
-vf(u0, t=t0, p=f_args)
-
 ts = jnp.linspace(t0, t1, num=250)
 odeint_solution = jax.experimental.ode.odeint(
     lambda u, t, *p: vf(u, t=t, p=p), u0, ts, *f_args, atol=1e-12, rtol=1e-12
 )
-ys_reference = odeint_solution[-1, :]
 
+
+problem = (vf, (u0,), t0, t1)
+problem_config = workprecision.ProblemConfig(
+    label="Lotka-Volterra (terminal-value simulation)",
+    problem=problem,
+    error_fn=benchmark.relative_rmse(solution=odeint_solution[-1, :]),
+    solve_fn=benchmark.probdiffeq_terminal_values(),
+)
+```
+
+```python
+print(problem_config)
+```
+
+```python
 fig, ax = plt.subplots(figsize=(5, 1))
 ax.plot(ts, odeint_solution, marker="None")
 plt.show()
@@ -82,92 +92,67 @@ plt.show()
 Let's start with finding the fastest probabilistic IVP solver.
 
 
-```python
-def solver_to_solve(solver, **kwargs):
-    return jax.jit(functools.partial(_solve, solver=solver))
-
-
-def _solve(*, solver, tol):
-    solution = solution_routines.simulate_terminal_values(
-        vf,
-        initial_values=(u0,),
-        t0=t0,
-        t1=t1,
-        parameters=f_args,
-        solver=solver,
-        atol=1e-3 * tol,
-        rtol=tol,
-        control=controls.ProportionalIntegral(),
-    )
-    diff = (solution.u - ys_reference) / (1e-5 + ys_reference)
-    return jnp.linalg.norm(diff) / jnp.sqrt(diff.size)
-
-
-ode_shape = u0.shape
-
-tolerances = 0.1 ** jnp.arange(1.0, 11.0, step=2.0)
-
-workprecision_diagram = functools.partial(
-    benchmark.workprecision_make, number=3, repeat=3, tols=tolerances
-)
-```
 
 ### Which mode of linearization?
 
 Should we linearize with a Taylor-approximation or by moment matching?
 
 ```python
-def correction_to_solver(implementation):
-    solver = solvers.MLESolver(strategy=filters.Filter(implementation=implementation))
-    return solver_to_solve(solver)
+def impl_to_method(impl, *, label):
+    solver = solvers.MLESolver(filters.Filter(impl))
+    return workprecision.MethodConfig(method=solver_to_method(solver), label=label)
 
 
-num_derivatives = 4
+def solver_to_method(solver):
+    return {
+        "parameters": f_args,
+        "solver": solver,
+        "control": controls.ProportionalIntegral(),
+    }
+
+
+def cubature_to_slr1(cubature, *, ode_shape):
+    return recipes.DenseSLR1.from_params(
+        ode_shape=ode_shape,
+        cubature=cubature,
+    )
+
+
+# Different linearisation styles
+ode_shape = u0.shape
 ts1 = recipes.DenseTS1.from_params(ode_shape=ode_shape)
-slr1_sci = recipes.DenseSLR1.from_params(
-    ode_shape=ode_shape,
-    num_derivatives=num_derivatives,
-    cubature=cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape),
-)
-
-slr1_ut = recipes.DenseSLR1.from_params(
-    ode_shape=ode_shape,
-    num_derivatives=num_derivatives,
-    cubature=cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0),
-)
-
-slr1_gh = recipes.DenseSLR1.from_params(
-    ode_shape=ode_shape,
-    num_derivatives=num_derivatives,
-    cubature=cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3),
-)
+sci = cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape)
+ut = cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0)
+gh = cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3)
+slr1_sci = cubature_to_slr1(sci, ode_shape=ode_shape)
+slr1_ut = cubature_to_slr1(ut, ode_shape=ode_shape)
+slr1_gh = cubature_to_slr1(gh, ode_shape=ode_shape)
 
 
-ts1_solver = correction_to_solver(ts1)
-slr1_sci_solver = correction_to_solver(slr1_sci)
-slr1_ut_solver = correction_to_solver(slr1_ut)
-slr1_gh_solver = correction_to_solver(slr1_gh)
-
-solve_fns = [
-    (ts1_solver, f"TS1({num_derivatives})"),
-    (slr1_sci_solver, f"SLR1({num_derivatives}, SCI)"),
-    (slr1_ut_solver, f"SLR1({num_derivatives}, UT)"),
-    (slr1_gh_solver, f"SLR1({num_derivatives}, GH)"),
+# Methods
+methods = [
+    impl_to_method(impl=ts1, label="TS1()"),
+    impl_to_method(impl=slr1_sci, label="SLR1(SCI)"),
+    impl_to_method(impl=slr1_ut, label="SLR1(UT)"),
+    impl_to_method(impl=slr1_gh, label="SLR1(GH)"),
 ]
 ```
 
 ```python
-%%time
-
-results = workprecision_diagram(solve_fns=solve_fns)
+tolerances = 0.1 ** jnp.arange(1.0, 9.0, step=2.0)
+results = workprecision.create(
+    problem=problem_config, methods=methods, tolerances=tolerances, repeat=5
+)
 ```
 
 ```python
 fig, ax = plt.subplots(figsize=(5, 3))
-fig, ax = benchmark.workprecision_plot(
-    results=results, fig=fig, ax=ax, ode_name=ODE_NAME
+fig, ax = workprecision.plot(
+    results=results, fig=fig, ax=ax, title=problem_config.label
 )
 plt.show()
+
+assert 0
 ```
 
 The Taylor-series based method is more efficient. The cubature rule has little effect on the efficiency of the moment-matching solver.
@@ -204,7 +189,7 @@ solve_fns = [
 ```
 
 ```python
-%%time
+# %#%time
 
 results = workprecision_diagram(solve_fns=solve_fns)
 ```
@@ -270,7 +255,7 @@ for strat, label in [
 ```
 
 ```python
-%%time
+# %#%time
 
 results_all = [workprecision_diagram(solve_fns=fns) for fns in solve_fns]
 ```
@@ -312,7 +297,7 @@ solve_fns = [
 ```
 
 ```python
-%%time
+# %#%time
 
 results = workprecision_diagram(solve_fns=solve_fns)
 ```
@@ -378,7 +363,7 @@ solve_fns = [
 ```
 
 ```python
-%%time
+# %#%time
 
 results = workprecision_diagram(solve_fns=solve_fns)
 ```
