@@ -24,7 +24,17 @@ class MethodConfig:
 class ProblemConfig:
     """Work-precision diagram configuration for a given problem."""
 
-    def __init__(self, label, problems, solve_fns, error_fn, atols, rtols, repeat=5):
+    def __init__(
+        self,
+        label,
+        problems,
+        solve_fns,
+        error_fn,
+        atols,
+        rtols,
+        error_unit="RMSE",
+        repeat=5,
+    ):
         self.label = label
 
         if not isinstance(problems, dict):
@@ -36,6 +46,7 @@ class ProblemConfig:
         self.solve_fns = solve_fns
 
         self.error_fn = error_fn
+        self.error_unit = error_unit
 
         self.atols = atols
         self.rtols = rtols
