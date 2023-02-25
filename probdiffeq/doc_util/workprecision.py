@@ -5,7 +5,9 @@ import timeit
 from typing import Any, Callable, Dict, NamedTuple
 
 import jax
-from tqdm.auto import tqdm as progressbar
+import jax.numpy as jnp
+from jax.typing import ArrayLike
+from tqdm.auto import tqdm
 
 from probdiffeq import _control_flow
 
@@ -24,6 +26,9 @@ class ProblemConfig(NamedTuple):
     problem: Any
     solve_fn: Callable
     error_fn: Callable
+    atols: ArrayLike
+    rtols: ArrayLike
+    repeat: int = 5
 
 
 class Results(NamedTuple):
@@ -40,6 +45,7 @@ class Timings(NamedTuple):
     max: float
     mean: float
     stdev: float
+    data: ArrayLike
 
     @classmethod
     def from_list(cls, timings):
@@ -48,42 +54,48 @@ class Timings(NamedTuple):
             max=max(timings),
             mean=statistics.mean(timings),
             stdev=statistics.stdev(timings),
+            data=jnp.asarray(timings),
         )
 
 
 # Work-precision diagram functionality
 
 
-def create(problem, methods, tolerances, *, repeat=5):
+def create(problem, methods):
     return {
-        method.label: _control_flow.tree_stack(
-            [
-                _evaluate_method(
-                    method_config=method,
-                    problem_config=problem,
-                    tolerance=tol,
-                    repeat=repeat,
-                )
-                for tol in progressbar(tolerances, leave=False)
-            ]
-        )
-        for method in progressbar(methods)
+        method.label: _evaluate_method(method_config=method, problem_config=problem)
+        for method in tqdm(methods)
     }
 
 
-def _evaluate_method(*, method_config, problem_config, tolerance, repeat):
+def _evaluate_method(*, method_config, problem_config):
     problem = problem_config.problem
-    error_fn = problem_config.error_fn
-    solve_fn = problem_config.solve_fn
     method = method_config.method
 
-    @jax.jit
-    def fn():
-        return solve_fn(*problem, tol=tolerance, **method)
+    error_fn = problem_config.error_fn
+    solve_fn = problem_config.solve_fn
+    atols = problem_config.atols
+    rtols = problem_config.rtols
+    repeat = problem_config.repeat
 
-    qoi = fn()
+    @jax.jit
+    def fn(atol, rtol):
+        return solve_fn(*problem, atol=atol, rtol=rtol, **method)
+
+    return _control_flow.tree_stack(
+        [
+            _evaluate_method_and_tolerance(
+                error_fn=error_fn, fn=fn, rtol=rtol, atol=atol, repeat=repeat
+            )
+            for atol, rtol in zip(tqdm(atols, leave=False), rtols)
+        ]
+    )
+
+
+def _evaluate_method_and_tolerance(*, error_fn, fn, atol, rtol, repeat):
+    qoi = fn(atol=atol, rtol=rtol)
     error = error_fn(qoi)
-    timings = timeit.repeat(fn, number=1, repeat=repeat)
+    timings = timeit.repeat(lambda: fn(atol=atol, rtol=rtol), number=1, repeat=repeat)
     return Results(work=Timings.from_list(timings), precision=error)
 
 
@@ -93,7 +105,8 @@ def plot(
     fig,
     ax,
     title,
-    alpha=0.95,
+    alpha_mean=0.95,
+    alpha_stdev=0.2 * 0.95,
     xticks=None,
     yticks=None,
     xlabel="Precision",
@@ -103,12 +116,12 @@ def plot(
     which_grid="both",
 ):
     for solver, result in results.items():
-        ax.loglog(result.precision, result.work.mean, label=solver, alpha=alpha)
+        ax.loglog(result.precision, result.work.mean, label=solver, alpha=alpha_mean)
         ax.fill_between(
             result.precision,
             result.work.mean - result.work.stdev,
             result.work.mean + result.work.stdev,
-            alpha=0.25 * alpha,
+            alpha=alpha_stdev,
         )
 
     if xticks is not None:
@@ -129,9 +142,4 @@ def plot(
 
     ax.grid(which_grid)
     ax.legend()
-    print(
-        "Next up: compute WP for all tolerances at once, "
-        "upgrade the remaining benchmarks. "
-        "Figure out how to squeeze other solvers into this framework."
-    )
     return fig, ax

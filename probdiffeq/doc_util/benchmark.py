@@ -20,9 +20,9 @@ def relative_rmse(*, solution: ArrayLike, atol=1e-5):
 
 
 def probdiffeq_terminal_values():
-    def solve_fn(*problem, tol, **method):
+    def solve_fn(*problem, atol, rtol, **method):
         solution = solution_routines.simulate_terminal_values(
-            *problem, atol=1e-2 * tol, rtol=tol, **method
+            *problem, atol=atol, rtol=rtol, **method
         )
         return solution.u
 
