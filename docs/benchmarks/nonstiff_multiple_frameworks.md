@@ -67,7 +67,6 @@ problems = {"probdiffeq": problem, "jax": problem_jax, "scipy": problem_scipy}
 # Compute a reference solution
 scipy_solution = scipy.integrate.solve_ivp(
     *problem_scipy.args,
-    **problem_scipy.kwargs,
     atol=1e-13,
     rtol=1e-13,
 )
