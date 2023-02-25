@@ -18,6 +18,14 @@ class FirstOrderIVP:
         self.t0 = t0
         self.t1 = t1
 
+    @property
+    def args(self):
+        return self.vector_field, self.initial_values, self.t0, self.t1
+
+    @property
+    def kwargs(self):
+        return {}
+
     def to_jax(self, t):
         @jax.jit
         def func(u, t_, *p):
@@ -36,6 +44,16 @@ class FirstOrderIVP:
             y0=np.asarray(self.initial_values[0]),
             t_eval=t_eval,
         )
+
+
+class SecondOrderIVP:
+    """First-order IVPs in the ProbDiffEq API."""
+
+    def __init__(self, vector_field, initial_values, t0, t1):
+        self.vector_field = vector_field
+        self.initial_values = initial_values
+        self.t0 = t0
+        self.t1 = t1
 
     @property
     def args(self):
@@ -89,27 +107,48 @@ def relative_rmse(*, solution: ArrayLike, atol=1e-5):
     return error_fn
 
 
-def probdiffeq_terminal_values():
+def absolute_rmse(*, solution: ArrayLike):
+    """Relative root mean-squared error."""
+    solution = jnp.asarray(solution)
+
+    @jax.jit
+    def error_fn(u: ArrayLike, /):
+        ratio = u - solution
+        return jnp.linalg.norm(ratio) / jnp.sqrt(ratio.size)
+
+    return error_fn
+
+
+# todo: change "select" to "qoi_fn" or something
+
+
+def probdiffeq_terminal_values(select_fn=None):
     def solve_fn(*args, atol, rtol, **kwargs):
         solution = solution_routines.simulate_terminal_values(
             *args, atol=atol, rtol=rtol, **kwargs
         )
+        if select_fn is not None:
+            return select_fn(solution.u)
         return solution.u
 
     return solve_fn
 
 
-def jax_terminal_values():
+def jax_terminal_values(select_fn=None):
     def solve_fn(*args, atol, rtol, **kwargs):
         solution = jax.experimental.ode.odeint(*args, atol=atol, rtol=rtol, **kwargs)
+        if select_fn is not None:
+            return select_fn(solution[-1, :])
         return solution[-1, :]
 
     return solve_fn
 
 
-def scipy_terminal_values():
+def scipy_terminal_values(select_fn=None):
     def solve_fn(*args, atol, rtol, **kwargs):
         solution = scipy.integrate.solve_ivp(*args, atol=atol, rtol=rtol, **kwargs)
+        if select_fn is not None:
+            return select_fn(solution.y.T[-1, :])
         return solution.y.T[-1, :]
 
     return solve_fn
