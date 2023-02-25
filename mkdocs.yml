@@ -70,6 +70,7 @@ plugins:
           - "advanced_examples/*.md"
           - "benchmarks/lotka_volterra/internal.md"
           - "benchmarks/lotka_volterra/external.md"
+          - "benchmarks/pleiades/external.md"
     - mknotebooks
 
 
@@ -112,4 +113,4 @@ nav:
           - "benchmarks/lotka_volterra/internal.ipynb"
           - "benchmarks/lotka_volterra/external.ipynb"
         - Pleiades:
-          - "benchmarks/lotka_volterra/external.ipynb"
+          - "benchmarks/pleiades/external.ipynb"
