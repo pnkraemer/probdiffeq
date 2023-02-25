@@ -68,8 +68,8 @@ plugins:
           - "quickstart/quickstart.md"
           - "examples/*.md"
           - "advanced_examples/*.md"
-          - "benchmarks/nonstiff_multiple_frameworks.md"
-          - "benchmarks/probdiffeq_only.md"
+          - "benchmarks/lotka_volterra/internal.md"
+          - "benchmarks/lotka_volterra/external.md"
     - mknotebooks
 
 
@@ -107,6 +107,7 @@ nav:
         - "dev_docs/creating_example_notebook.md"
         - "dev_docs/continuous_integration.md"
     - Benchmarks:
-        - "benchmarks/insights.md"
-        - "benchmarks/probdiffeq_only.ipynb"
-        - "benchmarks/nonstiff_multiple_frameworks.ipynb"
+        - Lotka-Volterra:
+          - "benchmarks/lotka_volterra/insights.md"
+          - "benchmarks/lotka_volterra/internal.ipynb"
+          - "benchmarks/lotka_volterra/external.ipynb"
