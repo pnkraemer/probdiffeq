@@ -135,7 +135,7 @@ class _AbstractSolver(abc.ABC):
         posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
         )
-        sol = self.strategy.extract_sol_terminal_value(posterior=posterior)
+        sol = self.strategy.extract_u_from_posterior(posterior=posterior)
 
         scale_sqrtm = self.strategy.init_output_scale_sqrtm()
         error_estimate = self.strategy.init_error_estimate()
@@ -199,7 +199,7 @@ class _AbstractSolver(abc.ABC):
     def _posterior_to_state(self, posterior, t, state, error_estimate):
         return Solution(
             t=t,
-            u=self.strategy.extract_sol_terminal_value(posterior=posterior),
+            u=self.strategy.extract_u_from_posterior(posterior=posterior),
             error_estimate=error_estimate,
             posterior=posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -258,7 +258,7 @@ class CalibrationFreeSolver(_AbstractSolver):
 
         # Extract and return solution
         # todo: strategy.extract_sol_*** should be `extract_u_from_posterior`
-        u = self.strategy.extract_sol_terminal_value(posterior=corrected)
+        u = self.strategy.extract_u_from_posterior(posterior=corrected)
         filtered = Solution(
             t=state.t + dt,
             u=u,
@@ -336,7 +336,7 @@ class DynamicSolver(_AbstractSolver):
         )
 
         # Return solution
-        sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
+        sol = self.strategy.extract_u_from_posterior(posterior=corrected)
         smoothing_solution = Solution(
             t=state.t + dt,
             u=sol,
@@ -414,7 +414,7 @@ class MLESolver(_AbstractSolver):
         )
 
         # Extract and return solution
-        sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
+        sol = self.strategy.extract_u_from_posterior(posterior=corrected)
         filtered = Solution(
             t=state.t + dt,
             u=sol,

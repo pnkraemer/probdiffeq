@@ -39,7 +39,7 @@ class Filter(_strategy.Strategy):
             t1=t1,
             scale_sqrtm=scale_sqrtm,
         )
-        u = self.extract_sol_terminal_value(posterior=sol)
+        u = self.extract_u_from_posterior(posterior=sol)
         return u, sol
 
     def sample(self, key, *, posterior, shape):
@@ -51,7 +51,7 @@ class Filter(_strategy.Strategy):
     def marginals_terminal_value(self, *, posterior):
         return posterior
 
-    def extract_sol_terminal_value(self, *, posterior):
+    def extract_u_from_posterior(self, *, posterior):
         return posterior.extract_qoi()
 
     def begin_extrapolation(self, *, posterior, dt):

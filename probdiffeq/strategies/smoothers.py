@@ -144,7 +144,7 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return a, (corrected_seq, b)
 
-    def extract_sol_terminal_value(self, *, posterior):
+    def extract_u_from_posterior(self, *, posterior):
         return posterior.init.extract_qoi()
 
     def marginals_terminal_value(self, *, posterior):
