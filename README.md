@@ -21,7 +21,7 @@ Features include:
 * Filtering, smoothing, and many other backends
 * Custom information operators
 * Physics-enhanced regression
-* Compatibility with other JAX-based libraries such as Optax or Blackjax.
+* Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
 and many more.
 
@@ -62,9 +62,6 @@ For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_exa
 Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
 
 
-
-
-
 ## Contributing
 Contributions are absolutely welcome!
 Start with checking the existing issues for a "good first issue" and have a look at  the developer documentation.
@@ -78,7 +75,7 @@ If you have a feature that you would like to see implemented, create an issue!
 * [ProbNum](https://probnum.readthedocs.io/en/latest/)
 * [Diffrax](https://docs.kidger.site/diffrax/)
 
-Check out how to transition from those packages (-> quickstart).
+Check out how to transition from those packages: [link](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/).
 
 Anything missing in this list? Please open an issue or make a pull request.
 
