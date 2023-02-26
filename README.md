@@ -57,7 +57,7 @@ There are examples and there are advanced examples.
 Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
-For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
+For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [Optax](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [BlackJAX](https://optax.readthedocs.io/en/latest/index.html).
 
 Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
 
