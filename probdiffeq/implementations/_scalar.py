@@ -417,7 +417,7 @@ class IBM(_collections.AbstractExtrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def init_corrected(self, taylor_coefficients):
+    def init_hidden_state(self, taylor_coefficients):
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)

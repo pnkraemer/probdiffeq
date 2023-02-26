@@ -56,8 +56,8 @@ class BlockDiagIBM(_collections.AbstractExtrapolation):
     def init_conditional(self, ssv_proto):
         return jax.vmap(_scalar.IBM.init_conditional)(self.ibm, ssv_proto)
 
-    def init_corrected(self, taylor_coefficients):
-        return jax.vmap(_scalar.IBM.init_corrected)(self.ibm, taylor_coefficients)
+    def init_hidden_state(self, taylor_coefficients):
+        return jax.vmap(_scalar.IBM.init_hidden_state)(self.ibm, taylor_coefficients)
 
     # todo: move to correction?
     def init_error_estimate(self):
