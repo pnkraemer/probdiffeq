@@ -21,7 +21,7 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_sol_terminal_value(self, *, posterior):
+    def extract_u_from_posterior(self, *, posterior):
         raise NotImplementedError
 
     @abc.abstractmethod

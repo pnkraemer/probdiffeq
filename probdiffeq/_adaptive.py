@@ -161,15 +161,13 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise the IVP solver state."""
         # Initialise the components
-        posterior, error_estimate = self.solver.init_fn(
-            taylor_coefficients=taylor_coefficients, t0=t0
-        )
+        posterior = self.solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
         state_control = self.control.init_fn()
 
         # Initialise (prototypes for) proposed values
         u0, *_ = taylor_coefficients
         error_norm_proposed = self._normalise_error(
-            error_estimate=error_estimate,
+            error_estimate=posterior.error_estimate,
             u=u0,
             atol=self.atol,
             rtol=self.rtol,
@@ -247,7 +245,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         dt = self.control.clip_fn(state=state.accepted, dt=state.dt_proposed, t1=t1)
 
         # Perform the actual step.
-        posterior, error_estimate = self.solver.step_fn(
+        posterior = self.solver.step_fn(
             state=state.accepted,
             vector_field=vector_field,
             dt=dt,
@@ -255,7 +253,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         )
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(
-            error_estimate=error_estimate,
+            error_estimate=posterior.error_estimate,
             u=self.reference_state_fn(posterior.u, state.accepted.u),
             atol=self.atol,
             rtol=self.rtol,
