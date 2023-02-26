@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+from jax.typing import ArrayLike
 
 from probdiffeq import cubature as cubature_module
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
@@ -212,8 +213,11 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         raise NotImplementedError
 
     def calibrate(
-        self, fx_mean: jax.Array, fx_centered_normed: jax.Array, extrapolated: Normal
+        self, fx_mean: ArrayLike, fx_centered_normed: ArrayLike, extrapolated: Normal
     ):
+        fx_mean = jnp.asarray(fx_mean)
+        fx_centered_normed = jnp.asarray(fx_centered_normed)
+
         # Extract shapes
         (S,) = fx_centered_normed.shape
         (n,) = extrapolated.mean.shape
