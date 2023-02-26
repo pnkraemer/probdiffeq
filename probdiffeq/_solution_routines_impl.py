@@ -105,14 +105,13 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
 
 
 def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters):
-    # todo: annoying that the error estimate is not part of the state...
     t0 = grid[0]
-    state, _ = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
     def body_fn(carry, t_new):
         s, t_old = carry
         dt = t_new - t_old
-        s_new, _ = solver.step_fn(
+        s_new = solver.step_fn(
             state=s, vector_field=vector_field, dt=dt, parameters=parameters
         )
         return (s_new, t_new), (s_new, t_new)

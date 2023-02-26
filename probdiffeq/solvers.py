@@ -16,10 +16,18 @@ class Solution(Generic[RVTypeVar]):
     """Estimated initial value problem solution."""
 
     def __init__(
-        self, t, u, output_scale_sqrtm, marginals: RVTypeVar, posterior, num_data_points
+        self,
+        t,
+        u,
+        error_estimate,
+        output_scale_sqrtm,
+        marginals: RVTypeVar,
+        posterior,
+        num_data_points,
     ):
         self.t = t
         self.u = u
+        self.error_estimate = error_estimate
         self.output_scale_sqrtm = output_scale_sqrtm
         self.marginals = marginals
         self.posterior = posterior
@@ -30,6 +38,7 @@ class Solution(Generic[RVTypeVar]):
             f"{self.__class__.__name__}("
             f"t={self.t},"
             f"u={self.u},"
+            f"error_estimate={self.error_estimate},"
             f"output_scale_sqrtm={self.output_scale_sqrtm},"
             f"marginals={self.marginals},"
             f"posterior={self.posterior},"
@@ -41,6 +50,7 @@ class Solution(Generic[RVTypeVar]):
         children = (
             self.t,
             self.u,
+            self.error_estimate,
             self.marginals,
             self.posterior,
             self.output_scale_sqrtm,
@@ -51,10 +61,11 @@ class Solution(Generic[RVTypeVar]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        t, u, marginals, posterior, output_scale_sqrtm, n = children
+        t, u, error_estimate, marginals, posterior, output_scale_sqrtm, n = children
         return cls(
             t=t,
             u=u,
+            error_estimate=error_estimate,
             marginals=marginals,
             posterior=posterior,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -75,6 +86,7 @@ class Solution(Generic[RVTypeVar]):
         return Solution(
             t=self.t[item],
             u=self.u[item],
+            error_estimate=self.error_estimate[item],
             output_scale_sqrtm=self.output_scale_sqrtm[item],
             # todo: make iterable?
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
@@ -131,13 +143,14 @@ class _AbstractSolver(abc.ABC):
         solution = Solution(
             t=t0,
             u=sol,
+            error_estimate=error_estimate,
             posterior=posterior,
             marginals=None,
             output_scale_sqrtm=scale_sqrtm,
             num_data_points=1.0,
         )
 
-        return solution, error_estimate
+        return solution
 
     def interpolate_fn(self, *, s0, s1, t):
         def interpolate(s0_, s1_, t_):
@@ -174,16 +187,20 @@ class _AbstractSolver(abc.ABC):
         index = jnp.reshape(index_as_array, ())
         acc, sol, prev = jax.lax.switch(index, branches, s0, s1, t)
 
-        previous = self._posterior_to_state(prev, t, s1)
-        solution = self._posterior_to_state(sol, t, s1)
-        accepted = self._posterior_to_state(acc, jnp.maximum(s1.t, t), s1)
+        error_estimate = jnp.empty_like(s0.error_estimate)
+        previous = self._posterior_to_state(prev, t, s1, error_estimate)
+        solution = self._posterior_to_state(sol, t, s1, error_estimate)
+        accepted = self._posterior_to_state(
+            acc, jnp.maximum(s1.t, t), s1, error_estimate
+        )
 
         return accepted, solution, previous
 
-    def _posterior_to_state(self, posterior, t, state):
+    def _posterior_to_state(self, posterior, t, state, error_estimate):
         return Solution(
             t=t,
             u=self.strategy.extract_sol_terminal_value(posterior=posterior),
+            error_estimate=error_estimate,
             posterior=posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
             marginals=None,
@@ -240,16 +257,18 @@ class CalibrationFreeSolver(_AbstractSolver):
         )
 
         # Extract and return solution
-        sol = self.strategy.extract_sol_terminal_value(posterior=corrected)
+        # todo: strategy.extract_sol_*** should be `extract_u_from_posterior`
+        u = self.strategy.extract_sol_terminal_value(posterior=corrected)
         filtered = Solution(
             t=state.t + dt,
-            u=sol,
+            u=u,
+            error_estimate=dt * error,
             marginals=None,
             posterior=corrected,
             output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
             num_data_points=state.num_data_points + 1,
         )
-        return filtered, dt * error
+        return filtered
 
     # todo: move this to the abstract solver and overwrite when necessary?
     #  the dynamic solver uses the same...
@@ -259,6 +278,8 @@ class CalibrationFreeSolver(_AbstractSolver):
         return Solution(
             t=state.t,
             u=u,  # new!
+            # error estimate is now irrelevant
+            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -271,6 +292,8 @@ class CalibrationFreeSolver(_AbstractSolver):
         return Solution(
             t=state.t,
             u=u,  # new!
+            # error estimate is now irrelevant
+            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -317,13 +340,14 @@ class DynamicSolver(_AbstractSolver):
         smoothing_solution = Solution(
             t=state.t + dt,
             u=sol,
+            error_estimate=dt * error,
             posterior=corrected,
             marginals=None,
             output_scale_sqrtm=scale_sqrtm,
             num_data_points=state.num_data_points + 1,
         )
 
-        return smoothing_solution, dt * error
+        return smoothing_solution
 
     def extract_fn(self, *, state):
         marginals = self.strategy.marginals(posterior=state.posterior)
@@ -332,6 +356,8 @@ class DynamicSolver(_AbstractSolver):
         return Solution(
             t=state.t,
             u=u,  # new!
+            # error estimate is now irrelevant
+            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -345,6 +371,8 @@ class DynamicSolver(_AbstractSolver):
         return Solution(
             t=state.t,
             u=u,  # new!
+            # error estimate is now irrelevant
+            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -390,12 +418,13 @@ class MLESolver(_AbstractSolver):
         filtered = Solution(
             t=state.t + dt,
             u=sol,
+            error_estimate=dt * error,
             marginals=None,
             posterior=corrected,
             output_scale_sqrtm=new_output_scale_sqrtm,
             num_data_points=n + 1,
         )
-        return filtered, dt * error
+        return filtered
 
     @staticmethod
     def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
@@ -437,6 +466,8 @@ class MLESolver(_AbstractSolver):
         return Solution(
             t=state.t,
             u=u,
+            # error estimate is now irrelevant
+            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=posterior,  # new!
             output_scale_sqrtm=scale_sqrtm,  # new!
