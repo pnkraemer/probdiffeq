@@ -182,6 +182,7 @@ def case_solver_pair_reference_ek1(
         rtol=solver_config.rtol_solve,
         control=controller_probdiffeq,
         parameters=f_args,
+        initial_dt_nugget=0.0,
     )
 
     # Get both into the same format
