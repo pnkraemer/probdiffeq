@@ -99,6 +99,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         control=controls.ProportionalIntegral(),
         norm_ord=None,
         numerical_zero=1e-10,
+        initial_dt_nugget=1e-5,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
         self.solver = solver
@@ -107,6 +108,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         self.control = control
         self.norm_ord = norm_ord
         self.numerical_zero = numerical_zero
+        self.initial_dt_nugget = initial_dt_nugget
         self.reference_state_fn = reference_state_fn
 
     def __repr__(self):
@@ -118,6 +120,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             f"\n\tcontrol={self.control},"
             f"\n\tnorm_order={self.norm_ord},"
             f"\n\tnumerical_zero={self.numerical_zero},"
+            f"\n\tinitial_dt_nugget={self.initial_dt_nugget},"
             f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
@@ -129,13 +132,14 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             self.rtol,
             self.control,
             self.numerical_zero,
+            self.initial_dt_nugget,
         )
         aux = self.norm_ord, self.reference_state_fn
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        solver, atol, rtol, control, numerical_zero = children
+        solver, atol, rtol, control, numerical_zero, nugget = children
         norm_ord, reference_state_fn = aux
         return cls(
             solver=solver,
@@ -144,6 +148,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             control=control,
             numerical_zero=numerical_zero,
             norm_ord=norm_ord,
+            initial_dt_nugget=nugget,
             reference_state_fn=reference_state_fn,
         )
 
@@ -181,11 +186,10 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             control=state_control,
         )
 
-    @staticmethod
-    def _propose_first_dt(*, taylor_coefficients, scale=0.01):
+    def _propose_first_dt(self, *, taylor_coefficients, scale=0.01):
         u0, f0, *_ = taylor_coefficients
         norm_y0 = jnp.linalg.norm(u0)
-        norm_dy0 = jnp.linalg.norm(f0)
+        norm_dy0 = jnp.linalg.norm(f0) + self.initial_dt_nugget
         return scale * norm_y0 / norm_dy0
 
     @jax.jit
