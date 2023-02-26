@@ -9,7 +9,7 @@
 
 ## Probabilistic solvers for differential equations in JAX
 
-`probdiffeq` implements adaptive probabilistic numerical solvers for initial value problems.
+ProbDiffEq implements adaptive probabilistic numerical solvers for initial value problems.
 
 It inherits automatic differentiation, vectorisation, and GPU capability from JAX.
 Features include:
@@ -44,7 +44,7 @@ pip install probdiffeq
 ```
 This installation assumes that [JAX](https://jax.readthedocs.io/en/latest/) is already available.
 
-To install `probdiffeq` with `jax[cpu]`, run
+To install ProbDiffEq with `jax[cpu]`, run
 ```commandline
 pip install probdiffeq[cpu]
 ```
@@ -57,7 +57,7 @@ There are examples and there are advanced examples.
 Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
-For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine `probdiffeq` with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
+For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
 
 Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
 
