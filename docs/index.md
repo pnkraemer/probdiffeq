@@ -9,7 +9,7 @@
 
 ## Probabilistic solvers for differential equations in JAX
 
-`probdiffeq` implements adaptive probabilistic numerical solvers for initial value problems.
+ProbDiffEq implements adaptive probabilistic numerical solvers for initial value problems.
 
 It inherits automatic differentiation, vectorisation, and GPU capability from JAX.
 Features include:
@@ -21,7 +21,7 @@ Features include:
 * Filtering, smoothing, and many other backends
 * Custom information operators
 * Physics-enhanced regression
-* Compatibility with other JAX-based libraries such as Optax or Blackjax.
+* Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
 and many more.
 
@@ -44,7 +44,7 @@ pip install probdiffeq
 ```
 This installation assumes that [JAX](https://jax.readthedocs.io/en/latest/) is already available.
 
-To install `probdiffeq` with `jax[cpu]`, run
+To install ProbDiffEq with `jax[cpu]`, run
 ```commandline
 pip install probdiffeq[cpu]
 ```
@@ -57,12 +57,9 @@ There are examples and there are advanced examples.
 Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
-For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine `probdiffeq` with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
+For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
 
 Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
-
-
-
 
 
 ## Contributing
@@ -78,11 +75,11 @@ If you have a feature that you would like to see implemented, create an issue!
 * [ProbNum](https://probnum.readthedocs.io/en/latest/)
 * [Diffrax](https://docs.kidger.site/diffrax/)
 
-Check out how to transition from those packages (-> quickstart).
+Check out how to transition from those packages: [link](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/).
 
 Anything missing in this list? Please open an issue or make a pull request.
 
-## You might also like:
+## You might also like
 
 * [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): 
   A library for example implementations of differential equations in NumPy and JAX
