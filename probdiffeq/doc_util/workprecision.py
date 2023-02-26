@@ -37,6 +37,9 @@ class ProblemConfig:
     ):
         self.label = label
 
+        # todo: the below is suboptimal.
+        #  Instead, we should save as is, and in the benchmark
+        #  check whether something is a dict (in which case we look for keys) or not.
         if not isinstance(problems, dict):
             problems = {"probdiffeq": problems}
         self.problems = problems
