@@ -113,6 +113,7 @@ def case_solver_pair_kronecker_ek0(
         rtol=solver_config.rtol_solve,
         control=controller_probdiffeq,
         parameters=f_args,
+        initial_dt_nugget=0.0,
         reference_state_fn=lambda x, y: jnp.abs(x),
     )
 
@@ -181,6 +182,7 @@ def case_solver_pair_reference_ek1(
         rtol=solver_config.rtol_solve,
         control=controller_probdiffeq,
         parameters=f_args,
+        initial_dt_nugget=0.0,
     )
 
     # Get both into the same format

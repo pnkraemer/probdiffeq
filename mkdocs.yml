@@ -71,6 +71,7 @@ plugins:
           - "benchmarks/lotka_volterra/internal.md"
           - "benchmarks/lotka_volterra/external.md"
           - "benchmarks/pleiades/external.md"
+          - "benchmarks/stiff_van_der_pol/external.md"
     - mknotebooks
 
 
@@ -114,3 +115,5 @@ nav:
           - "benchmarks/lotka_volterra/external.ipynb"
         - Pleiades:
           - "benchmarks/pleiades/external.ipynb"
+        - Stiff Van der Pol:
+          - "benchmarks/stiff_van_der_pol/external.ipynb"

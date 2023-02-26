@@ -82,7 +82,7 @@ Check out how to transition from those packages (-> quickstart).
 
 Anything missing in this list? Please open an issue or make a pull request.
 
-## You might also like:
+## You might also like
 
 * [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): 
   A library for example implementations of differential equations in NumPy and JAX
