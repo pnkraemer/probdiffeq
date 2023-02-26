@@ -19,6 +19,7 @@ The Pleiades problem is medium-dimensional (14, respectively 28 dimensions) and 
 We can use it to evaluate the efficiency of the state-space model factorisations and the gains of solving second-order problems as second-order problems, without transforming them into first-order problems. 
 
 ```python
+import diffrax
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -115,10 +116,12 @@ problem = benchmark.FirstOrderIVP(vector_field=vf, initial_values=(u0,), t0=t0, 
 
 problem_jax = problem.to_jax(t=jnp.asarray([t0, t1]))
 problem_scipy = problem.to_scipy(t_eval=[t0, t1])
+problem_diffrax = problem.to_diffrax()
 problems = {
     "probdiffeq-second": problem_2nd,
     "probdiffeq-first": problem,
     "jax": problem_jax,
+    "diffrax": problem_diffrax,
     "scipy": problem_scipy,
 }
 ```
@@ -140,11 +143,13 @@ error_fn = benchmark.absolute_rmse(solution=scipy_solution.y.T[-1, :14])
 solve_fn_2nd = benchmark.probdiffeq_terminal_values()
 solve_fn = benchmark.probdiffeq_terminal_values(select_fn=lambda x: x[:14])
 solve_fn_jax = benchmark.jax_terminal_values(select_fn=lambda x: x[:14])
+solve_fn_diffrax = benchmark.diffrax_terminal_values(select_fn=lambda x: x[:14])
 solve_fn_scipy = benchmark.scipy_terminal_values(select_fn=lambda x: x[:14])
 solve_fns = {
     "probdiffeq-second": solve_fn_2nd,
     "probdiffeq-first": solve_fn,
     "jax": solve_fn_jax,
+    "diffrax": solve_fn_diffrax,
     "scipy": solve_fn_scipy,
 }
 
@@ -197,6 +202,15 @@ def jax_method_config():
     )
 
 
+def diffrax_method_config(solver, label):
+    return workprecision.MethodConfig(
+        method={"solver": solver},
+        label=label + " (Diffrax)",
+        jit=True,
+        key="diffrax",
+    )
+
+
 def scipy_method_config(method):
     return workprecision.MethodConfig(
         method={"method": method}, label=method + " (SciPy)", jit=False, key="scipy"
@@ -216,6 +230,7 @@ ts0_iso_low_2nd = recipes.IsoTS0.from_params(
 
 # Methods
 methods = [
+    diffrax_method_config(solver=diffrax.Tsit5(), label="Tsit5()"),
     impl_to_method_config(
         ts0_iso_low_2nd,
         key="probdiffeq-second",
@@ -225,7 +240,6 @@ methods = [
         ts0_iso_low, key="probdiffeq-first", label=f"IsoTS0({num_derivatives}, 1st)"
     ),
     scipy_method_config(method="RK45"),
-    scipy_method_config(method="DOP853"),
     jax_method_config(),
 ]
 ```

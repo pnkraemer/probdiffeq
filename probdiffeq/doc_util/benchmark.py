@@ -1,4 +1,5 @@
 """Benchmark utils."""
+import diffrax
 import jax
 import jax.experimental.ode
 import jax.numpy as jnp
@@ -44,6 +45,39 @@ class FirstOrderIVP:
             y0=np.asarray(self.initial_values[0]),
             t_eval=t_eval,
         )
+
+    def to_diffrax(self):
+        @jax.jit
+        def f(t, y, args):
+            return self.vector_field(y, t=t, p=args)
+
+        return DiffraxIVP(
+            diffrax.ODETerm(f),
+            y0=self.initial_values[0],
+            t0=self.t0,
+            t1=self.t1,
+        )
+
+
+class DiffraxIVP:
+    def __init__(self, term, y0, t0, t1):
+        self.term = term
+        self.y0 = y0
+        self.t0 = t0
+        self.t1 = t1
+
+    @property
+    def args(self):
+        return (self.term,)
+
+    @property
+    def kwargs(self):
+        return {
+            "t0": self.t0,
+            "t1": self.t1,
+            "y0": self.y0,
+            "dt0": None,
+        }
 
 
 class SecondOrderIVP:
@@ -150,5 +184,20 @@ def scipy_terminal_values(select_fn=None):
         if select_fn is not None:
             return select_fn(solution.y.T[-1, :])
         return solution.y.T[-1, :]
+
+    return solve_fn
+
+
+def diffrax_terminal_values(select_fn=None):
+    def solve_fn(*args, atol, rtol, **kwargs):
+        controller = diffrax.PIDController(atol=atol, rtol=rtol)
+        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
+        solution = diffrax.diffeqsolve(
+            *args, saveat=saveat, stepsize_controller=controller, **kwargs
+        )
+
+        if select_fn is not None:
+            return select_fn(solution.ys[0, :])
+        return solution.ys[0, :]
 
     return solve_fn
