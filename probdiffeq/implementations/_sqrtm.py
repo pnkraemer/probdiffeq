@@ -132,5 +132,7 @@ def sum_of_sqrtm_factors(*, R_stack: Tuple):
 def sqrtm_to_upper_triangular(*, R):
     """Transform a right matrix square root to a Cholesky factor."""
     # todo: enforce positive diagonals?
+    #  (or expose this option; some equivalence tests might fail
+    #   if we always use a positive diagonal.)
     upper_sqrtm = jnp.linalg.qr(R, mode="r")
     return upper_sqrtm

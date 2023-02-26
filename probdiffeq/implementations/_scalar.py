@@ -285,8 +285,6 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # https://arxiv.org/pdf/2207.00426.pdf,
         # because the implementation below avoids sqrt-down-dates
         # pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
-        # todo: with R_X_F = r_0_square, we would save a qr decomposition, right?
-        #  (but would it still be valid?)
         _, (std_noi_mat, linop_mat) = _sqrtm.revert_conditional_noisefree(
             R_X_F=pts_centered_normed[:, None], R_X=fx_centered_normed[:, None]
         )

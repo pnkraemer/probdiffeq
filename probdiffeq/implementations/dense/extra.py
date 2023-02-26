@@ -6,8 +6,6 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 from probdiffeq.implementations.dense import _vars
 
-# todo: init_hidden_state should be init_hidden_state?
-
 
 @jax.tree_util.register_pytree_node_class
 class DenseConditional(_collections.AbstractConditional):
