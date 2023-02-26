@@ -6,8 +6,6 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
 from probdiffeq.implementations.dense import _vars
 
-# todo: init_corrected should be init_hidden_state?
-
 
 @jax.tree_util.register_pytree_node_class
 class DenseConditional(_collections.AbstractConditional):
@@ -117,7 +115,7 @@ class DenseIBM(_collections.AbstractExtrapolation):
             ode_shape=ode_shape,
         )
 
-    def init_corrected(self, taylor_coefficients):
+    def init_hidden_state(self, taylor_coefficients):
         if taylor_coefficients[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)

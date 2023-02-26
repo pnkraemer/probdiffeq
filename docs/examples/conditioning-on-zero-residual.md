@@ -109,7 +109,7 @@ def extrapolate_fn(rv, model, dt, scale_sqrtm):
 
 prior_u = []
 prior_du = []
-rv = extrapolation_model.init_corrected(taylor_coefficients)
+rv = extrapolation_model.init_hidden_state(taylor_coefficients)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
     prior_u.append(rv.marginal_nth_derivative(0).mean)
     prior_du.append(rv.marginal_nth_derivative(1).mean)

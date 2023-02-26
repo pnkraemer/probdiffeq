@@ -153,9 +153,6 @@ def absolute_rmse(*, solution: ArrayLike):
     return error_fn
 
 
-# todo: change "select" to "qoi_fn" or something
-
-
 def probdiffeq_terminal_values(select_fn=None):
     def solve_fn(*args, atol, rtol, **kwargs):
         solution = solution_routines.simulate_terminal_values(
