@@ -167,7 +167,7 @@ problem_config = workprecision.ProblemConfig(
 ```
 
 ```python
-fig, ax = plt.subplots(figsize=(4, 3))
+fig, ax = plt.subplots(figsize=(3, 2))
 colors = ["C" + str(i) for i in range(7)]
 y = scipy_solution.y.T
 for x1, x2, color in zip(y[:, 0:7].T, y[:, 7:14].T, colors):
