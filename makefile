@@ -10,18 +10,21 @@ format:
 	nbqa black docs/benchmarks/lotka_volterra/
 	nbqa black docs/benchmarks/pleiades/
 	nbqa black docs/benchmarks/stiff_van_der_pol/
+	nbqa black docs/benchmarks/hires/
 	nbqa isort docs/quickstart/
 	nbqa isort docs/examples/
 	nbqa isort docs/advanced_examples/
 	nbqa isort docs/benchmarks/lotka_volterra/
 	nbqa isort docs/benchmarks/pleiades/
 	nbqa isort docs/benchmarks/stiff_van_der_pol/
+	nbqa isort docs/benchmarks/hires/
 	jupytext --sync docs/quickstart/*
 	jupytext --sync docs/examples/*
 	jupytext --sync docs/advanced_examples/*
 	jupytext --sync docs/benchmarks/lotka_volterra/*
 	jupytext --sync docs/benchmarks/pleiades/*
 	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
+	jupytext --sync docs/benchmarks/hires/*
 
 lint:
 	pre-commit run --all-files
@@ -43,6 +46,7 @@ example:
 	jupytext --sync docs/benchmarks/lotka_volterra/*
 	jupytext --sync docs/benchmarks/pleiades/*
 	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
+	jupytext --sync docs/benchmarks/hires/*
 
 clean:
 	pre-commit clean
@@ -57,6 +61,8 @@ clean:
 	rm -rf docs/benchmarks/pleiades/.ipynb_checkpoints
 	rm -rf docs/benchmarks/stiff_van_der_pol/__pycache__
 	rm -rf docs/benchmarks/stiff_van_der_pol/.ipynb_checkpoints
+	rm -rf docs/benchmarks/hires/__pycache__
+	rm -rf docs/benchmarks/hires/.ipynb_checkpoints
 
 doc:
 	mkdocs build
