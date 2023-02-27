@@ -103,7 +103,7 @@ scipy_solution = scipy.integrate.solve_ivp(
 )
 
 # Select all remaining problem parameters
-rtols = 0.1 ** jnp.arange(1.0, 10.0, step=1.0)
+rtols = 0.1 ** jnp.arange(1.0, 9.0, step=1.0)
 atols = 1e-2 * rtols
 num_repeats = 3
 error_fn = benchmark.relative_rmse(solution=scipy_solution.y.T[-1, 0])
@@ -184,7 +184,6 @@ def scipy_method_config(method):
 # to those that transform the IVP into first-order form
 num_derivatives_low = 2
 num_derivatives = 4
-num_derivatives_high = 6
 
 ts1 = recipes.DenseTS1.from_params(ode_shape=u0.shape, num_derivatives=num_derivatives)
 ts1_2nd = recipes.DenseTS1.from_params(
@@ -192,9 +191,6 @@ ts1_2nd = recipes.DenseTS1.from_params(
 )
 ts1_2nd_low_order = recipes.DenseTS1.from_params(
     ode_shape=u0_2nd[0].shape, ode_order=2, num_derivatives=num_derivatives_low + 1
-)
-ts1_2nd_high_order = recipes.DenseTS1.from_params(
-    ode_shape=u0_2nd[0].shape, ode_order=2, num_derivatives=num_derivatives_high + 1
 )
 
 # Methods
@@ -211,11 +207,6 @@ methods = [
         ts1_2nd,
         key="probdiffeq-second",
         label=f"DenseTS1({num_derivatives+1}, 2nd)",
-    ),
-    impl_to_method_config(
-        ts1_2nd_high_order,
-        key="probdiffeq-second",
-        label=f"DenseTS1({num_derivatives_high+1}, 2nd)",
     ),
     impl_to_method_config(
         ts1, key="probdiffeq-first", label=f"DenseTS1({num_derivatives}, 1st)"
