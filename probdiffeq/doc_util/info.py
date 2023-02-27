@@ -2,18 +2,22 @@
 
 import subprocess
 
+import diffrax
 import jax
+import scipy
 
 import probdiffeq
 
 
 def print_info():
-    commit = _most_recent_commit(abbrev=6)
-
-    print(f"probdiffeq version:\n\t{probdiffeq.__version__}")
-
+    print()
+    print(f"ProbDiffEq version:\n\t{probdiffeq.__version__}")
+    print(f"Diffrax version:\n\t{diffrax.__version__}")
+    print(f"SciPy version:\n\t{scipy.__version__}")
+    print()
     # todo: the probdiffeq version should suffice now, right?
-    print(f"Most recent commit:\n\t{commit}")
+    commit = _most_recent_commit(abbrev=6)
+    print(f"Most recent ProbDiffEq commit:\n\t{commit}")
     print()
     jax.print_environment_info()
 
