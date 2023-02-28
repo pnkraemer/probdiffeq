@@ -1,5 +1,5 @@
 
-.PHONY: format lint test doc clean
+.PHONY: format lint test doc example run-benchmarks clean
 
 format:
 	isort .
@@ -43,6 +43,21 @@ example:
 	jupytext --execute docs/advanced_examples/*
 	jupytext --sync docs/advanced_examples/*
 	# No --execute for advanced examples and benchmarks (takes too long)
+	jupytext --sync docs/benchmarks/lotka_volterra/*
+	jupytext --sync docs/benchmarks/pleiades/*
+	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
+	jupytext --sync docs/benchmarks/hires/*
+
+run-benchmarks:
+	jupytext --sync docs/benchmarks/lotka_volterra/*
+	jupytext --sync docs/benchmarks/pleiades/*
+	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
+	jupytext --sync docs/benchmarks/hires/*
+	jupytext --execute docs/benchmarks/lotka_volterra/internal.ipynb
+	jupytext --execute docs/benchmarks/lotka_volterra/external.ipynb
+	jupytext --execute docs/benchmarks/pleiades/external.ipynb
+	jupytext --execute docs/benchmarks/stiff_van_der_pol/external.ipynb
+	jupytext --execute docs/benchmarks/hires/external.ipynb
 	jupytext --sync docs/benchmarks/lotka_volterra/*
 	jupytext --sync docs/benchmarks/pleiades/*
 	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
