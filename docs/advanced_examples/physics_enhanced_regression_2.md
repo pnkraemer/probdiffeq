@@ -20,8 +20,8 @@ jupyter:
 This tutorial explains how to estimate unknown parameters of initial value problems (IVPs) using Markov Chain Monte Carlo (MCMC) methods as provided by [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
 ## TL;DR
-Compute log-objective of noisy observations of IVP solutions with ProbDiffEq. Sample from this objective using BlackJAX.
-Evaluating the log-objective is described [in this paper](https://arxiv.org/abs/2202.01287) and the sampling is as done [in this paper](https://arxiv.org/abs/2002.09301).
+Compute log-posterior of IVP parameters given observations of the IVP solution with ProbDiffEq. Sample from this posterior using BlackJAX.
+Evaluating the log-likelihood of the data is described [in this paper](https://arxiv.org/abs/2202.01287). Based on this log-likelihood, sampling from the log-posterior is as done [in this paper](https://arxiv.org/abs/2002.09301).
 
 
 ## Technical setup
@@ -56,14 +56,17 @@ Instead, we can use a probabilistic solver instead of "any" numerical solver and
 
 **We can combine probabilistic IVP solvers with MCMC methods to estimate $\theta$ from $\text{data}$ in a way that quantifies numerical approximation errors (and other model mismatches).**
 To do so, we approximate the distribution of the IVP solution given the parameter $p(y(T) \mid \theta)$ and evaluate the marginal distribution of $N(y(T), \sigma^2I)$ given the probabilistic IVP solution.
-More formally, we use ProbDiffEq to evaluate
+More formally, we use ProbDiffEq to evaluate the density of the unnormalised posterior
 
-\begin{align*}
-M(\theta) 
-:=&~p(\text{data} \mid \theta) \\
-=&~\int p(\text{data} \mid y(T)) p(y(T) \mid [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta), \theta) d y(T).
-\end{align*}
+$$
+M(\theta) := p(\theta \mid \text{data})\propto p(\text{data} \mid \theta)p(\theta)
+$$
 
+where "$\propto$" means "proportional to" and the likelihood stems from the IVP solution
+
+$$
+p(\text{data} \mid \theta) = \int p(\text{data} \mid y(T)) p(y(T) \mid [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta), \theta) d y(T)
+$$
 Loosely speaking, this distribution averages $N(y(T), \sigma^2I)$ over all IVP solutions $y(T)$ that are realistic given the differential equation, grid $t_0, ..., t_N$, and prior distribution $p(y)$.
 This is useful, because if the approximation error is large, $M(\theta)$ "knows this". If the approximation error is ridiculously small, $M(\theta)$ "knows this" too and  we recover the procedure described for non-probabilistic solvers above.
 **Interestingly, non-probabilistic solvers cannot do this** averaging because they do not yield a statistical description of estimated IVP solutions.
@@ -169,25 +172,31 @@ ax.annotate("Data", (13.0, 30.0), **data_kwargs)
 solution = solve_save_at(theta_true)
 ax = plot_solution(solution, ax=ax, **data_kwargs)
 
-sample_kwargs = {"color": "C4"}
-ax.annotate("Initial guess", (7.5, 20.0), **sample_kwargs)
+guess_kwargs = {"color": "C3"}
+ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
 solution = solve_save_at(theta_guess)
-ax = plot_solution(solution, ax=ax, **sample_kwargs)
+ax = plot_solution(solution, ax=ax, **guess_kwargs)
 plt.show()
 ```
 
-## Objective functions via ProbDiffEq
+## Log-posterior densities via ProbDiffEq
 
-Set up a log-objective function that we can plug into BlackJAX.
+Set up a log-posterior density function that we can plug into BlackJAX. Choose a Gaussian prior centered at the initial guess with a large variance.
 
 ```python
+mean = theta_guess
+cov = jnp.eye(2) * 30  # fairly uninformed prior
+
+
 @jax.jit
-def logobjective_fn(theta, *, data, ts, solver, obs_stdev=0.1):
+def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
     y_T = solve_fixed(theta, ts=ts, solver=solver)
     marginals, _ = y_T.posterior.condition_on_qoi_observation(
         data, observation_std=obs_stdev
     )
-    return marginals.logpdf(data)
+    return marginals.logpdf(data) + jax.scipy.stats.multivariate_normal.logpdf(
+        theta, mean=mean, cov=cov
+    )
 
 
 # Fixed steps for reverse-mode differentiability:
@@ -204,7 +213,7 @@ def solve_fixed(theta, *, ts, solver):
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 data = solve_fixed(theta_true, ts=ts, solver=solver).u
 
-log_M = functools.partial(logobjective_fn, data=data, ts=ts, solver=solver)
+log_M = functools.partial(logposterior_fn, data=data, ts=ts, solver=solver)
 ```
 
 ```python
@@ -250,7 +259,7 @@ initial_state, nuts_kernel, _ = warmup.run(rng_key, initial_position)
 # INFERENCE LOOP
 rng_key, _ = jax.random.split(rng_key, 2)
 states = inference_loop(
-    rng_key, kernel=nuts_kernel, initial_state=initial_state, num_samples=200
+    rng_key, kernel=nuts_kernel, initial_state=initial_state, num_samples=150
 )
 ```
 
@@ -300,8 +309,8 @@ plt.show()
 Let's add the value of $M$ to the plot to see whether the sampler covers the entire region of interest.
 
 ```python
-xlim = jnp.amin(states.position[:, 0]) - 0.5, jnp.amax(states.position[:, 0]) + 0.5
-ylim = jnp.amin(states.position[:, 1]) - 0.5, jnp.amax(states.position[:, 1]) + 0.5
+xlim = 18, jnp.amax(states.position[:, 0]) + 0.5
+ylim = 18, jnp.amax(states.position[:, 1]) + 0.5
 
 xs = jnp.linspace(*xlim, num=300)
 ys = jnp.linspace(*ylim, num=300)
@@ -310,7 +319,7 @@ Xs, Ys = jnp.meshgrid(xs, ys)
 Thetas = jnp.stack((Xs, Ys))
 log_M_vmapped_x = jax.vmap(log_M, in_axes=-1, out_axes=-1)
 log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
-Zs = log_M_vmapped(Thetas)  # expensive, because N^2 ODE solves
+Zs = log_M_vmapped(Thetas)
 ```
 
 ```python
@@ -337,14 +346,14 @@ Looks great!
 
 ## Conclusion
 
-In conclusion, a log-objective function can be provided by ProbDiffEq such that any of BlackJAX' samplers yield parameter estimates of IVPs. 
+In conclusion, a log-posterior density function can be provided by ProbDiffEq such that any of BlackJAX' samplers yield parameter estimates of IVPs. 
 
 
 ## What's next
 
 Try to get a feeling for how the sampler reacts to changing observation noises, solver parameters, and so on.
 We could extend the sampling problem from $\theta \mapsto \log M(\theta)$ to some $(\theta, \sigma) \mapsto \log \tilde M(\theta, \sigma)$, i.e., treat the observation noise as unknown and run Hamiltonian Monte Carlo in a higher-dimensional parameter space.
-We could also add a prior distribution $p(\theta)$ to regularise the problem.
+We could also add a more suitable prior distribution $p(\theta)$ to regularise the problem.
 
 
 A final side note:
