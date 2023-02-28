@@ -14,47 +14,57 @@ jupyter:
 ---
 
 <!-- #region -->
-# Parameter estimation with BlackJAX (pt. 2)
+# Parameter estimation with BlackJAX
 
 
 This tutorial explains how to estimate unknown parameters of initial value problems (IVPs) using Markov Chain Monte Carlo (MCMC) methods as provided by [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
 ## TL;DR
-Compute log-density of noisy observations of IVP solutions with ProbDiffEq. Sample from this density using BlackJAX.
-Evaluating the log-density is described [in this paper](https://arxiv.org/abs/2202.01287) and the sampling is as done [in this paper](https://arxiv.org/abs/2002.09301).
+Compute log-objective of noisy observations of IVP solutions with ProbDiffEq. Sample from this objective using BlackJAX.
+Evaluating the log-objective is described [in this paper](https://arxiv.org/abs/2202.01287) and the sampling is as done [in this paper](https://arxiv.org/abs/2002.09301).
 
 
 ## Technical setup
 Let $f$ be a known vector field. In this example, we use the Lotka-Volterra model.
 Consider an ordinary differential equation 
+
 $$
 \dot y(t) = f(y(t)), \quad 0 \leq t \leq T
 $$
+
 subject to an unknown initial condition $y(0) = \theta$.
 Recall from the previous tutorials that the probabilistic IVP solution is an approximation of the posterior distribution
+
 $$
 p\left(y ~|~ [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta\right)
 $$
+
 for a Gaussian prior over $y$ and a pre-determined or adaptively selected grid $t_0, ..., t_N$.
 
 We don't know the initial condition of the IVP, but assume that we have noisy observations of the IVP soution $y$ at the terminal time $T$ of the integration problem,
+
 $$
 p(\text{data}~|~ y(T)) = N(y(T), \sigma^2 I)
 $$
+
 for some $\sigma > 0$.
 We can use these observations to reconstruct $\theta$, for example by sampling from $p(\text{data}~|~\theta)$ (which is a function of $\theta$).
 
 Now, one way of evaluating $p(\text{data} ~|~ \theta)$ is to use any numerical solver, for example a Runge-Kutta method, to approximate $y(T)$ from $\theta$ and evaluate $N(y(T), \sigma^2 I)$.
 But this ignores a few crucial concepts (e.g., the numerical error of the approximation; we refer to the references linked above). 
-Instead, we can use a probabilistic solver instead of "any" numerical solver and assemble a more comprehensive setup:
+Instead, we can use a probabilistic solver instead of "any" numerical solver and build a more comprehensive model:
 
 **We can combine probabilistic IVP solvers with MCMC methods to estimate $\theta$ from $\text{data}$ in a way that quantifies numerical approximation errors (and other model mismatches).**
 To do so, we approximate the distribution of the IVP solution given the parameter $p(y(T) \mid \theta)$ and evaluate the marginal distribution of $N(y(T), \sigma^2I)$ given the probabilistic IVP solution.
 More formally, we use ProbDiffEq to evaluate
-$$
-M(\theta) := p(\text{data} \mid \theta) = \int p(\text{data} \mid y(T), \theta) p(y(T) \mid [\dot y(t_n) = f(y(t_n))]_n, y(0) = \theta), \theta) d y(T).
-$$
-Loosely speaking, this distribution averages $N(y(T), \sigma^2I)$ over all possible IVP solutions $y(T)$ given the differential equation, grid $t_0, ..., t_N$, and prior distribution $p(y)$.
+
+\begin{align*}
+M(\theta) 
+:=&~p(\text{data} \mid \theta) \\
+=&~\int p(\text{data} \mid y(T)) p(y(T) \mid [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta), \theta) d y(T).
+\end{align*}
+
+Loosely speaking, this distribution averages $N(y(T), \sigma^2I)$ over all IVP solutions $y(T)$ that are realistic given the differential equation, grid $t_0, ..., t_N$, and prior distribution $p(y)$.
 This is useful, because if the approximation error is large, $M(\theta)$ "knows this". If the approximation error is ridiculously small, $M(\theta)$ "knows this" too and  we recover the procedure described for non-probabilistic solvers above.
 **Interestingly, non-probabilistic solvers cannot do this** averaging because they do not yield a statistical description of estimated IVP solutions.
 Non-probabilistic solvers would also fail if the observations were noise-free (i.e. $\sigma = 0$), but the present example notebook remains stable. (Try it yourself!)
@@ -166,16 +176,21 @@ ax = plot_solution(solution, ax=ax, **sample_kwargs)
 plt.show()
 ```
 
-Set up a log-density function that we can plug into BlackJAX.
+## Objective functions via ProbDiffEq
+
+Set up a log-objective function that we can plug into BlackJAX.
 
 ```python
 @jax.jit
-def logdensity_fn(theta, *, data, ts, solver, obs_stdev=0.1):
+def logobjective_fn(theta, *, data, ts, solver, obs_stdev=0.1):
     y_T = solve_fixed(theta, ts=ts, solver=solver)
     marginals, _ = y_T.posterior.condition_on_qoi_observation(
         data, observation_std=obs_stdev
     )
     return marginals.logpdf(data)
+
+
+# Fixed steps for reverse-mode differentiability:
 
 
 @jax.jit
@@ -189,17 +204,19 @@ def solve_fixed(theta, *, ts, solver):
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 data = solve_fixed(theta_true, ts=ts, solver=solver).u
 
-log_M = functools.partial(logdensity_fn, data=data, ts=ts, solver=solver)
+log_M = functools.partial(logobjective_fn, data=data, ts=ts, solver=solver)
 ```
 
 ```python
 print(jnp.exp(log_M(theta_true)), ">=", jnp.exp(log_M(theta_guess)), "?")
 ```
 
+## Sampling with BlackJAX
+
 From here on, BlackJAX takes over:
 
 
-Set up a sampler
+Set up a sampler.
 
 ```python
 @functools.partial(jax.jit, static_argnames=["kernel", "num_samples"])
@@ -236,6 +253,8 @@ states = inference_loop(
     rng_key, kernel=nuts_kernel, initial_state=initial_state, num_samples=200
 )
 ```
+
+## Visualisation
 
 Now that we have samples of $\theta$, let's plot the corresponding solutions:
 
@@ -325,6 +344,8 @@ In conclusion, a log-objective function can be provided by ProbDiffEq such that 
 
 Try to get a feeling for how the sampler reacts to changing observation noises, solver parameters, and so on.
 We could extend the sampling problem from $\theta \mapsto \log M(\theta)$ to some $(\theta, \sigma) \mapsto \log \tilde M(\theta, \sigma)$, i.e., treat the observation noise as unknown and run Hamiltonian Monte Carlo in a higher-dimensional parameter space.
+We could also add a prior distribution $p(\theta)$ to regularise the problem.
+
 
 A final side note:
 We could also replace the sampler with an optimisation algorithm and use this procedure to solve boundary value problems (albeit this may not be very efficient; use [this](https://arxiv.org/abs/2106.07761) algorithm instead).
