@@ -90,7 +90,7 @@ nav:
         - "examples/conditioning-on-zero-residual.ipynb"
     - Advanced Examples:
         - "advanced_examples/physics_enhanced_regression_1.ipynb"
-        - "advanced_examples/physics_enhanced_regression_2.ipynb"
+        - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
     - API Documentation:
         - "api_docs/solution_routines.md"
         - "api_docs/solvers.md"
