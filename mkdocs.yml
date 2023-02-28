@@ -91,6 +91,7 @@ nav:
     - Advanced Examples:
         - Parameter estimation with Optax: "advanced_examples/physics_enhanced_regression_1.ipynb"
         - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
+        - Train a Neural ODE with Optax: "advanced_examples/neural_ode.ipynb"
     - API Documentation:
         - "api_docs/solution_routines.md"
         - "api_docs/solvers.md"
