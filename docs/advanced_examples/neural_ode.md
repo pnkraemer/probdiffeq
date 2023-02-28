@@ -93,7 +93,7 @@ def build_update_fn(*, optimizer, loss_fn):
 Let's start with the example given in the [implicit layers tutorial](http://implicit-layers-tutorial.org/neural_odes/). The vector field is provided by [DiffEqZoo](https://diffeqzoo.readthedocs.io/).
 
 ```python
-f, u0, (t0, t1), f_args = ivps.neural_ode_mlp(layer_sizes=(2, 10, 1))
+f, u0, (t0, t1), f_args = ivps.neural_ode_mlp(layer_sizes=(2, 20, 1))
 
 
 @jax.jit
