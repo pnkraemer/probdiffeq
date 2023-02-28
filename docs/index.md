@@ -57,7 +57,7 @@ There are examples and there are advanced examples.
 Consult the examples first. They show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
-For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [`optax`](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [`blackjax`](https://optax.readthedocs.io/en/latest/index.html).
+For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [Optax](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [BlackJAX](https://optax.readthedocs.io/en/latest/index.html).
 
 Proceed with the quickstart and the examples before moving to the advanced examples and the API documentation.
 
@@ -67,6 +67,26 @@ Contributions are absolutely welcome!
 Start with checking the existing issues for a "good first issue" and have a look at  the developer documentation.
 
 If you have a feature that you would like to see implemented, create an issue!
+
+## Benchmarks
+
+ProbDiffEq curates a range of benchmarks that includes various library-internal configurations
+but also other packages like SciPy, JAX, or Diffrax. 
+To run the benchmark locally, install all dependencies via
+```commandline
+pip install .[example,test]
+```
+and then either open Jupyter and go to `docs/benchmarks`
+or execute all benchmarks via
+```commandline
+make run-benchmarks
+```
+Be patient, it might take a while. 
+Afterwards, open the jupyter notebook to see the result or build the documentation via
+```
+mkdocs serve
+```
+What do you find?
 
 ## Similar projects
 

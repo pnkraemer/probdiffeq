@@ -68,6 +68,26 @@ Start with checking the existing issues for a "good first issue" and have a look
 
 If you have a feature that you would like to see implemented, create an issue!
 
+## Benchmarks
+
+ProbDiffEq curates a range of benchmarks that includes various library-internal configurations
+but also other packages like SciPy, JAX, or Diffrax. 
+To run the benchmark locally, install all dependencies via
+```commandline
+pip install .[example,test]
+```
+and then either open Jupyter and go to `docs/benchmarks`
+or execute all benchmarks via
+```commandline
+make run-benchmarks
+```
+Be patient, it might take a while. 
+Afterwards, open the jupyter notebook to see the result or build the documentation via
+```
+mkdocs serve
+```
+What do you find?
+
 ## Similar projects
 
 * [Tornadox](https://github.com/pnkraemer/tornadox)
