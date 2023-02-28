@@ -14,7 +14,7 @@ jupyter:
 ---
 
 <!-- #region -->
-# Physics-enhanced regression part 1
+# Parameter estimation with Optax
 
 **Time-series data and optimization with ``optax``**
 
