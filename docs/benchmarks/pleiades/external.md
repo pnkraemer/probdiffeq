@@ -281,7 +281,3 @@ fig, ax = workprecision.plot(
 ax.set_xlim((1e-12, 1e1))
 plt.show()
 ```
-
-```python
-
-```

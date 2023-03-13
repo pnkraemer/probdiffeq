@@ -179,7 +179,3 @@ fig, ax = workprecision.plot(
 )
 plt.show()
 ```
-
-```python
-
-```
