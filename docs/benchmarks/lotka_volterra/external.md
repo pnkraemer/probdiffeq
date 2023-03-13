@@ -110,7 +110,11 @@ def impl_to_method_config(impl, *, label):
 def strategy_to_method_config(strategy, *, label):
     solver = solvers.MLESolver(strategy)
     return workprecision.MethodConfig(
-        method=solver_to_method(solver), label=label, key="probdiffeq", jit=True
+        method=solver_to_method(solver),
+        label="ProbDiffEq: " + label,
+        key="probdiffeq",
+        jit=True,
+        plotting_kwargs={"color": "C0"},
     )
 
 
@@ -124,16 +128,21 @@ def solver_to_method(solver):
 def jax_method_config():
     return workprecision.MethodConfig(
         method={},
-        label="Dormand-Prince (jax.experimental)",
+        label="JAX: Dormand-Prince",
         jit=True,
         tols_static=True,
         key="jax",
+        plotting_kwargs={"color": "C1"},
     )
 
 
 def scipy_method_config(method):
     return workprecision.MethodConfig(
-        method={"method": method}, label=method + " (SciPy)", jit=False, key="scipy"
+        method={"method": method},
+        label="SciPy: " + method,
+        jit=False,
+        key="scipy",
+        plotting_kwargs={"color": "C2"},
     )
 ```
 
@@ -164,7 +173,7 @@ results = workprecision.create(problem=problem_config, methods=methods)
 ```
 
 ```python
-fig, ax = plt.subplots(figsize=(5, 3))
+fig, ax = plt.subplots(figsize=(6, 4))
 fig, ax = workprecision.plot(
     results=results, fig=fig, ax=ax, title=problem_config.label
 )

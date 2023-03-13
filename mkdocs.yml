@@ -119,5 +119,5 @@ nav:
           - "benchmarks/pleiades/external.ipynb"
         - Stiff Van der Pol:
           - "benchmarks/stiff_van_der_pol/external.ipynb"
-        - High irradiance (HIRES):
+        - High irradiance response (HIRES):
           - "benchmarks/hires/external.ipynb"

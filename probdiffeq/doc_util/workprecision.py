@@ -13,12 +13,15 @@ from probdiffeq import _control_flow
 class MethodConfig:
     """Work-precision diagram configuration for a single method."""
 
-    def __init__(self, method, label, key=None, jit=True, tols_static=False):
+    def __init__(
+        self, method, label, key=None, jit=True, tols_static=False, plotting_kwargs=None
+    ):
         self.method = method
         self.label = label
         self.key = key if key is not None else "probdiffeq"
         self.jit = jit
         self.tols_static = tols_static
+        self.plotting_kwargs = plotting_kwargs if plotting_kwargs is not None else {}
 
 
 class ProblemConfig:
@@ -113,7 +116,10 @@ class Timings:
 
 def create(problem, methods):
     return {
-        method.label: _evaluate_method(method_config=method, problem_config=problem)
+        method.label: (
+            _evaluate_method(method_config=method, problem_config=problem),
+            method,
+        )
         for method in tqdm(methods)
     }
 
@@ -176,13 +182,20 @@ def plot(
     ylabel_unit="wall time, s",
     which_grid="both",
 ):
-    for solver, result in results.items():
-        ax.loglog(result.precision, result.work.mean, label=solver, alpha=alpha_mean)
+    for solver, (result, method) in results.items():
+        ax.loglog(
+            result.precision,
+            result.work.mean,
+            label=solver,
+            alpha=alpha_mean,
+            **method.plotting_kwargs,
+        )
         ax.fill_between(
             result.precision,
             result.work.mean - result.work.stdev,
             result.work.mean + result.work.stdev,
             alpha=alpha_stdev,
+            **method.plotting_kwargs,
         )
 
     if xticks is not None:
