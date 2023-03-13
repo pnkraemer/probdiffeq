@@ -279,7 +279,6 @@ fig, ax = workprecision.plot(
     xlabel_unit=problem_config.error_unit,
 )
 ax.set_xlim((1e-12, 1e1))
-plt.savefig("PleiadesWP.pdf", dpi=200)
 plt.show()
 ```
 

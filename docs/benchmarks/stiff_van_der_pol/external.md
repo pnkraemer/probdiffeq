@@ -233,6 +233,5 @@ fig, ax = workprecision.plot(
     title=problem_config.label,
     xlabel_unit=problem_config.error_unit,
 )
-plt.savefig("WPVanDerPol.pdf", dpi=200)
 plt.show()
 ```

@@ -177,7 +177,6 @@ fig, ax = plt.subplots(figsize=(6, 4))
 fig, ax = workprecision.plot(
     results=results, fig=fig, ax=ax, title=problem_config.label
 )
-plt.savefig("LotkaVolterra.pdf", dpi=200)
 plt.show()
 ```
 
