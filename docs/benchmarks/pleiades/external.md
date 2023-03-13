@@ -135,9 +135,9 @@ scipy_solution = scipy.integrate.solve_ivp(
 )
 
 # Select all remaining problem parameters
-rtols = 0.1 ** jnp.arange(3.0, 11.0, step=1.0)
+rtols = 0.1 ** jnp.arange(3.0, 11.0, step=2.0)
 atols = 1e-3 * rtols
-num_repeats = 10  # todo: make bigger
+num_repeats = 3
 error_fn = benchmark.absolute_rmse(solution=scipy_solution.y.T[-1, :14])
 
 solve_fn_2nd = benchmark.probdiffeq_terminal_values()
@@ -188,32 +188,42 @@ def impl_to_method_config(impl, *, key, label):
 def strategy_to_method_config(strategy, *, key, label):
     solver = solvers.DynamicSolver(strategy)
     return workprecision.MethodConfig(
-        method={"solver": solver}, label=label, key=key, jit=True
+        method={"solver": solver},
+        label="ProbDiffEq: " + label,
+        key=key,
+        jit=True,
+        plotting_kwargs={"color": "C0"},
     )
 
 
 def jax_method_config():
     return workprecision.MethodConfig(
         method={},
-        label="Dormand-Prince (jax.experimental)",
+        label="JAX: Dormand-Prince",
         jit=True,
         tols_static=True,
         key="jax",
+        plotting_kwargs={"color": "C1"},
     )
 
 
 def diffrax_method_config(solver, label):
     return workprecision.MethodConfig(
         method={"solver": solver},
-        label=label + " (Diffrax)",
+        label="Diffrax: " + label,
         jit=True,
         key="diffrax",
+        plotting_kwargs={"color": "C3"},
     )
 
 
 def scipy_method_config(method):
     return workprecision.MethodConfig(
-        method={"method": method}, label=method + " (SciPy)", jit=False, key="scipy"
+        method={"method": method},
+        label="SciPy: " + method,
+        jit=False,
+        key="scipy",
+        plotting_kwargs={"color": "C2"},
     )
 ```
 
@@ -227,19 +237,30 @@ ts0_iso_low = recipes.IsoTS0.from_params(num_derivatives=num_derivatives)
 ts0_iso_low_2nd = recipes.IsoTS0.from_params(
     ode_order=2, num_derivatives=num_derivatives + 1
 )
+ts0_iso_low_2nd_high = recipes.IsoTS0.from_params(
+    ode_order=2, num_derivatives=num_derivatives + 4
+)
 
 # Methods
 methods = [
     diffrax_method_config(solver=diffrax.Tsit5(), label="Tsit5()"),
+    diffrax_method_config(solver=diffrax.Dopri8(), label="Dopri8()"),
     impl_to_method_config(
         ts0_iso_low_2nd,
         key="probdiffeq-second",
         label=f"IsoTS0({num_derivatives+1}, 2nd)",
     ),
     impl_to_method_config(
+        ts0_iso_low_2nd_high,
+        key="probdiffeq-second",
+        label=f"IsoTS0({num_derivatives+4}, 2nd)",
+    ),
+    impl_to_method_config(
         ts0_iso_low, key="probdiffeq-first", label=f"IsoTS0({num_derivatives}, 1st)"
     ),
     scipy_method_config(method="RK45"),
+    scipy_method_config(method="Radau"),
+    scipy_method_config(method="DOP853"),
     jax_method_config(),
 ]
 ```
@@ -257,5 +278,11 @@ fig, ax = workprecision.plot(
     title=problem_config.label,
     xlabel_unit=problem_config.error_unit,
 )
+ax.set_xlim((1e-12, 1e1))
+plt.savefig("PleiadesWP.pdf", dpi=200)
 plt.show()
+```
+
+```python
+
 ```

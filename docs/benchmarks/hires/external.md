@@ -128,24 +128,30 @@ def strategy_to_method_config(strategy, *, label):
     solver = solvers.DynamicSolver(strategy)
     return workprecision.MethodConfig(
         method={"solver": solver},
-        label=label,
+        label="ProbDiffEq: " + label,
         key="probdiffeq",
         jit=True,
+        plotting_kwargs={"color": "C0"},
     )
 
 
 def diffrax_method_config(solver, label):
     return workprecision.MethodConfig(
         method={"solver": solver, "max_steps": 10_000},
-        label=label + " (Diffrax)",
+        label="Diffrax: " + label,
         jit=True,
         key="diffrax",
+        plotting_kwargs={"color": "C3"},
     )
 
 
 def scipy_method_config(method):
     return workprecision.MethodConfig(
-        method={"method": method}, label=method + " (SciPy)", jit=False, key="scipy"
+        method={"method": method},
+        label="SciPy: " + method,
+        jit=False,
+        key="scipy",
+        plotting_kwargs={"color": "C2"},
     )
 ```
 
@@ -182,5 +188,10 @@ fig, ax = workprecision.plot(
     title=problem_config.label,
     xlabel_unit=problem_config.error_unit,
 )
+plt.savefig("WPHighIrradianceResponse.pdf", dpi=200)
 plt.show()
+```
+
+```python
+
 ```
