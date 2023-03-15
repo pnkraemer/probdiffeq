@@ -15,7 +15,13 @@ from probdiffeq.implementations import recipes
 def taylor_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
+    """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
+
+    !!! warning "Compilation time"
+        JIT-compiling this function unrolls a loop of length `num`
+        and JIT-compiles the `vector_field` exactly `num` times.
+
+    """
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
@@ -59,7 +65,15 @@ def _subsets(x, /, n):
 def forward_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Taylor-expand the solution of an IVP with forward-mode differentiation."""
+    """Taylor-expand the solution of an IVP with forward-mode differentiation.
+
+    !!! warning "Compilation time"
+        JIT-compiling this function unrolls a loop of length `num`
+        and JIT-compiles the `vector_field` exactly `num(num+1)/2` times.
+
+
+
+    """
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
 
     g_n, g_0 = vf, vf
@@ -88,7 +102,12 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 def affine_recursion(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Evaluate the Taylor series of an affine differential equation."""
+    """Evaluate the Taylor series of an affine differential equation.
+
+    !!! warning "Compilation time"
+        JIT-compiling this function unrolls a loop of length `num`.
+
+    """
     if num == 0:
         return initial_values
 
@@ -202,6 +221,10 @@ def taylor_mode_doubling_fn(
         There is no guarantee that it works correctly.
         It might be deleted tomorrow
         and without any deprecation policy.
+
+    !!! warning "Compilation time"
+        JIT-compiling this function unrolls a loop of length `num`
+        and JIT-compiles the `vector_field` O(log(`num`)) times.
 
     """
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
