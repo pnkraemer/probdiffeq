@@ -76,9 +76,20 @@ class DenseConditional(_collections.AbstractConditional):
 
 @jax.tree_util.register_pytree_node_class
 class DenseIBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower, num_derivatives, ode_shape):
+    def __init__(
+        self,
+        a,
+        q_sqrtm_lower,
+        preconditioner_scales,
+        preconditioner_powers,
+        num_derivatives,
+        ode_shape,
+    ):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
+
+        self.preconditioner_scales = preconditioner_scales
+        self.preconditioner_powers = preconditioner_powers
 
         self.num_derivatives = num_derivatives
         assert len(ode_shape) == 1
@@ -92,15 +103,27 @@ class DenseIBM(_collections.AbstractExtrapolation):
         return f"{name}({args1}, {args2}, {args3})"
 
     def tree_flatten(self):
-        children = self.a, self.q_sqrtm_lower
+        children = (
+            self.a,
+            self.q_sqrtm_lower,
+            self.preconditioner_scales,
+            self.preconditioner_powers,
+        )
         aux = self.num_derivatives, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        a, q_sqrtm_lower = children
+        a, q_sqrtm_lower, scales, powers = children
         n, d = aux
-        return cls(a=a, q_sqrtm_lower=q_sqrtm_lower, num_derivatives=n, ode_shape=d)
+        return cls(
+            a=a,
+            q_sqrtm_lower=q_sqrtm_lower,
+            num_derivatives=n,
+            ode_shape=d,
+            preconditioner_powers=powers,
+            preconditioner_scales=scales,
+        )
 
     @classmethod
     def from_params(cls, ode_shape, num_derivatives):
@@ -108,11 +131,16 @@ class DenseIBM(_collections.AbstractExtrapolation):
         (d,) = ode_shape
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         eye_d = jnp.eye(d)
+
+        _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        scales, powers = _tmp
         return cls(
             a=jnp.kron(eye_d, a),
             q_sqrtm_lower=jnp.kron(eye_d, q_sqrtm),
             num_derivatives=num_derivatives,
             ode_shape=ode_shape,
+            preconditioner_scales=scales,
+            preconditioner_powers=powers,
         )
 
     def init_hidden_state(self, taylor_coefficients):
@@ -144,7 +172,7 @@ class DenseIBM(_collections.AbstractExtrapolation):
 
     def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
-            dt=dt, num_derivatives=self.num_derivatives
+            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
         (d,) = self.ode_shape
         p = jnp.tile(p, d)
