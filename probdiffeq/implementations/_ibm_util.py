@@ -22,7 +22,7 @@ def preconditioner_diagonal(*, dt, num_derivatives):
 
     dt_abs = jnp.abs(dt)
     scaling_vector = jnp.power(dt_abs, powers) / scales
-    scaling_vector_inv = jnp.power(dt_abs, -powers) / scales
+    scaling_vector_inv = jnp.power(dt_abs, -powers) * scales
 
     return scaling_vector, scaling_vector_inv
 
