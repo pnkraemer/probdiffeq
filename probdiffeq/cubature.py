@@ -53,7 +53,7 @@ class _PositiveCubatureRule:
 
 
 def _tree_stack_duplicates(tree, n):
-    return jax.tree_util.tree_map(lambda s: jnp.vstack([s[None, ...]] * n), tree)
+    return jax.tree_util.tree_map(lambda s: jnp.concatenate([s[None, ...]] * n), tree)
 
 
 def _tree_shape(tree):
@@ -83,7 +83,7 @@ class ThirdOrderSpherical(_PositiveCubatureRule):
 
 def _sci_pts_and_weights_sqrtm(*, d):
     eye_d = jnp.eye(d) * jnp.sqrt(d)
-    pts = jnp.vstack((eye_d, -1 * eye_d))
+    pts = jnp.concatenate((eye_d, -1 * eye_d))
     weights_sqrtm = jnp.ones((2 * d,)) / jnp.sqrt(2.0 * d)
     return pts, weights_sqrtm
 
@@ -113,7 +113,7 @@ class UnscentedTransform(_PositiveCubatureRule):
 def _ut_points_and_weights_sqrtm(d, *, r):
     eye_d = jnp.eye(d) * jnp.sqrt(d + r)
     zeros = jnp.zeros((1, d))
-    pts = jnp.vstack((eye_d, zeros, -1 * eye_d))
+    pts = jnp.concatenate((eye_d, zeros, -1 * eye_d))
     _scale = d + r
     weights_sqrtm1 = jnp.ones((d,)) / jnp.sqrt(2.0 * _scale)
     weights_sqrtm2 = jnp.sqrt(r / _scale)
@@ -161,4 +161,4 @@ def _tensor_weights(*args, **kwargs):
 def _tensor_points(x, /, *, d):
     x_mesh = jnp.meshgrid(*([x] * d))
     y_mesh = jax.tree_util.tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
-    return jnp.vstack(y_mesh).T
+    return jnp.stack(y_mesh).T
