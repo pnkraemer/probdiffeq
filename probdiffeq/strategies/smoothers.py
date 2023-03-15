@@ -76,8 +76,8 @@ class MarkovSequence(Generic[SSVTypeVar]):
         _, (qois, samples) = jax.lax.scan(
             f=body_fun, init=init_val, xs=xs, reverse=True
         )
-        qois_full = jnp.vstack((qois, init_qoi[None, ...]))
-        samples_full = jnp.vstack((samples, init_sample[None, ...]))
+        qois_full = jnp.concatenate((qois, init_qoi[None, ...]))
+        samples_full = jnp.concatenate((samples, init_sample[None, ...]))
         return qois_full, samples_full
 
     def marginalise_backwards(self):
