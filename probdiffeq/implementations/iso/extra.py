@@ -71,28 +71,48 @@ class IsoConditional(_collections.AbstractConditional):
 
 @jax.tree_util.register_pytree_node_class
 class IsoIBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower):
+    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
+
+        self.preconditioner_scales = preconditioner_scales
+        self.preconditioner_powers = preconditioner_powers
 
     def __repr__(self):
         name = self.__class__.__name__
         return f"{name}(a={self.a}, q_sqrtm_lower={self.q_sqrtm_lower})"
 
     def tree_flatten(self):
-        children = self.a, self.q_sqrtm_lower
+        children = (
+            self.a,
+            self.q_sqrtm_lower,
+            self.preconditioner_scales,
+            self.preconditioner_powers,
+        )
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        a, q_sqrtm_lower = children
-        return cls(a=a, q_sqrtm_lower=q_sqrtm_lower)
+        a, q_sqrtm_lower, scales, powers = children
+        return cls(
+            a=a,
+            q_sqrtm_lower=q_sqrtm_lower,
+            preconditioner_scales=scales,
+            preconditioner_powers=powers,
+        )
 
     @classmethod
     def from_params(cls, num_derivatives):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-        return cls(a=a, q_sqrtm_lower=q_sqrtm)
+        _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        scales, powers = _tmp
+        return cls(
+            a=a,
+            q_sqrtm_lower=q_sqrtm,
+            preconditioner_scales=scales,
+            preconditioner_powers=powers,
+        )
 
     @property
     def num_derivatives(self):
@@ -131,7 +151,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
-            dt=dt, num_derivatives=self.num_derivatives
+            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
     def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):

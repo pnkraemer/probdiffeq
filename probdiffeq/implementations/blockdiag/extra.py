@@ -12,12 +12,18 @@ _IBMCacheType = Tuple[jax.Array]  # Cache type
 
 @jax.tree_util.register_pytree_node_class
 class BlockDiagIBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower):
-        self.ibm = _scalar.IBM(a, q_sqrtm_lower)
+    def __init__(self, *args, **kwargs):
+        self.ibm = _scalar.IBM(*args, **kwargs)
 
     def __repr__(self):
         name = self.__class__.__name__
-        return f"{name}(a={self.ibm.a}, q_sqrtm_lower={self.ibm.q_sqrtm_lower})"
+        return (
+            f"{name}("
+            f"a={self.ibm.a}, "
+            f"q_sqrtm_lower={self.ibm.q_sqrtm_lower}, "
+            f"preconditioner_scales={self.ibm.preconditioner_scales}, "
+            f"preconditioner_powers={self.ibm.preconditioner_powers})"
+        )
 
     @property
     def num_derivatives(self):
@@ -35,7 +41,12 @@ class BlockDiagIBM(_collections.AbstractExtrapolation):
     @classmethod
     def tree_unflatten(cls, _aux, children):
         (ibm,) = children
-        return cls(a=ibm.a, q_sqrtm_lower=ibm.q_sqrtm_lower)
+        return cls(
+            a=ibm.a,
+            q_sqrtm_lower=ibm.q_sqrtm_lower,
+            preconditioner_scales=ibm.preconditioner_scales,
+            preconditioner_powers=ibm.preconditioner_powers,
+        )
 
     @classmethod
     def from_params(cls, ode_shape, num_derivatives):
@@ -43,7 +54,16 @@ class BlockDiagIBM(_collections.AbstractExtrapolation):
         (n,) = ode_shape
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
         a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
-        return cls(a=a_stack, q_sqrtm_lower=q_sqrtm_stack)
+
+        _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        scales, powers = _tmp
+        scales_stack, powers_stack = _tree_stack_duplicates((scales, powers), n=n)
+        return cls(
+            a=a_stack,
+            q_sqrtm_lower=q_sqrtm_stack,
+            preconditioner_scales=scales_stack,
+            preconditioner_powers=powers_stack,
+        )
 
     def begin_extrapolation(self, p0, /, dt):
         fn = jax.vmap(_scalar.IBM.begin_extrapolation, in_axes=(0, 0, None))
