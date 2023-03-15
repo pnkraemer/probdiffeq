@@ -119,6 +119,8 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return self.a.shape[0] - 1
 
     def init_hidden_state(self, taylor_coefficients):
+        # if len(taylor_coefficients) != self.num_derivatives + 1:
+        #     raise ValueError("len(taylor_coefficients) != self.num_derivatives + 1")
         m0_corrected = jnp.vstack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         rv = _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
