@@ -22,7 +22,7 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         return IsoNormal(m_obs, r_obs.T), (ssv, gain)
 
     def extract_qoi(self) -> jax.Array:
-        return self.marginal_nth_derivative(0).mean
+        return self.hidden_state.mean[0, :]
 
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
         return u[..., 0, :]
