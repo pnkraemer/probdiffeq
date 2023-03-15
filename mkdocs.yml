@@ -81,6 +81,7 @@ nav:
     - Quickstart:
         - "quickstart/quickstart.ipynb"
         - "quickstart/transitioning_from_other_packages.md"
+        - "quickstart/troubleshooting.md"
     - Examples:
         - "examples/posterior_uncertainties.ipynb"
         - "examples/second_order_problems.ipynb"
