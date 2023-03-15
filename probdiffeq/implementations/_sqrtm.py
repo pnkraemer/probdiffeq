@@ -122,7 +122,7 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
 
 def sum_of_sqrtm_factors(*, R_stack: Tuple):
     r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
-    R = jnp.vstack(R_stack)
+    R = jnp.concatenate(R_stack)
     uppertri = sqrtm_to_upper_triangular(R=R)
     if jnp.ndim(R_stack[0]) == 0:
         return jnp.reshape(uppertri, ())

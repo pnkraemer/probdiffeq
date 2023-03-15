@@ -123,7 +123,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
             raise ValueError(msg1 + msg2)
-        m0_corrected = jnp.vstack(taylor_coefficients)
+        m0_corrected = jnp.stack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         rv = _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
         return _vars.IsoStateSpaceVar(rv)

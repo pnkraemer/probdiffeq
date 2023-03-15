@@ -443,7 +443,7 @@ class IBM(_collections.AbstractExtrapolation):
             msg2 = "the number of derivatives in the implementation."
             raise ValueError(msg1 + msg2)
 
-        m0_matrix = jnp.vstack(taylor_coefficients)
+        m0_matrix = jnp.stack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
 
