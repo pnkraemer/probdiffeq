@@ -438,6 +438,11 @@ class IBM(_collections.AbstractExtrapolation):
         return self.a.shape[0] - 1
 
     def init_hidden_state(self, taylor_coefficients):
+        if len(taylor_coefficients) != self.num_derivatives + 1:
+            msg1 = "The number of Taylor coefficients does not match "
+            msg2 = "the number of derivatives in the implementation."
+            raise ValueError(msg1 + msg2)
+
         m0_matrix = jnp.vstack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
