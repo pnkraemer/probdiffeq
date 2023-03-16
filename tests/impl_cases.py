@@ -47,7 +47,7 @@ def case_slr0_dense(cubature_rule=None):
 
 
 # todo: parametrize with different cubature rules
-@pytest_cases.case
+@pytest_cases.case(id="BlockDiagSLR1")
 def case_slr1_blockdiag(cubature_rule=None):
     def impl_factory(**kwargs):
         return recipes.BlockDiagSLR1.from_params(cubature_rule=cubature_rule, **kwargs)

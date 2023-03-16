@@ -1,5 +1,5 @@
 """Tests for solving IVPs for checkpoints."""
-
+import jax
 import jax.numpy as jnp
 import pytest
 import pytest_cases
@@ -36,7 +36,7 @@ def fixture_solution_save_at(ode_problem, solver_fn, impl_fn, strat_fn, solver_c
         rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
     )
-    return solution.u, ode_problem.solution(solution.t)
+    return solution.u, jax.vmap(ode_problem.solution)(solution.t)
 
 
 def test_save_at_solved_correctly(solution_save_at, solver_config):

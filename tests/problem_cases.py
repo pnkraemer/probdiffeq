@@ -57,7 +57,6 @@ def case_lotka_volterra():
     )
 
     @jax.jit
-    @jax.vmap
     def solution(t):
         return solution_object.evaluate(t)
 

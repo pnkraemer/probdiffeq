@@ -1,4 +1,5 @@
 """Tests for solving IVPs on adaptive grids."""
+import jax
 import jax.numpy as jnp
 import pytest_cases
 
@@ -33,14 +34,14 @@ def fixture_solution_solve_with_python_while_loop(
         taylor_fn=taylor.taylor_mode_fn,
     )
 
-    return solution.u, ode_problem.solution(solution.t)
+    return solution.u, jax.vmap(ode_problem.solution)(solution.t)
 
 
 def test_solve_computes_correct_terminal_value(solution_solve, solver_config):
     u, u_ref = solution_solve
     assert jnp.allclose(
-        u[-1],
-        u_ref[-1],
+        u,
+        u_ref,
         atol=solver_config.atol_assert,
         rtol=solver_config.rtol_assert,
     )

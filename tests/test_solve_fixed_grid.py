@@ -37,7 +37,7 @@ def fixture_solution_fixed_grid(
         parameters=ode_problem.args,
         solver=solver,
     )
-    return (solution.t, solution.u), (grid, ode_problem.solution(grid))
+    return (solution.t, solution.u), (grid, jax.vmap(ode_problem.solution)(grid))
 
 
 def test_solve_fixed_grid_computes_terminal_values_correctly(

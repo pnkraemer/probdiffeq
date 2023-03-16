@@ -17,11 +17,12 @@ from probdiffeq.strategies import filters, smoothers
 def fixture_solution_terminal_values(
     ode_problem, solver_fn, impl_fn, strat_fn, solver_config
 ):
+    ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=solver_fn,
         strategy_factory=strat_fn,
         impl_factory=impl_fn,
-        ode_shape=(2,),
+        ode_shape=ode_shape,
         num_derivatives=4,
     )
     solution = solution_routines.simulate_terminal_values(
@@ -35,18 +36,22 @@ def fixture_solution_terminal_values(
         rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
     )
-    return solution, solver
+    return (solution.t, solution.u), (
+        ode_problem.t1,
+        ode_problem.solution(ode_problem.t1),
+    )
 
 
-def test_terminal_values_simulated_correctly(
-    reference_terminal_values, solution_terminal_values, solver_config
-):
-    t_ref, u_ref = reference_terminal_values
-    solution, _ = solution_terminal_values
-
-    assert solution.t == t_ref
+def test_terminal_values_simulated_correctly(solution_terminal_values, solver_config):
+    (t, u), (t_ref, u_ref) = solution_terminal_values
     assert jnp.allclose(
-        solution.u,
+        t,
+        t_ref,
+        atol=solver_config.atol_assert,
+        rtol=solver_config.rtol_assert,
+    )
+    assert jnp.allclose(
+        u,
         u_ref,
         atol=solver_config.atol_assert,
         rtol=solver_config.rtol_assert,
