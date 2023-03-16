@@ -2,26 +2,13 @@
 
 
 import dataclasses
-from typing import Callable, Literal, Tuple
+from typing import Callable, Tuple
 
 import diffeqzoo.ivps
 import diffrax
 import jax
 import pytest_cases
 import pytest_cases.filters
-
-
-@dataclasses.dataclass
-class Tag:
-    """Tags for ODE problem classes.
-
-    These tags are used to match compatible solvers and ODEs.
-    Solvers have a similar set of tags.
-    """
-
-    shape: Literal[(2,)]  # todo: scalar problems
-    order: Literal[1]  # todo: second-order problems
-    stiff: Literal[True, False]
 
 
 # todo: Remove "args" field to ensure that the reference solution
@@ -41,7 +28,7 @@ class ODEProblem:
     solution: Callable
 
 
-@pytest_cases.case(tags=(Tag(shape=(2,), order=1, stiff=False),))
+@pytest_cases.case(id="LotkaVolterra")
 def case_lotka_volterra():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
     t1 = 2.0  # Short time-intervals are sufficient for a unit test.

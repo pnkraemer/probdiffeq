@@ -253,6 +253,8 @@ def taylor_mode_doubling_fn(
         fx, jvp_fn = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
+        # todo: can we jax.fori_loop() this loop?
+        #  the running variable (cs_padded) should have constant size
         cs = [(fx[deg - 1] / deg)]
         for k in range(deg, min(2 * deg, num)):
             # The Jacobian of the embedded jet is block-banded,

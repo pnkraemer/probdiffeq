@@ -184,30 +184,30 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
 
 @jax.tree_util.register_pytree_node_class
 class StatisticalFirstOrder(_collections.AbstractCorrection):
-    def __init__(self, ode_order, cubature):
+    def __init__(self, ode_order, cubature_rule):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
-        self.cubature = cubature
+        self.cubature_rule = cubature_rule
 
     @classmethod
     def from_params(cls, ode_order):
         sci_fn = cubature_module.ThirdOrderSpherical.from_params
-        cubature = sci_fn(input_shape=())
-        return cls(ode_order=ode_order, cubature=cubature)
+        cubature_rule = sci_fn(input_shape=())
+        return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
-        children = (self.cubature,)
+        children = (self.cubature_rule,)
         aux = (self.ode_order,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (cubature,) = children
+        (cubature_rule,) = children
         (ode_order,) = aux
-        return cls(ode_order=ode_order, cubature=cubature)
+        return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
     def begin_correction(self, x: Normal, /, vector_field, t, p):
         raise NotImplementedError
@@ -261,18 +261,18 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
         # Multiply and shift the unit-points
         m_marg1_x = rv.mean[0]
-        sigma_points_centered = self.cubature.points * r_marg1_x[None]
+        sigma_points_centered = self.cubature_rule.points * r_marg1_x[None]
         sigma_points = m_marg1_x[None] + sigma_points_centered
 
         # Scale the shifted points with square-root weights
-        _w = self.cubature.weights_sqrtm
+        _w = self.cubature_rule.weights_sqrtm
         sigma_points_centered_normed = sigma_points_centered * _w
         return sigma_points, sigma_points_centered, sigma_points_centered_normed
 
     def center(self, fx):
-        fx_mean = self.cubature.weights_sqrtm**2 @ fx
+        fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
         fx_centered = fx - fx_mean[None]
-        fx_centered_normed = fx_centered * self.cubature.weights_sqrtm
+        fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm
         return fx_mean, fx_centered, fx_centered_normed
 
     def linearization_matrices(
@@ -284,7 +284,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # It seems to be different to Section VI.B in
         # https://arxiv.org/pdf/2207.00426.pdf,
         # because the implementation below avoids sqrt-down-dates
-        # pts_centered_normed = pts_centered * self.cubature.weights_sqrtm[:, None]
+        # pts_centered_normed = pts_centered * self.cubature_rule.weights_sqrtm[:, None]
         _, (std_noi_mat, linop_mat) = _sqrtm.revert_conditional_noisefree(
             R_X_F=pts_centered_normed[:, None], R_X=fx_centered_normed[:, None]
         )

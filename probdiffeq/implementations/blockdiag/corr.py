@@ -23,36 +23,42 @@ class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
 
     """
 
-    def __init__(self, ode_shape, ode_order, cubature):
+    def __init__(self, ode_shape, ode_order, cubature_rule):
         if ode_order > 1:
             raise ValueError
 
         super().__init__(ode_order=ode_order)
         self.ode_shape = ode_shape
 
-        self._mm = _scalar.StatisticalFirstOrder(ode_order=ode_order, cubature=cubature)
+        self._mm = _scalar.StatisticalFirstOrder(
+            ode_order=ode_order, cubature_rule=cubature_rule
+        )
 
     @property
-    def cubature(self):
-        return self._mm.cubature
+    def cubature_rule(self):
+        return self._mm.cubature_rule
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
-        children = (self.cubature,)
+        children = (self.cubature_rule,)
         aux = self.ode_order, self.ode_shape
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (cubature,) = children
+        (cubature_rule,) = children
         ode_order, ode_shape = aux
-        return cls(ode_order=ode_order, ode_shape=ode_shape, cubature=cubature)
+        return cls(
+            ode_order=ode_order, ode_shape=ode_shape, cubature_rule=cubature_rule
+        )
 
     @classmethod
     def from_params(cls, ode_shape, ode_order):
         cubature_fn = cubature_module.ThirdOrderSpherical.from_params_blockdiag
-        cubature = cubature_fn(input_shape=ode_shape)
-        return cls(ode_shape=ode_shape, ode_order=ode_order, cubature=cubature)
+        cubature_rule = cubature_fn(input_shape=ode_shape)
+        return cls(
+            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
+        )
 
     def begin_correction(self, extrapolated, /, vector_field, t, p):
         # Vmap relevant functions
