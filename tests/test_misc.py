@@ -1,4 +1,4 @@
-"""Tests for specific edge cases.
+"""Tests for miscellaneous edge cases.
 
 Place all tests that have no better place here.
 """
