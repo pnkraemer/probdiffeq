@@ -1,9 +1,12 @@
 """Tests for solving IVPs on fixed grids."""
+import functools
+
 import jax
 import jax.numpy as jnp
+import jax.test_util
 import pytest_cases
 
-from probdiffeq import solution_routines, solvers, test_util
+from probdiffeq import solution_routines, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -38,25 +41,25 @@ def fixture_solution_fixed_grid(
     return (solution.t, solution.u), (grid, jax.vmap(ode_problem.solution)(grid))
 
 
-def test_solve_fixed_grid_computes_terminal_values_correctly(
-    solution_fixed_grid, solver_config
-):
+def test_terminal_values_correct(solution_fixed_grid, solver_config):
     (t, u), (t_ref, u_ref) = solution_fixed_grid
     atol, rtol = solver_config.atol_assert, solver_config.rtol_assert
     assert jnp.allclose(t[-1], t_ref[-1], atol=atol, rtol=rtol)
     assert jnp.allclose(u[-1], u_ref[-1], atol=atol, rtol=rtol)
 
 
-# todo: all cases and all solvers
+# todo: all solver implementations
+@pytest_cases.fixture(scope="session", name="parameter_to_solution")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
 @pytest_cases.parametrize("impl_fn", [recipes.BlockDiagTS0.from_params])
-@pytest_cases.parametrize("solver_fn", [solvers.MLESolver])
+@pytest_cases.parametrize_with_cases("solver_fn", cases=".solver_cases")
 @pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
-def test_solve_fixed_grid_differentiable(
+def fixture_parameter_to_solution(
     ode_problem, solver_config, impl_fn, solver_fn, strat_fn
 ):
+    """Parameter-to-solution map. To be differentiated."""
+
     def fn(u0):
-        """Parameter-to-solution map. To be differentiated."""
         ode_shape = ode_problem.initial_values[0].shape
         solver = test_util.generate_solver(
             solver_factory=solver_fn,
@@ -78,13 +81,16 @@ def test_solve_fixed_grid_differentiable(
         )
         return solution.u
 
-    # todo: use jax.test_util.check_jvp and *check_vjp
-    # todo: split into two separate tests (jvp and vjp)
-    fx = fn(ode_problem.initial_values)
-    dfx_fwd = jax.jit(jax.jacfwd(fn))(ode_problem.initial_values)
-    dfx_rev = jax.jit(jax.jacrev(fn))(ode_problem.initial_values)
+    return fn, ode_problem.initial_values
 
-    out_shape = test_util.tree_shape(fx)
-    in_shape = test_util.tree_shape(ode_problem.initial_values[0])
-    assert test_util.tree_allclose(dfx_fwd, dfx_rev)
-    assert test_util.tree_shape(dfx_fwd) == (out_shape + in_shape,)
+
+def test_jvp(parameter_to_solution):
+    fn, primals = parameter_to_solution
+    jvp = functools.partial(jax.jvp, fn)
+    jax.test_util.check_jvp(fn, jvp, (primals,))
+
+
+def test_vjp(parameter_to_solution):
+    fn, primals = parameter_to_solution
+    vjp = functools.partial(jax.vjp, fn)
+    jax.test_util.check_vjp(fn, vjp, (primals,))

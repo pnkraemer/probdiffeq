@@ -1,6 +1,4 @@
 """Test utilities."""
-import jax
-import jax.numpy as jnp
 
 from probdiffeq import solvers
 from probdiffeq.implementations import recipes
@@ -49,16 +47,3 @@ def generate_solver(
 
     scale_sqrtm = impl.extrapolation.init_output_scale_sqrtm()
     return solver_factory(strat, output_scale_sqrtm=scale_sqrtm)
-
-
-def tree_shape(tree):
-    return jax.tree_util.tree_map(jnp.shape, tree)
-
-
-def tree_allclose(*trees, **kwargs):
-    return _tree_all_tree_map(lambda *a: jnp.allclose(*a, **kwargs), *trees)
-
-
-def _tree_all_tree_map(fn, *tree):
-    tree_of_bools = jax.tree_util.tree_map(fn, *tree)
-    return jax.tree_util.tree_all(tree_of_bools)
