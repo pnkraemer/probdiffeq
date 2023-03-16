@@ -33,19 +33,11 @@ def fixture_solution_solve_with_python_while_loop(
         taylor_fn=taylor.taylor_mode_fn,
     )
 
-    return (solution.t, solution.u), (solution.t, ode_problem.solution(solution.t))
+    return solution.u, ode_problem.solution(solution.t)
 
 
 def test_solve_computes_correct_terminal_value(solution_solve, solver_config):
-    (t, u), (t_ref, u_ref) = solution_solve
-
-    assert jnp.allclose(
-        t[-1],
-        t_ref[-1],
-        atol=solver_config.atol_assert,
-        rtol=solver_config.rtol_assert,
-    )
-
+    u, u_ref = solution_solve
     assert jnp.allclose(
         u[-1],
         u_ref[-1],
