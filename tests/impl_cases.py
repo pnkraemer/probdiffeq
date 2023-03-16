@@ -65,18 +65,45 @@ def case_slr1_dense_gh():
 
 
 # todo: parametrize with different cubature rules
-@pytest_cases.case(id="DenseSLR0")
-def case_slr0_dense(cubature_rule=None):
+@pytest_cases.case(id="DenseSLR0(Default)")
+def case_slr0_dense_default():
     def impl_factory(**kwargs):
-        return recipes.DenseSLR0.from_params(cubature_rule=cubature_rule, **kwargs)
+        return recipes.DenseSLR0.from_params(**kwargs)
+
+    return impl_factory
+
+
+@pytest_cases.case(id="DenseSLR0(ThirdOrderSpherical)")
+def case_slr0_dense_sci():
+    def impl_factory(**kwargs):
+        cube_fn = cubature.ThirdOrderSpherical.from_params
+        return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
+
+    return impl_factory
+
+
+@pytest_cases.case(id="DenseSLR0(UnscentedTransform)")
+def case_slr0_dense_ut():
+    def impl_factory(**kwargs):
+        cube_fn = cubature.UnscentedTransform.from_params
+        return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
+
+    return impl_factory
+
+
+@pytest_cases.case(id="DenseSLR0(GaussHermite)")
+def case_slr0_dense_gh():
+    def impl_factory(**kwargs):
+        cube_fn = cubature.GaussHermite.from_params
+        return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
 
 # todo: parametrize with different cubature rules
 @pytest_cases.case(id="BlockDiagSLR1")
-def case_slr1_blockdiag(cubature_rule=None):
+def case_slr1_blockdiag():
     def impl_factory(**kwargs):
-        return recipes.BlockDiagSLR1.from_params(cubature_rule=cubature_rule, **kwargs)
+        return recipes.BlockDiagSLR1.from_params(**kwargs)
 
     return impl_factory

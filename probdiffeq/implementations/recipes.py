@@ -175,10 +175,15 @@ class DenseSLR0(
 
     @classmethod
     def from_params(
-        cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
+        cls,
+        *,
+        ode_shape,
+        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
+        ode_order=1,
+        num_derivatives=4,
     ):
         correction = dense_corr.DenseStatisticalZerothOrder.from_params(
-            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
+            ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
         extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
