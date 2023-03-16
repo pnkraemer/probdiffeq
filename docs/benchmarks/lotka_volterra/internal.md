@@ -129,7 +129,7 @@ Should we linearize with a Taylor-approximation or by moment matching?
 def cubature_to_slr1(cubature, *, ode_shape):
     return recipes.DenseSLR1.from_params(
         ode_shape=ode_shape,
-        cubature=cubature,
+        cubature_rule=cubature,
     )
 
 
