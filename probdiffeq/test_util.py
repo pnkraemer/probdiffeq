@@ -15,12 +15,26 @@ def generate_solver(
 
     Examples
     --------
+    >>> from jax.config import config
+    >>> config.update("jax_platform_name", "cpu")
+
+    >>> from probdiffeq import solvers
+    >>> from probdiffeq.implementations import recipes
+    >>> from probdiffeq.strategies import smoothers
+
     >>> print(generate_solver())
+    MLESolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=4>))
 
     >>> print(generate_solver(num_derivatives=1))
+    MLESolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=1>))
 
+    >>> print(generate_solver(solver_factory=solvers.DynamicSolver))
+    DynamicSolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=4>))
 
-
+    >>> impl_fcty = recipes.DenseTS1.from_params
+    >>> strat_fcty = smoothers.Smoother
+    >>> print(generate_solver(strategy_factory=strat_fcty, impl_factory=impl_fcty, ode_shape=(1,)))  # noqa: E501
+    MLESolver(strategy=Smoother(implementation=<DenseTS1 with num_derivatives=4>))
     """
     impl = impl_factory(**impl_factory_kwargs)
     strat = strategy_factory(impl)
