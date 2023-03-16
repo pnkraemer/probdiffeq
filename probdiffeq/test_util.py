@@ -6,7 +6,7 @@ from probdiffeq.strategies import filters
 
 def generate_solver(
     *,
-    solver_factory=solvers.MLESolver,
+    solver_factory=solvers.CalibrationFreeSolver,
     strategy_factory=filters.Filter,
     impl_factory=recipes.IsoTS0.from_params,
     **impl_factory_kwargs,

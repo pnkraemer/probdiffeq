@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import solution_routines, solvers, taylor, test_util
+from probdiffeq import solution_routines, solvers, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -18,22 +18,24 @@ from probdiffeq.strategies import filters, smoothers
 def fixture_solution_fixed_grid(
     ode_problem, solver_fn, impl_fn, strat_fn, solver_config
 ):
+    ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=solver_fn,
         strategy_factory=strat_fn,
         impl_factory=impl_fn,
-        ode_shape=(2,),
+        ode_shape=ode_shape,
         num_derivatives=4,
     )
+
     t0, t1 = ode_problem.t0, ode_problem.t1
     grid = solver_config.grid_for_fixed_grid_fn(t0, t1)
+
     solution = solution_routines.solve_fixed_grid(
         ode_problem.vector_field,
         ode_problem.initial_values,
         grid=grid,
         parameters=ode_problem.args,
         solver=solver,
-        taylor_fn=taylor.taylor_mode_fn,
     )
     return (solution.t, solution.u), (grid, ode_problem.solution(grid))
 
@@ -65,13 +67,15 @@ def test_solve_fixed_grid_computes_terminal_values_correctly(
 def test_solve_fixed_grid_differentiable(
     ode_problem, solver_config, impl_fn, solver_fn, strat_fn
 ):
+    ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=solver_fn,
         strategy_factory=strat_fn,
         impl_factory=impl_fn,
-        ode_shape=(2,),
+        ode_shape=ode_shape,
         num_derivatives=1,  # Low order traces more quickly
     )
+
     t0, t1 = ode_problem.t0, ode_problem.t1
     grid = solver_config.grid_for_fixed_grid_fn(t0, t1)
 
