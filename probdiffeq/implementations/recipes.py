@@ -73,14 +73,16 @@ class BlockDiagSLR1(
     """
 
     @classmethod
-    def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
-        if cubature is None:
+    def from_params(
+        cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
+    ):
+        if cubature_rule is None:
             correction = blockdiag_corr.BlockDiagStatisticalFirstOrder.from_params(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
             correction = blockdiag_corr.BlockDiagStatisticalFirstOrder(
-                ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
+                ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
             )
         extrapolation = blockdiag_extra.BlockDiagIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
@@ -138,9 +140,11 @@ class DenseSLR1(
     AbstractImplementation[dense_corr.DenseStatisticalFirstOrder, dense_extra.DenseIBM]
 ):
     @classmethod
-    def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
+    def from_params(
+        cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
+    ):
         correction = dense_corr.DenseStatisticalFirstOrder.from_params(
-            ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
+            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
         )
         extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives
@@ -164,9 +168,11 @@ class DenseSLR0(
     """
 
     @classmethod
-    def from_params(cls, *, ode_shape, cubature=None, ode_order=1, num_derivatives=4):
+    def from_params(
+        cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
+    ):
         correction = dense_corr.DenseStatisticalZerothOrder.from_params(
-            ode_shape=ode_shape, ode_order=ode_order, cubature=cubature
+            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
         )
         extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives

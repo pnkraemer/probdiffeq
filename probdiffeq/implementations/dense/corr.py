@@ -246,12 +246,12 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
 
     @classmethod
-    def from_params(cls, ode_shape, ode_order, cubature=None):
-        if cubature is None:
+    def from_params(cls, ode_shape, ode_order, cubature_rule=None):
+        if cubature_rule is None:
             make_rule_fn = cubature_module.ThirdOrderSpherical.from_params
-            cubature = make_rule_fn(input_shape=ode_shape)
+            cubature_rule = make_rule_fn(input_shape=ode_shape)
 
-        linearise_fn = functools.partial(linearise_slr0, cubature_rule=cubature)
+        linearise_fn = functools.partial(linearise_slr0, cubature_rule=cubature_rule)
         return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
@@ -352,12 +352,12 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
 
     @classmethod
-    def from_params(cls, ode_shape, ode_order, cubature=None):
-        if cubature is None:
+    def from_params(cls, ode_shape, ode_order, cubature_rule=None):
+        if cubature_rule is None:
             make_rule_fn = cubature_module.ThirdOrderSpherical.from_params
-            cubature = make_rule_fn(input_shape=ode_shape)
+            cubature_rule = make_rule_fn(input_shape=ode_shape)
 
-        linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature)
+        linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature_rule)
         return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
