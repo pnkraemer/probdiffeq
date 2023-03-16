@@ -42,7 +42,7 @@ def fixture_solution_terminal_values(
     )
 
 
-def test_terminal_values_simulated_correctly(solution_terminal_values, solver_config):
+def test_terminal_values_correct(solution_terminal_values, solver_config):
     (t, u), (t_ref, u_ref) = solution_terminal_values
     assert jnp.allclose(
         t,

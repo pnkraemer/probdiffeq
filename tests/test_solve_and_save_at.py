@@ -39,7 +39,7 @@ def fixture_solution_save_at(ode_problem, solver_fn, impl_fn, strat_fn, solver_c
     return solution.u, jax.vmap(ode_problem.solution)(solution.t)
 
 
-def test_save_at_solved_correctly(solution_save_at, solver_config):
+def test_solution_correct(solution_save_at, solver_config):
     u, u_ref = solution_save_at
     assert jnp.allclose(
         u,
