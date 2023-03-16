@@ -231,6 +231,13 @@ class CalibrationFreeSolver(_AbstractSolver):
         # todo: overwrite init_fn()?
         self._output_scale_sqrtm = output_scale_sqrtm
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        args = (
+            f"strategy={self.strategy}, output_scale_sqrtm={self._output_scale_sqrtm}"
+        )
+        return f"{name}({args})"
+
     def step_fn(self, *, state, vector_field, dt, parameters):
         # Pre-error-estimate steps
         linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
