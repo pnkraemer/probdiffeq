@@ -24,8 +24,10 @@ class Tag:
 
 
 @pytest_cases.case(tags=(Tag("filter", "zeroth", ode_shape=(2,), ode_order=1),))
-def case_mle_filter_ts0_iso():
-    strategy = filters.Filter(recipes.IsoTS0.from_params())
+def case_mle_filter_ts0_iso(num_derivatives=4):
+    strategy = filters.Filter(
+        recipes.IsoTS0.from_params(num_derivatives=num_derivatives)
+    )
     return solvers.MLESolver(strategy=strategy)
 
 
