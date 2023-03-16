@@ -18,6 +18,8 @@ jupyter:
 Let's find the fastest solver of the Lotka-Volterra problem, a standard benchmark problem. It is low-dimensional, not stiff, and generally poses no major problems for any numerical solver.
 
 ```python
+import functools
+
 import jax
 import jax.experimental.ode
 import jax.numpy as jnp
@@ -126,22 +128,22 @@ def solver_to_method(solver):
 Should we linearize with a Taylor-approximation or by moment matching?
 
 ```python
-def cubature_to_slr1(cubature, *, ode_shape):
+def cubature_to_slr1(cubature_rule_fn, *, ode_shape):
     return recipes.DenseSLR1.from_params(
         ode_shape=ode_shape,
-        cubature_rule=cubature,
+        cubature_rule_fn=cubature_rule_fn,
     )
 
 
 # Different linearisation styles
 ode_shape = u0.shape
 ts1 = recipes.DenseTS1.from_params(ode_shape=ode_shape)
-sci = cubature.ThirdOrderSpherical.from_params(input_shape=ode_shape)
-ut = cubature.UnscentedTransform.from_params(input_shape=ode_shape, r=1.0)
-gh = cubature.GaussHermite.from_params(input_shape=ode_shape, degree=3)
-slr1_sci = cubature_to_slr1(sci, ode_shape=ode_shape)
-slr1_ut = cubature_to_slr1(ut, ode_shape=ode_shape)
-slr1_gh = cubature_to_slr1(gh, ode_shape=ode_shape)
+sci_fn = cubature.ThirdOrderSpherical.from_params
+ut_fn = functools.partial(cubature.UnscentedTransform.from_params, r=1.0)
+gh_fn = functools.partial(cubature.GaussHermite.from_params, degree=3)
+slr1_sci = cubature_to_slr1(sci_fn, ode_shape=ode_shape)
+slr1_ut = cubature_to_slr1(ut_fn, ode_shape=ode_shape)
+slr1_gh = cubature_to_slr1(gh_fn, ode_shape=ode_shape)
 
 
 # Methods
