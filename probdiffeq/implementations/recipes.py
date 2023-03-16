@@ -40,6 +40,11 @@ class AbstractImplementation(Generic[CorrType, ExtraType]):
         correction, extrapolation = children
         return cls(correction=correction, extrapolation=extrapolation)
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        n = self.extrapolation.num_derivatives
+        return f"<{name} with num_derivatives={n}>"
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoTS0(AbstractImplementation[iso_corr.IsoTaylorZerothOrder, iso_extra.IsoIBM]):
