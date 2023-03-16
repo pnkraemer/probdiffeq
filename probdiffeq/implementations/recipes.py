@@ -4,6 +4,7 @@ from typing import Generic, TypeVar
 
 import jax
 
+from probdiffeq import cubature
 from probdiffeq.implementations import _collections
 from probdiffeq.implementations.blockdiag import corr as blockdiag_corr
 from probdiffeq.implementations.blockdiag import extra as blockdiag_extra
@@ -141,10 +142,15 @@ class DenseSLR1(
 ):
     @classmethod
     def from_params(
-        cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
+        cls,
+        *,
+        ode_shape,
+        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
+        ode_order=1,
+        num_derivatives=4,
     ):
         correction = dense_corr.DenseStatisticalFirstOrder.from_params(
-            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
+            ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
         extrapolation = dense_extra.DenseIBM.from_params(
             ode_shape=ode_shape, num_derivatives=num_derivatives

@@ -2,6 +2,7 @@
 
 import pytest_cases
 
+from probdiffeq import cubature
 from probdiffeq.implementations import recipes
 
 
@@ -28,11 +29,37 @@ def case_ts0_dense():
     return recipes.DenseTS0.from_params
 
 
-# todo: parametrize with different cubature rules
-@pytest_cases.case(id="DenseSLR1")
-def case_slr1_dense(cubature_rule=None):
+@pytest_cases.case(id="DenseSLR1(Default)")
+def case_slr1_dense_default():
     def impl_factory(**kwargs):
-        return recipes.DenseSLR1.from_params(cubature_rule=cubature_rule, **kwargs)
+        return recipes.DenseSLR1.from_params(**kwargs)
+
+    return impl_factory
+
+
+@pytest_cases.case(id="DenseSLR1(ThirdOrderSpherical)")
+def case_slr1_dense_sci():
+    def impl_factory(**kwargs):
+        cube_fn = cubature.ThirdOrderSpherical.from_params
+        return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
+
+    return impl_factory
+
+
+@pytest_cases.case(id="DenseSLR1(UnscentedTransform)")
+def case_slr1_dense_ut():
+    def impl_factory(**kwargs):
+        cube_fn = cubature.UnscentedTransform.from_params
+        return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
+
+    return impl_factory
+
+
+@pytest_cases.case(id="DenseSLR1(GaussHermite)")
+def case_slr1_dense_gh():
+    def impl_factory(**kwargs):
+        cube_fn = cubature.GaussHermite.from_params
+        return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
