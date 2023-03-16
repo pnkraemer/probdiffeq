@@ -37,5 +37,9 @@ def generate_solver(
     MLESolver(strategy=Smoother(implementation=<DenseTS1 with num_derivatives=4>))
     """
     impl = impl_factory(**impl_factory_kwargs)
+
+    # I am not too happy with the need for this line below...
+    scale_sqrtm = impl.extrapolation.init_output_scale_sqrtm()
+
     strat = strategy_factory(impl)
-    return solver_factory(strat)
+    return solver_factory(strat, output_scale_sqrtm=scale_sqrtm)
