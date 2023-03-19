@@ -5,13 +5,18 @@ Essentially, these functions implement the IVP solution routines after
 initialisation of the Taylor coefficients.
 """
 
-import jax
-
 from probdiffeq import _adaptive, _control_flow
 
 
 def simulate_terminal_values(
-    vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
+    vector_field,
+    taylor_coefficients,
+    t0,
+    t1,
+    solver,
+    parameters,
+    while_loop_fn,
+    **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
@@ -23,6 +28,7 @@ def simulate_terminal_values(
         vector_field=vector_field,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
+        while_loop_fn=while_loop_fn,
     )
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
@@ -55,7 +61,7 @@ def solve_and_save_at(
 
 
 def _advance_ivp_solution_adaptively(
-    vector_field, t1, state0, adaptive_solver, parameters
+    vector_field, t1, state0, adaptive_solver, parameters, while_loop_fn
 ):
     """Advance an IVP solution to the next state."""
 
@@ -68,7 +74,7 @@ def _advance_ivp_solution_adaptively(
         )
         return state
 
-    sol = jax.lax.while_loop(
+    sol = while_loop_fn(
         cond_fun=cond_fun,
         body_fun=body_fun,
         init_val=state0,

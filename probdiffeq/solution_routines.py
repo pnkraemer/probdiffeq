@@ -20,6 +20,7 @@ def simulate_terminal_values(
     t0,
     t1,
     solver,
+    while_loop_fn,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     **options,
@@ -43,6 +44,7 @@ def simulate_terminal_values(
         t1=t1,
         solver=solver,
         parameters=parameters,
+        while_loop_fn=while_loop_fn,
         **options,
     )
 
