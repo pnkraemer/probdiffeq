@@ -21,7 +21,8 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters=(),
-    while_loop_fn=jax.lax.while_loop,
+    while_loop_fn_temporal=jax.lax.while_loop,
+    while_loop_fn_per_step=jax.lax.while_loop,
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
@@ -44,7 +45,8 @@ def simulate_terminal_values(
         t1=t1,
         solver=solver,
         parameters=parameters,
-        while_loop_fn=while_loop_fn,
+        while_loop_fn_temporal=while_loop_fn_temporal,
+        while_loop_fn_per_step=while_loop_fn_per_step,
         **options,
     )
 

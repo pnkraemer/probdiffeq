@@ -57,7 +57,8 @@ def fixture_solution_terminal_values(
         atol=solver_config.atol_solve,
         rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
-        while_loop_fn=loop_fn,
+        while_loop_fn_temporal=loop_fn,
+        while_loop_fn_per_step=loop_fn,
     )
     return (solution.t, solution.u), (
         ode_problem.t1,

@@ -15,13 +15,13 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters,
-    while_loop_fn,
+    while_loop_fn_temporal,
+    while_loop_fn_per_step,
     **options
 ):
-    print("todo: split into rejection_while_loop and time_while_loop or so")
     print("todo: make the same changes for solve_and_save_at")
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn, **options
+        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
     )
 
     state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
@@ -32,7 +32,7 @@ def simulate_terminal_values(
         vector_field=vector_field,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
-        while_loop_fn=while_loop_fn,
+        while_loop_fn=while_loop_fn_temporal,
     )
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
