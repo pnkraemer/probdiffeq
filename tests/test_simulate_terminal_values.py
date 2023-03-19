@@ -79,7 +79,7 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
 @pytest_cases.parametrize("impl_fn", [recipes.BlockDiagTS0.from_params])
 @pytest_cases.parametrize("solver_fn", [solvers.MLESolver])
 @pytest_cases.parametrize("strat_fn", [filters.Filter])
-def test_jvp(ode_problem, solver_fn, impl_fn, strat_fn, solver_config, loop_fn):
+def test_jvp(ode_problem, solver_fn, impl_fn, strat_fn, solver_config):
     ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=solver_fn,
