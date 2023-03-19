@@ -1,4 +1,5 @@
 """Tests for solving IVPs for checkpoints."""
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import pytest
@@ -8,12 +9,30 @@ from probdiffeq import solution_routines, taylor, test_util
 from probdiffeq.strategies import filters, smoothers
 
 
+@pytest_cases.case(id="jax.lax.while_loop")
+def case_loop_lax():
+    return jax.lax.while_loop
+
+
+@pytest_cases.case(id="eqx.bounded_while_loop")
+def case_loop_eqx():
+    def lo(cond_fun, body_fun, init_val):
+        return eqx.internal.while_loop(
+            cond_fun, body_fun, init_val, kind="bounded", max_steps=50
+        )
+
+    return lo
+
+
 @pytest_cases.fixture(scope="session", name="solution_save_at")
 @pytest_cases.parametrize_with_cases("impl_fn", cases=".impl_cases")
 @pytest_cases.parametrize_with_cases("solver_fn", cases=".solver_cases")
 @pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@pytest_cases.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def fixture_solution_save_at(ode_problem, solver_fn, impl_fn, strat_fn, solver_config):
+def fixture_solution_save_at(
+    ode_problem, solver_fn, impl_fn, strat_fn, solver_config, loop_fn
+):
     ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=solver_fn,
@@ -35,6 +54,8 @@ def fixture_solution_save_at(ode_problem, solver_fn, impl_fn, strat_fn, solver_c
         atol=solver_config.atol_solve,
         rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
+        while_loop_fn_temporal=loop_fn,
+        while_loop_fn_per_step=loop_fn,
     )
     return solution.u, jax.vmap(ode_problem.solution)(solution.t)
 

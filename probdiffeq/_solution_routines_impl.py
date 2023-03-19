@@ -19,7 +19,6 @@ def simulate_terminal_values(
     while_loop_fn_per_step,
     **options
 ):
-    print("todo: make the same changes for solve_and_save_at")
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
     )
@@ -38,9 +37,18 @@ def simulate_terminal_values(
 
 
 def solve_and_save_at(
-    vector_field, taylor_coefficients, save_at, solver, parameters, **options
+    vector_field,
+    taylor_coefficients,
+    save_at,
+    solver,
+    parameters,
+    while_loop_fn_temporal,
+    while_loop_fn_per_step,
+    **options
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
+    )
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
@@ -49,6 +57,7 @@ def solve_and_save_at(
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
+            while_loop_fn=while_loop_fn_temporal,
         )
         return s_next, s_next
 
