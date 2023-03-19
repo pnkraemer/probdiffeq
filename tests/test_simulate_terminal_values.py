@@ -1,6 +1,5 @@
 """Tests for solving IVPs for the terminal value."""
 
-import jax
 import jax.numpy as jnp
 import pytest_cases
 
@@ -36,7 +35,6 @@ def fixture_solution_terminal_values(
         atol=solver_config.atol_solve,
         rtol=solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,
-        while_loop_fn=jax.lax.while_loop,
     )
     return (solution.t, solution.u), (
         ode_problem.t1,

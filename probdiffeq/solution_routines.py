@@ -20,8 +20,8 @@ def simulate_terminal_values(
     t0,
     t1,
     solver,
-    while_loop_fn,
     parameters=(),
+    while_loop_fn=jax.lax.while_loop,
     taylor_fn=taylor.taylor_mode_fn,
     **options,
 ):
