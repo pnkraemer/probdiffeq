@@ -60,10 +60,10 @@ def fixture_solution_terminal_values(
         while_loop_fn_temporal=loop_fn,
         while_loop_fn_per_step=loop_fn,
     )
-    return (solution.t, solution.u), (
-        ode_problem.t1,
-        ode_problem.solution(ode_problem.t1),
-    )
+
+    sol = (solution.t, solution.u)
+    sol_ref = (ode_problem.t1, ode_problem.solution(ode_problem.t1))
+    return sol, sol_ref
 
 
 def test_terminal_values_correct(solution_terminal_values, solver_config):
