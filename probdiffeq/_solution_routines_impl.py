@@ -18,7 +18,11 @@ def simulate_terminal_values(
     while_loop_fn,
     **options
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
+    print("todo: split into rejection_while_loop and time_while_loop or so")
+    print("todo: make the same changes for solve_and_save_at")
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, while_loop_fn=while_loop_fn, **options
+    )
 
     state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
