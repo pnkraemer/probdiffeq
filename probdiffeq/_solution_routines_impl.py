@@ -5,15 +5,23 @@ Essentially, these functions implement the IVP solution routines after
 initialisation of the Taylor coefficients.
 """
 
-import jax
-
 from probdiffeq import _adaptive, _control_flow
 
 
 def simulate_terminal_values(
-    vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
+    vector_field,
+    taylor_coefficients,
+    t0,
+    t1,
+    solver,
+    parameters,
+    while_loop_fn_temporal,
+    while_loop_fn_per_step,
+    **options
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
+    )
 
     state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
 
@@ -23,14 +31,24 @@ def simulate_terminal_values(
         vector_field=vector_field,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
+        while_loop_fn=while_loop_fn_temporal,
     )
     return adaptive_solver.extract_terminal_value_fn(state=solution)
 
 
 def solve_and_save_at(
-    vector_field, taylor_coefficients, save_at, solver, parameters, **options
+    vector_field,
+    taylor_coefficients,
+    save_at,
+    solver,
+    parameters,
+    while_loop_fn_temporal,
+    while_loop_fn_per_step,
+    **options
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
+    )
 
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
@@ -39,6 +57,7 @@ def solve_and_save_at(
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
+            while_loop_fn=while_loop_fn_temporal,
         )
         return s_next, s_next
 
@@ -55,7 +74,7 @@ def solve_and_save_at(
 
 
 def _advance_ivp_solution_adaptively(
-    vector_field, t1, state0, adaptive_solver, parameters
+    vector_field, t1, state0, adaptive_solver, parameters, while_loop_fn
 ):
     """Advance an IVP solution to the next state."""
 
@@ -68,7 +87,7 @@ def _advance_ivp_solution_adaptively(
         )
         return state
 
-    sol = jax.lax.while_loop(
+    sol = while_loop_fn(
         cond_fun=cond_fun,
         body_fun=body_fun,
         init_val=state0,

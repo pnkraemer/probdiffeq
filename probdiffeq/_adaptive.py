@@ -100,9 +100,11 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         norm_ord=None,
         numerical_zero=1e-10,
         initial_dt_nugget=1e-5,
+        while_loop_fn=jax.lax.while_loop,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
         self.solver = solver
+        self.while_loop_fn = while_loop_fn
         self.atol = atol
         self.rtol = rtol
         self.control = control
@@ -134,15 +136,16 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             self.numerical_zero,
             self.initial_dt_nugget,
         )
-        aux = self.norm_ord, self.reference_state_fn
+        aux = self.norm_ord, self.reference_state_fn, self.while_loop_fn
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         solver, atol, rtol, control, numerical_zero, nugget = children
-        norm_ord, reference_state_fn = aux
+        norm_ord, reference_state_fn, while_loop_fn = aux
         return cls(
             solver=solver,
+            while_loop_fn=while_loop_fn,
             atol=atol,
             rtol=rtol,
             control=control,
@@ -226,7 +229,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         def init_fn(s):
             return True, s
 
-        _, state_new = jax.lax.while_loop(cond_fn, body_fn, init_fn(state0))
+        _, state_new = self.while_loop_fn(cond_fn, body_fn, init_fn(state0))
         return AdaptiveIVPSolverState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
