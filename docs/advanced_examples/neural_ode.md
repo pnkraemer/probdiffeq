@@ -68,7 +68,7 @@ def build_loss_fn(vf, initial_values, obs_stdev=1e-2):
 
         observation_std = jnp.ones_like(grid) * obs_stdev
         return dense_output.negative_marginal_log_likelihood(
-            observation_std=observation_std, u=data, solution=sol
+            observation_std=observation_std, u=data[:, None], solution=sol
         )
 
     return loss_fn
