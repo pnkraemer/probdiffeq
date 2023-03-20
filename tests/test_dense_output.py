@@ -212,6 +212,16 @@ def test_negative_marginal_log_likelihood_error_for_wrong_u_shape_1(solution_sav
         )
 
 
+def test_negative_marginal_log_likelihood_error_for_terminal_values(solution_save_at):
+    solution, solver = solution_save_at
+    data = solution.u + 0.005
+
+    with pytest.raises(ValueError, match="expected"):
+        _ = dense_output.negative_marginal_log_likelihood(
+            observation_std=jnp.ones_like(data[-1]), u=data[-1], solution=solution[-1]
+        )
+
+
 def test_negative_marginal_log_likelihood_terminal_values(solution_save_at):
     solution, solver = solution_save_at
     data = solution.u + 0.005

@@ -66,7 +66,17 @@ class _NMLLState(NamedTuple):
 
 def negative_marginal_log_likelihood_terminal_values(*, observation_std, u, solution):
     """Compute the negative marginal log-likelihood of \
-     observations of the IVP solution at the terminal value."""
+     observations of the IVP solution at the terminal value.
+
+    Parameters
+    ----------
+    observation_std
+        Standard deviation of the observation. Expected to be a scalar.
+    u
+        Observation. Expected to have shape (d,) for an ODE with shape (d,).
+    solution
+        Solution object. Expected to correspond to a solution of an ODE with shape (d,).
+    """
     if jnp.shape(observation_std) != ():
         raise ValueError(
             "Scalar observation noise expected. "
@@ -96,16 +106,22 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution):
     """Compute the negative marginal log-likelihood of \
      observations of the IVP solution.
 
+    Parameters
+    ----------
+    observation_std
+        Standard deviation of the observation. Expected to be have shape (n,).
+    u
+        Observation. Expected to have shape (n, d) for an ODE with shape (d,).
+    solution
+        Solution object. Expected to correspond to a solution of an ODE with shape (d,).
+
+
     !!! note
         Use `negative_marginal_log_likelihood_terminal_values`
         to compute the log-likelihood at the terminal values.
 
     """
     # todo: complain if it is used with a filter, not a smoother?
-
-    # todo: add "careful with slicing" to documentation.
-    # todo: use final data point
-    # todo: explain what to do with terminal value information.
     # todo: allow option for negative marginal log posterior
 
     if jnp.shape(observation_std) != (jnp.shape(u)[0],):
@@ -122,13 +138,14 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution):
             f"the solution shape {jnp.shape(solution.u)}."
         )
 
-    # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(
-        lambda x: x[1:, ...], solution.posterior.backward_model
-    )
+    if jnp.ndim(u) < 2:
+        raise ValueError(
+            "Time-series solution (ndim=2, shape=(n, m)) expected. "
+            f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
+        )
 
-    def init_fn(init, obs_std, data):
-        obs, (cor, _) = init.condition_on_qoi_observation(data, observation_std=obs_std)
+    def init_fn(rv, obs_std, data):
+        obs, (cor, _) = rv.condition_on_qoi_observation(data, observation_std=obs_std)
         nmll_new = -1 * jnp.sum(obs.logpdf(data))
         return _NMLLState(cor, 1.0, nmll_new)
 
@@ -162,12 +179,18 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution):
     #  But it is not clear which data structure that should be.
     #
 
+    # the 0th backward model contains meaningless values
+    bw_models = jax.tree_util.tree_map(
+        lambda x: x[1:, ...], solution.posterior.backward_model
+    )
+
+    # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], solution.posterior.init)
     init = init_fn(rv_terminal, observation_std[-1], u[-1])
     (_, _, nmll), _ = jax.lax.scan(
         f=filter_step,
         init=init,
-        xs=(bw_models, observation_std[:-1], u[:-1]),  # todo: use all data!
+        xs=(bw_models, observation_std[:-1], u[:-1]),
         reverse=True,
     )
     return nmll
