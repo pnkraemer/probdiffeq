@@ -15,13 +15,7 @@ from probdiffeq.implementations import recipes
 def taylor_mode_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
-
-    !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`
-        and JIT-compiles the `vector_field` exactly `num` times.
-
-    """
+    """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
@@ -33,15 +27,15 @@ def taylor_mode_fn(
 
     def body_fn(tcoeffs, _):
         # Pad the Taylor coefficients in zeros, call jet, and return the solution.
-        # Why does this even work? Because the $i$th output coefficiant of jet()
+        # This works, because the $i$th output coefficient of jet()
         # is independent of the $i+j$th input coefficient
-        # (see the explanation in taylor_mode_doubling_fn about triangular Jacobians)
+        # (see also the explanation in taylor_mode_doubling_fn)
         series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
         p, s_new = jax.experimental.jet.jet(vf, primals=initial_values, series=series)
 
         # The final values in s_new are nonsensical
         # (well, they are not; but we don't care about them)
-        # so we take them out
+        # so we remove them
         tcoeffs = [*initial_values, p, *s_new[:-1]]
         return tcoeffs, None
 
@@ -53,7 +47,7 @@ def taylor_mode_fn(
     taylor_coeffs, _ = jax.lax.scan(
         body_fn, init=taylor_coeffs, xs=None, length=num - 1
     )
-    return taylor_coeffs[:num_outputs]
+    return taylor_coeffs
 
 
 def _pad_to_length(x, /, *, length, value):
@@ -89,8 +83,7 @@ def forward_mode_fn(
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`
-        and JIT-compiles the `vector_field` exactly `num(num+1)/2` times.
+        JIT-compiling this function unrolls a loop of length `num`.
 
 
 
@@ -244,8 +237,7 @@ def taylor_mode_doubling_fn(
         and without any deprecation policy.
 
     !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`
-        and JIT-compiles the `vector_field` O(log(`num`)) times.
+        JIT-compiling this function unrolls a loop of length `num`.
 
     """
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
