@@ -4,15 +4,12 @@
 
 If a solution routine takes surprisingly long to compile but then executes quickly, 
 it may be due to the choice of Taylor-coefficient computation.
-Automatic-differentiation-based routines such as Taylor-mode or forward-mode Taylor-series
-estimation JIT-compile the ODE vector field $\nu$, respectively $\nu(\nu+1)/2$ times
-for $\nu$ derivatives in the state-space model (commonly referred to as `num_derivatives`).
-On top of this, the vector field is compiled a final time for the "actual" simulation.
-
-As a solution, either reduce the number of derivatives 
+Some functions in `probdiffeq.taylor` unroll a (small) loop.
+To avoid this, use `taylor_mode_fn` (which can be implemented with a scan).
+If the problem persists, reduce the number of derivatives 
 (if that is appropriate for your integration problem)
 or switch to a different Taylor-coefficient routine.
-For example, use
+For example, use a Runge-Kutta starter by calling
 ```python
 simulate_terminal_values(..., taylor_fn=taylor.make_runge_kutta_starter_fn())
 solve_and_save_at(..., taylor_fn=taylor.make_runge_kutta_starter_fn())
