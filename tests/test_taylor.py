@@ -29,7 +29,7 @@ def case_runge_kutta_starter():
 
 @pytest_cases.fixture(name="num_derivatives_max")
 def fixture_num_derivatives_max():
-    return 3
+    return 5
 
 
 @pytest_cases.case(tags=["first"])
