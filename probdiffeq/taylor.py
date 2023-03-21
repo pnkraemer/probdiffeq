@@ -40,7 +40,7 @@ def taylor_mode_fn(
         p, s_new = jax.experimental.jet.jet(vf, primals=initial_values, series=series)
 
         # The final values in s_new are nonsensical
-        # (well, they are not; but we dont care about them)
+        # (well, they are not; but we don't care about them)
         # so we take them out
         tcoeffs = [*initial_values, p, *s_new[:-1]]
         return tcoeffs, None
