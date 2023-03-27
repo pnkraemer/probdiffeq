@@ -118,10 +118,11 @@ def test_negative_marginal_log_likelihood_terminal_values_error_for_wrong_shapes
 
 
 @pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-def test_filter_ts0_iso_terminal_value_nll(ode_problem):
+@pytest_cases.parametrize("strategy_fn", [filters.Filter, smoothers.Smoother])
+def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
-    strategy = filters.Filter(recipe)
+    strategy = strategy_fn(recipe)
     solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
     sol = solution_routines.simulate_terminal_values(
         ode_problem.vector_field,
@@ -132,8 +133,9 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem):
         solver=solver,
     )
     data = sol.u + 0.1
-    nll = dense_output.negative_marginal_log_likelihood_terminal_values(
+    mll = dense_output.negative_marginal_log_likelihood_terminal_values(
         observation_std=1e-2, u=data, solution=sol
     )
-    print(nll)
-    assert False
+    assert mll.shape == ()
+    assert not jnp.isnan(mll)
+    assert not jnp.isinf(mll)

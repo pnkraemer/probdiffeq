@@ -5,6 +5,8 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.strategies import smoothers
+
 
 def sample(key, *, solution, solver, shape=()):
     return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
@@ -95,7 +97,11 @@ def negative_marginal_log_likelihood_terminal_values(*, observation_std, u, solu
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    obs, (cor, _) = solution.posterior.init.condition_on_qoi_observation(
+    if isinstance(solution.posterior, smoothers.MarkovSequence):
+        terminal_value = solution.posterior.init
+    else:
+        terminal_value = solution.posterior
+    obs, (cor, _) = terminal_value.condition_on_qoi_observation(
         u, observation_std=observation_std
     )
     nmll_new = -1 * jnp.sum(obs.logpdf(u))
