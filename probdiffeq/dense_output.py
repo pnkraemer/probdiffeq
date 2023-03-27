@@ -130,6 +130,11 @@ def negative_marginal_log_likelihood(*, observation_std, u, solution):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for negative marginal log posterior
 
+    if not isinstance(solution.posterior, smoothers.MarkovSequence):
+        msg1 = "Time-series marginal likelihoods "
+        msg2 = "cannot be computed with a filtering solution."
+        raise TypeError(msg1 + msg2)
+
     if jnp.shape(observation_std) != (jnp.shape(u)[0],):
         raise ValueError(
             f"Observation-noise shape {jnp.shape(observation_std)} does not match "
