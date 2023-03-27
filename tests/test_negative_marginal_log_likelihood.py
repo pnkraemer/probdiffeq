@@ -4,8 +4,9 @@ import pytest
 import pytest_cases
 import pytest_cases.filters
 
-from probdiffeq import dense_output, solution_routines, test_util
-from probdiffeq.strategies import smoothers
+from probdiffeq import dense_output, solution_routines, solvers, test_util
+from probdiffeq.implementations import recipes
+from probdiffeq.strategies import filters, smoothers
 
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
@@ -114,3 +115,25 @@ def test_negative_marginal_log_likelihood_terminal_values_error_for_wrong_shapes
         _ = dense_output.negative_marginal_log_likelihood_terminal_values(
             observation_std=jnp.ones(()), u=data[-1:], solution=solution[-1:]
         )
+
+
+@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+def test_filter_ts0_iso_terminal_value_nll(ode_problem):
+    """Issue #477."""
+    recipe = recipes.IsoTS0.from_params(num_derivatives=4)
+    strategy = filters.Filter(recipe)
+    solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
+    sol = solution_routines.simulate_terminal_values(
+        ode_problem.vector_field,
+        initial_values=ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
+        solver=solver,
+    )
+    data = sol.u + 0.1
+    nll = dense_output.negative_marginal_log_likelihood_terminal_values(
+        observation_std=1e-2, u=data, solution=sol
+    )
+    print(nll)
+    assert False
