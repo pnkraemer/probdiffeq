@@ -11,8 +11,8 @@ from probdiffeq.strategies import filters, smoothers
 
 @pytest_cases.fixture(scope="session", name="solution_native_python_while_loop")
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-def fixture_solution_native_python_while_loop(ode_problem):
-    solver = test_util.generate_solver(num_derivatives=1)
+def fixture_solution_native_python_while_loop(ode_problem, strategy_fn):
+    solver = test_util.generate_solver(num_derivatives=1, strategy_factory=strategy_fn)
     sol = ivpsolve.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
@@ -53,8 +53,8 @@ def test_loop_over_solution_is_possible(solution_native_python_while_loop):
     assert i == len(solution) - 1
 
 
-# Maybe this test should be in a different test suite, but it does not really matter...
 def test_marginal_nth_derivative_of_solution(solution_native_python_while_loop):
+    """Assert that each $n$th derivative matches the quantity of interest's shape."""
     sol, _ = solution_native_python_while_loop
 
     # Assert that the marginals have the same shape as the qoi.
@@ -67,70 +67,64 @@ def test_marginal_nth_derivative_of_solution(solution_native_python_while_loop):
         sol.marginals.marginal_nth_derivative(100)
 
 
+@pytest.mark.parametrize("strategy_fn", [filters.Filter], scope="session")
 def test_offgrid_marginals_filter(solution_native_python_while_loop):
     sol, solver = solution_native_python_while_loop
     t0, t1 = sol.t[0], sol.t[-1]
 
-    # todo: this is hacky. But the tests get faster?
-    if isinstance(solver.strategy, filters.Filter):
-        # Extrapolate from the left: close-to-left boundary must be similar,
-        # but close-to-right boundary must not be similar
-        u_left, _ = solution.offgrid_marginals(
-            t=sol[0].t + 1e-4,
-            solution=sol[1],
-            solution_previous=sol[0],
-            solver=solver,
-        )
-        u_right, _ = solution.offgrid_marginals(
-            t=sol[1].t - 1e-4,
-            solution=sol[1],
-            solution_previous=sol[0],
-            solver=solver,
-        )
-        assert jnp.allclose(u_left, sol[0].u, atol=1e-3, rtol=1e-3)
-        assert not jnp.allclose(u_right, sol[0].u, atol=1e-3, rtol=1e-3)
+    # Extrapolate from the left: close-to-left boundary must be similar,
+    # but close-to-right boundary must not be similar
+    u_left, _ = solution.offgrid_marginals(
+        t=sol[0].t + 1e-4,
+        solution=sol[1],
+        solution_previous=sol[0],
+        solver=solver,
+    )
+    u_right, _ = solution.offgrid_marginals(
+        t=sol[1].t - 1e-4,
+        solution=sol[1],
+        solution_previous=sol[0],
+        solver=solver,
+    )
+    assert jnp.allclose(u_left, sol[0].u, atol=1e-3, rtol=1e-3)
+    assert not jnp.allclose(u_right, sol[0].u, atol=1e-3, rtol=1e-3)
 
-        # Repeat the same but interpolating via *_searchsorted:
-        # check we correctly landed in the first interval
-        ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
-        u, _ = solution.offgrid_marginals_searchsorted(
-            ts=ts, solution=sol, solver=solver
-        )
-        assert jnp.allclose(u[0], sol.u[0], atol=1e-3, rtol=1e-3)
-        assert not jnp.allclose(u[0], sol.u[1], atol=1e-3, rtol=1e-3)
+    # Repeat the same but interpolating via *_searchsorted:
+    # check we correctly landed in the first interval
+    ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
+    u, _ = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    assert jnp.allclose(u[0], sol.u[0], atol=1e-3, rtol=1e-3)
+    assert not jnp.allclose(u[0], sol.u[1], atol=1e-3, rtol=1e-3)
 
 
+@pytest.mark.parametrize("strategy_fn", [smoothers.Smoother], scope="session")
 def test_offgrid_marginals_smoother(solution_native_python_while_loop):
     sol, solver = solution_native_python_while_loop
     t0, t1 = sol.t[0], sol.t[-1]
 
-    # todo: this is hacky. But the tests get faster?
-    if isinstance(solver.strategy, smoothers.Smoother):
-        # Extrapolate from the left: close-to-left boundary must be similar,
-        # but close-to-right boundary must not be similar
-        u_left, _ = solution.offgrid_marginals(
-            t=sol[0].t + 1e-4,
-            solution=sol[1],
-            solution_previous=sol[0],
-            solver=solver,
-        )
-        u_right, _ = solution.offgrid_marginals(
-            t=sol[1].t - 1e-4,
-            solution=sol[1],
-            solution_previous=sol[0],
-            solver=solver,
-        )
-        assert jnp.allclose(u_left, sol[0].u, atol=1e-3, rtol=1e-3)
-        assert jnp.allclose(u_right, sol[1].u, atol=1e-3, rtol=1e-3)
+    # Extrapolate from the left: close-to-left boundary must be similar,
+    # but close-to-right boundary must not be similar
+    u_left, _ = solution.offgrid_marginals(
+        t=sol[0].t + 1e-4,
+        solution=sol[1],
+        solution_previous=sol[0],
+        solver=solver,
+    )
+    u_right, _ = solution.offgrid_marginals(
+        t=sol[1].t - 1e-4,
+        solution=sol[1],
+        solution_previous=sol[0],
+        solver=solver,
+    )
+    assert jnp.allclose(u_left, sol[0].u, atol=1e-3, rtol=1e-3)
+    assert jnp.allclose(u_right, sol[1].u, atol=1e-3, rtol=1e-3)
 
-        # Repeat the same but interpolating via *_searchsorted:
-        # check we correctly landed in the first interval
-        ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
-        u, _ = solution.offgrid_marginals_searchsorted(
-            ts=ts, solution=sol, solver=solver
-        )
-        assert jnp.allclose(u[0], sol.u[0], atol=1e-3, rtol=1e-3)
-        assert jnp.allclose(u[-1], sol.u[-1], atol=1e-3, rtol=1e-3)
+    # Repeat the same but interpolating via *_searchsorted:
+    # check we correctly landed in the first interval
+    ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=4, endpoint=True)
+    u, _ = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    assert jnp.allclose(u[0], sol.u[0], atol=1e-3, rtol=1e-3)
+    assert jnp.allclose(u[-1], sol.u[-1], atol=1e-3, rtol=1e-3)
 
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
