@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solution, solvers
+from probdiffeq import ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -52,7 +52,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = solvers.DynamicSolver(
+solver = ivpsolvers.DynamicSolver(
     strategy=smoothers.Smoother(recipes.IsoTS0.from_params())
 )
 ```

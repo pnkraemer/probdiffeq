@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import controls, ivpsolve, solution, solvers
+from probdiffeq import controls, ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -53,7 +53,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = solvers.MLESolver(
+solver = ivpsolvers.MLESolver(
     smoothers.Smoother(recipes.DenseSLR1.from_params(ode_shape=(1,), num_derivatives=1))
 )
 ```

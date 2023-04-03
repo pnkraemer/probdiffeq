@@ -34,7 +34,7 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solution, solvers
+from probdiffeq import ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -70,7 +70,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 strategy = smoothers.Smoother(
     recipes.IsoTS0.from_params(num_derivatives=1),
 )
-solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=10.0)
+solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=10.0)
 
 
 solution_true = ivpsolve.solve_fixed_grid(
