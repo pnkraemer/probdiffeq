@@ -94,8 +94,8 @@ nav:
         - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
         - Train a Neural ODE with Optax: "advanced_examples/neural_ode.ipynb"
     - API Documentation:
-        - "api_docs/ivpsolve.md"
-        - "api_docs/ivpsolvers.md"
+        - Solution routines: "api_docs/ivpsolve.md"
+        - Solvers: "api_docs/ivpsolvers.md"
         - Estimation strategies:
           - "api_docs/strategies/filters.md"
           - "api_docs/strategies/smoothers.md"
