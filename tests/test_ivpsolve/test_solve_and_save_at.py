@@ -24,8 +24,8 @@ class _SolveAndSaveAtConfig(NamedTuple):
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-@pytest_cases.parametrize_with_cases("impl_fn", cases=".impl_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
 def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -38,7 +38,7 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.FixedPointSmoother])
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveAndSaveAtConfig(
@@ -52,8 +52,8 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases=".solver_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 def case_setup_all_solvers(ode_problem, solver_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -81,8 +81,8 @@ def case_loop_eqx():
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-@pytest_cases.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@pytest_cases.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -96,7 +96,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
 @pytest_cases.parametrize_with_cases(
-    "setup", cases=".", prefix="case_setup_", scope="session"
+    "setup", cases="..", prefix="case_setup_", scope="session"
 )
 def fixture_solution_save_at(setup):
     ode_shape = setup.ode_problem.initial_values[0].shape
@@ -136,7 +136,7 @@ def test_solution_correct(solution_save_at, solver_config):
     )
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoother_warning(ode_problem):
     """A non-fixed-point smoother is not usable in save-at-simulation."""
     ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=3)

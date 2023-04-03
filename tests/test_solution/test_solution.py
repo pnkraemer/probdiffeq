@@ -10,7 +10,7 @@ from probdiffeq.strategies import filters, smoothers
 
 
 @pytest_cases.fixture(scope="session", name="solution_native_python_while_loop")
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def fixture_solution_native_python_while_loop(ode_problem):
     solver = test_util.generate_solver(num_derivatives=1)
     sol = solution_routines.solve_with_python_while_loop(
@@ -134,7 +134,7 @@ def test_offgrid_marginals_smoother(solution_native_python_while_loop):
 
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def fixture_solution_save_at(ode_problem):
     solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
 
