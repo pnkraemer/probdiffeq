@@ -217,7 +217,8 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     bw_new = bw_old.merge_with_incoming_conditional(bw_model)  # sqrt-fp-smoother!
 
     # Correct
-    _, (corr, _) = extra.condition_on_qoi_observation(y, observation_std=0.0)
+    _, cond_cor = extra.observe_qoi(observation_std=0.0)
+    corr = cond_cor(y)
 
     # Return correction and backward-model
     return (corr, bw_new), None

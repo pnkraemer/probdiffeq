@@ -78,37 +78,7 @@ class StateSpaceVar(_collections.StateSpaceVar):
 
         obs = ScalarNormal(m_obs, r_obs.T)
         cor = Normal(m_cor, r_cor.T)
-        return obs, Conditional(gain, cor)
-
-    # def condition_on_qoi_observation(self, u, /, observation_std):
-    #
-    #     # what is this for? batched calls?
-    #     if self.hidden_state.cov_sqrtm_lower.ndim > 2:
-    #         fn = StateSpaceVar.condition_on_qoi_observation
-    #         fn_vmap = jax.vmap(fn, in_axes=(0, 0, None))
-    #         return fn_vmap(self, u, observation_std)
-    #
-    #     obs, cond_cor = self.observe_qoi(observation_std=observation_std)
-    #     cor = cond_cor(u)
-    #     return obs, (cor, cond_cor)
-    #
-    #     hc = self.hidden_state.cov_sqrtm_lower[0]
-    #     m_obs = self.hidden_state.mean[0]
-    #
-    #     r_yx = observation_std  # * jnp.eye(1)
-    #     r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional(
-    #         R_X=self.hidden_state.cov_sqrtm_lower.T,
-    #         R_X_F=hc[:, None],
-    #         R_YX=r_yx[None, None],
-    #     )
-    #     r_obs = jnp.reshape(r_obs_mat, ())
-    #     gain = jnp.reshape(gain_mat, (-1,))
-    #
-    #     m_cor = self.hidden_state.mean - gain * (m_obs - u)
-    #
-    #     obs = ScalarNormal(m_obs, r_obs.T)
-    #     cor = Normal(m_cor, r_cor.T)
-    #     return obs, (StateSpaceVar(cor), gain)
+        return obs, ConditionalQOI(gain, cor)
 
     def extract_qoi_from_sample(self, u, /):
         if u.ndim == 1:
@@ -353,7 +323,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class Conditional(_collections.AbstractConditional):
+class _Conditional(_collections.AbstractConditional):
     def __init__(self, transition, noise):
         self.transition = transition
         self.noise = noise
@@ -372,9 +342,12 @@ class Conditional(_collections.AbstractConditional):
         transition, noise = children
         return cls(transition=transition, noise=noise)
 
+
+@jax.tree_util.register_pytree_node_class
+class ConditionalHiddenState(_Conditional):
     def __call__(self, x, /):
         if self.transition.ndim > 2:
-            return jax.vmap(Conditional.__call__)(self, x)
+            return jax.vmap(ConditionalHiddenState.__call__)(self, x)
 
         print(self.transition.shape, x.shape)
         m = self.transition @ x + self.noise.mean
@@ -382,11 +355,12 @@ class Conditional(_collections.AbstractConditional):
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return Conditional(transition=self.transition, noise=noise)
+        return ConditionalHiddenState(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):
         if self.transition.ndim > 2:
-            return jax.vmap(Conditional.merge_with_incoming_conditional)(self, incoming)
+            fn = ConditionalHiddenState.merge_with_incoming_conditional
+            return jax.vmap(fn)(self, incoming)
 
         A = self.transition
         (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
@@ -399,13 +373,13 @@ class Conditional(_collections.AbstractConditional):
         Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
         noise = Normal(mean=xi, cov_sqrtm_lower=Xi)
-        return Conditional(g, noise=noise)
+        return ConditionalHiddenState(g, noise=noise)
 
     def marginalise(self, rv, /):
         # Todo: this auto-batch is a bit hacky,
         #  but single-handedly replaces the entire BatchConditional class
         if rv.hidden_state.mean.ndim > 1:
-            return jax.vmap(Conditional.marginalise)(self, rv)
+            return jax.vmap(ConditionalHiddenState.marginalise)(self, rv)
 
         m0, l0 = rv.hidden_state.mean, rv.hidden_state.cov_sqrtm_lower
 
@@ -415,6 +389,21 @@ class Conditional(_collections.AbstractConditional):
         ).T
 
         return StateSpaceVar(Normal(m_new, l_new))
+
+
+@jax.tree_util.register_pytree_node_class
+class ConditionalQOI(_Conditional):
+    def __call__(self, x, /):
+        if self.transition.ndim > 1:
+            return jax.vmap(ConditionalQOI.__call__)(self, x)
+        print(
+            self.transition.shape,
+            x.shape,
+            self.noise.mean.shape,
+            self.noise.cov_sqrtm_lower.shape,
+        )
+        m = self.transition * x + self.noise.mean
+        return StateSpaceVar(Normal(m, self.noise.cov_sqrtm_lower))
 
 
 @jax.tree_util.register_pytree_node_class
@@ -533,14 +522,14 @@ class IBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = Normal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = Conditional(g_bw, noise=backward_noise)
+        bw_model = ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = Normal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return StateSpaceVar(extrapolated), bw_model
 
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return Conditional(op, noise=noi)
+        return ConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         k = self.num_derivatives + 1
