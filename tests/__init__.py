@@ -17,4 +17,4 @@ config.update("jax_platform_name", "cpu")
 
 # Double precision
 # Needed for equivalence tests for smoothers.
-config.update("jax_enable_x64", True)
+config.update("jax_enable_x64", False)

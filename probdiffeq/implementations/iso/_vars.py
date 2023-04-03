@@ -60,16 +60,23 @@ class IsoNormal(_collections.AbstractNormal):
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
         res_white = (m_obs - u) / jnp.reshape(l_obs, ())
-
         x1 = jnp.dot(res_white, res_white.T)
+        assert False
         x2 = jnp.reshape(l_obs, ()) ** 2
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
     def norm_of_whitened_residual_sqrtm(self) -> jax.Array:
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
+
+        print(l_obs.shape)
+        assert False
         res_white = obs_pt / l_obs
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
+        evidence_sqrtm = jnp.linalg.qr(res_white[:, None], mode="r") / jnp.sqrt(
+            res_white.size
+        )
+        evidence_sqrtm = jnp.reshape(evidence_sqrtm, ())
+        # evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
     def scale_covariance(self, scale_sqrtm):

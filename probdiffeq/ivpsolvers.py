@@ -193,7 +193,8 @@ class CalibrationFreeSolver(_AbstractSolver):
             t=state.t,
             u=u,  # new!
             # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
+            # error_estimate=jnp.empty_like(state.error_estimate),
+            error_estimate=state.error_estimate,
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale_sqrtm=state.output_scale_sqrtm,
@@ -381,7 +382,8 @@ class MLESolver(_AbstractSolver):
             t=state.t,
             u=u,
             # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
+            # error_estimate=jnp.empty_like(state.error_estimate),
+            error_estimate=(state.error_estimate),
             marginals=marginals,  # new!
             posterior=posterior,  # new!
             output_scale_sqrtm=scale_sqrtm,  # new!

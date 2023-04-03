@@ -69,8 +69,8 @@ class _ProportionalIntegralCommon(AbstractControl):
         n1 = self.power_integral_unscaled / error_contraction_rate
         n2 = self.power_proportional_unscaled / error_contraction_rate
 
-        a1 = (1.0 / error_normalised) ** n1
-        a2 = (state.error_norm_previously_accepted / error_normalised) ** n2
+        a1 = jnp.power(error_normalised, -n1)
+        a2 = jnp.power(error_normalised / state.error_norm_previously_accepted, -n2)
         scale_factor_unclipped = self.safety * a1 * a2
 
         scale_factor = jnp.maximum(
@@ -132,13 +132,15 @@ class _IntegralCommon(AbstractControl):
     def control_fn(
         self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
-        scale_factor_unclipped = self.safety * (
-            error_normalised ** (-1.0 / error_contraction_rate)
+        scale_factor_unclipped = self.safety * jnp.power(
+            error_normalised, -1.0 / error_contraction_rate
         )
 
         scale_factor = jnp.maximum(
             self.factor_min, jnp.minimum(scale_factor_unclipped, self.factor_max)
         )
+        print("error small:", error_normalised < 1, "scale_factor", scale_factor)
+
         return scale_factor * dt_previous, ()
 
 

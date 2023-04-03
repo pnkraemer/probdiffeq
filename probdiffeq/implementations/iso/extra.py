@@ -84,6 +84,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def begin_extrapolation(
         self, p0: _vars.IsoStateSpaceVar, /, dt
     ) -> Tuple[_vars.IsoStateSpaceVar, Any]:
+        print(dt)
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * p0.hidden_state.mean
         m_ext_p = self.a @ m0_p

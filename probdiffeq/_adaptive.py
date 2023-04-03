@@ -196,6 +196,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
     @jax.jit
     def step_fn(self, state, vector_field, t1, parameters):
         """Perform a full step (including acceptance/rejection)."""
+
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
@@ -205,8 +206,10 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             lambda s: s,
             state,
         )
+
+        have_overstepped = state.accepted.t + self.numerical_zero >= t1
         state = jax.lax.cond(
-            state.accepted.t + self.numerical_zero >= t1,
+            have_overstepped,
             lambda s: self._interpolate(state=s, t=t1),
             lambda s: s,
             state,
@@ -280,7 +283,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
 
     @staticmethod
     def _normalise_error(*, error_estimate, u, atol, rtol, norm_ord):
-        error_relative = error_estimate / (atol + rtol * jnp.abs(u))
+        error_relative = jnp.abs(error_estimate) / (atol + rtol * jnp.abs(u))
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
