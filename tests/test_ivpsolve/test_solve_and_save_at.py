@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import pytest
 import pytest_cases
 
-from probdiffeq import ivpsolvers, solution_routines, taylor, test_util
+from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -111,7 +111,7 @@ def fixture_solution_save_at(setup):
     t0, t1 = setup.ode_problem.t0, setup.ode_problem.t1
     save_at = setup.solver_config.grid_for_save_at_fn(t0, t1)
 
-    solution = solution_routines.solve_and_save_at(
+    solution = ivpsolve.solve_and_save_at(
         setup.ode_problem.vector_field,
         setup.ode_problem.initial_values,
         save_at=save_at,
@@ -144,7 +144,7 @@ def test_smoother_warning(ode_problem):
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with pytest.warns():
-        solution_routines.solve_and_save_at(
+        ivpsolve.solve_and_save_at(
             ode_problem.vector_field,
             ode_problem.initial_values,
             save_at=ts,

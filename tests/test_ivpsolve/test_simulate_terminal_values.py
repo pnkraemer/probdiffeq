@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax.test_util
 import pytest_cases
 
-from probdiffeq import ivpsolvers, solution_routines, taylor, test_util
+from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -114,7 +114,7 @@ def fixture_solution_terminal_values(setup):
         ode_shape=ode_shape,
         num_derivatives=4,
     )
-    solution = solution_routines.simulate_terminal_values(
+    solution = ivpsolve.simulate_terminal_values(
         setup.ode_problem.vector_field,
         setup.ode_problem.initial_values,
         t0=setup.ode_problem.t0,
@@ -169,7 +169,7 @@ def test_jvp(ode_problem, solver_config):
 
 
 def _init_to_terminal_value(init, ode_problem, solver, solver_config):
-    solution = solution_routines.simulate_terminal_values(
+    solution = ivpsolve.simulate_terminal_values(
         ode_problem.vector_field,
         (init,),
         t0=ode_problem.t0,

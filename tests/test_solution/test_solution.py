@@ -5,7 +5,7 @@ import pytest
 import pytest_cases
 import pytest_cases.filters
 
-from probdiffeq import solution, solution_routines, test_util
+from probdiffeq import ivpsolve, solution, test_util
 from probdiffeq.strategies import filters, smoothers
 
 
@@ -13,7 +13,7 @@ from probdiffeq.strategies import filters, smoothers
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def fixture_solution_native_python_while_loop(ode_problem):
     solver = test_util.generate_solver(num_derivatives=1)
-    sol = solution_routines.solve_with_python_while_loop(
+    sol = ivpsolve.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,
@@ -139,7 +139,7 @@ def fixture_solution_save_at(ode_problem):
     solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
 
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=4)
-    sol = solution_routines.solve_and_save_at(
+    sol = ivpsolve.solve_and_save_at(
         ode_problem.vector_field,
         ode_problem.initial_values,
         save_at=save_at,

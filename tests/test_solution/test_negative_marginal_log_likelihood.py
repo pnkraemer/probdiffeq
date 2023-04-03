@@ -4,7 +4,7 @@ import pytest
 import pytest_cases
 import pytest_cases.filters
 
-from probdiffeq import ivpsolvers, solution, solution_routines, test_util
+from probdiffeq import ivpsolve, ivpsolvers, solution, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -15,7 +15,7 @@ def fixture_solution_save_at(ode_problem):
     solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
 
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=4)
-    sol = solution_routines.solve_and_save_at(
+    sol = ivpsolve.solve_and_save_at(
         ode_problem.vector_field,
         ode_problem.initial_values,
         save_at=save_at,
@@ -124,7 +124,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
     strategy = strategy_fn(recipe)
     solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
-    sol = solution_routines.simulate_terminal_values(
+    sol = ivpsolve.simulate_terminal_values(
         ode_problem.vector_field,
         initial_values=ode_problem.initial_values,
         t0=ode_problem.t0,
@@ -149,7 +149,7 @@ def test_nmll_raises_error_for_filter(ode_problem):
     solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1)
 
-    sol = solution_routines.solve_fixed_grid(
+    sol = ivpsolve.solve_fixed_grid(
         ode_problem.vector_field,
         initial_values=ode_problem.initial_values,
         grid=grid,
