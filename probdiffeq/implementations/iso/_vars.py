@@ -6,17 +6,6 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _sqrtm
 
 
-class IsoConditional:
-    def __init__(self, H, noise):
-        self.H = H
-        self.noise = noise
-
-    def __call__(self, u, /):
-        m = self.H * u[None, :] + self.noise.mean
-        rv = IsoNormal(mean=m, cov_sqrtm_lower=self.noise.cov_sqrtm_lower)
-        return IsoStateSpaceVar(rv)
-
-
 @jax.tree_util.register_pytree_node_class
 class IsoStateSpaceVar(_collections.StateSpaceVar):
     def observe_qoi(self, observation_std):
@@ -97,3 +86,61 @@ class IsoNormal(_collections.AbstractNormal):
     # todo: move to conditional???
     def Ax_plus_y(self, A, x, y) -> jax.Array:
         return A @ x + y
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoConditional(_collections.AbstractConditional):
+    def __init__(self, transition, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
+
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        return IsoStateSpaceVar(IsoNormal(m, self.noise.cov_sqrtm_lower))
+
+    def scale_covariance(self, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return IsoConditional(transition=self.transition, noise=noise)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
+
+        noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
+        bw_model = IsoConditional(g, noise=noise)
+        return bw_model
+
+    def marginalise(self, rv: IsoStateSpaceVar, /) -> IsoStateSpaceVar:
+        """Marginalise the output of a linear model."""
+        # Read
+        m0 = rv.hidden_state.mean
+        l0 = rv.hidden_state.cov_sqrtm_lower
+
+        # Apply transition
+        m_new = self.transition @ m0 + self.noise.mean
+        l_new = _sqrtm.sum_of_sqrtm_factors(
+            R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
+        ).T
+
+        return IsoStateSpaceVar(IsoNormal(mean=m_new, cov_sqrtm_lower=l_new))

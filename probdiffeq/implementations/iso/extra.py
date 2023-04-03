@@ -10,66 +10,6 @@ from probdiffeq.implementations.iso import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditional(_collections.AbstractConditional):
-    def __init__(self, transition, noise):
-        self.transition = transition
-        self.noise = noise
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        return f"{name}(transition={self.transition}, noise={self.noise})"
-
-    def tree_flatten(self):
-        children = self.transition, self.noise
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        transition, noise = children
-        return cls(transition=transition, noise=noise)
-
-    def __call__(self, x, /):
-        m = self.transition @ x + self.noise.mean
-        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m, self.noise.cov_sqrtm_lower))
-
-    def scale_covariance(self, scale_sqrtm):
-        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return IsoConditional(transition=self.transition, noise=noise)
-
-    def merge_with_incoming_conditional(self, incoming, /):
-        A = self.transition
-        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
-
-        C = incoming.transition
-        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
-
-        noise = _vars.IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
-        bw_model = IsoConditional(g, noise=noise)
-        return bw_model
-
-    def marginalise(self, rv: _vars.IsoStateSpaceVar, /) -> _vars.IsoStateSpaceVar:
-        """Marginalise the output of a linear model."""
-        # Read
-        m0 = rv.hidden_state.mean
-        l0 = rv.hidden_state.cov_sqrtm_lower
-
-        # Apply transition
-        m_new = self.transition @ m0 + self.noise.mean
-        l_new = _sqrtm.sum_of_sqrtm_factors(
-            R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
-        ).T
-
-        return _vars.IsoStateSpaceVar(
-            _vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
-        )
-
-
-@jax.tree_util.register_pytree_node_class
 class IsoIBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
         self.a = a
@@ -191,15 +131,15 @@ class IsoIBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = IsoConditional(g_bw, noise=backward_noise)
+        bw_model = _vars.IsoConditional(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoStateSpaceVar(extrapolated), bw_model
 
-    # todo: should this be a classmethod in IsoConditional?
+    # todo: should this be a classmethod in _vars.IsoConditional?
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return IsoConditional(op, noise=noi)
+        return _vars.IsoConditional(op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)
