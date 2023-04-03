@@ -28,21 +28,20 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def observe_qoi(self, observation_std):
         hc = self._select_derivative_vect(self.hidden_state.cov_sqrtm_lower, 0)
         m_obs = self._select_derivative(self.hidden_state.mean, 0)
 
-        r_yx = observation_std * jnp.eye(u.shape[0])
+        r_yx = observation_std * jnp.eye(self.target_shape[1])
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
-        m_cor = self.hidden_state.mean - gain @ (m_obs - u)
-
+        m_cor = self.hidden_state.mean - gain @ m_obs
         obs = DenseNormal(m_obs, r_obs.T)
-        cor = DenseStateSpaceVar(
-            DenseNormal(m_cor, r_cor.T), target_shape=self.target_shape
-        )
-        return obs, (cor, gain)
+
+        noise = DenseNormal(m_cor, r_cor.T)
+        cor = DenseConditional(gain, noise=noise, target_shape=self.target_shape)
+        return obs, cor
 
     def extract_qoi(self):
         if self.hidden_state.mean.ndim == 1:
@@ -132,3 +131,70 @@ class DenseNormal(_collections.AbstractNormal):
     @property
     def sample_shape(self):
         return self.mean.shape
+
+
+@jax.tree_util.register_pytree_node_class
+class DenseConditional(_collections.AbstractConditional):
+    def __init__(self, transition, noise, target_shape):
+        self.transition = transition
+        self.noise = noise
+        self.target_shape = target_shape
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args1 = f"transition={self.transition}, noise={self.noise}"
+        args2 = f"target_shape={self.target_shape}"
+        return f"{name}({args1}, {args2})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = (self.target_shape,)
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        transition, noise = children
+        (target_shape,) = aux
+        return cls(transition=transition, noise=noise, target_shape=target_shape)
+
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        cond = DenseNormal(m, self.noise.cov_sqrtm_lower)
+        return DenseStateSpaceVar(cond, target_shape=self.target_shape)
+
+    def scale_covariance(self, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        shape = self.target_shape
+        return DenseConditional(self.transition, noise=noise, target_shape=shape)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
+
+        noise = DenseNormal(mean=xi, cov_sqrtm_lower=Xi)
+        return DenseConditional(g, noise=noise, target_shape=self.target_shape)
+
+    def marginalise(self, rv, /):
+        # Pull into preconditioned space
+        m0_p = rv.hidden_state.mean
+        l0_p = rv.hidden_state.cov_sqrtm_lower
+
+        # Apply transition
+        m_new_p = self.transition @ m0_p + self.noise.mean
+        l_new_p = _sqrtm.sum_of_sqrtm_factors(
+            R_stack=((self.transition @ l0_p).T, self.noise.cov_sqrtm_lower.T)
+        ).T
+
+        # Push back into non-preconditioned space
+        m_new = m_new_p
+        l_new = l_new_p
+
+        marg = DenseNormal(m_new, l_new)
+        return DenseStateSpaceVar(marg, target_shape=rv.target_shape)

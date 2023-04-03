@@ -1,4 +1,8 @@
-"""Interact with estimated initial value problem (IVP) solutions on dense grids."""
+"""Interact with estimated solutions (on dense grids).
+
+For example, this module contains functionality to compute off-grid marginals,
+or to evaluate marginal likelihoods of observations of the solutions.
+"""
 
 from typing import Any, Generic, NamedTuple, TypeVar
 
@@ -101,6 +105,8 @@ class Solution(Generic[RVTypeVar]):
             yield self[i]
 
 
+# todo: this function is a bit of a meaningless wrapper.
+#  Either document its use-case or remove.
 def sample(key, *, solution, solver, shape=()):
     return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
@@ -135,14 +141,14 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
     # Vmap to the rescue :) It does not like kw-only arguments, though.
     @jax.vmap
     def marginals_vmap(sprev, t, s):
-        return offgrid_marginals(
+        return _offgrid_marginals(
             t=t, solution=s, solution_previous=sprev, solver=solver
         )
 
     return marginals_vmap(solution_left, ts, solution_right)
 
 
-def offgrid_marginals(*, solution, t, solution_previous, solver):
+def _offgrid_marginals(*, solution, t, solution_previous, solver):
     return solver.strategy.offgrid_marginals(
         marginals=solution.marginals,
         posterior_previous=solution_previous.posterior,
@@ -151,12 +157,6 @@ def offgrid_marginals(*, solution, t, solution_previous, solver):
         t1=solution.t,
         scale_sqrtm=solution.output_scale_sqrtm,
     )
-
-
-class _NMLLState(NamedTuple):
-    rv: Any
-    num_data: int
-    nmll: float
 
 
 def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
@@ -190,14 +190,20 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
+    # todo: replace with strategy.extract_terminal_values(posterior)
     if isinstance(solution.posterior, smoothers.MarkovSequence):
         terminal_value = solution.posterior.init
     else:
         terminal_value = solution.posterior
-    obs, (cor, _) = terminal_value.condition_on_qoi_observation(
-        u, observation_std=observation_std
-    )
+
+    obs, _ = terminal_value.observe_qoi(observation_std=observation_std)
     return jnp.sum(obs.logpdf(u))
+
+
+class _NMLLState(NamedTuple):
+    rv: Any
+    num_data: int
+    nmll: float
 
 
 def log_marginal_likelihood(*, observation_std, u, solution):
@@ -248,7 +254,8 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         )
 
     def init_fn(rv, obs_std, data):
-        obs, (cor, _) = rv.condition_on_qoi_observation(data, observation_std=obs_std)
+        obs, cond_cor = rv.observe_qoi(observation_std=obs_std)
+        cor = cond_cor(data)
         nmll_new = jnp.sum(obs.logpdf(data))
         return _NMLLState(cor, 1.0, nmll_new)
 
@@ -261,9 +268,8 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         rv_ext = bw_model.marginalise(rv)
 
         # Correct (with an alias for long function names)
-        obs, (cor, _) = rv_ext.condition_on_qoi_observation(
-            data, observation_std=obs_std
-        )
+        obs, cond_cor = rv_ext.observe_qoi(observation_std=obs_std)
+        cor = cond_cor(data)
 
         # Compute marginal log likelihood (with an alias for long function names)
         nmll_new = jnp.sum(obs.logpdf(data))

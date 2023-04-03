@@ -84,7 +84,7 @@ class StateSpaceVar(abc.ABC):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
     @abc.abstractmethod
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def observe_qoi(self, observation_std):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -168,15 +168,12 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     def __call__(self, x, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def scale_covariance(self, scale_sqrtm):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def merge_with_incoming_conditional(self, incoming, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def marginalise(self, rv, /):
         raise NotImplementedError
 

@@ -191,9 +191,7 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 @jax.jit
 def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
     y_T = solve_fixed(theta, ts=ts, solver=solver)
-    marginals, _ = y_T.posterior.condition_on_qoi_observation(
-        data, observation_std=obs_stdev
-    )
+    marginals, _ = y_T.posterior.observe_qoi(observation_std=obs_stdev)
     return marginals.logpdf(data) + jax.scipy.stats.multivariate_normal.logpdf(
         theta, mean=mean, cov=cov
     )
