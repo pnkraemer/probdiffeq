@@ -4,8 +4,7 @@ import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
 
-from probdiffeq import cubature as cubature_module
-from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
+from probdiffeq.implementations import _collections, _ibm_util, _sqrtm, cubature
 
 # todo: make public and split into submodules
 
@@ -193,7 +192,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, ode_order):
-        sci_fn = cubature_module.ThirdOrderSpherical.from_params
+        sci_fn = cubature.ThirdOrderSpherical.from_params
         cubature_rule = sci_fn(input_shape=())
         return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
