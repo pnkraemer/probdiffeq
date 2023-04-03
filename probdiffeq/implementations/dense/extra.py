@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
-from probdiffeq.implementations.dense import _vars
+from probdiffeq.implementations.dense import _conds, _vars
 
 
 @jax.tree_util.register_pytree_node_class
@@ -155,7 +155,7 @@ class DenseIBM(_collections.AbstractExtrapolation):
 
         shape = linearisation_pt.target_shape
         backward_noise = _vars.DenseNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.DenseConditional(
+        bw_model = _conds.DenseConditional(
             g_bw, noise=backward_noise, target_shape=shape
         )
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
@@ -165,7 +165,7 @@ class DenseIBM(_collections.AbstractExtrapolation):
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _vars.DenseConditional(
+        return _conds.DenseConditional(
             op, noise=noi, target_shape=ssv_proto.target_shape
         )
 
