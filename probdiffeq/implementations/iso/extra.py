@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
-from probdiffeq.implementations.iso import _vars
+from probdiffeq.implementations.iso import _conds, _vars
 
 
 @jax.tree_util.register_pytree_node_class
@@ -131,15 +131,15 @@ class IsoIBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.IsoConditionalHiddenState(g_bw, noise=backward_noise)
+        bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoStateSpaceVar(extrapolated), bw_model
 
-    # todo: should this be a classmethod in _vars.IsoConditional?
+    # todo: should this be a classmethod in _conds.IsoConditional?
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _vars.IsoConditionalHiddenState(op, noise=noi)
+        return _conds.IsoConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)
