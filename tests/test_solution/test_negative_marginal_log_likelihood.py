@@ -10,7 +10,7 @@ from probdiffeq.strategies import filters, smoothers
 
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def fixture_solution_save_at(ode_problem):
     solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
 
@@ -117,7 +117,7 @@ def test_negative_marginal_log_likelihood_terminal_values_error_for_wrong_shapes
         )
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize("strategy_fn", [filters.Filter, smoothers.Smoother])
 def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
@@ -141,7 +141,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     assert not jnp.isinf(mll)
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_nmll_raises_error_for_filter(ode_problem):
     """Non-terminal value calls are not possible for filters."""
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
