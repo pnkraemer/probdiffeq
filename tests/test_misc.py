@@ -58,19 +58,19 @@ def test_float32_compatibility():
 
     print("Hypothesis: compiling implies far fewer steps, and somehow NaNs. Why?")
 
-    # with jax.disable_jit():
-    solution = ivpsolve.solve_with_python_while_loop(
-        vf_2,
-        initial_values=(u0, du0),
-        t0=t0,
-        t1=t1,
-        solver=ts0_2,
-        atol=1e-3,
-        rtol=1e-3,
-        parameters=f_args,
-        control=controls.Integral(),
-        numerical_zero=1e-10,
-    )
+    with jax.disable_jit():
+        solution = ivpsolve.solve_with_python_while_loop(
+            vf_2,
+            initial_values=(u0, du0),
+            t0=t0,
+            t1=t1,
+            solver=ts0_2,
+            atol=1e-4,
+            rtol=1e-4,
+            parameters=f_args,
+            control=controls.Integral(),
+            numerical_zero=1e-10,
+        )
     print(len(solution))
     print(jnp.diff(solution.t))
     # print(solution.u[-10:])
