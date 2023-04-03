@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq import solution, solution_routines, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -59,7 +59,7 @@ solver = solvers.DynamicSolver(
 
 ```python tags=[]
 %%time
-solution = solution_routines.solve_with_python_while_loop(
+sol = solution_routines.solve_with_python_while_loop(
     vector_field,
     initial_values=(u0,),
     t0=t0,
@@ -74,14 +74,14 @@ solution = solution_routines.solve_with_python_while_loop(
 We can access elements of the solution.
 
 ```python tags=[]
-print(len(solution))
-print(solution[-1])
+print(len(sol))
+print(sol[-1])
 ```
 
 We can plot an estimate of the solution.
 
 ```python tags=[]
-plt.plot(solution.t, solution.u, ".-")
+plt.plot(sol.t, sol.u, ".-")
 plt.show()
 ```
 
@@ -99,9 +99,7 @@ Check this out:
 
 ```python tags=[]
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
-_, dense = dense_output.offgrid_marginals_searchsorted(
-    ts=ts, solution=solution, solver=solver
-)
+_, dense = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
 
 fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
 

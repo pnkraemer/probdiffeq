@@ -1,11 +1,104 @@
 """Interact with estimated initial value problem (IVP) solutions on dense grids."""
 
-from typing import Any, NamedTuple
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq.strategies import smoothers
+
+RVTypeVar = TypeVar("RVTypeVar")
+"""Type-variable for random variables used in \
+ generic initial value problem solutions."""
+
+
+@jax.tree_util.register_pytree_node_class
+class Solution(Generic[RVTypeVar]):
+    """Estimated initial value problem solution."""
+
+    def __init__(
+        self,
+        t,
+        u,
+        error_estimate,
+        output_scale_sqrtm,
+        marginals: RVTypeVar,
+        posterior,
+        num_data_points,
+    ):
+        self.t = t
+        self.u = u
+        self.error_estimate = error_estimate
+        self.output_scale_sqrtm = output_scale_sqrtm
+        self.marginals = marginals
+        self.posterior = posterior
+        self.num_data_points = num_data_points
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"t={self.t},"
+            f"u={self.u},"
+            f"error_estimate={self.error_estimate},"
+            f"output_scale_sqrtm={self.output_scale_sqrtm},"
+            f"marginals={self.marginals},"
+            f"posterior={self.posterior},"
+            f"num_data_points={self.num_data_points},"
+            ")"
+        )
+
+    def tree_flatten(self):
+        children = (
+            self.t,
+            self.u,
+            self.error_estimate,
+            self.marginals,
+            self.posterior,
+            self.output_scale_sqrtm,
+            self.num_data_points,
+        )
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        t, u, error_estimate, marginals, posterior, output_scale_sqrtm, n = children
+        return cls(
+            t=t,
+            u=u,
+            error_estimate=error_estimate,
+            marginals=marginals,
+            posterior=posterior,
+            output_scale_sqrtm=output_scale_sqrtm,
+            num_data_points=n,
+        )
+
+    def __len__(self):
+        if jnp.ndim(self.t) < 1:
+            raise ValueError("Solution object not batched :(")
+        return self.t.shape[0]
+
+    def __getitem__(self, item):
+        if jnp.ndim(self.t) < 1:
+            raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
+        if isinstance(item, tuple) and len(item) > jnp.ndim(self.t):
+            # s[2, 3] forbidden
+            raise ValueError(f"Inapplicable shape: {item, jnp.shape(self.t)}")
+        return Solution(
+            t=self.t[item],
+            u=self.u[item],
+            error_estimate=self.error_estimate[item],
+            output_scale_sqrtm=self.output_scale_sqrtm[item],
+            # todo: make iterable?
+            marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
+            # todo: make iterable?
+            posterior=jax.tree_util.tree_map(lambda x: x[item], self.posterior),
+            num_data_points=self.num_data_points[item],
+        )
+
+    def __iter__(self):
+        for i in range(self.t.shape[0]):
+            yield self[i]
 
 
 def sample(key, *, solution, solver, shape=()):

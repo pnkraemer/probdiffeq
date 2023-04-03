@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq import solution, solution_routines, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -61,7 +61,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```python
 # %#%time
 
-solution = solution_routines.solve_and_save_at(
+sol = solution_routines.solve_and_save_at(
     vf,
     initial_values=(u0,),
     save_at=ts,
@@ -75,7 +75,7 @@ solution = solution_routines.solve_and_save_at(
 Plot the solution
 
 ```python tags=[]
-_, num_derivatives, _ = solution.marginals.hidden_state.mean.shape
+_, num_derivatives, _ = sol.marginals.hidden_state.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -87,8 +87,8 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = solution.marginals.hidden_state.mean[:, i, :]
-    ls = solution.marginals.hidden_state.cov_sqrtm_lower[:, i, :]
+    ms = sol.marginals.hidden_state.mean[:, i, :]
+    ls = sol.marginals.hidden_state.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
@@ -100,13 +100,11 @@ for i, axes_cols in enumerate(axes_all.T):
     else:
         axes_cols[0].set_title(f"{i}th deriv.")
 
-    axes_cols[0].plot(solution.t, ms, marker="None")
+    axes_cols[0].plot(sol.t, ms, marker="None")
     for m in ms.T:
-        axes_cols[0].fill_between(
-            solution.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3
-        )
+        axes_cols[0].fill_between(sol.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
 
-    axes_cols[1].semilogy(solution.t, stds, marker="None")
+    axes_cols[1].semilogy(sol.t, stds, marker="None")
 
 plt.show()
 ```
@@ -121,7 +119,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```python
 # %#%time
 
-solution = solution_routines.solve_and_save_at(
+sol = solution_routines.solve_and_save_at(
     vf,
     initial_values=(u0,),
     save_at=ts,
@@ -134,11 +132,11 @@ solution = solution_routines.solve_and_save_at(
 
 ```python
 key = jax.random.PRNGKey(seed=1)
-u, samples = dense_output.sample(key, solution=solution, shape=(2,), solver=ts0)
+u, samples = solution.sample(key, solution=sol, shape=(2,), solver=ts0)
 ```
 
 ```python
-_, num_derivatives, _ = solution.marginals.hidden_state.mean.shape
+_, num_derivatives, _ = sol.marginals.hidden_state.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -150,9 +148,9 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = solution.marginals.hidden_state.mean[:, i, :]
+    ms = sol.marginals.hidden_state.mean[:, i, :]
     samps = samples[..., i, :]
-    ls = solution.marginals.hidden_state.cov_sqrtm_lower[:, i, :]
+    ls = sol.marginals.hidden_state.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
@@ -164,20 +162,14 @@ for i, axes_cols in enumerate(axes_all.T):
     else:
         axes_cols[0].set_title(f"{i}th deriv.")
 
-    axes_cols[0].plot(solution.t, ms, marker="None")
+    axes_cols[0].plot(sol.t, ms, marker="None")
     for s in samps:
-        axes_cols[0].plot(
-            solution.t, s[..., 0], color="C0", linewidth=0.35, marker="None"
-        )
-        axes_cols[0].plot(
-            solution.t, s[..., 1], color="C1", linewidth=0.35, marker="None"
-        )
+        axes_cols[0].plot(sol.t, s[..., 0], color="C0", linewidth=0.35, marker="None")
+        axes_cols[0].plot(sol.t, s[..., 1], color="C1", linewidth=0.35, marker="None")
     for m in ms.T:
-        axes_cols[0].fill_between(
-            solution.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3
-        )
+        axes_cols[0].fill_between(sol.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
 
-    axes_cols[1].semilogy(solution.t, stds, marker="None")
+    axes_cols[1].semilogy(sol.t, stds, marker="None")
 
 plt.show()
 ```

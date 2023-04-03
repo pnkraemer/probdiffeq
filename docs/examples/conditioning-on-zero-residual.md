@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import controls, dense_output, solution_routines, solvers
+from probdiffeq import controls, solution, solution_routines, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -62,7 +62,7 @@ solver = solvers.MLESolver(
 # %#%time
 
 # Solve the ODE with low precision
-solution = solution_routines.solve_with_python_while_loop(
+sol = solution_routines.solve_with_python_while_loop(
     vector_field,
     initial_values=(u0[None],),
     t0=t0,
@@ -79,8 +79,8 @@ solution = solution_routines.solve_with_python_while_loop(
 
 eps = 1e-4
 mesh = jnp.linspace(t0 + eps, t1 - eps, num=50, endpoint=True)
-_, marginals = dense_output.offgrid_marginals_searchsorted(
-    ts=mesh, solution=solution, solver=solver
+_, marginals = solution.offgrid_marginals_searchsorted(
+    ts=mesh, solution=sol, solver=solver
 )
 
 posterior_u = marginals.marginal_nth_derivative(0).mean
@@ -92,8 +92,8 @@ posterior_du = marginals.marginal_nth_derivative(1).mean
 
 extrapolation_model = solver.strategy.implementation.extrapolation
 taylor_coefficients = jnp.reshape(
-    solution.marginals.hidden_state.mean[0, ...],
-    solution.marginals.target_shape,
+    sol.marginals.hidden_state.mean[0, ...],
+    sol.marginals.target_shape,
     order="F",
 )
 
@@ -115,7 +115,7 @@ for t_old, t_new in zip(mesh[:-1], mesh[1:]):
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 
     dt = t_new - t_old
-    rv = extrapolate_fn(rv, extrapolation_model, dt, solution.output_scale_sqrtm.mean())
+    rv = extrapolate_fn(rv, extrapolation_model, dt, sol.output_scale_sqrtm.mean())
 
 prior_u.append(rv.marginal_nth_derivative(0).mean)
 prior_du.append(rv.marginal_nth_derivative(1).mean)

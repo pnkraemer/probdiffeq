@@ -4,7 +4,7 @@ import pytest
 import pytest_cases
 import pytest_cases.filters
 
-from probdiffeq import dense_output, solution_routines, solvers, test_util
+from probdiffeq import solution, solution_routines, solvers, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -15,7 +15,7 @@ def fixture_solution_save_at(ode_problem):
     solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
 
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=4)
-    solution = solution_routines.solve_and_save_at(
+    sol = solution_routines.solve_and_save_at(
         ode_problem.vector_field,
         ode_problem.initial_values,
         save_at=save_at,
@@ -24,16 +24,16 @@ def fixture_solution_save_at(ode_problem):
         atol=1e-1,
         rtol=1e-2,
     )
-    return solution, solver
+    return sol, solver
 
 
 def test_negative_marginal_log_likelihood(solution_save_at):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
-    k = solution.u.shape[0]
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
+    k = sol.u.shape[0]
 
-    mll = dense_output.negative_marginal_log_likelihood(
-        observation_std=jnp.ones((k,)), u=data, solution=solution
+    mll = solution.negative_marginal_log_likelihood(
+        observation_std=jnp.ones((k,)), u=data, solution=sol
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)
@@ -41,54 +41,54 @@ def test_negative_marginal_log_likelihood(solution_save_at):
 
 
 def test_negative_marginal_log_likelihood_error_for_wrong_std_shape_1(solution_save_at):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
-    k = solution.u.shape[0]
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
+    k = sol.u.shape[0]
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = dense_output.negative_marginal_log_likelihood(
-            observation_std=jnp.ones((k + 1,)), u=data, solution=solution
+        _ = solution.negative_marginal_log_likelihood(
+            observation_std=jnp.ones((k + 1,)), u=data, solution=sol
         )
 
 
 def test_negative_marginal_log_likelihood_error_for_wrong_std_shape_2(solution_save_at):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
-    k = solution.u.shape[0]
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
+    k = sol.u.shape[0]
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = dense_output.negative_marginal_log_likelihood(
-            observation_std=jnp.ones((k, 1)), u=data, solution=solution
+        _ = solution.negative_marginal_log_likelihood(
+            observation_std=jnp.ones((k, 1)), u=data, solution=sol
         )
 
 
 def test_negative_marginal_log_likelihood_error_for_wrong_u_shape_1(solution_save_at):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
-    k = solution.u.shape[0]
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
+    k = sol.u.shape[0]
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = dense_output.negative_marginal_log_likelihood(
-            observation_std=jnp.ones((k,)), u=data[..., None], solution=solution
+        _ = solution.negative_marginal_log_likelihood(
+            observation_std=jnp.ones((k,)), u=data[..., None], solution=sol
         )
 
 
 def test_negative_marginal_log_likelihood_error_for_terminal_values(solution_save_at):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
 
     with pytest.raises(ValueError, match="expected"):
-        _ = dense_output.negative_marginal_log_likelihood(
-            observation_std=jnp.ones_like(data[-1]), u=data[-1], solution=solution[-1]
+        _ = solution.negative_marginal_log_likelihood(
+            observation_std=jnp.ones_like(data[-1]), u=data[-1], solution=sol[-1]
         )
 
 
 def test_negative_marginal_log_likelihood_terminal_values(solution_save_at):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
 
-    mll = dense_output.negative_marginal_log_likelihood_terminal_values(
-        observation_std=jnp.ones(()), u=data[-1], solution=solution[-1]
+    mll = solution.negative_marginal_log_likelihood_terminal_values(
+        observation_std=jnp.ones(()), u=data[-1], solution=sol[-1]
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)
@@ -98,22 +98,22 @@ def test_negative_marginal_log_likelihood_terminal_values(solution_save_at):
 def test_negative_marginal_log_likelihood_terminal_values_error_for_wrong_shapes(
     solution_save_at,
 ):
-    solution, solver = solution_save_at
-    data = solution.u + 0.005
+    sol, solver = solution_save_at
+    data = sol.u + 0.005
 
     with pytest.raises(ValueError, match="expected"):
-        _ = dense_output.negative_marginal_log_likelihood_terminal_values(
-            observation_std=jnp.ones((1,)), u=data[-1], solution=solution[-1]
+        _ = solution.negative_marginal_log_likelihood_terminal_values(
+            observation_std=jnp.ones((1,)), u=data[-1], solution=sol[-1]
         )
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = dense_output.negative_marginal_log_likelihood_terminal_values(
-            observation_std=jnp.ones(()), u=data[-1, None], solution=solution[-1]
+        _ = solution.negative_marginal_log_likelihood_terminal_values(
+            observation_std=jnp.ones(()), u=data[-1, None], solution=sol[-1]
         )
 
     with pytest.raises(ValueError, match="expected"):
-        _ = dense_output.negative_marginal_log_likelihood_terminal_values(
-            observation_std=jnp.ones(()), u=data[-1:], solution=solution[-1:]
+        _ = solution.negative_marginal_log_likelihood_terminal_values(
+            observation_std=jnp.ones(()), u=data[-1:], solution=sol[-1:]
         )
 
 
@@ -133,7 +133,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
         solver=solver,
     )
     data = sol.u + 0.1
-    mll = dense_output.negative_marginal_log_likelihood_terminal_values(
+    mll = solution.negative_marginal_log_likelihood_terminal_values(
         observation_std=1e-2, u=data, solution=sol
     )
     assert mll.shape == ()
@@ -159,6 +159,6 @@ def test_nmll_raises_error_for_filter(ode_problem):
     data = sol.u + 0.1
     std = jnp.ones((sol.u.shape[0],))  # values irrelevant
     with pytest.raises(TypeError, match="ilter"):
-        _ = dense_output.negative_marginal_log_likelihood(
+        _ = solution.negative_marginal_log_likelihood(
             observation_std=std, u=data, solution=sol
         )
