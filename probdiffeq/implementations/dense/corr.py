@@ -5,8 +5,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import cubature as cubature_module
-from probdiffeq.implementations import _collections, _sqrtm
+from probdiffeq.implementations import _collections, _sqrtm, cubature
 from probdiffeq.implementations.dense import _vars
 
 # todo:
@@ -250,7 +249,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         cls,
         ode_shape,
         ode_order,
-        cubature_rule_fn=cubature_module.ThirdOrderSpherical.from_params,
+        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
     ):
         cubature_rule = cubature_rule_fn(input_shape=ode_shape)
         linearise_fn = functools.partial(linearise_slr0, cubature_rule=cubature_rule)
@@ -358,7 +357,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         cls,
         ode_shape,
         ode_order,
-        cubature_rule_fn=cubature_module.ThirdOrderSpherical.from_params,
+        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
     ):
         cubature_rule = cubature_rule_fn(input_shape=ode_shape)
         linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature_rule)

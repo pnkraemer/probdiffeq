@@ -4,8 +4,7 @@ from typing import Generic, TypeVar
 
 import jax
 
-from probdiffeq import cubature
-from probdiffeq.implementations import _collections
+from probdiffeq.implementations import _collections, cubature
 from probdiffeq.implementations.blockdiag import corr as blockdiag_corr
 from probdiffeq.implementations.blockdiag import extra as blockdiag_extra
 from probdiffeq.implementations.dense import corr as dense_corr

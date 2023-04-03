@@ -3,8 +3,7 @@ from typing import Callable, Tuple
 
 import jax
 
-from probdiffeq import cubature as cubature_module
-from probdiffeq.implementations import _collections, _scalar
+from probdiffeq.implementations import _collections, _scalar, cubature
 
 _SLR1CacheType = Tuple[Callable]
 """Type-variable for the correction-cache."""
@@ -54,7 +53,7 @@ class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, ode_shape, ode_order):
-        cubature_fn = cubature_module.ThirdOrderSpherical.from_params_blockdiag
+        cubature_fn = cubature.ThirdOrderSpherical.from_params_blockdiag
         cubature_rule = cubature_fn(input_shape=ode_shape)
         return cls(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
