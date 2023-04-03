@@ -349,7 +349,6 @@ class ConditionalHiddenState(_Conditional):
         if self.transition.ndim > 2:
             return jax.vmap(ConditionalHiddenState.__call__)(self, x)
 
-        print(self.transition.shape, x.shape)
         m = self.transition @ x + self.noise.mean
         return StateSpaceVar(Normal(m, self.noise.cov_sqrtm_lower))
 
@@ -396,12 +395,6 @@ class ConditionalQOI(_Conditional):
     def __call__(self, x, /):
         if self.transition.ndim > 1:
             return jax.vmap(ConditionalQOI.__call__)(self, x)
-        print(
-            self.transition.shape,
-            x.shape,
-            self.noise.mean.shape,
-            self.noise.cov_sqrtm_lower.shape,
-        )
         m = self.transition * x + self.noise.mean
         return StateSpaceVar(Normal(m, self.noise.cov_sqrtm_lower))
 

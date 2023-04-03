@@ -13,6 +13,7 @@ from probdiffeq.strategies import filters, smoothers
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize(
     "impl_fn",
+    # one for each SSM factorisation
     [
         lambda num_derivatives, **kwargs: recipes.IsoTS0.from_params(
             num_derivatives=num_derivatives
@@ -20,7 +21,7 @@ from probdiffeq.strategies import filters, smoothers
         recipes.BlockDiagTS0.from_params,
         recipes.DenseTS0.from_params,
     ],
-    ids=["Iso", "BD", "Den"],
+    ids=["IsoTS0", "BlockDiagTS0", "DenseTS0"],
 )
 def fixture_solution_save_at(ode_problem, impl_fn):
     solver = test_util.generate_solver(

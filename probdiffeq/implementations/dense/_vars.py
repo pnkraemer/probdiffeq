@@ -43,23 +43,6 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
         cor = DenseConditional(gain, noise=noise, target_shape=self.target_shape)
         return obs, cor
 
-    #
-    # def condition_on_qoi_observation(self, u, /, observation_std):
-    #     hc = self._select_derivative_vect(self.hidden_state.cov_sqrtm_lower, 0)
-    #     m_obs = self._select_derivative(self.hidden_state.mean, 0)
-    #
-    #     r_yx = observation_std * jnp.eye(u.shape[0])
-    #     r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
-    #         R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
-    #     )
-    #     m_cor = self.hidden_state.mean - gain @ (m_obs - u)
-    #
-    #     obs = DenseNormal(m_obs, r_obs.T)
-    #     cor = DenseStateSpaceVar(
-    #         DenseNormal(m_cor, r_cor.T), target_shape=self.target_shape
-    #     )
-    #     return obs, (cor, gain)
-
     def extract_qoi(self):
         if self.hidden_state.mean.ndim == 1:
             return self._select_derivative(self.hidden_state.mean, i=0)
