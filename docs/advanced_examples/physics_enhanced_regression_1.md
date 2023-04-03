@@ -34,7 +34,7 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq import solution, solution_routines, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -103,7 +103,7 @@ def param_to_log_likelihood(parameters_, u0_, ts_, solver_, vf_, data_, obs_stde
     )
 
     observation_std = jnp.ones_like(ts_) * obs_stdev
-    return dense_output.negative_marginal_log_likelihood(
+    return solution.negative_marginal_log_likelihood(
         observation_std=observation_std, u=data_, solution=sol_
     )
 

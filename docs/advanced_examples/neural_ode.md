@@ -25,7 +25,7 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq import solution, solution_routines, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -67,7 +67,7 @@ def build_loss_fn(vf, initial_values, obs_stdev=1e-2):
         )
 
         observation_std = jnp.ones_like(grid) * obs_stdev
-        return dense_output.negative_marginal_log_likelihood(
+        return solution.negative_marginal_log_likelihood(
             observation_std=observation_std, u=data[:, None], solution=sol
         )
 

@@ -81,7 +81,7 @@ To translate between the two packages, consider the following:
 * ProbNumDiffEq.jl refers to `IBM(output_scale_sqrtm=x)` as `IWP(diffusion=x^2)`. They are the same processes. 
 * ProbNumDiffEq.jl switches between filtering and smoothing with a `smooth=true/false` flag. We use different strategies to distinguish between those because this way, it becomes easier to cache reusable quantities for the smoother. 
 * Initialisation schemes like those in `ProbNumDiffEq` are in `probdiffeq/taylor.py`. ProbDiffEq offers some rules for high-order differential equations and some unique methods (e.g. doubling). But the feature lists are relatively similar.
-* The features in [Fenrir.jl](https://github.com/nathanaelbosch/Fenrir.jl), which extends ProbNumDiffEq.jl, should be more or less readily available via `probdiffeq/dense_output.py`. Check out the tutorial notebooks!
+* The features in [Fenrir.jl](https://github.com/nathanaelbosch/Fenrir.jl), which extends ProbNumDiffEq.jl, should be more or less readily available via `probdiffeq/solution.py`. Check out the tutorial notebooks!
 
 Should I replace ProbNumDiffEq.jl with ProbDiffEq?
 Short answer: No. 

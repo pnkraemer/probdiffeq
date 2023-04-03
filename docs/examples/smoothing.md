@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq import solution, solution_routines, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -103,14 +103,14 @@ If you like, compute the solution on a dense grid after solving.
 ts_dense = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=500, endpoint=True
 )  # must be off-grid
-dense, _ = dense_output.offgrid_marginals_searchsorted(
+dense, _ = solution.offgrid_marginals_searchsorted(
     ts=ts_dense, solution=eks0sol, solver=eks0
 )
 
 ts_coarse = jnp.linspace(
     t0 + 1e-4, t1 - 1e-4, num=25, endpoint=True
 )  # must be off-grid
-coarse, _ = dense_output.offgrid_marginals_searchsorted(
+coarse, _ = solution.offgrid_marginals_searchsorted(
     ts=ts_coarse, solution=eks0sol, solver=eks0
 )
 
