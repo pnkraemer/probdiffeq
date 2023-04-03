@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax.test_util
 import pytest_cases
 
-from probdiffeq import solution_routines, solvers, taylor, test_util
+from probdiffeq import ivpsolvers, solution_routines, taylor, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -31,7 +31,7 @@ class _SimulateTerminalValuesConfig(NamedTuple):
 def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
-        solver_fn=solvers.MLESolver,
+        solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
         strat_fn=filters.Filter,
         solver_config=solver_config,
@@ -47,7 +47,7 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
-        solver_fn=solvers.MLESolver,
+        solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.BlockDiagTS0.from_params,
         strat_fn=strat_fn,
         solver_config=solver_config,
@@ -58,7 +58,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 @pytest_cases.case
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-def case_setup_all_solvers(ode_problem, solver_fn, solver_config):
+def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
         solver_fn=solver_fn,
@@ -90,7 +90,7 @@ def case_loop_eqx():
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
-        solver_fn=solvers.MLESolver,
+        solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.BlockDiagTS0.from_params,
         strat_fn=filters.Filter,
         solver_config=solver_config,
@@ -149,7 +149,7 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
 def test_jvp(ode_problem, solver_config):
     ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
-        solver_factory=solvers.MLESolver,
+        solver_factory=ivpsolvers.MLESolver,
         strategy_factory=filters.Filter,
         impl_factory=recipes.BlockDiagTS0.from_params,
         ode_shape=ode_shape,

@@ -1,13 +1,13 @@
 """Test utilities."""
 
-from probdiffeq import solvers
+from probdiffeq import ivpsolvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
 
 def generate_solver(
     *,
-    solver_factory=solvers.MLESolver,
+    solver_factory=ivpsolvers.MLESolver,
     strategy_factory=filters.Filter,
     impl_factory=recipes.IsoTS0.from_params,
     **impl_factory_kwargs,
@@ -19,7 +19,7 @@ def generate_solver(
     >>> from jax.config import config
     >>> config.update("jax_platform_name", "cpu")
 
-    >>> from probdiffeq import solvers
+    >>> from probdiffeq import ivpsolvers
     >>> from probdiffeq.implementations import recipes
     >>> from probdiffeq.strategies import smoothers
 
@@ -29,7 +29,7 @@ def generate_solver(
     >>> print(generate_solver(num_derivatives=1))
     MLESolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=1>))
 
-    >>> print(generate_solver(solver_factory=solvers.DynamicSolver))
+    >>> print(generate_solver(solver_factory=ivpsolvers.DynamicSolver))
     DynamicSolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=4>))
 
     >>> impl_fcty = recipes.DenseTS1.from_params
@@ -42,7 +42,7 @@ def generate_solver(
 
     # I am not too happy with the need for this distinction below...
 
-    if solver_factory in [solvers.MLESolver, solvers.DynamicSolver]:
+    if solver_factory in [ivpsolvers.MLESolver, ivpsolvers.DynamicSolver]:
         return solver_factory(strat)
 
     scale_sqrtm = impl.extrapolation.init_output_scale_sqrtm()

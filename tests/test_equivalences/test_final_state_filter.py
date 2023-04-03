@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolvers, solution_routines
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -33,7 +33,7 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
         t0=ode_problem.t0,
         t1=ode_problem.t1,
         parameters=ode_problem.args,
-        solver=solvers.DynamicSolver(strategy=fil),
+        solver=ivpsolvers.DynamicSolver(strategy=fil),
         atol=atol,
         rtol=rtol,
     )
@@ -43,7 +43,7 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
         t0=ode_problem.t0,
         t1=ode_problem.t1,
         parameters=ode_problem.args,
-        solver=solvers.DynamicSolver(strategy=smo),
+        solver=ivpsolvers.DynamicSolver(strategy=smo),
         atol=atol,
         rtol=rtol,
     )

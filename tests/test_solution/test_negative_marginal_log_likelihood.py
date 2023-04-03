@@ -1,10 +1,10 @@
-"""Tests for IVP solvers."""
+"""Tests for marginal log likelihoods."""
 import jax.numpy as jnp
 import pytest
 import pytest_cases
 import pytest_cases.filters
 
-from probdiffeq import solution, solution_routines, solvers, test_util
+from probdiffeq import ivpsolvers, solution, solution_routines, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -123,7 +123,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
     strategy = strategy_fn(recipe)
-    solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
+    solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
     sol = solution_routines.simulate_terminal_values(
         ode_problem.vector_field,
         initial_values=ode_problem.initial_values,
@@ -146,7 +146,7 @@ def test_nmll_raises_error_for_filter(ode_problem):
     """Non-terminal value calls are not possible for filters."""
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
     strategy = filters.Filter(recipe)
-    solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
+    solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1)
 
     sol = solution_routines.solve_fixed_grid(
