@@ -135,14 +135,15 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
     # Vmap to the rescue :) It does not like kw-only arguments, though.
     @jax.vmap
     def marginals_vmap(sprev, t, s):
-        return offgrid_marginals(
+        return _offgrid_marginals(
             t=t, solution=s, solution_previous=sprev, solver=solver
         )
 
     return marginals_vmap(solution_left, ts, solution_right)
 
 
-def offgrid_marginals(*, solution, t, solution_previous, solver):
+# todo: either document or remove from public API
+def _offgrid_marginals(*, solution, t, solution_previous, solver):
     return solver.strategy.offgrid_marginals(
         marginals=solution.marginals,
         posterior_previous=solution_previous.posterior,
