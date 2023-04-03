@@ -7,7 +7,7 @@ import numpy as np
 import scipy.integrate
 from jax.typing import ArrayLike
 
-from probdiffeq import solution_routines
+from probdiffeq import ivpsolve
 
 
 class FirstOrderIVP:
@@ -155,7 +155,7 @@ def absolute_rmse(*, solution: ArrayLike):
 
 def probdiffeq_terminal_values(select_fn=None):
     def solve_fn(*args, atol, rtol, **kwargs):
-        solution = solution_routines.simulate_terminal_values(
+        solution = ivpsolve.simulate_terminal_values(
             *args, atol=atol, rtol=rtol, **kwargs
         )
         if select_fn is not None:
