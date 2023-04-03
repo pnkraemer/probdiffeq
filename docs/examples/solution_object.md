@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution, solution_routines, solvers
+from probdiffeq import ivpsolve, solution, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -59,7 +59,7 @@ solver = solvers.DynamicSolver(
 
 ```python tags=[]
 %%time
-sol = solution_routines.solve_with_python_while_loop(
+sol = ivpsolve.solve_with_python_while_loop(
     vector_field,
     initial_values=(u0,),
     t0=t0,

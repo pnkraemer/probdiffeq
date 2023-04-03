@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution, solution_routines, solvers
+from probdiffeq import ivpsolve, solution, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -65,7 +65,7 @@ But be aware that a smoother computes more intermediate values than a filter, so
 
 ```python
 ekf0 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
-ekf0sol = solution_routines.simulate_terminal_values(
+ekf0sol = ivpsolve.simulate_terminal_values(
     vf,
     initial_values=(u0,),
     t0=t0,
@@ -82,7 +82,7 @@ If you are used to calling traditional solve() methods, use one a conventional s
 
 ```python
 eks0 = solvers.MLESolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
-eks0sol = solution_routines.solve_with_python_while_loop(
+eks0sol = ivpsolve.solve_with_python_while_loop(
     vf,
     initial_values=(u0,),
     t0=t0,
@@ -138,7 +138,7 @@ use the solve_and_save_at function together with a fixed-point smoother.
 eks0_fixpt = solvers.MLESolver(
     smoothers.FixedPointSmoother(recipes.IsoTS0.from_params())
 )
-fixptsol = solution_routines.solve_and_save_at(
+fixptsol = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),
     save_at=ts_dense,  # reuse from above

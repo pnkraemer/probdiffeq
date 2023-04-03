@@ -25,7 +25,7 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution, solution_routines, solvers
+from probdiffeq import ivpsolve, solution, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -58,7 +58,7 @@ def build_loss_fn(vf, initial_values, obs_stdev=1e-2):
 
     @jax.jit
     def loss_fn(parameters):
-        sol = solution_routines.solve_fixed_grid(
+        sol = ivpsolve.solve_fixed_grid(
             vf,
             initial_values=initial_values,
             grid=grid,
@@ -109,7 +109,7 @@ solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
 ```
 
 ```python
-sol = solution_routines.solve_fixed_grid(
+sol = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=grid, solver=solver, parameters=f_args
 )
 
@@ -144,12 +144,12 @@ for i in range(chunk_size):
 plt.plot(sol.t, data, "-", linewidth=5, alpha=0.5, label="Data")
 
 
-sol = solution_routines.solve_fixed_grid(
+sol = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=grid, solver=solver, parameters=p
 )
 plt.plot(sol.t, sol.u, ".-", label="Final guess")
 
-sol = solution_routines.solve_fixed_grid(
+sol = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=grid, solver=solver, parameters=f_args
 )
 plt.plot(sol.t, sol.u, ".-", label="Initial guess")

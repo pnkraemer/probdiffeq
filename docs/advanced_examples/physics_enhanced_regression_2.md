@@ -98,7 +98,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
@@ -153,7 +153,7 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 
 @jax.jit
 def solve_adaptive(theta, *, save_at):
-    return solution_routines.solve_and_save_at(
+    return ivpsolve.solve_and_save_at(
         vf, initial_values=(theta,), save_at=save_at, solver=solver
     )
 
@@ -204,9 +204,7 @@ def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
 
 @jax.jit
 def solve_fixed(theta, *, ts, solver):
-    sol = solution_routines.solve_fixed_grid(
-        vf, initial_values=(theta,), grid=ts, solver=solver
-    )
+    sol = ivpsolve.solve_fixed_grid(vf, initial_values=(theta,), grid=ts, solver=solver)
     return sol[-1]
 
 

@@ -34,7 +34,7 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution, solution_routines, solvers
+from probdiffeq import ivpsolve, solution, solvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
@@ -73,7 +73,7 @@ strategy = smoothers.Smoother(
 solver = solvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=10.0)
 
 
-solution_true = solution_routines.solve_fixed_grid(
+solution_true = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=solver, parameters=parameter_true
 )
 data = solution_true.u
@@ -84,7 +84,7 @@ plt.show()
 We make an initial guess, but it does not lead to a good data fit:
 
 ```python
-solution_guess = solution_routines.solve_fixed_grid(
+solution_guess = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=solver, parameters=parameter_guess
 )
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
@@ -98,7 +98,7 @@ This incorporates the likelihood of the data under the distribution induced by t
 
 ```python
 def param_to_log_likelihood(parameters_, u0_, ts_, solver_, vf_, data_, obs_stdev=1e-1):
-    sol_ = solution_routines.solve_fixed_grid(
+    sol_ = ivpsolve.solve_fixed_grid(
         vf_, initial_values=(u0_,), grid=ts_, solver=solver_, parameters=parameters_
     )
 
@@ -163,7 +163,7 @@ for i in range(chunk_size):
 The solution looks much better:
 
 ```python
-solution_wrong = solution_routines.solve_fixed_grid(
+solution_wrong = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=solver, parameters=p
 )
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)

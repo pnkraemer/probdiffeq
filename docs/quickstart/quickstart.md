@@ -4,7 +4,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -29,7 +29,7 @@ solver = solvers.MLESolver(strategy)
 
 
 # Solve
-solution = solution_routines.solve_with_python_while_loop(
+solution = ivpsolve.solve_with_python_while_loop(
     vector_field, initial_values=(u0,), t0=t0, t1=t1, solver=solver, parameters=0.5
 )
 
