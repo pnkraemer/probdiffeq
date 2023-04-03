@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import pytest_cases
 from tornadox import ek0, ek1, init, ivp, step
 
-from probdiffeq import controls, solution_routines, solvers
+from probdiffeq import controls, ivpsolve, ivpsolvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
@@ -86,7 +86,7 @@ def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
 def fixture_solver_probdiffeq_kronecker_ek0(num):
     implementation = recipes.IsoTS0.from_params(num_derivatives=num)
     strategy = filters.Filter(implementation=implementation)
-    return solvers.DynamicSolver(strategy=strategy)
+    return ivpsolvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case
@@ -103,7 +103,7 @@ def case_solver_pair_kronecker_ek0(
 
     # Solve with probdiffeq
     vf_ode, u0, (t0, t1), f_args = ivp_probdiffeq
-    solution_probdiffeq = solution_routines.solve_with_python_while_loop(
+    solution_probdiffeq = ivpsolve.solve_with_python_while_loop(
         vf_ode,
         initial_values=u0,
         t0=t0,
@@ -155,7 +155,7 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
 def fixture_solver_probdiffeq_reference_ek1(num):
     implementation = recipes.DenseTS1.from_params(num_derivatives=num, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
-    return solvers.DynamicSolver(strategy=strategy)
+    return ivpsolvers.DynamicSolver(strategy=strategy)
 
 
 @pytest_cases.case
@@ -172,7 +172,7 @@ def case_solver_pair_reference_ek1(
 
     # Solve with probdiffeq
     vf_ode, u0, (t0, t1), f_args = ivp_probdiffeq
-    solution_probdiffeq = solution_routines.solve_with_python_while_loop(
+    solution_probdiffeq = ivpsolve.solve_with_python_while_loop(
         vf_ode,
         initial_values=u0,
         t0=t0,

@@ -15,7 +15,7 @@ jupyter:
 
 # Dynamic and non-dynamic solvers
 
-You can choose between a `solvers.CalibrationFreeSolver()` (which does not calibrate the output-scale), a `solvers.MLESolver()` (which calibrates a global output scale via quasi-maximum-likelihood-estimation), and a `solvers.DynamicSolver()`, which calibrates a time-varying, piecewise constant output-scale via "local' quasi-maximum-likelihood estimation, similar to how ODE solver estimate local errors.
+You can choose between a `ivpsolvers.CalibrationFreeSolver()` (which does not calibrate the output-scale), a `ivpsolvers.MLESolver()` (which calibrates a global output scale via quasi-maximum-likelihood-estimation), and a `ivpsolvers.DynamicSolver()`, which calibrates a time-varying, piecewise constant output-scale via "local' quasi-maximum-likelihood estimation, similar to how ODE solver estimate local errors.
 
 But are these good for?
 In short: choose a `DynamicSolver` if your ODE output-scale varies quite strongly, and choose an `MLESolver` otherwise.
@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
@@ -63,8 +63,8 @@ implementation = recipes.DenseTS1.from_params(
 )
 strategy = filters.Filter(implementation=implementation)
 
-dynamic = solvers.DynamicSolver(strategy=strategy)
-mle = solvers.MLESolver(strategy=strategy)
+dynamic = ivpsolvers.DynamicSolver(strategy=strategy)
+mle = ivpsolvers.MLESolver(strategy=strategy)
 ```
 
 ```python
@@ -72,10 +72,10 @@ t0, t1 = 0.0, 3.0
 num_pts = 200
 
 ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
-solution_dynamic = solution_routines.solve_fixed_grid(
+solution_dynamic = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=dynamic, parameters=f_args
 )
-solution_mle = solution_routines.solve_fixed_grid(
+solution_mle = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=mle, parameters=f_args
 )
 ```
@@ -122,10 +122,10 @@ t1_long = t1 * 7
 num_pts = num_pts * 7
 ts = jnp.linspace(t0, t1_long, num=num_pts, endpoint=True)
 
-solution_dynamic = solution_routines.solve_fixed_grid(
+solution_dynamic = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=dynamic, parameters=f_args
 )
-solution_mle = solution_routines.solve_fixed_grid(
+solution_mle = ivpsolve.solve_fixed_grid(
     vf, initial_values=(u0,), grid=ts, solver=mle, parameters=f_args
 )
 ```

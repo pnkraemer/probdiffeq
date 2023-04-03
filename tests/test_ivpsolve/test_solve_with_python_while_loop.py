@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import solution_routines, taylor, test_util
+from probdiffeq import ivpsolve, taylor, test_util
 from probdiffeq.strategies import filters, smoothers
 
 
@@ -22,7 +22,7 @@ def fixture_solution_solve_with_python_while_loop(
         ode_shape=(2,),
         num_derivatives=4,
     )
-    solution = solution_routines.solve_with_python_while_loop(
+    solution = ivpsolve.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,

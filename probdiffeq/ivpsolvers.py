@@ -1,4 +1,4 @@
-"""Initial value problem solvers and solutions."""
+"""Calibrated IVP solvers."""
 
 import abc
 

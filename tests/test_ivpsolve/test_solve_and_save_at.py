@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import pytest
 import pytest_cases
 
-from probdiffeq import solution_routines, solvers, taylor, test_util
+from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -29,7 +29,7 @@ class _SolveAndSaveAtConfig(NamedTuple):
 def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
-        solver_fn=solvers.MLESolver,
+        solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
         strat_fn=filters.Filter,
         solver_config=solver_config,
@@ -43,7 +43,7 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
-        solver_fn=solvers.MLESolver,
+        solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.BlockDiagTS0.from_params,
         strat_fn=strat_fn,
         solver_config=solver_config,
@@ -54,7 +54,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 @pytest_cases.case
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-def case_setup_all_solvers(ode_problem, solver_fn, solver_config):
+def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=solver_fn,
@@ -86,7 +86,7 @@ def case_loop_eqx():
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
-        solver_fn=solvers.MLESolver,
+        solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.BlockDiagTS0.from_params,
         strat_fn=filters.Filter,
         solver_config=solver_config,
@@ -111,7 +111,7 @@ def fixture_solution_save_at(setup):
     t0, t1 = setup.ode_problem.t0, setup.ode_problem.t1
     save_at = setup.solver_config.grid_for_save_at_fn(t0, t1)
 
-    solution = solution_routines.solve_and_save_at(
+    solution = ivpsolve.solve_and_save_at(
         setup.ode_problem.vector_field,
         setup.ode_problem.initial_values,
         save_at=save_at,
@@ -144,7 +144,7 @@ def test_smoother_warning(ode_problem):
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with pytest.warns():
-        solution_routines.solve_and_save_at(
+        ivpsolve.solve_and_save_at(
             ode_problem.vector_field,
             ode_problem.initial_values,
             save_at=ts,
