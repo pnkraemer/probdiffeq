@@ -2,8 +2,7 @@
 
 import pytest_cases
 
-from probdiffeq import cubature
-from probdiffeq.implementations import recipes
+from probdiffeq.implementations import cubature, recipes
 
 
 @pytest_cases.case(id="IsoTS0")
