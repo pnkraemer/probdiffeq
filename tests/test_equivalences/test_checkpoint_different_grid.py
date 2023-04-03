@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest_cases
 
-from probdiffeq import dense_output, solution_routines, solvers
+from probdiffeq import solution, solution_routines, solvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -40,7 +40,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
         **kwargs
     )
     ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=k * len(smo_sol.t) // 2)
-    u, dense = dense_output.offgrid_marginals_searchsorted(
+    u, dense = solution.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=smo_sol, solver=solvers.DynamicSolver(strategy=smo)
     )
 
