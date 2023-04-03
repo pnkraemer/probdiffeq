@@ -84,7 +84,7 @@ class StateSpaceVar(abc.ABC):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
     @abc.abstractmethod
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def observe_qoi(self, observation_std):
         raise NotImplementedError
 
     @abc.abstractmethod

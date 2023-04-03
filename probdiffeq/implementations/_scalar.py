@@ -54,11 +54,13 @@ class StateSpaceVar(_collections.StateSpaceVar):
     def extract_qoi(self):
         return self.hidden_state.mean[..., 0]
 
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def observe_qoi(self, observation_std):
+        # what is this for? batched calls? If so, that seems wrong.
+        #  the scalar state should not worry about the context it is called in.
         if self.hidden_state.cov_sqrtm_lower.ndim > 2:
-            return jax.vmap(
-                StateSpaceVar.condition_on_qoi_observation, in_axes=(0, 0, None)
-            )(self, u, observation_std)
+            fn = StateSpaceVar.observe_qoi
+            fn_vmap = jax.vmap(fn, in_axes=(0, None), out_axes=(0, 0))
+            return fn_vmap(self, observation_std)
 
         hc = self.hidden_state.cov_sqrtm_lower[0]
         m_obs = self.hidden_state.mean[0]
@@ -72,11 +74,41 @@ class StateSpaceVar(_collections.StateSpaceVar):
         r_obs = jnp.reshape(r_obs_mat, ())
         gain = jnp.reshape(gain_mat, (-1,))
 
-        m_cor = self.hidden_state.mean - gain * (m_obs - u)
+        m_cor = self.hidden_state.mean - gain * m_obs
 
         obs = ScalarNormal(m_obs, r_obs.T)
         cor = Normal(m_cor, r_cor.T)
-        return obs, (StateSpaceVar(cor), gain)
+        return obs, Conditional(gain, cor)
+
+    # def condition_on_qoi_observation(self, u, /, observation_std):
+    #
+    #     # what is this for? batched calls?
+    #     if self.hidden_state.cov_sqrtm_lower.ndim > 2:
+    #         fn = StateSpaceVar.condition_on_qoi_observation
+    #         fn_vmap = jax.vmap(fn, in_axes=(0, 0, None))
+    #         return fn_vmap(self, u, observation_std)
+    #
+    #     obs, cond_cor = self.observe_qoi(observation_std=observation_std)
+    #     cor = cond_cor(u)
+    #     return obs, (cor, cond_cor)
+    #
+    #     hc = self.hidden_state.cov_sqrtm_lower[0]
+    #     m_obs = self.hidden_state.mean[0]
+    #
+    #     r_yx = observation_std  # * jnp.eye(1)
+    #     r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional(
+    #         R_X=self.hidden_state.cov_sqrtm_lower.T,
+    #         R_X_F=hc[:, None],
+    #         R_YX=r_yx[None, None],
+    #     )
+    #     r_obs = jnp.reshape(r_obs_mat, ())
+    #     gain = jnp.reshape(gain_mat, (-1,))
+    #
+    #     m_cor = self.hidden_state.mean - gain * (m_obs - u)
+    #
+    #     obs = ScalarNormal(m_obs, r_obs.T)
+    #     cor = Normal(m_cor, r_cor.T)
+    #     return obs, (StateSpaceVar(cor), gain)
 
     def extract_qoi_from_sample(self, u, /):
         if u.ndim == 1:

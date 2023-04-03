@@ -8,6 +8,18 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _sqrtm
 
 
+class DenseConditional:
+    def __init__(self, H, noise, target_shape):
+        self.H = H
+        self.noise = noise
+        self.target_shape = target_shape
+
+    def __call__(self, u, /):
+        mean = self.H @ u + self.noise.mean
+        rv = DenseNormal(mean, self.noise.cov_sqrtm_lower)
+        return DenseStateSpaceVar(rv, target_shape=self.target_shape)
+
+
 @jax.tree_util.register_pytree_node_class
 class DenseStateSpaceVar(_collections.StateSpaceVar):
     def __init__(self, hidden_state, *, target_shape):
@@ -28,21 +40,37 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def observe_qoi(self, observation_std):
         hc = self._select_derivative_vect(self.hidden_state.cov_sqrtm_lower, 0)
         m_obs = self._select_derivative(self.hidden_state.mean, 0)
 
-        r_yx = observation_std * jnp.eye(u.shape[0])
+        r_yx = observation_std * jnp.eye(self.target_shape[1])
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
-        m_cor = self.hidden_state.mean - gain @ (m_obs - u)
-
+        m_cor = self.hidden_state.mean - gain @ m_obs
         obs = DenseNormal(m_obs, r_obs.T)
-        cor = DenseStateSpaceVar(
-            DenseNormal(m_cor, r_cor.T), target_shape=self.target_shape
-        )
-        return obs, (cor, gain)
+
+        noise = DenseNormal(m_cor, r_cor.T)
+        cor = DenseConditional(gain, noise=noise, target_shape=self.target_shape)
+        return obs, cor
+
+    #
+    # def condition_on_qoi_observation(self, u, /, observation_std):
+    #     hc = self._select_derivative_vect(self.hidden_state.cov_sqrtm_lower, 0)
+    #     m_obs = self._select_derivative(self.hidden_state.mean, 0)
+    #
+    #     r_yx = observation_std * jnp.eye(u.shape[0])
+    #     r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
+    #         R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
+    #     )
+    #     m_cor = self.hidden_state.mean - gain @ (m_obs - u)
+    #
+    #     obs = DenseNormal(m_obs, r_obs.T)
+    #     cor = DenseStateSpaceVar(
+    #         DenseNormal(m_cor, r_cor.T), target_shape=self.target_shape
+    #     )
+    #     return obs, (cor, gain)
 
     def extract_qoi(self):
         if self.hidden_state.mean.ndim == 1:

@@ -6,9 +6,20 @@ import jax.numpy as jnp
 from probdiffeq.implementations import _collections, _sqrtm
 
 
+class IsoConditional:
+    def __init__(self, H, noise):
+        self.H = H
+        self.noise = noise
+
+    def __call__(self, u, /):
+        m = self.H * u[None, :] + self.noise.mean
+        rv = IsoNormal(mean=m, cov_sqrtm_lower=self.noise.cov_sqrtm_lower)
+        return IsoStateSpaceVar(rv)
+
+
 @jax.tree_util.register_pytree_node_class
 class IsoStateSpaceVar(_collections.StateSpaceVar):
-    def condition_on_qoi_observation(self, u, /, observation_std):
+    def observe_qoi(self, observation_std):
         hc = self.hidden_state.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.hidden_state.mean[0, ...]
 
@@ -16,10 +27,17 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
-        m_cor = self.hidden_state.mean - gain * (m_obs - u)[None, :]
+        m_cor = self.hidden_state.mean - gain * m_obs[None, :]
 
-        ssv = IsoStateSpaceVar(IsoNormal(m_cor, r_cor.T))
-        return IsoNormal(m_obs, r_obs.T), (ssv, gain)
+        obs = IsoNormal(m_obs, r_obs.T)
+        cond = IsoConditional(gain, noise=IsoNormal(m_cor, r_cor.T))
+        return obs, cond
+
+    #
+    # def condition_on_qoi_observation(self, u, /, observation_std):
+    #     obs, cor_cond = self.observe_qoi(observation_std=observation_std)
+    #     cor = cor_cond(u)
+    #     return obs, (IsoStateSpaceVar(cor), cor_cond)
 
     def extract_qoi(self) -> jax.Array:
         return self.hidden_state.mean[..., 0, :]

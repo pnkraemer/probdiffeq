@@ -1,4 +1,8 @@
-"""Interact with estimated initial value problem (IVP) solutions on dense grids."""
+"""Interact with estimated solutions (on dense grids).
+
+For example, this module contains functionality to compute off-grid marginals,
+or to evaluate marginal likelihoods of observations of the solutions.
+"""
 
 from typing import Any, Generic, NamedTuple, TypeVar
 
@@ -101,6 +105,8 @@ class Solution(Generic[RVTypeVar]):
             yield self[i]
 
 
+# todo: this function is a bit of a meaningless wrapper.
+#  Either document its use-case or remove.
 def sample(key, *, solution, solver, shape=()):
     return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
@@ -142,7 +148,6 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
     return marginals_vmap(solution_left, ts, solution_right)
 
 
-# todo: either document or remove from public API
 def _offgrid_marginals(*, solution, t, solution_previous, solver):
     return solver.strategy.offgrid_marginals(
         marginals=solution.marginals,
@@ -152,12 +157,6 @@ def _offgrid_marginals(*, solution, t, solution_previous, solver):
         t1=solution.t,
         scale_sqrtm=solution.output_scale_sqrtm,
     )
-
-
-class _NMLLState(NamedTuple):
-    rv: Any
-    num_data: int
-    nmll: float
 
 
 def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
@@ -191,14 +190,20 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
+    # todo: replace with strategy.extract_terminal_values(posterior)
     if isinstance(solution.posterior, smoothers.MarkovSequence):
         terminal_value = solution.posterior.init
     else:
         terminal_value = solution.posterior
-    obs, (cor, _) = terminal_value.condition_on_qoi_observation(
-        u, observation_std=observation_std
-    )
+
+    obs, _ = terminal_value.observe_qoi(observation_std=observation_std)
     return jnp.sum(obs.logpdf(u))
+
+
+class _NMLLState(NamedTuple):
+    rv: Any
+    num_data: int
+    nmll: float
 
 
 def log_marginal_likelihood(*, observation_std, u, solution):

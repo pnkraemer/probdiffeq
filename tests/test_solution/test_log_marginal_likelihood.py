@@ -11,8 +11,20 @@ from probdiffeq.strategies import filters, smoothers
 
 @pytest_cases.fixture(scope="session", name="solution_save_at")
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-def fixture_solution_save_at(ode_problem):
-    solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
+@pytest_cases.parametrize(
+    "impl_fn",
+    [
+        # recipes.IsoTS0.from_params,
+        # recipes.BlockDiagTS0.from_params,
+        recipes.DenseTS0.from_params,
+    ],
+)
+def fixture_solution_save_at(ode_problem, impl_fn):
+    solver = test_util.generate_solver(
+        strategy_factory=smoothers.FixedPointSmoother,
+        impl_factory=impl_fn,
+        ode_shape=ode_problem.initial_values[0].shape,
+    )
 
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=4)
     sol = ivpsolve.solve_and_save_at(
