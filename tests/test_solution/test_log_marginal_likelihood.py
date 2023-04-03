@@ -27,12 +27,12 @@ def fixture_solution_save_at(ode_problem):
     return sol, solver
 
 
-def test_negative_marginal_log_likelihood(solution_save_at):
+def test_log_marginal_likelihood(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
-    mll = solution.negative_marginal_log_likelihood(
+    mll = solution.log_marginal_likelihood(
         observation_std=jnp.ones((k,)), u=data, solution=sol
     )
     assert mll.shape == ()
@@ -40,54 +40,54 @@ def test_negative_marginal_log_likelihood(solution_save_at):
     assert not jnp.isinf(mll)
 
 
-def test_negative_marginal_log_likelihood_error_for_wrong_std_shape_1(solution_save_at):
+def test_log_marginal_likelihood_error_for_wrong_std_shape_1(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = solution.negative_marginal_log_likelihood(
+        _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones((k + 1,)), u=data, solution=sol
         )
 
 
-def test_negative_marginal_log_likelihood_error_for_wrong_std_shape_2(solution_save_at):
+def test_log_marginal_likelihood_error_for_wrong_std_shape_2(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = solution.negative_marginal_log_likelihood(
+        _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones((k, 1)), u=data, solution=sol
         )
 
 
-def test_negative_marginal_log_likelihood_error_for_wrong_u_shape_1(solution_save_at):
+def test_log_marginal_likelihood_error_for_wrong_u_shape_1(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = solution.negative_marginal_log_likelihood(
+        _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones((k,)), u=data[..., None], solution=sol
         )
 
 
-def test_negative_marginal_log_likelihood_error_for_terminal_values(solution_save_at):
+def test_log_marginal_likelihood_error_for_terminal_values(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
     with pytest.raises(ValueError, match="expected"):
-        _ = solution.negative_marginal_log_likelihood(
+        _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones_like(data[-1]), u=data[-1], solution=sol[-1]
         )
 
 
-def test_negative_marginal_log_likelihood_terminal_values(solution_save_at):
+def test_log_marginal_likelihood_terminal_values(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
-    mll = solution.negative_marginal_log_likelihood_terminal_values(
+    mll = solution.log_marginal_likelihood_terminal_values(
         observation_std=jnp.ones(()), u=data[-1], solution=sol[-1]
     )
     assert mll.shape == ()
@@ -95,24 +95,24 @@ def test_negative_marginal_log_likelihood_terminal_values(solution_save_at):
     assert not jnp.isinf(mll)
 
 
-def test_negative_marginal_log_likelihood_terminal_values_error_for_wrong_shapes(
+def test_log_marginal_likelihood_terminal_values_error_for_wrong_shapes(
     solution_save_at,
 ):
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
     with pytest.raises(ValueError, match="expected"):
-        _ = solution.negative_marginal_log_likelihood_terminal_values(
+        _ = solution.log_marginal_likelihood_terminal_values(
             observation_std=jnp.ones((1,)), u=data[-1], solution=sol[-1]
         )
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = solution.negative_marginal_log_likelihood_terminal_values(
+        _ = solution.log_marginal_likelihood_terminal_values(
             observation_std=jnp.ones(()), u=data[-1, None], solution=sol[-1]
         )
 
     with pytest.raises(ValueError, match="expected"):
-        _ = solution.negative_marginal_log_likelihood_terminal_values(
+        _ = solution.log_marginal_likelihood_terminal_values(
             observation_std=jnp.ones(()), u=data[-1:], solution=sol[-1:]
         )
 
@@ -133,7 +133,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
         solver=solver,
     )
     data = sol.u + 0.1
-    mll = solution.negative_marginal_log_likelihood_terminal_values(
+    mll = solution.log_marginal_likelihood_terminal_values(
         observation_std=1e-2, u=data, solution=sol
     )
     assert mll.shape == ()
@@ -159,6 +159,4 @@ def test_nmll_raises_error_for_filter(ode_problem):
     data = sol.u + 0.1
     std = jnp.ones((sol.u.shape[0],))  # values irrelevant
     with pytest.raises(TypeError, match="ilter"):
-        _ = solution.negative_marginal_log_likelihood(
-            observation_std=std, u=data, solution=sol
-        )
+        _ = solution.log_marginal_likelihood(observation_std=std, u=data, solution=sol)
