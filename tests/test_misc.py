@@ -11,6 +11,13 @@ from probdiffeq import test_util
 @pytest_cases.parametrize("incr", [1, -1])
 @pytest_cases.parametrize("n", [2])
 def test_incorrect_number_of_taylor_coefficients_init(incr, n):
+    """Assert that a specific ValueError is raised.
+
+    Specifically:
+    A ValueError must be raised if the number of Taylor coefficients
+    passed to *IBM.init_hidden_state() does not match the `num_derivatives`
+    attribute of the extrapolation model.
+    """
     solver = test_util.generate_solver(num_derivatives=n)
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
 

@@ -26,8 +26,8 @@ class _SimulateTerminalValuesConfig(NamedTuple):
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-@pytest_cases.parametrize_with_cases("impl_fn", cases=".impl_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
 def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -40,7 +40,7 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize(
     "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
 )
@@ -56,8 +56,8 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases=".solver_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@pytest_cases.parametrize_with_cases("solver_fn", cases="..solver_cases")
 def case_setup_all_solvers(ode_problem, solver_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -85,8 +85,8 @@ def case_loop_eqx():
 
 
 @pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
-@pytest_cases.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@pytest_cases.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -103,7 +103,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 
 @pytest_cases.fixture(scope="session", name="solution_terminal_values")
 @pytest_cases.parametrize_with_cases(
-    "setup", cases=".", prefix="case_setup_", scope="session"
+    "setup", cases="..", prefix="case_setup_", scope="session"
 )
 def fixture_solution_terminal_values(setup):
     ode_shape = setup.ode_problem.initial_values[0].shape
@@ -145,7 +145,7 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
     assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases=".problem_cases")
+@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_jvp(ode_problem, solver_config):
     ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
