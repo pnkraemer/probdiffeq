@@ -6,67 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _sqrtm, cubature
-from probdiffeq.implementations.dense import _vars
-
-# todo:
-#  statistical linear regression (zeroth order)
-#  statistical linear regression (cov-free)
-#  statistical linear regression (Jacobian)
-#  statistical linear regression (Bayesian cubature)
-
-
-def linearise_ts0(*, fn, m):
-    """Linearise a function with a zeroth-order Taylor series."""
-    return fn(m)
-
-
-def linearise_ts1(*, fn, m):
-    """Linearise a function with a first-order Taylor series."""
-    b, jvp_fn = jax.linearize(fn, m)
-    return jvp_fn, (b,)
-
-
-def linearise_slr1(*, fn, x, cubature_rule):
-    """Linearise a function with first-order statistical linear regression."""
-    # Create sigma-points
-    pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
-    pts = x.mean[None, :] + pts_centered
-    pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
-
-    # Evaluate the nonlinear function
-    fx = jax.vmap(fn)(pts)
-    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
-    fx_centered = fx - fx_mean[None, :]
-    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-
-    # Compute statistical linear regression matrices
-    _, (cov_sqrtm_cond, linop_cond) = _sqrtm.revert_conditional_noisefree(
-        R_X_F=pts_centered_normed, R_X=fx_centered_normed
-    )
-    mean_cond = fx_mean - linop_cond @ x.mean
-    return linop_cond, _vars.DenseNormal(mean_cond, cov_sqrtm_cond.T)
-
-
-def linearise_slr0(*, fn, x, cubature_rule):
-    """Linearise a function with zeroth-order statistical linear regression.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-    # Create sigma-points
-    pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
-    pts = x.mean[None, :] + pts_centered
-
-    # Evaluate the nonlinear function
-    fx = jax.vmap(fn)(pts)
-    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
-    fx_centered = fx - fx_mean[None, :]
-    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-    return _vars.DenseNormal(fx_mean, fx_centered_normed.T)
+from probdiffeq.implementations.dense import _vars, linearise
 
 
 @jax.tree_util.register_pytree_node_class
@@ -77,7 +17,7 @@ class DenseTaylorZerothOrder(_collections.AbstractCorrection):
         self.ode_shape = ode_shape
 
         # Turn this into an argument if other linearisation functions apply
-        self.linearise_fn = linearise_ts0
+        self.linearise_fn = linearise.ts0
 
         # Selection matrices
         fn, fn_vect = _select_derivative, _select_derivative_vect
@@ -171,7 +111,7 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
             return x1 - fx0
 
         # Linearise the ODE residual (not the vector field!)
-        jvp_fn, (b,) = linearise_ts1(fn=ode_residual, m=x.hidden_state.mean)
+        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=x.hidden_state.mean)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
@@ -252,7 +192,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
     ):
         cubature_rule = cubature_rule_fn(input_shape=ode_shape)
-        linearise_fn = functools.partial(linearise_slr0, cubature_rule=cubature_rule)
+        linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
         return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
@@ -360,7 +300,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
     ):
         cubature_rule = cubature_rule_fn(input_shape=ode_shape)
-        linearise_fn = functools.partial(linearise_slr1, cubature_rule=cubature_rule)
+        linearise_fn = functools.partial(linearise.slr1, cubature_rule=cubature_rule)
         return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
