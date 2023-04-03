@@ -168,15 +168,12 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     def __call__(self, x, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def scale_covariance(self, scale_sqrtm):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def merge_with_incoming_conditional(self, incoming, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def marginalise(self, rv, /):
         raise NotImplementedError
 

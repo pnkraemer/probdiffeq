@@ -254,7 +254,8 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         )
 
     def init_fn(rv, obs_std, data):
-        obs, (cor, _) = rv.condition_on_qoi_observation(data, observation_std=obs_std)
+        obs, cond_cor = rv.observe_qoi(observation_std=obs_std)
+        cor = cond_cor(data)
         nmll_new = jnp.sum(obs.logpdf(data))
         return _NMLLState(cor, 1.0, nmll_new)
 
@@ -267,9 +268,8 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         rv_ext = bw_model.marginalise(rv)
 
         # Correct (with an alias for long function names)
-        obs, (cor, _) = rv_ext.condition_on_qoi_observation(
-            data, observation_std=obs_std
-        )
+        obs, cond_cor = rv_ext.observe_qoi(observation_std=obs_std)
+        cor = cond_cor(data)
 
         # Compute marginal log likelihood (with an alias for long function names)
         nmll_new = jnp.sum(obs.logpdf(data))

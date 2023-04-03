@@ -131,7 +131,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.IsoConditional(g_bw, noise=backward_noise)
+        bw_model = _vars.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoStateSpaceVar(extrapolated), bw_model
 
@@ -139,7 +139,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _vars.IsoConditional(op, noise=noi)
+        return _vars.IsoConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         return jnp.eye(*self.a.shape)

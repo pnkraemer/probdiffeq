@@ -376,6 +376,7 @@ class Conditional(_collections.AbstractConditional):
         if self.transition.ndim > 2:
             return jax.vmap(Conditional.__call__)(self, x)
 
+        print(self.transition.shape, x.shape)
         m = self.transition @ x + self.noise.mean
         return StateSpaceVar(Normal(m, self.noise.cov_sqrtm_lower))
 

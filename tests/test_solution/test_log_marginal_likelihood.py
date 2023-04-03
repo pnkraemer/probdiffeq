@@ -14,16 +14,20 @@ from probdiffeq.strategies import filters, smoothers
 @pytest_cases.parametrize(
     "impl_fn",
     [
-        # recipes.IsoTS0.from_params,
-        # recipes.BlockDiagTS0.from_params,
+        lambda num_derivatives, **kwargs: recipes.IsoTS0.from_params(
+            num_derivatives=num_derivatives
+        ),
+        recipes.BlockDiagTS0.from_params,
         recipes.DenseTS0.from_params,
     ],
+    ids=["Iso", "BD", "Den"],
 )
 def fixture_solution_save_at(ode_problem, impl_fn):
     solver = test_util.generate_solver(
         strategy_factory=smoothers.FixedPointSmoother,
         impl_factory=impl_fn,
         ode_shape=ode_problem.initial_values[0].shape,
+        num_derivatives=2,
     )
 
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=4)

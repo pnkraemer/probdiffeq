@@ -16,17 +16,12 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
-        m_cor = self.hidden_state.mean - gain * m_obs[None, :]
+        gain = jnp.reshape(gain, (-1,))
+        m_cor = self.hidden_state.mean - gain[:, None] * m_obs[None, :]
 
         obs = IsoNormal(m_obs, r_obs.T)
-        cond = IsoConditional(gain, noise=IsoNormal(m_cor, r_cor.T))
+        cond = IsoConditionalQOI(gain, noise=IsoNormal(m_cor, r_cor.T))
         return obs, cond
-
-    #
-    # def condition_on_qoi_observation(self, u, /, observation_std):
-    #     obs, cor_cond = self.observe_qoi(observation_std=observation_std)
-    #     cor = cor_cond(u)
-    #     return obs, (IsoStateSpaceVar(cor), cor_cond)
 
     def extract_qoi(self) -> jax.Array:
         return self.hidden_state.mean[..., 0, :]
@@ -89,7 +84,7 @@ class IsoNormal(_collections.AbstractNormal):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditional(_collections.AbstractConditional):
+class _IsoConditional(_collections.AbstractConditional):
     def __init__(self, transition, noise):
         self.transition = transition
         self.noise = noise
@@ -108,13 +103,13 @@ class IsoConditional(_collections.AbstractConditional):
         transition, noise = children
         return cls(transition=transition, noise=noise)
 
+
+@jax.tree_util.register_pytree_node_class
+class IsoConditionalHiddenState(_IsoConditional):
+    # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         return IsoStateSpaceVar(IsoNormal(m, self.noise.cov_sqrtm_lower))
-
-    def scale_covariance(self, scale_sqrtm):
-        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return IsoConditional(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -128,7 +123,7 @@ class IsoConditional(_collections.AbstractConditional):
         Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
         noise = IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
-        bw_model = IsoConditional(g, noise=noise)
+        bw_model = IsoConditionalHiddenState(g, noise=noise)
         return bw_model
 
     def marginalise(self, rv: IsoStateSpaceVar, /) -> IsoStateSpaceVar:
@@ -144,3 +139,16 @@ class IsoConditional(_collections.AbstractConditional):
         ).T
 
         return IsoStateSpaceVar(IsoNormal(mean=m_new, cov_sqrtm_lower=l_new))
+
+    def scale_covariance(self, scale_sqrtm):
+        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return IsoConditionalHiddenState(transition=self.transition, noise=noise)
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoConditionalQOI(_IsoConditional):
+    # Conditional between hidden state and QOI
+    def __call__(self, x, /):
+        mv = self.transition[:, None] * x[None, :]
+        m = mv + self.noise.mean
+        return IsoStateSpaceVar(IsoNormal(m, self.noise.cov_sqrtm_lower))
