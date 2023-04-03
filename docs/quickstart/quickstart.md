@@ -4,7 +4,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -25,11 +25,11 @@ t0, t1 = 0.0, 1.0
 #     MLESolver: Calibrate unknown parameters with (quasi-)maximum-likelihood estimation
 implementation = recipes.DenseTS1.from_params(ode_shape=(1,))
 strategy = smoothers.Smoother(implementation)
-solver = solvers.MLESolver(strategy)
+solver = ivpsolvers.MLESolver(strategy)
 
 
 # Solve
-solution = solution_routines.solve_with_python_while_loop(
+solution = ivpsolve.solve_with_python_while_loop(
     vector_field, initial_values=(u0,), t0=t0, t1=t1, solver=solver, parameters=0.5
 )
 

@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
@@ -50,14 +50,14 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ts0_1 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
+ts0_1 = ivpsolvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
 ```python
 %%time
 
-solution = solution_routines.solve_and_save_at(
+solution = ivpsolve.solve_and_save_at(
     vf_1,
     initial_values=(u0,),
     save_at=ts,
@@ -80,7 +80,7 @@ In fact, above, we used the following solver:
 
 ```python
 implementation = recipes.IsoTS0.from_params(ode_order=1, num_derivatives=4)
-ts0_1_granular = solvers.MLESolver(filters.Filter(implementation))
+ts0_1_granular = ivpsolvers.MLESolver(filters.Filter(implementation))
 assert ts0_1_granular == ts0_1
 ```
 
@@ -97,14 +97,14 @@ def vf_2(y, dy, t, p):
 
 # One derivative more than above because we don't transform to first order
 implementation = recipes.IsoTS0.from_params(ode_order=2, num_derivatives=5)
-ts0_2 = solvers.MLESolver(filters.Filter(implementation))
+ts0_2 = ivpsolvers.MLESolver(filters.Filter(implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
 ```python
 %%time
 
-solution = solution_routines.solve_and_save_at(
+solution = ivpsolve.solve_and_save_at(
     vf_2,
     initial_values=(u0, du0),
     save_at=ts,

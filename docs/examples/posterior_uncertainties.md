@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import solution, solution_routines, solvers
+from probdiffeq import ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -54,14 +54,14 @@ def vf(*ys, t, p):
 ## Filter
 
 ```python
-ts0 = solvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
+ts0 = ivpsolvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
 # %#%time
 
-sol = solution_routines.solve_and_save_at(
+sol = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),
     save_at=ts,
@@ -112,14 +112,14 @@ plt.show()
 ## Smoother
 
 ```python
-ts0 = solvers.MLESolver(smoothers.FixedPointSmoother(recipes.IsoTS0.from_params()))
+ts0 = ivpsolvers.MLESolver(smoothers.FixedPointSmoother(recipes.IsoTS0.from_params()))
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
 # %#%time
 
-sol = solution_routines.solve_and_save_at(
+sol = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),
     save_at=ts,

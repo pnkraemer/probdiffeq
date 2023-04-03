@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import jax.test_util
 import pytest_cases
 
-from probdiffeq import solution_routines, test_util
+from probdiffeq import ivpsolve, test_util
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -31,7 +31,7 @@ def fixture_solution_fixed_grid(
     t0, t1 = ode_problem.t0, ode_problem.t1
     grid = solver_config.grid_for_fixed_grid_fn(t0, t1)
 
-    solution = solution_routines.solve_fixed_grid(
+    solution = ivpsolve.solve_fixed_grid(
         ode_problem.vector_field,
         ode_problem.initial_values,
         grid=grid,
@@ -72,7 +72,7 @@ def fixture_parameter_to_solution(
         t0, t1 = ode_problem.t0, ode_problem.t1
         grid = solver_config.grid_for_fixed_grid_fn(t0, t1)
 
-        solution = solution_routines.solve_fixed_grid(
+        solution = ivpsolve.solve_fixed_grid(
             ode_problem.vector_field,
             u0,
             grid=grid,

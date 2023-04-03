@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 import pytest_cases
 
-from probdiffeq import solution_routines, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -41,23 +41,23 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \
      the results should be identical."""
-    smo_sol = solution_routines.solve_with_python_while_loop(
+    smo_sol = ivpsolve.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
         t0=ode_problem.t0,
         t1=ode_problem.t1,
         parameters=ode_problem.args,
-        solver=solvers.DynamicSolver(strategy=smo),
+        solver=ivpsolvers.DynamicSolver(strategy=smo),
         atol=1e-2 * tol,
         rtol=tol,
     )
 
-    fp_smo_sol = solution_routines.solve_and_save_at(
+    fp_smo_sol = ivpsolve.solve_and_save_at(
         ode_problem.vector_field,
         ode_problem.initial_values,
         save_at=smo_sol.t,
         parameters=ode_problem.args,
-        solver=solvers.DynamicSolver(strategy=fp_smo),
+        solver=ivpsolvers.DynamicSolver(strategy=fp_smo),
         atol=1e-2 * tol,
         rtol=tol,
     )
