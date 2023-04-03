@@ -14,7 +14,7 @@ from probdiffeq.strategies import filters, smoothers
 @pytest_cases.fixture(scope="session", name="solution_fixed_grid")
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..solver_cases")
+@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 @pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
 def fixture_solution_fixed_grid(
     ode_problem, solver_fn, impl_fn, strat_fn, solver_config
@@ -52,7 +52,7 @@ def test_terminal_values_correct(solution_fixed_grid, solver_config):
 @pytest_cases.fixture(scope="session", name="parameter_to_solution")
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
 @pytest_cases.parametrize("impl_fn", [recipes.BlockDiagTS0.from_params])
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..solver_cases")
+@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 @pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
 def fixture_parameter_to_solution(
     ode_problem, solver_config, impl_fn, solver_fn, strat_fn

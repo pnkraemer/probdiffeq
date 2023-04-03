@@ -57,7 +57,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 
 @pytest_cases.case
 @pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..solver_cases")
+@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 def case_setup_all_solvers(ode_problem, solver_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
