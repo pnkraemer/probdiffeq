@@ -122,3 +122,5 @@ nav:
           - "benchmarks/stiff_van_der_pol/external.ipynb"
         - High irradiance response (HIRES):
           - "benchmarks/hires/external.ipynb"
+    - Miscellaneous:
+      - Changelog: "CHANGELOG.md"
