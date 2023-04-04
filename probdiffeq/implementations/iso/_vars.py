@@ -3,7 +3,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _sqrtm
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.iso import _conds
 
 
@@ -16,7 +17,7 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         r_x_f = hc.T
         r_x = self.hidden_state.cov_sqrtm_lower.T
         r_yx = observation_std * jnp.ones((1, 1))
-        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
+        r_obs, (r_cor, gain) = _sqrt_util.revert_conditional(
             R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
         )
         r_obs = jnp.reshape(r_obs, ())
@@ -52,7 +53,7 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         mean = self.hidden_state.mean[n, :]
         cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
         R = cov_sqrtm_lower_nonsquare[:, None]
-        cov_sqrtm_lower_square = _sqrtm.sqrtm_to_upper_triangular(R=R)
+        cov_sqrtm_lower_square = _sqrt_util.sqrtm_to_upper_triangular(R=R)
         cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
         return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 

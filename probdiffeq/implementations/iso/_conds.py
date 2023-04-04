@@ -2,7 +2,8 @@
 
 import jax
 
-from probdiffeq.implementations import _collections, _sqrtm
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.iso import _vars
 
 
@@ -38,14 +39,16 @@ class IsoConditionalHiddenState(_IsoConditional):
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
-        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
 
         C = incoming.transition
         (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
 
         g = A @ C
         xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
+        Xi = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
+        ).T
 
         noise = _vars.IsoNormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
         bw_model = IsoConditionalHiddenState(g, noise=noise)
@@ -59,7 +62,7 @@ class IsoConditionalHiddenState(_IsoConditional):
 
         # Apply transition
         m_new = self.transition @ m0 + self.noise.mean
-        l_new = _sqrtm.sum_of_sqrtm_factors(
+        l_new = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 

@@ -5,7 +5,8 @@ from typing import Any, Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections, _ibm_util
 from probdiffeq.implementations.iso import _conds, _vars
 
 
@@ -105,8 +106,11 @@ class IsoIBM(_collections.AbstractExtrapolation):
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
-        l_ext_p = _sqrtm.sum_of_sqrtm_factors(
-            R_stack=((self.a @ l0_p).T, (output_scale_sqrtm * self.q_sqrtm_lower).T)
+        l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=(
+                (self.a @ l0_p).T,
+                (output_scale_sqrtm * self.q_sqrtm_lower).T,
+            )
         ).T
         l_ext = p[:, None] * l_ext_p
         return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m_ext, l_ext))
@@ -116,7 +120,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
-        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
             R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,
