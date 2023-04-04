@@ -139,7 +139,6 @@ class _IntegralCommon(AbstractControl):
         scale_factor = jnp.maximum(
             self.factor_min, jnp.minimum(scale_factor_unclipped, self.factor_max)
         )
-        print("error small:", error_normalised < 1, "scale_factor", scale_factor)
 
         return scale_factor * dt_previous, ()
 
