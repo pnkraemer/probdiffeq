@@ -18,32 +18,13 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
         l_obs_square = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
         l_obs = jnp.reshape(l_obs_square, ())
-        # jnp.sqrt(\|res_white\|^2 / d) without forming the square
-        print(bias)
 
-        output_scale_sqrtm_ss = _sqrtm.sqrtm_to_upper_triangular(
-            R=bias[:, None]
-        ) / jnp.sqrt(bias.size)
-
-        output_scale_sqrtm_s = jnp.reshape(jnp.abs(output_scale_sqrtm_ss), ())
-        output_scale_sqrtm = jnp.abs(jnp.reshape(output_scale_sqrtm_s / l_obs, ()))
-
-        # scale * error is 1e25 * 1e-25, which is meeega unstable
-        #
-        print(
-            "Next: why does the f32 test pass for disable_jit() "
-            "and fail for standard solve? "
-            "Can we simplify the error-output-scale expression even further?"
-            "Or is there some issue in the propose_step method?"
+        output_scale_sqrtm_ss = _sqrtm.sqrtm_to_upper_triangular(R=bias[:, None])
+        output_scale_sqrtm_s = jnp.reshape(
+            output_scale_sqrtm_ss / jnp.sqrt(bias.size), ()
         )
-        error_estimate = jnp.abs(l_obs)
-        print(
-            output_scale_sqrtm,
-            error_estimate,
-            output_scale_sqrtm * error_estimate,
-            output_scale_sqrtm_s,
-        )
-        print()
+        output_scale_sqrtm = jnp.reshape(output_scale_sqrtm_s / l_obs, ())
+
         return output_scale_sqrtm_s, output_scale_sqrtm, (bias,)
 
     def complete_correction(
