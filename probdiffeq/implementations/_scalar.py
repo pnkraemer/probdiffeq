@@ -34,10 +34,11 @@ class NormalQOI(_collections.AbstractNormal):
         return NormalQOI(self.mean, scale_sqrtm * self.cov_sqrtm_lower)
 
     def logpdf(self, u, /):
-        x1 = self.marginal_stds() ** 2  # logdet
-        x2 = self.mahalanobis_norm(u) ** 2
+        x1 = self.marginal_stds()  # logdet
+        x2 = self.mahalanobis_norm(u)
         x3 = u.size * jnp.log(jnp.pi * 2)
-        return -0.5 * (x1 + x2 + x3)
+        sum = _sqrt_util.sqrt_sum_square(x1, x2, jnp.sqrt(x3))
+        return -0.5 * jnp.square(sum)
 
     def marginal_stds(self):
         return jnp.abs(self.cov_sqrtm_lower)

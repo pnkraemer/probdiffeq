@@ -138,7 +138,7 @@ def sqrtm_to_upper_triangular(*, R):
     return upper_sqrtm
 
 
-def sqrt_sum_square(*args):
+def sqrt_sum_square(*args):  # logsumexp but for squares
     stack = jnp.stack(args)
     sqrt_mat = sqrtm_to_upper_triangular(R=stack[:, None])
     sqrt_mat_abs = jnp.abs(sqrt_mat)  # convention

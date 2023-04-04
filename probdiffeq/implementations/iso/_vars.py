@@ -81,10 +81,11 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
 @jax.tree_util.register_pytree_node_class
 class IsoNormalQOI(_collections.AbstractNormal):
     def logpdf(self, u, /) -> jax.Array:
-        x1 = self.mahalanobis_norm(u) ** 2
-        x2 = self.cov_sqrtm_lower**2  # logdet
+        x1 = self.mahalanobis_norm(u)
+        x2 = self.cov_sqrtm_lower  # logdet
         x3 = self.mean.size * jnp.log(jnp.pi * 2)
-        return -0.5 * (x1 + x2 + x3)
+        sum = _sqrt_util.sqrt_sum_square(x1, x2, jnp.sqrt(x3))
+        return -0.5 * jnp.square(sum)
 
     def mahalanobis_norm(self, u, /) -> jax.Array:
         r"""Compute \|x - m\|_{C^{-1}}."""

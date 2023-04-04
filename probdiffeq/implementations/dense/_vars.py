@@ -102,10 +102,11 @@ class DenseNormal(_collections.AbstractNormal):
     """
 
     def logpdf(self, u, /):
-        x1 = self.mahalanobis_norm(u) ** 2
-        x2 = jnp.linalg.slogdet(self.cov_sqrtm_lower)[1] ** 2
+        x1 = self.mahalanobis_norm(u)
+        x2 = jnp.linalg.slogdet(self.cov_sqrtm_lower)[1]
         x3 = u.size * jnp.log(jnp.pi * 2)
-        return -0.5 * (x1 + x2 + x3)
+        sum = _sqrt_util.sqrt_sum_square(x1, x2, jnp.sqrt(x3))
+        return -0.5 * jnp.square(sum)
 
     def mahalanobis_norm(self, u, /):
         res_white = self.residual_white(u)
