@@ -13,13 +13,16 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         hc = self.hidden_state.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.hidden_state.mean[0, ...]
 
+        r_x_f = hc.T
+        r_x = self.hidden_state.cov_sqrtm_lower.T
         r_yx = observation_std * jnp.ones((1, 1))
         r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
-            R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
+            R_X_F=r_x_f, R_X=r_x, R_YX=r_yx
         )
+        r_obs = jnp.reshape(r_obs, ())
         gain = jnp.reshape(gain, (-1,))
-        m_cor = self.hidden_state.mean - gain[:, None] * m_obs[None, :]
 
+        m_cor = self.hidden_state.mean - gain[:, None] * m_obs[None, :]
         obs = IsoNormalQOI(m_obs, r_obs.T)
         cor = IsoNormalHiddenState(m_cor, r_cor.T)
         cond = _conds.IsoConditionalQOI(gain, noise=cor)
