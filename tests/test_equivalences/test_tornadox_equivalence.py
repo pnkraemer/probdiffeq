@@ -3,25 +3,25 @@
 import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
-import pytest_cases
 from tornadox import ek0, ek1, init, ivp, step
 
 from probdiffeq import controls, ivpsolve, ivpsolvers
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
 
-@pytest_cases.fixture(scope="session", name="num")
+@testing.fixture(scope="session", name="num")
 def fixture_num():
     return 4
 
 
-@pytest_cases.fixture(scope="session", name="control_params")
+@testing.fixture(scope="session", name="control_params")
 def fixture_control_params():
     return 0.2, 10.0, 0.95
 
 
-@pytest_cases.fixture(scope="session", name="vanderpol")
+@testing.fixture(scope="session", name="vanderpol")
 def fixture_vanderpol():
     # van-der-Pol as a setup. We really don't want stiffness here.
     return diffeqzoo.ivps.van_der_pol_first_order(
@@ -29,7 +29,7 @@ def fixture_vanderpol():
     )
 
 
-@pytest_cases.fixture(scope="session", name="ivp_tornadox")
+@testing.fixture(scope="session", name="ivp_tornadox")
 def fixture_ivp_tornadox(vanderpol):
     f, u0, (t0, t1), f_args = vanderpol
 
@@ -42,7 +42,7 @@ def fixture_ivp_tornadox(vanderpol):
     )
 
 
-@pytest_cases.fixture(scope="session", name="ivp_probdiffeq")
+@testing.fixture(scope="session", name="ivp_probdiffeq")
 def fixture_ivp_probdiffeq(vanderpol):
     f, u0, (t0, t1), f_args = vanderpol
 
@@ -54,7 +54,7 @@ def fixture_ivp_probdiffeq(vanderpol):
     return vf_ode, (u0,), (t0, t1), f_args
 
 
-@pytest_cases.fixture(scope="session", name="steprule_tornadox")
+@testing.fixture(scope="session", name="steprule_tornadox")
 def fixture_steprule_tornadox(solver_config, control_params):
     factor_min, factor_max, safety = control_params
     return step.AdaptiveSteps(
@@ -65,7 +65,7 @@ def fixture_steprule_tornadox(solver_config, control_params):
     )
 
 
-@pytest_cases.fixture(scope="session", name="controller_probdiffeq")
+@testing.fixture(scope="session", name="controller_probdiffeq")
 def fixture_controller_probdiffeq(control_params):
     factor_min, factor_max, safety = control_params
     return controls.IntegralClipped(
@@ -73,7 +73,7 @@ def fixture_controller_probdiffeq(control_params):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solver_tornadox_kronecker_ek0")
+@testing.fixture(scope="session", name="solver_tornadox_kronecker_ek0")
 def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
     return ek0.KroneckerEK0(
         initialization=init.TaylorMode(),
@@ -82,14 +82,14 @@ def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solver_probdiffeq_kronecker_ek0")
+@testing.fixture(scope="session", name="solver_probdiffeq_kronecker_ek0")
 def fixture_solver_probdiffeq_kronecker_ek0(num):
     implementation = recipes.IsoTS0.from_params(num_derivatives=num)
     strategy = filters.Filter(implementation=implementation)
     return ivpsolvers.DynamicSolver(strategy=strategy)
 
 
-@pytest_cases.case
+@testing.case
 def case_solver_pair_kronecker_ek0(
     solver_config,
     ivp_tornadox,
@@ -142,7 +142,7 @@ def case_solver_pair_kronecker_ek0(
     return output_tornadox, solution_probdiffeq
 
 
-@pytest_cases.fixture(scope="session", name="solver_tornadox_reference_ek1")
+@testing.fixture(scope="session", name="solver_tornadox_reference_ek1")
 def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
     return ek1.ReferenceEK1(
         initialization=init.TaylorMode(),
@@ -151,14 +151,14 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solver_probdiffeq_reference_ek1")
+@testing.fixture(scope="session", name="solver_probdiffeq_reference_ek1")
 def fixture_solver_probdiffeq_reference_ek1(num):
     implementation = recipes.DenseTS1.from_params(num_derivatives=num, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return ivpsolvers.DynamicSolver(strategy=strategy)
 
 
-@pytest_cases.case
+@testing.case
 def case_solver_pair_reference_ek1(
     solver_config,
     ivp_tornadox,
@@ -208,7 +208,7 @@ def case_solver_pair_reference_ek1(
     return output_tornadox, solution_probdiffeq
 
 
-@pytest_cases.parametrize_with_cases(
+@testing.parametrize_with_cases(
     "solution_tornadox, solution_probdiffeq", cases=".", prefix="case_solver_pair_"
 )
 def test_outputs_equal(solution_tornadox, solution_probdiffeq):

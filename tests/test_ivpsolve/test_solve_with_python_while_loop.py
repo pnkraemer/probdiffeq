@@ -1,17 +1,17 @@
 """Tests for solving IVPs on adaptive grids."""
 import jax
 import jax.numpy as jnp
-import pytest_cases
 
 from probdiffeq import ivpsolve, taylor, test_util
+from probdiffeq.backend import testing
 from probdiffeq.strategies import filters, smoothers
 
 
-@pytest_cases.fixture(scope="session", name="solution_solve")
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-@pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
+@testing.fixture(scope="session", name="solution_solve")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
+@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+@testing.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
 def fixture_solution_solve_with_python_while_loop(
     ode_problem, solver_fn, impl_fn, strat_fn, solver_config
 ):

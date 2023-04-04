@@ -7,7 +7,8 @@ from typing import Callable
 import jax
 import jax.experimental.ode
 import jax.numpy as jnp
-import pytest_cases
+
+from probdiffeq.backend import testing
 
 # Solver configurations (for example, tolerances.)
 # My attempt at bundling up all those magic save_at grids, tolerances, etc.
@@ -29,7 +30,7 @@ class SolverConfiguration:
         return 10 * self.rtol_solve
 
 
-@pytest_cases.fixture(scope="session", name="solver_config")
+@testing.fixture(scope="session", name="solver_config")
 def fixture_solver_config():
     grid_fn = functools.partial(jnp.linspace, endpoint=True, num=10)
     save_at_fn = functools.partial(jnp.linspace, endpoint=True, num=5)

@@ -4,10 +4,9 @@ from typing import Any, NamedTuple
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import pytest
-import pytest_cases
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -23,9 +22,9 @@ class _SolveAndSaveAtConfig(NamedTuple):
     solver_config: Any
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
 def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -37,9 +36,9 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     )
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize("strat_fn", [filters.Filter, smoothers.FixedPointSmoother])
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -51,9 +50,9 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     )
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -65,12 +64,12 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     )
 
 
-@pytest_cases.case(id="jax.lax.while_loop")
+@testing.case(id="jax.lax.while_loop")
 def case_loop_lax():
     return jax.lax.while_loop
 
 
-@pytest_cases.case(id="eqx.bounded_while_loop")
+@testing.case(id="eqx.bounded_while_loop")
 def case_loop_eqx():
     def lo(cond_fun, body_fun, init_val):
         return eqx.internal.while_loop(
@@ -80,9 +79,9 @@ def case_loop_eqx():
     return lo
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -94,8 +93,8 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     )
 
 
-@pytest_cases.fixture(scope="session", name="solution_save_at")
-@pytest_cases.parametrize_with_cases(
+@testing.fixture(scope="session", name="solution_save_at")
+@testing.parametrize_with_cases(
     "setup", cases="..", prefix="case_setup_", scope="session"
 )
 def fixture_solution_save_at(setup):
@@ -136,14 +135,14 @@ def test_solution_correct(solution_save_at, solver_config):
     )
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoother_warning(ode_problem):
     """A non-fixed-point smoother is not usable in save-at-simulation."""
     ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=3)
     solver = test_util.generate_solver(strategy_factory=smoothers.Smoother)
 
     # todo: does this compute the full solve? We only want to catch a warning!
-    with pytest.warns():
+    with testing.warns():
         ivpsolve.solve_and_save_at(
             ode_problem.vector_field,
             ode_problem.initial_values,
