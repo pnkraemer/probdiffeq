@@ -7,9 +7,9 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.test_util
-import pytest_cases
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -25,9 +25,9 @@ class _SimulateTerminalValuesConfig(NamedTuple):
     loop_fn: Any
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
 def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -39,9 +39,9 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
     )
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize(
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize(
     "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
 )
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
@@ -55,9 +55,9 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     )
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -69,12 +69,12 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     )
 
 
-@pytest_cases.case(id="jax.lax.while_loop")
+@testing.case(id="jax.lax.while_loop")
 def case_loop_lax():
     return jax.lax.while_loop
 
 
-@pytest_cases.case(id="eqx.bounded_while_loop")
+@testing.case(id="eqx.bounded_while_loop")
 def case_loop_eqx():
     def lo(cond_fun, body_fun, init_val):
         return eqx.internal.while_loop(
@@ -84,9 +84,9 @@ def case_loop_eqx():
     return lo
 
 
-@pytest_cases.case
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -101,8 +101,8 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 # Compute the IVP solution for given setups
 
 
-@pytest_cases.fixture(scope="session", name="solution_terminal_values")
-@pytest_cases.parametrize_with_cases(
+@testing.fixture(scope="session", name="solution_terminal_values")
+@testing.parametrize_with_cases(
     "setup", cases="..", prefix="case_setup_", scope="session"
 )
 def fixture_solution_terminal_values(setup):
@@ -145,7 +145,7 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
     assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_jvp(ode_problem, solver_config):
     ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(

@@ -4,18 +4,18 @@ import functools
 import jax
 import jax.numpy as jnp
 import jax.test_util
-import pytest_cases
 
 from probdiffeq import ivpsolve, test_util
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
-@pytest_cases.fixture(scope="session", name="solution_fixed_grid")
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize_with_cases("impl_fn", cases="..impl_cases")
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-@pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
+@testing.fixture(scope="session", name="solution_fixed_grid")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
+@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+@testing.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
 def fixture_solution_fixed_grid(
     ode_problem, solver_fn, impl_fn, strat_fn, solver_config
 ):
@@ -49,11 +49,11 @@ def test_terminal_values_correct(solution_fixed_grid, solver_config):
 
 
 # todo: all solver implementations
-@pytest_cases.fixture(scope="session", name="parameter_to_solution")
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize("impl_fn", [recipes.BlockDiagTS0.from_params])
-@pytest_cases.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-@pytest_cases.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
+@testing.fixture(scope="session", name="parameter_to_solution")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize("impl_fn", [recipes.BlockDiagTS0.from_params])
+@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+@testing.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
 def fixture_parameter_to_solution(
     ode_problem, solver_config, impl_fn, solver_fn, strat_fn
 ):
