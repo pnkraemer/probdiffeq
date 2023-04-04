@@ -100,23 +100,27 @@ class DenseNormal(_collections.AbstractNormal):
     The mean is a (d*n,)-shaped array that represents a (d,n)-shaped matrix.
     """
 
-    # todo: extract _whiten() method?!
-
     def logpdf(self, u, /):
-        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
-
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
-
-        x1 = jnp.dot(res_white, res_white.T)
-        x2 = jnp.linalg.slogdet(l_obs)[1] ** 2
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        x1 = self.mahalanobis_norm(u) ** 2
+        x2 = jnp.linalg.slogdet(self.cov_sqrtm_lower)[1] ** 2
+        x3 = u.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
     def mahalanobis_norm(self, u, /):
+        res_white = self.residual_white(u)
+        norm_square = jnp.linalg.qr(res_white[:, None], mode="r")
+        return jnp.reshape(norm_square, ())
+
+    def marginal_stds(self):
+        def std(x):
+            std_mat = jnp.linalg.qr(x[..., None], mode="r")
+            return jnp.reshape(std_mat, ())
+
+        return jax.vmap(std)(self.cov_sqrtm_lower)
+
+    def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt - u, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
+        return jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt - u, lower=False)
 
     def scale_covariance(self, scale_sqrtm):
         cov_scaled = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
