@@ -1,10 +1,9 @@
 """There are too many ways to smooth. We assert they all do the same."""
 
 import jax.numpy as jnp
-import pytest
-import pytest_cases
 
 from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -13,13 +12,13 @@ from probdiffeq.strategies import smoothers
 #  this redundancy should be eliminated
 
 
-@pytest_cases.case
+@testing.case
 def smoother_pair_smoother_and_fixedpoint():
     impl = recipes.IsoTS0.from_params()
     return smoothers.Smoother(impl), smoothers.FixedPointSmoother(impl)
 
 
-@pytest_cases.case
+@testing.case
 def smoother_pair_two_smoothers():
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
@@ -33,10 +32,10 @@ def smoother_pair_two_smoothers():
 #   which does not work, UNLESS the smoother happens to step exactly
 #   from checkpoint to checkpoint (which is the corner case that we are
 #   testing here). Therefore, we happily ignore the warning.
-@pytest.mark.filterwarnings("ignore:A conventional smoother")
-@pytest_cases.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
-@pytest_cases.parametrize("tol", [1e-2])
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.filterwarnings("ignore:A conventional smoother")
+@testing.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
+@testing.parametrize("tol", [1e-2])
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \

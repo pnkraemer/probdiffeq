@@ -2,9 +2,9 @@
 
 import jax
 import jax.numpy as jnp
-import pytest_cases
 
 from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import smoothers
 
@@ -13,15 +13,15 @@ from probdiffeq.strategies import smoothers
 #  this redundancy should be eliminated
 
 
-@pytest_cases.case
+@testing.case
 def smoother_pair_smoother_and_fixedpoint():
     impl = recipes.IsoTS0.from_params()
     return smoothers.Smoother(impl), smoothers.FixedPointSmoother(impl)
 
 
-@pytest_cases.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
-@pytest_cases.parametrize("k", [1, 3])  # k * N // 2 off-grid points
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
+@testing.parametrize("k", [1, 3])  # k * N // 2 off-grid points
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \

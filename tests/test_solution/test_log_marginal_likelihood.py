@@ -1,17 +1,15 @@
 """Tests for marginal log likelihoods."""
 import jax.numpy as jnp
-import pytest
-import pytest_cases
-import pytest_cases.filters
 
 from probdiffeq import ivpsolve, ivpsolvers, solution, test_util
+from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
-@pytest_cases.fixture(scope="session", name="solution_save_at")
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize(
+@testing.fixture(scope="session", name="solution_save_at")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize(
     "impl_fn",
     # one for each SSM factorisation
     [
@@ -62,7 +60,7 @@ def test_log_marginal_likelihood_error_for_wrong_std_shape_1(solution_save_at):
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
-    with pytest.raises(ValueError, match="does not match"):
+    with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones((k + 1,)), u=data, solution=sol
         )
@@ -73,7 +71,7 @@ def test_log_marginal_likelihood_error_for_wrong_std_shape_2(solution_save_at):
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
-    with pytest.raises(ValueError, match="does not match"):
+    with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones((k, 1)), u=data, solution=sol
         )
@@ -84,7 +82,7 @@ def test_log_marginal_likelihood_error_for_wrong_u_shape_1(solution_save_at):
     data = sol.u + 0.005
     k = sol.u.shape[0]
 
-    with pytest.raises(ValueError, match="does not match"):
+    with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones((k,)), u=data[..., None], solution=sol
         )
@@ -94,7 +92,7 @@ def test_log_marginal_likelihood_error_for_terminal_values(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
-    with pytest.raises(ValueError, match="expected"):
+    with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones_like(data[-1]), u=data[-1], solution=sol[-1]
         )
@@ -118,24 +116,24 @@ def test_log_marginal_likelihood_terminal_values_error_for_wrong_shapes(
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
-    with pytest.raises(ValueError, match="expected"):
+    with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
             observation_std=jnp.ones((1,)), u=data[-1], solution=sol[-1]
         )
 
-    with pytest.raises(ValueError, match="does not match"):
+    with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood_terminal_values(
             observation_std=jnp.ones(()), u=data[-1, None], solution=sol[-1]
         )
 
-    with pytest.raises(ValueError, match="expected"):
+    with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
             observation_std=jnp.ones(()), u=data[-1:], solution=sol[-1:]
         )
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@pytest_cases.parametrize("strategy_fn", [filters.Filter, smoothers.Smoother])
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize("strategy_fn", [filters.Filter, smoothers.Smoother])
 def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
@@ -158,7 +156,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     assert not jnp.isinf(mll)
 
 
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def test_nmll_raises_error_for_filter(ode_problem):
     """Non-terminal value calls are not possible for filters."""
     recipe = recipes.IsoTS0.from_params(num_derivatives=4)
@@ -175,5 +173,5 @@ def test_nmll_raises_error_for_filter(ode_problem):
     )
     data = sol.u + 0.1
     std = jnp.ones((sol.u.shape[0],))  # values irrelevant
-    with pytest.raises(TypeError, match="ilter"):
+    with testing.raises(TypeError, match="ilter"):
         _ = solution.log_marginal_likelihood(observation_std=std, u=data, solution=sol)

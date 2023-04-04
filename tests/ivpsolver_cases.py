@@ -1,11 +1,10 @@
 """Test cases for implementations."""
 
-import pytest_cases
-
 from probdiffeq import ivpsolvers
+from probdiffeq.backend import testing
 
 
-@pytest_cases.case(id="MLESolver")
+@testing.case(id="MLESolver")
 def case_mle():
     def factory(strategy, output_scale_sqrtm):
         return ivpsolvers.MLESolver(strategy)
@@ -13,7 +12,7 @@ def case_mle():
     return factory
 
 
-@pytest_cases.case(id="DynamicSolver")
+@testing.case(id="DynamicSolver")
 def case_dynamic():
     def factory(strategy, output_scale_sqrtm):
         return ivpsolvers.DynamicSolver(strategy)
@@ -21,6 +20,6 @@ def case_dynamic():
     return factory
 
 
-@pytest_cases.case(id="CalibrationFreeSolver")
+@testing.case(id="CalibrationFreeSolver")
 def case_calibration_free():
     return ivpsolvers.CalibrationFreeSolver

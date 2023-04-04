@@ -1,16 +1,14 @@
 """Tests for IVP solvers."""
 import jax
 import jax.numpy as jnp
-import pytest
-import pytest_cases
-import pytest_cases.filters
 
 from probdiffeq import ivpsolve, solution, test_util
+from probdiffeq.backend import testing
 from probdiffeq.strategies import filters, smoothers
 
 
-@pytest_cases.fixture(scope="function", name="solution_native_python_while_loop")
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.fixture(scope="function", name="solution_native_python_while_loop")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def fixture_solution_native_python_while_loop(ode_problem, strategy_fn):
     solver = test_util.generate_solver(num_derivatives=1, strategy_factory=strategy_fn)
     sol = ivpsolve.solve_with_python_while_loop(
@@ -26,26 +24,26 @@ def fixture_solution_native_python_while_loop(ode_problem, strategy_fn):
     return sol, solver
 
 
-@pytest.mark.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
 def test_solution_is_iterable(solution_native_python_while_loop):
     sol, _ = solution_native_python_while_loop
     assert isinstance(sol[0], type(sol))
     assert len(sol) == len(sol.t)
 
 
-@pytest.mark.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
 def test_getitem_raises_error_for_nonbatched_solutions(
     solution_native_python_while_loop,
 ):
     """__getitem__ only works for batched solutions."""
     sol, _ = solution_native_python_while_loop
-    with pytest.raises(ValueError):
+    with testing.raises(ValueError):
         _ = sol[0][0]
-    with pytest.raises(ValueError):
+    with testing.raises(ValueError):
         _ = sol[0, 0]
 
 
-@pytest.mark.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
 def test_loop_over_solution_is_possible(solution_native_python_while_loop):
     solution_full, _ = solution_native_python_while_loop
 
@@ -57,7 +55,7 @@ def test_loop_over_solution_is_possible(solution_native_python_while_loop):
     assert i == len(solution_full) - 1
 
 
-@pytest.mark.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
 def test_marginal_nth_derivative_of_solution(solution_native_python_while_loop):
     """Assert that each $n$th derivative matches the quantity of interest's shape."""
     sol, _ = solution_native_python_while_loop
@@ -68,11 +66,11 @@ def test_marginal_nth_derivative_of_solution(solution_native_python_while_loop):
         assert derivatives.mean.shape == sol.u.shape
 
     # if the requested derivative is not in the state-space model, raise a ValueError
-    with pytest.raises(ValueError):
+    with testing.raises(ValueError):
         sol.marginals.marginal_nth_derivative(100)
 
 
-@pytest.mark.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
 def test_offgrid_marginals_filter(solution_native_python_while_loop):
     """Assert that the offgrid-marginals are close to the boundary values."""
     sol, solver = solution_native_python_while_loop
@@ -86,7 +84,7 @@ def test_offgrid_marginals_filter(solution_native_python_while_loop):
     assert not jnp.allclose(u[0], sol.u[1], atol=1e-3, rtol=1e-3)
 
 
-@pytest.mark.parametrize("strategy_fn", [smoothers.Smoother], scope="function")
+@testing.parametrize("strategy_fn", [smoothers.Smoother], scope="function")
 def test_offgrid_marginals_smoother(solution_native_python_while_loop):
     sol, solver = solution_native_python_while_loop
     t0, t1 = sol.t[0], sol.t[-1]
@@ -99,8 +97,8 @@ def test_offgrid_marginals_smoother(solution_native_python_while_loop):
     assert jnp.allclose(u[-1], sol.u[-1], atol=1e-3, rtol=1e-3)
 
 
-@pytest_cases.fixture(scope="function", name="solution_save_at")
-@pytest_cases.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.fixture(scope="function", name="solution_save_at")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
 def fixture_solution_save_at(ode_problem):
     solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
 
@@ -117,7 +115,7 @@ def fixture_solution_save_at(ode_problem):
     return sol, solver
 
 
-@pytest_cases.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
+@testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_grid_samples(solution_save_at, shape):
     sol, solver = solution_save_at
 

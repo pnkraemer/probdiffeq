@@ -7,8 +7,8 @@ from typing import Callable, Tuple
 import diffeqzoo.ivps
 import diffrax
 import jax
-import pytest_cases
-import pytest_cases.filters
+
+from probdiffeq.backend import testing
 
 
 # todo: Remove "args" field to ensure that the reference solution
@@ -28,7 +28,7 @@ class ODEProblem:
     solution: Callable
 
 
-@pytest_cases.case(id="LotkaVolterra")
+@testing.case(id="LotkaVolterra")
 def case_lotka_volterra():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
     t1 = 2.0  # Short time-intervals are sufficient for a unit test.
