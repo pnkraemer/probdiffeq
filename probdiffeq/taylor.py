@@ -44,6 +44,12 @@ def taylor_mode_fn(
     zeros = jnp.zeros_like(primals)
     taylor_coeffs = _pad_to_length(taylor_coeffs, length=num_outputs, value=zeros)
 
+    # Early exit for num=1.
+    #  Why? because zero-length scan and disable_jit() don't work together.
+    if num == 1:
+        return taylor_coeffs
+
+    # Compute all coefficients with scan().
     taylor_coeffs, _ = jax.lax.scan(
         body_fn, init=taylor_coeffs, xs=None, length=num - 1
     )
