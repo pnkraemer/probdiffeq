@@ -82,13 +82,13 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
 class IsoNormalQOI(_collections.AbstractNormal):
     def logpdf(self, u, /) -> jax.Array:
         x1 = self.mahalanobis_norm_squared(u)
-        x2 = u.size * 2.0 * jnp.log(self.cov_sqrtm_lower)  # logdet-part
+        x2 = u.size * 2.0 * jnp.log(jnp.abs(self.cov_sqrtm_lower))
         x3 = u.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
     def mahalanobis_norm_squared(self, u, /) -> jax.Array:
         r"""Compute \|x - m\|_{C^{-1}}^2."""
-        # not via norm()^2, because of differentiability issues
+        # not via norm()^2, for better differentiability
         res_white = self.residual_white(u)
         return jnp.dot(res_white, res_white)
 
