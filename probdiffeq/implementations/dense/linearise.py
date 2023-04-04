@@ -3,7 +3,7 @@
 
 import jax
 
-from probdiffeq.implementations import _sqrtm
+from probdiffeq import _sqrt_util
 from probdiffeq.implementations.dense import _vars
 
 # todo:
@@ -38,11 +38,11 @@ def slr1(*, fn, x, cubature_rule):
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
     # Compute statistical linear regression matrices
-    _, (cov_sqrtm_cond, linop_cond) = _sqrtm.revert_conditional_noisefree(
+    _, (cov_sqrt_util_cond, linop_cond) = _sqrt_util.revert_conditional_noisefree(
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
     mean_cond = fx_mean - linop_cond @ x.mean
-    return linop_cond, _vars.DenseNormal(mean_cond, cov_sqrtm_cond.T)
+    return linop_cond, _vars.DenseNormal(mean_cond, cov_sqrt_util_cond.T)
 
 
 def slr0(*, fn, x, cubature_rule):

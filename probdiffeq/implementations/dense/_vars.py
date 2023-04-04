@@ -5,7 +5,8 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _sqrtm
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.dense import _conds
 
 
@@ -35,7 +36,7 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
         m_obs = self._select_derivative(self.hidden_state.mean, 0)
 
         r_yx = observation_std * jnp.eye(self.target_shape[1])
-        r_obs, (r_cor, gain) = _sqrtm.revert_conditional(
+        r_obs, (r_cor, gain) = _sqrt_util.revert_conditional(
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
         m_cor = self.hidden_state.mean - gain @ m_obs
@@ -76,7 +77,7 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
         cov_sqrtm_lower_nonsquare = self._select_derivative_vect(
             self.hidden_state.cov_sqrtm_lower, n
         )
-        cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
+        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
             R=cov_sqrtm_lower_nonsquare.T
         ).T
         return DenseNormal(mean, cov_sqrtm_lower)

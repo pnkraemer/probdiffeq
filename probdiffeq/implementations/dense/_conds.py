@@ -3,7 +3,8 @@
 
 import jax
 
-from probdiffeq.implementations import _collections, _sqrtm
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.dense import _vars
 
 
@@ -43,14 +44,16 @@ class DenseConditional(_collections.AbstractConditional):
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
-        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
 
         C = incoming.transition
         (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
 
         g = A @ C
         xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
+        Xi = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
+        ).T
 
         noise = _vars.DenseNormal(mean=xi, cov_sqrtm_lower=Xi)
         return DenseConditional(g, noise=noise, target_shape=self.target_shape)
@@ -62,7 +65,7 @@ class DenseConditional(_collections.AbstractConditional):
 
         # Apply transition
         m_new_p = self.transition @ m0_p + self.noise.mean
-        l_new_p = _sqrtm.sum_of_sqrtm_factors(
+        l_new_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=((self.transition @ l0_p).T, self.noise.cov_sqrtm_lower.T)
         ).T
 

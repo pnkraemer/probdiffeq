@@ -5,7 +5,8 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _sqrtm, cubature
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections, cubature
 from probdiffeq.implementations.dense import _vars, linearise
 
 
@@ -54,7 +55,7 @@ class DenseTaylorZerothOrder(_collections.AbstractCorrection):
         fx = self.linearise_fn(fn=f_wrapped, m=m0)
 
         b = m1 - fx
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         observed = _vars.DenseNormal(b, l_obs_raw)
 
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
@@ -70,7 +71,7 @@ class DenseTaylorZerothOrder(_collections.AbstractCorrection):
         l_obs_nonsquare = self.e1_vect(ext.hidden_state.cov_sqrtm_lower)
 
         # Compute correction according to ext -> obs
-        r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
+        r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
         )
 
@@ -122,7 +123,7 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
         cov_sqrtm_lower = jvp_fn_vect(x.hidden_state.cov_sqrtm_lower)
 
         # Gather the observed variable
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         observed = _vars.DenseNormal(b, l_obs_raw)
 
         # Extract the output scale and the error estimate
@@ -144,7 +145,7 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
         l_obs_nonsquare = jvp_fn_vect(ext.hidden_state.cov_sqrtm_lower)
 
         # Compute the correction matrices
-        r_obs, (r_cor, gain) = _sqrtm.revert_conditional_noisefree(
+        r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
         )
 
@@ -216,7 +217,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
-        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
 
         # todo: higher-order ODEs
@@ -231,7 +232,9 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         m_1 = self.e1(x.hidden_state.mean)
         r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
         m_marg = m_1 - noise.mean
-        l_marg = _sqrtm.sum_of_sqrtm_factors(R_stack=(r_1, noise.cov_sqrtm_lower.T)).T
+        l_marg = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=(r_1, noise.cov_sqrtm_lower.T)
+        ).T
         marginals = _vars.DenseNormal(m_marg, l_marg)
 
         # Compute output scale and error estimate
@@ -252,7 +255,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         r_1 = self.e1_vect(_x.hidden_state.cov_sqrtm_lower).T
 
         # Extract the linearisation point
-        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
 
         # Apply statistical linear regression to the ODE vector field
@@ -262,7 +265,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
         HL = r_1.T
-        r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
+        r_marg, (r_bw, gain) = _sqrt_util.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
         # Compute the marginal mean and gather the marginals
@@ -325,7 +328,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
-        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
 
         # todo: higher-order ODEs
@@ -340,7 +343,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         m_1 = self.e1(x.hidden_state.mean)
         r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
         m_marg = m_1 - (linop @ m_0 + noise.mean)
-        l_marg = _sqrtm.sum_of_sqrtm_factors(
+        l_marg = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(r_1, r_0_square @ linop.T, noise.cov_sqrtm_lower.T)
         ).T
         marginals = _vars.DenseNormal(m_marg, l_marg)
@@ -363,7 +366,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         r_1 = self.e1_vect(_x.hidden_state.cov_sqrtm_lower).T
 
         # Extract the linearisation point
-        r_0_square = _sqrtm.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
         lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
 
         # Apply statistical linear regression to the ODE vector field
@@ -373,7 +376,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         # Compute the sigma-point correction of the ODE residual
         L = extrapolated.hidden_state.cov_sqrtm_lower
         HL = r_1.T - H @ r_0.T
-        r_marg, (r_bw, gain) = _sqrtm.revert_conditional(
+        r_marg, (r_bw, gain) = _sqrt_util.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
 

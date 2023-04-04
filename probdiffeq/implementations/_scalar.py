@@ -4,7 +4,8 @@ import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
 
-from probdiffeq.implementations import _collections, _ibm_util, _sqrtm, cubature
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections, _ibm_util, cubature
 
 # todo: make public and split into submodules
 
@@ -70,7 +71,7 @@ class StateSpaceVar(_collections.StateSpaceVar):
         m_obs = self.hidden_state.mean[0]
 
         r_yx = observation_std  # * jnp.eye(1)
-        r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional(
+        r_obs_mat, (r_cor, gain_mat) = _sqrt_util.revert_conditional(
             R_X=self.hidden_state.cov_sqrtm_lower.T,
             R_X_F=hc[:, None],
             R_YX=r_yx[None, None],
@@ -107,7 +108,7 @@ class StateSpaceVar(_collections.StateSpaceVar):
 
         mean = self.hidden_state.mean[n]
         cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
-        cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
+        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
             R=cov_sqrtm_lower_nonsquare[:, None]
         ).T
         return NormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
@@ -150,7 +151,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
         cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, :]
-        l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
+        l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
         l_obs = jnp.reshape(l_obs_raw, ())
         observed = NormalQOI(b, l_obs)
         cache = (b,)
@@ -168,7 +169,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         )
 
         l_obs_nonsquare = l_ext[self.ode_order, :]
-        r_obs_mat, (r_cor, gain_mat) = _sqrtm.revert_conditional_noisefree(
+        r_obs_mat, (r_cor, gain_mat) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=l_obs_nonsquare[:, None], R_X=l_ext.T
         )
         r_obs = jnp.reshape(r_obs_mat, ())
@@ -230,7 +231,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # Marginal covariance
         R1 = jnp.reshape(extrapolated.cov_sqrtm_lower[1, :], (n, 1))
         R2 = jnp.reshape(fx_centered_normed, (S, 1))
-        std_marg_mat = _sqrtm.sum_of_sqrtm_factors(R_stack=(R1, R2))
+        std_marg_mat = _sqrt_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
         std_marg = jnp.reshape(std_marg_mat, ())
 
         # Extract error estimate and output scale from marginals
@@ -261,7 +262,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
     def transform_sigma_points(self, rv: NormalHiddenState):
         # Extract square-root of covariance (-> std-dev.)
         L0_nonsq = rv.cov_sqrtm_lower[0, :]
-        r_marg1_x_mat = _sqrtm.sqrtm_to_upper_triangular(R=L0_nonsq[:, None])
+        r_marg1_x_mat = _sqrt_util.sqrtm_to_upper_triangular(R=L0_nonsq[:, None])
         r_marg1_x = jnp.reshape(r_marg1_x_mat, ())
 
         # Multiply and shift the unit-points
@@ -290,7 +291,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # https://arxiv.org/pdf/2207.00426.pdf,
         # because the implementation below avoids sqrt-down-dates
         # pts_centered_normed = pts_centered * self.cubature_rule.weights_sqrtm[:, None]
-        _, (std_noi_mat, linop_mat) = _sqrtm.revert_conditional_noisefree(
+        _, (std_noi_mat, linop_mat) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=pts_centered_normed[:, None], R_X=fx_centered_normed[:, None]
         )
         std_noi = jnp.reshape(std_noi_mat, ())
@@ -302,9 +303,12 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
     def complete_correction_post_linearize(self, linop, extrapolated, noise):
         # Compute the cubature-correction
-        L0, L1 = extrapolated.cov_sqrtm_lower[0, :], extrapolated.cov_sqrtm_lower[1, :]
+        L0, L1 = (
+            extrapolated.cov_sqrtm_lower[0, :],
+            extrapolated.cov_sqrtm_lower[1, :],
+        )
         HL = L1 - linop * L0
-        std_marg_mat, (r_bw, gain_mat) = _sqrtm.revert_conditional(
+        std_marg_mat, (r_bw, gain_mat) = _sqrt_util.revert_conditional(
             R_X=extrapolated.cov_sqrtm_lower.T,
             R_X_F=HL[:, None],
             R_YX=noise.cov_sqrtm_lower[None, None],
@@ -366,14 +370,16 @@ class ConditionalHiddenState(_Conditional):
             return jax.vmap(fn)(self, incoming)
 
         A = self.transition
-        (b, B_sqrtm) = self.noise.mean, self.noise.cov_sqrtm_lower
+        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
 
         C = incoming.transition
         (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
 
         g = A @ C
         xi = A @ d + b
-        Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
+        Xi = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
+        ).T
 
         noise = NormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
         return ConditionalHiddenState(g, noise=noise)
@@ -387,7 +393,7 @@ class ConditionalHiddenState(_Conditional):
         m0, l0 = rv.hidden_state.mean, rv.hidden_state.cov_sqrtm_lower
 
         m_new = self.transition @ m0 + self.noise.mean
-        l_new = _sqrtm.sum_of_sqrtm_factors(
+        l_new = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
@@ -488,7 +494,7 @@ class IBM(_collections.AbstractExtrapolation):
     def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
-        l_ext_p = _sqrtm.sum_of_sqrtm_factors(
+        l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
                 (self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
                 (output_scale_sqrtm * self.q_sqrtm_lower).T,
@@ -502,7 +508,7 @@ class IBM(_collections.AbstractExtrapolation):
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
-        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
             R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,

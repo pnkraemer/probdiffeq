@@ -3,7 +3,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _ibm_util, _sqrtm
+from probdiffeq import _sqrt_util
+from probdiffeq.implementations import _collections, _ibm_util
 from probdiffeq.implementations.dense import _conds, _vars
 
 
@@ -120,7 +121,7 @@ class DenseIBM(_collections.AbstractExtrapolation):
     def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
-        l_ext_p = _sqrtm.sum_of_sqrtm_factors(
+        l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
                 (self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
                 (output_scale_sqrtm * self.q_sqrtm_lower).T,
@@ -137,7 +138,7 @@ class DenseIBM(_collections.AbstractExtrapolation):
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
-        r_ext_p, (r_bw_p, g_bw_p) = _sqrtm.revert_conditional(
+        r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
             R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,
