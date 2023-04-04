@@ -18,36 +18,31 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
         l_obs_nonscalar = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
         l_obs = jnp.reshape(l_obs_nonscalar, ())
+        obs = _vars.IsoNormalQOI(bias, l_obs)
 
-        res_white = (bias / l_obs) / jnp.sqrt(bias.size)
+        mahalanobis_norm = obs.mahalanobis_norm(jnp.zeros_like(m1))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(bias.size)
 
-        # jnp.sqrt(\|res_white\|^2/d) without forming the square
-        output_scale_sqrtm = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=res_white[:, None]), ()
-        )
-
-        error_estimate = l_obs
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (bias,)
+        error_estimate_unscaled = obs.marginal_std()
+        error_estimate = error_estimate_unscaled * output_scale_sqrtm
+        return error_estimate, output_scale_sqrtm, (bias,)
 
     def complete_correction(
         self, extrapolated: _vars.IsoStateSpaceVar, cache
-    ) -> Tuple[_vars.IsoNormal, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
+    ) -> Tuple[_vars.IsoNormalHiddenState, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
         (bias,) = cache
 
-        m_ext, l_ext = (
-            extrapolated.hidden_state.mean,
-            extrapolated.hidden_state.cov_sqrtm_lower,
-        )
+        m_ext = extrapolated.hidden_state.mean
+        l_ext = extrapolated.hidden_state.cov_sqrtm_lower
         l_obs = l_ext[self.ode_order, ...]
 
         l_obs_nonscalar = _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None])
         l_obs_scalar = jnp.reshape(l_obs_nonscalar, ())
-        c_obs = l_obs_scalar**2
 
-        observed = _vars.IsoNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = _vars.IsoNormalQOI(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
-        g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
-        m_cor = m_ext - g[:, None] * bias[None, :]
-        l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = _vars.IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        g = (l_ext @ l_obs.T) / l_obs_scalar  # shape (n,)
+        m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
+        l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
+        corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (_vars.IsoStateSpaceVar(corrected), g)

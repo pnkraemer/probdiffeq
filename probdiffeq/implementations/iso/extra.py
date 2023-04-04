@@ -65,7 +65,9 @@ class IsoIBM(_collections.AbstractExtrapolation):
             raise ValueError(msg1 + msg2)
         m0_corrected = jnp.stack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        rv = _vars.IsoNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        rv = _vars.IsoNormalHiddenState(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
         return _vars.IsoStateSpaceVar(rv)
 
     def init_ssv(self, ode_shape):
@@ -73,7 +75,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m0, c0))
+        return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m0, c0))
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -90,7 +92,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
-        ext = _vars.IsoNormal(m_ext, q_sqrtm)
+        ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
         return _vars.IsoStateSpaceVar(ext), (m_ext_p, m0_p, p, p_inv)
 
     def _assemble_preconditioner(self, dt):
@@ -107,7 +109,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
             R_stack=((self.a @ l0_p).T, (output_scale_sqrtm * self.q_sqrtm_lower).T)
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m_ext, l_ext))
+        return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m_ext, l_ext))
 
     def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
         m_ext_p, m0_p, p, p_inv = cache
@@ -130,9 +132,9 @@ class IsoIBM(_collections.AbstractExtrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.IsoNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.IsoNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoStateSpaceVar(extrapolated), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
@@ -145,7 +147,7 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return jnp.eye(*self.a.shape)
 
     def _init_backward_noise(self, rv_proto):
-        return _vars.IsoNormal(
+        return _vars.IsoNormalHiddenState(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
