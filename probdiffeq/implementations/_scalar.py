@@ -37,18 +37,21 @@ class NormalQOI(_collections.AbstractNormal):
         if jnp.ndim(u) > 0:
             return jax.vmap(NormalQOI.logpdf)(self, u)
 
-        x1 = self.marginal_stds()  # logdet
-        x2 = self.mahalanobis_norm(u)
-        x3 = u.size * jnp.log(jnp.pi * 2)
-        sum = _sqrt_util.sqrt_sum_square(x1, x2, jnp.sqrt(x3))
-        return -0.5 * jnp.square(sum)
+        x1 = 2.0 * jnp.log(self.marginal_stds())  # logdet
+        x2 = self.mahalanobis_norm_squared(u)
+        x3 = jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
 
     def marginal_stds(self):
         return jnp.abs(self.cov_sqrtm_lower)
 
+    def mahalanobis_norm_squared(self, u, /):
+        res_white_scalar = self.residual_white(u)
+        return res_white_scalar**2.0
+
     def mahalanobis_norm(self, u, /):
         res_white_scalar = self.residual_white(u)
-        return res_white_scalar
+        return jnp.abs(res_white_scalar)
 
     def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
