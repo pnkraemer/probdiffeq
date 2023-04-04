@@ -131,7 +131,7 @@ class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
 
         mahalanobis_fn = _scalar.NormalQOI.mahalanobis_norm
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
-        output_scale_sqrtm = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m0))
+        output_scale_sqrtm = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
         error_estimate = obs_unbatch.cov_sqrtm_lower
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 

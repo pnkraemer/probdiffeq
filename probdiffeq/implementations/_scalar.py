@@ -33,18 +33,22 @@ class NormalQOI(_collections.AbstractNormal):
         return NormalQOI(self.mean, scale_sqrtm * self.cov_sqrtm_lower)
 
     def logpdf(self, u, /):
-        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = (m_obs - u) / l_obs
-        x1 = l_obs**2
-        x2 = jnp.dot(res_white, res_white.T)
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        x1 = self.marginal_stds() ** 2  # logdet
+        x2 = self.mahalanobis_norm(u) ** 2
+        x3 = u.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
+    def marginal_stds(self):
+        return jnp.abs(self.cov_sqrtm_lower)
+
     def mahalanobis_norm(self, u, /):
+        res_white_scalar = self.residual_white(u)
+        return res_white_scalar
+
+    def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
         res_white = (obs_pt - u) / l_obs
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
+        return res_white
 
 
 @jax.tree_util.register_pytree_node_class
@@ -112,18 +116,10 @@ class StateSpaceVar(_collections.StateSpaceVar):
 @jax.tree_util.register_pytree_node_class
 class NormalHiddenState(_collections.AbstractNormal):
     def logpdf(self, u, /):
-        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, (m_obs - u), lower=False)
-        x1 = jnp.linalg.slogdet(l_obs)[1] ** 2
-        x2 = jnp.dot(res_white, res_white.T)
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
-        return -0.5 * (x1 + x2 + x3)
+        raise NotImplementedError
 
     def mahalanobis_norm(self, u, /):
-        obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
+        raise NotImplementedError
 
     def scale_covariance(self, scale_sqrtm):
         return NormalHiddenState(
@@ -145,10 +141,11 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
-
-        output_scale_sqrtm = observed.mahalanobis_norm(jnp.zeros_like(m0))
-        error_estimate = observed.cov_sqrtm_lower
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+        mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m1.size)
+        error_estimate_unscaled = observed.marginal_stds()
+        error_estimate = output_scale_sqrtm * error_estimate_unscaled
+        return error_estimate, output_scale_sqrtm, cache
 
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
@@ -177,7 +174,6 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         r_obs = jnp.reshape(r_obs_mat, ())
         gain = jnp.reshape(gain_mat, (-1,))
         m_cor = m_ext - gain * b
-
         observed = NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
         corrected = StateSpaceVar(
             NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
@@ -239,8 +235,11 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
         # Extract error estimate and output scale from marginals
         marginals = NormalQOI(m_marg, std_marg)
-        output_scale_sqrtm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
-        error_estimate = std_marg
+        mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros(()))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m_marg.size)
+
+        error_estimate_unscaled = marginals.marginal_stds()
+        error_estimate = error_estimate_unscaled * output_scale_sqrtm
         return error_estimate, output_scale_sqrtm
 
     def complete_correction(self, extrapolated, cache):
