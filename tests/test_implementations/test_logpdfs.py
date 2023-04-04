@@ -14,7 +14,8 @@ from probdiffeq.implementations.iso import _vars as vars_iso
 def test_logpdf_dense():
     u = jnp.arange(1.0, 4.0)
     m = u + 1.0
-    cov_cholesky = u[:, None] * u[None, :] + jnp.eye(3)
+    cov_cholesky = jnp.linalg.cholesky(u[:, None] * u[None, :] + jnp.eye(3))
+
     pdf1 = vars_dense.DenseNormal(m, cov_cholesky).logpdf(u)
     pdf2 = jax.scipy.stats.multivariate_normal.logpdf(
         u, mean=m, cov=cov_cholesky @ cov_cholesky.T
