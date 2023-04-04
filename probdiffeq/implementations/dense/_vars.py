@@ -112,9 +112,11 @@ class DenseNormal(_collections.AbstractNormal):
         return jnp.reshape(norm_square, ())
 
     def marginal_stds(self):
-        # todo: implement in square-root arithmetic
-        L = self.cov_sqrtm_lower
-        return jnp.sqrt(jnp.einsum("nj,nj->n", L, L))
+        def std(x):
+            std_mat = jnp.linalg.qr(x[..., None], mode="r")
+            return jnp.reshape(std_mat, ())
+
+        return jax.vmap(std)(self.cov_sqrtm_lower)
 
     def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
