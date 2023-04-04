@@ -66,9 +66,9 @@ class IsoNormal(_collections.AbstractNormal):
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
-    def norm_of_whitened_residual_sqrtm(self) -> jax.Array:
+    def mahalanobis_norm(self, u, /) -> jax.Array:
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = obs_pt / l_obs
+        res_white = (obs_pt - u) / l_obs
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 

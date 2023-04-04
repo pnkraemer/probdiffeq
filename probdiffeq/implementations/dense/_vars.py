@@ -112,9 +112,9 @@ class DenseNormal(_collections.AbstractNormal):
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
-    def norm_of_whitened_residual_sqrtm(self):
+    def mahalanobis_norm(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
+        res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt - u, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 

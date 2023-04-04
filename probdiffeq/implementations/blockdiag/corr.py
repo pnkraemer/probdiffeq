@@ -2,6 +2,7 @@
 from typing import Callable, Tuple
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq.implementations import _collections, _scalar, cubature
 
@@ -128,10 +129,9 @@ class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
         marginalise_fn = jax.vmap(_scalar.TaylorZerothOrder.marginalise_observation)
         cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x.hidden_state)
 
-        output_scale_sqrtm_fn = jax.vmap(
-            _scalar.ScalarNormal.norm_of_whitened_residual_sqrtm
-        )
-        output_scale_sqrtm = output_scale_sqrtm_fn(obs_unbatch)
+        mahalanobis_fn = _scalar.ScalarNormal.mahalanobis_norm
+        mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
+        output_scale_sqrtm = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m0))
         error_estimate = obs_unbatch.cov_sqrtm_lower
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
