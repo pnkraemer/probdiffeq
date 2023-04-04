@@ -57,7 +57,7 @@ class DenseTaylorZerothOrder(_collections.AbstractCorrection):
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         observed = _vars.DenseNormal(b, l_obs_raw)
 
-        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
+        output_scale_sqrtm = observed.mahalanobis_norm(jnp.zeros_like(b))
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
 
@@ -122,7 +122,7 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
         obs = _vars.DenseNormal(b, l_obs_raw)
 
         # Extract the output scale and the error estimate
-        output_scale_sqrtm = obs.norm_of_whitened_residual_sqrtm()
+        output_scale_sqrtm = obs.mahalanobis_norm(jnp.zeros_like(b))
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
 
         # Return the scaled error estimate and the other quantities
@@ -229,7 +229,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         marginals = _vars.DenseNormal(m_marg, l_marg)
 
         # Compute output scale and error estimate
-        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
+        output_scale_sqrtm = marginals.mahalanobis_norm(jnp.zeros_like(m_1))
         l_obs = marginals.cov_sqrtm_lower
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
 
@@ -339,7 +339,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         marginals = _vars.DenseNormal(m_marg, l_marg)
 
         # Compute output scale and error estimate
-        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
+        output_scale_sqrtm = marginals.mahalanobis_norm(jnp.zeros_like(m_1))
         l_obs = marginals.cov_sqrtm_lower
         error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
 

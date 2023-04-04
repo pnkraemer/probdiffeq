@@ -342,7 +342,7 @@ class MLESolver(_AbstractSolver):
 
     @staticmethod
     def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
-        x = obs.norm_of_whitened_residual_sqrtm()
+        x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean))
         return jnp.sqrt(n * diffsqrtm**2 + x**2) / jnp.sqrt(n + 1)
 
     def extract_fn(self, *, state):

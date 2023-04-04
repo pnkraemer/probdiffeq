@@ -40,9 +40,9 @@ class ScalarNormal(_collections.AbstractNormal):
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
-    def norm_of_whitened_residual_sqrtm(self):
+    def mahalanobis_norm(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        res_white = obs_pt / l_obs
+        res_white = (obs_pt - u) / l_obs
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
         return evidence_sqrtm
 
@@ -119,7 +119,7 @@ class Normal(_collections.AbstractNormal):
         x3 = res_white.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
-    def norm_of_whitened_residual_sqrtm(self):
+    def mahalanobis_norm(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
         res_white = jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt, lower=False)
         evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
@@ -146,7 +146,7 @@ class TaylorZerothOrder(_collections.AbstractCorrection):
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
 
-        output_scale_sqrtm = observed.norm_of_whitened_residual_sqrtm()
+        output_scale_sqrtm = observed.mahalanobis_norm(jnp.zeros_like(m0))
         error_estimate = observed.cov_sqrtm_lower
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
@@ -234,7 +234,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
         # Extract error estimate and output scale from marginals
         marginals = ScalarNormal(m_marg, std_marg)
-        output_scale_sqrtm = marginals.norm_of_whitened_residual_sqrtm()
+        output_scale_sqrtm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
         error_estimate = std_marg
         return error_estimate, output_scale_sqrtm
 

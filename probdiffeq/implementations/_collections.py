@@ -44,7 +44,7 @@ class AbstractNormal(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def norm_of_whitened_residual_sqrtm(self):
+    def mahalanobis_norm(self, u, /):
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -22,7 +22,8 @@ Notable breaking changes:
   The new term is mathematically more accurate, implements less logic and has a shorter name.
   The same applies to `solution.negative_marginal_log_likelihood_terminal_values`, which
   has become `solution.log_marginal_likelihood_terminal_values`.
-
+* `norm_of_whitened_residual_sqrtm()` has been renamed to `mahalanobis_norm(x, /)` and is a function of one argument now.
+  This is mathematically more accurate; the function should depend on an input.
 
 
 Notable enhancements:

@@ -16,9 +16,9 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         bias = m1 - vector_field(*m0, t=t, p=p)
         cov_sqrtm_lower = x.hidden_state.cov_sqrtm_lower[self.ode_order, ...]
 
-        l_obs = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None]), ()
-        )
+        l_obs_nonscalar = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
+        l_obs = jnp.reshape(l_obs_nonscalar, ())
+
         res_white = (bias / l_obs) / jnp.sqrt(bias.size)
 
         # jnp.sqrt(\|res_white\|^2/d) without forming the square
@@ -40,9 +40,8 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         )
         l_obs = l_ext[self.ode_order, ...]
 
-        l_obs_scalar = jnp.reshape(
-            _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None]), ()
-        )
+        l_obs_nonscalar = _sqrtm.sqrtm_to_upper_triangular(R=l_obs[:, None])
+        l_obs_scalar = jnp.reshape(l_obs_nonscalar, ())
         c_obs = l_obs_scalar**2
 
         observed = _vars.IsoNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
