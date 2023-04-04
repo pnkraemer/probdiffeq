@@ -31,7 +31,7 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
     def complete_correction(
         self, extrapolated: _vars.IsoStateSpaceVar, cache
-    ) -> Tuple[_vars.IsoNormal, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
+    ) -> Tuple[_vars.IsoNormalHiddenState, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
         (bias,) = cache
 
         m_ext, l_ext = (
@@ -44,10 +44,10 @@ class IsoTaylorZerothOrder(_collections.AbstractCorrection):
         l_obs_scalar = jnp.reshape(l_obs_nonscalar, ())
         c_obs = l_obs_scalar**2
 
-        observed = _vars.IsoNormal(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = _vars.IsoNormalQOI(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / c_obs  # shape (n,)
         m_cor = m_ext - g[:, None] * bias[None, :]
         l_cor = l_ext - g[:, None] * l_obs[None, :]
-        corrected = _vars.IsoNormal(mean=m_cor, cov_sqrtm_lower=l_cor)
+        corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
         return observed, (_vars.IsoStateSpaceVar(corrected), g)

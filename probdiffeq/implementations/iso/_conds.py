@@ -32,7 +32,9 @@ class IsoConditionalHiddenState(_IsoConditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m, self.noise.cov_sqrtm_lower))
+        return _vars.IsoStateSpaceVar(
+            _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
+        )
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -45,7 +47,7 @@ class IsoConditionalHiddenState(_IsoConditional):
         xi = A @ d + b
         Xi = _sqrtm.sum_of_sqrtm_factors(R_stack=((A @ D_sqrtm).T, B_sqrtm.T)).T
 
-        noise = _vars.IsoNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = _vars.IsoNormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
         bw_model = IsoConditionalHiddenState(g, noise=noise)
         return bw_model
 
@@ -61,9 +63,8 @@ class IsoConditionalHiddenState(_IsoConditional):
             R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
-        return _vars.IsoStateSpaceVar(
-            _vars.IsoNormal(mean=m_new, cov_sqrtm_lower=l_new)
-        )
+        rv = _vars.IsoNormalHiddenState(mean=m_new, cov_sqrtm_lower=l_new)
+        return _vars.IsoStateSpaceVar(rv)
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -76,4 +77,5 @@ class IsoConditionalQOI(_IsoConditional):
     def __call__(self, x, /):
         mv = self.transition[:, None] * x[None, :]
         m = mv + self.noise.mean
-        return _vars.IsoStateSpaceVar(_vars.IsoNormal(m, self.noise.cov_sqrtm_lower))
+        rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
+        return _vars.IsoStateSpaceVar(rv)

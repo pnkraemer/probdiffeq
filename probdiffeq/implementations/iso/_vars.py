@@ -20,8 +20,9 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         gain = jnp.reshape(gain, (-1,))
         m_cor = self.hidden_state.mean - gain[:, None] * m_obs[None, :]
 
-        obs = IsoNormal(m_obs, r_obs.T)
-        cond = _conds.IsoConditionalQOI(gain, noise=IsoNormal(m_cor, r_cor.T))
+        obs = IsoNormalQOI(m_obs, r_obs.T)
+        cor = IsoNormalHiddenState(m_cor, r_cor.T)
+        cond = _conds.IsoConditionalQOI(gain, noise=cor)
         return obs, cond
 
     def extract_qoi(self) -> jax.Array:
@@ -31,9 +32,8 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         return u[..., 0, :]
 
     def scale_covariance(self, scale_sqrtm):
-        return IsoStateSpaceVar(
-            self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
-        )
+        rv = self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return IsoStateSpaceVar(rv)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 2:
@@ -51,11 +51,38 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
             R=cov_sqrtm_lower_nonsquare[:, None]
         ).T
-        return IsoNormal(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
+        return IsoNormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormal(_collections.AbstractNormal):
+class IsoNormalHiddenState(_collections.AbstractNormal):
+    def logpdf(self, u, /) -> jax.Array:
+        raise NotImplementedError
+
+    def mahalanobis_norm(self, u, /) -> jax.Array:
+        raise NotImplementedError
+
+    def scale_covariance(self, scale_sqrtm):
+        cov_sqrtm_lower = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
+        return IsoNormalHiddenState(mean=self.mean, cov_sqrtm_lower=cov_sqrtm_lower)
+
+    def transform_unit_sample(self, base, /) -> jax.Array:
+        return self.mean + self.cov_sqrtm_lower @ base
+
+    # todo: move to conditional???
+    def Ax_plus_y(self, A, x, y) -> jax.Array:
+        return A @ x + y
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoNormalQOI(_collections.AbstractNormal):
+    def __init__(self, mean, cov_sqrtm_lower):
+        *batch_shape, _odedim = jnp.shape(mean)
+        if jnp.shape(cov_sqrtm_lower) != tuple(batch_shape):
+            raise ValueError
+
+        super().__init__(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
+
     def logpdf(self, u, /) -> jax.Array:
         m_obs, l_obs = self.mean, self.cov_sqrtm_lower
 
@@ -73,12 +100,12 @@ class IsoNormal(_collections.AbstractNormal):
         return evidence_sqrtm
 
     def scale_covariance(self, scale_sqrtm):
-        cov_sqrtm_lower = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
-        return IsoNormal(mean=self.mean, cov_sqrtm_lower=cov_sqrtm_lower)
+        cov_sqrtm_lower = scale_sqrtm[..., None] * self.cov_sqrtm_lower
+        return IsoNormalQOI(mean=self.mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
     def transform_unit_sample(self, base, /) -> jax.Array:
-        return self.mean + self.cov_sqrtm_lower @ base
+        raise NotImplementedError
 
     # todo: move to conditional???
     def Ax_plus_y(self, A, x, y) -> jax.Array:
-        return A @ x + y
+        raise NotImplementedError
