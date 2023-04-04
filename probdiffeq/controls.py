@@ -133,7 +133,7 @@ class _IntegralCommon(AbstractControl):
         self, *, state, error_normalised, error_contraction_rate, dt_previous
     ):
         scale_factor_unclipped = self.safety * jnp.power(
-            error_normalised, -1.0 / error_contraction_rate
+            1.0 / error_normalised, 1.0 / error_contraction_rate
         )
 
         scale_factor = jnp.maximum(
