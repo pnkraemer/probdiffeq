@@ -36,22 +36,22 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         return IsoStateSpaceVar(rv)
 
     def marginal_nth_derivative(self, n):
+        # if the variable has batch-axes, vmap the result
         if self.hidden_state.mean.ndim > 2:
-            # if the variable has batch-axes, vmap the result
             fn = IsoStateSpaceVar.marginal_nth_derivative
             vect_fn = jax.vmap(fn, in_axes=(0, None))
             return vect_fn(self, n)
 
         if n >= self.hidden_state.mean.shape[0]:
-            msg = f"The {n}th derivative not available in the state-space variable."
+            msg = f"The {n}th derivative is not available in the state-variable."
             raise ValueError(msg)
 
         mean = self.hidden_state.mean[n, :]
         cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
-        cov_sqrtm_lower = _sqrtm.sqrtm_to_upper_triangular(
-            R=cov_sqrtm_lower_nonsquare[:, None]
-        ).T
-        return IsoNormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
+        R = cov_sqrtm_lower_nonsquare[:, None]
+        cov_sqrtm_lower_square = _sqrtm.sqrtm_to_upper_triangular(R=R)
+        cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
+        return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -76,28 +76,23 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
 
 @jax.tree_util.register_pytree_node_class
 class IsoNormalQOI(_collections.AbstractNormal):
-    def __init__(self, mean, cov_sqrtm_lower):
-        *batch_shape, _odedim = jnp.shape(mean)
-        if jnp.shape(cov_sqrtm_lower) != tuple(batch_shape):
-            raise ValueError
-
-        super().__init__(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
-
     def logpdf(self, u, /) -> jax.Array:
-        m_obs, l_obs = self.mean, self.cov_sqrtm_lower
-
-        res_white = (m_obs - u) / jnp.reshape(l_obs, ())
-
-        x1 = jnp.dot(res_white, res_white.T)
-        x2 = jnp.reshape(l_obs, ()) ** 2
-        x3 = res_white.size * jnp.log(jnp.pi * 2)
+        x1 = self.mahalanobis_norm(u) ** 2
+        x2 = self.cov_sqrtm_lower**2  # logdet
+        x3 = self.mean.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 
     def mahalanobis_norm(self, u, /) -> jax.Array:
+        r"""Compute \|x - m\|_{C^{-1}}."""
+        # sqrt(dot(res, res.T)) without forming the dot product explicitly
+        res_white = self.residual_white(u)
+        res_white_squeeze = jnp.linalg.qr(res_white[:, None], mode="r")
+        return jnp.reshape(res_white_squeeze, ())
+
+    def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
         res_white = (obs_pt - u) / l_obs
-        evidence_sqrtm = jnp.sqrt(jnp.dot(res_white, res_white.T) / res_white.size)
-        return evidence_sqrtm
+        return res_white
 
     def scale_covariance(self, scale_sqrtm):
         cov_sqrtm_lower = scale_sqrtm[..., None] * self.cov_sqrtm_lower
@@ -105,6 +100,9 @@ class IsoNormalQOI(_collections.AbstractNormal):
 
     def transform_unit_sample(self, base, /) -> jax.Array:
         raise NotImplementedError
+
+    def marginal_std(self):
+        return self.cov_sqrtm_lower
 
     # todo: move to conditional???
     def Ax_plus_y(self, A, x, y) -> jax.Array:
