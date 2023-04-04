@@ -136,3 +136,10 @@ def sqrtm_to_upper_triangular(*, R):
     #   if we always use a positive diagonal.)
     upper_sqrtm = jnp.linalg.qr(R, mode="r")
     return upper_sqrtm
+
+
+def sqrt_sum_square(*args):
+    stack = jnp.stack(args)
+    sqrt_mat = sqrtm_to_upper_triangular(R=stack[:, None])
+    sqrt_mat_abs = jnp.abs(sqrt_mat)  # convention
+    return jnp.reshape(sqrt_mat_abs, ())
