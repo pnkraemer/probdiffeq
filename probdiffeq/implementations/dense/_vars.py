@@ -103,6 +103,7 @@ class DenseNormal(_collections.AbstractNormal):
 
     def logpdf(self, u, /):
         x1 = self.mahalanobis_norm(u)
+        # todo: compute this slogdet more efficiently (L is triangular!)
         x2 = jnp.linalg.slogdet(self.cov_sqrtm_lower)[1]
         x3 = u.size * jnp.log(jnp.pi * 2)
         sum = _sqrt_util.sqrt_sum_square(x1, x2, jnp.sqrt(x3))
