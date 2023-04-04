@@ -113,7 +113,6 @@ class DenseNormal(_collections.AbstractNormal):
 
     def mahalanobis_norm_squared(self, u, /):
         res_white = self.residual_white(u)
-        print(res_white)
         return jnp.dot(res_white, res_white)
 
     def mahalanobis_norm(self, u, /):
@@ -131,7 +130,7 @@ class DenseNormal(_collections.AbstractNormal):
     def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
         return jax.scipy.linalg.solve_triangular(
-            l_obs.T, u - obs_pt, lower=False, trans=1
+            l_obs.T, u - obs_pt, lower=False, trans="T"
         )
 
     def scale_covariance(self, scale_sqrtm):
