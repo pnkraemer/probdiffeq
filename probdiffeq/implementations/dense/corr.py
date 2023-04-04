@@ -57,9 +57,13 @@ class DenseTaylorZerothOrder(_collections.AbstractCorrection):
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
         observed = _vars.DenseNormal(b, l_obs_raw)
 
-        output_scale_sqrtm = observed.mahalanobis_norm(jnp.zeros_like(b))
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (b,)
+        mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(b.size)
+        error_estimate_unscaled = observed.marginal_stds()
+        error_estimate = output_scale_sqrtm * error_estimate_unscaled
+
+        # Return scaled error estimate and other quantities
+        return error_estimate, output_scale_sqrtm, (b,)
 
     def complete_correction(self, extrapolated, cache):
         ext = extrapolated  # alias for readability
@@ -119,14 +123,16 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
 
         # Gather the observed variable
         l_obs_raw = _sqrtm.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        obs = _vars.DenseNormal(b, l_obs_raw)
+        observed = _vars.DenseNormal(b, l_obs_raw)
 
         # Extract the output scale and the error estimate
-        output_scale_sqrtm = obs.mahalanobis_norm(jnp.zeros_like(b))
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs_raw, l_obs_raw))
+        mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(b.size)
+        error_estimate_unscaled = observed.marginal_stds()
+        error_estimate = output_scale_sqrtm * error_estimate_unscaled
 
-        # Return the scaled error estimate and the other quantities
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, (jvp_fn, (b,))
+        # Return scaled error estimate and other quantities
+        return error_estimate, output_scale_sqrtm, (jvp_fn, (b,))
 
     def complete_correction(self, extrapolated: _vars.DenseStateSpaceVar, cache):
         # Assign short-named variables for readability
@@ -229,12 +235,13 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         marginals = _vars.DenseNormal(m_marg, l_marg)
 
         # Compute output scale and error estimate
-        output_scale_sqrtm = marginals.mahalanobis_norm(jnp.zeros_like(m_1))
-        l_obs = marginals.cov_sqrtm_lower
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
+        mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m_marg.size)
+        error_estimate_unscaled = marginals.marginal_stds()
+        error_estimate = output_scale_sqrtm * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+        return error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
         # Select the required derivatives
@@ -339,12 +346,13 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         marginals = _vars.DenseNormal(m_marg, l_marg)
 
         # Compute output scale and error estimate
-        output_scale_sqrtm = marginals.mahalanobis_norm(jnp.zeros_like(m_1))
-        l_obs = marginals.cov_sqrtm_lower
-        error_estimate = jnp.sqrt(jnp.einsum("nj,nj->n", l_obs, l_obs))
+        mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
+        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m_marg.size)
+        error_estimate_unscaled = marginals.marginal_stds()
+        error_estimate = output_scale_sqrtm * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+        return error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache):
         # Select the required derivatives
