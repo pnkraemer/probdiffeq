@@ -37,7 +37,10 @@ plt.rcParams.update(notebook.plot_config())
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
-config.update("jax_enable_x64", True)
+# Catch NaN gradients in CI
+# Disable to improve speed
+config.update("jax_debug_nans", True)
+
 config.update("jax_platform_name", "cpu")
 ```
 
@@ -125,19 +128,20 @@ Like in the other tutorials, we use [Optax](https://optax.readthedocs.io/en/late
 
 ```python
 loss_fn = build_loss_fn(vf=vf, initial_values=(u0,))
-optim = optax.adam(learning_rate=1e-2)
+optim = optax.adam(learning_rate=2e-2)
 update_fn = build_update_fn(optimizer=optim, loss_fn=loss_fn)
 ```
 
 ```python
 p = f_args
 state = optim.init(p)
-
-chunk_size = 30
+chunk_size = 25
 for i in range(chunk_size):
     for _ in range(chunk_size**2):
         p, state = update_fn(p, state)
-    print(f"After {(i+1)*chunk_size**2}/{chunk_size**3} steps:", loss_fn(p))
+    print(
+        f"Log-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:", loss_fn(p)
+    )
 ```
 
 ```python

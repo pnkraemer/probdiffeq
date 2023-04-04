@@ -213,4 +213,14 @@ def case_solver_pair_reference_ek1(
 )
 def test_outputs_equal(solution_tornadox, solution_probdiffeq):
     for sol_tornadox, sol_probdiffeq in zip(solution_tornadox, solution_probdiffeq):
-        assert jnp.allclose(sol_tornadox, sol_probdiffeq)
+        # We need to lower the 'rtol' because tornadox is incorrect:
+        # To estimate errors, both probdiffeq and tornadox compute whitened residuals
+        # as (L^T)^(-1)v. But tornadox calls solve_triangular incorrectly
+        # (it forgets to set trans=1.)
+        # ProbDiffEq does it correctly as confirmed by the logpdf-tests
+        # (which fail with a small but noticeable error without  trans=1)
+        #
+        # Honestly, I find it a bit strange that the effect of this incorrect call
+        #  is not bigger. The output scales are simply wrong.
+        #  But until we run into more issues, let's roll with it.
+        assert jnp.allclose(sol_tornadox, sol_probdiffeq, rtol=2e-2)

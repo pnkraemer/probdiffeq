@@ -129,6 +129,20 @@ def sum_of_sqrtm_factors(*, R_stack: Tuple):
     return uppertri
 
 
+def sqrt_sum_square(*args):  # logsumexp but for squares
+    args_are_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) == 0, args)
+    if not jax.tree_util.tree_all(args_are_scalar):
+        args_shapes = jax.tree_util.tree_map(jnp.shape, args)
+        msg1 = "'sqrt_sum_square' expects scalar arguments. "
+        msg2 = f"PyTree with shapes {args_shapes} received."
+        raise ValueError(msg1 + msg2)
+
+    stack = jnp.stack(args)
+    sqrt_mat = sqrtm_to_upper_triangular(R=stack[:, None])
+    sqrt_mat_abs = jnp.abs(sqrt_mat)  # convention
+    return jnp.reshape(sqrt_mat_abs, ())
+
+
 def sqrtm_to_upper_triangular(*, R):
     """Transform a right matrix square root to a Cholesky factor."""
     # todo: enforce positive diagonals?

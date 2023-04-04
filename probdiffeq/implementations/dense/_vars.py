@@ -102,15 +102,23 @@ class DenseNormal(_collections.AbstractNormal):
     """
 
     def logpdf(self, u, /):
-        x1 = self.mahalanobis_norm(u) ** 2
-        x2 = jnp.linalg.slogdet(self.cov_sqrtm_lower)[1] ** 2
+        # todo: cache those?
+        diagonal = jnp.diagonal(self.cov_sqrtm_lower, axis1=-1, axis2=-2)
+        slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+
+        x1 = self.mahalanobis_norm_squared(u)
+        x2 = 2.0 * slogdet
         x3 = u.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
+
+    def mahalanobis_norm_squared(self, u, /):
+        res_white = self.residual_white(u)
+        return jnp.dot(res_white, res_white)
 
     def mahalanobis_norm(self, u, /):
         res_white = self.residual_white(u)
         norm_square = jnp.linalg.qr(res_white[:, None], mode="r")
-        return jnp.reshape(norm_square, ())
+        return jnp.reshape(jnp.abs(norm_square), ())
 
     def marginal_stds(self):
         def std(x):
@@ -121,7 +129,9 @@ class DenseNormal(_collections.AbstractNormal):
 
     def residual_white(self, u, /):
         obs_pt, l_obs = self.mean, self.cov_sqrtm_lower
-        return jax.scipy.linalg.solve_triangular(l_obs.T, obs_pt - u, lower=False)
+        return jax.scipy.linalg.solve_triangular(
+            l_obs.T, u - obs_pt, lower=False, trans="T"
+        )
 
     def scale_covariance(self, scale_sqrtm):
         cov_scaled = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower

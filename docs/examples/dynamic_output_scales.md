@@ -42,7 +42,6 @@ if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
 
-config.update("jax_enable_x64", True)
 config.update("jax_platform_name", "cpu")
 ```
 
