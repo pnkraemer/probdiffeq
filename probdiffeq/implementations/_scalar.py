@@ -34,6 +34,9 @@ class NormalQOI(_collections.AbstractNormal):
         return NormalQOI(self.mean, scale_sqrtm * self.cov_sqrtm_lower)
 
     def logpdf(self, u, /):
+        if jnp.ndim(u) > 0:
+            return jax.vmap(NormalQOI.logpdf)(self, u)
+
         x1 = self.marginal_stds()  # logdet
         x2 = self.mahalanobis_norm(u)
         x3 = u.size * jnp.log(jnp.pi * 2)

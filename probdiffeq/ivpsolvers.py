@@ -342,7 +342,18 @@ class MLESolver(_AbstractSolver):
 
     @staticmethod
     def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
-        x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean))
+        # Special consideration for block-diagonal models
+        # todo: should this logic be pushed to the implementation itself?
+        if jnp.ndim(diffsqrtm) > 0:
+
+            def fn_partial(d, o):
+                fn = MLESolver._update_output_scale_sqrtm
+                return fn(diffsqrtm=d, n=n, obs=o)
+
+            fn_vmap = jax.vmap(fn_partial)
+            return fn_vmap(diffsqrtm, obs)
+
+        x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
         sum = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
         return sum / jnp.sqrt(n + 1)
 
