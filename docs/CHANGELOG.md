@@ -26,9 +26,12 @@ Notable breaking changes:
   This is mathematically more accurate; the function should depend on an input.
 
 
-Notable enhancements:
+Notable bug fixes:
 
-* None
+* The log-pdf behaviour of Gaussian random variables has been corrected (previously, the returned values were incorrect).
+  This means that the behaviour of, e.g., parameter estimation scripts will change slightly.
+  A related bugfix in the whitened residuals implies that the DenseTS1 is not exactly equivalent 
+  to tornadox.ReferenceEK1 anymore (because the latter still has the same error).
 
 
 ## Prior to v0.2.0
