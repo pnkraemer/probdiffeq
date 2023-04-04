@@ -6,8 +6,8 @@ from math import prod
 
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util
 from probdiffeq.backend import testing
-from probdiffeq.implementations import _sqrtm
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 
@@ -22,7 +22,7 @@ def test_revert_kernel_scalar(HCshape, Cshape, Xshape):
     K = C @ HC.T @ jnp.linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
-    extra, (bw_noise, g) = _sqrtm.revert_conditional(R_X_F=HC.T, R_X=C.T, R_YX=X.T)
+    extra, (bw_noise, g) = _sqrt_util.revert_conditional(R_X_F=HC.T, R_X=C.T, R_YX=X.T)
 
     def cov(x):
         return x.T @ x
@@ -41,7 +41,7 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
     K = C @ HC.T @ jnp.linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
-    extra, (bw_noise, g) = _sqrtm.revert_conditional_noisefree(R_X_F=HC.T, R_X=C.T)
+    extra, (bw_noise, g) = _sqrt_util.revert_conditional_noisefree(R_X_F=HC.T, R_X=C.T)
 
     def cov(x):
         return x.T @ x
