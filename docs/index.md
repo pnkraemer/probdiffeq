@@ -29,10 +29,11 @@ and many more.
 
 * **QUICKSTART:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/quickstart/)
 * **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples/posterior_uncertainties/)
-* **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/#choosing-a-solver)
-* **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/ivpsolve/)
+* **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/choosing_a_solver/)
+* **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
-* **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/ivpsolve/)
+* **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/benchmarks/pleiades/external/)
+* **CHANGELOG:** [LINK](https://github.com/pnkraemer/probdiffeq/blob/main/docs/CHANGELOG.md)
 
 
 ## Installation
