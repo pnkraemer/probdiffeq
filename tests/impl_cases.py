@@ -22,7 +22,7 @@ def case_ts1_dense():
     return recipes.DenseTS1.from_params
 
 
-@testing.case(id="DenseTS0", tags=["scalar"])
+@testing.case(id="ScalarTS0", tags=["scalar"])
 def case_ts0_scalar():
     def impl_factory(*, num_derivatives, ode_shape=()):
         return recipes.ScalarTS0.from_params(num_derivatives=num_derivatives)

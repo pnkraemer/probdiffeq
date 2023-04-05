@@ -104,6 +104,7 @@ nav:
           - Dense: "api_docs/implementations/dense.md"
           - Isotropic: "api_docs/implementations/iso.md"
           - Block-diagonal: "api_docs/implementations/blockdiag.md"
+          - Scalar: "api_docs/implementations/scalar.md"
           - Cubature rules: "api_docs/implementations/cubature.md"
         - "api_docs/solution.md"
         - "api_docs/taylor.md"
