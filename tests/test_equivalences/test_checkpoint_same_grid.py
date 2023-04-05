@@ -35,7 +35,7 @@ def smoother_pair_two_smoothers():
 @testing.filterwarnings("ignore:A conventional smoother")
 @testing.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
 @testing.parametrize("tol", [1e-2])
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \
