@@ -1,9 +1,6 @@
 theme:
     name: material
     features:
-        - navigation.tabs
-        - navigation.tabs.sticky
-        - navigation.top
         - toc.integrate
     palette:
         - scheme: default
@@ -55,6 +52,7 @@ plugins:
         handlers:
             python:
                 options:
+                    inherited_members: alphabetical
                     show_root_full_path: true
                     show_if_no_docstring: true
                     show_signature_annotations: true
@@ -83,14 +81,14 @@ nav:
         - Choosing a solver: "quickstart/choosing_a_solver.md"
         - Troubleshooting: "quickstart/troubleshooting.md"
     - Examples & Benchmarks:
-        - Basic Examples:
+        - Solvers & Solutions:
             - "examples/posterior_uncertainties.ipynb"
             - "examples/second_order_problems.ipynb"
             - "examples/smoothing.ipynb"
             - "examples/solution_object.ipynb"
             - "examples/dynamic_output_scales.ipynb"
             - "examples/conditioning-on-zero-residual.ipynb"
-        - Advanced Examples:
+        - Parameter estimation:
             - Parameter estimation with Optax: "advanced_examples/physics_enhanced_regression_1.ipynb"
             - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
             - Neural ODEs with Optax: "advanced_examples/neural_ode.ipynb"
@@ -106,21 +104,30 @@ nav:
             - High irradiance response (HIRES):
               - "benchmarks/hires/external.ipynb"
     - API Documentation:
-        - probdiffeq.ivpsolve: "api_docs/ivpsolve.md"
-        - probdiffeq.ivpsolvers: "api_docs/ivpsolvers.md"
-        - probdiffeq.strategies:
-          - probdiffeq.strategies.filters: "api_docs/strategies/filters.md"
-          - probdiffeq.strategies.smoothers: "api_docs/strategies/smoothers.md"
-        - probdiffeq.implementations:
-          - probdiffeq.implementations.recipes: "api_docs/implementations/recipes.md"
-          - probdiffeq.implementations.dense: "api_docs/implementations/dense.md"
-          - probdiffeq.implementations.iso: "api_docs/implementations/iso.md"
-          - probdiffeq.implementations.blockdiag: "api_docs/implementations/blockdiag.md"
-          - probdiffeq.implementations.scalar: "api_docs/implementations/scalar.md"
-          - probdiffeq.implementations.cubature: "api_docs/implementations/cubature.md"
-        - probdiffeq.solution: "api_docs/solution.md"
-        - probdiffeq.taylor: "api_docs/taylor.md"
-        - probdiffeq.controls: "api_docs/controls.md"
+        - ivpsolve: "api_docs/ivpsolve.md"
+        - ivpsolvers: "api_docs/ivpsolvers.md"
+        - strategies:
+          - filters: "api_docs/strategies/filters.md"
+          - smoothers: "api_docs/strategies/smoothers.md"
+        - implementations:
+          - recipes: "api_docs/implementations/recipes.md"
+          - cubature: "api_docs/implementations/cubature.md"
+          - dense:
+              - extra: "api_docs/implementations/dense/extra.md"
+              - linearise: "api_docs/implementations/dense/linearise.md"
+              - corr: "api_docs/implementations/dense/corr.md"
+          - iso:
+              - extra: "api_docs/implementations/iso/extra.md"
+              - corr: "api_docs/implementations/iso/corr.md"
+          - blockdiag:
+              - extra: "api_docs/implementations/blockdiag/extra.md"
+              - corr: "api_docs/implementations/blockdiag/corr.md"
+          - scalar:
+              - extra: "api_docs/implementations/scalar/extra.md"
+              - corr: "api_docs/implementations/scalar/corr.md"
+        - solution: "api_docs/solution.md"
+        - taylor: "api_docs/taylor.md"
+        - controls: "api_docs/controls.md"
 
     - Developer Documentation:
         - Changelog: "CHANGELOG.md"
