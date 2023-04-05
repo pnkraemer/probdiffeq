@@ -4,7 +4,8 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _ibm_util, _scalar
+from probdiffeq.implementations import _collections, _ibm_util
+from probdiffeq.implementations.scalar import _scalar
 
 _IBMCacheType = Tuple[jax.Array]  # Cache type
 """Type-variable for the extrapolation-cache."""

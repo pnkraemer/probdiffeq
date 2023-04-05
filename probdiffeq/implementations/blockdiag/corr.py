@@ -4,7 +4,8 @@ from typing import Callable, Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _scalar, cubature
+from probdiffeq.implementations import _collections, cubature
+from probdiffeq.implementations.scalar import _scalar
 
 _SLR1CacheType = Tuple[Callable]
 """Type-variable for the correction-cache."""
