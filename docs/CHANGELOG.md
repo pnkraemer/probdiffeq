@@ -25,6 +25,10 @@ Notable breaking changes:
 * `norm_of_whitened_residual_sqrtm()` has been renamed to `mahalanobis_norm(x, /)` and is a function of one argument now.
   This is mathematically more accurate; the function should depend on an input.
 
+Notable enhancements:
+
+* Scalar solvers are now part of the public API. While all "other" methods are for IVPs of shape `(d,)`,
+  scalar solvers target problems of shape `()` (i.e. if the initial values are floats, not arrays).
 
 Notable bug fixes:
 
