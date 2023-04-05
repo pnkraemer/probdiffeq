@@ -7,9 +7,9 @@ import jax.numpy as jnp
 import jax.scipy.stats
 
 from probdiffeq.backend import testing
-from probdiffeq.implementations import _scalar
 from probdiffeq.implementations.dense import _vars as vars_dense
 from probdiffeq.implementations.iso import _vars as vars_iso
+from probdiffeq.implementations.scalar import _vars as vars_scalar
 
 
 @testing.fixture(name="setup")
@@ -73,12 +73,11 @@ def test_logpdf_scalar(setup):
     variance = jnp.trace(cov_cholesky)
 
     def fn1(x):
-        return _scalar.NormalQOI(mean, variance).logpdf(x)
+        return vars_scalar.NormalQOI(mean, variance).logpdf(x)
 
     def fn2(x):
-        return jax.scipy.stats.multivariate_normal.logpdf(
-            x, mean=mean, cov=variance**2
-        )
+        logpdf_fn = jax.scipy.stats.multivariate_normal.logpdf
+        return logpdf_fn(x, mean=mean, cov=variance**2)
 
     u = mean + 1e-3
     pdf1 = fn1(u)
