@@ -26,9 +26,9 @@ class _SimulateTerminalValuesConfig(NamedTuple):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
-def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag="nd")
+def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
@@ -40,7 +40,23 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases(
+    "ode_problem", cases="..problem_cases", has_tag="scalar"
+)
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag="scalar")
+def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
+    return _SimulateTerminalValuesConfig(
+        ode_problem=ode_problem,
+        solver_fn=ivpsolvers.MLESolver,
+        impl_fn=impl_fn,
+        strat_fn=filters.Filter,
+        solver_config=solver_config,
+        loop_fn=jax.lax.while_loop,
+    )
+
+
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 @testing.parametrize(
     "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
 )
@@ -56,7 +72,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 @testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SimulateTerminalValuesConfig(
@@ -85,8 +101,8 @@ def case_loop_eqx():
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@testing.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
+@testing.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -103,7 +119,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 
 @testing.fixture(scope="session", name="solution_terminal_values")
 @testing.parametrize_with_cases(
-    "setup", cases="..", prefix="case_setup_", scope="session"
+    "setup", cases=".", prefix="case_setup_", scope="session"
 )
 def fixture_solution_terminal_values(setup):
     ode_shape = setup.ode_problem.initial_values[0].shape
@@ -145,7 +161,7 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
     assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)
 
 
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 def test_jvp(ode_problem, solver_config):
     ode_shape = ode_problem.initial_values[0].shape
     solver = test_util.generate_solver(
