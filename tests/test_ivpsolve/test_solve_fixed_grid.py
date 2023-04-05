@@ -153,17 +153,22 @@ def fixture_parameter_to_solution(setup):
     return fn, setup.ode_problem.initial_values, skip_vjp
 
 
-def test_jvp(parameter_to_solution):
+def test_jvp(parameter_to_solution, solver_config):
     fn, primals, _ = parameter_to_solution
     jvp = functools.partial(jax.jvp, fn)
-    jax.test_util.check_jvp(fn, jvp, (primals,))
+
+    atol, rtol = solver_config.atol_assert, solver_config.rtol_assert
+    jax.test_util.check_jvp(f=fn, f_jvp=jvp, args=(primals,), atol=atol, rtol=rtol)
 
 
-def test_vjp(parameter_to_solution):
+def test_vjp(parameter_to_solution, solver_config):
     fn, primals, skip_vjp = parameter_to_solution
     if skip_vjp:
-        testing.skip(
-            "DenseSLR1 is not guaranteed to have valid VJPs at the moment #500."
+        reason = (
+            "DenseSLR1 is not guaranteed to have valid VJPs at the moment. See: #500."
         )
+        testing.skip(reason)
     vjp = functools.partial(jax.vjp, fn)
-    jax.test_util.check_vjp(fn, vjp, (primals,))
+
+    atol, rtol = solver_config.atol_assert, solver_config.rtol_assert
+    jax.test_util.check_vjp(f=fn, f_vjp=vjp, args=(primals,), atol=atol, rtol=rtol)

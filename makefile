@@ -30,7 +30,7 @@ lint:
 	pre-commit run --all-files
 
 test:
-	pytest -n auto -x -v -s  # parallelise, fail early, verbose output, show all 'stdout's
+	pytest -n auto -v -s  # parallelise, verbose output, show all 'stdout's
 	python -m doctest probdiffeq/*.py
 
 example:
