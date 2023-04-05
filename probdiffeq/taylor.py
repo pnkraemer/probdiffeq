@@ -134,8 +134,7 @@ def affine_recursion(
     vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
     fx, jvp_fn = jax.linearize(vf, *initial_values)
 
-    fx_rec = fx
-    fx_evaluations = [fx_rec := jvp_fn(fx_rec) for _ in range(num - 1)]  # noqa: F841
+    fx_evaluations = [fx := jvp_fn(fx) for _ in range(num - 1)]  # noqa: F821,F841
     return [*initial_values, fx, *fx_evaluations]
 
 

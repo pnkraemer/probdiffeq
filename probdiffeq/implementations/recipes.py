@@ -11,7 +11,8 @@ from probdiffeq.implementations.dense import corr as dense_corr
 from probdiffeq.implementations.dense import extra as dense_extra
 from probdiffeq.implementations.iso import corr as iso_corr
 from probdiffeq.implementations.iso import extra as iso_extra
-from probdiffeq.implementations.scalar import _scalar
+from probdiffeq.implementations.scalar import corr as scalar_corr
+from probdiffeq.implementations.scalar import extra as scalar_extra
 
 # todo: why are these classes? Why not plain functions?
 #  nothing is happening in here, really.
@@ -196,9 +197,11 @@ class DenseSLR0(
 
 
 @jax.tree_util.register_pytree_node_class
-class ScalarTS0(AbstractImplementation[_scalar.TaylorZerothOrder, _scalar.IBM]):
+class ScalarTS0(
+    AbstractImplementation[scalar_corr.TaylorZerothOrder, scalar_extra.IBM]
+):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = _scalar.TaylorZerothOrder(ode_order=ode_order)
-        extrapolation = _scalar.IBM.from_params(num_derivatives=num_derivatives)
+        correction = scalar_corr.TaylorZerothOrder(ode_order=ode_order)
+        extrapolation = scalar_extra.IBM.from_params(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
