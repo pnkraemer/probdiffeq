@@ -1,4 +1,4 @@
-# Quickstart
+# An easy example
 
 ```python
 import jax
