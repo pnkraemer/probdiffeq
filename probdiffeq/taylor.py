@@ -135,7 +135,7 @@ def affine_recursion(
     fx, jvp_fn = jax.linearize(vf, *initial_values)
 
     tmp = fx
-    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]  # noqa: F821,F841
+    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]  # noqa: F841
     return [*initial_values, fx, *fx_evaluations]
 
 
