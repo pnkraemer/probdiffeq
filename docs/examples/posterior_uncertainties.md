@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.14.4
+      jupytext_version: 1.14.5
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -74,7 +74,7 @@ sol = ivpsolve.solve_and_save_at(
 
 Plot the solution
 
-```python tags=[]
+```python
 _, num_derivatives, _ = sol.marginals.hidden_state.mean.shape
 
 

@@ -23,7 +23,7 @@ def strategy_pair_fixedpoint_smoother():
 
 
 @testing.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 def test_final_state_equal_to_filter(ode_problem, fil, smo):
     """Filters and smoothers should compute the same terminal values."""
     atol, rtol = 1e-2, 1e-1

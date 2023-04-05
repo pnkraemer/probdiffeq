@@ -4,7 +4,8 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _ibm_util, _scalar
+from probdiffeq.implementations import _collections, _ibm_util
+from probdiffeq.implementations.scalar import extra as scalar_extra
 
 _IBMCacheType = Tuple[jax.Array]  # Cache type
 """Type-variable for the extrapolation-cache."""
@@ -13,7 +14,7 @@ _IBMCacheType = Tuple[jax.Array]  # Cache type
 @jax.tree_util.register_pytree_node_class
 class BlockDiagIBM(_collections.AbstractExtrapolation):
     def __init__(self, *args, **kwargs):
-        self.ibm = _scalar.IBM(*args, **kwargs)
+        self.ibm = scalar_extra.IBM(*args, **kwargs)
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -66,29 +67,31 @@ class BlockDiagIBM(_collections.AbstractExtrapolation):
         )
 
     def begin_extrapolation(self, p0, /, dt):
-        fn = jax.vmap(_scalar.IBM.begin_extrapolation, in_axes=(0, 0, None))
+        fn = jax.vmap(scalar_extra.IBM.begin_extrapolation, in_axes=(0, 0, None))
         return fn(self.ibm, p0, dt)
 
     def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
-        fn = jax.vmap(_scalar.IBM.complete_extrapolation)
+        fn = jax.vmap(scalar_extra.IBM.complete_extrapolation)
         return fn(self.ibm, linearisation_pt, p0, cache, output_scale_sqrtm)
 
     def init_conditional(self, ssv_proto):
-        return jax.vmap(_scalar.IBM.init_conditional)(self.ibm, ssv_proto)
+        return jax.vmap(scalar_extra.IBM.init_conditional)(self.ibm, ssv_proto)
 
     def init_hidden_state(self, taylor_coefficients):
-        return jax.vmap(_scalar.IBM.init_hidden_state)(self.ibm, taylor_coefficients)
+        return jax.vmap(scalar_extra.IBM.init_hidden_state)(
+            self.ibm, taylor_coefficients
+        )
 
     # todo: move to correction?
     def init_error_estimate(self):
-        return jax.vmap(_scalar.IBM.init_error_estimate)(self.ibm)
+        return jax.vmap(scalar_extra.IBM.init_error_estimate)(self.ibm)
 
     # todo: move to correction?
     def init_output_scale_sqrtm(self):
-        return jax.vmap(_scalar.IBM.init_output_scale_sqrtm)(self.ibm)
+        return jax.vmap(scalar_extra.IBM.init_output_scale_sqrtm)(self.ibm)
 
     def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
-        fn = jax.vmap(_scalar.IBM.revert_markov_kernel)
+        fn = jax.vmap(scalar_extra.IBM.revert_markov_kernel)
         return fn(self.ibm, linearisation_pt, p0, cache, output_scale_sqrtm)
 
 

@@ -1,47 +1,105 @@
 """Tests for solving IVPs on adaptive grids."""
+from typing import Any, NamedTuple
+
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, taylor, test_util
+from probdiffeq import ivpsolve, ivpsolvers, test_util
 from probdiffeq.backend import testing
+from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
-@testing.fixture(scope="session", name="solution_solve")
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
-@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+class _SolveWithPythonWhileLoopConfig(NamedTuple):
+    ode_problem: Any
+    impl_fn: Any
+    solver_fn: Any
+    strat_fn: Any
+    solver_config: Any
+
+
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["nd"])
+def case_setup_all_nd_configs(ode_problem, impl_fn, solver_config):
+    return _SolveWithPythonWhileLoopConfig(
+        ode_problem=ode_problem,
+        impl_fn=impl_fn,
+        solver_fn=ivpsolvers.MLESolver,
+        strat_fn=filters.Filter,
+        solver_config=solver_config,
+    )
+
+
+@testing.case
+@testing.parametrize_with_cases(
+    "ode_problem", cases="..problem_cases", has_tag=["scalar"]
+)
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["scalar"])
+def case_setup_all_scalar_configs(ode_problem, impl_fn, solver_config):
+    return _SolveWithPythonWhileLoopConfig(
+        ode_problem=ode_problem,
+        impl_fn=impl_fn,
+        solver_fn=ivpsolvers.MLESolver,
+        strat_fn=filters.Filter,
+        solver_config=solver_config,
+    )
+
+
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 @testing.parametrize("strat_fn", [filters.Filter, smoothers.Smoother])
-def fixture_solution_solve_with_python_while_loop(
-    ode_problem, solver_fn, impl_fn, strat_fn, solver_config
-):
+def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
+    return _SolveWithPythonWhileLoopConfig(
+        ode_problem=ode_problem,
+        impl_fn=recipes.BlockDiagTS0.from_params,
+        solver_fn=ivpsolvers.MLESolver,
+        strat_fn=strat_fn,
+        solver_config=solver_config,
+    )
+
+
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
+@testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
+def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
+    return _SolveWithPythonWhileLoopConfig(
+        ode_problem=ode_problem,
+        solver_fn=solver_fn,
+        impl_fn=recipes.BlockDiagTS0.from_params,
+        strat_fn=filters.Filter,
+        solver_config=solver_config,
+    )
+
+
+@testing.fixture(scope="session", name="solution_solve")
+@testing.parametrize_with_cases(
+    "setup", cases=".", prefix="case_setup_", scope="session"
+)
+def fixture_solution_solve_with_python_while_loop(setup):
     solver = test_util.generate_solver(
-        solver_factory=solver_fn,
-        strategy_factory=strat_fn,
-        impl_factory=impl_fn,
-        ode_shape=(2,),
+        solver_factory=setup.solver_fn,
+        strategy_factory=setup.strat_fn,
+        impl_factory=setup.impl_fn,
+        ode_shape=setup.ode_problem.initial_values[0].shape,
         num_derivatives=4,
     )
     solution = ivpsolve.solve_with_python_while_loop(
-        ode_problem.vector_field,
-        ode_problem.initial_values,
-        t0=ode_problem.t0,
-        t1=ode_problem.t1,
-        parameters=ode_problem.args,
+        setup.ode_problem.vector_field,
+        setup.ode_problem.initial_values,
+        t0=setup.ode_problem.t0,
+        t1=setup.ode_problem.t1,
+        parameters=setup.ode_problem.args,
         solver=solver,
-        atol=solver_config.atol_solve,
-        rtol=solver_config.rtol_solve,
-        taylor_fn=taylor.taylor_mode_fn,
+        atol=setup.solver_config.atol_solve,
+        rtol=setup.solver_config.rtol_solve,
     )
 
-    return solution.u, jax.vmap(ode_problem.solution)(solution.t)
+    return solution.u, jax.vmap(setup.ode_problem.solution)(solution.t)
 
 
 def test_solve_computes_correct_terminal_value(solution_solve, solver_config):
     u, u_ref = solution_solve
-    assert jnp.allclose(
-        u,
-        u_ref,
-        atol=solver_config.atol_assert,
-        rtol=solver_config.rtol_assert,
-    )
+    atol = solver_config.atol_assert
+    rtol = solver_config.rtol_assert
+    assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)

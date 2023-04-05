@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.14.4
+      jupytext_version: 1.14.5
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -18,7 +18,7 @@ jupyter:
 Probabilistic IVP solvers are probabilistic numerical algorithms, which means they compute probability distributions over possible solutions instead of simple point estimates.
 A probabilistic description is much richer than a non-probabilistic description, so the solution objects returned by the probabilistic IVP solver are worth investigating:
 
-```python tags=[]
+```python
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -40,7 +40,7 @@ if not backend.has_been_selected:
 config.update("jax_platform_name", "cpu")
 ```
 
-```python tags=[]
+```python
 # Make a problem
 f, u0, (t0, t1), f_args = ivps.sir()
 
@@ -56,7 +56,7 @@ solver = ivpsolvers.DynamicSolver(
 )
 ```
 
-```python tags=[]
+```python
 %%time
 sol = ivpsolve.solve_with_python_while_loop(
     vector_field,
@@ -72,14 +72,14 @@ sol = ivpsolve.solve_with_python_while_loop(
 
 We can access elements of the solution.
 
-```python tags=[]
+```python
 print(len(sol))
 print(sol[-1])
 ```
 
 We can plot an estimate of the solution.
 
-```python tags=[]
+```python
 plt.plot(sol.t, sol.u, ".-")
 plt.show()
 ```
@@ -96,7 +96,7 @@ and many more options.
 
 Check this out:
 
-```python tags=[]
+```python
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
 _, dense = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
 

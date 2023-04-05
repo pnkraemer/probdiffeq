@@ -2,7 +2,7 @@ default_language_version:
   python: python3
 repos:
   - repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 23.3.0
     hooks:
       - id: black
         language_version: python3
@@ -17,13 +17,13 @@ repos:
     - id: flake8
       additional_dependencies: [flake8-docstrings]
   - repo: https://github.com/mwouts/jupytext
-    rev: v1.14.4
+    rev: v1.14.5
     hooks:
     - id: jupytext
       files: (docs/).+
       args: [--sync]
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.6.3
+    rev: 1.7.0
     hooks:
      - id: nbqa-black
        files: (docs/).+

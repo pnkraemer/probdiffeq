@@ -23,9 +23,9 @@ class _SolveAndSaveAtConfig(NamedTuple):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases")
-def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["nd"])
+def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
@@ -37,7 +37,23 @@ def case_setup_all_implementations(ode_problem, impl_fn, solver_config):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases(
+    "ode_problem", cases="..problem_cases", has_tag=["scalar"]
+)
+@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["scalar"])
+def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
+    return _SolveAndSaveAtConfig(
+        ode_problem=ode_problem,
+        solver_fn=ivpsolvers.MLESolver,
+        impl_fn=impl_fn,
+        strat_fn=filters.Filter,
+        solver_config=solver_config,
+        loop_fn=jax.lax.while_loop,
+    )
+
+
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize("strat_fn", [filters.Filter, smoothers.FixedPointSmoother])
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveAndSaveAtConfig(
@@ -51,7 +67,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SolveAndSaveAtConfig(
@@ -80,8 +96,8 @@ def case_loop_eqx():
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
-@testing.parametrize_with_cases("loop_fn", cases="..", prefix="case_loop_")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
 def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
@@ -95,7 +111,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 
 @testing.fixture(scope="session", name="solution_save_at")
 @testing.parametrize_with_cases(
-    "setup", cases="..", prefix="case_setup_", scope="session"
+    "setup", cases=".", prefix="case_setup_", scope="session"
 )
 def fixture_solution_save_at(setup):
     ode_shape = setup.ode_problem.initial_values[0].shape
@@ -135,7 +151,7 @@ def test_solution_correct(solution_save_at, solver_config):
     )
 
 
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 def test_smoother_warning(ode_problem):
     """A non-fixed-point smoother is not usable in save-at-simulation."""
     ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=3)

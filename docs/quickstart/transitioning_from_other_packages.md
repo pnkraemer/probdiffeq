@@ -167,18 +167,3 @@ Additionally:
 
 * Solution objects in ProbDiffEq are random processes (posterior distributions). Random variable types replace most vectors and matrices. This statistical description is richer than a point estimate but needs to be calibrated (e.g. by using an `MLESolver()` instead of `CalibrationFreeSolver()`)
 * ProbDiffEq offers different solution methods: `simulate_terminal_values()`, `solve_with_native_python_loop()`, or `solve_and_save_at()`. Expressing different modes of solving differential equations in different functions leads to simple code in each solution routine. It also allows matching the solver to the solving mode (e.g., terminal values vs save-at). For example, `simulate_terminal_values()` is best combined with a filter.
-
-
-## Choosing a solver
-Good solvers are problem-dependent. Nevertheless, some guidelines exist:
-
-* If your problem is high-dimensional, use an implementation based on Kronecker-factorisation or block-diagonal covariances. The complexity of those two scales as O(d) for d-dimensional problems (per step). `DenseTS1()` and `DenseSLR1()` cost O(d^3) per step.
-* Use `IsoTS0()` or `BlockDiagTS0()` instead of `DenseTS0()`
-* If your problem is stiff, use a solver with first-order linearisation (for sintance DenseTS1 or DenseSLR1) instead of one with zeroth-order linearisation. Try to avoid too extreme state-space model factorisations (e.g. `Iso*` or `BlockDiag*`)
-* Almost always, use a `Filter` strategy for `simulate_terminal_values()`, 
-  a smoother strategy for `solve_with_native_python_loop()`, 
-  and a `FixedPointSmoother` strategy for `solve_and_save_at()`.
-* Use `DynamicSolver()` if you expect that the output scale of your IVP solution varies greatly. 
-  Otherwise, choose an `MLESolver()`. Try a `CalibrationFreeSolver()` for parameter-inference problems.
-
-These guidelines are a work in progress and may change soon. If you have any input, let us know!

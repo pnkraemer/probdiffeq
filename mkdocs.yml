@@ -4,14 +4,14 @@ theme:
         - navigation.sections  # Sections are included in the navigation on the left.
     palette:
         - scheme: default
-          primary: teal
-          accent: teal
+          primary: red
+          accent: red
           toggle:
              icon: material/weather-night
              name: Switch to dark mode
         - scheme: slate
-          primary: teal
-          accent: teal
+          primary: black
+          accent: black
           toggle:
              icon: material/weather-sunny
              name: Switch to light mode
@@ -81,6 +81,7 @@ nav:
     - Quickstart:
         - "quickstart/quickstart.ipynb"
         - "quickstart/transitioning_from_other_packages.md"
+        - "quickstart/choosing_a_solver.md"
         - "quickstart/troubleshooting.md"
     - Examples:
         - "examples/posterior_uncertainties.ipynb"
@@ -104,6 +105,7 @@ nav:
           - Dense: "api_docs/implementations/dense.md"
           - Isotropic: "api_docs/implementations/iso.md"
           - Block-diagonal: "api_docs/implementations/blockdiag.md"
+          - Scalar: "api_docs/implementations/scalar.md"
           - Cubature rules: "api_docs/implementations/cubature.md"
         - "api_docs/solution.md"
         - "api_docs/taylor.md"
