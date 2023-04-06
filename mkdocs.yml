@@ -131,6 +131,7 @@ nav:
 
     - Developer Documentation:
         - Changelog: "dev_docs/changelog.md"
+        - "dev_docs/public_api.md"
         - "dev_docs/creating_example_notebook.md"
         - "dev_docs/continuous_integration.md"
 

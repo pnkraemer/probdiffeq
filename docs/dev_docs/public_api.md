@@ -12,11 +12,12 @@ All public functions and classes in the following modules and packages are consi
 * `implementations.recipes.py`
 * `implementations.cubature.py`
 
-Exceptions from this rule are all functions and classes  that are not marked as `warning: highly experimental`,
+Exceptions from this rule are all functions and classes  that are marked as `warning: highly experimental`,
 e.g., `taylor.taylor_mode_doubling_fn`.
 
 Breaking changes in these public modules are officially considered breaking changes.
-This means that the minor version number is increased (there has not been a major version yet).
+This means that the minor version number is increased according the the rules of semantic versioning
+(there has not been a major version yet).
 It also means that an entry in the  changelog is warranted, and if deprecation policies are introduced in the future, it would apply to these module.
 
 Everything else is either considered private or experimental.
