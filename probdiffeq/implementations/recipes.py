@@ -46,7 +46,7 @@ class AbstractImplementation:
 class IsoTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = iso_corr.IsoTaylorZerothOrder(ode_order=ode_order)
+        correction = iso_corr.taylor_order_zero(ode_order=ode_order)
         extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
 
@@ -69,11 +69,11 @@ class BlockDiagSLR1(AbstractImplementation):
         cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
     ):
         if cubature_rule is None:
-            correction = blockdiag_corr.BlockDiagStatisticalFirstOrder.from_params(
+            correction = blockdiag_corr.statistical_order_one(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
-            correction = blockdiag_corr.BlockDiagStatisticalFirstOrder(
+            correction = blockdiag_corr.statistical_order_one(
                 ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
             )
         extrapolation = blockdiag_extra.ibm_blockdiag(

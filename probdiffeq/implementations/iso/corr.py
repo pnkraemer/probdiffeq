@@ -9,8 +9,12 @@ from probdiffeq.implementations import _collections
 from probdiffeq.implementations.iso import _vars
 
 
+def taylor_order_zero(*args, **kwargs):
+    return _IsoTaylorZerothOrder(*args, **kwargs)
+
+
 @jax.tree_util.register_pytree_node_class
-class IsoTaylorZerothOrder(_collections.AbstractCorrection):
+class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
     def begin_correction(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
