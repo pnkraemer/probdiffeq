@@ -33,6 +33,7 @@ class _PositiveCubatureRule:
 
 
 def blockdiag(cubature_fn):
+    """Turn a cubature-factory into a blockdiagonal-cubature factory."""
     # Todo: is this what _we want_?
     #  It is what we had so far, but how does the complexity of this mess
     #  scale with the dimensionality of the problem?
@@ -50,14 +51,6 @@ def blockdiag(cubature_fn):
         return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
     return fn
-
-
-def _tree_stack_duplicates(tree, n):
-    return jax.tree_util.tree_map(lambda s: jnp.concatenate([s[None, ...]] * n), tree)
-
-
-def _tree_shape(tree):
-    return jax.tree_util.tree_map(jnp.shape, tree)
 
 
 def third_order_spherical(input_shape):
