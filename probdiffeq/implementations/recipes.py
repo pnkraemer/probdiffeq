@@ -1,10 +1,8 @@
 """State-space model implementations."""
 
-from typing import Generic, TypeVar
-
 import jax
 
-from probdiffeq.implementations import _collections, cubature
+from probdiffeq.implementations import cubature
 from probdiffeq.implementations.blockdiag import corr as blockdiag_corr
 from probdiffeq.implementations.blockdiag import extra as blockdiag_extra
 from probdiffeq.implementations.dense import corr as dense_corr
@@ -18,21 +16,13 @@ from probdiffeq.implementations.scalar import extra as scalar_extra
 #  nothing is happening in here, really.
 
 
-ExtraType = TypeVar("ExtraType", bound=_collections.AbstractExtrapolation)
-"""A type-variable for an extrapolation style."""
-
-
-CorrType = TypeVar("CorrType", bound=_collections.AbstractCorrection)
-"""A type-variable for a correction style."""
-
-
-class AbstractImplementation(Generic[CorrType, ExtraType]):
+class AbstractImplementation:
     """State-space model implementation.
 
     Mostly a container for an extrapolation style and a correction style.
     """
 
-    def __init__(self, *, correction: CorrType, extrapolation: ExtraType):
+    def __init__(self, *, correction, extrapolation):
         self.correction = correction
         self.extrapolation = extrapolation
 
@@ -53,20 +43,16 @@ class AbstractImplementation(Generic[CorrType, ExtraType]):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoTS0(AbstractImplementation[iso_corr.IsoTaylorZerothOrder, iso_extra.IsoIBM]):
+class IsoTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
         correction = iso_corr.IsoTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = iso_extra.IsoIBM.from_params(num_derivatives=num_derivatives)
+        extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class BlockDiagSLR1(
-    AbstractImplementation[
-        blockdiag_corr.BlockDiagStatisticalFirstOrder, blockdiag_extra.BlockDiagIBM
-    ]
-):
+class BlockDiagSLR1(AbstractImplementation):
     """First-order statistical linear regression in state-space models \
      with a block-diagonal structure.
 
@@ -97,11 +83,7 @@ class BlockDiagSLR1(
 
 
 @jax.tree_util.register_pytree_node_class
-class BlockDiagTS0(
-    AbstractImplementation[
-        blockdiag_corr.BlockDiagStatisticalFirstOrder, blockdiag_extra.BlockDiagIBM
-    ]
-):
+class BlockDiagTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = blockdiag_corr.BlockDiagTaylorZerothOrder(ode_order=ode_order)
@@ -112,9 +94,7 @@ class BlockDiagTS0(
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseTS1(
-    AbstractImplementation[dense_corr.DenseTaylorFirstOrder, dense_extra.DenseIBM]
-):
+class DenseTS1(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = dense_corr.DenseTaylorFirstOrder(
@@ -127,9 +107,7 @@ class DenseTS1(
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseTS0(
-    AbstractImplementation[dense_corr.DenseTaylorZerothOrder, dense_extra.DenseIBM]
-):
+class DenseTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = dense_corr.DenseTaylorZerothOrder(
@@ -142,9 +120,7 @@ class DenseTS0(
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseSLR1(
-    AbstractImplementation[dense_corr.DenseStatisticalFirstOrder, dense_extra.DenseIBM]
-):
+class DenseSLR1(AbstractImplementation):
     @classmethod
     def from_params(
         cls,
@@ -164,9 +140,7 @@ class DenseSLR1(
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseSLR0(
-    AbstractImplementation[dense_corr.DenseStatisticalZerothOrder, dense_extra.DenseIBM]
-):
+class DenseSLR0(AbstractImplementation):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
 
@@ -197,9 +171,7 @@ class DenseSLR0(
 
 
 @jax.tree_util.register_pytree_node_class
-class ScalarTS0(
-    AbstractImplementation[scalar_corr.TaylorZerothOrder, scalar_extra.IBM]
-):
+class ScalarTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
         correction = scalar_corr.TaylorZerothOrder(ode_order=ode_order)

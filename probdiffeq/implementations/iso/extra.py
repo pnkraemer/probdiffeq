@@ -10,8 +10,20 @@ from probdiffeq.implementations import _collections, _ibm_util
 from probdiffeq.implementations.iso import _conds, _vars
 
 
+def ibm_iso(num_derivatives):
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    scales, powers = _tmp
+    return _IsoIBM(
+        a=a,
+        q_sqrtm_lower=q_sqrtm,
+        preconditioner_scales=scales,
+        preconditioner_powers=powers,
+    )
+
+
 @jax.tree_util.register_pytree_node_class
-class IsoIBM(_collections.AbstractExtrapolation):
+class _IsoIBM(_collections.AbstractExtrapolation):
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
@@ -39,18 +51,6 @@ class IsoIBM(_collections.AbstractExtrapolation):
         return cls(
             a=a,
             q_sqrtm_lower=q_sqrtm_lower,
-            preconditioner_scales=scales,
-            preconditioner_powers=powers,
-        )
-
-    @classmethod
-    def from_params(cls, num_derivatives):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-        _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-        scales, powers = _tmp
-        return cls(
-            a=a,
-            q_sqrtm_lower=q_sqrtm,
             preconditioner_scales=scales,
             preconditioner_powers=powers,
         )
