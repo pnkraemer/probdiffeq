@@ -100,7 +100,7 @@ class DenseTS1(AbstractImplementation):
         correction = dense_corr.DenseTaylorFirstOrder(
             ode_shape=ode_shape, ode_order=ode_order
         )
-        extrapolation = dense_extra.DenseIBM.from_params(
+        extrapolation = dense_extra.ibm_dense(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
@@ -113,7 +113,7 @@ class DenseTS0(AbstractImplementation):
         correction = dense_corr.DenseTaylorZerothOrder(
             ode_shape=ode_shape, ode_order=ode_order
         )
-        extrapolation = dense_extra.DenseIBM.from_params(
+        extrapolation = dense_extra.ibm_dense(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
@@ -133,7 +133,7 @@ class DenseSLR1(AbstractImplementation):
         correction = dense_corr.DenseStatisticalFirstOrder.from_params(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
-        extrapolation = dense_extra.DenseIBM.from_params(
+        extrapolation = dense_extra.ibm_dense(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
@@ -164,7 +164,7 @@ class DenseSLR0(AbstractImplementation):
         correction = dense_corr.DenseStatisticalZerothOrder.from_params(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
-        extrapolation = dense_extra.DenseIBM.from_params(
+        extrapolation = dense_extra.ibm_dense(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)

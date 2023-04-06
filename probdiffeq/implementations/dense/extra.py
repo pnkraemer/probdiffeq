@@ -8,8 +8,26 @@ from probdiffeq.implementations import _collections, _ibm_util
 from probdiffeq.implementations.dense import _conds, _vars
 
 
+def ibm_dense(ode_shape, num_derivatives):
+    assert len(ode_shape) == 1
+    (d,) = ode_shape
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    eye_d = jnp.eye(d)
+
+    _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    scales, powers = _tmp
+    return _DenseIBM(
+        a=jnp.kron(eye_d, a),
+        q_sqrtm_lower=jnp.kron(eye_d, q_sqrtm),
+        num_derivatives=num_derivatives,
+        ode_shape=ode_shape,
+        preconditioner_scales=scales,
+        preconditioner_powers=powers,
+    )
+
+
 @jax.tree_util.register_pytree_node_class
-class DenseIBM(_collections.AbstractExtrapolation):
+class _DenseIBM(_collections.AbstractExtrapolation):
     def __init__(
         self,
         a,
@@ -57,24 +75,6 @@ class DenseIBM(_collections.AbstractExtrapolation):
             ode_shape=d,
             preconditioner_powers=powers,
             preconditioner_scales=scales,
-        )
-
-    @classmethod
-    def from_params(cls, ode_shape, num_derivatives):
-        assert len(ode_shape) == 1
-        (d,) = ode_shape
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-        eye_d = jnp.eye(d)
-
-        _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-        scales, powers = _tmp
-        return cls(
-            a=jnp.kron(eye_d, a),
-            q_sqrtm_lower=jnp.kron(eye_d, q_sqrtm),
-            num_derivatives=num_derivatives,
-            ode_shape=ode_shape,
-            preconditioner_scales=scales,
-            preconditioner_powers=powers,
         )
 
     def init_hidden_state(self, taylor_coefficients):
