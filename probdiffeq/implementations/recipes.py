@@ -86,7 +86,7 @@ class BlockDiagSLR1(AbstractImplementation):
 class BlockDiagTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = blockdiag_corr.BlockDiagTaylorZerothOrder(ode_order=ode_order)
+        correction = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
         extrapolation = blockdiag_extra.ibm_blockdiag(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )

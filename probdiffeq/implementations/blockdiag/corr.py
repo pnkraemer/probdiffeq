@@ -119,23 +119,38 @@ class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         )
 
 
+def taylor_order_zero(*args, **kwargs):
+    ts0 = scalar_corr.taylor_order_zero(*args, **kwargs)
+    return _BlockDiagTaylorZerothOrder(ts0)
+
+
 _TS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._ts0 = scalar_corr.TaylorZerothOrder(*args, **kwargs)
+class _BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
+    def __init__(self, ts0, /):
+        super().__init__(ode_order=ts0.ode_order)
+        self.ts0 = ts0
+
+    def tree_flatten(self):
+        children = (self.ts0,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (ts0,) = children
+        return cls(ts0)
 
     def begin_correction(self, x, /, vector_field, t, p):
-        select_fn = jax.vmap(scalar_corr.TaylorZerothOrder.select_derivatives)
-        m0, m1 = select_fn(self._ts0, x.hidden_state)
+        select_fn = jax.vmap(type(self.ts0).select_derivatives)
+        m0, m1 = select_fn(self.ts0, x.hidden_state)
 
         fx = vector_field(*m0.T, t=t, p=p)
 
-        marginalise_fn = jax.vmap(scalar_corr.TaylorZerothOrder.marginalise_observation)
-        cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x.hidden_state)
+        marginalise_fn = jax.vmap(type(self.ts0).marginalise_observation)
+        cache, obs_unbatch = marginalise_fn(self.ts0, fx, m1, x.hidden_state)
 
         mahalanobis_fn = scalar_vars.NormalQOI.mahalanobis_norm
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
@@ -144,8 +159,8 @@ class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache: _TS0CacheType):
-        fn = jax.vmap(scalar_corr.TaylorZerothOrder.complete_correction)
-        return fn(self._ts0, extrapolated, cache)
+        fn = jax.vmap(type(self.ts0).complete_correction)
+        return fn(self.ts0, extrapolated, cache)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]
