@@ -1,39 +1,33 @@
 """Cubature rules."""
 
+from typing import Any, Callable, NamedTuple
+
 import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
-# todo: clean up the constructors
-#  (there is a lot of duplication, and the *_batch logic is not really obvious)
 
-
-@jax.tree_util.register_pytree_node_class
-class _PositiveCubatureRule:
+class PositiveCubatureRule(NamedTuple):
     """Cubature rule with positive weights."""
 
-    def __init__(self, *, points, weights_sqrtm):
-        self.points = points
-        self.weights_sqrtm = weights_sqrtm
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        args = f"points={self.points}, weights_sqrtm={self.weights_sqrtm}"
-        return f"{name}({args})"
-
-    def tree_flatten(self):
-        children = self.points, self.weights_sqrtm
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        pts, weights_sqrtm = children
-        return cls(points=pts, weights_sqrtm=weights_sqrtm)
+    points: jax.Array
+    weights_sqrtm: jax.Array
 
 
-def blockdiag(cubature_fn):
-    """Turn a cubature-factory into a blockdiagonal-cubature-factory."""
+CubatureFactory = Callable[[Any], PositiveCubatureRule]
+"""Signature for the methods compatible with transformations à la `blockdiag()`."""
+
+
+def blockdiag(cubature_fn: CubatureFactory) -> CubatureFactory:
+    """Turn a cubature-factory into a blockdiagonal-cubature-factory.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
     # Todo: is this what _we want_?
     #  It is what we had so far, but how does the complexity of this mess
     #  scale with the dimensionality of the problem?
@@ -48,25 +42,25 @@ def blockdiag(cubature_fn):
         d, *_ = input_shape
         points = instance.points.T  # (d, S)
         weights_sqrtm = jnp.stack(d * [instance.weights_sqrtm])  # (d, S)
-        return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+        return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
     return fn
 
 
-def third_order_spherical(input_shape):
+def third_order_spherical(input_shape) -> PositiveCubatureRule:
     """Third-order spherical cubature integration."""
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
         points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
-        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+        return PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
     (S, _) = points_mat.shape
     points = jnp.reshape(points_mat, (S,))
-    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+    return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _third_order_spherical_params(*, d):
@@ -76,20 +70,20 @@ def _third_order_spherical_params(*, d):
     return pts, weights_sqrtm
 
 
-def unscented_transform(input_shape, r=1.0):
+def unscented_transform(input_shape, r=1.0) -> PositiveCubatureRule:
     """Unscented transform."""
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
         points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
-        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+        return PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
     (S, _) = points_mat.shape
     points = jnp.reshape(points_mat, (S,))
-    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+    return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _unscented_transform_params(d, *, r):
@@ -103,10 +97,10 @@ def _unscented_transform_params(d, *, r):
     return pts, weights_sqrtm
 
 
-def gauss_hermite(input_shape, degree=5):
+def gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
     """(Statistician's) Gauss-Hermite cubature.
 
-    The number of cubature points is prod(input_shape)**degree.
+    The number of cubature points is `prod(input_shape)**degree`.
     """
     assert len(input_shape) == 1
     (dim,) = input_shape
@@ -123,7 +117,7 @@ def gauss_hermite(input_shape, degree=5):
     # Build a tensor grid and return class
     tensor_pts = _tensor_points(pts, d=dim)
     tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
-    return _PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
+    return PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
 
 
 # how does this generalise to an input_shape instead of an input_dimension?
