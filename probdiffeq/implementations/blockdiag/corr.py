@@ -56,7 +56,7 @@ class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, ode_shape, ode_order):
-        cubature_fn = cubature.ThirdOrderSpherical.from_params_blockdiag
+        cubature_fn = cubature.blockdiag(cubature.third_order_spherical)
         cubature_rule = cubature_fn(input_shape=ode_shape)
         return cls(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule

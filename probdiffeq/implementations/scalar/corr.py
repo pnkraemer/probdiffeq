@@ -68,7 +68,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
     @classmethod
     def from_params(cls, ode_order):
-        sci_fn = cubature.ThirdOrderSpherical.from_params
+        sci_fn = cubature.third_order_spherical
         cubature_rule = sci_fn(input_shape=())
         return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
