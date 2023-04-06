@@ -175,5 +175,5 @@ class ScalarTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
         correction = scalar_corr.TaylorZerothOrder(ode_order=ode_order)
-        extrapolation = scalar_extra.IBM.from_params(num_derivatives=num_derivatives)
+        extrapolation = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
