@@ -97,7 +97,7 @@ class BlockDiagTS0(AbstractImplementation):
 class DenseTS1(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = dense_corr.DenseTaylorFirstOrder(
+        correction = dense_corr.taylor_order_one(
             ode_shape=ode_shape, ode_order=ode_order
         )
         extrapolation = dense_extra.ibm_dense(
@@ -110,7 +110,7 @@ class DenseTS1(AbstractImplementation):
 class DenseTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = dense_corr.DenseTaylorZerothOrder(
+        correction = dense_corr.taylor_order_zero(
             ode_shape=ode_shape, ode_order=ode_order
         )
         extrapolation = dense_extra.ibm_dense(
@@ -130,7 +130,7 @@ class DenseSLR1(AbstractImplementation):
         ode_order=1,
         num_derivatives=4,
     ):
-        correction = dense_corr.DenseStatisticalFirstOrder.from_params(
+        correction = dense_corr.statistical_order_one(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
         extrapolation = dense_extra.ibm_dense(

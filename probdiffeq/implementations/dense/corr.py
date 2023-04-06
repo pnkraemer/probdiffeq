@@ -10,8 +10,44 @@ from probdiffeq.implementations import _collections, cubature
 from probdiffeq.implementations.dense import _vars, linearise
 
 
+def taylor_order_zero(*args, **kwargs):
+    return _DenseTaylorZerothOrder(*args, **kwargs)
+
+
+def taylor_order_one(*args, **kwargs):
+    return _DenseTaylorFirstOrder(*args, **kwargs)
+
+
+def statistical_order_zero(
+    ode_shape,
+    ode_order,
+    cubature_rule_fn=cubature.third_order_spherical,
+):
+    cubature_rule = cubature_rule_fn(input_shape=ode_shape)
+    linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
+    return _DenseStatisticalZerothOrder(
+        ode_shape=ode_shape,
+        ode_order=ode_order,
+        linearise_fn=linearise_fn,
+    )
+
+
+def statistical_order_one(
+    ode_shape,
+    ode_order,
+    cubature_rule_fn=cubature.third_order_spherical,
+):
+    cubature_rule = cubature_rule_fn(input_shape=ode_shape)
+    linearise_fn = functools.partial(linearise.slr1, cubature_rule=cubature_rule)
+    return _DenseStatisticalFirstOrder(
+        ode_shape=ode_shape,
+        ode_order=ode_order,
+        linearise_fn=linearise_fn,
+    )
+
+
 @jax.tree_util.register_pytree_node_class
-class DenseTaylorZerothOrder(_collections.AbstractCorrection):
+class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -87,7 +123,7 @@ class DenseTaylorZerothOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseTaylorFirstOrder(_collections.AbstractCorrection):
+class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -159,20 +195,6 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
 
         # Return the results
         return observed, (corrected, gain)
-
-
-def statistical_order_zero(
-    ode_shape,
-    ode_order,
-    cubature_rule_fn=cubature.third_order_spherical,
-):
-    cubature_rule = cubature_rule_fn(input_shape=ode_shape)
-    linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
-    return _DenseStatisticalZerothOrder(
-        ode_shape=ode_shape,
-        ode_order=ode_order,
-        linearise_fn=linearise_fn,
-    )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -286,7 +308,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
+class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError
@@ -304,17 +326,6 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         self.e1 = functools.partial(select, i=1)
         self.e0_vect = functools.partial(select_vect, i=0)
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
-
-    @classmethod
-    def from_params(
-        cls,
-        ode_shape,
-        ode_order,
-        cubature_rule_fn=cubature.third_order_spherical,
-    ):
-        cubature_rule = cubature_rule_fn(input_shape=ode_shape)
-        linearise_fn = functools.partial(linearise.slr1, cubature_rule=cubature_rule)
-        return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
