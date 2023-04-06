@@ -4,7 +4,7 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.implementations import _collections, _ibm_util
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.scalar import extra as scalar_extra
 
 _IBMCacheType = Tuple[jax.Array]  # Cache type
@@ -14,34 +14,19 @@ _IBMCacheType = Tuple[jax.Array]  # Cache type
 def ibm_blockdiag(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (n,) = ode_shape
-    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-    a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
-
-    _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-    scales, powers = _tmp
-    scales_stack, powers_stack = _tree_stack_duplicates((scales, powers), n=n)
-    return _BlockDiagIBM(
-        a=a_stack,
-        q_sqrtm_lower=q_sqrtm_stack,
-        preconditioner_scales=scales_stack,
-        preconditioner_powers=powers_stack,
-    )
+    ibm = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
+    ibm_stack = _tree_stack_duplicates(ibm, n=n)
+    return _BlockDiag(ibm_stack)
 
 
 @jax.tree_util.register_pytree_node_class
-class _BlockDiagIBM(_collections.AbstractExtrapolation):
-    def __init__(self, *args, **kwargs):
-        self.ibm = scalar_extra._IBM(*args, **kwargs)
+class _BlockDiag(_collections.AbstractExtrapolation):
+    def __init__(self, ibm):
+        self.ibm = ibm
 
     def __repr__(self):
         name = self.__class__.__name__
-        return (
-            f"{name}("
-            f"a={self.ibm.a}, "
-            f"q_sqrtm_lower={self.ibm.q_sqrtm_lower}, "
-            f"preconditioner_scales={self.ibm.preconditioner_scales}, "
-            f"preconditioner_powers={self.ibm.preconditioner_powers})"
-        )
+        return f"{name}(ibm={self.ibm})"
 
     @property
     def num_derivatives(self):
@@ -59,12 +44,7 @@ class _BlockDiagIBM(_collections.AbstractExtrapolation):
     @classmethod
     def tree_unflatten(cls, _aux, children):
         (ibm,) = children
-        return cls(
-            a=ibm.a,
-            q_sqrtm_lower=ibm.q_sqrtm_lower,
-            preconditioner_scales=ibm.preconditioner_scales,
-            preconditioner_powers=ibm.preconditioner_powers,
-        )
+        return cls(ibm)
 
     def begin_extrapolation(self, p0, /, dt):
         fn = jax.vmap(scalar_extra._IBM.begin_extrapolation, in_axes=(0, 0, None))
