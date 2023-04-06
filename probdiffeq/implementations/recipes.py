@@ -76,7 +76,7 @@ class BlockDiagSLR1(AbstractImplementation):
             correction = blockdiag_corr.BlockDiagStatisticalFirstOrder(
                 ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
             )
-        extrapolation = blockdiag_extra.BlockDiagIBM.from_params(
+        extrapolation = blockdiag_extra.ibm_blockdiag(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)
@@ -87,7 +87,7 @@ class BlockDiagTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = blockdiag_corr.BlockDiagTaylorZerothOrder(ode_order=ode_order)
-        extrapolation = blockdiag_extra.BlockDiagIBM.from_params(
+        extrapolation = blockdiag_extra.ibm_blockdiag(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
         return cls(correction=correction, extrapolation=extrapolation)

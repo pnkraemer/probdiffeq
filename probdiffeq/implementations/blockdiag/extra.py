@@ -11,10 +11,27 @@ _IBMCacheType = Tuple[jax.Array]  # Cache type
 """Type-variable for the extrapolation-cache."""
 
 
+def ibm_blockdiag(ode_shape, num_derivatives):
+    assert len(ode_shape) == 1
+    (n,) = ode_shape
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
+
+    _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    scales, powers = _tmp
+    scales_stack, powers_stack = _tree_stack_duplicates((scales, powers), n=n)
+    return _BlockDiagIBM(
+        a=a_stack,
+        q_sqrtm_lower=q_sqrtm_stack,
+        preconditioner_scales=scales_stack,
+        preconditioner_powers=powers_stack,
+    )
+
+
 @jax.tree_util.register_pytree_node_class
-class BlockDiagIBM(_collections.AbstractExtrapolation):
+class _BlockDiagIBM(_collections.AbstractExtrapolation):
     def __init__(self, *args, **kwargs):
-        self.ibm = scalar_extra.IBM(*args, **kwargs)
+        self.ibm = scalar_extra._IBM(*args, **kwargs)
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -49,49 +66,32 @@ class BlockDiagIBM(_collections.AbstractExtrapolation):
             preconditioner_powers=ibm.preconditioner_powers,
         )
 
-    @classmethod
-    def from_params(cls, ode_shape, num_derivatives):
-        assert len(ode_shape) == 1
-        (n,) = ode_shape
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-        a_stack, q_sqrtm_stack = _tree_stack_duplicates((a, q_sqrtm), n=n)
-
-        _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-        scales, powers = _tmp
-        scales_stack, powers_stack = _tree_stack_duplicates((scales, powers), n=n)
-        return cls(
-            a=a_stack,
-            q_sqrtm_lower=q_sqrtm_stack,
-            preconditioner_scales=scales_stack,
-            preconditioner_powers=powers_stack,
-        )
-
     def begin_extrapolation(self, p0, /, dt):
-        fn = jax.vmap(scalar_extra.IBM.begin_extrapolation, in_axes=(0, 0, None))
+        fn = jax.vmap(scalar_extra._IBM.begin_extrapolation, in_axes=(0, 0, None))
         return fn(self.ibm, p0, dt)
 
     def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
-        fn = jax.vmap(scalar_extra.IBM.complete_extrapolation)
+        fn = jax.vmap(scalar_extra._IBM.complete_extrapolation)
         return fn(self.ibm, linearisation_pt, p0, cache, output_scale_sqrtm)
 
     def init_conditional(self, ssv_proto):
-        return jax.vmap(scalar_extra.IBM.init_conditional)(self.ibm, ssv_proto)
+        return jax.vmap(scalar_extra._IBM.init_conditional)(self.ibm, ssv_proto)
 
     def init_hidden_state(self, taylor_coefficients):
-        return jax.vmap(scalar_extra.IBM.init_hidden_state)(
+        return jax.vmap(scalar_extra._IBM.init_hidden_state)(
             self.ibm, taylor_coefficients
         )
 
     # todo: move to correction?
     def init_error_estimate(self):
-        return jax.vmap(scalar_extra.IBM.init_error_estimate)(self.ibm)
+        return jax.vmap(scalar_extra._IBM.init_error_estimate)(self.ibm)
 
     # todo: move to correction?
     def init_output_scale_sqrtm(self):
-        return jax.vmap(scalar_extra.IBM.init_output_scale_sqrtm)(self.ibm)
+        return jax.vmap(scalar_extra._IBM.init_output_scale_sqrtm)(self.ibm)
 
     def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
-        fn = jax.vmap(scalar_extra.IBM.revert_markov_kernel)
+        fn = jax.vmap(scalar_extra._IBM.revert_markov_kernel)
         return fn(self.ibm, linearisation_pt, p0, cache, output_scale_sqrtm)
 
 
