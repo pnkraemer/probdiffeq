@@ -1,7 +1,7 @@
 theme:
     name: material
     features:
-        - navigation.sections  # Sections are included in the navigation on the left.
+        - toc.integrate
     palette:
         - scheme: default
           primary: red
@@ -15,8 +15,6 @@ theme:
           toggle:
              icon: material/weather-sunny
              name: Switch to light mode
-    icon:
-        repo: fontawesome/brands/github  # GitHub logo in top right
 
 site_name: probdiffeq
 site_description: The documentation for the probdiffeq software library.
@@ -50,22 +48,21 @@ extra_javascript:
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 plugins:
-    - search
     - mkdocstrings:
         handlers:
             python:
                 options:
-                    inherited_members: true
+                    inherited_members: alphabetical
                     show_root_full_path: true
                     show_if_no_docstring: true
                     show_signature_annotations: true
                     show_source: true
                     docstring_style: numpy
-                    members_order: alphabetical
                     show_root_heading: true
+                    heading_level: 2
     - exclude:
         glob:
-          - "quickstart/quickstart.md"
+          - "quickstart/easy_example.md"
           - "examples/*.md"
           - "advanced_examples/*.md"
           - "benchmarks/lotka_volterra/internal.md"
@@ -77,52 +74,64 @@ plugins:
 
 
 nav:
-    - index.md
-    - Quickstart:
-        - "quickstart/quickstart.ipynb"
-        - "quickstart/transitioning_from_other_packages.md"
-        - "quickstart/choosing_a_solver.md"
-        - "quickstart/troubleshooting.md"
-    - Examples:
-        - "examples/posterior_uncertainties.ipynb"
-        - "examples/second_order_problems.ipynb"
-        - "examples/smoothing.ipynb"
-        - "examples/solution_object.ipynb"
-        - "examples/dynamic_output_scales.ipynb"
-        - "examples/conditioning-on-zero-residual.ipynb"
-    - Advanced Examples:
-        - Parameter estimation with Optax: "advanced_examples/physics_enhanced_regression_1.ipynb"
-        - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
-        - Train a Neural ODE with Optax: "advanced_examples/neural_ode.ipynb"
+    - Getting started:
+        - Getting started: "index.md"
+        - An easy example: "quickstart/easy_example.ipynb"
+        - Transitioning: "quickstart/transitioning_from_other_packages.md"
+        - Choosing a solver: "quickstart/choosing_a_solver.md"
+        - Troubleshooting: "quickstart/troubleshooting.md"
+    - Examples & Benchmarks:
+        - Solvers & Solutions:
+            - "examples/posterior_uncertainties.ipynb"
+            - "examples/second_order_problems.ipynb"
+            - "examples/smoothing.ipynb"
+            - "examples/solution_object.ipynb"
+            - "examples/dynamic_output_scales.ipynb"
+            - "examples/conditioning-on-zero-residual.ipynb"
+        - Parameter estimation:
+            - Parameter estimation with Optax: "advanced_examples/physics_enhanced_regression_1.ipynb"
+            - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
+            - Neural ODEs with Optax: "advanced_examples/neural_ode.ipynb"
+        - Benchmarks:
+            - Lotka-Volterra:
+              - "benchmarks/lotka_volterra/insights.md"
+              - "benchmarks/lotka_volterra/internal.ipynb"
+              - "benchmarks/lotka_volterra/external.ipynb"
+            - Pleiades:
+              - "benchmarks/pleiades/external.ipynb"
+            - Stiff Van der Pol:
+              - "benchmarks/stiff_van_der_pol/external.ipynb"
+            - High irradiance response (HIRES):
+              - "benchmarks/hires/external.ipynb"
     - API Documentation:
-        - Solution routines: "api_docs/ivpsolve.md"
-        - Solvers: "api_docs/ivpsolvers.md"
-        - Estimation strategies:
-          - "api_docs/strategies/filters.md"
-          - "api_docs/strategies/smoothers.md"
-        - State-space model implementations:
-          - Recipes: "api_docs/implementations/recipes.md"
-          - Dense: "api_docs/implementations/dense.md"
-          - Isotropic: "api_docs/implementations/iso.md"
-          - Block-diagonal: "api_docs/implementations/blockdiag.md"
-          - Scalar: "api_docs/implementations/scalar.md"
-          - Cubature rules: "api_docs/implementations/cubature.md"
-        - "api_docs/solution.md"
-        - "api_docs/taylor.md"
-        - "api_docs/controls.md"
+        - ivpsolve: "api_docs/ivpsolve.md"
+        - ivpsolvers: "api_docs/ivpsolvers.md"
+        - strategies:
+          - filters: "api_docs/strategies/filters.md"
+          - smoothers: "api_docs/strategies/smoothers.md"
+        - implementations:
+          - recipes: "api_docs/implementations/recipes.md"
+          - cubature: "api_docs/implementations/cubature.md"
+          - dense:
+              - extra: "api_docs/implementations/dense/extra.md"
+              - linearise: "api_docs/implementations/dense/linearise.md"
+              - corr: "api_docs/implementations/dense/corr.md"
+          - iso:
+              - extra: "api_docs/implementations/iso/extra.md"
+              - corr: "api_docs/implementations/iso/corr.md"
+          - blockdiag:
+              - extra: "api_docs/implementations/blockdiag/extra.md"
+              - corr: "api_docs/implementations/blockdiag/corr.md"
+          - scalar:
+              - extra: "api_docs/implementations/scalar/extra.md"
+              - corr: "api_docs/implementations/scalar/corr.md"
+        - solution: "api_docs/solution.md"
+        - taylor: "api_docs/taylor.md"
+        - controls: "api_docs/controls.md"
+
     - Developer Documentation:
+        - Changelog: "CHANGELOG.md"
         - "dev_docs/creating_example_notebook.md"
         - "dev_docs/continuous_integration.md"
-    - Benchmarks:
-        - Lotka-Volterra:
-          - "benchmarks/lotka_volterra/insights.md"
-          - "benchmarks/lotka_volterra/internal.ipynb"
-          - "benchmarks/lotka_volterra/external.ipynb"
-        - Pleiades:
-          - "benchmarks/pleiades/external.ipynb"
-        - Stiff Van der Pol:
-          - "benchmarks/stiff_van_der_pol/external.ipynb"
-        - High irradiance response (HIRES):
-          - "benchmarks/hires/external.ipynb"
-    - Miscellaneous:
-      - Changelog: "CHANGELOG.md"
+
+
