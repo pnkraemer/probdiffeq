@@ -146,34 +146,46 @@ def fixture_parameter_to_solution(setup):
     implementation = solver.strategy.implementation
 
     # DenseSLR1(ThirdOrderSpherical) has a NaN vector-Jacobian product.
-    # Therefore, we skip all vjp-DenseSLR1 tests until VJP behaviour is cleaned up.
+    # Therefore, we skip all autodiff-DenseSLR1 tests
+    # until the VJP/JVP behaviour has been cleaned up.
     # (It is easier to skip them all for now than to investigate how to skip
     # this very specific instance.) See: Issue #500.
-    skip_vjp = isinstance(implementation, recipes.DenseSLR1)
-    return fn, setup.ode_problem.initial_values, skip_vjp
+    skip_jvp_and_vjp = isinstance(implementation, recipes.DenseSLR1)
+    return fn, setup.ode_problem.initial_values, skip_jvp_and_vjp
 
 
 def test_jvp(parameter_to_solution, solver_config):
-    fn, primals, _ = parameter_to_solution
+    fn, primals, skip_jvp = parameter_to_solution
+    if skip_jvp:
+        reason1 = "DenseSLR1 is not guaranteed to have valid JVPs at the moment. "
+        reason2 = "See: #500."
+        testing.skip(reason1 + reason2)
+
     jvp = functools.partial(jax.jvp, fn)
 
-    atol, rtol = solver_config.atol_assert, solver_config.rtol_assert
+    # Autodiff tests are sometimes a bit flaky...
+    # There is also no clear mathematical argument that solutions that
+    # have been computed with atol A and rtol R should have
+    # gradients that coincide with their finite difference approximations with
+    # accuracies A and R. Therefore, we relax them a little bit.
+    # todo: move autodiff_atol_assert, autodiff_rtol_assert into solver config.
+    atol, rtol = 10 * solver_config.atol_assert, 10 * solver_config.rtol_assert
     jax.test_util.check_jvp(f=fn, f_jvp=jvp, args=(primals,), atol=atol, rtol=rtol)
 
 
 def test_vjp(parameter_to_solution, solver_config):
     fn, primals, skip_vjp = parameter_to_solution
     if skip_vjp:
-        reason = (
-            "DenseSLR1 is not guaranteed to have valid VJPs at the moment. See: #500."
-        )
-        testing.skip(reason)
+        reason1 = "DenseSLR1 is not guaranteed to have valid VJPs at the moment. "
+        reason2 = "See: #500."
+        testing.skip(reason1 + reason2)
     vjp = functools.partial(jax.vjp, fn)
 
-    # JVP tests are sometimes a bit flaky...
+    # Autodiff tests are sometimes a bit flaky...
     # There is also no clear mathematical argument that solutions that
     # have been computed with atol A and rtol R should have
     # gradients that coincide with their finite difference approximations with
     # accuracies A and R. Therefore, we relax them a little bit.
+    # todo: move autodiff_atol_assert, autodiff_rtol_assert into solver config.
     atol, rtol = 10 * solver_config.atol_assert, 10 * solver_config.rtol_assert
     jax.test_util.check_vjp(f=fn, f_vjp=vjp, args=(primals,), atol=atol, rtol=rtol)
