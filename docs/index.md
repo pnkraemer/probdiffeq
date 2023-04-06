@@ -33,7 +33,7 @@ and many more.
 * **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
 * **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/benchmarks/pleiades/external/)
-* **CHANGELOG:** [LINK](https://github.com/pnkraemer/probdiffeq/blob/main/docs/CHANGELOG.md)
+* **CHANGELOG:** [LINK](https://github.com/pnkraemer/probdiffeq/blob/main/docs/changelog.md)
 
 
 ## Installation
