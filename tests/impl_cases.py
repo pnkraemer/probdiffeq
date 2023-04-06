@@ -46,7 +46,7 @@ def case_slr1_dense_default():
 @testing.case(id="DenseSLR1(ThirdOrderSpherical)", tags=["nd"])
 def case_slr1_dense_sci():
     def impl_factory(**kwargs):
-        cube_fn = cubature.ThirdOrderSpherical.from_params
+        cube_fn = cubature.third_order_spherical
         return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
@@ -82,7 +82,7 @@ def case_slr0_dense_default():
 @testing.case(id="DenseSLR0(ThirdOrderSpherical)", tags=["nd"])
 def case_slr0_dense_sci():
     def impl_factory(**kwargs):
-        cube_fn = cubature.ThirdOrderSpherical.from_params
+        cube_fn = cubature.third_order_spherical
         return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory

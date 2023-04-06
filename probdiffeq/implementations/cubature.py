@@ -31,25 +31,25 @@ class _PositiveCubatureRule:
         pts, weights_sqrtm = children
         return cls(points=pts, weights_sqrtm=weights_sqrtm)
 
-    @classmethod
-    def from_params_blockdiag(cls, input_shape, **kwargs):
-        # Todo: is this what _we want_?
-        #  It is what we had so far, but how does the complexity of this mess
-        #  scale with the dimensionality of the problem?
-        #  It would be more efficient if S would not depend on the dimension anymore.
-        #  Currently it does. If we simply stacked 'd' 1-dimensional rules
-        #  on top of each other, the complexity reduces
-        #  (but the solver seems to suffer a lot...)
 
-        # Alright, so what do we do here?
-        # Make a _PositiveCubatureRule(points.shape=(S, d), weights.shape=(S,))
-        # pylint: disable=no-member
-        instance = cls.from_params(input_shape=input_shape, **kwargs)
+def blockdiag(cubature_fn):
+    # Todo: is this what _we want_?
+    #  It is what we had so far, but how does the complexity of this mess
+    #  scale with the dimensionality of the problem?
+    #  It would be more efficient if S would not depend on the dimension anymore.
+    #  Currently it does. If we simply stacked 'd' 1-dimensional rules
+    #  on top of each other, the complexity reduces
+    #  (but the solver seems to suffer a lot...)
+
+    def fn(input_shape, **kwargs):
+        instance = cubature_fn(input_shape=input_shape, **kwargs)
 
         d, *_ = input_shape
         points = instance.points.T  # (d, S)
         weights_sqrtm = jnp.stack(d * [instance.weights_sqrtm])  # (d, S)
-        return cls(points=points, weights_sqrtm=weights_sqrtm)
+        return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+
+    return fn
 
 
 def _tree_stack_duplicates(tree, n):
@@ -60,25 +60,20 @@ def _tree_shape(tree):
     return jax.tree_util.tree_map(jnp.shape, tree)
 
 
-@jax.tree_util.register_pytree_node_class
-class ThirdOrderSpherical(_PositiveCubatureRule):
+def third_order_spherical(input_shape):
     """Third-order spherical cubature integration."""
+    assert len(input_shape) <= 1
+    if len(input_shape) == 1:
+        (d,) = input_shape
+        points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=d)
+        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
-    @classmethod
-    def from_params(cls, input_shape):
-        """Construct an SCI rule from the shape of the input of the integrand."""
-        assert len(input_shape) <= 1
-        if len(input_shape) == 1:
-            (d,) = input_shape
-            points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=d)
-            return cls(points=points_mat, weights_sqrtm=weights_sqrtm)
-
-        # If input_shape == (), compute weights via input_shape=(1,)
-        # and 'squeeze' the points.
-        points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=1)
-        (S, _) = points_mat.shape
-        points = jnp.reshape(points_mat, (S,))
-        return cls(points=points, weights_sqrtm=weights_sqrtm)
+    # If input_shape == (), compute weights via input_shape=(1,)
+    # and 'squeeze' the points.
+    points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=1)
+    (S, _) = points_mat.shape
+    points = jnp.reshape(points_mat, (S,))
+    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _sci_pts_and_weights_sqrtm(*, d):

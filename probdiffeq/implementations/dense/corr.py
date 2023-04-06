@@ -196,7 +196,7 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         cls,
         ode_shape,
         ode_order,
-        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
+        cubature_rule_fn=cubature.third_order_spherical,
     ):
         cubature_rule = cubature_rule_fn(input_shape=ode_shape)
         linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
@@ -307,7 +307,7 @@ class DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         cls,
         ode_shape,
         ode_order,
-        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
+        cubature_rule_fn=cubature.third_order_spherical,
     ):
         cubature_rule = cubature_rule_fn(input_shape=ode_shape)
         linearise_fn = functools.partial(linearise.slr1, cubature_rule=cubature_rule)

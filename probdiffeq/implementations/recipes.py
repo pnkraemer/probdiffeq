@@ -150,7 +150,7 @@ class DenseSLR1(
         cls,
         *,
         ode_shape,
-        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
+        cubature_rule_fn=cubature.third_order_spherical,
         ode_order=1,
         num_derivatives=4,
     ):
@@ -183,7 +183,7 @@ class DenseSLR0(
         cls,
         *,
         ode_shape,
-        cubature_rule_fn=cubature.ThirdOrderSpherical.from_params,
+        cubature_rule_fn=cubature.third_order_spherical,
         ode_order=1,
         num_derivatives=4,
     ):
