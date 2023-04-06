@@ -174,6 +174,6 @@ class DenseSLR0(AbstractImplementation):
 class ScalarTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = scalar_corr.TaylorZerothOrder(ode_order=ode_order)
+        correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
         extrapolation = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)

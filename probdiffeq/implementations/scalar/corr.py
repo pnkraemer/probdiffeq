@@ -11,8 +11,12 @@ from probdiffeq.implementations.scalar import _vars
 # todo: make public and split into submodules
 
 
+def taylor_order_zero(*args, **kwargs):
+    return _TaylorZerothOrder(*args, **kwargs)
+
+
 @jax.tree_util.register_pytree_node_class
-class TaylorZerothOrder(_collections.AbstractCorrection):
+class _TaylorZerothOrder(_collections.AbstractCorrection):
     def begin_correction(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
