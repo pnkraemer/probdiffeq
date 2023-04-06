@@ -161,7 +161,7 @@ class DenseSLR0(AbstractImplementation):
         ode_order=1,
         num_derivatives=4,
     ):
-        correction = dense_corr.DenseStatisticalZerothOrder.from_params(
+        correction = dense_corr.statistical_order_zero(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
         extrapolation = dense_extra.ibm_dense(

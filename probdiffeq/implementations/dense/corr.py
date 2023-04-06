@@ -161,8 +161,22 @@ class DenseTaylorFirstOrder(_collections.AbstractCorrection):
         return observed, (corrected, gain)
 
 
+def statistical_order_zero(
+    ode_shape,
+    ode_order,
+    cubature_rule_fn=cubature.third_order_spherical,
+):
+    cubature_rule = cubature_rule_fn(input_shape=ode_shape)
+    linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
+    return _DenseStatisticalZerothOrder(
+        ode_shape=ode_shape,
+        ode_order=ode_order,
+        linearise_fn=linearise_fn,
+    )
+
+
 @jax.tree_util.register_pytree_node_class
-class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
+class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
 
@@ -190,17 +204,6 @@ class DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         self.e1 = functools.partial(select, i=1)
         self.e0_vect = functools.partial(select_vect, i=0)
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
-
-    @classmethod
-    def from_params(
-        cls,
-        ode_shape,
-        ode_order,
-        cubature_rule_fn=cubature.third_order_spherical,
-    ):
-        cubature_rule = cubature_rule_fn(input_shape=ode_shape)
-        linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
-        return cls(ode_shape=ode_shape, ode_order=ode_order, linearise_fn=linearise_fn)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
