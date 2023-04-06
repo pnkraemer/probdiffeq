@@ -138,8 +138,8 @@ def cubature_to_slr1(cubature_rule_fn, *, ode_shape):
 # Different linearisation styles
 ode_shape = u0.shape
 ts1 = recipes.DenseTS1.from_params(ode_shape=ode_shape)
-sci_fn = cubature.ThirdOrderSpherical.from_params
-ut_fn = functools.partial(cubature.UnscentedTransform.from_params, r=1.0)
+sci_fn = cubature.third_order_spherical
+ut_fn = functools.partial(cubature.unscented_transform, r=1.0)
 gh_fn = functools.partial(cubature.GaussHermite.from_params, degree=3)
 slr1_sci = cubature_to_slr1(sci_fn, ode_shape=ode_shape)
 slr1_ut = cubature_to_slr1(ut_fn, ode_shape=ode_shape)

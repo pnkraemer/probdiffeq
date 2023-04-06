@@ -58,47 +58,41 @@ def third_order_spherical(input_shape):
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
-        points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=d)
+        points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
         return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
-    points_mat, weights_sqrtm = _sci_pts_and_weights_sqrtm(d=1)
+    points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
     (S, _) = points_mat.shape
     points = jnp.reshape(points_mat, (S,))
     return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
-def _sci_pts_and_weights_sqrtm(*, d):
+def _third_order_spherical_params(*, d):
     eye_d = jnp.eye(d) * jnp.sqrt(d)
     pts = jnp.concatenate((eye_d, -1 * eye_d))
     weights_sqrtm = jnp.ones((2 * d,)) / jnp.sqrt(2.0 * d)
     return pts, weights_sqrtm
 
 
-@jax.tree_util.register_pytree_node_class
-class UnscentedTransform(_PositiveCubatureRule):
+def unscented_transform(input_shape, r=1.0):
     """Unscented transform."""
+    assert len(input_shape) <= 1
+    if len(input_shape) == 1:
+        (d,) = input_shape
+        points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
+        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
-    # todo: more parameters...
-    @classmethod
-    def from_params(cls, *, input_shape, r=1.0):
-        """Construct an unscented transform from parameters."""
-        assert len(input_shape) <= 1
-        if len(input_shape) == 1:
-            (d,) = input_shape
-            points_mat, weights_sqrtm = _ut_points_and_weights_sqrtm(d=d, r=r)
-            return cls(points=points_mat, weights_sqrtm=weights_sqrtm)
-
-        # If input_shape == (), compute weights via input_shape=(1,)
-        # and 'squeeze' the points.
-        points_mat, weights_sqrtm = _ut_points_and_weights_sqrtm(d=1, r=r)
-        (S, _) = points_mat.shape
-        points = jnp.reshape(points_mat, (S,))
-        return cls(points=points, weights_sqrtm=weights_sqrtm)
+    # If input_shape == (), compute weights via input_shape=(1,)
+    # and 'squeeze' the points.
+    points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
+    (S, _) = points_mat.shape
+    points = jnp.reshape(points_mat, (S,))
+    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
-def _ut_points_and_weights_sqrtm(d, *, r):
+def _unscented_transform_params(d, *, r):
     eye_d = jnp.eye(d) * jnp.sqrt(d + r)
     zeros = jnp.zeros((1, d))
     pts = jnp.concatenate((eye_d, zeros, -1 * eye_d))

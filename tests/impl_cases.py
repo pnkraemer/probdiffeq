@@ -55,7 +55,7 @@ def case_slr1_dense_sci():
 @testing.case(id="DenseSLR1(UnscentedTransform)", tags=["nd"])
 def case_slr1_dense_ut():
     def impl_factory(**kwargs):
-        cube_fn = cubature.UnscentedTransform.from_params
+        cube_fn = cubature.unscented_transform
         return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
@@ -91,7 +91,7 @@ def case_slr0_dense_sci():
 @testing.case(id="DenseSLR0(UnscentedTransform)", tags=["nd"])
 def case_slr0_dense_ut():
     def impl_factory(**kwargs):
-        cube_fn = cubature.UnscentedTransform.from_params
+        cube_fn = cubature.unscented_transform
         return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
