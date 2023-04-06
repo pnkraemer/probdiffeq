@@ -64,7 +64,7 @@ def case_slr1_dense_ut():
 @testing.case(id="DenseSLR1(GaussHermite)", tags=["nd"])
 def case_slr1_dense_gh():
     def impl_factory(**kwargs):
-        cube_fn = cubature.GaussHermite.from_params
+        cube_fn = cubature.gauss_hermite
         return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
@@ -100,7 +100,7 @@ def case_slr0_dense_ut():
 @testing.case(id="DenseSLR0(GaussHermite)", tags=["nd"])
 def case_slr0_dense_gh():
     def impl_factory(**kwargs):
-        cube_fn = cubature.GaussHermite.from_params
+        cube_fn = cubature.gauss_hermite
         return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory

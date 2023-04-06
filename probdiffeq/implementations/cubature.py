@@ -33,7 +33,7 @@ class _PositiveCubatureRule:
 
 
 def blockdiag(cubature_fn):
-    """Turn a cubature-factory into a blockdiagonal-cubature factory."""
+    """Turn a cubature-factory into a blockdiagonal-cubature-factory."""
     # Todo: is this what _we want_?
     #  It is what we had so far, but how does the complexity of this mess
     #  scale with the dimensionality of the problem?
@@ -103,32 +103,27 @@ def _unscented_transform_params(d, *, r):
     return pts, weights_sqrtm
 
 
-@jax.tree_util.register_pytree_node_class
-class GaussHermite(_PositiveCubatureRule):
-    """(Statistician's) Gauss-Hermite cubature."""
+def gauss_hermite(input_shape, degree=5):
+    """(Statistician's) Gauss-Hermite cubature.
 
-    @classmethod
-    def from_params(cls, *, input_shape, degree=5):
-        """Construct a Gauss-Hermite cubature rule.
+    The number of cubature points is prod(input_shape)**degree.
+    """
+    assert len(input_shape) == 1
+    (dim,) = input_shape
 
-        The number of cubature points is prod(input_shape)**degree.
-        """
-        assert len(input_shape) == 1
-        (dim,) = input_shape
+    # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
+    _roots = scipy.special.roots_hermitenorm(n=degree, mu=True)
+    pts, weights, sum_of_weights = _roots
+    weights = weights / sum_of_weights
 
-        # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
-        _roots = scipy.special.roots_hermitenorm(n=degree, mu=True)
-        pts, weights, sum_of_weights = _roots
-        weights = weights / sum_of_weights
+    # Transform into jax arrays and take square root of weights
+    pts = jnp.asarray(pts)
+    weights_sqrtm = jnp.sqrt(jnp.asarray(weights))
 
-        # Transform into jax arrays and take square root of weights
-        pts = jnp.asarray(pts)
-        weights_sqrtm = jnp.sqrt(jnp.asarray(weights))
-
-        # Build a tensor grid and return class
-        tensor_pts = _tensor_points(pts, d=dim)
-        tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
-        return cls(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
+    # Build a tensor grid and return class
+    tensor_pts = _tensor_points(pts, d=dim)
+    tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
+    return _PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
 
 
 # how does this generalise to an input_shape instead of an input_dimension?
