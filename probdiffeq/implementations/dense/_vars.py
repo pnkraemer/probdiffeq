@@ -142,9 +142,6 @@ class DenseNormal(_collections.AbstractNormal):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
 
-    def Ax_plus_y(self, A, x, y):
-        return A @ x + y
-
     @property
     def sample_shape(self):
         return self.mean.shape
