@@ -73,10 +73,6 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
     def transform_unit_sample(self, base, /) -> jax.Array:
         return self.mean + self.cov_sqrtm_lower @ base
 
-    # todo: move to conditional???
-    def Ax_plus_y(self, A, x, y) -> jax.Array:
-        return A @ x + y
-
 
 @jax.tree_util.register_pytree_node_class
 class IsoNormalQOI(_collections.AbstractNormal):
@@ -113,7 +109,3 @@ class IsoNormalQOI(_collections.AbstractNormal):
 
     def marginal_std(self):
         return self.cov_sqrtm_lower
-
-    # todo: move to conditional???
-    def Ax_plus_y(self, A, x, y) -> jax.Array:
-        raise NotImplementedError

@@ -18,9 +18,6 @@ class NormalQOI(_collections.AbstractNormal):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return m + l_sqrtm * base
 
-    def Ax_plus_y(self, A, x, y):
-        return A * x + y
-
     def condition_on_qoi_observation(self, u, /, observation_std):
         raise NotImplementedError
 
@@ -138,6 +135,3 @@ class NormalHiddenState(_collections.AbstractNormal):
     def transform_unit_sample(self, base, /):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
-
-    def Ax_plus_y(self, A, x, y):
-        return A @ x + y

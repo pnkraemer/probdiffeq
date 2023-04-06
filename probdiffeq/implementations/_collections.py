@@ -47,10 +47,6 @@ class AbstractNormal(abc.ABC):
     def mahalanobis_norm(self, u, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def Ax_plus_y(self, A, x, y):
-        raise NotImplementedError
-
     @property
     def sample_shape(self) -> Tuple[int]:
         return self.mean.shape
