@@ -12,8 +12,16 @@ _SLR1CacheType = Tuple[Callable]
 """Type-variable for the correction-cache."""
 
 
+def statistical_order_one(ode_shape, ode_order):
+    cubature_fn = cubature.blockdiag(cubature.third_order_spherical)
+    cubature_rule = cubature_fn(input_shape=ode_shape)
+    return _BlockDiagStatisticalFirstOrder(
+        ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
+    )
+
+
 @jax.tree_util.register_pytree_node_class
-class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
+class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
     """First-order statistical linear regression in state-space models \
      with block-diagonal covariance structure.
 
@@ -52,14 +60,6 @@ class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(
             ode_order=ode_order, ode_shape=ode_shape, cubature_rule=cubature_rule
-        )
-
-    @classmethod
-    def from_params(cls, ode_shape, ode_order):
-        cubature_fn = cubature.blockdiag(cubature.third_order_spherical)
-        cubature_rule = cubature_fn(input_shape=ode_shape)
-        return cls(
-            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
         )
 
     def begin_correction(self, extrapolated, /, vector_field, t, p):
@@ -119,23 +119,41 @@ class BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         )
 
 
+def taylor_order_zero(*args, **kwargs):
+    ts0 = scalar_corr.taylor_order_zero(*args, **kwargs)
+    return _BlockDiag(ts0)
+
+
 _TS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._ts0 = scalar_corr.TaylorZerothOrder(*args, **kwargs)
+class _BlockDiag(_collections.AbstractCorrection):
+    def __init__(self, corr, /):
+        super().__init__(ode_order=corr.ode_order)
+        self.corr = corr
+
+    def __repr__(self):
+        return f"{self.__name__}({self.corr})"
+
+    def tree_flatten(self):
+        children = (self.corr,)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (corr,) = children
+        return cls(corr)
 
     def begin_correction(self, x, /, vector_field, t, p):
-        select_fn = jax.vmap(scalar_corr.TaylorZerothOrder.select_derivatives)
-        m0, m1 = select_fn(self._ts0, x.hidden_state)
+        select_fn = jax.vmap(type(self.corr).select_derivatives)
+        m0, m1 = select_fn(self.corr, x.hidden_state)
 
         fx = vector_field(*m0.T, t=t, p=p)
 
-        marginalise_fn = jax.vmap(scalar_corr.TaylorZerothOrder.marginalise_observation)
-        cache, obs_unbatch = marginalise_fn(self._ts0, fx, m1, x.hidden_state)
+        marginalise_fn = jax.vmap(type(self.corr).marginalise_observation)
+        cache, obs_unbatch = marginalise_fn(self.corr, fx, m1, x.hidden_state)
 
         mahalanobis_fn = scalar_vars.NormalQOI.mahalanobis_norm
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
@@ -144,8 +162,8 @@ class BlockDiagTaylorZerothOrder(_collections.AbstractCorrection):
         return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
 
     def complete_correction(self, extrapolated, cache: _TS0CacheType):
-        fn = jax.vmap(scalar_corr.TaylorZerothOrder.complete_correction)
-        return fn(self._ts0, extrapolated, cache)
+        fn = jax.vmap(type(self.corr).complete_correction)
+        return fn(self.corr, extrapolated, cache)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
         return cov_sqrtm_lower[:, self.ode_order, ...]

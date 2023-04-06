@@ -46,7 +46,7 @@ class AbstractImplementation:
 class IsoTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = iso_corr.IsoTaylorZerothOrder(ode_order=ode_order)
+        correction = iso_corr.taylor_order_zero(ode_order=ode_order)
         extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)
 
@@ -69,11 +69,11 @@ class BlockDiagSLR1(AbstractImplementation):
         cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
     ):
         if cubature_rule is None:
-            correction = blockdiag_corr.BlockDiagStatisticalFirstOrder.from_params(
+            correction = blockdiag_corr.statistical_order_one(
                 ode_shape=ode_shape, ode_order=ode_order
             )
         else:
-            correction = blockdiag_corr.BlockDiagStatisticalFirstOrder(
+            correction = blockdiag_corr.statistical_order_one(
                 ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
             )
         extrapolation = blockdiag_extra.ibm_blockdiag(
@@ -86,7 +86,7 @@ class BlockDiagSLR1(AbstractImplementation):
 class BlockDiagTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = blockdiag_corr.BlockDiagTaylorZerothOrder(ode_order=ode_order)
+        correction = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
         extrapolation = blockdiag_extra.ibm_blockdiag(
             ode_shape=ode_shape, num_derivatives=num_derivatives
         )
@@ -97,7 +97,7 @@ class BlockDiagTS0(AbstractImplementation):
 class DenseTS1(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = dense_corr.DenseTaylorFirstOrder(
+        correction = dense_corr.taylor_order_one(
             ode_shape=ode_shape, ode_order=ode_order
         )
         extrapolation = dense_extra.ibm_dense(
@@ -110,7 +110,7 @@ class DenseTS1(AbstractImplementation):
 class DenseTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = dense_corr.DenseTaylorZerothOrder(
+        correction = dense_corr.taylor_order_zero(
             ode_shape=ode_shape, ode_order=ode_order
         )
         extrapolation = dense_extra.ibm_dense(
@@ -130,7 +130,7 @@ class DenseSLR1(AbstractImplementation):
         ode_order=1,
         num_derivatives=4,
     ):
-        correction = dense_corr.DenseStatisticalFirstOrder.from_params(
+        correction = dense_corr.statistical_order_one(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
         extrapolation = dense_extra.ibm_dense(
@@ -161,7 +161,7 @@ class DenseSLR0(AbstractImplementation):
         ode_order=1,
         num_derivatives=4,
     ):
-        correction = dense_corr.DenseStatisticalZerothOrder.from_params(
+        correction = dense_corr.statistical_order_zero(
             ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
         )
         extrapolation = dense_extra.ibm_dense(
@@ -174,6 +174,6 @@ class DenseSLR0(AbstractImplementation):
 class ScalarTS0(AbstractImplementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = scalar_corr.TaylorZerothOrder(ode_order=ode_order)
+        correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
         extrapolation = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
         return cls(correction=correction, extrapolation=extrapolation)

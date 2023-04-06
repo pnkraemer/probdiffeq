@@ -5,14 +5,18 @@ import jax.numpy as jnp
 from jax.typing import ArrayLike
 
 from probdiffeq import _sqrt_util
-from probdiffeq.implementations import _collections, cubature
+from probdiffeq.implementations import _collections
 from probdiffeq.implementations.scalar import _vars
 
 # todo: make public and split into submodules
 
 
+def taylor_order_zero(*args, **kwargs):
+    return _TaylorZerothOrder(*args, **kwargs)
+
+
 @jax.tree_util.register_pytree_node_class
-class TaylorZerothOrder(_collections.AbstractCorrection):
+class _TaylorZerothOrder(_collections.AbstractCorrection):
     def begin_correction(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
@@ -65,12 +69,6 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
         super().__init__(ode_order=ode_order)
         self.cubature_rule = cubature_rule
-
-    @classmethod
-    def from_params(cls, ode_order):
-        sci_fn = cubature.third_order_spherical
-        cubature_rule = sci_fn(input_shape=())
-        return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
