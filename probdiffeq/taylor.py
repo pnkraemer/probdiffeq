@@ -217,7 +217,7 @@ def _rk_filter_step(carry, y, extrapolation, dt):
 
     # Extrapolate (with fixed-point-style merging)
     lin_pt, extra_cache = extrapolation.begin_extrapolation(rv, dt=dt)
-    extra, bw_model = extrapolation.revert_markov_kernel(
+    extra, bw_model = extrapolation.complete_extrapolation_with_reversal(
         linearisation_pt=lin_pt, p0=rv, cache=extra_cache, output_scale_sqrtm=1.0
     )
     bw_new = bw_old.merge_with_incoming_conditional(bw_model)  # sqrt-fp-smoother!

@@ -92,7 +92,9 @@ class _IBM(_collections.AbstractExtrapolation):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
+    def complete_extrapolation_without_reversal(
+        self, linearisation_pt, p0, cache, output_scale_sqrtm
+    ):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
@@ -106,7 +108,9 @@ class _IBM(_collections.AbstractExtrapolation):
             _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         )
 
-    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
+    def complete_extrapolation_with_reversal(
+        self, linearisation_pt, p0, cache, output_scale_sqrtm
+    ):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
 

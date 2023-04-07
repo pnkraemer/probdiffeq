@@ -118,7 +118,9 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
+    def complete_extrapolation_without_reversal(
+        self, linearisation_pt, p0, cache, output_scale_sqrtm
+    ):
         _, _, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
@@ -133,7 +135,9 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.DenseStateSpaceVar(rv, target_shape=shape)
 
-    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
+    def complete_extrapolation_with_reversal(
+        self, linearisation_pt, p0, cache, output_scale_sqrtm
+    ):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
 

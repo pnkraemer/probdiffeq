@@ -60,7 +60,9 @@ class Filter(_strategy.Strategy):
     def complete_extrapolation(
         self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
-        return self.implementation.extrapolation.complete_extrapolation(
+        extra = self.implementation.extrapolation
+        extrapolate_fn = extra.complete_extrapolation_without_reversal
+        return extrapolate_fn(
             linearisation_pt=linearisation_pt,
             cache=cache,
             p0=posterior_previous,
