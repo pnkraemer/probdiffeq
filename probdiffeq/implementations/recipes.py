@@ -17,7 +17,7 @@ from probdiffeq.implementations.scalar import extra as scalar_extra
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractImplementation:
+class Implementation:
     """State-space model implementation.
 
     Contains an extrapolation style and a correction style.
@@ -46,11 +46,11 @@ class AbstractImplementation:
 def ts0_iso(*, ode_order=1, num_derivatives=4):
     correction = iso_corr.taylor_order_zero(ode_order=ode_order)
     extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
-    return AbstractImplementation(correction=correction, extrapolation=extrapolation)
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class
-class BlockDiagSLR1(AbstractImplementation):
+class BlockDiagSLR1(Implementation):
     """First-order statistical linear regression in state-space models \
      with a block-diagonal structure.
 
@@ -81,7 +81,7 @@ class BlockDiagSLR1(AbstractImplementation):
 
 
 @jax.tree_util.register_pytree_node_class
-class BlockDiagTS0(AbstractImplementation):
+class BlockDiagTS0(Implementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
@@ -92,7 +92,7 @@ class BlockDiagTS0(AbstractImplementation):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseTS1(AbstractImplementation):
+class DenseTS1(Implementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = dense_corr.taylor_order_one(
@@ -105,7 +105,7 @@ class DenseTS1(AbstractImplementation):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseTS0(AbstractImplementation):
+class DenseTS0(Implementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
         correction = dense_corr.taylor_order_zero(
@@ -118,7 +118,7 @@ class DenseTS0(AbstractImplementation):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseSLR1(AbstractImplementation):
+class DenseSLR1(Implementation):
     @classmethod
     def from_params(
         cls,
@@ -138,7 +138,7 @@ class DenseSLR1(AbstractImplementation):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseSLR0(AbstractImplementation):
+class DenseSLR0(Implementation):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
 
@@ -169,7 +169,7 @@ class DenseSLR0(AbstractImplementation):
 
 
 @jax.tree_util.register_pytree_node_class
-class ScalarTS0(AbstractImplementation):
+class ScalarTS0(Implementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
         correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
