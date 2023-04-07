@@ -230,7 +230,7 @@ class DynamicSolver(_AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
-        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+        linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
         error, scale_sqrtm, cache_obs = self.strategy.begin_correction(
@@ -239,7 +239,6 @@ class DynamicSolver(_AbstractSolver):
 
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            cache_ext,
             posterior_previous=state.posterior,
             output_scale_sqrtm=scale_sqrtm,
         )
