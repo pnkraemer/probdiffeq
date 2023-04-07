@@ -73,7 +73,7 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         return jax.vmap(type(self.extra).init_output_scale_sqrtm)(self.extra)
 
     def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
         fn = jax.vmap(type(self.extra).complete_extrapolation_with_reversal)
-        return fn(self.extra, linearisation_pt, p0, cache, output_scale_sqrtm)
+        return fn(self.extra, linearisation_pt, p0, output_scale_sqrtm)

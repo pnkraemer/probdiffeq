@@ -301,7 +301,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, target_shape=_shape)
+        corrected = _vars.DenseStateSpaceVar(rv, cache=(), target_shape=_shape)
 
         # Return the results
         return marginals, (corrected, gain)

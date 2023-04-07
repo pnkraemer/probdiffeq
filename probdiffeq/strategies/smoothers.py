@@ -259,13 +259,12 @@ class FixedPointSmoother(_SmootherCommon):
     """
 
     def complete_extrapolation(
-        self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm
+        self, linearisation_pt, *, posterior_previous, output_scale_sqrtm
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
             linearisation_pt=linearisation_pt,
             p0=posterior_previous.init,
             output_scale_sqrtm=output_scale_sqrtm,
-            cache=cache,
         )
         extrapolated, bw_increment = _temp
 

@@ -78,7 +78,8 @@ class ConditionalHiddenState(_Conditional):
             R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
-        return _vars.StateSpaceVar(_vars.NormalHiddenState(m_new, l_new))
+        rv = _vars.NormalHiddenState(m_new, l_new)
+        return _vars.StateSpaceVar(rv, cache=())
 
 
 @jax.tree_util.register_pytree_node_class
