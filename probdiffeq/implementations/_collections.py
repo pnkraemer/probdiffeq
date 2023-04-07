@@ -144,7 +144,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def revert_markov_kernel(
+    def complete_extrapolation_with_reversal(
         self,
         linearisation_pt: SSVTypeVar,
         p0,

@@ -108,7 +108,9 @@ class _IBM(_collections.AbstractExtrapolation):
             _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         )
 
-    def revert_markov_kernel(self, linearisation_pt, p0, cache, output_scale_sqrtm):
+    def complete_extrapolation_with_reversal(
+        self, linearisation_pt, p0, cache, output_scale_sqrtm
+    ):
         m_ext_p, m0_p, p, p_inv = cache
         m_ext = linearisation_pt.hidden_state.mean
 

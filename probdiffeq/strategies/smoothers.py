@@ -170,7 +170,10 @@ class _SmootherCommon(_strategy.Strategy):
         linearisation_pt, cache = self.implementation.extrapolation.begin_extrapolation(
             rv, dt=dt
         )
-        extrapolated, bw_model = self.implementation.extrapolation.revert_markov_kernel(
+
+        _extra = self.implementation.extrapolation
+        extra_fn = _extra.complete_extrapolation_with_reversal
+        extrapolated, bw_model = extra_fn(
             linearisation_pt=linearisation_pt,
             p0=rv,
             output_scale_sqrtm=output_scale_sqrtm,
@@ -192,7 +195,9 @@ class Smoother(_SmootherCommon):
     def complete_extrapolation(
         self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
     ):
-        extrapolated, bw_model = self.implementation.extrapolation.revert_markov_kernel(
+        extra = self.implementation.extrapolation
+        extra_fn = extra.complete_extrapolation_with_reversal
+        extrapolated, bw_model = extra_fn(
             linearisation_pt=linearisation_pt,
             p0=posterior_previous.init,
             cache=cache,
@@ -258,7 +263,7 @@ class FixedPointSmoother(_SmootherCommon):
     def complete_extrapolation(
         self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm
     ):
-        _temp = self.implementation.extrapolation.revert_markov_kernel(
+        _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
             linearisation_pt=linearisation_pt,
             p0=posterior_previous.init,
             output_scale_sqrtm=output_scale_sqrtm,
