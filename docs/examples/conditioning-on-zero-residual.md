@@ -100,7 +100,7 @@ taylor_coefficients = jnp.reshape(
 @jax.jit
 def extrapolate_fn(rv, model, dt, scale_sqrtm):
     ssv, cache = model.begin_extrapolation(rv, dt)
-    rv = model.complete_extrapolation(
+    rv = model.complete_extrapolation_without_reversal(
         ssv, p0=rv, cache=cache, output_scale_sqrtm=scale_sqrtm
     )
     return rv
@@ -126,7 +126,7 @@ prior_du = jnp.asarray(prior_du)
 ```python
 # Plot the samples
 
-fig, axes = plt.subplots(nrows=3, ncols=2, sharex=True, sharey="row")
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(5, 3), sharex=True, sharey="row")
 ((ax0, ax1), (ax2, ax3), (ax4, ax5)) = axes
 
 
