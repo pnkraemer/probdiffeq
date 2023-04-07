@@ -120,9 +120,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        m_ext_p, m0_p, p, p_inv = cache
+        m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
@@ -145,7 +145,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoStateSpaceVar(extrapolated), bw_model
+        return _vars.IsoStateSpaceVar(extrapolated, cache=()), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
     def init_conditional(self, ssv_proto):
