@@ -151,8 +151,8 @@ def scipy_method_config(method):
 num_low, num_medium, num_high = 3, 5, 8
 ode_shape = u0.shape
 
-ts0_iso_low = recipes.iso_ts0(num_derivatives=num_low)
-ts0_iso_medium = recipes.iso_ts0(num_derivatives=num_medium)
+ts0_iso_low = recipes.ts0_iso(num_derivatives=num_low)
+ts0_iso_medium = recipes.ts0_iso(num_derivatives=num_medium)
 ts1_high = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 slr1_high = recipes.DenseSLR1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
 
