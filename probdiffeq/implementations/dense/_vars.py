@@ -12,20 +12,20 @@ from probdiffeq.implementations.dense import _conds
 
 @jax.tree_util.register_pytree_node_class
 class DenseStateSpaceVar(_collections.StateSpaceVar):
-    def __init__(self, hidden_state, *, target_shape):
-        super().__init__(hidden_state=hidden_state)
+    def __init__(self, hidden_state, *, cache, target_shape):
+        super().__init__(hidden_state=hidden_state, cache=cache)
         self.target_shape = target_shape
 
     def tree_flatten(self):
-        children = (self.hidden_state,)
+        children = (self.hidden_state, self.cache)
         aux = (self.target_shape,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (hidden_state,) = children
+        (hidden_state, cache) = children
         (target_shape,) = aux
-        return cls(hidden_state=hidden_state, target_shape=target_shape)
+        return cls(hidden_state=hidden_state, cache=cache, target_shape=target_shape)
 
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
@@ -59,8 +59,8 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
     def scale_covariance(self, scale_sqrtm):
-        hidden_state_scaled = self.hidden_state.scale_covariance(scale_sqrtm)
-        return DenseStateSpaceVar(hidden_state_scaled, target_shape=self.target_shape)
+        rv = self.hidden_state.scale_covariance(scale_sqrtm)
+        return DenseStateSpaceVar(rv, cache=self.cache, target_shape=self.target_shape)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
