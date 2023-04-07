@@ -7,7 +7,7 @@ from probdiffeq.strategies import _strategy
 @jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy):
     def init_posterior(self, *, taylor_coefficients):
-        return self.implementation.extrapolation.init_hidden_state(
+        return self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
 

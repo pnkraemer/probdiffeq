@@ -115,7 +115,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
-    def init_hidden_state(self, taylor_coefficients) -> SSVTypeVar:
+    def init_state_space_var(self, taylor_coefficients) -> SSVTypeVar:
         raise NotImplementedError
 
     @abc.abstractmethod

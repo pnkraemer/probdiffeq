@@ -60,7 +60,7 @@ class _IBM(_collections.AbstractExtrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def init_hidden_state(self, taylor_coefficients):
+    def init_state_space_var(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."

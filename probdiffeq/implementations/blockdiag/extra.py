@@ -59,8 +59,8 @@ class _BlockDiag(_collections.AbstractExtrapolation):
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)
 
-    def init_hidden_state(self, taylor_coefficients):
-        return jax.vmap(type(self.extra).init_hidden_state)(
+    def init_state_space_var(self, taylor_coefficients):
+        return jax.vmap(type(self.extra).init_state_space_var)(
             self.extra, taylor_coefficients
         )
 

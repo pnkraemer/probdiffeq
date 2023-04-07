@@ -122,7 +122,7 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     def init_posterior(self, *, taylor_coefficients):
-        corrected = self.implementation.extrapolation.init_hidden_state(
+        corrected = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
 
