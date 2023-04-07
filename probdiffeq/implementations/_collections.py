@@ -134,7 +134,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_extrapolation(
+    def complete_extrapolation_without_reversal(
         self,
         linearisation_pt: SSVTypeVar,
         p0,

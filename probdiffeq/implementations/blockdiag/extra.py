@@ -50,8 +50,10 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         fn = jax.vmap(type(self.extra).begin_extrapolation, in_axes=(0, 0, None))
         return fn(self.extra, p0, dt)
 
-    def complete_extrapolation(self, linearisation_pt, p0, cache, output_scale_sqrtm):
-        fn = jax.vmap(type(self.extra).complete_extrapolation)
+    def complete_extrapolation_without_reversal(
+        self, linearisation_pt, p0, cache, output_scale_sqrtm
+    ):
+        fn = jax.vmap(type(self.extra).complete_extrapolation_without_reversal)
         return fn(self.extra, linearisation_pt, p0, cache, output_scale_sqrtm)
 
     def init_conditional(self, ssv_proto):
