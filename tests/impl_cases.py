@@ -110,6 +110,6 @@ def case_slr0_dense_gh():
 @testing.case(id="BlockDiagSLR1", tags=["nd"])
 def case_slr1_blockdiag():
     def impl_factory(**kwargs):
-        return recipes.BlockDiagSLR1.from_params(**kwargs)
+        return recipes.slr1_blockdiag(**kwargs)
 
     return impl_factory

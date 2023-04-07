@@ -24,12 +24,13 @@ class Implementation(NamedTuple):
 
 
 def ts0_iso(*, ode_order=1, num_derivatives=4):
+    """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
     correction = iso_corr.taylor_order_zero(ode_order=ode_order)
     extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
     return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class BlockDiagSLR1(Implementation):
+def slr1_blockdiag(*, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4):
     """First-order statistical linear regression in state-space models \
      with a block-diagonal structure.
 
@@ -40,23 +41,18 @@ class BlockDiagSLR1(Implementation):
         and without any deprecation policy.
 
     """
-
-    @classmethod
-    def from_params(
-        cls, *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
-    ):
-        if cubature_rule is None:
-            correction = blockdiag_corr.statistical_order_one(
-                ode_shape=ode_shape, ode_order=ode_order
-            )
-        else:
-            correction = blockdiag_corr.statistical_order_one(
-                ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
-            )
-        extrapolation = blockdiag_extra.ibm_blockdiag(
-            ode_shape=ode_shape, num_derivatives=num_derivatives
+    if cubature_rule is None:
+        correction = blockdiag_corr.statistical_order_one(
+            ode_shape=ode_shape, ode_order=ode_order
         )
-        return cls(correction=correction, extrapolation=extrapolation)
+    else:
+        correction = blockdiag_corr.statistical_order_one(
+            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
+        )
+    extrapolation = blockdiag_extra.ibm_blockdiag(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
 class BlockDiagTS0(Implementation):
