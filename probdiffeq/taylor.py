@@ -179,7 +179,7 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    _impl = recipes.IsoTS0.from_params(num_derivatives=num)
+    _impl = recipes.ts0_iso(num_derivatives=num)
     extrapolation = _impl.extrapolation
 
     # Initialise

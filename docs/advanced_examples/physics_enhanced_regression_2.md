@@ -137,7 +137,7 @@ theta_guess = u0  # initial guess
 
 # Create a probabilistic solver
 strategy = filters.Filter(
-    recipes.IsoTS0.from_params(num_derivatives=2),
+    recipes.ts0_iso(num_derivatives=2),
 )
 solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=10.0)
 ```

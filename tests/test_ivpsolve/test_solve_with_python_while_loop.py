@@ -52,7 +52,7 @@ def case_setup_all_scalar_configs(ode_problem, impl_fn, solver_config):
 def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         solver_fn=ivpsolvers.MLESolver,
         strat_fn=strat_fn,
         solver_config=solver_config,
@@ -66,7 +66,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,
         solver_fn=solver_fn,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         strat_fn=filters.Filter,
         solver_config=solver_config,
     )

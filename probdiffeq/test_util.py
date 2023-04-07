@@ -9,7 +9,7 @@ def generate_solver(
     *,
     solver_factory=ivpsolvers.MLESolver,
     strategy_factory=filters.Filter,
-    impl_factory=recipes.IsoTS0.from_params,
+    impl_factory=recipes.ts0_iso,
     **impl_factory_kwargs,
 ):
     """Generate a solver.
@@ -24,18 +24,18 @@ def generate_solver(
     >>> from probdiffeq.strategies import smoothers
 
     >>> print(generate_solver())
-    MLESolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=4>))
+    MLESolver(strategy=Filter(implementation=<Implementation with num_derivatives=4, ode_order=1>))
 
     >>> print(generate_solver(num_derivatives=1))
-    MLESolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=1>))
+    MLESolver(strategy=Filter(implementation=<Implementation with num_derivatives=1, ode_order=1>))
 
     >>> print(generate_solver(solver_factory=ivpsolvers.DynamicSolver))
-    DynamicSolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=4>))
+    DynamicSolver(strategy=Filter(implementation=<Implementation with num_derivatives=4, ode_order=1>))
 
-    >>> impl_fcty = recipes.DenseTS1.from_params
+    >>> impl_fcty = recipes.ts1_dense
     >>> strat_fcty = smoothers.Smoother
     >>> print(generate_solver(strategy_factory=strat_fcty, impl_factory=impl_fcty, ode_shape=(1,)))  # noqa: E501
-    MLESolver(strategy=Smoother(implementation=<DenseTS1 with num_derivatives=4>))
+    MLESolver(strategy=Smoother(implementation=<Implementation with num_derivatives=4, ode_order=1>))
     """
     impl = impl_factory(**impl_factory_kwargs)
     strat = strategy_factory(impl)

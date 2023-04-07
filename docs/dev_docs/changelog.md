@@ -24,11 +24,20 @@ Notable breaking changes:
   has become `solution.log_marginal_likelihood_terminal_values`.
 * `norm_of_whitened_residual_sqrtm()` has been renamed to `mahalanobis_norm(x, /)` and is a function of one argument now.
   This is mathematically more accurate; the function should depend on an input.
+* The recipes in implementation.recipes are not class-methods anymore but functions.
+  For instance, instead of `recipes.IsoTS0.from_params(**kwargs)` users must call `recipes.ts0_iso(**kwargs)`.
+  The advantages of this change are much less code to achieve the same logic, 
+  more freedom to change background-implementations without worrying about API, 
+  and improved ease of maintenance (no more classmethods, no more custom pytree node registration.)
+
 
 Notable enhancements:
 
 * Scalar solvers are now part of the public API. While all "other" methods are for IVPs of shape `(d,)`,
   scalar solvers target problems of shape `()` (i.e. if the initial values are floats, not arrays).
+* The public API has been defined (see the developer docs). Notably, this document describes changes in which modules necessitate an entry in this changelog.
+
+
 
 Notable bug fixes:
 

@@ -9,6 +9,7 @@ import jax.test_util
 from probdiffeq import ivpsolve, ivpsolvers, test_util
 from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
+from probdiffeq.implementations.dense import corr as dense_corr
 from probdiffeq.strategies import filters, smoothers
 
 
@@ -57,7 +58,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveFixedGridConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         strat_fn=strat_fn,
         solver_config=solver_config,
     )
@@ -70,7 +71,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SolveFixedGridConfig(
         ode_problem=ode_problem,
         solver_fn=solver_fn,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         strat_fn=filters.Filter,
         solver_config=solver_config,
     )
@@ -143,14 +144,13 @@ def fixture_parameter_to_solution(setup):
         )
         return solution.u
 
-    implementation = solver.strategy.implementation
-
     # DenseSLR1(ThirdOrderSpherical) has a NaN vector-Jacobian product.
     # Therefore, we skip all autodiff-DenseSLR1 tests
     # until the VJP/JVP behaviour has been cleaned up.
     # (It is easier to skip them all for now than to investigate how to skip
     # this very specific instance.) See: Issue #500.
-    skip_jvp_and_vjp = isinstance(implementation, recipes.DenseSLR1)
+    corr = solver.strategy.implementation.correction
+    skip_jvp_and_vjp = isinstance(corr, dense_corr._DenseStatisticalFirstOrder)
     return fn, setup.ode_problem.initial_values, skip_jvp_and_vjp
 
 
