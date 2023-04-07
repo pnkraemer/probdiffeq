@@ -1,5 +1,7 @@
 """State-space model implementations."""
 
+from typing import Any, NamedTuple
+
 import jax
 
 from probdiffeq.implementations import cubature
@@ -12,35 +14,15 @@ from probdiffeq.implementations.iso import extra as iso_extra
 from probdiffeq.implementations.scalar import corr as scalar_corr
 from probdiffeq.implementations.scalar import extra as scalar_extra
 
-# todo: why are these classes? Why not plain functions?
-#  nothing is happening in here, really.
 
-
-@jax.tree_util.register_pytree_node_class
-class Implementation:
+class Implementation(NamedTuple):
     """State-space model implementation.
 
     Contains an extrapolation style and a correction style.
     """
 
-    def __init__(self, *, correction, extrapolation):
-        self.correction = correction
-        self.extrapolation = extrapolation
-
-    def tree_flatten(self):
-        children = (self.correction, self.extrapolation)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        correction, extrapolation = children
-        return cls(correction=correction, extrapolation=extrapolation)
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        n = self.extrapolation.num_derivatives
-        return f"<{name} with num_derivatives={n}>"
+    correction: Any
+    extrapolation: Any
 
 
 def ts0_iso(*, ode_order=1, num_derivatives=4):
