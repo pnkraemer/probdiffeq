@@ -117,12 +117,12 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
+        self, linearisation_pt, *, output_scale_sqrtm, posterior_previous
     ):
         raise NotImplementedError
 
     def init_posterior(self, *, taylor_coefficients):
-        corrected = self.implementation.extrapolation.init_hidden_state(
+        corrected = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
 
@@ -167,7 +167,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
         dt = t - t0
-        linearisation_pt, cache = self.implementation.extrapolation.begin_extrapolation(
+        linearisation_pt = self.implementation.extrapolation.begin_extrapolation(
             rv, dt=dt
         )
 
@@ -177,7 +177,6 @@ class _SmootherCommon(_strategy.Strategy):
             linearisation_pt=linearisation_pt,
             p0=rv,
             output_scale_sqrtm=output_scale_sqrtm,
-            cache=cache,
         )
         return extrapolated, bw_model  # should this return a MarkovSequence?
 
@@ -193,14 +192,13 @@ class Smoother(_SmootherCommon):
     """Smoother."""
 
     def complete_extrapolation(
-        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
+        self, linearisation_pt, *, output_scale_sqrtm, posterior_previous
     ):
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
             linearisation_pt=linearisation_pt,
             p0=posterior_previous.init,
-            cache=cache,
             output_scale_sqrtm=output_scale_sqrtm,
         )
         return MarkovSequence(init=extrapolated, backward_model=bw_model)
@@ -261,13 +259,12 @@ class FixedPointSmoother(_SmootherCommon):
     """
 
     def complete_extrapolation(
-        self, linearisation_pt, cache, *, posterior_previous, output_scale_sqrtm
+        self, linearisation_pt, *, posterior_previous, output_scale_sqrtm
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
             linearisation_pt=linearisation_pt,
             p0=posterior_previous.init,
             output_scale_sqrtm=output_scale_sqrtm,
-            cache=cache,
         )
         extrapolated, bw_increment = _temp
 

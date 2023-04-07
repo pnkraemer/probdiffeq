@@ -148,7 +148,7 @@ class CalibrationFreeSolver(_AbstractSolver):
 
     def step_fn(self, *, state, vector_field, dt, parameters):
         # Pre-error-estimate steps
-        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+        linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
 
@@ -160,7 +160,6 @@ class CalibrationFreeSolver(_AbstractSolver):
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            cache_ext,
             output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
             posterior_previous=state.posterior,
         )
@@ -230,7 +229,7 @@ class DynamicSolver(_AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
-        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+        linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
         error, scale_sqrtm, cache_obs = self.strategy.begin_correction(
@@ -239,7 +238,6 @@ class DynamicSolver(_AbstractSolver):
 
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            cache_ext,
             posterior_previous=state.posterior,
             output_scale_sqrtm=scale_sqrtm,
         )
@@ -301,7 +299,7 @@ class MLESolver(_AbstractSolver):
 
     def step_fn(self, *, state, vector_field, dt, parameters):
         # Pre-error-estimate steps
-        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+        linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
 
@@ -313,7 +311,6 @@ class MLESolver(_AbstractSolver):
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            cache_ext,
             output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
             posterior_previous=state.posterior,
         )

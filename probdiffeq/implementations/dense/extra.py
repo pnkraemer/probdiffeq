@@ -77,7 +77,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             preconditioner_scales=scales,
         )
 
-    def init_hidden_state(self, taylor_coefficients):
+    def init_state_space_var(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -91,7 +91,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         corr = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        return _vars.DenseStateSpaceVar(corr, target_shape=m0_matrix.shape)
+        return _vars.DenseStateSpaceVar(corr, cache=None, target_shape=m0_matrix.shape)
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
@@ -105,9 +105,10 @@ class _DenseIBM(_collections.AbstractExtrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        extrapolated = _vars.DenseNormal(m_ext, q_sqrtm)
-        ssv = _vars.DenseStateSpaceVar(extrapolated, target_shape=shape)
-        return ssv, (m_ext_p, m0_p, p, p_inv)
+        ext = _vars.DenseNormal(m_ext, q_sqrtm)
+        cache = (m_ext_p, m0_p, p, p_inv)
+        ssv = _vars.DenseStateSpaceVar(ext, target_shape=shape, cache=cache)
+        return ssv
 
     def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
@@ -119,9 +120,9 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         return p, p_inv
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        _, _, p, p_inv = cache
+        _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
@@ -133,12 +134,12 @@ class _DenseIBM(_collections.AbstractExtrapolation):
 
         shape = linearisation_pt.target_shape
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.DenseStateSpaceVar(rv, target_shape=shape)
+        return _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
 
     def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        m_ext_p, m0_p, p, p_inv = cache
+        m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
@@ -164,8 +165,8 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             g_bw, noise=backward_noise, target_shape=shape
         )
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        extrapolated = _vars.DenseStateSpaceVar(rv, target_shape=shape)
-        return extrapolated, bw_model
+        ext = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
+        return ext, bw_model
 
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()

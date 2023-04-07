@@ -7,7 +7,7 @@ from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
-@testing.fixture(scope="session", name="solution_save_at")
+@testing.fixture(name="solution_save_at")
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 @testing.parametrize(
     "impl_fn",

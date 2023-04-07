@@ -59,7 +59,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def init_hidden_state(self, taylor_coefficients):
+    def init_state_space_var(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -69,14 +69,15 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.IsoStateSpaceVar(rv)
+        return _vars.IsoStateSpaceVar(rv, cache=None)
 
     def init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m0, c0))
+        rv = _vars.IsoNormalHiddenState(m0, c0)
+        return _vars.IsoStateSpaceVar(rv, cache=None)
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -94,7 +95,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoStateSpaceVar(ext), (m_ext_p, m0_p, p, p_inv)
+        return _vars.IsoStateSpaceVar(ext, cache=(m_ext_p, m0_p, p, p_inv))
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -102,9 +103,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        _, _, p, p_inv = cache
+        _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
@@ -115,12 +116,13 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             )
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m_ext, l_ext))
+        rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
+        return _vars.IsoStateSpaceVar(rv, cache=None)
 
     def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        m_ext_p, m0_p, p, p_inv = cache
+        m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
@@ -143,7 +145,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoStateSpaceVar(extrapolated), bw_model
+        return _vars.IsoStateSpaceVar(extrapolated, cache=None), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
     def init_conditional(self, ssv_proto):

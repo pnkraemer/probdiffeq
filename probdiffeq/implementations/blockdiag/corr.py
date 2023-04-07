@@ -89,9 +89,8 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
 
         H, noise = self.linearize(extrapolated, vmap_f)
 
-        fn = jax.vmap(
-            scalar_corr.StatisticalFirstOrder.complete_correction_post_linearize
-        )
+        compl_fn = scalar_corr.StatisticalFirstOrder.complete_correction_post_linearize
+        fn = jax.vmap(compl_fn)
         return fn(self._mm, H, extrapolated.hidden_state, noise)
 
     def linearize(self, extrapolated, vmap_f):

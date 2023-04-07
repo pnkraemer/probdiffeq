@@ -60,7 +60,7 @@ class _IBM(_collections.AbstractExtrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def init_hidden_state(self, taylor_coefficients):
+    def init_state_space_var(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -73,7 +73,7 @@ class _IBM(_collections.AbstractExtrapolation):
         rv = _vars.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.StateSpaceVar(rv)
+        return _vars.StateSpaceVar(rv, cache=None)
 
     def init_error_estimate(self):
         return jnp.zeros(())
@@ -85,7 +85,7 @@ class _IBM(_collections.AbstractExtrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.StateSpaceVar(extrapolated), (m_ext_p, m0_p, p, p_inv)
+        return _vars.StateSpaceVar(extrapolated, cache=(m_ext_p, m0_p, p, p_inv))
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -93,9 +93,9 @@ class _IBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        _, _, p, p_inv = cache
+        _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
@@ -104,14 +104,14 @@ class _IBM(_collections.AbstractExtrapolation):
             )
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.StateSpaceVar(
-            _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        )
+
+        rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return _vars.StateSpaceVar(rv, cache=None)
 
     def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        m_ext_p, m0_p, p, p_inv = cache
+        m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
@@ -134,7 +134,7 @@ class _IBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.StateSpaceVar(extrapolated), bw_model
+        return _vars.StateSpaceVar(extrapolated, cache=None), bw_model
 
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()

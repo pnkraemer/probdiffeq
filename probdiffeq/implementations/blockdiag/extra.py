@@ -51,16 +51,16 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         return fn(self.extra, p0, dt)
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
         fn = jax.vmap(type(self.extra).complete_extrapolation_without_reversal)
-        return fn(self.extra, linearisation_pt, p0, cache, output_scale_sqrtm)
+        return fn(self.extra, linearisation_pt, p0, output_scale_sqrtm)
 
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)
 
-    def init_hidden_state(self, taylor_coefficients):
-        return jax.vmap(type(self.extra).init_hidden_state)(
+    def init_state_space_var(self, taylor_coefficients):
+        return jax.vmap(type(self.extra).init_state_space_var)(
             self.extra, taylor_coefficients
         )
 
@@ -73,7 +73,7 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         return jax.vmap(type(self.extra).init_output_scale_sqrtm)(self.extra)
 
     def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
         fn = jax.vmap(type(self.extra).complete_extrapolation_with_reversal)
-        return fn(self.extra, linearisation_pt, p0, cache, output_scale_sqrtm)
+        return fn(self.extra, linearisation_pt, p0, output_scale_sqrtm)

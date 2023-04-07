@@ -117,7 +117,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 # Compute the IVP solution for given setups
 
 
-@testing.fixture(scope="session", name="solution_terminal_values")
+@testing.fixture(name="solution_terminal_values")
 @testing.parametrize_with_cases(
     "setup", cases=".", prefix="case_setup_", scope="session"
 )

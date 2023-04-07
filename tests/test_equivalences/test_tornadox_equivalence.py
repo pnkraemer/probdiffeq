@@ -11,17 +11,17 @@ from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
 
 
-@testing.fixture(scope="session", name="num")
+@testing.fixture(name="num")
 def fixture_num():
     return 4
 
 
-@testing.fixture(scope="session", name="control_params")
+@testing.fixture(name="control_params")
 def fixture_control_params():
     return 0.2, 10.0, 0.95
 
 
-@testing.fixture(scope="session", name="vanderpol")
+@testing.fixture(name="vanderpol")
 def fixture_vanderpol():
     # van-der-Pol as a setup. We really don't want stiffness here.
     return diffeqzoo.ivps.van_der_pol_first_order(
@@ -29,7 +29,7 @@ def fixture_vanderpol():
     )
 
 
-@testing.fixture(scope="session", name="ivp_tornadox")
+@testing.fixture(name="ivp_tornadox")
 def fixture_ivp_tornadox(vanderpol):
     f, u0, (t0, t1), f_args = vanderpol
 
@@ -42,7 +42,7 @@ def fixture_ivp_tornadox(vanderpol):
     )
 
 
-@testing.fixture(scope="session", name="ivp_probdiffeq")
+@testing.fixture(name="ivp_probdiffeq")
 def fixture_ivp_probdiffeq(vanderpol):
     f, u0, (t0, t1), f_args = vanderpol
 
@@ -54,7 +54,7 @@ def fixture_ivp_probdiffeq(vanderpol):
     return vf_ode, (u0,), (t0, t1), f_args
 
 
-@testing.fixture(scope="session", name="steprule_tornadox")
+@testing.fixture(name="steprule_tornadox")
 def fixture_steprule_tornadox(solver_config, control_params):
     factor_min, factor_max, safety = control_params
     return step.AdaptiveSteps(
@@ -65,7 +65,7 @@ def fixture_steprule_tornadox(solver_config, control_params):
     )
 
 
-@testing.fixture(scope="session", name="controller_probdiffeq")
+@testing.fixture(name="controller_probdiffeq")
 def fixture_controller_probdiffeq(control_params):
     factor_min, factor_max, safety = control_params
     return controls.IntegralClipped(
@@ -73,7 +73,7 @@ def fixture_controller_probdiffeq(control_params):
     )
 
 
-@testing.fixture(scope="session", name="solver_tornadox_kronecker_ek0")
+@testing.fixture(name="solver_tornadox_kronecker_ek0")
 def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
     return ek0.KroneckerEK0(
         initialization=init.TaylorMode(),
@@ -82,7 +82,7 @@ def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
     )
 
 
-@testing.fixture(scope="session", name="solver_probdiffeq_kronecker_ek0")
+@testing.fixture(name="solver_probdiffeq_kronecker_ek0")
 def fixture_solver_probdiffeq_kronecker_ek0(num):
     implementation = recipes.ts0_iso(num_derivatives=num)
     strategy = filters.Filter(implementation=implementation)
@@ -142,7 +142,7 @@ def case_solver_pair_kronecker_ek0(
     return output_tornadox, solution_probdiffeq
 
 
-@testing.fixture(scope="session", name="solver_tornadox_reference_ek1")
+@testing.fixture(name="solver_tornadox_reference_ek1")
 def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
     return ek1.ReferenceEK1(
         initialization=init.TaylorMode(),
@@ -151,7 +151,7 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
     )
 
 
-@testing.fixture(scope="session", name="solver_probdiffeq_reference_ek1")
+@testing.fixture(name="solver_probdiffeq_reference_ek1")
 def fixture_solver_probdiffeq_reference_ek1(num):
     implementation = recipes.ts1_dense(num_derivatives=num, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
