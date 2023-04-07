@@ -117,7 +117,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
+        self, linearisation_pt, *, output_scale_sqrtm, posterior_previous
     ):
         raise NotImplementedError
 

@@ -35,7 +35,7 @@ class DenseConditional(_collections.AbstractConditional):
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         cond = _vars.DenseNormal(m, self.noise.cov_sqrtm_lower)
-        return _vars.DenseStateSpaceVar(cond, target_shape=self.target_shape)
+        return _vars.DenseStateSpaceVar(cond, cache=(), target_shape=self.target_shape)
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -74,4 +74,4 @@ class DenseConditional(_collections.AbstractConditional):
         l_new = l_new_p
 
         marg = _vars.DenseNormal(m_new, l_new)
-        return _vars.DenseStateSpaceVar(marg, target_shape=rv.target_shape)
+        return _vars.DenseStateSpaceVar(marg, cache=(), target_shape=rv.target_shape)

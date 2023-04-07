@@ -148,7 +148,7 @@ class CalibrationFreeSolver(_AbstractSolver):
 
     def step_fn(self, *, state, vector_field, dt, parameters):
         # Pre-error-estimate steps
-        linearisation_pt, cache_ext = self.strategy.begin_extrapolation(
+        linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
 
@@ -160,7 +160,6 @@ class CalibrationFreeSolver(_AbstractSolver):
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            cache_ext,
             output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
             posterior_previous=state.posterior,
         )

@@ -76,7 +76,8 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m0, c0))
+        rv = _vars.IsoNormalHiddenState(m0, c0)
+        return _vars.IsoStateSpaceVar(rv, cache=())
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -115,9 +116,8 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             )
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.IsoStateSpaceVar(
-            _vars.IsoNormalHiddenState(m_ext, l_ext), cache=()
-        )
+        rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
+        return _vars.IsoStateSpaceVar(rv, cache=())
 
     def complete_extrapolation_with_reversal(
         self, linearisation_pt, p0, output_scale_sqrtm

@@ -37,9 +37,8 @@ class ConditionalHiddenState(_Conditional):
             return jax.vmap(ConditionalHiddenState.__call__)(self, x)
 
         m = self.transition @ x + self.noise.mean
-        return _vars.StateSpaceVar(
-            _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        )
+        rv = _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
+        return _vars.StateSpaceVar(rv, cache=())
 
     def scale_covariance(self, scale_sqrtm):
         noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
@@ -88,6 +87,5 @@ class ConditionalQOI(_Conditional):
         if self.transition.ndim > 1:
             return jax.vmap(ConditionalQOI.__call__)(self, x)
         m = self.transition * x + self.noise.mean
-        return _vars.StateSpaceVar(
-            _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        )
+        rv = _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
+        return _vars.StateSpaceVar(rv, cache=())
