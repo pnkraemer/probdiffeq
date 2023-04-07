@@ -9,7 +9,7 @@ def generate_solver(
     *,
     solver_factory=ivpsolvers.MLESolver,
     strategy_factory=filters.Filter,
-    impl_factory=recipes.IsoTS0.from_params,
+    impl_factory=recipes.ts0_iso,
     **impl_factory_kwargs,
 ):
     """Generate a solver.

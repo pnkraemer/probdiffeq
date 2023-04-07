@@ -84,7 +84,7 @@ def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
 
 @testing.fixture(scope="session", name="solver_probdiffeq_kronecker_ek0")
 def fixture_solver_probdiffeq_kronecker_ek0(num):
-    implementation = recipes.IsoTS0.from_params(num_derivatives=num)
+    implementation = recipes.ts0_iso(num_derivatives=num)
     strategy = filters.Filter(implementation=implementation)
     return ivpsolvers.DynamicSolver(strategy=strategy)
 

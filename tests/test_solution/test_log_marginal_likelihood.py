@@ -13,7 +13,7 @@ from probdiffeq.strategies import filters, smoothers
     "impl_fn",
     # one for each SSM factorisation
     [
-        lambda num_derivatives, **kwargs: recipes.IsoTS0.from_params(
+        lambda num_derivatives, **kwargs: recipes.ts0_iso(
             num_derivatives=num_derivatives
         ),
         recipes.BlockDiagTS0.from_params,
@@ -136,7 +136,7 @@ def test_log_marginal_likelihood_terminal_values_error_for_wrong_shapes(
 @testing.parametrize("strategy_fn", [filters.Filter, smoothers.Smoother])
 def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
-    recipe = recipes.IsoTS0.from_params(num_derivatives=4)
+    recipe = recipes.ts0_iso(num_derivatives=4)
     strategy = strategy_fn(recipe)
     solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
     sol = ivpsolve.simulate_terminal_values(
@@ -159,7 +159,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 def test_nmll_raises_error_for_filter(ode_problem):
     """Non-terminal value calls are not possible for filters."""
-    recipe = recipes.IsoTS0.from_params(num_derivatives=4)
+    recipe = recipes.ts0_iso(num_derivatives=4)
     strategy = filters.Filter(recipe)
     solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1)

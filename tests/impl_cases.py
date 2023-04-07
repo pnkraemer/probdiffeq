@@ -7,7 +7,7 @@ from probdiffeq.implementations import cubature, recipes
 @testing.case(id="IsoTS0", tags=["nd"])
 def case_ts0_iso():
     def impl_factory(*, num_derivatives, ode_shape):
-        return recipes.IsoTS0.from_params(num_derivatives=num_derivatives)
+        return recipes.ts0_iso(num_derivatives=num_derivatives)
 
     return impl_factory
 

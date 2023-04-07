@@ -15,7 +15,7 @@ from probdiffeq.strategies import smoothers
 
 @testing.case
 def smoother_pair_smoother_and_fixedpoint():
-    impl = recipes.IsoTS0.from_params()
+    impl = recipes.ts0_iso()
     return smoothers.Smoother(impl), smoothers.FixedPointSmoother(impl)
 
 

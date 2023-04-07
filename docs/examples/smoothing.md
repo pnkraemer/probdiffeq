@@ -63,7 +63,7 @@ If you are interested in the terminal value of the ODE solution, you can use fil
 But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient here.
 
 ```python
-ekf0 = ivpsolvers.MLESolver(filters.Filter(recipes.IsoTS0.from_params()))
+ekf0 = ivpsolvers.MLESolver(filters.Filter(recipes.iso_ts0()))
 ekf0sol = ivpsolve.simulate_terminal_values(
     vf,
     initial_values=(u0,),
@@ -80,7 +80,7 @@ print(ekf0sol.t, ekf0sol.u)
 If you are used to calling traditional solve() methods, use one a conventional smoother (i.e. not the fixed-point smoother).
 
 ```python
-eks0 = ivpsolvers.MLESolver(smoothers.Smoother(recipes.IsoTS0.from_params()))
+eks0 = ivpsolvers.MLESolver(smoothers.Smoother(recipes.iso_ts0()))
 eks0sol = ivpsolve.solve_with_python_while_loop(
     vf,
     initial_values=(u0,),
@@ -134,9 +134,7 @@ use the solve_and_save_at function together with a fixed-point smoother.
 
 
 ```python
-eks0_fixpt = ivpsolvers.MLESolver(
-    smoothers.FixedPointSmoother(recipes.IsoTS0.from_params())
-)
+eks0_fixpt = ivpsolvers.MLESolver(smoothers.FixedPointSmoother(recipes.iso_ts0()))
 fixptsol = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),

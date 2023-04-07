@@ -14,7 +14,7 @@ from probdiffeq.strategies import smoothers
 
 @testing.case
 def smoother_pair_smoother_and_fixedpoint():
-    impl = recipes.IsoTS0.from_params()
+    impl = recipes.ts0_iso()
     return smoothers.Smoother(impl), smoothers.FixedPointSmoother(impl)
 
 
@@ -23,7 +23,7 @@ def smoother_pair_two_smoothers():
     # if the checkpoints are equal to the solver states,
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
-    impl = recipes.IsoTS0.from_params()
+    impl = recipes.ts0_iso()
     return smoothers.Smoother(impl), smoothers.Smoother(impl)
 
 

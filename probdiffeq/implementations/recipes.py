@@ -16,10 +16,11 @@ from probdiffeq.implementations.scalar import extra as scalar_extra
 #  nothing is happening in here, really.
 
 
+@jax.tree_util.register_pytree_node_class
 class AbstractImplementation:
     """State-space model implementation.
 
-    Mostly a container for an extrapolation style and a correction style.
+    Contains an extrapolation style and a correction style.
     """
 
     def __init__(self, *, correction, extrapolation):
@@ -42,13 +43,10 @@ class AbstractImplementation:
         return f"<{name} with num_derivatives={n}>"
 
 
-@jax.tree_util.register_pytree_node_class
-class IsoTS0(AbstractImplementation):
-    @classmethod
-    def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = iso_corr.taylor_order_zero(ode_order=ode_order)
-        extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
-        return cls(correction=correction, extrapolation=extrapolation)
+def ts0_iso(*, ode_order=1, num_derivatives=4):
+    correction = iso_corr.taylor_order_zero(ode_order=ode_order)
+    extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
+    return AbstractImplementation(correction=correction, extrapolation=extrapolation)
 
 
 @jax.tree_util.register_pytree_node_class

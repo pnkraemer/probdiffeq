@@ -176,7 +176,7 @@ What is the performance difference between an isotropic, block-diagonal, and den
 
 ```python
 # Different factorisations
-ts0_iso = recipes.IsoTS0.from_params()
+ts0_iso = recipes.iso_ts0()
 ts0_batch = recipes.BlockDiagTS0.from_params(ode_shape=ode_shape)
 ts0_dense = recipes.DenseTS0.from_params(ode_shape=ode_shape)
 
@@ -208,7 +208,7 @@ The isotropic solver and the dense solver actually compute the same posterior (t
 
 ```python
 # Methods
-impl = recipes.IsoTS0.from_params()
+impl = recipes.iso_ts0()
 methods = [
     strategy_to_method_config(filters.Filter(impl), label="Filter"),
     strategy_to_method_config(smoothers.Smoother(impl), label="Smoother"),
@@ -253,8 +253,8 @@ Let's compare the winning solvers to find the best one.
 # Implementations
 num_low, num_medium, num_high = 3, 5, 8
 
-ts0_iso_low = recipes.IsoTS0.from_params(num_derivatives=num_low)
-ts0_iso_medium = recipes.IsoTS0.from_params(num_derivatives=num_medium)
+ts0_iso_low = recipes.iso_ts0(num_derivatives=num_low)
+ts0_iso_medium = recipes.iso_ts0(num_derivatives=num_medium)
 
 ts1_low = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_low)
 ts1_medium = recipes.DenseTS1.from_params(

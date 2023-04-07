@@ -233,13 +233,9 @@ def scipy_method_config(method):
 # to those that transform the IVP into first-order form
 num_derivatives = 4
 
-ts0_iso_low = recipes.IsoTS0.from_params(num_derivatives=num_derivatives)
-ts0_iso_low_2nd = recipes.IsoTS0.from_params(
-    ode_order=2, num_derivatives=num_derivatives + 1
-)
-ts0_iso_low_2nd_high = recipes.IsoTS0.from_params(
-    ode_order=2, num_derivatives=num_derivatives + 4
-)
+ts0_iso_low = recipes.iso_ts0(num_derivatives=num_derivatives)
+ts0_iso_low_2nd = recipes.iso_ts0(ode_order=2, num_derivatives=num_derivatives + 1)
+ts0_iso_low_2nd_high = recipes.iso_ts0(ode_order=2, num_derivatives=num_derivatives + 4)
 
 # Methods
 methods = [
