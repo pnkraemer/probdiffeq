@@ -55,9 +55,9 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         gain = jnp.reshape(gain_mat, (-1,))
         m_cor = m_ext - gain * b
         observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
-        corrected = _vars.StateSpaceVar(
-            _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        )
+
+        rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        corrected = _vars.StateSpaceVar(rv_cor, cache=())
         return observed, (corrected, gain)
 
 

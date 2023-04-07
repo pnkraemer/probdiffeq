@@ -19,10 +19,9 @@ class Filter(_strategy.Strategy):
         # to the in-between variable. That's it.
 
         dt = t - t0
-        linearisation_pt, cache = self.begin_extrapolation(posterior=p0, dt=dt)
+        linearisation_pt = self.begin_extrapolation(posterior=p0, dt=dt)
         extrapolated = self.complete_extrapolation(
             linearisation_pt,
-            cache,
             posterior_previous=p0,
             output_scale_sqrtm=scale_sqrtm,
         )
@@ -58,13 +57,12 @@ class Filter(_strategy.Strategy):
         return self.implementation.extrapolation.begin_extrapolation(posterior, dt=dt)
 
     def complete_extrapolation(
-        self, linearisation_pt, cache, *, output_scale_sqrtm, posterior_previous
+        self, linearisation_pt, *, output_scale_sqrtm, posterior_previous
     ):
         extra = self.implementation.extrapolation
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         return extrapolate_fn(
             linearisation_pt=linearisation_pt,
-            cache=cache,
             p0=posterior_previous,
             output_scale_sqrtm=output_scale_sqrtm,
         )

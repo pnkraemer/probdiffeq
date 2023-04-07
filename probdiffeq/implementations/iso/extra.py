@@ -69,7 +69,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.IsoStateSpaceVar(rv)
+        return _vars.IsoStateSpaceVar(rv, cache=())
 
     def init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
@@ -94,7 +94,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoStateSpaceVar(ext), (m_ext_p, m0_p, p, p_inv)
+        return _vars.IsoStateSpaceVar(ext, cache=(m_ext_p, m0_p, p, p_inv))
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -102,9 +102,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, cache, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale_sqrtm
     ):
-        _, _, p, p_inv = cache
+        _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
         l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
@@ -115,7 +115,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             )
         ).T
         l_ext = p[:, None] * l_ext_p
-        return _vars.IsoStateSpaceVar(_vars.IsoNormalHiddenState(m_ext, l_ext))
+        return _vars.IsoStateSpaceVar(
+            _vars.IsoNormalHiddenState(m_ext, l_ext), cache=()
+        )
 
     def complete_extrapolation_with_reversal(
         self, linearisation_pt, p0, cache, output_scale_sqrtm

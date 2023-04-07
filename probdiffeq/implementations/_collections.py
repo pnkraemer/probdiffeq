@@ -63,18 +63,19 @@ class StateSpaceVar(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
-    def __init__(self, hidden_state):
+    def __init__(self, hidden_state, *, cache):
         self.hidden_state = hidden_state
+        self.cache = cache
 
     def tree_flatten(self):
-        children = (self.hidden_state,)
+        children = (self.hidden_state, self.cache)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (hidden_state,) = children
-        return cls(hidden_state=hidden_state)
+        (hidden_state, cache) = children
+        return cls(hidden_state=hidden_state, cache=cache)
 
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"

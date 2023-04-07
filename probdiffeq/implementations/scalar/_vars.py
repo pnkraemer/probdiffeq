@@ -95,9 +95,8 @@ class StateSpaceVar(_collections.StateSpaceVar):
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
     def scale_covariance(self, scale_sqrtm):
-        return StateSpaceVar(
-            self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
-        )
+        rv = self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+        return StateSpaceVar(rv, cache=self.cache)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:

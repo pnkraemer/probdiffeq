@@ -37,7 +37,7 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
 
     def scale_covariance(self, scale_sqrtm):
         rv = self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
-        return IsoStateSpaceVar(rv)
+        return IsoStateSpaceVar(rv, cache=self.cache)
 
     def marginal_nth_derivative(self, n):
         # if the variable has batch-axes, vmap the result
