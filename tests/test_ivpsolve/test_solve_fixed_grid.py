@@ -80,7 +80,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
 # Compute the IVP solution for given setups
 
 
-@testing.fixture(scope="session", name="solution_fixed_grid")
+@testing.fixture(name="solution_fixed_grid")
 @testing.parametrize_with_cases(
     "setup", cases=".", prefix="case_setup_", scope="session"
 )
@@ -117,7 +117,7 @@ def test_terminal_values_correct(solution_fixed_grid, solver_config):
     assert jnp.allclose(u[-1], u_ref[-1], atol=atol, rtol=rtol)
 
 
-@testing.fixture(scope="session", name="parameter_to_solution")
+@testing.fixture(name="parameter_to_solution")
 @testing.parametrize_with_cases(
     "setup", cases=".", prefix="case_setup_", scope="session"
 )

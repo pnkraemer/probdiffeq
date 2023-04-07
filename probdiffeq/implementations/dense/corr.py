@@ -119,7 +119,7 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = ext.hidden_state.mean - gain @ b
         cor = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         _shape = ext.target_shape
-        corrected = _vars.DenseStateSpaceVar(cor, cache=(), target_shape=_shape)
+        corrected = _vars.DenseStateSpaceVar(cor, cache=None, target_shape=_shape)
         return observed, (corrected, gain)
 
 
@@ -193,7 +193,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         m_cor = ext.hidden_state.mean - gain @ b
         rv = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         _shape = ext.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=(), target_shape=_shape)
+        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return observed, (corrected, gain)
@@ -303,7 +303,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=(), target_shape=_shape)
+        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return marginals, (corrected, gain)
@@ -404,7 +404,7 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=(), target_shape=_shape)
+        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return marginals, (corrected, gain)

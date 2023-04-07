@@ -91,7 +91,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         corr = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        return _vars.DenseStateSpaceVar(corr, cache=(), target_shape=m0_matrix.shape)
+        return _vars.DenseStateSpaceVar(corr, cache=None, target_shape=m0_matrix.shape)
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
@@ -134,7 +134,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
 
         shape = linearisation_pt.target_shape
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.DenseStateSpaceVar(rv, cache=(), target_shape=shape)
+        return _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
 
     def complete_extrapolation_with_reversal(
         self, linearisation_pt, p0, output_scale_sqrtm
@@ -165,7 +165,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             g_bw, noise=backward_noise, target_shape=shape
         )
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ext = _vars.DenseStateSpaceVar(rv, cache=(), target_shape=shape)
+        ext = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
         return ext, bw_model
 
     def init_conditional(self, ssv_proto):

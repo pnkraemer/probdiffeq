@@ -69,7 +69,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.IsoStateSpaceVar(rv, cache=())
+        return _vars.IsoStateSpaceVar(rv, cache=None)
 
     def init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
@@ -77,7 +77,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
         rv = _vars.IsoNormalHiddenState(m0, c0)
-        return _vars.IsoStateSpaceVar(rv, cache=())
+        return _vars.IsoStateSpaceVar(rv, cache=None)
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -117,7 +117,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        return _vars.IsoStateSpaceVar(rv, cache=())
+        return _vars.IsoStateSpaceVar(rv, cache=None)
 
     def complete_extrapolation_with_reversal(
         self, linearisation_pt, p0, output_scale_sqrtm
@@ -145,7 +145,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoStateSpaceVar(extrapolated, cache=()), bw_model
+        return _vars.IsoStateSpaceVar(extrapolated, cache=None), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
     def init_conditional(self, ssv_proto):

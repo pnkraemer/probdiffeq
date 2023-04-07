@@ -57,7 +57,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
 
         rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        corrected = _vars.StateSpaceVar(rv_cor, cache=())
+        corrected = _vars.StateSpaceVar(rv_cor, cache=None)
         return observed, (corrected, gain)
 
 
@@ -200,5 +200,5 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain * m_marg
         rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        cor = _vars.StateSpaceVar(rv_cor, cache=())
+        cor = _vars.StateSpaceVar(rv_cor, cache=None)
         return obs, (cor, gain)

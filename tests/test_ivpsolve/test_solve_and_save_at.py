@@ -109,7 +109,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     )
 
 
-@testing.fixture(scope="session", name="solution_save_at")
+@testing.fixture(name="solution_save_at")
 @testing.parametrize_with_cases(
     "setup", cases=".", prefix="case_setup_", scope="session"
 )

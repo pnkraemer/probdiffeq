@@ -72,7 +72,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     )
 
 
-@testing.fixture(scope="session", name="solution_solve")
+@testing.fixture(name="solution_solve")
 @testing.parametrize_with_cases(
     "setup", cases=".", prefix="case_setup_", scope="session"
 )
