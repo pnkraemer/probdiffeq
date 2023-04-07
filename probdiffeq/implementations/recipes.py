@@ -61,60 +61,53 @@ def slr1_blockdiag(*, ode_shape, cubature_rule=None, ode_order=1, num_derivative
     return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class BlockDiagTS0(Implementation):
-    @classmethod
-    def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
-        extrapolation = blockdiag_extra.ibm_blockdiag(
-            ode_shape=ode_shape, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
+def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4):
+    correction = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
+    extrapolation = blockdiag_extra.ibm_blockdiag(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class DenseTS1(Implementation):
-    @classmethod
-    def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = dense_corr.taylor_order_one(
-            ode_shape=ode_shape, ode_order=ode_order
-        )
-        extrapolation = dense_extra.ibm_dense(
-            ode_shape=ode_shape, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
+def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4):
+    correction = dense_corr.taylor_order_one(ode_shape=ode_shape, ode_order=ode_order)
+    extrapolation = dense_extra.ibm_dense(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class DenseTS0(Implementation):
-    @classmethod
-    def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
-        correction = dense_corr.taylor_order_zero(
-            ode_shape=ode_shape, ode_order=ode_order
-        )
-        extrapolation = dense_extra.ibm_dense(
-            ode_shape=ode_shape, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
+def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4):
+    correction = dense_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
+    extrapolation = dense_extra.ibm_dense(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class DenseSLR1(Implementation):
-    @classmethod
-    def from_params(
-        cls,
-        *,
-        ode_shape,
-        cubature_rule_fn=cubature.third_order_spherical,
-        ode_order=1,
-        num_derivatives=4,
-    ):
-        correction = dense_corr.statistical_order_one(
-            ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
-        )
-        extrapolation = dense_extra.ibm_dense(
-            ode_shape=ode_shape, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
+def slr1_dense(
+    *,
+    ode_shape,
+    cubature_rule_fn=cubature.third_order_spherical,
+    ode_order=1,
+    num_derivatives=4,
+):
+    correction = dense_corr.statistical_order_one(
+        ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
+    )
+    extrapolation = dense_extra.ibm_dense(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class DenseSLR0(Implementation):
+def slr0_dense(
+    *,
+    ode_shape,
+    cubature_rule_fn=cubature.third_order_spherical,
+    ode_order=1,
+    num_derivatives=4,
+):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
 
@@ -125,28 +118,16 @@ class DenseSLR0(Implementation):
         and without any deprecation policy.
 
     """
-
-    @classmethod
-    def from_params(
-        cls,
-        *,
-        ode_shape,
-        cubature_rule_fn=cubature.third_order_spherical,
-        ode_order=1,
-        num_derivatives=4,
-    ):
-        correction = dense_corr.statistical_order_zero(
-            ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
-        )
-        extrapolation = dense_extra.ibm_dense(
-            ode_shape=ode_shape, num_derivatives=num_derivatives
-        )
-        return cls(correction=correction, extrapolation=extrapolation)
+    correction = dense_corr.statistical_order_zero(
+        ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
+    )
+    extrapolation = dense_extra.ibm_dense(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
+    return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-class ScalarTS0(Implementation):
-    @classmethod
-    def from_params(cls, *, ode_order=1, num_derivatives=4):
-        correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
-        extrapolation = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
-        return cls(correction=correction, extrapolation=extrapolation)
+def ts0_scalar(*, ode_order=1, num_derivatives=4):
+    correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
+    extrapolation = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
+    return Implementation(correction=correction, extrapolation=extrapolation)
