@@ -199,5 +199,6 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain * m_marg
-        cor = _vars.StateSpaceVar(_vars.NormalHiddenState(m_bw, r_bw.T))
+        rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
+        cor = _vars.StateSpaceVar(rv_cor, cache=())
         return obs, (cor, gain)
