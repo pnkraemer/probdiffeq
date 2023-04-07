@@ -2,8 +2,6 @@
 
 from typing import Any, NamedTuple
 
-import jax
-
 from probdiffeq.implementations import cubature
 from probdiffeq.implementations.blockdiag import corr as blockdiag_corr
 from probdiffeq.implementations.blockdiag import extra as blockdiag_extra
@@ -31,7 +29,6 @@ def ts0_iso(*, ode_order=1, num_derivatives=4):
     return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class BlockDiagSLR1(Implementation):
     """First-order statistical linear regression in state-space models \
      with a block-diagonal structure.
@@ -62,7 +59,6 @@ class BlockDiagSLR1(Implementation):
         return cls(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class BlockDiagTS0(Implementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
@@ -73,7 +69,6 @@ class BlockDiagTS0(Implementation):
         return cls(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class DenseTS1(Implementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
@@ -86,7 +81,6 @@ class DenseTS1(Implementation):
         return cls(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class DenseTS0(Implementation):
     @classmethod
     def from_params(cls, *, ode_shape, ode_order=1, num_derivatives=4):
@@ -99,7 +93,6 @@ class DenseTS0(Implementation):
         return cls(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class DenseSLR1(Implementation):
     @classmethod
     def from_params(
@@ -119,7 +112,6 @@ class DenseSLR1(Implementation):
         return cls(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class DenseSLR0(Implementation):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
@@ -150,7 +142,6 @@ class DenseSLR0(Implementation):
         return cls(correction=correction, extrapolation=extrapolation)
 
 
-@jax.tree_util.register_pytree_node_class
 class ScalarTS0(Implementation):
     @classmethod
     def from_params(cls, *, ode_order=1, num_derivatives=4):
