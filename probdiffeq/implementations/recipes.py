@@ -22,6 +22,12 @@ class Implementation(NamedTuple):
     correction: Any
     extrapolation: Any
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        n = self.extrapolation.num_derivatives
+        o = self.correction.ode_order
+        return f"<{name} with num_derivatives={n}, ode_order={o}>"
+
 
 def ts0_iso(*, ode_order=1, num_derivatives=4):
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
