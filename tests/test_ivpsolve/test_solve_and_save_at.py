@@ -59,7 +59,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         strat_fn=strat_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
@@ -73,7 +73,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=solver_fn,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
@@ -102,7 +102,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
-        impl_fn=recipes.BlockDiagTS0.from_params,
+        impl_fn=recipes.ts0_blockdiag,
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=loop_fn,

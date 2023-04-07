@@ -159,10 +159,8 @@ def scipy_method_config(method):
 num_derivatives_low = 3
 num_derivatives = 5
 
-ts1_low = recipes.DenseTS1.from_params(
-    ode_shape=u0.shape, num_derivatives=num_derivatives_low
-)
-ts1 = recipes.DenseTS1.from_params(ode_shape=u0.shape, num_derivatives=num_derivatives)
+ts1_low = recipes.ts1_dense(ode_shape=u0.shape, num_derivatives=num_derivatives_low)
+ts1 = recipes.ts1_dense(ode_shape=u0.shape, num_derivatives=num_derivatives)
 
 # Methods
 methods = [

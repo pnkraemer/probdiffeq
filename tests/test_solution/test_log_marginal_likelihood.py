@@ -16,8 +16,8 @@ from probdiffeq.strategies import filters, smoothers
         lambda num_derivatives, **kwargs: recipes.ts0_iso(
             num_derivatives=num_derivatives
         ),
-        recipes.BlockDiagTS0.from_params,
-        recipes.DenseTS0.from_params,
+        recipes.ts0_blockdiag,
+        recipes.ts0_dense,
     ],
     ids=["IsoTS0", "BlockDiagTS0", "DenseTS0"],
 )

@@ -14,31 +14,31 @@ def case_ts0_iso():
 
 @testing.case(id="BlockDiagTS0", tags=["nd"])
 def case_ts0_blockdiag():
-    return recipes.BlockDiagTS0.from_params
+    return recipes.ts0_blockdiag
 
 
 @testing.case(id="DenseTS1", tags=["nd"])
 def case_ts1_dense():
-    return recipes.DenseTS1.from_params
+    return recipes.ts1_dense
 
 
 @testing.case(id="ScalarTS0", tags=["scalar"])
 def case_ts0_scalar():
     def impl_factory(*, num_derivatives, ode_shape=()):
-        return recipes.ScalarTS0.from_params(num_derivatives=num_derivatives)
+        return recipes.ts0_scalar(num_derivatives=num_derivatives)
 
     return impl_factory
 
 
 @testing.case(id="DenseTS0", tags=["nd"])
 def case_ts0_dense():
-    return recipes.DenseTS0.from_params
+    return recipes.ts0_dense
 
 
 @testing.case(id="DenseSLR1(Default)", tags=["nd"])
 def case_slr1_dense_default():
     def impl_factory(**kwargs):
-        return recipes.DenseSLR1.from_params(**kwargs)
+        return recipes.slr1_dense(**kwargs)
 
     return impl_factory
 
@@ -47,7 +47,7 @@ def case_slr1_dense_default():
 def case_slr1_dense_sci():
     def impl_factory(**kwargs):
         cube_fn = cubature.third_order_spherical
-        return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
+        return recipes.slr1_dense(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
@@ -56,7 +56,7 @@ def case_slr1_dense_sci():
 def case_slr1_dense_ut():
     def impl_factory(**kwargs):
         cube_fn = cubature.unscented_transform
-        return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
+        return recipes.slr1_dense(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
@@ -65,7 +65,7 @@ def case_slr1_dense_ut():
 def case_slr1_dense_gh():
     def impl_factory(**kwargs):
         cube_fn = cubature.gauss_hermite
-        return recipes.DenseSLR1.from_params(cubature_rule_fn=cube_fn, **kwargs)
+        return recipes.slr1_dense(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
@@ -74,7 +74,7 @@ def case_slr1_dense_gh():
 @testing.case(id="DenseSLR0(Default)", tags=["nd"])
 def case_slr0_dense_default():
     def impl_factory(**kwargs):
-        return recipes.DenseSLR0.from_params(**kwargs)
+        return recipes.slr0_dense(**kwargs)
 
     return impl_factory
 
@@ -83,7 +83,7 @@ def case_slr0_dense_default():
 def case_slr0_dense_sci():
     def impl_factory(**kwargs):
         cube_fn = cubature.third_order_spherical
-        return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
+        return recipes.slr0_dense(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
@@ -92,7 +92,7 @@ def case_slr0_dense_sci():
 def case_slr0_dense_ut():
     def impl_factory(**kwargs):
         cube_fn = cubature.unscented_transform
-        return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
+        return recipes.slr0_dense(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 
@@ -101,7 +101,7 @@ def case_slr0_dense_ut():
 def case_slr0_dense_gh():
     def impl_factory(**kwargs):
         cube_fn = cubature.gauss_hermite
-        return recipes.DenseSLR0.from_params(cubature_rule_fn=cube_fn, **kwargs)
+        return recipes.slr0_dense(cubature_rule_fn=cube_fn, **kwargs)
 
     return impl_factory
 

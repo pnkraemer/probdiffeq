@@ -153,8 +153,8 @@ ode_shape = u0.shape
 
 ts0_iso_low = recipes.ts0_iso(num_derivatives=num_low)
 ts0_iso_medium = recipes.ts0_iso(num_derivatives=num_medium)
-ts1_high = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
-slr1_high = recipes.DenseSLR1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
+ts1_high = recipes.ts1_dense(ode_shape=ode_shape, num_derivatives=num_high)
+slr1_high = recipes.slr1_dense(ode_shape=ode_shape, num_derivatives=num_high)
 
 # Methods
 methods = [

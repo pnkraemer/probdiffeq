@@ -129,7 +129,7 @@ Should we linearize with a Taylor-approximation or by moment matching?
 
 ```python
 def cubature_to_slr1(cubature_rule_fn, *, ode_shape):
-    return recipes.DenseSLR1.from_params(
+    return recipes.slr1_dense(
         ode_shape=ode_shape,
         cubature_rule_fn=cubature_rule_fn,
     )
@@ -137,7 +137,7 @@ def cubature_to_slr1(cubature_rule_fn, *, ode_shape):
 
 # Different linearisation styles
 ode_shape = u0.shape
-ts1 = recipes.DenseTS1.from_params(ode_shape=ode_shape)
+ts1 = recipes.ts1_dense(ode_shape=ode_shape)
 sci_fn = cubature.third_order_spherical
 ut_fn = functools.partial(cubature.unscented_transform, r=1.0)
 gh_fn = functools.partial(cubature.gauss_hermite, degree=3)
@@ -177,8 +177,8 @@ What is the performance difference between an isotropic, block-diagonal, and den
 ```python
 # Different factorisations
 ts0_iso = recipes.ts0_iso()
-ts0_batch = recipes.BlockDiagTS0.from_params(ode_shape=ode_shape)
-ts0_dense = recipes.DenseTS0.from_params(ode_shape=ode_shape)
+ts0_batch = recipes.ts0_blockdiag(ode_shape=ode_shape)
+ts0_dense = recipes.ts0_dense(ode_shape=ode_shape)
 
 # Methods
 methods = [
@@ -256,13 +256,11 @@ num_low, num_medium, num_high = 3, 5, 8
 ts0_iso_low = recipes.ts0_iso(num_derivatives=num_low)
 ts0_iso_medium = recipes.ts0_iso(num_derivatives=num_medium)
 
-ts1_low = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_low)
-ts1_medium = recipes.DenseTS1.from_params(
-    ode_shape=ode_shape, num_derivatives=num_medium
-)
-ts1_high = recipes.DenseTS1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
+ts1_low = recipes.ts1_dense(ode_shape=ode_shape, num_derivatives=num_low)
+ts1_medium = recipes.ts1_dense(ode_shape=ode_shape, num_derivatives=num_medium)
+ts1_high = recipes.ts1_dense(ode_shape=ode_shape, num_derivatives=num_high)
 
-slr1_high = recipes.DenseSLR1.from_params(ode_shape=ode_shape, num_derivatives=num_high)
+slr1_high = recipes.slr1_dense(ode_shape=ode_shape, num_derivatives=num_high)
 
 # Methods
 methods = [

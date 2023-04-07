@@ -153,7 +153,7 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
 
 @testing.fixture(scope="session", name="solver_probdiffeq_reference_ek1")
 def fixture_solver_probdiffeq_reference_ek1(num):
-    implementation = recipes.DenseTS1.from_params(num_derivatives=num, ode_shape=(2,))
+    implementation = recipes.ts1_dense(num_derivatives=num, ode_shape=(2,))
     strategy = filters.Filter(implementation=implementation)
     return ivpsolvers.DynamicSolver(strategy=strategy)
 

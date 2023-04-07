@@ -57,9 +57,7 @@ def vf(*ys, t, p):
 ```python
 num_derivatives = 1
 
-implementation = recipes.DenseTS1.from_params(
-    ode_shape=(1,), num_derivatives=num_derivatives
-)
+implementation = recipes.ts1_dense(ode_shape=(1,), num_derivatives=num_derivatives)
 strategy = filters.Filter(implementation=implementation)
 
 dynamic = ivpsolvers.DynamicSolver(strategy=strategy)

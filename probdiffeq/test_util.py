@@ -32,7 +32,7 @@ def generate_solver(
     >>> print(generate_solver(solver_factory=ivpsolvers.DynamicSolver))
     DynamicSolver(strategy=Filter(implementation=<IsoTS0 with num_derivatives=4>))
 
-    >>> impl_fcty = recipes.DenseTS1.from_params
+    >>> impl_fcty = recipes.ts1_dense
     >>> strat_fcty = smoothers.Smoother
     >>> print(generate_solver(strategy_factory=strat_fcty, impl_factory=impl_fcty, ode_shape=(1,)))  # noqa: E501
     MLESolver(strategy=Smoother(implementation=<DenseTS1 with num_derivatives=4>))
