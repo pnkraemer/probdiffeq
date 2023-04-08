@@ -20,13 +20,15 @@ class AbstractControl(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def control_fn(self, error_normalised, error_contraction_rate, state: S) -> S:
-        r"""Propose a time-step $\Delta t$."""
+    def clip(self, t: jax.Array, t1: jax.Array, state: S) -> S:
+        """(Optionally) clip the current step to not exceed t1."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def clip_fn(self, t, t1, state: S) -> S:
-        """(Optionally) clip the current step to not exceed t1."""
+    def apply(
+        self, error_normalised: jax.Array, error_contraction_rate: jax.Array, state: S
+    ) -> S:
+        r"""Propose a time-step $\Delta t$."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -45,11 +47,11 @@ class _PIState(NamedTuple):
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class _ProportionalIntegralCommon(AbstractControl[_PIState]):
-    safety: float = 0.95
-    factor_min: float = 0.2
-    factor_max: float = 10.0
-    power_integral_unscaled: float = 0.3
-    power_proportional_unscaled: float = 0.4
+    safety: jax.Array = 0.95
+    factor_min: jax.Array = 0.2
+    factor_max: jax.Array = 10.0
+    power_integral_unscaled: jax.Array = 0.3
+    power_proportional_unscaled: jax.Array = 0.4
 
     def tree_flatten(self):
         children = (
@@ -70,10 +72,10 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
         return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
 
     @abc.abstractmethod
-    def clip_fn(self, t, t1, state: _PIState) -> _PIState:
+    def clip(self, t, t1, state: _PIState) -> _PIState:
         raise NotImplementedError
 
-    def control_fn(
+    def apply(
         self, error_normalised, error_contraction_rate, state: _PIState
     ) -> _PIState:
         n1 = self.power_integral_unscaled / error_contraction_rate
@@ -108,7 +110,7 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
 class ProportionalIntegral(_ProportionalIntegralCommon):
     """Proportional-integral (PI) controller."""
 
-    def clip_fn(self, t, t1, state: _PIState) -> _PIState:
+    def clip(self, t, t1, state: _PIState) -> _PIState:
         return state
 
 
@@ -120,7 +122,7 @@ class ProportionalIntegralClipped(_ProportionalIntegralCommon):
     Suggested time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    def clip_fn(self, t, t1, state: _PIState) -> _PIState:
+    def clip(self, t, t1, state: _PIState) -> _PIState:
         dt = state.dt_proposed
         dt_clipped = jnp.minimum(dt, t1 - t)
         return _PIState(dt_clipped, state.error_norm_previously_accepted)
@@ -133,9 +135,9 @@ class _IState(NamedTuple):
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class _IntegralCommon(AbstractControl[_IState]):
-    safety: float = 0.95
-    factor_min: float = 0.2
-    factor_max: float = 10.0
+    safety: jax.Array = 0.95
+    factor_min: jax.Array = 0.2
+    factor_max: jax.Array = 10.0
 
     def tree_flatten(self):
         children = (self.safety, self.factor_min, self.factor_max)
@@ -150,10 +152,10 @@ class _IntegralCommon(AbstractControl[_IState]):
         return _IState(dt0)
 
     @abc.abstractmethod
-    def clip_fn(self, t, t1, state: _IState) -> _IState:
+    def clip(self, t, t1, state: _IState) -> _IState:
         raise NotImplementedError
 
-    def control_fn(
+    def apply(
         self, error_normalised, error_contraction_rate, state: _IState
     ) -> _IState:
         scale_factor_unclipped = self.safety * (
@@ -175,7 +177,7 @@ class _IntegralCommon(AbstractControl[_IState]):
 class Integral(_IntegralCommon):
     r"""Integral (I) controller."""
 
-    def clip_fn(self, t, t1, state):
+    def clip(self, t: jax.Array, t1: jax.Array, state: _IState) -> _IState:
         return state
 
 
@@ -187,7 +189,6 @@ class IntegralClipped(_IntegralCommon):
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    def clip_fn(self, t, t1, state):
-        dt = state.dt_proposed
-        dt_clipped = jnp.minimum(dt, t1 - t)
+    def clip(self, t: jax.Array, t1: jax.Array, state: _IState) -> _IState:
+        dt_clipped = jnp.minimum(state.dt_proposed, t1 - t)
         return _IState(dt_clipped)

@@ -232,7 +232,7 @@ class AdaptiveIVPSolver(Generic[T]):
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
         # This must happen _before_ the step.
-        state_control = self.control.clip_fn(
+        state_control = self.control.clip(
             t=state.accepted.t, state=state.control, t1=t1
         )
 
@@ -251,7 +251,7 @@ class AdaptiveIVPSolver(Generic[T]):
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
-        state_control = self.control.control_fn(
+        state_control = self.control.apply(
             state=state_control,
             error_normalised=error_normalised,
             error_contraction_rate=self.error_contraction_rate,
