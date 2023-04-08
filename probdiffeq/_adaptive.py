@@ -24,7 +24,6 @@ class _AdaptiveState(Generic[S, C]):
 
     def __init__(
         self,
-        dt_proposed,
         error_norm_proposed,
         control: C,
         proposed: S,
@@ -32,7 +31,6 @@ class _AdaptiveState(Generic[S, C]):
         solution: S,
         previous: S,
     ):
-        self.dt_proposed = dt_proposed
         self.error_norm_proposed = error_norm_proposed
         self.control = control
         self.proposed = proposed
@@ -43,7 +41,6 @@ class _AdaptiveState(Generic[S, C]):
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
-            f"\n\tdt_proposed={self.dt_proposed},"
             f"\n\terror_norm_proposed={self.error_norm_proposed},"
             f"\n\tcontrol={self.control},"
             f"\n\tproposed={self.proposed},"
@@ -55,7 +52,6 @@ class _AdaptiveState(Generic[S, C]):
 
     def tree_flatten(self):
         children = (
-            self.dt_proposed,
             self.error_norm_proposed,
             self.control,
             self.proposed,
@@ -69,7 +65,6 @@ class _AdaptiveState(Generic[S, C]):
     @classmethod
     def tree_unflatten(cls, _aux, children):
         (
-            dt_proposed,
             error_norm_proposed,
             control,
             proposed,
@@ -78,7 +73,6 @@ class _AdaptiveState(Generic[S, C]):
             previous,
         ) = children
         return cls(
-            dt_proposed=dt_proposed,
             error_norm_proposed=error_norm_proposed,
             control=control,
             proposed=proposed,
@@ -164,16 +158,13 @@ class AdaptiveIVPSolver(Generic[T]):
         return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init_fn(self, dt0, **kwargs):
+    def init_fn(self, dt0, **solver_init_kwargs):
         """Initialise the IVP solver state."""
-        # todo: make init() a function of state_solver,
-        #  state_control, and dt_proposed. Make extract_fn() return those.
-
         # Initialise the components
-        state_solver = self.solver.init_fn(**kwargs)
+        state_control = self.control.init_state_from_dt(dt0)
+        state_solver = self.solver.init_fn(**solver_init_kwargs)
 
         # Initialise (prototypes for) proposed values
-        state_control = self.control.init_fn()
         error_norm_proposed = self._normalise_error(
             error_estimate=state_solver.error_estimate,
             u=state_solver.u,
@@ -182,7 +173,6 @@ class AdaptiveIVPSolver(Generic[T]):
             norm_ord=self.norm_ord,
         )
         return _AdaptiveState(
-            dt_proposed=dt0,
             error_norm_proposed=error_norm_proposed,
             solution=state_solver,
             proposed=state_solver,
@@ -229,7 +219,6 @@ class AdaptiveIVPSolver(Generic[T]):
 
         _, state_new = self.while_loop_fn(cond_fn, body_fn, init_fn(state0))
         return _AdaptiveState(
-            dt_proposed=state_new.dt_proposed,
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
             accepted=state_new.proposed,  # holla! New! :)
@@ -243,13 +232,15 @@ class AdaptiveIVPSolver(Generic[T]):
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
         # This must happen _before_ the step.
-        dt = self.control.clip_fn(state=state.accepted, dt=state.dt_proposed, t1=t1)
+        state_control = self.control.clip(
+            t=state.accepted.t, state=state.control, t1=t1
+        )
 
         # Perform the actual step.
         posterior = self.solver.step_fn(
             state=state.accepted,
             vector_field=vector_field,
-            dt=dt,
+            dt=self.control.extract_dt_from_state(state_control),
             parameters=parameters,
         )
         # Normalise the error and propose a new step.
@@ -260,14 +251,12 @@ class AdaptiveIVPSolver(Generic[T]):
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
-        dt_proposed, state_control = self.control.control_fn(
-            state=state.control,
+        state_control = self.control.apply(
+            state=state_control,
             error_normalised=error_normalised,
             error_contraction_rate=self.error_contraction_rate,
-            dt_previous=state.dt_proposed,
         )
         return _AdaptiveState(
-            dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
             solution=state.solution,  # too early to accept :)
@@ -287,7 +276,6 @@ class AdaptiveIVPSolver(Generic[T]):
             s0=state.previous, s1=state.accepted, t=t
         )
         return _AdaptiveState(
-            dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             proposed=_inf_like(state.proposed),
             accepted=accepted,  # holla! New! :)
@@ -298,17 +286,19 @@ class AdaptiveIVPSolver(Generic[T]):
 
     def extract_fn(self, state: _AdaptiveState[S, C], /) -> S:
         solver_extract = self.solver.extract_fn(state.solution)
+        control_extract = self.control.extract_dt_from_state(state.control)
 
         # return BOTH dt & solver_extract.
         #  Usually, only the latter is necessary.
         #  but we return both because this way, extract is inverse to init,
         #  and it becomes much easier to restart the solver at a new point
         #  without losing consistency.
-        return state.dt_proposed, solver_extract
+        return control_extract, solver_extract
 
     def extract_terminal_value_fn(self, state: _AdaptiveState[S, C], /) -> S:
         solver_extract = self.solver.extract_terminal_value_fn(state.solution)
-        return state.dt_proposed, solver_extract
+        control_extract = self.control.extract_dt_from_state(state.control)
+        return control_extract, solver_extract
 
 
 def _inf_like(tree):

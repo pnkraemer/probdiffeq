@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 import jax.test_util
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
+from probdiffeq import controls, ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.backend import testing
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -23,6 +23,7 @@ class _SimulateTerminalValuesConfig(NamedTuple):
     strat_fn: Any
     solver_config: Any
     loop_fn: Any
+    control: Any
 
 
 @testing.case
@@ -36,6 +37,7 @@ def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
+        control=controls.ProportionalIntegral(),
     )
 
 
@@ -52,6 +54,7 @@ def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
+        control=controls.ProportionalIntegral(),
     )
 
 
@@ -68,6 +71,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
         strat_fn=strat_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
+        control=controls.ProportionalIntegral(),
     )
 
 
@@ -82,6 +86,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
+        control=controls.ProportionalIntegral(),
     )
 
 
@@ -111,6 +116,45 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=loop_fn,
+        control=controls.ProportionalIntegral(),
+    )
+
+
+@testing.case
+def case_control_pi():
+    return controls.ProportionalIntegral()
+
+
+@testing.case
+def case_control_pi_clipped():
+    return controls.ProportionalIntegralClipped()
+
+
+@testing.case
+def case_control_i():
+    return controls.Integral()
+
+
+@testing.case
+def case_control_i_clipped():
+    return controls.IntegralClipped()
+
+
+# todo: test for all_taylor_fns as well
+
+
+@testing.case
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
+@testing.parametrize_with_cases("control", cases=".", prefix="case_control_")
+def case_setup_all_controls(ode_problem, control, solver_config):
+    return _SimulateTerminalValuesConfig(
+        ode_problem=ode_problem,
+        solver_fn=ivpsolvers.MLESolver,
+        impl_fn=recipes.ts0_blockdiag,
+        strat_fn=filters.Filter,
+        solver_config=solver_config,
+        loop_fn=jax.lax.while_loop,
+        control=control,
     )
 
 
@@ -153,6 +197,7 @@ def fixture_solution_terminal_values(setup):
         taylor_fn=taylor.taylor_mode_fn,
         while_loop_fn_temporal=setup.loop_fn,
         while_loop_fn_per_step=setup.loop_fn,
+        control=setup.control,
     )
 
     sol = (solution.t, solution.u)
