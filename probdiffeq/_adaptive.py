@@ -101,6 +101,9 @@ class AdaptiveIVPSolver(Generic[T]):
         solver: T,
         atol=1e-4,
         rtol=1e-2,
+        # todo: replace the default with `None`.
+        #  function evaluations in signatures
+        #  are not a great idea...
         control=controls.ProportionalIntegral(),
         norm_ord=None,
         numerical_zero=1e-10,
@@ -163,7 +166,9 @@ class AdaptiveIVPSolver(Generic[T]):
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0, dt0):
         """Initialise the IVP solver state."""
-        # todo: make a function of posterior, state_control, and dt_proposed
+        # todo: make init() a function of state_solver,
+        #  state_control, and dt_proposed. Make extract_fn() return those.
+
         # Initialise the components
         state_solver = self.solver.init_fn(
             taylor_coefficients=taylor_coefficients, t0=t0
@@ -293,10 +298,10 @@ class AdaptiveIVPSolver(Generic[T]):
             control=state.control,
         )
 
-    def extract_fn(self, *, state: _AdaptiveState[S, C]) -> S:
+    def extract_fn(self, state: _AdaptiveState[S, C], /) -> S:
         return self.solver.extract_fn(state.solution)
 
-    def extract_terminal_value_fn(self, *, state: _AdaptiveState[S, C]) -> S:
+    def extract_terminal_value_fn(self, state: _AdaptiveState[S, C], /) -> S:
         return self.solver.extract_terminal_value_fn(state.solution)
 
 

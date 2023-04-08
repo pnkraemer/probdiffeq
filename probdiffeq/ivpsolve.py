@@ -59,6 +59,7 @@ def solve_and_save_at(
     initial_values,
     save_at,
     solver,
+    dt0,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     while_loop_fn_temporal=jax.lax.while_loop,
@@ -96,6 +97,7 @@ def solve_and_save_at(
         taylor_coefficients=taylor_coefficients,
         save_at=save_at,
         solver=solver,
+        dt0=dt0,
         parameters=parameters,
         while_loop_fn_temporal=while_loop_fn_temporal,
         while_loop_fn_per_step=while_loop_fn_per_step,
@@ -111,6 +113,7 @@ def solve_with_python_while_loop(
     initial_values,
     t0,
     t1,
+    dt0,
     solver,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
@@ -138,6 +141,7 @@ def solve_with_python_while_loop(
         t0=t0,
         t1=t1,
         solver=solver,
+        dt0=dt0,
         parameters=parameters,
         **options,
     )
@@ -174,7 +178,10 @@ def solve_fixed_grid(
     )
 
 
-def dt0(vector_field, initial_values, /, t0, parameters, scale=0.01, nugget=1e-5):
+def propose_dt0(
+    vector_field, initial_values, /, t0, parameters, scale=0.01, nugget=1e-5
+):
+    """Propose an initial time-step."""
     u0, *_ = initial_values
     f0 = vector_field(*initial_values, t=t0, p=parameters)
 
