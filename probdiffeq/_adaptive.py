@@ -4,28 +4,33 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import controls
+from probdiffeq import controls, ivpsolvers
 
-StateTypeVar = TypeVar("StateTypeVar")
-"""A type-variable for generic (probabilistic) IVP solver states."""
+S = TypeVar("S")
+"""A type-variable for generic IVP solver states."""
 
-SolverTypeVar = TypeVar("SolverTypeVar")
-"""A type-variable for non-adaptive (probabilistic) IVP solvers."""
+C = TypeVar("C", bound=controls.AbstractControl)
+"""A type-variable for generic controller states."""
+
+T = TypeVar("T", bound=ivpsolvers.AbstractSolver)
+"""A type-variable for (non-adaptive) IVP solvers."""
 
 
+# basically a namedtuple, but NamedTuples cannot be generic,
+#  which is why we implement this functionality manually.
 @jax.tree_util.register_pytree_node_class
-class AdaptiveIVPSolverState(Generic[StateTypeVar]):
+class _AdaptiveState(Generic[S, C]):
     """Adaptive IVP solver state."""
 
     def __init__(
         self,
         dt_proposed,
         error_norm_proposed,
-        control,
-        proposed: StateTypeVar,
-        accepted: StateTypeVar,
-        solution: StateTypeVar,
-        previous: StateTypeVar,
+        control: C,
+        proposed: S,
+        accepted: S,
+        solution: S,
+        previous: S,
     ):
         self.dt_proposed = dt_proposed
         self.error_norm_proposed = error_norm_proposed
@@ -88,12 +93,12 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 
 @jax.tree_util.register_pytree_node_class
-class AdaptiveIVPSolver(Generic[SolverTypeVar]):
+class AdaptiveIVPSolver(Generic[T]):
     """Adaptive IVP solvers."""
 
     def __init__(
         self,
-        solver: SolverTypeVar,
+        solver: T,
         atol=1e-4,
         rtol=1e-2,
         control=controls.ProportionalIntegral(),
@@ -163,6 +168,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
     @jax.jit
     def init_fn(self, *, taylor_coefficients, t0):
         """Initialise the IVP solver state."""
+        # todo: make a function of posterior, state_control, and dt_proposed
         # Initialise the components
         posterior = self.solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
         state_control = self.control.init_fn()
@@ -177,7 +183,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             norm_ord=self.norm_ord,
         )
         dt_proposed = self._propose_first_dt(taylor_coefficients=taylor_coefficients)
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=dt_proposed,
             error_norm_proposed=error_norm_proposed,
             solution=posterior,
@@ -230,7 +236,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             return True, s
 
         _, state_new = self.while_loop_fn(cond_fn, body_fn, init_fn(state0))
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
@@ -268,7 +274,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             error_contraction_rate=self.error_contraction_rate,
             dt_previous=state.dt_proposed,
         )
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
@@ -284,11 +290,11 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
-    def _interpolate(self, *, state, t):
+    def _interpolate(self, *, state: _AdaptiveState[S, C], t) -> _AdaptiveState[S, C]:
         accepted, solution, previous = self.solver.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             proposed=_inf_like(state.proposed),
@@ -298,13 +304,11 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             control=state.control,
         )
 
-    def extract_fn(self, *, state):  # noqa: D102
-        state = self.solver.extract_fn(state=state.solution)
-        return state
+    def extract_fn(self, *, state: _AdaptiveState[S, C]) -> S:
+        return self.solver.extract_fn(state.solution)
 
-    def extract_terminal_value_fn(self, *, state):  # noqa: D102
-        state = self.solver.extract_terminal_value_fn(state=state.solution)
-        return state
+    def extract_terminal_value_fn(self, *, state: _AdaptiveState[S, C]) -> S:
+        return self.solver.extract_terminal_value_fn(state.solution)
 
 
 def _inf_like(tree):

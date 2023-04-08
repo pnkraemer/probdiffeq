@@ -9,7 +9,7 @@ from probdiffeq import _sqrt_util, solution
 
 
 @jax.tree_util.register_pytree_node_class
-class _AbstractSolver(abc.ABC):
+class AbstractSolver(abc.ABC):
     """Interface for initial value problem solvers."""
 
     def __init__(self, strategy):
@@ -32,11 +32,11 @@ class _AbstractSolver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_fn(self, *, state):
+    def extract_fn(self, state, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_terminal_value_fn(self, *, state):
+    def extract_terminal_value_fn(self, state, /):
         raise NotImplementedError
 
     def init_fn(self, *, taylor_coefficients, t0):
@@ -127,7 +127,7 @@ class _AbstractSolver(abc.ABC):
 
 
 @jax.tree_util.register_pytree_node_class
-class CalibrationFreeSolver(_AbstractSolver):
+class CalibrationFreeSolver(AbstractSolver):
     """Initial value problem solver.
 
     No automatic output-scale calibration.
@@ -185,7 +185,7 @@ class CalibrationFreeSolver(_AbstractSolver):
 
     # todo: move this to the abstract solver and overwrite when necessary?
     #  the dynamic solver uses the same...
-    def extract_fn(self, *, state):
+    def extract_fn(self, state, /):
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
@@ -199,7 +199,7 @@ class CalibrationFreeSolver(_AbstractSolver):
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, *, state):
+    def extract_terminal_value_fn(self, state, /):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
@@ -225,7 +225,7 @@ class CalibrationFreeSolver(_AbstractSolver):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicSolver(_AbstractSolver):
+class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state, vector_field, dt, parameters):
@@ -261,7 +261,7 @@ class DynamicSolver(_AbstractSolver):
 
         return smoothing_solution
 
-    def extract_fn(self, *, state):
+    def extract_fn(self, state, /):
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = marginals.extract_qoi()
 
@@ -276,7 +276,7 @@ class DynamicSolver(_AbstractSolver):
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, *, state):
+    def extract_terminal_value_fn(self, state, /):
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         u = marginals.extract_qoi()
 
@@ -293,7 +293,7 @@ class DynamicSolver(_AbstractSolver):
 
 
 @jax.tree_util.register_pytree_node_class
-class MLESolver(_AbstractSolver):
+class MLESolver(AbstractSolver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
@@ -354,12 +354,12 @@ class MLESolver(_AbstractSolver):
         sum = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
         return sum / jnp.sqrt(n + 1)
 
-    def extract_fn(self, *, state):
+    def extract_fn(self, state, /):
         s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
         margs = self.strategy.marginals(posterior=state.posterior)
         return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
 
-    def extract_terminal_value_fn(self, *, state):
+    def extract_terminal_value_fn(self, state, /):
         s = state.output_scale_sqrtm
         margs = self.strategy.marginals_terminal_value(posterior=state.posterior)
         return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
