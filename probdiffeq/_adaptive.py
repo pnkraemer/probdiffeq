@@ -101,15 +101,15 @@ class AdaptiveIVPSolver(Generic[T]):
         solver: T,
         atol=1e-4,
         rtol=1e-2,
-        # todo: replace the default with `None`.
-        #  function evaluations in signatures
-        #  are not a great idea...
-        control=controls.ProportionalIntegral(),
+        control=None,
         norm_ord=None,
         numerical_zero=1e-10,
         while_loop_fn=jax.lax.while_loop,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
+        if control is None:
+            control = controls.ProportionalIntegral()
+
         self.solver = solver
         self.while_loop_fn = while_loop_fn
         self.atol = atol
