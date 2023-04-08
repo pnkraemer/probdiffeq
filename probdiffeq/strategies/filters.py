@@ -10,8 +10,14 @@ from probdiffeq.strategies import _strategy
 # next, add "t" into this solution (and into MarkovSequence)
 # this will simplify a million functions in this code base
 # and is the next step en route to x=extract(init(x)) for solvers, strategies, etc.
+# more specifically, init_posterior(tcoeffs) becomes
+# init_posterior_from_tcoeffs(t, tcoeffs)
+#  which allows the solver (!) to satisfy x = extract(init(x)). Then,
+#  the strategy can be made to obey this pattern next.
 # todo: if we happen to keep this class, make it generic.
 class _FilterSol(NamedTuple):
+    """Filtering solution."""
+
     ssv: Any
 
     def scale_covariance(self, s, /):
@@ -23,12 +29,16 @@ class _FilterSol(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy[_FilterSol]):
+    """Filter strategy."""
+
     def init_posterior(self, *, taylor_coefficients) -> _FilterSol:
         ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
         return _FilterSol(ssv)
 
+    # todo: make interpolation result into a named-tuple.
+    #  it is too confusing what those three posteriors mean.
     def case_right_corner(
         self, *, p0: _FilterSol, p1: _FilterSol, t, t0, t1, scale_sqrtm
     ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:  # s1.t == t
@@ -39,7 +49,6 @@ class Filter(_strategy.Strategy[_FilterSol]):
     ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
-
         dt = t - t0
         linearisation_pt = self.begin_extrapolation(posterior=p0, dt=dt)
         extrapolated = self.complete_extrapolation(
@@ -47,7 +56,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
             posterior_previous=p0,
             output_scale_sqrtm=scale_sqrtm,
         )
-        return rv1, extrapolated, extrapolated
+        return _FilterSol(rv1), extrapolated, extrapolated
 
     def offgrid_marginals(
         self, *, t, marginals, posterior_previous: _FilterSol, t0, t1, scale_sqrtm
@@ -67,10 +76,10 @@ class Filter(_strategy.Strategy[_FilterSol]):
         raise NotImplementedError
 
     def marginals(self, *, posterior: _FilterSol):
-        return posterior
+        return posterior.ssv
 
     def marginals_terminal_value(self, *, posterior: _FilterSol):
-        return posterior
+        return posterior.ssv
 
     def extract_u_from_posterior(self, *, posterior: _FilterSol):
         return posterior.ssv.extract_qoi()
@@ -107,7 +116,9 @@ class Filter(_strategy.Strategy[_FilterSol]):
         return _FilterSol(ssv)
 
     # todo: more type-stability in corrections!
-    def complete_correction(self, *, extrapolated: _FilterSol, cache_obs) -> _FilterSol:
+    def complete_correction(
+        self, *, extrapolated: _FilterSol, cache_obs
+    ) -> Tuple[Any, Tuple[_FilterSol, Any]]:
         obs, (corr, gain) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.ssv, cache=cache_obs
         )

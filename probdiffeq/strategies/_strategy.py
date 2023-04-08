@@ -25,51 +25,51 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_u_from_posterior(self, *, posterior):
+    def extract_u_from_posterior(self, *, posterior: P):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):
+    def case_right_corner(self, *, p0: P, p1: P, t, t0, t1, scale_sqrtm):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_interpolate(self, *, p0, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
+    def case_interpolate(self, *, p0: P, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginals(self, *, posterior):  # todo: rename to marginalise?
+    def marginals(self, *, posterior: P):  # todo: rename to marginalise?
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginals_terminal_value(self, *, posterior):  # todo: rename to marginalise?
+    def marginals_terminal_value(self, *, posterior: P):  # todo: rename to marginalise?
         raise NotImplementedError
 
     @abc.abstractmethod
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
+        self, *, t, marginals, posterior_previous: P, t0, t1, scale_sqrtm
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def sample(self, key, *, posterior, shape):
+    def sample(self, key, *, posterior: P, shape):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, *, posterior, dt):
+    def begin_extrapolation(self, *, posterior: P, dt):
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt, *, output_scale_sqrtm, posterior_previous
+        self, linearisation_pt: P, *, output_scale_sqrtm, posterior_previous: P
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_correction(self, linearisation_pt, *, vector_field, t, p):
+    def begin_correction(self, linearisation_pt: P, *, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, extrapolated, cache_obs):
+    def complete_correction(self, *, extrapolated: P, cache_obs):
         raise NotImplementedError
 
     def tree_flatten(self):
