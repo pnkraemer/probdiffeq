@@ -1,12 +1,16 @@
 """Interface for estimation strategies."""
 
 import abc
+from typing import Generic, TypeVar
 
 import jax
 
+P = TypeVar("P")
+"""A type-variable to indicate strategy-state ("posterior") types."""
+
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(abc.ABC):
+class Strategy(abc.ABC, Generic[P]):
     """Inference strategy interface."""
 
     def __init__(self, implementation):
@@ -17,7 +21,7 @@ class Strategy(abc.ABC):
         return f"{self.__class__.__name__}({args})"
 
     @abc.abstractmethod
-    def init_posterior(self, *, taylor_coefficients):
+    def init_posterior(self, *, taylor_coefficients) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -61,6 +65,10 @@ class Strategy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def begin_correction(self, linearisation_pt, *, vector_field, t, p):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def complete_correction(self, *, extrapolated, cache_obs):
         raise NotImplementedError
 
@@ -79,8 +87,3 @@ class Strategy(abc.ABC):
 
     def init_output_scale_sqrtm(self):
         return self.implementation.extrapolation.init_output_scale_sqrtm()
-
-    def begin_correction(self, linearisation_pt, *, vector_field, t, p):
-        return self.implementation.correction.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=t, p=p
-        )

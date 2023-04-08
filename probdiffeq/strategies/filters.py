@@ -1,20 +1,42 @@
 """Forward-only estimation: filtering."""
+from typing import Any, NamedTuple, Tuple
+
 import jax
 
 from probdiffeq.strategies import _strategy
 
 
+# this class is NOT redundant.
+# next, add "t" into this solution (and into MarkovSequence)
+# this will simplify a million functions in this code base
+# and is the next step en route to x=extract(init(x)) for solvers, strategies, etc.
+# todo: if we happen to keep this class, make it generic.
+class _FilterSol(NamedTuple):
+    ssv: Any
+
+    def scale_covariance(self, s, /):
+        return _FilterSol(self.ssv.scale_covariance(s))
+
+    def extract_qoi(self):
+        return self.ssv.extract_qoi()
+
+
 @jax.tree_util.register_pytree_node_class
-class Filter(_strategy.Strategy):
-    def init_posterior(self, *, taylor_coefficients):
-        return self.implementation.extrapolation.init_state_space_var(
+class Filter(_strategy.Strategy[_FilterSol]):
+    def init_posterior(self, *, taylor_coefficients) -> _FilterSol:
+        ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
+        return _FilterSol(ssv)
 
-    def case_right_corner(self, *, p0, p1, t, t0, t1, scale_sqrtm):  # s1.t == t
+    def case_right_corner(
+        self, *, p0: _FilterSol, p1: _FilterSol, t, t0, t1, scale_sqrtm
+    ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:  # s1.t == t
         return p1, p1, p1
 
-    def case_interpolate(self, *, p0, rv1, t0, t, t1, scale_sqrtm):
+    def case_interpolate(
+        self, *, p0: _FilterSol, rv1, t0, t, t1, scale_sqrtm
+    ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
 
@@ -28,8 +50,8 @@ class Filter(_strategy.Strategy):
         return rv1, extrapolated, extrapolated
 
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous, t0, t1, scale_sqrtm
-    ):
+        self, *, t, marginals, posterior_previous: _FilterSol, t0, t1, scale_sqrtm
+    ) -> Tuple[jax.Array, _FilterSol]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
             rv1=marginals,
@@ -41,33 +63,53 @@ class Filter(_strategy.Strategy):
         u = self.extract_u_from_posterior(posterior=sol)
         return u, sol
 
-    def sample(self, key, *, posterior, shape):
+    def sample(self, key, *, posterior: _FilterSol, shape):
         raise NotImplementedError
 
-    def marginals(self, *, posterior):
+    def marginals(self, *, posterior: _FilterSol):
         return posterior
 
-    def marginals_terminal_value(self, *, posterior):
+    def marginals_terminal_value(self, *, posterior: _FilterSol):
         return posterior
 
-    def extract_u_from_posterior(self, *, posterior):
-        return posterior.extract_qoi()
+    def extract_u_from_posterior(self, *, posterior: _FilterSol):
+        return posterior.ssv.extract_qoi()
 
-    def begin_extrapolation(self, *, posterior, dt):
-        return self.implementation.extrapolation.begin_extrapolation(posterior, dt=dt)
+    def begin_extrapolation(self, *, posterior: _FilterSol, dt) -> _FilterSol:
+        extrapolate = self.implementation.extrapolation.begin_extrapolation
+        ssv = extrapolate(posterior.ssv, dt=dt)
+        return _FilterSol(ssv)
+
+    # todo: make "linearisation_pt" positional only. Then rename this mess.
+    def begin_correction(
+        self, linearisation_pt: _FilterSol, *, vector_field, t, p
+    ) -> Tuple[jax.Array, float, Any]:
+        ssv = linearisation_pt.ssv
+        return self.implementation.correction.begin_correction(
+            ssv, vector_field=vector_field, t=t, p=p
+        )
 
     def complete_extrapolation(
-        self, linearisation_pt, *, output_scale_sqrtm, posterior_previous
-    ):
+        self,
+        linearisation_pt: _FilterSol,
+        *,
+        output_scale_sqrtm,
+        posterior_previous: _FilterSol,
+    ) -> _FilterSol:
         extra = self.implementation.extrapolation
         extrapolate_fn = extra.complete_extrapolation_without_reversal
-        return extrapolate_fn(
-            linearisation_pt=linearisation_pt,
-            p0=posterior_previous,
+        # todo: extrapolation needs a serious signature-variable-renaming...
+        ssv = extrapolate_fn(
+            linearisation_pt=linearisation_pt.ssv,
+            p0=posterior_previous.ssv,
             output_scale_sqrtm=output_scale_sqrtm,
         )
+        return _FilterSol(ssv)
 
-    def complete_correction(self, *, extrapolated, cache_obs):
-        return self.implementation.correction.complete_correction(
-            extrapolated=extrapolated, cache=cache_obs
+    # todo: more type-stability in corrections!
+    def complete_correction(self, *, extrapolated: _FilterSol, cache_obs) -> _FilterSol:
+        obs, (corr, gain) = self.implementation.correction.complete_correction(
+            extrapolated=extrapolated.ssv, cache=cache_obs
         )
+        corr = _FilterSol(corr)
+        return obs, (corr, gain)
