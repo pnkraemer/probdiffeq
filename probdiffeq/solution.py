@@ -11,13 +11,13 @@ import jax.numpy as jnp
 
 from probdiffeq.strategies import smoothers
 
-RVTypeVar = TypeVar("RVTypeVar")
+R = TypeVar("R")
 """Type-variable for random variables used in \
  generic initial value problem solutions."""
 
 
 @jax.tree_util.register_pytree_node_class
-class Solution(Generic[RVTypeVar]):
+class Solution(Generic[R]):
     """Estimated initial value problem solution."""
 
     def __init__(
@@ -26,7 +26,7 @@ class Solution(Generic[RVTypeVar]):
         u,
         error_estimate,
         output_scale_sqrtm,
-        marginals: RVTypeVar,
+        marginals: R,
         posterior,
         num_data_points,
     ):
@@ -111,7 +111,7 @@ def sample(key, *, solution, solver, shape=()):
     return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
 
 
-# todo: the functions herein should only depend on posteriors / strategies!
+# todo: the functions in here should only depend on posteriors / strategies!
 
 
 def offgrid_marginals_searchsorted(*, ts, solution, solver):
@@ -191,10 +191,12 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
         )
 
     # todo: replace with strategy.extract_terminal_values(posterior)
+    #  (the catch is that this would involve a
+    #  new argument "strategy"/"solver" for this function...
     if isinstance(solution.posterior, smoothers.MarkovSequence):
         terminal_value = solution.posterior.init
     else:
-        terminal_value = solution.posterior
+        terminal_value = solution.posterior.ssv
 
     obs, _ = terminal_value.observe_qoi(observation_std=observation_std)
     return jnp.sum(obs.logpdf(u))
