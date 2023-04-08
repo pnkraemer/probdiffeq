@@ -4,6 +4,7 @@
 import warnings
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq import _ivpsolve_impl, taylor
 from probdiffeq.strategies import smoothers
@@ -20,6 +21,7 @@ def simulate_terminal_values(
     t0,
     t1,
     solver,
+    dt0,
     parameters=(),
     while_loop_fn_temporal=jax.lax.while_loop,
     while_loop_fn_per_step=jax.lax.while_loop,
@@ -45,6 +47,7 @@ def simulate_terminal_values(
         t1=t1,
         solver=solver,
         parameters=parameters,
+        dt0=dt0,
         while_loop_fn_temporal=while_loop_fn_temporal,
         while_loop_fn_per_step=while_loop_fn_per_step,
         **options,
@@ -75,11 +78,9 @@ def solve_and_save_at(
     _assert_tuple(initial_values)
 
     if isinstance(solver.strategy, smoothers.Smoother):
-        msg = (
-            "A conventional smoother cannot be used."
-            "Did you mean ``smoothers.FixedPointSmoother()``?"
-        )
-        warnings.warn(msg)
+        msg1 = "A conventional smoother cannot be used. "
+        msg2 = "Did you mean ``smoothers.FixedPointSmoother()``?"
+        warnings.warn(msg1 + msg2)
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -171,6 +172,16 @@ def solve_fixed_grid(
         parameters=parameters,
         **options,
     )
+
+
+def dt0(vector_field, initial_values, /, t0, parameters, scale=0.01, nugget=1e-5):
+    u0, *_ = initial_values
+    f0 = vector_field(*initial_values, t=t0, p=parameters)
+
+    norm_y0 = jnp.linalg.norm(u0)
+    norm_dy0 = jnp.linalg.norm(f0) + nugget
+
+    return scale * norm_y0 / norm_dy0
 
 
 def _assert_tuple(x, /):

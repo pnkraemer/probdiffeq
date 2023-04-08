@@ -15,6 +15,7 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters,
+    dt0,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
     **options
@@ -23,7 +24,9 @@ def simulate_terminal_values(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
     )
 
-    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state0 = adaptive_solver.init_fn(
+        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+    )
 
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
