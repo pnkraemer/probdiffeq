@@ -36,7 +36,8 @@ Notable enhancements:
 * Scalar solvers are now part of the public API. While all "other" methods are for IVPs of shape `(d,)`,
   scalar solvers target problems of shape `()` (i.e. if the initial values are floats, not arrays).
 * The public API has been defined (see the developer docs). Notably, this document describes changes in which modules necessitate an entry in this changelog.
-
+* `dt0` can now be provided to the solution routines. To do so, call `simulate_terminal_values(..., dt0=1.)` replacing `1.` with appropriate values.
+  This change is completely backwards-compatible. The argument `dt0` is entirely optional, and its default value is set to the same as before.
 
 
 Notable bug fixes:
