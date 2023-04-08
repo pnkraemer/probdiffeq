@@ -7,9 +7,15 @@ initialisation of the Taylor coefficients.
 
 from probdiffeq import _adaptive, _control_flow
 
+# todo: rename to _collocate_seq.py ?
+#  rationale: sequential collocation. Initial conditions are available.
+#  We have an initial "posterior" (rename to "process"?) and a constraint,
+#  and simulate the constrained posterior sequentially (and usually adaptively).
+
 
 def simulate_terminal_values(
     vector_field,
+    *,
     taylor_coefficients,
     t0,
     t1,
