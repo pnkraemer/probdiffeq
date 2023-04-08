@@ -161,7 +161,7 @@ class AdaptiveIVPSolver(Generic[T]):
     def init_fn(self, dt0, **solver_init_kwargs):
         """Initialise the IVP solver state."""
         # Initialise the components
-        state_control = self.control.init_fn(dt0)
+        state_control = self.control.init_state_from_dt(dt0)
         state_solver = self.solver.init_fn(**solver_init_kwargs)
 
         # Initialise (prototypes for) proposed values
@@ -240,7 +240,7 @@ class AdaptiveIVPSolver(Generic[T]):
         posterior = self.solver.step_fn(
             state=state.accepted,
             vector_field=vector_field,
-            dt=self.control.extract_fn(state_control),
+            dt=self.control.extract_dt_from_state(state_control),
             parameters=parameters,
         )
         # Normalise the error and propose a new step.
@@ -286,7 +286,7 @@ class AdaptiveIVPSolver(Generic[T]):
 
     def extract_fn(self, state: _AdaptiveState[S, C], /) -> S:
         solver_extract = self.solver.extract_fn(state.solution)
-        control_extract = self.control.extract_fn(state.control)
+        control_extract = self.control.extract_dt_from_state(state.control)
 
         # return BOTH dt & solver_extract.
         #  Usually, only the latter is necessary.
@@ -297,7 +297,7 @@ class AdaptiveIVPSolver(Generic[T]):
 
     def extract_terminal_value_fn(self, state: _AdaptiveState[S, C], /) -> S:
         solver_extract = self.solver.extract_terminal_value_fn(state.solution)
-        control_extract = self.control.extract_fn(state.control)
+        control_extract = self.control.extract_dt_from_state(state.control)
         return control_extract, solver_extract
 
 

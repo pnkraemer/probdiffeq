@@ -15,7 +15,7 @@ class AbstractControl(abc.ABC, Generic[S]):
     """Interface for control-algorithms."""
 
     @abc.abstractmethod
-    def init_fn(self, dt0: jax.Array) -> S:
+    def init_state_from_dt(self, dt0: jax.Array) -> S:
         """Initialise the controller state."""
         raise NotImplementedError
 
@@ -30,7 +30,7 @@ class AbstractControl(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_fn(self, state: S) -> jax.Array:
+    def extract_dt_from_state(self, state: S) -> jax.Array:
         """Extract the time-step from the controller state."""
         raise NotImplementedError
 
@@ -66,7 +66,7 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
-    def init_fn(self, dt0):
+    def init_state_from_dt(self, dt0):
         return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
 
     @abc.abstractmethod
@@ -99,7 +99,7 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
         )
         return state
 
-    def extract_fn(self, state: _PIState) -> jax.Array:
+    def extract_dt_from_state(self, state: _PIState) -> jax.Array:
         return state.dt_proposed
 
 
@@ -146,7 +146,7 @@ class _IntegralCommon(AbstractControl[_IState]):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
-    def init_fn(self, dt0) -> _IState:
+    def init_state_from_dt(self, dt0) -> _IState:
         return _IState(dt0)
 
     @abc.abstractmethod
@@ -166,7 +166,7 @@ class _IntegralCommon(AbstractControl[_IState]):
         dt = scale_factor * state.dt_proposed
         return _IState(dt)
 
-    def extract_fn(self, state: _IState) -> jax.Array:
+    def extract_dt_from_state(self, state: _IState) -> jax.Array:
         return state.dt_proposed
 
 
