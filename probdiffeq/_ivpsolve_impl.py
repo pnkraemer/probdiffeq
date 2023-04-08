@@ -36,7 +36,8 @@ def simulate_terminal_values(
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
     )
-    return adaptive_solver.extract_terminal_value_fn(solution)
+    _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
+    return sol
 
 
 def solve_and_save_at(
@@ -76,7 +77,8 @@ def solve_and_save_at(
         xs=save_at[1:],
         reverse=False,
     )
-    return adaptive_solver.extract_fn(solution)
+    _dt, sol = adaptive_solver.extract_fn(solution)
+    return sol
 
 
 def _advance_ivp_solution_adaptively(
@@ -117,7 +119,8 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
-    return adaptive_solver.extract_fn(forward_solution)
+    _dt, sol = adaptive_solver.extract_fn(forward_solution)
+    return sol
 
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
@@ -146,4 +149,5 @@ def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters
     _, (result, _) = _control_flow.scan_with_init(
         f=body_fn, init=(state, t0), xs=grid[1:]
     )
-    return solver.extract_fn(result)
+    sol = solver.extract_fn(result)
+    return sol
