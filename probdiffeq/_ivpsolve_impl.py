@@ -15,6 +15,7 @@ def simulate_terminal_values(
     t1,
     solver,
     parameters,
+    dt0,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
     **options
@@ -23,7 +24,9 @@ def simulate_terminal_values(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
     )
 
-    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state0 = adaptive_solver.init_fn(
+        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+    )
 
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
@@ -33,7 +36,7 @@ def simulate_terminal_values(
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
     )
-    return adaptive_solver.extract_terminal_value_fn(state=solution)
+    return adaptive_solver.extract_terminal_value_fn(solution)
 
 
 def solve_and_save_at(
@@ -41,6 +44,7 @@ def solve_and_save_at(
     taylor_coefficients,
     save_at,
     solver,
+    dt0,
     parameters,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
@@ -62,7 +66,9 @@ def solve_and_save_at(
         return s_next, s_next
 
     t0 = save_at[0]
-    state0 = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state0 = adaptive_solver.init_fn(
+        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+    )
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
@@ -70,7 +76,7 @@ def solve_and_save_at(
         xs=save_at[1:],
         reverse=False,
     )
-    return adaptive_solver.extract_fn(state=solution)
+    return adaptive_solver.extract_fn(solution)
 
 
 def _advance_ivp_solution_adaptively(
@@ -96,11 +102,13 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, taylor_coefficients, t0, t1, solver, parameters, **options
+    vector_field, taylor_coefficients, t0, t1, solver, dt0, parameters, **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
-    state = adaptive_solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state = adaptive_solver.init_fn(
+        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+    )
     generator = _solution_generator(
         vector_field,
         state=state,
@@ -109,7 +117,7 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
-    return adaptive_solver.extract_fn(state=forward_solution)
+    return adaptive_solver.extract_fn(forward_solution)
 
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
@@ -138,4 +146,4 @@ def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters
     _, (result, _) = _control_flow.scan_with_init(
         f=body_fn, init=(state, t0), xs=grid[1:]
     )
-    return solver.extract_fn(state=result)
+    return solver.extract_fn(result)

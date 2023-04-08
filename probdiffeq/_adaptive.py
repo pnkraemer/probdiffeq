@@ -4,28 +4,33 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import controls
+from probdiffeq import controls, ivpsolvers
 
-StateTypeVar = TypeVar("StateTypeVar")
-"""A type-variable for generic (probabilistic) IVP solver states."""
+S = TypeVar("S")
+"""A type-variable for generic IVP solver states."""
 
-SolverTypeVar = TypeVar("SolverTypeVar")
-"""A type-variable for non-adaptive (probabilistic) IVP solvers."""
+C = TypeVar("C", bound=controls.AbstractControl)
+"""A type-variable for generic controller states."""
+
+T = TypeVar("T", bound=ivpsolvers.AbstractSolver)
+"""A type-variable for (non-adaptive) IVP solvers."""
 
 
+# basically a namedtuple, but NamedTuples cannot be generic,
+#  which is why we implement this functionality manually.
 @jax.tree_util.register_pytree_node_class
-class AdaptiveIVPSolverState(Generic[StateTypeVar]):
+class _AdaptiveState(Generic[S, C]):
     """Adaptive IVP solver state."""
 
     def __init__(
         self,
         dt_proposed,
         error_norm_proposed,
-        control,
-        proposed: StateTypeVar,
-        accepted: StateTypeVar,
-        solution: StateTypeVar,
-        previous: StateTypeVar,
+        control: C,
+        proposed: S,
+        accepted: S,
+        solution: S,
+        previous: S,
     ):
         self.dt_proposed = dt_proposed
         self.error_norm_proposed = error_norm_proposed
@@ -88,21 +93,23 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 
 @jax.tree_util.register_pytree_node_class
-class AdaptiveIVPSolver(Generic[SolverTypeVar]):
+class AdaptiveIVPSolver(Generic[T]):
     """Adaptive IVP solvers."""
 
     def __init__(
         self,
-        solver: SolverTypeVar,
+        solver: T,
         atol=1e-4,
         rtol=1e-2,
-        control=controls.ProportionalIntegral(),
+        control=None,
         norm_ord=None,
         numerical_zero=1e-10,
-        initial_dt_nugget=1e-5,
         while_loop_fn=jax.lax.while_loop,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
+        if control is None:
+            control = controls.ProportionalIntegral()
+
         self.solver = solver
         self.while_loop_fn = while_loop_fn
         self.atol = atol
@@ -110,7 +117,6 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         self.control = control
         self.norm_ord = norm_ord
         self.numerical_zero = numerical_zero
-        self.initial_dt_nugget = initial_dt_nugget
         self.reference_state_fn = reference_state_fn
 
     def __repr__(self):
@@ -122,7 +128,6 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             f"\n\tcontrol={self.control},"
             f"\n\tnorm_order={self.norm_ord},"
             f"\n\tnumerical_zero={self.numerical_zero},"
-            f"\n\tinitial_dt_nugget={self.initial_dt_nugget},"
             f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
@@ -134,14 +139,13 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             self.rtol,
             self.control,
             self.numerical_zero,
-            self.initial_dt_nugget,
         )
         aux = self.norm_ord, self.reference_state_fn, self.while_loop_fn
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        solver, atol, rtol, control, numerical_zero, nugget = children
+        solver, atol, rtol, control, numerical_zero = children
         norm_ord, reference_state_fn, while_loop_fn = aux
         return cls(
             solver=solver,
@@ -151,7 +155,6 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             control=control,
             numerical_zero=numerical_zero,
             norm_ord=norm_ord,
-            initial_dt_nugget=nugget,
             reference_state_fn=reference_state_fn,
         )
 
@@ -161,37 +164,34 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init_fn(self, *, taylor_coefficients, t0):
+    def init_fn(self, *, taylor_coefficients, t0, dt0):
         """Initialise the IVP solver state."""
+        # todo: make init() a function of state_solver,
+        #  state_control, and dt_proposed. Make extract_fn() return those.
+
         # Initialise the components
-        posterior = self.solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+        state_solver = self.solver.init_fn(
+            taylor_coefficients=taylor_coefficients, t0=t0
+        )
         state_control = self.control.init_fn()
 
         # Initialise (prototypes for) proposed values
-        u0, *_ = taylor_coefficients
         error_norm_proposed = self._normalise_error(
-            error_estimate=posterior.error_estimate,
-            u=u0,
+            error_estimate=state_solver.error_estimate,
+            u=state_solver.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
-        dt_proposed = self._propose_first_dt(taylor_coefficients=taylor_coefficients)
-        return AdaptiveIVPSolverState(
-            dt_proposed=dt_proposed,
+        return _AdaptiveState(
+            dt_proposed=dt0,
             error_norm_proposed=error_norm_proposed,
-            solution=posterior,
-            proposed=posterior,
-            accepted=posterior,
-            previous=posterior,
+            solution=state_solver,
+            proposed=state_solver,
+            accepted=state_solver,
+            previous=state_solver,
             control=state_control,
         )
-
-    def _propose_first_dt(self, *, taylor_coefficients, scale=0.01):
-        u0, f0, *_ = taylor_coefficients
-        norm_y0 = jnp.linalg.norm(u0)
-        norm_dy0 = jnp.linalg.norm(f0) + self.initial_dt_nugget
-        return scale * norm_y0 / norm_dy0
 
     @jax.jit
     def step_fn(self, state, vector_field, t1, parameters):
@@ -230,7 +230,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             return True, s
 
         _, state_new = self.while_loop_fn(cond_fn, body_fn, init_fn(state0))
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=state_new.dt_proposed,
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
@@ -268,7 +268,7 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             error_contraction_rate=self.error_contraction_rate,
             dt_previous=state.dt_proposed,
         )
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=dt_proposed,  # new
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
@@ -284,11 +284,11 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
-    def _interpolate(self, *, state, t):
+    def _interpolate(self, *, state: _AdaptiveState[S, C], t) -> _AdaptiveState[S, C]:
         accepted, solution, previous = self.solver.interpolate_fn(
             s0=state.previous, s1=state.accepted, t=t
         )
-        return AdaptiveIVPSolverState(
+        return _AdaptiveState(
             dt_proposed=state.dt_proposed,
             error_norm_proposed=state.error_norm_proposed,
             proposed=_inf_like(state.proposed),
@@ -298,13 +298,11 @@ class AdaptiveIVPSolver(Generic[SolverTypeVar]):
             control=state.control,
         )
 
-    def extract_fn(self, *, state):  # noqa: D102
-        state = self.solver.extract_fn(state=state.solution)
-        return state
+    def extract_fn(self, state: _AdaptiveState[S, C], /) -> S:
+        return self.solver.extract_fn(state.solution)
 
-    def extract_terminal_value_fn(self, *, state):  # noqa: D102
-        state = self.solver.extract_terminal_value_fn(state=state.solution)
-        return state
+    def extract_terminal_value_fn(self, state: _AdaptiveState[S, C], /) -> S:
+        return self.solver.extract_terminal_value_fn(state.solution)
 
 
 def _inf_like(tree):

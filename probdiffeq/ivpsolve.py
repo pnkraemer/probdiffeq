@@ -4,6 +4,7 @@
 import warnings
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq import _ivpsolve_impl, taylor
 from probdiffeq.strategies import smoothers
@@ -20,10 +21,12 @@ def simulate_terminal_values(
     t0,
     t1,
     solver,
+    dt0=None,
     parameters=(),
     while_loop_fn_temporal=jax.lax.while_loop,
     while_loop_fn_per_step=jax.lax.while_loop,
     taylor_fn=taylor.taylor_mode_fn,
+    propose_dt0_nugget=1e-5,
     **options,
 ):
     """Simulate the terminal values of an initial value problem."""
@@ -38,6 +41,11 @@ def simulate_terminal_values(
         parameters=parameters,
     )
 
+    if dt0 is None:
+        f, u0s = vector_field, initial_values
+        nugget = propose_dt0_nugget
+        dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
+
     return _ivpsolve_impl.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
@@ -45,6 +53,7 @@ def simulate_terminal_values(
         t1=t1,
         solver=solver,
         parameters=parameters,
+        dt0=dt0,
         while_loop_fn_temporal=while_loop_fn_temporal,
         while_loop_fn_per_step=while_loop_fn_per_step,
         **options,
@@ -56,10 +65,12 @@ def solve_and_save_at(
     initial_values,
     save_at,
     solver,
+    dt0=None,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     while_loop_fn_temporal=jax.lax.while_loop,
     while_loop_fn_per_step=jax.lax.while_loop,
+    propose_dt0_nugget=1e-5,
     **options,
 ):
     """Solve an initial value problem \
@@ -75,26 +86,31 @@ def solve_and_save_at(
     _assert_tuple(initial_values)
 
     if isinstance(solver.strategy, smoothers.Smoother):
-        msg = (
-            "A conventional smoother cannot be used."
-            "Did you mean ``smoothers.FixedPointSmoother()``?"
-        )
-        warnings.warn(msg)
+        msg1 = "A conventional smoother cannot be used. "
+        msg2 = "Did you mean ``smoothers.FixedPointSmoother()``?"
+        warnings.warn(msg1 + msg2)
 
+    t0 = save_at[0]
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
-        t=save_at[0],
+        t=t0,
         parameters=parameters,
     )
+
+    if dt0 is None:
+        f, u0s = vector_field, initial_values
+        nugget = propose_dt0_nugget
+        dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
     return _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         save_at=save_at,
         solver=solver,
+        dt0=dt0,
         parameters=parameters,
         while_loop_fn_temporal=while_loop_fn_temporal,
         while_loop_fn_per_step=while_loop_fn_per_step,
@@ -111,8 +127,10 @@ def solve_with_python_while_loop(
     t0,
     t1,
     solver,
+    dt0=None,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
+    propose_dt0_nugget=1e-5,
     **options,
 ):
     """Solve an initial value problem with a native-Python while loop.
@@ -131,12 +149,18 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
 
+    if dt0 is None:
+        f, u0s = vector_field, initial_values
+        nugget = propose_dt0_nugget
+        dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
+
     return _ivpsolve_impl.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         t1=t1,
         solver=solver,
+        dt0=dt0,
         parameters=parameters,
         **options,
     )
@@ -171,6 +195,19 @@ def solve_fixed_grid(
         parameters=parameters,
         **options,
     )
+
+
+def propose_dt0(
+    vector_field, initial_values, /, t0, parameters, scale=0.01, nugget=1e-5
+):
+    """Propose an initial time-step."""
+    u0, *_ = initial_values
+    f0 = vector_field(*initial_values, t=t0, p=parameters)
+
+    norm_y0 = jnp.linalg.norm(u0)
+    norm_dy0 = jnp.linalg.norm(f0) + nugget
+
+    return scale * norm_y0 / norm_dy0
 
 
 def _assert_tuple(x, /):

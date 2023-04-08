@@ -2,6 +2,12 @@
 
 ## v0.2.0
 
+This version overhauls large parts of the API. 
+Much of the functionality now looks different.
+Almost all implementations remain identical to before, though, and the API changes
+reduce to renaming function parameters.
+Change to the new API according to the instructions below.
+
 Notable breaking changes:
 
 * `solution_routines.py` has been renamed to `ivpsolve.py`. 
@@ -29,14 +35,18 @@ Notable breaking changes:
   The advantages of this change are much less code to achieve the same logic, 
   more freedom to change background-implementations without worrying about API, 
   and improved ease of maintenance (no more classmethods, no more custom pytree node registration.)
-
+* `extract_fn` and `extract_terminal_value_fn` in the solvers are now positional only. 
+  They only depend on a single argument (`state`) and since the term `state` is so incredibly overloaded
+  we make it positional only now, and will rename it afterwards. 
+  To update your code, replace `solver.extract_*fn(state=x)` with `solver.extract_*fn(x)`.
 
 Notable enhancements:
 
 * Scalar solvers are now part of the public API. While all "other" methods are for IVPs of shape `(d,)`,
   scalar solvers target problems of shape `()` (i.e. if the initial values are floats, not arrays).
 * The public API has been defined (see the developer docs). Notably, this document describes changes in which modules necessitate an entry in this changelog.
-
+* `dt0` can now be provided to the solution routines. To do so, call `simulate_terminal_values(..., dt0=1.)` replacing `1.` with appropriate values.
+  This change is completely backwards-compatible. The argument `dt0` is entirely optional, and its default value is set to the same as before.
 
 
 Notable bug fixes:

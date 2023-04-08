@@ -130,12 +130,23 @@ def fixture_solution_terminal_values(setup):
         ode_shape=ode_shape,
         num_derivatives=4,
     )
+
+    # todo: move to solver config?
+    #  (But this would involve knowing the IVP at solver-config-creation time,
+    #  which would be a non-trivial change.)
+    ode = setup.ode_problem.vector_field
+    u0s = setup.ode_problem.initial_values
+    t0 = setup.ode_problem.t0
+    parameters = setup.ode_problem.args
+    dt0 = ivpsolve.propose_dt0(ode, u0s, t0=t0, parameters=parameters)
+
     solution = ivpsolve.simulate_terminal_values(
-        setup.ode_problem.vector_field,
-        setup.ode_problem.initial_values,
-        t0=setup.ode_problem.t0,
+        ode,
+        u0s,
+        t0=t0,
         t1=setup.ode_problem.t1,
-        parameters=setup.ode_problem.args,
+        parameters=parameters,
+        dt0=dt0,
         solver=solver,
         atol=setup.solver_config.atol_solve,
         rtol=setup.solver_config.rtol_solve,
