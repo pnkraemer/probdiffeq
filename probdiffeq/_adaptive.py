@@ -104,7 +104,6 @@ class AdaptiveIVPSolver(Generic[T]):
         control=controls.ProportionalIntegral(),
         norm_ord=None,
         numerical_zero=1e-10,
-        initial_dt_nugget=1e-5,
         while_loop_fn=jax.lax.while_loop,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
@@ -115,7 +114,6 @@ class AdaptiveIVPSolver(Generic[T]):
         self.control = control
         self.norm_ord = norm_ord
         self.numerical_zero = numerical_zero
-        self.initial_dt_nugget = initial_dt_nugget
         self.reference_state_fn = reference_state_fn
 
     def __repr__(self):
@@ -127,7 +125,6 @@ class AdaptiveIVPSolver(Generic[T]):
             f"\n\tcontrol={self.control},"
             f"\n\tnorm_order={self.norm_ord},"
             f"\n\tnumerical_zero={self.numerical_zero},"
-            f"\n\tinitial_dt_nugget={self.initial_dt_nugget},"
             f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
@@ -139,14 +136,13 @@ class AdaptiveIVPSolver(Generic[T]):
             self.rtol,
             self.control,
             self.numerical_zero,
-            self.initial_dt_nugget,
         )
         aux = self.norm_ord, self.reference_state_fn, self.while_loop_fn
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        solver, atol, rtol, control, numerical_zero, nugget = children
+        solver, atol, rtol, control, numerical_zero = children
         norm_ord, reference_state_fn, while_loop_fn = aux
         return cls(
             solver=solver,
@@ -156,7 +152,6 @@ class AdaptiveIVPSolver(Generic[T]):
             control=control,
             numerical_zero=numerical_zero,
             norm_ord=norm_ord,
-            initial_dt_nugget=nugget,
             reference_state_fn=reference_state_fn,
         )
 
@@ -166,38 +161,32 @@ class AdaptiveIVPSolver(Generic[T]):
         return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init_fn(self, *, taylor_coefficients, t0):
+    def init_fn(self, *, taylor_coefficients, t0, dt0):
         """Initialise the IVP solver state."""
         # todo: make a function of posterior, state_control, and dt_proposed
         # Initialise the components
-        posterior = self.solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+        state_solver = self.solver.init_fn(
+            taylor_coefficients=taylor_coefficients, t0=t0
+        )
         state_control = self.control.init_fn()
 
         # Initialise (prototypes for) proposed values
-        u0, *_ = taylor_coefficients
         error_norm_proposed = self._normalise_error(
-            error_estimate=posterior.error_estimate,
-            u=u0,
+            error_estimate=state_solver.error_estimate,
+            u=state_solver.u,
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
-        dt_proposed = self._propose_first_dt(taylor_coefficients=taylor_coefficients)
         return _AdaptiveState(
-            dt_proposed=dt_proposed,
+            dt_proposed=dt0,
             error_norm_proposed=error_norm_proposed,
-            solution=posterior,
-            proposed=posterior,
-            accepted=posterior,
-            previous=posterior,
+            solution=state_solver,
+            proposed=state_solver,
+            accepted=state_solver,
+            previous=state_solver,
             control=state_control,
         )
-
-    def _propose_first_dt(self, *, taylor_coefficients, scale=0.01):
-        u0, f0, *_ = taylor_coefficients
-        norm_y0 = jnp.linalg.norm(u0)
-        norm_dy0 = jnp.linalg.norm(f0) + self.initial_dt_nugget
-        return scale * norm_y0 / norm_dy0
 
     @jax.jit
     def step_fn(self, state, vector_field, t1, parameters):
