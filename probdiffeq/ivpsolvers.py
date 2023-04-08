@@ -104,6 +104,7 @@ class AbstractSolver(abc.ABC):
 
         return accepted, solution, previous
 
+    # todo: is this what ivpsolver.init() should look like?
     def _posterior_to_state(self, posterior, t, state, error_estimate):
         return solution.Solution(
             t=t,
@@ -383,8 +384,8 @@ class MLESolver(AbstractSolver):
         #  in intermediate objects
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
-        marginals = marginals_unscaled.scale_covariance(scale_sqrtm=scale_sqrtm)
-        posterior = state.posterior.scale_covariance(scale_sqrtm=scale_sqrtm)
+        marginals = marginals_unscaled.scale_covariance(scale_sqrtm)
+        posterior = state.posterior.scale_covariance(scale_sqrtm)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,

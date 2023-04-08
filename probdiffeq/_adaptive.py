@@ -158,7 +158,7 @@ class AdaptiveIVPSolver(Generic[T]):
         return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init_fn(self, dt0, **solver_init_kwargs):
+    def init(self, dt0, **solver_init_kwargs):
         """Initialise the IVP solver state."""
         # Initialise the components
         state_control = self.control.init_state_from_dt(dt0)
@@ -214,10 +214,10 @@ class AdaptiveIVPSolver(Generic[T]):
             proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
 
-        def init_fn(s):
+        def init(s):
             return True, s
 
-        _, state_new = self.while_loop_fn(cond_fn, body_fn, init_fn(state0))
+        _, state_new = self.while_loop_fn(cond_fn, body_fn, init(state0))
         return _AdaptiveState(
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
