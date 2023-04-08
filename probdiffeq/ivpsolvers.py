@@ -95,32 +95,29 @@ class AbstractSolver(abc.ABC):
         index = jnp.reshape(index_as_array, ())
         acc, sol, prev = jax.lax.switch(index, branches, s0, s1, t)
 
-        error_estimate = jnp.empty_like(s0.error_estimate)
-
         # helper function to make code below more readable
-        def make_state(p, *, t):
-            return self._posterior_to_state(
+        def make_state(p, t_):
+            return self._init_state_from_posterior(
                 p,
-                t=t,
+                t=t_,
                 num_data_points=s1.num_data_points,
                 output_scale_sqrtm=s1.output_scale_sqrtm,
-                error_estimate=error_estimate,
             )
 
-        previous = make_state(prev, t=t)
-        solution = make_state(sol, t=t)
-        accepted = make_state(acc, t=jnp.maximum(s1.t, t))
+        previous = make_state(prev, t)
+        solution_ = make_state(sol, t)
+        accepted = make_state(acc, jnp.maximum(s1.t, t))
 
-        return accepted, solution, previous
+        return accepted, solution_, previous
 
     # todo: is this what ivpsolver.init() should look like?
-    def _posterior_to_state(
-        self, posterior, *, t, num_data_points, output_scale_sqrtm, error_estimate
+    def _init_state_from_posterior(
+        self, posterior, *, t, num_data_points, output_scale_sqrtm
     ):
         return solution.Solution(
             t=t,
             u=self.strategy.extract_u_from_posterior(posterior=posterior),
-            error_estimate=error_estimate,
+            error_estimate=self.strategy.init_error_estimate(),
             posterior=posterior,
             output_scale_sqrtm=output_scale_sqrtm,
             marginals=None,
