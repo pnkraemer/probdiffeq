@@ -24,7 +24,7 @@ def simulate_terminal_values(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
     )
 
-    state0 = adaptive_solver.init_fn(
+    state0 = adaptive_solver.init(
         taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
     )
 
@@ -67,7 +67,7 @@ def solve_and_save_at(
         return s_next, s_next
 
     t0 = save_at[0]
-    state0 = adaptive_solver.init_fn(
+    state0 = adaptive_solver.init(
         taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
     )
 
@@ -108,7 +108,7 @@ def solve_with_python_while_loop(
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
-    state = adaptive_solver.init_fn(
+    state = adaptive_solver.init(
         taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
     )
     generator = _solution_generator(
