@@ -98,7 +98,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
 from probdiffeq.implementations import recipes
 from probdiffeq.strategies import filters
@@ -169,13 +169,13 @@ fig, ax = plt.subplots()
 
 data_kwargs = {"alpha": 0.5, "color": "gray"}
 ax.annotate("Data", (13.0, 30.0), **data_kwargs)
-solution = solve_save_at(theta_true)
-ax = plot_solution(solution, ax=ax, **data_kwargs)
+sol = solve_save_at(theta_true)
+ax = plot_solution(sol, ax=ax, **data_kwargs)
 
 guess_kwargs = {"color": "C3"}
 ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
-solution = solve_save_at(theta_guess)
-ax = plot_solution(solution, ax=ax, **guess_kwargs)
+sol = solve_save_at(theta_guess)
+ax = plot_solution(sol, ax=ax, **guess_kwargs)
 plt.show()
 ```
 
@@ -191,10 +191,11 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 @jax.jit
 def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
     y_T = solve_fixed(theta, ts=ts, solver=solver)
-    marginals, _ = y_T.posterior.observe_qoi(observation_std=obs_stdev)
-    return marginals.logpdf(data) + jax.scipy.stats.multivariate_normal.logpdf(
-        theta, mean=mean, cov=cov
+    logpdf_data = solution.log_marginal_likelihood_terminal_values(
+        u=data, solution=y_T, observation_std=obs_stdev
     )
+    logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
+    return logpdf_data + logpdf_prior
 
 
 # Fixed steps for reverse-mode differentiability:
@@ -279,13 +280,13 @@ for sol in solution_samples:
 
 data_kwargs = {"color": "gray"}
 ax.annotate("Data", (18.25, 40.0), **data_kwargs)
-solution = solve_save_at(theta_true)
-ax = plot_solution(solution, ax=ax, linewidth=4, alpha=0.5, **data_kwargs)
+sol = solve_save_at(theta_true)
+ax = plot_solution(sol, ax=ax, linewidth=4, alpha=0.5, **data_kwargs)
 
 guess_kwargs = {"color": "gray"}
 ax.annotate("Initial guess", (6.0, 12.0), **guess_kwargs)
-solution = solve_save_at(theta_guess)
-ax = plot_solution(solution, ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs)
+sol = solve_save_at(theta_guess)
+ax = plot_solution(sol, ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs)
 plt.show()
 ```
 
