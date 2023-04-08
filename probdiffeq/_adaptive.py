@@ -164,18 +164,16 @@ class AdaptiveIVPSolver(Generic[T]):
         return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init_fn(self, *, taylor_coefficients, t0, dt0):
+    def init_fn(self, dt0, **kwargs):
         """Initialise the IVP solver state."""
         # todo: make init() a function of state_solver,
         #  state_control, and dt_proposed. Make extract_fn() return those.
 
         # Initialise the components
-        state_solver = self.solver.init_fn(
-            taylor_coefficients=taylor_coefficients, t0=t0
-        )
-        state_control = self.control.init_fn()
+        state_solver = self.solver.init_fn(**kwargs)
 
         # Initialise (prototypes for) proposed values
+        state_control = self.control.init_fn()
         error_norm_proposed = self._normalise_error(
             error_estimate=state_solver.error_estimate,
             u=state_solver.u,
@@ -299,10 +297,18 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
     def extract_fn(self, state: _AdaptiveState[S, C], /) -> S:
-        return self.solver.extract_fn(state.solution)
+        solver_extract = self.solver.extract_fn(state.solution)
+
+        # return BOTH dt & solver_extract.
+        #  Usually, only the latter is necessary.
+        #  but we return both because this way, extract is inverse to init,
+        #  and it becomes much easier to restart the solver at a new point
+        #  without losing consistency.
+        return state.dt_proposed, solver_extract
 
     def extract_terminal_value_fn(self, state: _AdaptiveState[S, C], /) -> S:
-        return self.solver.extract_terminal_value_fn(state.solution)
+        solver_extract = self.solver.extract_terminal_value_fn(state.solution)
+        return state.dt_proposed, solver_extract
 
 
 def _inf_like(tree):
