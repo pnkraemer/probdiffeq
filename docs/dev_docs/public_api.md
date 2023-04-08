@@ -1,6 +1,6 @@
 # Private and public API
 
-All public functions and classes in the following modules and packages are considered public API:
+All public functions and class-creators in the following modules and packages are considered public API:
 
 * `ivpsolvers.py`
 * `ivpsolve.py`
@@ -12,8 +12,9 @@ All public functions and classes in the following modules and packages are consi
 * `implementations.recipes.py`
 * `implementations.cubature.py`
 
-Exceptions from this rule are all functions and classes  that are marked as `warning: highly experimental`,
-e.g., `taylor.taylor_mode_doubling_fn`.
+Exceptions of this rule are all functions and class-creators that are 
+marked as `warning: highly experimental`, e.g., `taylor.taylor_mode_doubling_fn`.
+
 
 Breaking changes in these public modules are officially considered breaking changes.
 This means that the minor version number is increased according the the rules of semantic versioning
