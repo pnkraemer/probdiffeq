@@ -99,7 +99,7 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
         )
         return state
 
-    def extract_fn(self, state: S) -> jax.Array:
+    def extract_fn(self, state: _PIState) -> jax.Array:
         return state.dt_proposed
 
 
@@ -132,7 +132,7 @@ class _IState(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class _IntegralCommon(AbstractControl):
+class _IntegralCommon(AbstractControl[_IState]):
     safety: float = 0.95
     factor_min: float = 0.2
     factor_max: float = 10.0
@@ -146,11 +146,11 @@ class _IntegralCommon(AbstractControl):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
-    def init_fn(self, dt0):
+    def init_fn(self, dt0) -> _IState:
         return _IState(dt0)
 
     @abc.abstractmethod
-    def clip_fn(self, t, t1, state):
+    def clip_fn(self, t, t1, state: _IState) -> _IState:
         raise NotImplementedError
 
     def control_fn(
@@ -166,7 +166,7 @@ class _IntegralCommon(AbstractControl):
         dt = scale_factor * state.dt_proposed
         return _IState(dt)
 
-    def extract_fn(self, state: S) -> jax.Array:
+    def extract_fn(self, state: _IState) -> jax.Array:
         return state.dt_proposed
 
 
