@@ -178,9 +178,7 @@ def solve_fixed_grid(
     vector_field, *, u0, posterior, grid, solver, parameters, output_scale
 ):
     t0 = grid[0]
-    state = solver.init_solution_from_posterior(
-        posterior, t=t0, u=u0, output_scale=output_scale
-    )
+    state = solver.init(posterior, t=t0, u=u0, output_scale=output_scale)
 
     def body_fn(carry, t_new):
         s, t_old = carry

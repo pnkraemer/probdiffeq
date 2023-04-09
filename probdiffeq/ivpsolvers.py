@@ -64,9 +64,7 @@ class AbstractSolver(abc.ABC):
         return posterior
 
     # todo: rename to init() or init_state_from_posterior()
-    def init_solution_from_posterior(
-        self, posterior, *, t, u, output_scale, num_data_points=1.0
-    ) -> _State:
+    def init(self, posterior, *, t, u, output_scale, num_data_points=1.0) -> _State:
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
@@ -116,7 +114,7 @@ class AbstractSolver(abc.ABC):
 
         # helper function to make code below more readable
         def make_state(p, t_) -> _State:
-            return self.init_solution_from_posterior(
+            return self.init(
                 posterior=p,
                 t=t_,
                 u=self.strategy.extract_u_from_posterior(p),

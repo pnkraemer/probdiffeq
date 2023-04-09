@@ -162,7 +162,7 @@ class AdaptiveIVPSolver(Generic[T]):
         """Initialise the IVP solver state."""
         # Initialise the components
         state_control = self.control.init_state_from_dt(dt0)
-        state_solver = self.solver.init_solution_from_posterior(**solver_kwargs)
+        state_solver = self.solver.init(**solver_kwargs)
 
         # Initialise (prototypes for) proposed values
         error_norm_proposed = self._normalise_error(
