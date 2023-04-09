@@ -81,7 +81,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
     def marginals_terminal_value(self, *, posterior: _FilterSol):
         return posterior.ssv
 
-    def extract_u_from_posterior(self, *, posterior: _FilterSol):
+    def extract_u_from_posterior(self, posterior: _FilterSol):
         return posterior.ssv.extract_qoi()
 
     def begin_extrapolation(self, *, posterior: _FilterSol, dt) -> _FilterSol:

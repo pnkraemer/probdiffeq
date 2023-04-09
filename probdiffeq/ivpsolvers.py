@@ -45,11 +45,12 @@ class AbstractSolver(abc.ABC):
         )
         return posterior
 
-    def init_fn(self, *, posterior, t, u, output_scale):
+    def init_solution_from_posterior(
+        self, posterior, *, t, u, output_scale, num_data_points=1.0
+    ):
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
-
         return solution.Solution(
             t=t,
             u=u,
@@ -57,7 +58,7 @@ class AbstractSolver(abc.ABC):
             posterior=posterior,
             marginals=None,
             output_scale=output_scale,
-            num_data_points=1.0,
+            num_data_points=num_data_points,
         )
 
     def interpolate_fn(self, *, s0, s1, t):
@@ -97,11 +98,12 @@ class AbstractSolver(abc.ABC):
 
         # helper function to make code below more readable
         def make_state(p, t_):
-            return self._init_solution_from_posterior(
-                p,
+            return self.init_solution_from_posterior(
+                posterior=p,
                 t=t_,
-                num_data_points=s1.num_data_points,
+                u=self.strategy.extract_u_from_posterior(p),
                 output_scale=s1.output_scale,
+                num_data_points=s1.num_data_points,
             )
 
         # todo: which output scale is used for MLESolver interpolation
@@ -112,21 +114,6 @@ class AbstractSolver(abc.ABC):
         accepted = make_state(acc, jnp.maximum(s1.t, t))
 
         return accepted, solution_, previous
-
-    # todo: is this what ivpsolver.init() should look like?
-    def _init_solution_from_posterior(
-        self, posterior, *, t, num_data_points, output_scale
-    ):
-        output_scale = self.strategy.init_output_scale(output_scale)
-        return solution.Solution(
-            t=t,
-            u=self.strategy.extract_u_from_posterior(posterior=posterior),
-            error_estimate=self.strategy.init_error_estimate(),
-            posterior=posterior,
-            output_scale=output_scale,
-            marginals=None,
-            num_data_points=num_data_points,
-        )
 
     def tree_flatten(self):
         children = (self.strategy,)
