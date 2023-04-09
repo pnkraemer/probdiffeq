@@ -53,10 +53,12 @@ def simulate_terminal_values(
 
 def solve_and_save_at(
     vector_field,
+    *,
     taylor_coefficients,
     save_at,
     solver,
     dt0,
+    output_scale_sqrtm,
     parameters,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
@@ -74,12 +76,16 @@ def solve_and_save_at(
             adaptive_solver=adaptive_solver,
             parameters=parameters,
             while_loop_fn=while_loop_fn_temporal,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
         return s_next, s_next
 
     t0 = save_at[0]
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        dt0=dt0,
+        output_scale_sqrtm=output_scale_sqrtm,
     )
 
     _, solution = _control_flow.scan_with_init(
@@ -127,6 +133,7 @@ def _advance_ivp_solution_adaptively(
 
 def solve_with_python_while_loop(
     vector_field,
+    *,
     taylor_coefficients,
     t0,
     t1,
@@ -175,7 +182,7 @@ def _solution_generator(
 
 
 def solve_fixed_grid(
-    vector_field, taylor_coefficients, grid, solver, parameters, output_scale_sqrtm
+    vector_field, *, taylor_coefficients, grid, solver, parameters, output_scale_sqrtm
 ):
     t0 = grid[0]
     state = solver.init_fn(
