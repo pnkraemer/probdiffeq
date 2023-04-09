@@ -39,6 +39,16 @@ Notable breaking changes:
   They only depend on a single argument (`state`) and since the term `state` is so incredibly overloaded
   we make it positional only now, and will rename it afterwards. 
   To update your code, replace `solver.extract_*fn(state=x)` with `solver.extract_*fn(x)`.
+* The `output_scale_sqrtm` parameter moved from being hidden in the SSM implementation (exception: CalibrationFreeSolver)
+  to being an input argument to solve()-style methods. Concretely, this means that instead of
+  `solve*(solver=CalibrationFreeSolver(..., output_scale_sqrtm=1.))`, users implement
+  `solve(solver=CalibrationFreeSolver(...), output_scale_sqrtm=1.)` from now on.
+  The advantages of this change are that all solvers are now created equal; that this opens the door to introducing more solver-hyper-parameters,
+  and that it simplifies some lower-level codes. What about MLESolver and DynamicSolver? Those also accept the same argument,
+  but since their outputs are independent of the prior scale (which can be shown),
+  the value of output_scale_sqrtm is not important. It is set to a default value of 1.
+
+
 
 Notable enhancements:
 
