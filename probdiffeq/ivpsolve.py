@@ -21,7 +21,7 @@ def simulate_terminal_values(
     t0,
     t1,
     solver,
-    output_scale_sqrtm,
+    output_scale_sqrtm=1.0,
     dt0=None,
     parameters=(),
     while_loop_fn_temporal=jax.lax.while_loop,
