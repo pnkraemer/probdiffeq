@@ -256,7 +256,9 @@ class CalibrationFreeSolver(AbstractSolver):
 class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters, output_scale_sqrtm):
+        del output_scale_sqrtm  # unused
+
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
