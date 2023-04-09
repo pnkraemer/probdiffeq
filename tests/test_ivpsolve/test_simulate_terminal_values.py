@@ -24,6 +24,7 @@ class _SimulateTerminalValuesConfig(NamedTuple):
     solver_config: Any
     loop_fn: Any
     control: Any
+    output_scale: Any
 
 
 @testing.case
@@ -38,6 +39,7 @@ def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=controls.ProportionalIntegral(),
+        output_scale=1.0,
     )
 
 
@@ -55,6 +57,7 @@ def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=controls.ProportionalIntegral(),
+        output_scale=1.0,
     )
 
 
@@ -72,6 +75,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=controls.ProportionalIntegral(),
+        output_scale=1.0,
     )
 
 
@@ -87,6 +91,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=controls.ProportionalIntegral(),
+        output_scale=1.0,
     )
 
 
@@ -117,6 +122,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
         solver_config=solver_config,
         loop_fn=loop_fn,
         control=controls.ProportionalIntegral(),
+        output_scale=1.0,
     )
 
 
@@ -155,6 +161,7 @@ def case_setup_all_controls(ode_problem, control, solver_config):
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=control,
+        output_scale=1.0,
     )
 
 
@@ -190,6 +197,7 @@ def fixture_solution_terminal_values(setup):
         t0=t0,
         t1=setup.ode_problem.t1,
         parameters=parameters,
+        output_scale=setup.output_scale,
         dt0=dt0,
         solver=solver,
         atol=setup.solver_config.atol_solve,

@@ -39,8 +39,8 @@ class DenseConditional(_collections.AbstractConditional):
             cond, cache=None, target_shape=self.target_shape
         )
 
-    def scale_covariance(self, scale_sqrtm):
-        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+    def scale_covariance(self, output_scale):
+        noise = self.noise.scale_covariance(output_scale=output_scale)
         shape = self.target_shape
         return DenseConditional(self.transition, noise=noise, target_shape=shape)
 

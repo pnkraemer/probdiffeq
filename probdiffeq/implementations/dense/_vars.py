@@ -58,8 +58,8 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
             return u.reshape(self.target_shape, order="F")[0, ...]
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
-    def scale_covariance(self, scale_sqrtm):
-        rv = self.hidden_state.scale_covariance(scale_sqrtm)
+    def scale_covariance(self, output_scale):
+        rv = self.hidden_state.scale_covariance(output_scale)
         return DenseStateSpaceVar(rv, cache=self.cache, target_shape=self.target_shape)
 
     def marginal_nth_derivative(self, n):
@@ -133,8 +133,8 @@ class DenseNormal(_collections.AbstractNormal):
             l_obs.T, u - obs_pt, lower=False, trans="T"
         )
 
-    def scale_covariance(self, scale_sqrtm):
-        cov_scaled = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
+    def scale_covariance(self, output_scale):
+        cov_scaled = output_scale[..., None, None] * self.cov_sqrtm_lower
         return DenseNormal(mean=self.mean, cov_sqrtm_lower=cov_scaled)
 
     # automatically batched because of numpy's broadcasting rules?

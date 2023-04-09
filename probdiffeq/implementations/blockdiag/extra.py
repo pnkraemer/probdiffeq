@@ -51,10 +51,10 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         return fn(self.extra, p0, dt)
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale
     ):
         fn = jax.vmap(type(self.extra).complete_extrapolation_without_reversal)
-        return fn(self.extra, linearisation_pt, p0, output_scale_sqrtm)
+        return fn(self.extra, linearisation_pt, p0, output_scale)
 
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)
@@ -69,11 +69,12 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         return jax.vmap(type(self.extra).init_error_estimate)(self.extra)
 
     # todo: move to correction?
-    def init_output_scale_sqrtm(self):
-        return jax.vmap(type(self.extra).init_output_scale_sqrtm)(self.extra)
+    def init_output_scale(self, output_scale):
+        # broadcast to shape (d,)
+        output_scale = output_scale * jnp.ones(self.ode_shape)
+        fn_vmap = jax.vmap(type(self.extra).init_output_scale)
+        return fn_vmap(self.extra, output_scale)
 
-    def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, output_scale_sqrtm
-    ):
+    def complete_extrapolation_with_reversal(self, linearisation_pt, p0, output_scale):
         fn = jax.vmap(type(self.extra).complete_extrapolation_with_reversal)
-        return fn(self.extra, linearisation_pt, p0, output_scale_sqrtm)
+        return fn(self.extra, linearisation_pt, p0, output_scale)

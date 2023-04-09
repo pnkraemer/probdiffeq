@@ -95,12 +95,12 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         observed = _vars.DenseNormal(b, l_obs_raw)
 
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(b.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(b.size)
         error_estimate_unscaled = observed.marginal_stds()
-        error_estimate = output_scale_sqrtm * error_estimate_unscaled
+        error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale_sqrtm, (b,)
+        return error_estimate, output_scale, (b,)
 
     def complete_correction(self, extrapolated, cache):
         ext = extrapolated  # alias for readability
@@ -165,12 +165,12 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
 
         # Extract the output scale and the error estimate
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(b.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(b.size)
         error_estimate_unscaled = observed.marginal_stds()
-        error_estimate = output_scale_sqrtm * error_estimate_unscaled
+        error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale_sqrtm, (jvp_fn, (b,))
+        return error_estimate, output_scale, (jvp_fn, (b,))
 
     def complete_correction(self, extrapolated: _vars.DenseStateSpaceVar, cache):
         # Assign short-named variables for readability
@@ -266,12 +266,12 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
 
         # Compute output scale and error estimate
         mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m_marg.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(m_marg.size)
         error_estimate_unscaled = marginals.marginal_stds()
-        error_estimate = output_scale_sqrtm * error_estimate_unscaled
+        error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale_sqrtm, cache
+        return error_estimate, output_scale, cache
 
     def complete_correction(self, extrapolated, cache):
         # Select the required derivatives
@@ -366,12 +366,12 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
 
         # Compute output scale and error estimate
         mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m_marg.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(m_marg.size)
         error_estimate_unscaled = marginals.marginal_stds()
-        error_estimate = output_scale_sqrtm * error_estimate_unscaled
+        error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale_sqrtm, cache
+        return error_estimate, output_scale, cache
 
     def complete_correction(self, extrapolated, cache):
         # Select the required derivatives

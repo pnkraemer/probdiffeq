@@ -71,6 +71,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
+    # todo: why does this method have the same name as the above?
     def init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
         (d,) = ode_shape
@@ -82,8 +83,8 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 
-    def init_output_scale_sqrtm(self):
-        return 1.0
+    def init_output_scale(self, output_scale):
+        return output_scale
 
     def begin_extrapolation(
         self, p0: _vars.IsoStateSpaceVar, /, dt
@@ -103,7 +104,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale
     ):
         _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
@@ -112,16 +113,14 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
                 (self.a @ l0_p).T,
-                (output_scale_sqrtm * self.q_sqrtm_lower).T,
+                (output_scale * self.q_sqrtm_lower).T,
             )
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, output_scale_sqrtm
-    ):
+    def complete_extrapolation_with_reversal(self, linearisation_pt, p0, output_scale):
         m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
@@ -129,7 +128,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
-            R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,
+            R_YX=(output_scale * self.q_sqrtm_lower).T,
         )
         l_ext_p, l_bw_p = r_ext_p.T, r_bw_p.T
         m_bw_p = m0_p - g_bw_p @ m_ext_p

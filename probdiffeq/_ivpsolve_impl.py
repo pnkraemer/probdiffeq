@@ -22,6 +22,7 @@ def simulate_terminal_values(
     solver,
     parameters,
     dt0,
+    output_scale,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
     **options
@@ -31,7 +32,10 @@ def simulate_terminal_values(
     )
 
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        dt0=dt0,
+        output_scale=output_scale,
     )
 
     solution = _advance_ivp_solution_adaptively(
@@ -41,6 +45,7 @@ def simulate_terminal_values(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
+        output_scale=output_scale,
     )
     _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
     return sol
@@ -48,10 +53,12 @@ def simulate_terminal_values(
 
 def solve_and_save_at(
     vector_field,
+    *,
     taylor_coefficients,
     save_at,
     solver,
     dt0,
+    output_scale,
     parameters,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
@@ -69,12 +76,16 @@ def solve_and_save_at(
             adaptive_solver=adaptive_solver,
             parameters=parameters,
             while_loop_fn=while_loop_fn_temporal,
+            output_scale=output_scale,
         )
         return s_next, s_next
 
     t0 = save_at[0]
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        dt0=dt0,
+        output_scale=output_scale,
     )
 
     _, solution = _control_flow.scan_with_init(
@@ -88,7 +99,14 @@ def solve_and_save_at(
 
 
 def _advance_ivp_solution_adaptively(
-    vector_field, t1, state0, adaptive_solver, parameters, while_loop_fn
+    *,
+    vector_field,
+    t1,
+    state0,
+    adaptive_solver,
+    parameters,
+    while_loop_fn,
+    output_scale
 ):
     """Advance an IVP solution to the next state."""
 
@@ -97,7 +115,11 @@ def _advance_ivp_solution_adaptively(
 
     def body_fun(s):
         state = adaptive_solver.step_fn(
-            state=s, vector_field=vector_field, t1=t1, parameters=parameters
+            state=s,
+            vector_field=vector_field,
+            t1=t1,
+            parameters=parameters,
+            output_scale=output_scale,
         )
         return state
 
@@ -110,12 +132,24 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, taylor_coefficients, t0, t1, solver, dt0, parameters, **options
+    vector_field,
+    *,
+    taylor_coefficients,
+    t0,
+    t1,
+    solver,
+    dt0,
+    parameters,
+    output_scale,
+    **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        dt0=dt0,
+        output_scale=output_scale,
     )
     generator = _solution_generator(
         vector_field,
@@ -123,32 +157,49 @@ def solve_with_python_while_loop(
         t1=t1,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
+        output_scale=output_scale,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
     _dt, sol = adaptive_solver.extract_fn(forward_solution)
     return sol
 
 
-def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
+def _solution_generator(
+    vector_field, *, state, t1, adaptive_solver, parameters, output_scale
+):
     """Generate a probabilistic IVP solution iteratively."""
     while state.solution.t < t1:
         yield state
         state = adaptive_solver.step_fn(
-            state=state, vector_field=vector_field, t1=t1, parameters=parameters
+            state=state,
+            vector_field=vector_field,
+            t1=t1,
+            parameters=parameters,
+            output_scale=output_scale,
         )
 
     yield state
 
 
-def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters):
+def solve_fixed_grid(
+    vector_field, *, taylor_coefficients, grid, solver, parameters, output_scale
+):
     t0 = grid[0]
-    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state = solver.init_fn(
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        output_scale=output_scale,
+    )
 
     def body_fn(carry, t_new):
         s, t_old = carry
         dt = t_new - t_old
         s_new = solver.step_fn(
-            state=s, vector_field=vector_field, dt=dt, parameters=parameters
+            state=s,
+            vector_field=vector_field,
+            dt=dt,
+            parameters=parameters,
+            output_scale=output_scale,
         )
         return (s_new, t_new), (s_new, t_new)
 

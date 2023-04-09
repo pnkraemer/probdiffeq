@@ -25,7 +25,7 @@ class Solution(Generic[R]):
         t,
         u,
         error_estimate,
-        output_scale_sqrtm,
+        output_scale,
         marginals: R,
         posterior,
         num_data_points,
@@ -33,7 +33,7 @@ class Solution(Generic[R]):
         self.t = t
         self.u = u
         self.error_estimate = error_estimate
-        self.output_scale_sqrtm = output_scale_sqrtm
+        self.output_scale = output_scale
         self.marginals = marginals
         self.posterior = posterior
         self.num_data_points = num_data_points
@@ -44,7 +44,7 @@ class Solution(Generic[R]):
             f"t={self.t},"
             f"u={self.u},"
             f"error_estimate={self.error_estimate},"
-            f"output_scale_sqrtm={self.output_scale_sqrtm},"
+            f"output_scale={self.output_scale},"
             f"marginals={self.marginals},"
             f"posterior={self.posterior},"
             f"num_data_points={self.num_data_points},"
@@ -58,7 +58,7 @@ class Solution(Generic[R]):
             self.error_estimate,
             self.marginals,
             self.posterior,
-            self.output_scale_sqrtm,
+            self.output_scale,
             self.num_data_points,
         )
         aux = ()
@@ -66,14 +66,14 @@ class Solution(Generic[R]):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        t, u, error_estimate, marginals, posterior, output_scale_sqrtm, n = children
+        t, u, error_estimate, marginals, posterior, output_scale, n = children
         return cls(
             t=t,
             u=u,
             error_estimate=error_estimate,
             marginals=marginals,
             posterior=posterior,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
             num_data_points=n,
         )
 
@@ -92,7 +92,7 @@ class Solution(Generic[R]):
             t=self.t[item],
             u=self.u[item],
             error_estimate=self.error_estimate[item],
-            output_scale_sqrtm=self.output_scale_sqrtm[item],
+            output_scale=self.output_scale[item],
             # todo: make iterable?
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
             # todo: make iterable?
@@ -155,7 +155,7 @@ def _offgrid_marginals(*, solution, t, solution_previous, solver):
         t=t,
         t0=solution_previous.t,
         t1=solution.t,
-        scale_sqrtm=solution.output_scale_sqrtm,
+        output_scale=solution.output_scale,
     )
 
 

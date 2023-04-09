@@ -29,11 +29,11 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_right_corner(self, *, p0: P, p1: P, t, t0, t1, scale_sqrtm):
+    def case_right_corner(self, *, p0: P, p1: P, t, t0, t1, output_scale):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_interpolate(self, *, p0: P, rv1, t, t0, t1, scale_sqrtm):  # noqa: D102
+    def case_interpolate(self, *, p0: P, rv1, t, t0, t1, output_scale):  # noqa: D102
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -46,7 +46,7 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: P, t0, t1, scale_sqrtm
+        self, *, t, marginals, posterior_previous: P, t0, t1, output_scale
     ):
         raise NotImplementedError
 
@@ -60,7 +60,7 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt: P, *, output_scale_sqrtm, posterior_previous: P
+        self, linearisation_pt: P, *, output_scale, posterior_previous: P
     ):
         raise NotImplementedError
 
@@ -85,5 +85,6 @@ class Strategy(abc.ABC, Generic[P]):
     def init_error_estimate(self):
         return self.implementation.extrapolation.init_error_estimate()
 
-    def init_output_scale_sqrtm(self):
-        return self.implementation.extrapolation.init_output_scale_sqrtm()
+    def init_output_scale(self, *args, **kwargs):
+        init_fn = self.implementation.extrapolation.init_output_scale
+        return init_fn(*args, **kwargs)

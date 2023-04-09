@@ -6,18 +6,12 @@ from probdiffeq.backend import testing
 
 @testing.case(id="MLESolver")
 def case_mle():
-    def factory(strategy, output_scale_sqrtm):
-        return ivpsolvers.MLESolver(strategy)
-
-    return factory
+    return ivpsolvers.MLESolver
 
 
 @testing.case(id="DynamicSolver")
 def case_dynamic():
-    def factory(strategy, output_scale_sqrtm):
-        return ivpsolvers.DynamicSolver(strategy)
-
-    return factory
+    return ivpsolvers.DynamicSolver
 
 
 @testing.case(id="CalibrationFreeSolver")

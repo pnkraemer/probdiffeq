@@ -39,13 +39,13 @@ class AbstractSolver(abc.ABC):
     def extract_terminal_value_fn(self, state, /):
         raise NotImplementedError
 
-    def init_fn(self, *, taylor_coefficients, t0):
+    def init_fn(self, *, taylor_coefficients, t0, output_scale):
         posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
         )
         u = self.strategy.extract_u_from_posterior(posterior=posterior)
 
-        scale_sqrtm = self.strategy.init_output_scale_sqrtm()
+        output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
 
         sol = solution.Solution(
@@ -54,7 +54,7 @@ class AbstractSolver(abc.ABC):
             error_estimate=error_estimate,
             posterior=posterior,
             marginals=None,
-            output_scale_sqrtm=scale_sqrtm,
+            output_scale=output_scale,
             num_data_points=1.0,
         )
 
@@ -68,7 +68,7 @@ class AbstractSolver(abc.ABC):
                 t=t_,
                 t0=s0_.t,
                 t1=s1_.t,
-                scale_sqrtm=s1.output_scale_sqrtm,
+                output_scale=s1.output_scale,
             )
 
         def right_corner(s0_, s1_, t_):
@@ -79,7 +79,7 @@ class AbstractSolver(abc.ABC):
                 t=t_,
                 t0=s0_.t,
                 t1=s1_.t,
-                scale_sqrtm=s1.output_scale_sqrtm,
+                output_scale=s1.output_scale,
             )
 
         # Cases to switch between
@@ -95,25 +95,37 @@ class AbstractSolver(abc.ABC):
         index = jnp.reshape(index_as_array, ())
         acc, sol, prev = jax.lax.switch(index, branches, s0, s1, t)
 
-        error_estimate = jnp.empty_like(s0.error_estimate)
-        previous = self._posterior_to_state(prev, t, s1, error_estimate)
-        solution = self._posterior_to_state(sol, t, s1, error_estimate)
-        accepted = self._posterior_to_state(
-            acc, jnp.maximum(s1.t, t), s1, error_estimate
-        )
+        # helper function to make code below more readable
+        def make_state(p, t_):
+            return self._init_state_from_posterior(
+                p,
+                t=t_,
+                num_data_points=s1.num_data_points,
+                output_scale=s1.output_scale,
+            )
 
-        return accepted, solution, previous
+        # todo: which output scale is used for MLESolver interpolation
+        #  _during_ the simulation? hopefully the prior one!
+
+        previous = make_state(prev, t)
+        solution_ = make_state(sol, t)
+        accepted = make_state(acc, jnp.maximum(s1.t, t))
+
+        return accepted, solution_, previous
 
     # todo: is this what ivpsolver.init() should look like?
-    def _posterior_to_state(self, posterior, t, state, error_estimate):
+    def _init_state_from_posterior(
+        self, posterior, *, t, num_data_points, output_scale
+    ):
+        output_scale = self.strategy.init_output_scale(output_scale)
         return solution.Solution(
             t=t,
             u=self.strategy.extract_u_from_posterior(posterior=posterior),
-            error_estimate=error_estimate,
+            error_estimate=self.strategy.init_error_estimate(),
             posterior=posterior,
-            output_scale_sqrtm=state.output_scale_sqrtm,
+            output_scale=output_scale,
             marginals=None,
-            num_data_points=state.num_data_points,
+            num_data_points=num_data_points,
         )
 
     def tree_flatten(self):
@@ -134,20 +146,7 @@ class CalibrationFreeSolver(AbstractSolver):
     No automatic output-scale calibration.
     """
 
-    def __init__(self, strategy, *, output_scale_sqrtm):
-        super().__init__(strategy=strategy)
-
-        # todo: overwrite init_fn()?
-        self._output_scale_sqrtm = output_scale_sqrtm
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        args = (
-            f"strategy={self.strategy}, output_scale_sqrtm={self._output_scale_sqrtm}"
-        )
-        return f"{name}({args})"
-
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -159,9 +158,10 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
         # Post-error-estimate steps
+        scale = self.strategy.init_output_scale(output_scale)
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
+            output_scale=scale,
             posterior_previous=state.posterior,
         )
 
@@ -179,7 +179,7 @@ class CalibrationFreeSolver(AbstractSolver):
             error_estimate=dt * error,
             marginals=None,
             posterior=corrected,
-            output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
+            output_scale=scale,
             num_data_points=state.num_data_points + 1,
         )
         return filtered
@@ -196,7 +196,7 @@ class CalibrationFreeSolver(AbstractSolver):
             error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale_sqrtm=state.output_scale_sqrtm,
+            output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
 
@@ -210,37 +210,29 @@ class CalibrationFreeSolver(AbstractSolver):
             error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale_sqrtm=state.output_scale_sqrtm,
+            output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
-
-    def tree_flatten(self):
-        children = (self.strategy, self._output_scale_sqrtm)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (strategy, output_scale_sqrtm) = children
-        return cls(strategy=strategy, output_scale_sqrtm=output_scale_sqrtm)
 
 
 @jax.tree_util.register_pytree_node_class
 class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
+        del output_scale  # unused
+
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
-        error, scale_sqrtm, cache_obs = self.strategy.begin_correction(
+        error, output_scale, cache_obs = self.strategy.begin_correction(
             linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
             posterior_previous=state.posterior,
-            output_scale_sqrtm=scale_sqrtm,
+            output_scale=output_scale,
         )
 
         # Final observation
@@ -256,7 +248,7 @@ class DynamicSolver(AbstractSolver):
             error_estimate=dt * error,
             posterior=corrected,
             marginals=None,
-            output_scale_sqrtm=scale_sqrtm,
+            output_scale=output_scale,
             num_data_points=state.num_data_points + 1,
         )
 
@@ -273,7 +265,7 @@ class DynamicSolver(AbstractSolver):
             error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale_sqrtm=state.output_scale_sqrtm,
+            output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
 
@@ -288,7 +280,7 @@ class DynamicSolver(AbstractSolver):
             error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale_sqrtm=state.output_scale_sqrtm,
+            output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
 
@@ -298,7 +290,7 @@ class MLESolver(AbstractSolver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -310,19 +302,20 @@ class MLESolver(AbstractSolver):
         )
 
         # Post-error-estimate steps
+        scale = self.strategy.init_output_scale(output_scale)
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
+            output_scale=scale,
             posterior_previous=state.posterior,
         )
         # Complete step (incl. calibration!)
-        output_scale_sqrtm, n = state.output_scale_sqrtm, state.num_data_points
+        output_scale, n = state.output_scale, state.num_data_points
         observed, (corrected, _) = self.strategy.complete_correction(
             extrapolated=extrapolated,
             cache_obs=cache_obs,
         )
-        new_output_scale_sqrtm = self._update_output_scale_sqrtm(
-            diffsqrtm=output_scale_sqrtm, n=n, obs=observed
+        new_output_scale = self._update_output_scale(
+            diffsqrtm=output_scale, n=n, obs=observed
         )
 
         # Extract and return solution
@@ -333,19 +326,19 @@ class MLESolver(AbstractSolver):
             error_estimate=dt * error,
             marginals=None,
             posterior=corrected,
-            output_scale_sqrtm=new_output_scale_sqrtm,
+            output_scale=new_output_scale,
             num_data_points=n + 1,
         )
         return filtered
 
     @staticmethod
-    def _update_output_scale_sqrtm(*, diffsqrtm, n, obs):
+    def _update_output_scale(*, diffsqrtm, n, obs):
         # Special consideration for block-diagonal models
         # todo: should this logic be pushed to the implementation itself?
         if jnp.ndim(diffsqrtm) > 0:
 
             def fn_partial(d, o):
-                fn = MLESolver._update_output_scale_sqrtm
+                fn = MLESolver._update_output_scale
                 return fn(diffsqrtm=d, n=n, obs=o)
 
             fn_vmap = jax.vmap(fn_partial)
@@ -356,17 +349,17 @@ class MLESolver(AbstractSolver):
         return sum / jnp.sqrt(n + 1)
 
     def extract_fn(self, state, /):
-        s = state.output_scale_sqrtm[-1] * jnp.ones_like(state.output_scale_sqrtm)
+        s = state.output_scale[-1] * jnp.ones_like(state.output_scale)
         margs = self.strategy.marginals(posterior=state.posterior)
-        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
+        return self._rescale(output_scale=s, marginals_unscaled=margs, state=state)
 
     def extract_terminal_value_fn(self, state, /):
-        s = state.output_scale_sqrtm
+        s = state.output_scale
         margs = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
+        return self._rescale(output_scale=s, marginals_unscaled=margs, state=state)
 
     @staticmethod
-    def _rescale(*, scale_sqrtm, marginals_unscaled, state):
+    def _rescale(*, output_scale, marginals_unscaled, state):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
@@ -376,7 +369,7 @@ class MLESolver(AbstractSolver):
         #      def is_leaf(x):
         #          return isinstance(x, AbstractNormal)
         #      def fn(x: AbstractNormal):
-        #          return x.scale_covariance(scale_sqrtm)
+        #          return x.scale_covariance(output_scale)
         #      return tree_map(fn, tree, is_leaf=is_leaf)
         #  marginals = scale_cov(marginals_unscaled)
         #  posterior = scale_cov(state.posterior)
@@ -384,8 +377,8 @@ class MLESolver(AbstractSolver):
         #  in intermediate objects
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
-        marginals = marginals_unscaled.scale_covariance(scale_sqrtm)
-        posterior = state.posterior.scale_covariance(scale_sqrtm)
+        marginals = marginals_unscaled.scale_covariance(output_scale)
+        posterior = state.posterior.scale_covariance(output_scale)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -394,6 +387,6 @@ class MLESolver(AbstractSolver):
             error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=posterior,  # new!
-            output_scale_sqrtm=scale_sqrtm,  # new!
+            output_scale=output_scale,  # new!
             num_data_points=state.num_data_points,
         )

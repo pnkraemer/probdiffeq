@@ -40,10 +40,11 @@ def generate_solver(
     impl = impl_factory(**impl_factory_kwargs)
     strat = strategy_factory(impl)
 
-    # I am not too happy with the need for this distinction below...
-
-    if solver_factory in [ivpsolvers.MLESolver, ivpsolvers.DynamicSolver]:
-        return solver_factory(strat)
-
-    scale_sqrtm = impl.extrapolation.init_output_scale_sqrtm()
-    return solver_factory(strat, output_scale_sqrtm=scale_sqrtm)
+    return solver_factory(strat)
+    # # I am not too happy with the need for this distinction below...
+    #
+    # if solver_factory in [ivpsolvers.MLESolver, ivpsolvers.DynamicSolver]:
+    #     return solver_factory(strat)
+    #
+    # output_scale = impl.extrapolation.init_output_scale()
+    # return solver_factory(strat, output_scale=output_scale)

@@ -120,14 +120,14 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         return p, p_inv
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, output_scale_sqrtm
+        self, linearisation_pt, p0, output_scale
     ):
         _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
                 (self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
-                (output_scale_sqrtm * self.q_sqrtm_lower).T,
+                (output_scale * self.q_sqrtm_lower).T,
             )
         ).T
         l_ext = p[:, None] * l_ext_p
@@ -136,9 +136,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
 
-    def complete_extrapolation_with_reversal(
-        self, linearisation_pt, p0, output_scale_sqrtm
-    ):
+    def complete_extrapolation_with_reversal(self, linearisation_pt, p0, output_scale):
         m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
@@ -146,7 +144,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
-            R_YX=(output_scale_sqrtm * self.q_sqrtm_lower).T,
+            R_YX=(output_scale * self.q_sqrtm_lower).T,
         )
         l_ext_p, l_bw_p = r_ext_p.T, r_bw_p.T
         m_bw_p = m0_p - g_bw_p @ m_ext_p
@@ -187,5 +185,5 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
-    def init_output_scale_sqrtm(self):
-        return 1.0
+    def init_output_scale(self, output_scale):
+        return output_scale
