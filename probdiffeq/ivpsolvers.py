@@ -45,11 +45,6 @@ class AbstractSolver(abc.ABC):
         )
         u = self.strategy.extract_u_from_posterior(posterior=posterior)
 
-        # raise RuntimeError(
-        #     "Next: Then, see whether we can make "
-        #     "ivpsolver._init_state_from_posterior the ivpsolvers.init_fn() "
-        #     "already (and if not, keep fixing until we can)."
-        # )
         output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
 
