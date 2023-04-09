@@ -130,6 +130,7 @@ def solve_with_python_while_loop(
     t0,
     t1,
     solver,
+    output_scale_sqrtm=1.0,
     dt0=None,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
@@ -164,6 +165,7 @@ def solve_with_python_while_loop(
         t1=t1,
         solver=solver,
         dt0=dt0,
+        output_scale_sqrtm=output_scale_sqrtm,
         parameters=parameters,
         **options,
     )

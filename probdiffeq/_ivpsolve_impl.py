@@ -126,12 +126,23 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, taylor_coefficients, t0, t1, solver, dt0, parameters, **options
+    vector_field,
+    taylor_coefficients,
+    t0,
+    t1,
+    solver,
+    dt0,
+    parameters,
+    output_scale_sqrtm,
+    **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        dt0=dt0,
+        output_scale_sqrtm=output_scale_sqrtm,
     )
     generator = _solution_generator(
         vector_field,
@@ -139,18 +150,25 @@ def solve_with_python_while_loop(
         t1=t1,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
+        output_scale_sqrtm=output_scale_sqrtm,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
     _dt, sol = adaptive_solver.extract_fn(forward_solution)
     return sol
 
 
-def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
+def _solution_generator(
+    vector_field, *, state, t1, adaptive_solver, parameters, output_scale_sqrtm
+):
     """Generate a probabilistic IVP solution iteratively."""
     while state.solution.t < t1:
         yield state
         state = adaptive_solver.step_fn(
-            state=state, vector_field=vector_field, t1=t1, parameters=parameters
+            state=state,
+            vector_field=vector_field,
+            t1=t1,
+            parameters=parameters,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
 
     yield state
