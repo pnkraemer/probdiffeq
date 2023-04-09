@@ -46,14 +46,7 @@ class AbstractSolver(abc.ABC):
         u = self.strategy.extract_u_from_posterior(posterior=posterior)
 
         # raise RuntimeError(
-        #     "Next: complete making init_output_scale have an input argument "
-        #     "(which promotes to appropriate shapes or whatever. "
-        #     "As a result, if this goes through, we will have "
-        #     "a clean way of enforcing solver_parameters in every solve() "
-        #     "method and are one step closer to x = extract(init(x)). "
-        #     "The first step is to make output_scale an input "
-        #     "to the init_fn() we are currently in. "
-        #     "Then, fix errors. Then, see whether we can make "
+        #     "Next: Then, see whether we can make "
         #     "ivpsolver._init_state_from_posterior the ivpsolvers.init_fn() "
         #     "already (and if not, keep fixing until we can)."
         # )

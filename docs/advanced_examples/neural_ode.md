@@ -141,7 +141,8 @@ for i in range(chunk_size):
     for _ in range(chunk_size**2):
         p, state = update_fn(p, state)
     print(
-        f"Log-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:", loss_fn(p)
+        f"Neg. log-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:",
+        loss_fn(p),
     )
 ```
 

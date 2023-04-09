@@ -70,11 +70,16 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 strategy = smoothers.Smoother(
     recipes.ts0_iso(num_derivatives=1),
 )
-solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale=10.0)
+solver = ivpsolvers.CalibrationFreeSolver(strategy)
 
 
 solution_true = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=parameter_true
+    vf,
+    initial_values=(u0,),
+    grid=ts,
+    solver=solver,
+    parameters=parameter_true,
+    output_scale=10.0,
 )
 data = solution_true.u
 plt.plot(ts, data, "P-")
@@ -85,7 +90,12 @@ We make an initial guess, but it does not lead to a good data fit:
 
 ```python
 solution_guess = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=parameter_guess
+    vf,
+    initial_values=(u0,),
+    grid=ts,
+    solver=solver,
+    parameters=parameter_guess,
+    output_scale=10.0,
 )
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_guess.u)
@@ -99,7 +109,12 @@ This incorporates the likelihood of the data under the distribution induced by t
 ```python
 def param_to_log_likelihood(parameters_, u0_, ts_, solver_, vf_, data_, obs_stdev=1e-1):
     sol_ = ivpsolve.solve_fixed_grid(
-        vf_, initial_values=(u0_,), grid=ts_, solver=solver_, parameters=parameters_
+        vf_,
+        initial_values=(u0_,),
+        grid=ts_,
+        solver=solver_,
+        parameters=parameters_,
+        output_scale=10.0,
     )
 
     observation_std = jnp.ones_like(ts_) * obs_stdev
@@ -120,8 +135,6 @@ sensitivities = jax.jit(jax.grad(parameter_to_data_fit))
 We can differentiate the function forward- and reverse-mode (the latter is possible because we use fixed steps)
 
 ```python
-%%time
-
 parameter_to_data_fit(parameter_guess)
 sensitivities(parameter_guess)
 ```
@@ -147,8 +160,6 @@ update_fn = build_update_fn(optimizer=optim, loss_fn=parameter_to_data_fit)
 ```
 
 ```python
-%%time
-
 p = parameter_guess
 state = optim.init(p)
 

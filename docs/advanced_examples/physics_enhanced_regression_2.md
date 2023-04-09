@@ -139,7 +139,7 @@ theta_guess = u0  # initial guess
 strategy = filters.Filter(
     recipes.ts0_iso(num_derivatives=2),
 )
-solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale=10.0)
+solver = ivpsolvers.CalibrationFreeSolver(strategy)
 ```
 
 ```python
@@ -154,7 +154,7 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 @jax.jit
 def solve_adaptive(theta, *, save_at):
     return ivpsolve.solve_and_save_at(
-        vf, initial_values=(theta,), save_at=save_at, solver=solver
+        vf, initial_values=(theta,), save_at=save_at, solver=solver, output_scale=10.0
     )
 
 
@@ -203,7 +203,9 @@ def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
 
 @jax.jit
 def solve_fixed(theta, *, ts, solver):
-    sol = ivpsolve.solve_fixed_grid(vf, initial_values=(theta,), grid=ts, solver=solver)
+    sol = ivpsolve.solve_fixed_grid(
+        vf, initial_values=(theta,), grid=ts, solver=solver, output_scale=10.0
+    )
     return sol[-1]
 
 

@@ -84,7 +84,6 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         return jnp.zeros(())  # the initialisation is error-free
 
     def init_output_scale(self, output_scale):
-        print("Next: rename output scale sqrtm to output scale.")
         return output_scale
 
     def begin_extrapolation(
