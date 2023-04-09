@@ -67,6 +67,7 @@ def build_loss_fn(vf, initial_values, obs_stdev=1e-2):
             grid=grid,
             solver=solver,
             parameters=parameters,
+            output_scale_sqrtm=1.0,
         )
 
         observation_std = jnp.ones_like(grid) * obs_stdev
@@ -108,7 +109,7 @@ def vf(y, *, t, p):
 strategy = smoothers.Smoother(
     recipes.ts0_iso(num_derivatives=1),
 )
-solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=1.0)
+solver = ivpsolvers.CalibrationFreeSolver(strategy)
 ```
 
 ```python
