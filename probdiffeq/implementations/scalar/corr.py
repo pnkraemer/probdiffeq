@@ -8,8 +8,6 @@ from probdiffeq import _sqrt_util
 from probdiffeq.implementations import _collections
 from probdiffeq.implementations.scalar import _vars
 
-# todo: make public and split into submodules
-
 
 def taylor_order_zero(*args, **kwargs):
     return _TaylorZerothOrder(*args, **kwargs)

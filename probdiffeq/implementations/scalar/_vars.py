@@ -7,8 +7,6 @@ from probdiffeq import _sqrt_util
 from probdiffeq.implementations import _collections
 from probdiffeq.implementations.scalar import _conds
 
-# todo: make public and split into submodules
-
 
 @jax.tree_util.register_pytree_node_class
 class NormalQOI(_collections.AbstractNormal):
