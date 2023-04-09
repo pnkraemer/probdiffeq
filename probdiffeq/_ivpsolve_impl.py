@@ -16,7 +16,8 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field,
     *,
-    taylor_coefficients,
+    u0,
+    posterior,
     t0,
     t1,
     solver,
@@ -32,12 +33,8 @@ def simulate_terminal_values(
     )
 
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients,
-        t0=t0,
-        dt0=dt0,
-        output_scale=output_scale,
+        posterior=posterior, u=u0, t=t0, dt0=dt0, output_scale=output_scale
     )
-
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
@@ -54,7 +51,8 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field,
     *,
-    taylor_coefficients,
+    u0,
+    posterior,
     save_at,
     solver,
     dt0,
@@ -82,10 +80,7 @@ def solve_and_save_at(
 
     t0 = save_at[0]
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients,
-        t0=t0,
-        dt0=dt0,
-        output_scale=output_scale,
+        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
     )
 
     _, solution = _control_flow.scan_with_init(
@@ -134,7 +129,8 @@ def _advance_ivp_solution_adaptively(
 def solve_with_python_while_loop(
     vector_field,
     *,
-    taylor_coefficients,
+    u0,
+    posterior,
     t0,
     t1,
     solver,
@@ -146,10 +142,7 @@ def solve_with_python_while_loop(
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients,
-        t0=t0,
-        dt0=dt0,
-        output_scale=output_scale,
+        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
     )
     generator = _solution_generator(
         vector_field,
@@ -182,13 +175,11 @@ def _solution_generator(
 
 
 def solve_fixed_grid(
-    vector_field, *, taylor_coefficients, grid, solver, parameters, output_scale
+    vector_field, *, u0, posterior, grid, solver, parameters, output_scale
 ):
     t0 = grid[0]
-    state = solver.init_fn(
-        taylor_coefficients=taylor_coefficients,
-        t0=t0,
-        output_scale=output_scale,
+    state = solver.init_solution_from_posterior(
+        posterior, t=t0, u=u0, output_scale=output_scale
     )
 
     def body_fn(carry, t_new):

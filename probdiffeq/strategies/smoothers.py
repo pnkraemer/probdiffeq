@@ -159,7 +159,7 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return a, (corrected_seq, b)
 
-    def extract_u_from_posterior(self, *, posterior: MarkovSequence):
+    def extract_u_from_posterior(self, posterior: MarkovSequence):
         return posterior.init.extract_qoi()
 
     def marginals_terminal_value(self, *, posterior: MarkovSequence):
