@@ -28,11 +28,11 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         obs = _vars.IsoNormalQOI(bias, l_obs)
 
         mahalanobis_norm = obs.mahalanobis_norm(jnp.zeros_like(m1))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(bias.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(bias.size)
 
         error_estimate_unscaled = obs.marginal_std()
-        error_estimate = error_estimate_unscaled * output_scale_sqrtm
-        return error_estimate, output_scale_sqrtm, (bias,)
+        error_estimate = error_estimate_unscaled * output_scale
+        return error_estimate, output_scale, (bias,)
 
     def complete_correction(
         self, extrapolated: _vars.IsoStateSpaceVar, cache

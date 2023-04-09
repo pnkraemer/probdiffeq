@@ -20,7 +20,7 @@ class _SolveAndSaveAtConfig(NamedTuple):
     strat_fn: Any
     loop_fn: Any
     solver_config: Any
-    output_scale_sqrtm: Any
+    output_scale: Any
 
 
 @testing.case
@@ -34,7 +34,7 @@ def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -51,7 +51,7 @@ def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -66,7 +66,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
         strat_fn=strat_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -81,7 +81,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -111,7 +111,7 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
         strat_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=loop_fn,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -148,7 +148,7 @@ def fixture_solution_save_at(setup):
         parameters=setup.ode_problem.args,
         solver=solver,
         dt0=dt0,
-        output_scale_sqrtm=setup.output_scale_sqrtm,
+        output_scale=setup.output_scale,
         atol=setup.solver_config.atol_solve,
         rtol=setup.solver_config.rtol_solve,
         taylor_fn=taylor.taylor_mode_fn,

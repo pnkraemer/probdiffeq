@@ -74,9 +74,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
         smo_sol.posterior.backward_model.noise.mean,
         **tols
     )
-    assert jnp.allclose(
-        fp_smo_sol.output_scale_sqrtm, smo_sol.output_scale_sqrtm, **tols
-    )
+    assert jnp.allclose(fp_smo_sol.output_scale, smo_sol.output_scale, **tols)
 
     # covariances are equal, but cov_sqrtm_lower might not be
 

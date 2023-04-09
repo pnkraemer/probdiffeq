@@ -122,7 +122,7 @@ class _SmootherCommon(_strategy.Strategy):
         self,
         linearisation_pt: MarkovSequence,
         *,
-        output_scale_sqrtm,
+        output_scale,
         posterior_previous: MarkovSequence,
     ):
         raise NotImplementedError
@@ -180,7 +180,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     # Auxiliary routines that are the same among all subclasses
 
-    def _interpolate_from_to_fn(self, *, rv, output_scale_sqrtm, t, t0):
+    def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
         dt = t - t0
         linearisation_pt = self.implementation.extrapolation.begin_extrapolation(
             rv, dt=dt
@@ -191,7 +191,7 @@ class _SmootherCommon(_strategy.Strategy):
         extrapolated, bw_model = extra_fn(
             linearisation_pt=linearisation_pt,
             p0=rv,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         return extrapolated, bw_model  # should this return a MarkovSequence?
 
@@ -210,7 +210,7 @@ class Smoother(_SmootherCommon):
         self,
         linearisation_pt: MarkovSequence,
         *,
-        output_scale_sqrtm,
+        output_scale,
         posterior_previous: MarkovSequence,
     ) -> MarkovSequence:
         extra = self.implementation.extrapolation
@@ -218,7 +218,7 @@ class Smoother(_SmootherCommon):
         extrapolated, bw_model = extra_fn(
             linearisation_pt=linearisation_pt.init,
             p0=posterior_previous.init,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         return MarkovSequence(init=extrapolated, backward_model=bw_model)
 
@@ -240,12 +240,12 @@ class Smoother(_SmootherCommon):
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=p0.init, output_scale_sqrtm=scale_sqrtm, t=t, t0=t0
+            rv=p0.init, output_scale=scale_sqrtm, t=t, t0=t0
         )
         posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
         _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
+            rv=extrapolated0, output_scale=scale_sqrtm, t=t1, t0=t
         )
         posterior1 = MarkovSequence(init=rv1, backward_model=backward_model1)
 
@@ -284,12 +284,12 @@ class FixedPointSmoother(_SmootherCommon):
         linearisation_pt: MarkovSequence,
         *,
         posterior_previous: MarkovSequence,
-        output_scale_sqrtm,
+        output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
             linearisation_pt=linearisation_pt.init,
             p0=posterior_previous.init,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         extrapolated, bw_increment = _temp
 
@@ -323,7 +323,7 @@ class FixedPointSmoother(_SmootherCommon):
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
             rv=p0.init,
-            output_scale_sqrtm=scale_sqrtm,
+            output_scale=scale_sqrtm,
             t=t,
             t0=t0,
         )
@@ -333,7 +333,7 @@ class FixedPointSmoother(_SmootherCommon):
         previous = self._duplicate_with_unit_backward_model(posterior=solution)
 
         _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, output_scale_sqrtm=scale_sqrtm, t=t1, t0=t
+            rv=extrapolated0, output_scale=scale_sqrtm, t=t1, t0=t
         )
         accepted = MarkovSequence(init=rv1, backward_model=backward_model1)
         return accepted, solution, previous

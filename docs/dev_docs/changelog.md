@@ -47,6 +47,9 @@ Notable breaking changes:
   and that it simplifies some lower-level codes. What about MLESolver and DynamicSolver? Those also accept the same argument,
   but since their outputs are independent of the prior scale (which can be shown),
   the value of output_scale_sqrtm is not important. It is set to a default value of 1.
+* The `output_scale_sqrtm` parameter is now called `output_scale`. 
+  This is mathematically more accurate: the parameter models $sigma$, and the `_sqrtm` 
+  suffix was previously used to mark that ProbDiffEq estimates $sigma$ not $sigma^2$ (like other packages).
 
 
 

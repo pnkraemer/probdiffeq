@@ -70,7 +70,7 @@ ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 strategy = smoothers.Smoother(
     recipes.ts0_iso(num_derivatives=1),
 )
-solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale_sqrtm=10.0)
+solver = ivpsolvers.CalibrationFreeSolver(strategy, output_scale=10.0)
 
 
 solution_true = ivpsolve.solve_fixed_grid(

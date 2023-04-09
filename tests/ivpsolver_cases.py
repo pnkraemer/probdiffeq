@@ -7,7 +7,7 @@ from probdiffeq.backend import testing
 @testing.case(id="MLESolver")
 def case_mle():
     return ivpsolvers.MLESolver
-    # def factory(strategy, output_scale_sqrtm):
+    # def factory(strategy, output_scale):
     #     return ivpsolvers.MLESolver(strategy)
     #
     # return factory
@@ -16,7 +16,7 @@ def case_mle():
 @testing.case(id="DynamicSolver")
 def case_dynamic():
     return ivpsolvers.DynamicSolver
-    # def factory(strategy, output_scale_sqrtm):
+    # def factory(strategy, output_scale):
     #     return ivpsolvers.DynamicSolver(strategy)
     #
     # return factory

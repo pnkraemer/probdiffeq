@@ -22,7 +22,7 @@ def simulate_terminal_values(
     solver,
     parameters,
     dt0,
-    output_scale_sqrtm,
+    output_scale,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
     **options
@@ -35,7 +35,7 @@ def simulate_terminal_values(
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         dt0=dt0,
-        output_scale_sqrtm=output_scale_sqrtm,
+        output_scale=output_scale,
     )
 
     solution = _advance_ivp_solution_adaptively(
@@ -45,7 +45,7 @@ def simulate_terminal_values(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
-        output_scale_sqrtm=output_scale_sqrtm,
+        output_scale=output_scale,
     )
     _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
     return sol
@@ -58,7 +58,7 @@ def solve_and_save_at(
     save_at,
     solver,
     dt0,
-    output_scale_sqrtm,
+    output_scale,
     parameters,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
@@ -76,7 +76,7 @@ def solve_and_save_at(
             adaptive_solver=adaptive_solver,
             parameters=parameters,
             while_loop_fn=while_loop_fn_temporal,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         return s_next, s_next
 
@@ -85,7 +85,7 @@ def solve_and_save_at(
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         dt0=dt0,
-        output_scale_sqrtm=output_scale_sqrtm,
+        output_scale=output_scale,
     )
 
     _, solution = _control_flow.scan_with_init(
@@ -106,7 +106,7 @@ def _advance_ivp_solution_adaptively(
     adaptive_solver,
     parameters,
     while_loop_fn,
-    output_scale_sqrtm
+    output_scale
 ):
     """Advance an IVP solution to the next state."""
 
@@ -119,7 +119,7 @@ def _advance_ivp_solution_adaptively(
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         return state
 
@@ -140,7 +140,7 @@ def solve_with_python_while_loop(
     solver,
     dt0,
     parameters,
-    output_scale_sqrtm,
+    output_scale,
     **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
@@ -149,7 +149,7 @@ def solve_with_python_while_loop(
         taylor_coefficients=taylor_coefficients,
         t0=t0,
         dt0=dt0,
-        output_scale_sqrtm=output_scale_sqrtm,
+        output_scale=output_scale,
     )
     generator = _solution_generator(
         vector_field,
@@ -157,7 +157,7 @@ def solve_with_python_while_loop(
         t1=t1,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
-        output_scale_sqrtm=output_scale_sqrtm,
+        output_scale=output_scale,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
     _dt, sol = adaptive_solver.extract_fn(forward_solution)
@@ -165,7 +165,7 @@ def solve_with_python_while_loop(
 
 
 def _solution_generator(
-    vector_field, *, state, t1, adaptive_solver, parameters, output_scale_sqrtm
+    vector_field, *, state, t1, adaptive_solver, parameters, output_scale
 ):
     """Generate a probabilistic IVP solution iteratively."""
     while state.solution.t < t1:
@@ -175,20 +175,20 @@ def _solution_generator(
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
 
     yield state
 
 
 def solve_fixed_grid(
-    vector_field, *, taylor_coefficients, grid, solver, parameters, output_scale_sqrtm
+    vector_field, *, taylor_coefficients, grid, solver, parameters, output_scale
 ):
     t0 = grid[0]
     state = solver.init_fn(
         taylor_coefficients=taylor_coefficients,
         t0=t0,
-        output_scale_sqrtm=output_scale_sqrtm,
+        output_scale=output_scale,
     )
 
     def body_fn(carry, t_new):
@@ -199,7 +199,7 @@ def solve_fixed_grid(
             vector_field=vector_field,
             dt=dt,
             parameters=parameters,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         return (s_new, t_new), (s_new, t_new)
 

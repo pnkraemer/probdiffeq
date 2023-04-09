@@ -22,10 +22,10 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m1.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
         error_estimate_unscaled = observed.marginal_stds()
-        error_estimate = output_scale_sqrtm * error_estimate_unscaled
-        return error_estimate, output_scale_sqrtm, cache
+        error_estimate = output_scale * error_estimate_unscaled
+        return error_estimate, output_scale, cache
 
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
@@ -110,11 +110,11 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # Extract error estimate and output scale from marginals
         marginals = _vars.NormalQOI(m_marg, std_marg)
         mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros(()))
-        output_scale_sqrtm = mahalanobis_norm / jnp.sqrt(m_marg.size)
+        output_scale = mahalanobis_norm / jnp.sqrt(m_marg.size)
 
         error_estimate_unscaled = marginals.marginal_stds()
-        error_estimate = error_estimate_unscaled * output_scale_sqrtm
-        return error_estimate, output_scale_sqrtm
+        error_estimate = error_estimate_unscaled * output_scale
+        return error_estimate, output_scale
 
     def complete_correction(self, extrapolated, cache):
         raise NotImplementedError

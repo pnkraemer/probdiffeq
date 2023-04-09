@@ -79,10 +79,10 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
 
         # Compute output scale and error estimate
         calibrate_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.calibrate)
-        error_estimate, output_scale_sqrtm = calibrate_fn(
+        error_estimate, output_scale = calibrate_fn(
             self._mm, fx_mean, fx_centered_normed, extrapolated.hidden_state
         )
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+        return output_scale * error_estimate, output_scale, cache
 
     def complete_correction(self, extrapolated, cache):
         (vmap_f,) = cache
@@ -156,9 +156,9 @@ class _BlockDiag(_collections.AbstractCorrection):
 
         mahalanobis_fn = scalar_vars.NormalQOI.mahalanobis_norm
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
-        output_scale_sqrtm = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
+        output_scale = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
         error_estimate = obs_unbatch.cov_sqrtm_lower
-        return output_scale_sqrtm * error_estimate, output_scale_sqrtm, cache
+        return output_scale * error_estimate, output_scale, cache
 
     def complete_correction(self, extrapolated, cache: _TS0CacheType):
         fn = jax.vmap(type(self.corr).complete_correction)

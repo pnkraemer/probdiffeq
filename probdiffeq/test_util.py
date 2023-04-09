@@ -46,5 +46,5 @@ def generate_solver(
     # if solver_factory in [ivpsolvers.MLESolver, ivpsolvers.DynamicSolver]:
     #     return solver_factory(strat)
     #
-    # scale_sqrtm = impl.extrapolation.init_output_scale_sqrtm()
-    # return solver_factory(strat, output_scale_sqrtm=scale_sqrtm)
+    # scale_sqrtm = impl.extrapolation.init_output_scale()
+    # return solver_factory(strat, output_scale=scale_sqrtm)

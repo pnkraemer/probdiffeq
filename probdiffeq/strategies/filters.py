@@ -54,7 +54,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         extrapolated = self.complete_extrapolation(
             linearisation_pt,
             posterior_previous=p0,
-            output_scale_sqrtm=scale_sqrtm,
+            output_scale=scale_sqrtm,
         )
         return _FilterSol(rv1), extrapolated, extrapolated
 
@@ -102,7 +102,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         self,
         linearisation_pt: _FilterSol,
         *,
-        output_scale_sqrtm,
+        output_scale,
         posterior_previous: _FilterSol,
     ) -> _FilterSol:
         extra = self.implementation.extrapolation
@@ -111,7 +111,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         ssv = extrapolate_fn(
             linearisation_pt=linearisation_pt.ssv,
             p0=posterior_previous.ssv,
-            output_scale_sqrtm=output_scale_sqrtm,
+            output_scale=output_scale,
         )
         return _FilterSol(ssv)
 

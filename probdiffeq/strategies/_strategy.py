@@ -60,7 +60,7 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt: P, *, output_scale_sqrtm, posterior_previous: P
+        self, linearisation_pt: P, *, output_scale, posterior_previous: P
     ):
         raise NotImplementedError
 
@@ -85,6 +85,6 @@ class Strategy(abc.ABC, Generic[P]):
     def init_error_estimate(self):
         return self.implementation.extrapolation.init_error_estimate()
 
-    def init_output_scale_sqrtm(self, *args, **kwargs):
-        init_fn = self.implementation.extrapolation.init_output_scale_sqrtm
+    def init_output_scale(self, *args, **kwargs):
+        init_fn = self.implementation.extrapolation.init_output_scale
         return init_fn(*args, **kwargs)

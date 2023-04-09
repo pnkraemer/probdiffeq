@@ -78,7 +78,7 @@ To translate between the two packages, consider the following:
 * Everything termed `EK0` or `EK1` inProbNumDiffEq.jlis `TS0` or `TS1` in ProbDiffEq ("TS" stands for "Taylor series" linearisation and stands in contrast to "SLR", i.e. "statistical linear regression").
 * ProbNumDiffEq.jl calibrates output scales via `DynamicDiffusion`, `FixedDiffusion`, `DynamicMVDiffusion`, or `FixedMVDiffusion`. 
  Their equivalents in ProbDiffEq are `DynamicSolver()` or `MLESolver()`. Feed them with any strategies (Filters/Smoothers) and any state-space model implementations. Use a block-diagonal one (e.g. `BlockDiagTS0()`) for multivariate output scales ("`MVDiffusion`"). Try the `CalibrationFreeSolver()` with a manual (gradient-based?) calibration if the other routines are unsatisfactory.
-* ProbNumDiffEq.jl refers to `IBM(output_scale_sqrtm=x)` as `IWP(diffusion=x^2)`. They are the same processes. 
+* ProbNumDiffEq.jl refers to `IBM(output_scale=x)` as `IWP(diffusion=x^2)`. They are the same processes. 
 * ProbNumDiffEq.jl switches between filtering and smoothing with a `smooth=true/false` flag. We use different strategies to distinguish between those because this way, it becomes easier to cache reusable quantities for the smoother. 
 * Initialisation schemes like those in `ProbNumDiffEq` are in `probdiffeq/taylor.py`. ProbDiffEq offers some rules for high-order differential equations and some unique methods (e.g. doubling). But the feature lists are relatively similar.
 * The features in [Fenrir.jl](https://github.com/nathanaelbosch/Fenrir.jl), which extends ProbNumDiffEq.jl, should be more or less readily available via `probdiffeq/solution.py`. Check out the tutorial notebooks!

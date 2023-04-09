@@ -63,7 +63,7 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
         cov(smoother_solution.marginals.hidden_state.cov_sqrtm_lower),
     )
     assert _tree_all_allclose(
-        filter_solution.output_scale_sqrtm, smoother_solution.output_scale_sqrtm
+        filter_solution.output_scale, smoother_solution.output_scale
     )
 
 

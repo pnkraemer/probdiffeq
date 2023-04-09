@@ -19,7 +19,7 @@ class _SolveFixedGridConfig(NamedTuple):
     impl_fn: Any
     strat_fn: Any
     solver_config: Any
-    output_scale_sqrtm: Any
+    output_scale: Any
 
 
 @testing.case
@@ -32,7 +32,7 @@ def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
         impl_fn=impl_fn,
         strat_fn=filters.Filter,
         solver_config=solver_config,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -48,7 +48,7 @@ def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
         impl_fn=impl_fn,
         strat_fn=filters.Filter,
         solver_config=solver_config,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -64,7 +64,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
         impl_fn=recipes.ts0_blockdiag,
         strat_fn=strat_fn,
         solver_config=solver_config,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -78,7 +78,7 @@ def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
         impl_fn=recipes.ts0_blockdiag,
         strat_fn=filters.Filter,
         solver_config=solver_config,
-        output_scale_sqrtm=1.0,
+        output_scale=1.0,
     )
 
 
@@ -108,7 +108,7 @@ def fixture_solution_fixed_grid(setup):
         grid=grid,
         parameters=setup.ode_problem.args,
         solver=solver,
-        output_scale_sqrtm=setup.output_scale_sqrtm,
+        output_scale=setup.output_scale,
     )
 
     sol = (solution.t, solution.u)
