@@ -52,7 +52,7 @@ def solve_and_save_at(
     vector_field,
     *,
     u0,
-    posterior,
+    solution,
     save_at,
     solver,
     dt0,
@@ -78,10 +78,7 @@ def solve_and_save_at(
         )
         return s_next, s_next
 
-    t0 = save_at[0]
-    state0 = adaptive_solver.init(
-        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
-    )
+    state0 = adaptive_solver.init(solution, dt0=dt0)
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,

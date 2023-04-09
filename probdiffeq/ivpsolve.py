@@ -41,7 +41,7 @@ def simulate_terminal_values(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
+    posterior = solver.empty_solution_from_tcoeffs(taylor_coefficients)
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -105,8 +105,9 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
-
+    sol = solver.empty_solution_from_tcoeffs(
+        taylor_coefficients, t=t0, output_scale=output_scale
+    )
     if dt0 is None:
         f, u0s = vector_field, initial_values
         nugget = propose_dt0_nugget
@@ -114,7 +115,7 @@ def solve_and_save_at(
 
     return _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
+        solution=sol,
         u0=initial_values[0],
         save_at=save_at,
         solver=solver,
@@ -158,7 +159,7 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
+    posterior = solver.empty_solution_from_tcoeffs(taylor_coefficients)
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -200,7 +201,7 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
+    posterior = solver.empty_solution_from_tcoeffs(taylor_coefficients)
 
     return _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),

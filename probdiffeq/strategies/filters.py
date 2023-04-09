@@ -75,10 +75,10 @@ class Filter(_strategy.Strategy[_FilterSol]):
     def sample(self, key, *, posterior: _FilterSol, shape):
         raise NotImplementedError
 
-    def marginals(self, *, posterior: _FilterSol):
+    def marginals(self, posterior: _FilterSol):
         return posterior.ssv
 
-    def marginals_terminal_value(self, *, posterior: _FilterSol):
+    def marginals_terminal_value(self, posterior: _FilterSol):
         return posterior.ssv
 
     def extract_u_from_posterior(self, posterior: _FilterSol):

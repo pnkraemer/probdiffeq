@@ -16,11 +16,14 @@ class _State(NamedTuple):
     t: Any
     u: Any
     posterior: Any
-    output_scale: Any
     num_data_points: Any
+
+    # Not contained in _State but in Solution: output_scale, marginals.
 
     # Different to solution.Solution():
     error_estimate: Any
+    output_scale_calibrated: Any
+    output_scale_prior: Any
 
 
 @jax.tree_util.register_pytree_node_class
@@ -56,28 +59,67 @@ class AbstractSolver(abc.ABC):
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
-    # todo: change to empty_solution_from_tcoeffs?
-    def posterior_from_tcoeffs(self, taylor_coefficients, /):
+    # # todo: change to empty_solution_from_tcoeffs?
+    # def posterior_from_tcoeffs(self, taylor_coefficients, /):
+    #     posterior = self.strategy.init_posterior(
+    #         taylor_coefficients=taylor_coefficients
+    #     )
+    #     return posterior
+
+    def empty_solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
+        """Construct an initial `Solution` object.
+
+        An (even if empty) solution object is needed to initialise the solver.
+        Thus, this method is kind-of a helper function to make the rest of the
+        initialisation code a bit simpler.
+        """
         posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
         )
-        return posterior
+        u = taylor_coefficients[0]
+        return self.empty_solution_from_posterior(posterior, u=u, **kwargs)
 
-    # todo: rename to init() or init_state_from_posterior()
-    def init(self, posterior, *, t, u, output_scale, num_data_points=1.0) -> _State:
-        # todo: if we `init()` this output scale, should we also `extract()`?
+    def empty_solution_from_posterior(self, posterior, /, *, u, t, output_scale):
         output_scale = self.strategy.init_output_scale(output_scale)
-        error_estimate = self.strategy.init_error_estimate()
-        return _State(
+        return solution.Solution(
             t=t,
-            u=u,
-            error_estimate=error_estimate,
             posterior=posterior,
+            marginals=self.strategy.marginals_terminal_value(posterior),
             output_scale=output_scale,
-            num_data_points=num_data_points,
+            u=u,
+            num_data_points=1.0,
+        )
+
+    def init(self, sol, /) -> _State:
+        # todo: if we `init()` this output scale, should we also `extract()`?
+        error_estimate = self.strategy.init_error_estimate()
+
+        # discard sol.marginals. Add an error estimate instead.
+        return _State(
+            t=sol.t,
+            u=sol.u,
+            error_estimate=error_estimate,
+            posterior=sol.posterior,
+            output_scale_prior=sol.output_scale,
+            output_scale_calibrated=sol.output_scale,
+            num_data_points=sol.num_data_points,
         )
 
     def interpolate_fn(self, *, s0: _State, s1: _State, t):
+        raise RuntimeError(
+            "Next up: wrap strategy.case_interpolate and case_right_corner "
+            "into solver methods that operate on solver states. "
+            "Currently, we lose too much information and need to use functions "
+            "such as make_state, which should absolutely not be necessary."
+            "Once this is done, make dynamic solver use local_scale as BOTH output scales, "
+            "and keep fixing all the tests (we are in the middle of state having "
+            "two different output scales). Then, remove output_scale from step_fn() "
+            "and keep fixing all failing tests. Once this is done, "
+            "we should be ready to look at the Pull request diff "
+            "(as we are done splitting _State from Solution() -- and "
+            "maybe even done with extract(init(solver))?"
+        )
+
         def interpolate(s0_: _State, s1_: _State, t_):
             return self.strategy.case_interpolate(
                 p0=s0_.posterior,
@@ -85,7 +127,7 @@ class AbstractSolver(abc.ABC):
                 t=t_,
                 t0=s0_.t,
                 t1=s1_.t,
-                output_scale=s1.output_scale,
+                output_scale=s1.output_scale_prior,
             )
 
         def right_corner(s0_: _State, s1_: _State, t_):
@@ -96,7 +138,7 @@ class AbstractSolver(abc.ABC):
                 t=t_,
                 t0=s0_.t,
                 t1=s1_.t,
-                output_scale=s1.output_scale,
+                output_scale=s1.output_scale_prior,
             )
 
         # Cases to switch between
@@ -118,6 +160,7 @@ class AbstractSolver(abc.ABC):
                 posterior=p,
                 t=t_,
                 u=self.strategy.extract_u_from_posterior(p),
+                output_scale_calibrated=s1.output_scale,
                 output_scale=s1.output_scale,
                 num_data_points=s1.num_data_points,
             )
@@ -303,14 +346,15 @@ class MLESolver(AbstractSolver):
             posterior_previous=state.posterior,
         )
         # Complete step (incl. calibration!)
-        output_scale, n = state.output_scale, state.num_data_points
         observed, (corrected, _) = self.strategy.complete_correction(
             extrapolated=extrapolated,
             cache_obs=cache_obs,
         )
+        output_scale, n = state.output_scale_calibrated, state.num_data_points
         new_output_scale = self._update_output_scale(
             diffsqrtm=output_scale, n=n, obs=observed
         )
+        # todo: remove output_scale from step_fn() signature.
 
         # Extract and return solution
         u = self.strategy.extract_u_from_posterior(posterior=corrected)
@@ -319,7 +363,8 @@ class MLESolver(AbstractSolver):
             u=u,
             error_estimate=dt * error,
             posterior=corrected,
-            output_scale=new_output_scale,
+            output_scale_prior=state.output_scale_prior,
+            output_scale_calibrated=new_output_scale,
             num_data_points=n + 1,
         )
 
