@@ -12,13 +12,14 @@ from probdiffeq import _sqrt_util, solution
 class _State(NamedTuple):
     """Solver state."""
 
+    # Same as in solution.Solution()
     t: Any
     u: Any
     posterior: Any
     output_scale: Any
     num_data_points: Any
 
-    # Different to solution:
+    # Different to solution.Solution():
     error_estimate: Any
 
 
