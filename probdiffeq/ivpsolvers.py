@@ -146,20 +146,6 @@ class CalibrationFreeSolver(AbstractSolver):
     No automatic output-scale calibration.
     """
 
-    # def __init__(self, strategy, *, output_scale):
-    #     super().__init__(strategy=strategy)
-    #
-    #     # todo: overwrite init_fn()?
-    #     # todo: remove
-    #     self._output_scale = output_scale
-    #
-    # def __repr__(self):
-    #     name = self.__class__.__name__
-    #     args = (
-    #         f"strategy={self.strategy}, output_scale={self._output_scale}"
-    #     )
-    #     return f"{name}({args})"
-
     def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
@@ -227,17 +213,6 @@ class CalibrationFreeSolver(AbstractSolver):
             output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
-
-    #
-    # def tree_flatten(self):
-    #     children = (self.strategy, self._output_scale)
-    #     aux = ()
-    #     return children, aux
-    #
-    # @classmethod
-    # def tree_unflatten(cls, _aux, children):
-    #     (strategy, output_scale) = children
-    #     return cls(strategy=strategy, output_scale=output_scale)
 
 
 @jax.tree_util.register_pytree_node_class
