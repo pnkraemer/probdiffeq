@@ -1,11 +1,25 @@
 """Calibrated IVP solvers."""
 
 import abc
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util, solution
+
+
+class _State(NamedTuple):
+    """Solver state."""
+
+    t: Any
+    u: Any
+    posterior: Any
+    output_scale: Any
+    num_data_points: Any
+
+    # Different to solution:
+    error_estimate: Any
 
 
 @jax.tree_util.register_pytree_node_class
@@ -28,41 +42,44 @@ class AbstractSolver(abc.ABC):
     # Abstract methods
 
     @abc.abstractmethod
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(
+        self, *, state: _State, vector_field, dt, parameters, output_scale
+    ) -> _State:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_fn(self, state, /):
+    def extract_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_terminal_value_fn(self, state, /):
+    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
+    # todo: change to empty_solution_from_tcoeffs?
     def posterior_from_tcoeffs(self, taylor_coefficients, /):
         posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
         )
         return posterior
 
+    # todo: rename to init() or init_state_from_posterior()
     def init_solution_from_posterior(
         self, posterior, *, t, u, output_scale, num_data_points=1.0
-    ):
+    ) -> _State:
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
-        return solution.Solution(
+        return _State(
             t=t,
             u=u,
             error_estimate=error_estimate,
             posterior=posterior,
-            marginals=None,
             output_scale=output_scale,
             num_data_points=num_data_points,
         )
 
-    def interpolate_fn(self, *, s0, s1, t):
-        def interpolate(s0_, s1_, t_):
+    def interpolate_fn(self, *, s0: _State, s1: _State, t):
+        def interpolate(s0_: _State, s1_: _State, t_):
             return self.strategy.case_interpolate(
                 p0=s0_.posterior,
                 rv1=self.strategy.marginals_terminal_value(posterior=s1.posterior),
@@ -72,7 +89,7 @@ class AbstractSolver(abc.ABC):
                 output_scale=s1.output_scale,
             )
 
-        def right_corner(s0_, s1_, t_):
+        def right_corner(s0_: _State, s1_: _State, t_):
             # todo: are all these arguments needed?
             return self.strategy.case_right_corner(
                 p0=s0_.posterior,
@@ -97,7 +114,7 @@ class AbstractSolver(abc.ABC):
         acc, sol, prev = jax.lax.switch(index, branches, s0, s1, t)
 
         # helper function to make code below more readable
-        def make_state(p, t_):
+        def make_state(p, t_) -> _State:
             return self.init_solution_from_posterior(
                 posterior=p,
                 t=t_,
@@ -133,7 +150,9 @@ class CalibrationFreeSolver(AbstractSolver):
     No automatic output-scale calibration.
     """
 
-    def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
+    def step_fn(
+        self, *, state: _State, vector_field, dt, parameters, output_scale
+    ) -> _State:
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -160,41 +179,35 @@ class CalibrationFreeSolver(AbstractSolver):
 
         # Extract and return solution
         u = self.strategy.extract_u_from_posterior(posterior=corrected)
-        filtered = solution.Solution(
+        return _State(
             t=state.t + dt,
             u=u,
             error_estimate=dt * error,
-            marginals=None,
             posterior=corrected,
             output_scale=scale,
             num_data_points=state.num_data_points + 1,
         )
-        return filtered
 
     # todo: move this to the abstract solver and overwrite when necessary?
     #  the dynamic solver uses the same...
-    def extract_fn(self, state, /):
+    def extract_fn(self, state: _State, /) -> solution.Solution:
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
             u=u,  # new!
-            # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, state, /):
+    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
             u=u,  # new!
-            # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale=state.output_scale,
@@ -206,7 +219,9 @@ class CalibrationFreeSolver(AbstractSolver):
 class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
-    def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
+    def step_fn(
+        self, *, state: _State, vector_field, dt, parameters, output_scale
+    ) -> _State:
         del output_scale  # unused
 
         linearisation_pt = self.strategy.begin_extrapolation(
@@ -229,42 +244,33 @@ class DynamicSolver(AbstractSolver):
 
         # Return solution
         u = self.strategy.extract_u_from_posterior(posterior=corrected)
-        smoothing_solution = solution.Solution(
+        return _State(
             t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             posterior=corrected,
-            marginals=None,
             output_scale=output_scale,
             num_data_points=state.num_data_points + 1,
         )
 
-        return smoothing_solution
-
-    def extract_fn(self, state, /):
+    def extract_fn(self, state: _State, /) -> solution.Solution:
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = marginals.extract_qoi()
-
         return solution.Solution(
             t=state.t,
             u=u,  # new!
-            # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale=state.output_scale,
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, state, /):
+    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         u = marginals.extract_qoi()
-
         return solution.Solution(
             t=state.t,
             u=u,  # new!
-            # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=state.posterior,
             output_scale=state.output_scale,
@@ -277,7 +283,9 @@ class MLESolver(AbstractSolver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
-    def step_fn(self, *, state, vector_field, dt, parameters, output_scale):
+    def step_fn(
+        self, *, state: _State, vector_field, dt, parameters, output_scale
+    ) -> _State:
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -307,16 +315,14 @@ class MLESolver(AbstractSolver):
 
         # Extract and return solution
         u = self.strategy.extract_u_from_posterior(posterior=corrected)
-        filtered = solution.Solution(
+        return _State(
             t=state.t + dt,
             u=u,
             error_estimate=dt * error,
-            marginals=None,
             posterior=corrected,
             output_scale=new_output_scale,
             num_data_points=n + 1,
         )
-        return filtered
 
     @staticmethod
     def _update_output_scale(*, diffsqrtm, n, obs):
@@ -335,18 +341,34 @@ class MLESolver(AbstractSolver):
         sum = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
         return sum / jnp.sqrt(n + 1)
 
-    def extract_fn(self, state, /):
+    def extract_fn(self, state: _State, /) -> solution.Solution:
         s = state.output_scale[-1] * jnp.ones_like(state.output_scale)
-        margs = self.strategy.marginals(posterior=state.posterior)
-        return self._rescale(output_scale=s, marginals_unscaled=margs, state=state)
+        marginals = self.strategy.marginals(posterior=state.posterior)
+        state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
+        return solution.Solution(
+            t=state.t,
+            u=state.u,
+            marginals=marginals,  # new!
+            posterior=state.posterior,
+            output_scale=state.output_scale,
+            num_data_points=state.num_data_points,
+        )
 
-    def extract_terminal_value_fn(self, state, /):
+    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         s = state.output_scale
-        margs = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        return self._rescale(output_scale=s, marginals_unscaled=margs, state=state)
+        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
+        return solution.Solution(
+            t=state.t,
+            u=state.u,
+            marginals=marginals,  # new!
+            posterior=state.posterior,
+            output_scale=state.output_scale,
+            num_data_points=state.num_data_points,
+        )
 
     @staticmethod
-    def _rescale(*, output_scale, marginals_unscaled, state):
+    def _rescale_covs(state, /, *, output_scale, marginals_unscaled):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
@@ -367,13 +389,11 @@ class MLESolver(AbstractSolver):
         marginals = marginals_unscaled.scale_covariance(output_scale)
         posterior = state.posterior.scale_covariance(output_scale)
         u = marginals.extract_qoi()
-        return solution.Solution(
+        return _State(
             t=state.t,
             u=u,
-            # error estimate is now irrelevant
-            error_estimate=jnp.empty_like(state.error_estimate),
-            marginals=marginals,  # new!
-            posterior=posterior,  # new!
-            output_scale=output_scale,  # new!
+            posterior=posterior,
+            output_scale=output_scale,
+            error_estimate=None,  # irrelevant, will be removed in next step.
             num_data_points=state.num_data_points,
         )
