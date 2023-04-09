@@ -151,5 +151,5 @@ class _IBM(_collections.AbstractExtrapolation):
         cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
         return _vars.NormalHiddenState(mean, cov_sqrtm_lower)
 
-    def init_output_scale_sqrtm(self):
-        return 1.0
+    def init_output_scale_sqrtm(self, output_scale_sqrtm):
+        return output_scale_sqrtm

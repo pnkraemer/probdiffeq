@@ -182,17 +182,27 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
     @jax.jit
-    def step_fn(self, state, vector_field, t1, parameters):
+    def step_fn(self, state, vector_field, t1, parameters, output_scale_sqrtm):
         """Perform a full step (including acceptance/rejection)."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
             lambda s: self._rejection_loop(
-                state0=s, vector_field=vector_field, t1=t1, parameters=parameters
+                state0=s,
+                vector_field=vector_field,
+                t1=t1,
+                parameters=parameters,
+                output_scale_sqrtm=output_scale_sqrtm,
             ),
             lambda s: s,
             state,
         )
+
+        # todo: which output scale does this interpolation use?
+        #  the MLE solver should use the prior one, but it looks like
+        #  we are using the calibrated scale.
+        #  to test this, assert that MLESolver and calibrated_solver(mle) are IDENTICAL.
+        #  they will not be if the configuration is such that interpolation matters.
         state = jax.lax.cond(
             state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
@@ -201,7 +211,9 @@ class AdaptiveIVPSolver(Generic[T]):
         )
         return state
 
-    def _rejection_loop(self, *, vector_field, state0, t1, parameters):
+    def _rejection_loop(
+        self, *, vector_field, state0, t1, parameters, output_scale_sqrtm
+    ):
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
@@ -209,7 +221,11 @@ class AdaptiveIVPSolver(Generic[T]):
         def body_fn(x):
             _, s = x
             s = self._attempt_step_fn(
-                state=s, vector_field=vector_field, t1=t1, parameters=parameters
+                state=s,
+                vector_field=vector_field,
+                t1=t1,
+                parameters=parameters,
+                output_scale_sqrtm=output_scale_sqrtm,
             )
             proceed_iteration = s.error_norm_proposed > 1.0
             return proceed_iteration, s
@@ -227,7 +243,9 @@ class AdaptiveIVPSolver(Generic[T]):
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, vector_field, t1, parameters):
+    def _attempt_step_fn(
+        self, *, state, vector_field, t1, parameters, output_scale_sqrtm
+    ):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
@@ -242,6 +260,7 @@ class AdaptiveIVPSolver(Generic[T]):
             vector_field=vector_field,
             dt=self.control.extract_dt_from_state(state_control),
             parameters=parameters,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(

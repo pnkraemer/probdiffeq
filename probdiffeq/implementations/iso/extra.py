@@ -71,6 +71,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
+    # todo: why does this method have the same name as the above?
     def init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
         (d,) = ode_shape
@@ -82,8 +83,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 
-    def init_output_scale_sqrtm(self):
-        return 1.0
+    def init_output_scale_sqrtm(self, output_scale_sqrtm):
+        print("Next: rename output scale sqrtm to output scale.")
+        return output_scale_sqrtm
 
     def begin_extrapolation(
         self, p0: _vars.IsoStateSpaceVar, /, dt

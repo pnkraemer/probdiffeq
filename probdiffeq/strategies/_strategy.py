@@ -85,5 +85,6 @@ class Strategy(abc.ABC, Generic[P]):
     def init_error_estimate(self):
         return self.implementation.extrapolation.init_error_estimate()
 
-    def init_output_scale_sqrtm(self):
-        return self.implementation.extrapolation.init_output_scale_sqrtm()
+    def init_output_scale_sqrtm(self, *args, **kwargs):
+        init_fn = self.implementation.extrapolation.init_output_scale_sqrtm
+        return init_fn(*args, **kwargs)

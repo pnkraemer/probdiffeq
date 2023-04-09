@@ -22,6 +22,7 @@ def simulate_terminal_values(
     solver,
     parameters,
     dt0,
+    output_scale_sqrtm,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
     **options
@@ -31,7 +32,10 @@ def simulate_terminal_values(
     )
 
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients, t0=t0, dt0=dt0
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        dt0=dt0,
+        output_scale_sqrtm=output_scale_sqrtm,
     )
 
     solution = _advance_ivp_solution_adaptively(
@@ -41,6 +45,7 @@ def simulate_terminal_values(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
+        output_scale_sqrtm=output_scale_sqrtm,
     )
     _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
     return sol
@@ -88,7 +93,14 @@ def solve_and_save_at(
 
 
 def _advance_ivp_solution_adaptively(
-    vector_field, t1, state0, adaptive_solver, parameters, while_loop_fn
+    *,
+    vector_field,
+    t1,
+    state0,
+    adaptive_solver,
+    parameters,
+    while_loop_fn,
+    output_scale_sqrtm
 ):
     """Advance an IVP solution to the next state."""
 
@@ -97,7 +109,11 @@ def _advance_ivp_solution_adaptively(
 
     def body_fun(s):
         state = adaptive_solver.step_fn(
-            state=s, vector_field=vector_field, t1=t1, parameters=parameters
+            state=s,
+            vector_field=vector_field,
+            t1=t1,
+            parameters=parameters,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
         return state
 

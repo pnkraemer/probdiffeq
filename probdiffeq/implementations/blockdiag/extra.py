@@ -69,8 +69,11 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         return jax.vmap(type(self.extra).init_error_estimate)(self.extra)
 
     # todo: move to correction?
-    def init_output_scale_sqrtm(self):
-        return jax.vmap(type(self.extra).init_output_scale_sqrtm)(self.extra)
+    def init_output_scale_sqrtm(self, output_scale_sqrtm):
+        # broadcast to shape (d,)
+        output_scale_sqrtm = output_scale_sqrtm * jnp.ones(self.ode_shape)
+        fn_vmap = jax.vmap(type(self.extra).init_output_scale_sqrtm)
+        return fn_vmap(self.extra, output_scale_sqrtm)
 
     def complete_extrapolation_with_reversal(
         self, linearisation_pt, p0, output_scale_sqrtm

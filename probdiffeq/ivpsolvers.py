@@ -39,13 +39,25 @@ class AbstractSolver(abc.ABC):
     def extract_terminal_value_fn(self, state, /):
         raise NotImplementedError
 
-    def init_fn(self, *, taylor_coefficients, t0):
+    def init_fn(self, *, taylor_coefficients, t0, output_scale_sqrtm):
         posterior = self.strategy.init_posterior(
             taylor_coefficients=taylor_coefficients
         )
         u = self.strategy.extract_u_from_posterior(posterior=posterior)
 
-        scale_sqrtm = self.strategy.init_output_scale_sqrtm()
+        # raise RuntimeError(
+        #     "Next: complete making init_output_scale have an input argument "
+        #     "(which promotes to appropriate shapes or whatever. "
+        #     "As a result, if this goes through, we will have "
+        #     "a clean way of enforcing solver_parameters in every solve() "
+        #     "method and are one step closer to x = extract(init(x)). "
+        #     "The first step is to make output_scale_sqrtm an input "
+        #     "to the init_fn() we are currently in. "
+        #     "Then, fix errors. Then, see whether we can make "
+        #     "ivpsolver._init_state_from_posterior the ivpsolvers.init_fn() "
+        #     "already (and if not, keep fixing until we can)."
+        # )
+        scale_sqrtm = self.strategy.init_output_scale_sqrtm(output_scale_sqrtm)
         error_estimate = self.strategy.init_error_estimate()
 
         sol = solution.Solution(
@@ -104,6 +116,9 @@ class AbstractSolver(abc.ABC):
                 output_scale_sqrtm=s1.output_scale_sqrtm,
             )
 
+        # todo: which output scale is used for MLESolver interpolation
+        #  _during_ the simulation? hopefully the prior one!
+
         previous = make_state(prev, t)
         solution_ = make_state(sol, t)
         accepted = make_state(acc, jnp.maximum(s1.t, t))
@@ -114,6 +129,7 @@ class AbstractSolver(abc.ABC):
     def _init_state_from_posterior(
         self, posterior, *, t, num_data_points, output_scale_sqrtm
     ):
+        output_scale_sqrtm = self.strategy.init_output_scale_sqrtm(output_scale_sqrtm)
         return solution.Solution(
             t=t,
             u=self.strategy.extract_u_from_posterior(posterior=posterior),
@@ -142,20 +158,21 @@ class CalibrationFreeSolver(AbstractSolver):
     No automatic output-scale calibration.
     """
 
-    def __init__(self, strategy, *, output_scale_sqrtm):
-        super().__init__(strategy=strategy)
+    # def __init__(self, strategy, *, output_scale_sqrtm):
+    #     super().__init__(strategy=strategy)
+    #
+    #     # todo: overwrite init_fn()?
+    #     # todo: remove
+    #     self._output_scale_sqrtm = output_scale_sqrtm
+    #
+    # def __repr__(self):
+    #     name = self.__class__.__name__
+    #     args = (
+    #         f"strategy={self.strategy}, output_scale_sqrtm={self._output_scale_sqrtm}"
+    #     )
+    #     return f"{name}({args})"
 
-        # todo: overwrite init_fn()?
-        self._output_scale_sqrtm = output_scale_sqrtm
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        args = (
-            f"strategy={self.strategy}, output_scale_sqrtm={self._output_scale_sqrtm}"
-        )
-        return f"{name}({args})"
-
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters, output_scale_sqrtm):
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -167,9 +184,10 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
         # Post-error-estimate steps
+        scale = self.strategy.init_output_scale_sqrtm(output_scale_sqrtm)
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
+            output_scale_sqrtm=scale,
             posterior_previous=state.posterior,
         )
 
@@ -187,7 +205,7 @@ class CalibrationFreeSolver(AbstractSolver):
             error_estimate=dt * error,
             marginals=None,
             posterior=corrected,
-            output_scale_sqrtm=self._output_scale_sqrtm,  # todo: use from state?
+            output_scale_sqrtm=scale,
             num_data_points=state.num_data_points + 1,
         )
         return filtered
@@ -222,15 +240,16 @@ class CalibrationFreeSolver(AbstractSolver):
             num_data_points=state.num_data_points,
         )
 
-    def tree_flatten(self):
-        children = (self.strategy, self._output_scale_sqrtm)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (strategy, output_scale_sqrtm) = children
-        return cls(strategy=strategy, output_scale_sqrtm=output_scale_sqrtm)
+    #
+    # def tree_flatten(self):
+    #     children = (self.strategy, self._output_scale_sqrtm)
+    #     aux = ()
+    #     return children, aux
+    #
+    # @classmethod
+    # def tree_unflatten(cls, _aux, children):
+    #     (strategy, output_scale_sqrtm) = children
+    #     return cls(strategy=strategy, output_scale_sqrtm=output_scale_sqrtm)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -306,7 +325,7 @@ class MLESolver(AbstractSolver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
-    def step_fn(self, *, state, vector_field, dt, parameters):
+    def step_fn(self, *, state, vector_field, dt, parameters, output_scale_sqrtm):
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -318,9 +337,10 @@ class MLESolver(AbstractSolver):
         )
 
         # Post-error-estimate steps
+        scale = self.strategy.init_output_scale_sqrtm(output_scale_sqrtm)
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            output_scale_sqrtm=self.strategy.init_output_scale_sqrtm(),
+            output_scale_sqrtm=scale,
             posterior_previous=state.posterior,
         )
         # Complete step (incl. calibration!)
