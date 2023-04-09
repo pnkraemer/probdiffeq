@@ -156,15 +156,25 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
     yield state
 
 
-def solve_fixed_grid(vector_field, taylor_coefficients, grid, solver, parameters):
+def solve_fixed_grid(
+    vector_field, taylor_coefficients, grid, solver, parameters, output_scale_sqrtm
+):
     t0 = grid[0]
-    state = solver.init_fn(taylor_coefficients=taylor_coefficients, t0=t0)
+    state = solver.init_fn(
+        taylor_coefficients=taylor_coefficients,
+        t0=t0,
+        output_scale_sqrtm=output_scale_sqrtm,
+    )
 
     def body_fn(carry, t_new):
         s, t_old = carry
         dt = t_new - t_old
         s_new = solver.step_fn(
-            state=s, vector_field=vector_field, dt=dt, parameters=parameters
+            state=s,
+            vector_field=vector_field,
+            dt=dt,
+            parameters=parameters,
+            output_scale_sqrtm=output_scale_sqrtm,
         )
         return (s_new, t_new), (s_new, t_new)
 

@@ -174,6 +174,7 @@ def solve_fixed_grid(
     initial_values,
     grid,
     solver,
+    output_scale_sqrtm=1.0,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     **options,
@@ -196,6 +197,7 @@ def solve_fixed_grid(
         grid=grid,
         solver=solver,
         parameters=parameters,
+        output_scale_sqrtm=output_scale_sqrtm,
         **options,
     )
 
