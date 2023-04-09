@@ -16,7 +16,7 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field,
     *,
-    taylor_coefficients,
+    posterior,
     t0,
     t1,
     solver,
@@ -32,7 +32,7 @@ def simulate_terminal_values(
     )
 
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         t0=t0,
         dt0=dt0,
         output_scale=output_scale,
@@ -54,7 +54,7 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field,
     *,
-    taylor_coefficients,
+    posterior,
     save_at,
     solver,
     dt0,
@@ -82,7 +82,7 @@ def solve_and_save_at(
 
     t0 = save_at[0]
     state0 = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         t0=t0,
         dt0=dt0,
         output_scale=output_scale,
@@ -132,21 +132,12 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field,
-    *,
-    taylor_coefficients,
-    t0,
-    t1,
-    solver,
-    dt0,
-    parameters,
-    output_scale,
-    **options
+    vector_field, *, posterior, t0, t1, solver, dt0, parameters, output_scale, **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state = adaptive_solver.init(
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         t0=t0,
         dt0=dt0,
         output_scale=output_scale,
@@ -182,11 +173,11 @@ def _solution_generator(
 
 
 def solve_fixed_grid(
-    vector_field, *, taylor_coefficients, grid, solver, parameters, output_scale
+    vector_field, *, posterior, grid, solver, parameters, output_scale
 ):
     t0 = grid[0]
     state = solver.init_fn(
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         t0=t0,
         output_scale=output_scale,
     )

@@ -41,6 +41,7 @@ def simulate_terminal_values(
         t=t0,
         parameters=parameters,
     )
+    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -50,7 +51,7 @@ def simulate_terminal_values(
     # todo: should we already make the solver adaptive here?
     return _ivpsolve_impl.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         t0=t0,
         t1=t1,
         solver=solver,
@@ -103,6 +104,7 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
+    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -111,7 +113,7 @@ def solve_and_save_at(
 
     return _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         save_at=save_at,
         solver=solver,
         dt0=dt0,
@@ -154,6 +156,7 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
+    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -162,7 +165,7 @@ def solve_with_python_while_loop(
 
     return _ivpsolve_impl.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         t0=t0,
         t1=t1,
         solver=solver,
@@ -194,10 +197,11 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
+    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
 
     return _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        taylor_coefficients=taylor_coefficients,
+        posterior=posterior,
         grid=grid,
         solver=solver,
         parameters=parameters,
