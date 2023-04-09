@@ -16,6 +16,7 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field,
     *,
+    u0,
     posterior,
     t0,
     t1,
@@ -32,12 +33,8 @@ def simulate_terminal_values(
     )
 
     state0 = adaptive_solver.init(
-        posterior=posterior,
-        t0=t0,
-        dt0=dt0,
-        output_scale=output_scale,
+        posterior=posterior, u=u0, t=t0, dt0=dt0, output_scale=output_scale
     )
-
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
@@ -54,6 +51,7 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field,
     *,
+    u0,
     posterior,
     save_at,
     solver,
@@ -82,10 +80,7 @@ def solve_and_save_at(
 
     t0 = save_at[0]
     state0 = adaptive_solver.init(
-        posterior=posterior,
-        t0=t0,
-        dt0=dt0,
-        output_scale=output_scale,
+        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
     )
 
     _, solution = _control_flow.scan_with_init(
@@ -132,15 +127,22 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, *, posterior, t0, t1, solver, dt0, parameters, output_scale, **options
+    vector_field,
+    *,
+    u0,
+    posterior,
+    t0,
+    t1,
+    solver,
+    dt0,
+    parameters,
+    output_scale,
+    **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
     state = adaptive_solver.init(
-        posterior=posterior,
-        t0=t0,
-        dt0=dt0,
-        output_scale=output_scale,
+        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
     )
     generator = _solution_generator(
         vector_field,
@@ -173,14 +175,10 @@ def _solution_generator(
 
 
 def solve_fixed_grid(
-    vector_field, *, posterior, grid, solver, parameters, output_scale
+    vector_field, *, u0, posterior, grid, solver, parameters, output_scale
 ):
     t0 = grid[0]
-    state = solver.init_fn(
-        posterior=posterior,
-        t0=t0,
-        output_scale=output_scale,
-    )
+    state = solver.init_fn(posterior=posterior, t=t0, u=u0, output_scale=output_scale)
 
     def body_fn(carry, t_new):
         s, t_old = carry

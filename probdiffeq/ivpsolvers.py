@@ -45,15 +45,13 @@ class AbstractSolver(abc.ABC):
         )
         return posterior
 
-    def init_fn(self, *, posterior, t0, output_scale):
-        u = self.strategy.extract_u_from_posterior(posterior=posterior)
-
+    def init_fn(self, *, posterior, t, u, output_scale):
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
 
-        sol = solution.Solution(
-            t=t0,
+        return solution.Solution(
+            t=t,
             u=u,
             error_estimate=error_estimate,
             posterior=posterior,
@@ -61,8 +59,6 @@ class AbstractSolver(abc.ABC):
             output_scale=output_scale,
             num_data_points=1.0,
         )
-
-        return sol
 
     def interpolate_fn(self, *, s0, s1, t):
         def interpolate(s0_, s1_, t_):

@@ -52,6 +52,7 @@ def simulate_terminal_values(
     return _ivpsolve_impl.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         posterior=posterior,
+        u0=initial_values[0],
         t0=t0,
         t1=t1,
         solver=solver,
@@ -114,6 +115,7 @@ def solve_and_save_at(
     return _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         posterior=posterior,
+        u0=initial_values[0],
         save_at=save_at,
         solver=solver,
         dt0=dt0,
@@ -166,6 +168,7 @@ def solve_with_python_while_loop(
     return _ivpsolve_impl.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
         posterior=posterior,
+        u0=initial_values[0],
         t0=t0,
         t1=t1,
         solver=solver,
@@ -202,6 +205,7 @@ def solve_fixed_grid(
     return _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         posterior=posterior,
+        u0=initial_values[0],
         grid=grid,
         solver=solver,
         parameters=parameters,
