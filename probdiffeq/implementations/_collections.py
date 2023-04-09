@@ -40,7 +40,7 @@ class AbstractNormal(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_covariance(self, scale_sqrtm):
+    def scale_covariance(self, output_scale):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -93,7 +93,7 @@ class StateSpaceVar(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def scale_covariance(self, scale_sqrtm):
+    def scale_covariance(self, output_scale):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -165,7 +165,7 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     def __call__(self, x, /):
         raise NotImplementedError
 
-    def scale_covariance(self, scale_sqrtm):
+    def scale_covariance(self, output_scale):
         raise NotImplementedError
 
     def merge_with_incoming_conditional(self, incoming, /):

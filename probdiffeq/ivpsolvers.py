@@ -57,7 +57,7 @@ class AbstractSolver(abc.ABC):
         #     "ivpsolver._init_state_from_posterior the ivpsolvers.init_fn() "
         #     "already (and if not, keep fixing until we can)."
         # )
-        scale_sqrtm = self.strategy.init_output_scale(output_scale)
+        output_scale = self.strategy.init_output_scale(output_scale)
         error_estimate = self.strategy.init_error_estimate()
 
         sol = solution.Solution(
@@ -66,7 +66,7 @@ class AbstractSolver(abc.ABC):
             error_estimate=error_estimate,
             posterior=posterior,
             marginals=None,
-            output_scale=scale_sqrtm,
+            output_scale=output_scale,
             num_data_points=1.0,
         )
 
@@ -80,7 +80,7 @@ class AbstractSolver(abc.ABC):
                 t=t_,
                 t0=s0_.t,
                 t1=s1_.t,
-                scale_sqrtm=s1.output_scale,
+                output_scale=s1.output_scale,
             )
 
         def right_corner(s0_, s1_, t_):
@@ -91,7 +91,7 @@ class AbstractSolver(abc.ABC):
                 t=t_,
                 t0=s0_.t,
                 t1=s1_.t,
-                scale_sqrtm=s1.output_scale,
+                output_scale=s1.output_scale,
             )
 
         # Cases to switch between
@@ -262,14 +262,14 @@ class DynamicSolver(AbstractSolver):
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
-        error, scale_sqrtm, cache_obs = self.strategy.begin_correction(
+        error, output_scale, cache_obs = self.strategy.begin_correction(
             linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
             posterior_previous=state.posterior,
-            output_scale=scale_sqrtm,
+            output_scale=output_scale,
         )
 
         # Final observation
@@ -285,7 +285,7 @@ class DynamicSolver(AbstractSolver):
             error_estimate=dt * error,
             posterior=corrected,
             marginals=None,
-            output_scale=scale_sqrtm,
+            output_scale=output_scale,
             num_data_points=state.num_data_points + 1,
         )
 
@@ -388,15 +388,15 @@ class MLESolver(AbstractSolver):
     def extract_fn(self, state, /):
         s = state.output_scale[-1] * jnp.ones_like(state.output_scale)
         margs = self.strategy.marginals(posterior=state.posterior)
-        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
+        return self._rescale(output_scale=s, marginals_unscaled=margs, state=state)
 
     def extract_terminal_value_fn(self, state, /):
         s = state.output_scale
         margs = self.strategy.marginals_terminal_value(posterior=state.posterior)
-        return self._rescale(scale_sqrtm=s, marginals_unscaled=margs, state=state)
+        return self._rescale(output_scale=s, marginals_unscaled=margs, state=state)
 
     @staticmethod
-    def _rescale(*, scale_sqrtm, marginals_unscaled, state):
+    def _rescale(*, output_scale, marginals_unscaled, state):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
@@ -406,7 +406,7 @@ class MLESolver(AbstractSolver):
         #      def is_leaf(x):
         #          return isinstance(x, AbstractNormal)
         #      def fn(x: AbstractNormal):
-        #          return x.scale_covariance(scale_sqrtm)
+        #          return x.scale_covariance(output_scale)
         #      return tree_map(fn, tree, is_leaf=is_leaf)
         #  marginals = scale_cov(marginals_unscaled)
         #  posterior = scale_cov(state.posterior)
@@ -414,8 +414,8 @@ class MLESolver(AbstractSolver):
         #  in intermediate objects
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
-        marginals = marginals_unscaled.scale_covariance(scale_sqrtm)
-        posterior = state.posterior.scale_covariance(scale_sqrtm)
+        marginals = marginals_unscaled.scale_covariance(output_scale)
+        posterior = state.posterior.scale_covariance(output_scale)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -424,6 +424,6 @@ class MLESolver(AbstractSolver):
             error_estimate=jnp.empty_like(state.error_estimate),
             marginals=marginals,  # new!
             posterior=posterior,  # new!
-            output_scale=scale_sqrtm,  # new!
+            output_scale=output_scale,  # new!
             num_data_points=state.num_data_points,
         )

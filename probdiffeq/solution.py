@@ -155,7 +155,7 @@ def _offgrid_marginals(*, solution, t, solution_previous, solver):
         t=t,
         t0=solution_previous.t,
         t1=solution.t,
-        scale_sqrtm=solution.output_scale,
+        output_scale=solution.output_scale,
     )
 
 

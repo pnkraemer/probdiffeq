@@ -27,8 +27,8 @@ class NormalQOI(_collections.AbstractNormal):
     def extract_qoi_from_sample(self, u, /):
         raise NotImplementedError
 
-    def scale_covariance(self, scale_sqrtm):
-        return NormalQOI(self.mean, scale_sqrtm * self.cov_sqrtm_lower)
+    def scale_covariance(self, output_scale):
+        return NormalQOI(self.mean, output_scale * self.cov_sqrtm_lower)
 
     def logpdf(self, u, /):
         if jnp.ndim(u) > 0:
@@ -94,8 +94,8 @@ class StateSpaceVar(_collections.StateSpaceVar):
             return u[0]
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
-    def scale_covariance(self, scale_sqrtm):
-        rv = self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+    def scale_covariance(self, output_scale):
+        rv = self.hidden_state.scale_covariance(output_scale=output_scale)
         return StateSpaceVar(rv, cache=self.cache)
 
     def marginal_nth_derivative(self, n):
@@ -125,10 +125,10 @@ class NormalHiddenState(_collections.AbstractNormal):
     def mahalanobis_norm(self, u, /):
         raise NotImplementedError
 
-    def scale_covariance(self, scale_sqrtm):
+    def scale_covariance(self, output_scale):
         return NormalHiddenState(
             mean=self.mean,
-            cov_sqrtm_lower=scale_sqrtm[..., None, None] * self.cov_sqrtm_lower,
+            cov_sqrtm_lower=output_scale[..., None, None] * self.cov_sqrtm_lower,
         )
 
     def transform_unit_sample(self, base, /):

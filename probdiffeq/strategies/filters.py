@@ -40,12 +40,12 @@ class Filter(_strategy.Strategy[_FilterSol]):
     # todo: make interpolation result into a named-tuple.
     #  it is too confusing what those three posteriors mean.
     def case_right_corner(
-        self, *, p0: _FilterSol, p1: _FilterSol, t, t0, t1, scale_sqrtm
+        self, *, p0: _FilterSol, p1: _FilterSol, t, t0, t1, output_scale
     ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:  # s1.t == t
         return p1, p1, p1
 
     def case_interpolate(
-        self, *, p0: _FilterSol, rv1, t0, t, t1, scale_sqrtm
+        self, *, p0: _FilterSol, rv1, t0, t, t1, output_scale
     ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
@@ -54,12 +54,12 @@ class Filter(_strategy.Strategy[_FilterSol]):
         extrapolated = self.complete_extrapolation(
             linearisation_pt,
             posterior_previous=p0,
-            output_scale=scale_sqrtm,
+            output_scale=output_scale,
         )
         return _FilterSol(rv1), extrapolated, extrapolated
 
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: _FilterSol, t0, t1, scale_sqrtm
+        self, *, t, marginals, posterior_previous: _FilterSol, t0, t1, output_scale
     ) -> Tuple[jax.Array, _FilterSol]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
@@ -67,7 +67,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
             p0=posterior_previous,
             t0=t0,
             t1=t1,
-            scale_sqrtm=scale_sqrtm,
+            output_scale=output_scale,
         )
         u = self.extract_u_from_posterior(posterior=sol)
         return u, sol

@@ -68,8 +68,8 @@ class IsoConditionalHiddenState(_IsoConditional):
         rv = _vars.IsoNormalHiddenState(mean=m_new, cov_sqrtm_lower=l_new)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    def scale_covariance(self, scale_sqrtm):
-        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+    def scale_covariance(self, output_scale):
+        noise = self.noise.scale_covariance(output_scale=output_scale)
         return IsoConditionalHiddenState(transition=self.transition, noise=noise)
 
 

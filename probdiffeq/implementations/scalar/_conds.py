@@ -40,8 +40,8 @@ class ConditionalHiddenState(_Conditional):
         rv = _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
         return _vars.StateSpaceVar(rv, cache=None)
 
-    def scale_covariance(self, scale_sqrtm):
-        noise = self.noise.scale_covariance(scale_sqrtm=scale_sqrtm)
+    def scale_covariance(self, output_scale):
+        noise = self.noise.scale_covariance(output_scale=output_scale)
         return ConditionalHiddenState(transition=self.transition, noise=noise)
 
     def merge_with_incoming_conditional(self, incoming, /):

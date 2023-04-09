@@ -98,10 +98,10 @@ taylor_coefficients = jnp.reshape(
 
 
 @jax.jit
-def extrapolate_fn(rv, model, dt, scale_sqrtm):
+def extrapolate_fn(rv, model, dt, output_scale):
     ssv = model.begin_extrapolation(rv, dt)
     rv = model.complete_extrapolation_without_reversal(
-        ssv, p0=rv, output_scale=scale_sqrtm
+        ssv, p0=rv, output_scale=output_scale
     )
     return rv
 

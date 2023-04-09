@@ -35,8 +35,8 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
         return u[..., 0, :]
 
-    def scale_covariance(self, scale_sqrtm):
-        rv = self.hidden_state.scale_covariance(scale_sqrtm=scale_sqrtm)
+    def scale_covariance(self, output_scale):
+        rv = self.hidden_state.scale_covariance(output_scale=output_scale)
         return IsoStateSpaceVar(rv, cache=self.cache)
 
     def marginal_nth_derivative(self, n):
@@ -66,8 +66,8 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
     def mahalanobis_norm(self, u, /) -> jax.Array:
         raise NotImplementedError
 
-    def scale_covariance(self, scale_sqrtm):
-        cov_sqrtm_lower = scale_sqrtm[..., None, None] * self.cov_sqrtm_lower
+    def scale_covariance(self, output_scale):
+        cov_sqrtm_lower = output_scale[..., None, None] * self.cov_sqrtm_lower
         return IsoNormalHiddenState(mean=self.mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
     def transform_unit_sample(self, base, /) -> jax.Array:
@@ -100,8 +100,8 @@ class IsoNormalQOI(_collections.AbstractNormal):
         res_white = (obs_pt - u) / l_obs
         return res_white
 
-    def scale_covariance(self, scale_sqrtm):
-        cov_sqrtm_lower = scale_sqrtm[..., None] * self.cov_sqrtm_lower
+    def scale_covariance(self, output_scale):
+        cov_sqrtm_lower = output_scale[..., None] * self.cov_sqrtm_lower
         return IsoNormalQOI(mean=self.mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
     def transform_unit_sample(self, base, /) -> jax.Array:
