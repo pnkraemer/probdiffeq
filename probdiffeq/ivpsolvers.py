@@ -59,23 +59,24 @@ class AbstractSolver(abc.ABC):
             parameters=parameters,
             vector_field=vector_field,
         )
-        # output_extra = self.strategy.begin_extrapolation(state.strategy, dt=dt)
-        # output_corr = self.strategy.begin_correction(
-        #     output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
-        # )
-        # return output_extra, output_corr
 
     def _strategy_complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        extrapolated = self.strategy.complete_extrapolation(
+        return self.strategy.complete(
             output_extra,
-            state_previous=state.strategy,
+            state.strategy,
             output_scale=output_scale,
+            cache_obs=cache_obs,
         )
-        # Final observation
-        observed, (corrected, _) = self.strategy.complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return observed, corrected
+        # extrapolated = self.strategy.complete_extrapolation(
+        #     output_extra,
+        #     state_previous=state.strategy,
+        #     output_scale=output_scale,
+        # )
+        # # Final observation
+        # observed, (corrected, _) = self.strategy.complete_correction(
+        #     extrapolated, cache_obs=cache_obs
+        # )
+        # return observed, corrected
 
     @abc.abstractmethod
     def extract_fn(self, state: _State, /) -> solution.Solution:

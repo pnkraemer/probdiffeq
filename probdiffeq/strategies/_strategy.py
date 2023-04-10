@@ -114,3 +114,15 @@ class Strategy(abc.ABC, Generic[S, P]):
             output_extra, vector_field=vector_field, t=t + dt, p=parameters
         )
         return output_extra, output_corr
+
+    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        extrapolated = self.complete_extrapolation(
+            output_extra,
+            state_previous=state,
+            output_scale=output_scale,
+        )
+        # Final observation
+        observed, (corrected, _) = self.complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
