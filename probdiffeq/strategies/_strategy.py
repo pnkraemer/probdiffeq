@@ -37,11 +37,11 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginals(self, posterior: P):  # todo: rename to marginalise?
+    def extract_marginals(self, posterior: P):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginals_terminal_value(self, posterior: P):  # todo: rename to marginalise?
+    def extract_marginals_terminal_values(self, posterior: P):
         raise NotImplementedError
 
     @abc.abstractmethod
