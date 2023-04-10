@@ -228,25 +228,23 @@ class CalibrationFreeSolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
-        linearisation_pt = self.strategy.begin_extrapolation(
-            posterior=state.posterior, dt=dt
-        )
+        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             output_scale=state.output_scale_prior,
             posterior_previous=state.posterior,
         )
 
         # Complete step (incl. calibration!)
         _, (corrected, _) = self.strategy.complete_correction(
-            extrapolated=extrapolated,
+            extrapolated,
             cache_obs=cache_obs,
         )
 
@@ -298,22 +296,20 @@ class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        linearisation_pt = self.strategy.begin_extrapolation(
-            posterior=state.posterior, dt=dt
-        )
+        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
         error, output_scale, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             posterior_previous=state.posterior,
             output_scale=output_scale,
         )
 
         # Final observation
         _, (corrected, _) = self.strategy.complete_correction(
-            extrapolated=extrapolated, cache_obs=cache_obs
+            extrapolated, cache_obs=cache_obs
         )
 
         # Return solution
@@ -362,24 +358,22 @@ class MLESolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
-        linearisation_pt = self.strategy.begin_extrapolation(
-            posterior=state.posterior, dt=dt
-        )
+        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             output_scale=state.output_scale_prior,
             posterior_previous=state.posterior,
         )
         # Complete step (incl. calibration!)
         observed, (corrected, _) = self.strategy.complete_correction(
-            extrapolated=extrapolated,
+            extrapolated,
             cache_obs=cache_obs,
         )
         output_scale, n = state.output_scale_calibrated, state.num_data_points
