@@ -65,7 +65,7 @@ class AbstractSolver(abc.ABC):
         initialisation code a bit simpler.
         """
         # todo: this should not call init(), but strategy.sol_from_tcoeffs()!
-        posterior = self.strategy.init(taylor_coefficients=taylor_coefficients)
+        posterior = self.strategy.solution_from_tcoeffs(taylor_coefficients)
         u = taylor_coefficients[0]
 
         # todo: if we `init()` this output scale, should we also `extract()`?
@@ -86,11 +86,12 @@ class AbstractSolver(abc.ABC):
 
     def init(self, sol, /) -> _State:
         error_estimate = self.strategy.init_error_estimate()
+        strategy_state = self.strategy.init(sol.posterior)
         return _State(
             t=sol.t,
             u=sol.u,
             error_estimate=error_estimate,
-            strategy=sol.posterior,
+            strategy=strategy_state,
             output_scale_prior=sol.output_scale,
             output_scale_calibrated=sol.output_scale,
             num_data_points=sol.num_data_points,
@@ -150,7 +151,9 @@ class AbstractSolver(abc.ABC):
 
     def _interp_make_state(self, state_strategy, *, t, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        u = self.strategy.extract_u(state_strategy)
+
+        posterior = self.strategy.extract(state_strategy)
+        u = self.strategy.extract_u(posterior)
         return _State(
             strategy=state_strategy,
             t=t,
@@ -202,7 +205,8 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u(corrected)
+        posterior = self.strategy.extract(corrected)
+        u = self.strategy.extract_u(posterior)
         return _State(
             t=state.t + dt,
             u=u,
@@ -268,7 +272,8 @@ class DynamicSolver(AbstractSolver):
         )
 
         # Return solution
-        u = self.strategy.extract_u(corrected)
+        posterior = self.strategy.extract(corrected)
+        u = self.strategy.extract_u(posterior)
         return _State(
             t=state.t + dt,
             u=u,
@@ -339,7 +344,8 @@ class MLESolver(AbstractSolver):
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u(corrected)
+        posterior = self.strategy.extract(corrected)
+        u = self.strategy.extract_u(posterior)
         return _State(
             t=state.t + dt,
             u=u,

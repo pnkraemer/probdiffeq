@@ -2,7 +2,7 @@
 
 import abc
 import functools
-from typing import Any, Generic, Tuple, TypeVar
+from typing import Any, Generic, NamedTuple, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -37,11 +37,6 @@ class MarkovSequence(Generic[S]):
     def tree_unflatten(cls, _aux, children):
         init, backward_model = children
         return cls(init=init, backward_model=backward_model)
-
-    def scale_covariance(self, output_scale):
-        bw_model = self.backward_model.scale_covariance(output_scale)
-        init = self.init.scale_covariance(output_scale)
-        return MarkovSequence(init=init, backward_model=bw_model)
 
     def transform_unit_sample(self, base_sample, /):
         if base_sample.shape == self.sample_shape:
@@ -98,19 +93,29 @@ class MarkovSequence(Generic[S]):
         return self.backward_model.noise.sample_shape
 
 
+class _SmState(NamedTuple):
+    ssv: Any
+    backward_model: Any
+
+    def scale_covariance(self, output_scale):
+        bw_model = self.backward_model.scale_covariance(output_scale)
+        ssv = self.ssv.scale_covariance(output_scale)
+        return _SmState(ssv=ssv, backward_model=bw_model)
+
+
 class _SmootherCommon(_strategy.Strategy):
     # Inherited abstract methods
 
     @abc.abstractmethod
     def case_interpolate(
-        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[MarkovSequence]:
+        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[_SmState]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
-        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[MarkovSequence]:
+        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[_SmState]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -119,7 +124,7 @@ class _SmootherCommon(_strategy.Strategy):
         *,
         t,
         marginals,
-        posterior,
+        posterior: MarkovSequence,
         posterior_previous: MarkovSequence,
         t0,
         t1,
@@ -130,15 +135,18 @@ class _SmootherCommon(_strategy.Strategy):
     @abc.abstractmethod
     def complete_extrapolation(
         self,
-        output_extra: MarkovSequence,
+        output_extra: _SmState,
         /,
         *,
         output_scale,
-        state_previous: MarkovSequence,
+        state_previous: _SmState,
     ):
         raise NotImplementedError
 
-    def init(self, *, taylor_coefficients) -> MarkovSequence:
+    def init(self, posterior, /) -> _SmState:
+        return _SmState(ssv=posterior.init, backward_model=posterior.backward_model)
+
+    def solution_from_tcoeffs(self, taylor_coefficients):
         corrected = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
@@ -147,33 +155,32 @@ class _SmootherCommon(_strategy.Strategy):
         bw_model = init_bw_model(ssv_proto=corrected)
         return MarkovSequence(init=corrected, backward_model=bw_model)
 
-    # todo: use this function.
-    def extract(self, posterior: MarkovSequence, /) -> MarkovSequence:
-        return posterior
+    def extract(self, state: _SmState, /) -> MarkovSequence:
+        return MarkovSequence(init=state.ssv, backward_model=state.backward_model)
 
-    def begin_extrapolation(
-        self, posterior: MarkovSequence, /, *, dt
-    ) -> MarkovSequence:
+    def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
         ssv = self.implementation.extrapolation.begin_extrapolation(
-            posterior.init, dt=dt
+            posterior.ssv, dt=dt
         )
-        return MarkovSequence(init=ssv, backward_model=None)
+        return _SmState(ssv=ssv, backward_model=None)
 
     def begin_correction(
-        self, output_extra: MarkovSequence, /, *, vector_field, t, p
+        self, output_extra: _SmState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        ssv = output_extra.init
+        ssv = output_extra.ssv
         return self.implementation.correction.begin_correction(
             ssv, vector_field=vector_field, t=t, p=p
         )
 
-    def complete_correction(self, extrapolated: MarkovSequence, /, *, cache_obs):
+    def complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
         a, (corrected, b) = self.implementation.correction.complete_correction(
-            extrapolated=extrapolated.init, cache=cache_obs
+            extrapolated=extrapolated.ssv, cache=cache_obs
         )
-        corrected_seq = MarkovSequence(
-            init=corrected, backward_model=extrapolated.backward_model
+        corrected_seq = _SmState(
+            ssv=corrected,
+            backward_model=extrapolated.backward_model,
         )
+
         return a, (corrected_seq, b)
 
     def extract_u(self, posterior: MarkovSequence, /):
@@ -211,10 +218,10 @@ class _SmootherCommon(_strategy.Strategy):
         return extrapolated, bw_model  # should this return a MarkovSequence?
 
     # todo: should this be a classmethod of MarkovSequence?
-    def _duplicate_with_unit_backward_model(self, *, posterior: MarkovSequence):
+    def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
         init_conditional_fn = self.implementation.extrapolation.init_conditional
-        bw_model = init_conditional_fn(ssv_proto=posterior.init)
-        return MarkovSequence(init=posterior.init, backward_model=bw_model)
+        bw_model = init_conditional_fn(ssv_proto=posterior.ssv)
+        return _SmState(ssv=posterior.ssv, backward_model=bw_model)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -223,31 +230,31 @@ class Smoother(_SmootherCommon):
 
     def complete_extrapolation(
         self,
-        output_extra: MarkovSequence,
+        output_extra: _SmState,
         /,
         *,
         output_scale,
-        state_previous: MarkovSequence,
-    ) -> MarkovSequence:
+        state_previous: _SmState,
+    ) -> _SmState:
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            output_extra.init,
-            s0=state_previous.init,
+            output_extra.ssv,
+            s0=state_previous.ssv,
             output_scale=output_scale,
         )
-        return MarkovSequence(init=extrapolated, backward_model=bw_model)
+        return _SmState(ssv=extrapolated, backward_model=bw_model)
 
     def case_right_corner(
-        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[MarkovSequence]:
+        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[_SmState]:
         # todo: is this duplication unnecessary?
-        accepted = self._duplicate_with_unit_backward_model(posterior=s1)
+        accepted = self._duplicate_with_unit_backward_model(s1)
         return _collections.InterpRes(accepted=accepted, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, s0: MarkovSequence, s1: MarkovSequence, t0, t1, t, output_scale
-    ) -> _collections.InterpRes[MarkovSequence]:
+        self, *, s0: _SmState, s1: _SmState, t0, t1, t, output_scale
+    ) -> _collections.InterpRes[_SmState]:
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -257,20 +264,20 @@ class Smoother(_SmootherCommon):
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=s0.init, output_scale=output_scale, t=t, t0=t0
+            rv=s0.ssv, output_scale=output_scale, t=t, t0=t0
         )
-        posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
+        posterior0 = _SmState(ssv=extrapolated0, backward_model=backward_model0)
 
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        posterior1 = MarkovSequence(init=s1.init, backward_model=backward_model1)
+        posterior1 = _SmState(ssv=s1.ssv, backward_model=backward_model1)
 
         return _collections.InterpRes(
             accepted=posterior1, solution=posterior0, previous=posterior0
         )
 
-    # todo: move marginals to MarkovSequence/FilterSol
+    # todo: move marginals to _SmState/FilterSol
     def offgrid_marginals(
         self,
         *,
@@ -284,8 +291,8 @@ class Smoother(_SmootherCommon):
     ):
         acc, _sol, _prev = self.case_interpolate(
             t=t,
-            s1=posterior,
-            s0=posterior_previous,
+            s1=self.init(posterior),
+            s0=self.init(posterior_previous),
             t0=t0,
             t1=t1,
             output_scale=output_scale,
@@ -309,15 +316,15 @@ class FixedPointSmoother(_SmootherCommon):
 
     def complete_extrapolation(
         self,
-        output_extra: MarkovSequence,
+        output_extra: _SmState,
         /,
         *,
-        state_previous: MarkovSequence,
+        state_previous: _SmState,
         output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
-            output_extra.init,
-            s0=state_previous.init,
+            output_extra.ssv,
+            s0=state_previous.ssv,
             output_scale=output_scale,
         )
         extrapolated, bw_increment = _temp
@@ -325,18 +332,19 @@ class FixedPointSmoother(_SmootherCommon):
         merge_fn = state_previous.backward_model.merge_with_incoming_conditional
         backward_model = merge_fn(bw_increment)
 
-        return MarkovSequence(init=extrapolated, backward_model=backward_model)
+        return _SmState(ssv=extrapolated, backward_model=backward_model)
 
     def case_right_corner(
-        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
+        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
     ):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
         merge_fn = s0.backward_model.merge_with_incoming_conditional
         backward_model1 = merge_fn(s1.backward_model)
 
-        solution = MarkovSequence(init=s1.init, backward_model=backward_model1)
-        accepted = self._duplicate_with_unit_backward_model(posterior=solution)
+        solution = _SmState(ssv=s1.ssv, backward_model=backward_model1)
+
+        accepted = self._duplicate_with_unit_backward_model(solution)
         previous = accepted
 
         return _collections.InterpRes(
@@ -344,8 +352,8 @@ class FixedPointSmoother(_SmootherCommon):
         )
 
     def case_interpolate(
-        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[MarkovSequence]:
+        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[_SmState]:
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -355,20 +363,21 @@ class FixedPointSmoother(_SmootherCommon):
 
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
-            rv=s0.init,
+            rv=s0.ssv,
             output_scale=output_scale,
             t=t,
             t0=t0,
         )
         backward_model0 = s0.backward_model.merge_with_incoming_conditional(bw0)
-        solution = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
+        solution = _SmState(ssv=extrapolated0, backward_model=backward_model0)
 
-        previous = self._duplicate_with_unit_backward_model(posterior=solution)
+        previous = self._duplicate_with_unit_backward_model(solution)
 
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        accepted = MarkovSequence(init=s1.init, backward_model=backward_model1)
+        accepted = _SmState(ssv=s1.ssv, backward_model=backward_model1)
+
         return _collections.InterpRes(
             accepted=accepted, solution=solution, previous=previous
         )
