@@ -71,15 +71,15 @@ class Filter(_strategy.Strategy[_FiState]):
         t,
         marginals,
         posterior,
-        posterior_previous: _FiState,
+        posterior_previous,
         t0,
         t1,
         output_scale,
     ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            p1=posterior,
-            p0=posterior_previous,
+            p1=_FiState(posterior),
+            p0=_FiState(posterior_previous),
             t0=t0,
             t1=t1,
             output_scale=output_scale,
