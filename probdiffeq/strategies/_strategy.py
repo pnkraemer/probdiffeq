@@ -21,11 +21,19 @@ class Strategy(abc.ABC, Generic[P]):
         return f"{self.__class__.__name__}({args})"
 
     @abc.abstractmethod
-    def init_posterior(self, *, taylor_coefficients) -> P:
+    def init(self, *, taylor_coefficients) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_u_from_posterior(self, posterior: P):
+    def extract_u(self, posterior: P, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_marginals(self, posterior: P, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_marginals_terminal_values(self, posterior: P, /):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -34,14 +42,6 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def case_interpolate(self, *, p0: P, p1: P, t, t0, t1, output_scale):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def marginals(self, posterior: P):  # todo: rename to marginalise?
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def marginals_terminal_value(self, posterior: P):  # todo: rename to marginalise?
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -55,21 +55,21 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, *, posterior: P, dt):
+    def begin_extrapolation(self, posterior: P, /, *, dt):
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt: P, *, output_scale, posterior_previous: P
+        self, output_extra: P, /, *, output_scale, posterior_previous: P
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_correction(self, linearisation_pt: P, *, vector_field, t, p):
+    def begin_correction(self, output_extra: P, /, *, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, extrapolated: P, cache_obs):
+    def complete_correction(self, extrapolated: P, /, *, cache_obs):
         raise NotImplementedError
 
     def tree_flatten(self):
