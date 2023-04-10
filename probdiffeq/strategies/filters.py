@@ -33,11 +33,13 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     # todo: this should not operate on taylor_coefficients but on some SSV.
-    def init(self, *, taylor_coefficients) -> _FiState:
-        ssv = self.implementation.extrapolation.init_state_space_var(
+    def init(self, ssv, /) -> _FiState:
+        return _FiState(ssv)
+
+    def solution_from_tcoeffs(self, taylor_coefficients):
+        return self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
-        return _FiState(ssv)
 
     def extract(self, posterior: _FiState, /):
         return posterior.ssv
@@ -96,8 +98,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def extract_marginals_terminal_values(self, ssv, /):
         return ssv
 
-    def extract_u(self, posterior: _FiState, /):
-        return posterior.ssv.extract_qoi()
+    def extract_u(self, ssv: _FiState, /):
+        return ssv.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolate = self.implementation.extrapolation.begin_extrapolation
