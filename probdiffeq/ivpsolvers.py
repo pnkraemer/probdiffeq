@@ -84,7 +84,6 @@ class AbstractSolver(abc.ABC):
     def __init__(self, strategy):
         self.strategy = strategy
         # raise RuntimeError(
-        #     "Next: update all solvers to current API.".
         #     "Next: remove output_scale from step_fn() "
         #     "and keep fixing all failing tests. Once this is done, "
         #     "we should be ready to look at the Pull request diff "
@@ -173,26 +172,6 @@ class AbstractSolver(abc.ABC):
         apply_branch_as_array, *_ = jnp.where(index_as_array, size=1)
         apply_branch = jnp.reshape(apply_branch_as_array, ())
         return jax.lax.switch(apply_branch, branches, s0, s1, t)
-        #
-        # # helper function to make code below more readable
-        # def make_state(p, t_) -> _State:
-        #     return self.empty_solution_from_posterior(
-        #         p,
-        #         t=t_,
-        #         u=self.strategy.extract_u_from_posterior(p),
-        #         output_scale_calibrated=s1.output_scale_calibrated,
-        #         output_scale_prior=s1.output_scale_prior,
-        #         num_data_points=s1.num_data_points,
-        #     )
-        #
-        # # todo: which output scale is used for MLESolver interpolation
-        # #  _during_ the simulation? hopefully the prior one!
-
-        # previous = make_state(prev, t)
-        # solution_ = make_state(sol, t)
-        # accepted = make_state(acc, jnp.maximum(s1.t, t))
-        #
-        # return accepted, solution_, previous
 
     def case_interpolate(self, s0: _State, s1: _State, t) -> _Interp[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
@@ -478,7 +457,7 @@ class MLESolver(AbstractSolver):
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        s = state.output_scale
+        s = state.output_scale_calibrated
         marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(

@@ -16,9 +16,7 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field,
     *,
-    u0,
-    posterior,
-    t0,
+    solution,
     t1,
     solver,
     parameters,
@@ -32,9 +30,7 @@ def simulate_terminal_values(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
     )
 
-    state0 = adaptive_solver.init(
-        posterior=posterior, u=u0, t=t0, dt0=dt0, output_scale=output_scale
-    )
+    state0 = adaptive_solver.init(solution, dt0=dt0)
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
@@ -51,7 +47,6 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field,
     *,
-    u0,
     solution,
     save_at,
     solver,
