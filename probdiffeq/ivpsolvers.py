@@ -15,6 +15,7 @@ class _State(NamedTuple):
     # Same as in solution.Solution()
     t: Any
     u: Any
+    # todo: rename this to 'strategy', indicating the strategy's state.
     posterior: Any
     num_data_points: Any
 
@@ -57,7 +58,7 @@ class AbstractSolver(abc.ABC):
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
+    def solution_from_tcoeffs(self, taylor_coefficients, /, t, output_scale):
         """Construct an initial `Solution` object.
 
         An (even if empty) solution object is needed to initialise the solver.
@@ -66,10 +67,7 @@ class AbstractSolver(abc.ABC):
         """
         posterior = self.strategy.init(taylor_coefficients=taylor_coefficients)
         u = taylor_coefficients[0]
-        return self.solution_from_posterior(posterior, u=u, **kwargs)
 
-    def solution_from_posterior(self, posterior, /, *, u, t, output_scale):
-        """Use for initialisation but also for interpolation."""
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
 
