@@ -5,7 +5,7 @@ Essentially, these functions implement the IVP solution routines after
 initialisation of the Taylor coefficients.
 """
 
-from probdiffeq import _adaptive, _control_flow
+from probdiffeq import _control_flow
 
 # todo: rename to _collocate_seq.py ?
 #  rationale: sequential collocation. Initial conditions are available.
@@ -18,17 +18,11 @@ def simulate_terminal_values(
     *,
     solution,
     t1,
-    solver,
+    adaptive_solver,
     parameters,
     dt0,
-    while_loop_fn_temporal,
-    while_loop_fn_per_step,
-    **options,
+    while_loop_fn,
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
-    )
-
     state0 = adaptive_solver.init(solution, dt0=dt0)
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
@@ -36,7 +30,7 @@ def simulate_terminal_values(
         vector_field=vector_field,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
-        while_loop_fn=while_loop_fn_temporal,
+        while_loop_fn=while_loop_fn,
     )
     _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
     return sol
@@ -47,17 +41,11 @@ def solve_and_save_at(
     *,
     solution,
     save_at,
-    solver,
+    adaptive_solver,
     dt0,
     parameters,
-    while_loop_fn_temporal,
-    while_loop_fn_per_step,
-    **options,
+    while_loop_fn,
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
-    )
-
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
@@ -65,7 +53,7 @@ def solve_and_save_at(
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
-            while_loop_fn=while_loop_fn_temporal,
+            while_loop_fn=while_loop_fn,
         )
         return s_next, s_next
 
@@ -113,10 +101,8 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, *, solution, t1, solver, dt0, parameters, **options
+    vector_field, *, solution, t1, adaptive_solver, dt0, parameters
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
-
     state = adaptive_solver.init(solution, dt0=dt0)
     generator = _solution_generator(
         vector_field,
