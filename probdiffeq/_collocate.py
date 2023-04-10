@@ -1,16 +1,9 @@
-"""Routines for estimating solutions of differential equations \
- constrained by Taylor-series initial information.
+"""Sequential collocation.
 
-Essentially, these functions implement the IVP solution routines after
-initialisation of the Taylor coefficients.
+Sequentially (and often, adaptively) constrain a random process to an ODE.
 """
 
 from probdiffeq import _control_flow
-
-# todo: rename to _collocate_seq.py ?
-#  rationale: sequential collocation. Initial conditions are available.
-#  We have an initial "posterior" (rename to "process"?) and a constraint,
-#  and simulate the constrained posterior sequentially (and usually adaptively).
 
 
 def simulate_terminal_values(

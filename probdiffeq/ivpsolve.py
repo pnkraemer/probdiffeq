@@ -6,7 +6,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _adaptive, _ivpsolve_impl, taylor
+from probdiffeq import _adaptive, _collocate, taylor
 from probdiffeq.strategies import smoothers
 
 # The high-level checkpoint-style routines
@@ -54,7 +54,7 @@ def simulate_terminal_values(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _ivpsolve_impl.simulate_terminal_values(
+    return _collocate.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         solution=sol,
         t1=t1,
@@ -118,7 +118,7 @@ def solve_and_save_at(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _ivpsolve_impl.solve_and_save_at(
+    return _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         solution=sol,
         save_at=save_at,
@@ -172,7 +172,7 @@ def solve_with_python_while_loop(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _ivpsolve_impl.solve_with_python_while_loop(
+    return _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
         solution=sol,
         t1=t1,
@@ -205,7 +205,7 @@ def solve_fixed_grid(
     sol = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
-    return _ivpsolve_impl.solve_fixed_grid(
+    return _collocate.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         solution=sol,
         grid=grid,
