@@ -50,7 +50,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - t0
-        linearisation_pt = self.begin_extrapolation(posterior=p0, dt=dt)
+        linearisation_pt = self.begin_extrapolation(p0, dt=dt)
         extrapolated = self.complete_extrapolation(
             linearisation_pt,
             posterior_previous=p0,
@@ -92,14 +92,14 @@ class Filter(_strategy.Strategy[_FilterSol]):
     def extract_u(self, posterior: _FilterSol, /):
         return posterior.ssv.extract_qoi()
 
-    def begin_extrapolation(self, *, posterior: _FilterSol, dt) -> _FilterSol:
+    def begin_extrapolation(self, posterior: _FilterSol, /, *, dt) -> _FilterSol:
         extrapolate = self.implementation.extrapolation.begin_extrapolation
         ssv = extrapolate(posterior.ssv, dt=dt)
         return _FilterSol(ssv)
 
     # todo: make "linearisation_pt" positional only. Then rename this mess.
     def begin_correction(
-        self, linearisation_pt: _FilterSol, *, vector_field, t, p
+        self, linearisation_pt: _FilterSol, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
         ssv = linearisation_pt.ssv
         return self.implementation.correction.begin_correction(
@@ -109,6 +109,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
     def complete_extrapolation(
         self,
         linearisation_pt: _FilterSol,
+        /,
         *,
         output_scale,
         posterior_previous: _FilterSol,
@@ -125,7 +126,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
 
     # todo: more type-stability in corrections!
     def complete_correction(
-        self, *, extrapolated: _FilterSol, cache_obs
+        self, extrapolated: _FilterSol, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FilterSol, Any]]:
         obs, (corr, gain) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.ssv, cache=cache_obs

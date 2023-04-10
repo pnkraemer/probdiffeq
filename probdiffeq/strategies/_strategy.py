@@ -55,21 +55,21 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, *, posterior: P, dt):
+    def begin_extrapolation(self, posterior: P, /, *, dt):
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt: P, *, output_scale, posterior_previous: P
+        self, linearisation_pt: P, /, *, output_scale, posterior_previous: P
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_correction(self, linearisation_pt: P, *, vector_field, t, p):
+    def begin_correction(self, linearisation_pt: P, /, *, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, *, extrapolated: P, cache_obs):
+    def complete_correction(self, extrapolated: P, /, *, cache_obs):
         raise NotImplementedError
 
     def tree_flatten(self):

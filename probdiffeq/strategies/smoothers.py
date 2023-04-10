@@ -131,6 +131,7 @@ class _SmootherCommon(_strategy.Strategy):
     def complete_extrapolation(
         self,
         linearisation_pt: MarkovSequence,
+        /,
         *,
         output_scale,
         posterior_previous: MarkovSequence,
@@ -146,21 +147,23 @@ class _SmootherCommon(_strategy.Strategy):
         bw_model = init_bw_model(ssv_proto=corrected)
         return MarkovSequence(init=corrected, backward_model=bw_model)
 
-    def begin_extrapolation(self, *, posterior: MarkovSequence, dt) -> MarkovSequence:
+    def begin_extrapolation(
+        self, posterior: MarkovSequence, /, *, dt
+    ) -> MarkovSequence:
         ssv = self.implementation.extrapolation.begin_extrapolation(
             posterior.init, dt=dt
         )
         return MarkovSequence(init=ssv, backward_model=None)
 
     def begin_correction(
-        self, linearisation_pt: MarkovSequence, *, vector_field, t, p
+        self, linearisation_pt: MarkovSequence, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
         ssv = linearisation_pt.init
         return self.implementation.correction.begin_correction(
             ssv, vector_field=vector_field, t=t, p=p
         )
 
-    def complete_correction(self, *, extrapolated: MarkovSequence, cache_obs):
+    def complete_correction(self, extrapolated: MarkovSequence, /, *, cache_obs):
         a, (corrected, b) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.init, cache=cache_obs
         )
@@ -219,6 +222,7 @@ class Smoother(_SmootherCommon):
     def complete_extrapolation(
         self,
         linearisation_pt: MarkovSequence,
+        /,
         *,
         output_scale,
         posterior_previous: MarkovSequence,
@@ -303,6 +307,7 @@ class FixedPointSmoother(_SmootherCommon):
     def complete_extrapolation(
         self,
         linearisation_pt: MarkovSequence,
+        /,
         *,
         posterior_previous: MarkovSequence,
         output_scale,
