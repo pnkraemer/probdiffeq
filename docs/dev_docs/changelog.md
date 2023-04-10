@@ -69,7 +69,8 @@ Notable bug fixes:
   This means that the behaviour of, e.g., parameter estimation scripts will change slightly.
   A related bugfix in the whitened residuals implies that the DenseTS1 is not exactly equivalent 
   to tornadox.ReferenceEK1 anymore (because the latter still has the same error).
-
+* The interpolation behaviour of the MLESolver when called in solve_and_save_at() had a small error, which amplified the output scale unnecessarily between steps.
+  This has been fixed. As a result, the posterior-uncertainty notebook displays more realistic uncertainty estimates in high-order derivatives. Check it out!
 
 ## Prior to v0.2.0
 
