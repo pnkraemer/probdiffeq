@@ -365,8 +365,8 @@ class MLESolver(AbstractSolver):
             return fn_vmap(diffsqrtm, obs)
 
         x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
-        sum = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
-        return sum / jnp.sqrt(n + 1)
+        sum_updated = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
+        return sum_updated / jnp.sqrt(n + 1)
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
