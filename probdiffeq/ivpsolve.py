@@ -160,7 +160,9 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.empty_solution_from_tcoeffs(taylor_coefficients)
+    sol = solver.empty_solution_from_tcoeffs(
+        taylor_coefficients, t=t0, output_scale=output_scale
+    )
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -169,9 +171,7 @@ def solve_with_python_while_loop(
 
     return _ivpsolve_impl.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
-        u0=initial_values[0],
-        t0=t0,
+        solution=sol,
         t1=t1,
         solver=solver,
         dt0=dt0,

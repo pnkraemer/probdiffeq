@@ -124,23 +124,11 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field,
-    *,
-    u0,
-    posterior,
-    t0,
-    t1,
-    solver,
-    dt0,
-    parameters,
-    output_scale,
-    **options
+    vector_field, *, solution, t1, solver, dt0, parameters, output_scale, **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
-    state = adaptive_solver.init(
-        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
-    )
+    state = adaptive_solver.init(solution, dt0=dt0)
     generator = _solution_generator(
         vector_field,
         state=state,
