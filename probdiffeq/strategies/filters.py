@@ -77,19 +77,19 @@ class Filter(_strategy.Strategy[_FilterSol]):
             t1=t1,
             output_scale=output_scale,
         )
-        u = self.extract_u_from_posterior(posterior=sol)
+        u = self.extract_u(sol)
         return u, sol
 
     def sample(self, key, *, posterior: _FilterSol, shape):
         raise NotImplementedError
 
-    def extract_marginals(self, posterior: _FilterSol):
+    def extract_marginals(self, posterior: _FilterSol, /):
         return posterior.ssv
 
-    def extract_marginals_terminal_values(self, posterior: _FilterSol):
+    def extract_marginals_terminal_values(self, posterior: _FilterSol, /):
         return posterior.ssv
 
-    def extract_u_from_posterior(self, posterior: _FilterSol):
+    def extract_u(self, posterior: _FilterSol, /):
         return posterior.ssv.extract_qoi()
 
     def begin_extrapolation(self, *, posterior: _FilterSol, dt) -> _FilterSol:

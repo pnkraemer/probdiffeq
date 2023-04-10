@@ -169,13 +169,13 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return a, (corrected_seq, b)
 
-    def extract_u_from_posterior(self, posterior: MarkovSequence):
+    def extract_u(self, posterior: MarkovSequence, /):
         return posterior.init.extract_qoi()
 
-    def extract_marginals_terminal_values(self, posterior: MarkovSequence):
+    def extract_marginals_terminal_values(self, posterior: MarkovSequence, /):
         return posterior.init
 
-    def extract_marginals(self, posterior: MarkovSequence):
+    def extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
         markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
         return markov.marginalise_backwards()

@@ -197,7 +197,7 @@ class AbstractSolver(abc.ABC):
 
     def _interp_make_state(self, posterior, *, t, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        u = self.strategy.extract_u_from_posterior(posterior)
+        u = self.strategy.extract_u(posterior)
         return _State(
             posterior=posterior,
             t=t,
@@ -251,7 +251,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u_from_posterior(posterior=corrected)
+        u = self.strategy.extract_u(corrected)
         return _State(
             t=state.t + dt,
             u=u,
@@ -266,7 +266,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -281,9 +281,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals_terminal_values(
-            posterior=state.posterior
-        )
+        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -319,7 +317,7 @@ class DynamicSolver(AbstractSolver):
         )
 
         # Return solution
-        u = self.strategy.extract_u_from_posterior(posterior=corrected)
+        u = self.strategy.extract_u(corrected)
         return _State(
             t=state.t + dt,
             u=u,
@@ -333,7 +331,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -345,9 +343,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals_terminal_values(
-            posterior=state.posterior
-        )
+        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -392,7 +388,7 @@ class MLESolver(AbstractSolver):
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u_from_posterior(posterior=corrected)
+        u = self.strategy.extract_u(corrected)
         return _State(
             t=state.t + dt,
             u=u,
@@ -424,7 +420,7 @@ class MLESolver(AbstractSolver):
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
 
-        marginals = self.strategy.extract_marginals(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals(state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,
@@ -437,9 +433,7 @@ class MLESolver(AbstractSolver):
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         s = state.output_scale_calibrated
-        marginals = self.strategy.extract_marginals_terminal_values(
-            posterior=state.posterior
-        )
+        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,

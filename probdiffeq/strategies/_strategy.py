@@ -25,7 +25,15 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_u_from_posterior(self, posterior: P):
+    def extract_u(self, posterior: P, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_marginals(self, posterior: P, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_marginals_terminal_values(self, posterior: P, /):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -34,14 +42,6 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def case_interpolate(self, *, p0: P, p1: P, t, t0, t1, output_scale):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_marginals(self, posterior: P):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_marginals_terminal_values(self, posterior: P):
         raise NotImplementedError
 
     @abc.abstractmethod
