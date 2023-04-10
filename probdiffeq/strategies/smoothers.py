@@ -147,6 +147,10 @@ class _SmootherCommon(_strategy.Strategy):
         bw_model = init_bw_model(ssv_proto=corrected)
         return MarkovSequence(init=corrected, backward_model=bw_model)
 
+    # todo: use this function.
+    def extract(self, posterior: MarkovSequence, /) -> MarkovSequence:
+        return posterior
+
     def begin_extrapolation(
         self, posterior: MarkovSequence, /, *, dt
     ) -> MarkovSequence:

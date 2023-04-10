@@ -32,11 +32,15 @@ class _FilterSol(NamedTuple):
 class Filter(_strategy.Strategy[_FilterSol]):
     """Filter strategy."""
 
+    # todo: this should not operate on taylor_coefficients but on some SSV.
     def init(self, *, taylor_coefficients) -> _FilterSol:
         ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
         return _FilterSol(ssv)
+
+    def extract(self, posterior: _FilterSol, /):
+        return posterior.ssv
 
     # todo: make interpolation result into a named-tuple.
     #  it is too confusing what those three posteriors mean.
@@ -86,11 +90,11 @@ class Filter(_strategy.Strategy[_FilterSol]):
     def sample(self, key, *, posterior: _FilterSol, shape):
         raise NotImplementedError
 
-    def extract_marginals(self, posterior: _FilterSol, /):
-        return posterior.ssv
+    def extract_marginals(self, ssv, /):
+        return ssv
 
-    def extract_marginals_terminal_values(self, posterior: _FilterSol, /):
-        return posterior.ssv
+    def extract_marginals_terminal_values(self, ssv, /):
+        return ssv
 
     def extract_u(self, posterior: _FilterSol, /):
         return posterior.ssv.extract_qoi()

@@ -46,9 +46,7 @@ class AbstractSolver(abc.ABC):
     # Abstract methods
 
     @abc.abstractmethod
-    def step_fn(
-        self, *, state: _State, vector_field, dt, parameters, output_scale
-    ) -> _State:
+    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -74,10 +72,14 @@ class AbstractSolver(abc.ABC):
         """Use for initialisation but also for interpolation."""
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
+
+        # todo: make "marginals" an input to this function, then couple it with the posterior
+        #  and make (marginals, posterior) the "solution" type for the strategies.
+        marginals = self.strategy.extract_marginals_terminal_values(posterior)
         return solution.Solution(
             t=t,
             posterior=posterior,
-            marginals=self.strategy.extract_marginals_terminal_values(posterior),
+            marginals=marginals,
             output_scale=output_scale,
             u=u,
             num_data_points=1.0,
@@ -216,13 +218,14 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals(state.posterior)
+        posterior = self.strategy.extract(state.posterior)
+        marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
             u=u,  # new!
             marginals=marginals,  # new!
-            posterior=state.posterior,
+            posterior=posterior,
             # _prior and _calibrated are identical.
             #  but we use _prior because we might remove the _calibrated
             #  value in the future.
@@ -231,13 +234,14 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
+        posterior = self.strategy.extract(state.posterior)
+        marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
             u=u,  # new!
             marginals=marginals,  # new!
-            posterior=state.posterior,
+            posterior=posterior,
             output_scale=state.output_scale_prior,
             num_data_points=state.num_data_points,
         )
@@ -279,25 +283,27 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals(state.posterior)
+        posterior = self.strategy.extract(state.posterior)
+        marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
             u=u,  # new!
             marginals=marginals,  # new!
-            posterior=state.posterior,
+            posterior=posterior,
             output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
+        posterior = self.strategy.extract(state.posterior)
+        marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
             u=u,  # new!
             marginals=marginals,  # new!
-            posterior=state.posterior,
+            posterior=posterior,
             output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
@@ -363,29 +369,32 @@ class MLESolver(AbstractSolver):
         return sum / jnp.sqrt(n + 1)
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
+        posterior = self.strategy.extract(state.posterior)
+        marginals = self.strategy.extract_marginals(posterior)
+
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
-
-        marginals = self.strategy.extract_marginals(state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,
             u=state.u,
             marginals=marginals,
-            posterior=state.posterior,
+            posterior=posterior,
             output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
+        posterior = self.strategy.extract(state.posterior)
+        marginals = self.strategy.extract_marginals_terminal_values(posterior)
+
         s = state.output_scale_calibrated
-        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,
             u=state.u,
             marginals=marginals,
-            posterior=state.posterior,
+            posterior=posterior,
             output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
