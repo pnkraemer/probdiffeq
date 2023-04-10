@@ -50,6 +50,7 @@ Notable breaking changes:
 * The `output_scale_sqrtm` parameter is now called `output_scale`. 
   This is mathematically more accurate: the parameter models $sigma$, and the `_sqrtm` 
   suffix was previously used to mark that ProbDiffEq estimates $sigma$ not $sigma^2$ (like other packages).
+* The output_scale parameter is not part of the step_fn() API anymore. Instead, it is tracked in the solver state.
 
 
 

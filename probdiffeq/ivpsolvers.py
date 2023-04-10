@@ -238,9 +238,7 @@ class CalibrationFreeSolver(AbstractSolver):
     No automatic output-scale calibration.
     """
 
-    def step_fn(
-        self, *, state: _State, vector_field, dt, parameters, output_scale
-    ) -> _State:
+    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -252,10 +250,9 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
         # Post-error-estimate steps
-        scale = self.strategy.init_output_scale(output_scale)
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            output_scale=scale,
+            output_scale=state.output_scale_prior,
             posterior_previous=state.posterior,
         )
 
@@ -272,11 +269,11 @@ class CalibrationFreeSolver(AbstractSolver):
             u=u,
             error_estimate=dt * error,
             posterior=corrected,
-            output_scale_prior=scale,
+            output_scale_prior=state.output_scale_prior,
             # Nothing happens in the field below:
             #  but we cannot use "None" if we want to reuse the init()
             #  method from abstract solvers (which populate this field).
-            output_scale_calibrated=scale,
+            output_scale_calibrated=state.output_scale_prior,
             num_data_points=state.num_data_points + 1,
         )
 
@@ -314,11 +311,7 @@ class CalibrationFreeSolver(AbstractSolver):
 class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
-    def step_fn(
-        self, *, state: _State, vector_field, dt, parameters, output_scale
-    ) -> _State:
-        del output_scale  # unused
-
+    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
         )
@@ -381,9 +374,7 @@ class MLESolver(AbstractSolver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
-    def step_fn(
-        self, *, state: _State, vector_field, dt, parameters, output_scale
-    ) -> _State:
+    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
         linearisation_pt = self.strategy.begin_extrapolation(
             posterior=state.posterior, dt=dt
@@ -395,10 +386,9 @@ class MLESolver(AbstractSolver):
         )
 
         # Post-error-estimate steps
-        scale = self.strategy.init_output_scale(output_scale)
         extrapolated = self.strategy.complete_extrapolation(
             linearisation_pt,
-            output_scale=scale,
+            output_scale=state.output_scale_prior,
             posterior_previous=state.posterior,
         )
         # Complete step (incl. calibration!)

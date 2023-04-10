@@ -21,10 +21,9 @@ def simulate_terminal_values(
     solver,
     parameters,
     dt0,
-    output_scale,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
-    **options
+    **options,
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
@@ -38,7 +37,6 @@ def simulate_terminal_values(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
-        output_scale=output_scale,
     )
     _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
     return sol
@@ -55,7 +53,7 @@ def solve_and_save_at(
     parameters,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
-    **options
+    **options,
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **options
@@ -93,7 +91,6 @@ def _advance_ivp_solution_adaptively(
     adaptive_solver,
     parameters,
     while_loop_fn,
-    output_scale
 ):
     """Advance an IVP solution to the next state."""
 
@@ -106,7 +103,6 @@ def _advance_ivp_solution_adaptively(
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
-            output_scale=output_scale,
         )
         return state
 

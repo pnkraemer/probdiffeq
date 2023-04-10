@@ -58,7 +58,6 @@ def simulate_terminal_values(
         solver=solver,
         parameters=parameters,
         dt0=dt0,
-        output_scale=output_scale,
         while_loop_fn_temporal=while_loop_fn_temporal,
         while_loop_fn_per_step=while_loop_fn_per_step,
         **options,
