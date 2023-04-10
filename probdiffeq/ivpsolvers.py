@@ -15,8 +15,7 @@ class _State(NamedTuple):
     # Same as in solution.Solution()
     t: Any
     u: Any
-    # todo: rename this to 'strategy', indicating the strategy's state.
-    posterior: Any
+    strategy: Any
     num_data_points: Any
 
     # Not contained in _State but in Solution: output_scale, marginals.
@@ -91,7 +90,7 @@ class AbstractSolver(abc.ABC):
             t=sol.t,
             u=sol.u,
             error_estimate=error_estimate,
-            posterior=sol.posterior,
+            strategy=sol.posterior,
             output_scale_prior=sol.output_scale,
             output_scale_calibrated=sol.output_scale,
             num_data_points=sol.num_data_points,
@@ -115,8 +114,8 @@ class AbstractSolver(abc.ABC):
         self, s0: _State, s1: _State, t
     ) -> _collections.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
-            p0=s0.posterior,
-            p1=s1.posterior,
+            p0=s0.strategy,
+            p1=s1.strategy,
             t=t,
             t0=s0.t,
             t1=s1.t,
@@ -136,8 +135,8 @@ class AbstractSolver(abc.ABC):
     ) -> _collections.InterpRes[_State]:
         # todo: are all these arguments needed?
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
-            p0=s0.posterior,
-            p1=s1.posterior,
+            p0=s0.strategy,
+            p1=s1.strategy,
             t=t,
             t0=s0.t,
             t1=s1.t,
@@ -153,7 +152,7 @@ class AbstractSolver(abc.ABC):
         error_estimate = self.strategy.init_error_estimate()
         u = self.strategy.extract_u(state_strategy)
         return _State(
-            posterior=state_strategy,
+            strategy=state_strategy,
             t=t,
             u=u,
             num_data_points=reference.num_data_points,
@@ -182,7 +181,7 @@ class CalibrationFreeSolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
-        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
+        output_extra = self.strategy.begin_extrapolation(state.strategy, dt=dt)
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
@@ -193,7 +192,7 @@ class CalibrationFreeSolver(AbstractSolver):
         extrapolated = self.strategy.complete_extrapolation(
             output_extra,
             output_scale=state.output_scale_prior,
-            state_previous=state.posterior,
+            state_previous=state.strategy,
         )
 
         # Complete step (incl. calibration!)
@@ -208,7 +207,7 @@ class CalibrationFreeSolver(AbstractSolver):
             t=state.t + dt,
             u=u,
             error_estimate=dt * error,
-            posterior=corrected,
+            strategy=corrected,
             output_scale_prior=state.output_scale_prior,
             # Nothing happens in the field below:
             #  but we cannot use "None" if we want to reuse the init()
@@ -218,7 +217,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.posterior)
+        posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
@@ -234,7 +233,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.posterior)
+        posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
@@ -252,14 +251,14 @@ class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
+        output_extra = self.strategy.begin_extrapolation(state.strategy, dt=dt)
         error, output_scale, cache_obs = self.strategy.begin_correction(
             output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
             output_extra,
-            state_previous=state.posterior,
+            state_previous=state.strategy,
             output_scale=output_scale,
         )
 
@@ -274,7 +273,7 @@ class DynamicSolver(AbstractSolver):
             t=state.t + dt,
             u=u,
             error_estimate=dt * error,
-            posterior=corrected,
+            strategy=corrected,
             output_scale_calibrated=output_scale,
             # current scale becomes the new prior scale!
             #  this is because dynamic solvers assume a piecewise-constant model
@@ -283,7 +282,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.posterior)
+        posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
@@ -296,7 +295,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.posterior)
+        posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
@@ -316,7 +315,7 @@ class MLESolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
-        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
+        output_extra = self.strategy.begin_extrapolation(state.strategy, dt=dt)
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
@@ -327,7 +326,7 @@ class MLESolver(AbstractSolver):
         extrapolated = self.strategy.complete_extrapolation(
             output_extra,
             output_scale=state.output_scale_prior,
-            state_previous=state.posterior,
+            state_previous=state.strategy,
         )
         # Complete step (incl. calibration!)
         observed, (corrected, _) = self.strategy.complete_correction(
@@ -345,7 +344,7 @@ class MLESolver(AbstractSolver):
             t=state.t + dt,
             u=u,
             error_estimate=dt * error,
-            posterior=corrected,
+            strategy=corrected,
             output_scale_prior=state.output_scale_prior,
             output_scale_calibrated=new_output_scale,
             num_data_points=n + 1,
@@ -371,7 +370,7 @@ class MLESolver(AbstractSolver):
     def extract_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
-        posterior = self.strategy.extract(state.posterior)
+        posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
 
         # promote calibrated scale to the correct batch-shape
@@ -389,7 +388,7 @@ class MLESolver(AbstractSolver):
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
 
-        posterior = self.strategy.extract(state.posterior)
+        posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
 
         s = state.output_scale_calibrated
@@ -417,18 +416,18 @@ class MLESolver(AbstractSolver):
         #          return x.scale_covariance(output_scale)
         #      return tree_map(fn, tree, is_leaf=is_leaf)
         #  marginals = scale_cov(marginals_unscaled)
-        #  posterior = scale_cov(state.posterior)
+        #  posterior = scale_cov(state.strategy)
         #  Which would avoid having to do this over and over again
         #  in intermediate objects
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
         marginals = marginals_unscaled.scale_covariance(output_scale)
-        state_strategy = state.posterior.scale_covariance(output_scale)
+        state_strategy = state.strategy.scale_covariance(output_scale)
         u = marginals.extract_qoi()
         return _State(
             t=state.t,
             u=u,
-            posterior=state_strategy,
+            strategy=state_strategy,
             output_scale_calibrated=output_scale,
             output_scale_prior=None,  # irrelevant, will be removed in next step
             error_estimate=None,  # irrelevant, will be removed in next step.
