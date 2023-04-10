@@ -78,9 +78,9 @@ class _IBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros(())
 
-    def begin_extrapolation(self, p0, /, dt):
+    def begin_extrapolation(self, s0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv * p0.hidden_state.mean
+        m0_p = p_inv * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
@@ -93,13 +93,13 @@ class _IBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_without_reversal(
-        self, output_begin, /, p0, output_scale
+        self, output_begin, /, s0, output_scale
     ):
         _, _, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
-                (self.a @ (p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower)).T,
+                (self.a @ (p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower)).T,
                 (output_scale * self.q_sqrtm_lower).T,
             )
         ).T
@@ -108,11 +108,11 @@ class _IBM(_collections.AbstractExtrapolation):
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.StateSpaceVar(rv, cache=None)
 
-    def complete_extrapolation_with_reversal(self, output_begin, /, p0, output_scale):
+    def complete_extrapolation_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
 
-        l0_p = p_inv[:, None] * p0.hidden_state.cov_sqrtm_lower
+        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,

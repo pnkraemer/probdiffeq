@@ -45,24 +45,24 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     # todo: make interpolation result into a named-tuple.
     #  it is too confusing what those three posteriors mean.
     def case_right_corner(
-        self, *, p0: _FiState, p1: _FiState, t, t0, t1, output_scale
+        self, *, s0: _FiState, s1: _FiState, t, t0, t1, output_scale
     ) -> _collections.InterpRes[_FiState]:  # s1.t == t
-        return _collections.InterpRes(accepted=p1, solution=p1, previous=p1)
+        return _collections.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, p0: _FiState, p1: _FiState, t0, t, t1, output_scale
+        self, *, s0: _FiState, s1: _FiState, t0, t, t1, output_scale
     ) -> _collections.InterpRes[_FiState]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - t0
-        output_extra = self.begin_extrapolation(p0, dt=dt)
+        output_extra = self.begin_extrapolation(s0, dt=dt)
         extrapolated = self.complete_extrapolation(
             output_extra,
-            state_previous=p0,
+            state_previous=s0,
             output_scale=output_scale,
         )
         return _collections.InterpRes(
-            accepted=p1, solution=extrapolated, previous=extrapolated
+            accepted=s1, solution=extrapolated, previous=extrapolated
         )
 
     def offgrid_marginals(
@@ -78,8 +78,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            p1=_FiState(posterior),
-            p0=_FiState(posterior_previous),
+            s1=_FiState(posterior),
+            s0=_FiState(posterior_previous),
             t0=t0,
             t1=t1,
             output_scale=output_scale,
@@ -126,7 +126,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
             output_extra.ssv,
-            p0=state_previous.ssv,
+            s0=state_previous.ssv,
             output_scale=output_scale,
         )
         return _FiState(ssv)

@@ -114,8 +114,8 @@ class AbstractSolver(abc.ABC):
         self, s0: _State, s1: _State, t
     ) -> _collections.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
-            p0=s0.strategy,
-            p1=s1.strategy,
+            s0=s0.strategy,
+            s1=s1.strategy,
             t=t,
             t0=s0.t,
             t1=s1.t,
@@ -135,8 +135,8 @@ class AbstractSolver(abc.ABC):
     ) -> _collections.InterpRes[_State]:
         # todo: are all these arguments needed?
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
-            p0=s0.strategy,
-            p1=s1.strategy,
+            s0=s0.strategy,
+            s1=s1.strategy,
             t=t,
             t0=s0.t,
             t1=s1.t,
