@@ -68,13 +68,14 @@ class AbstractSolver(abc.ABC):
         u = taylor_coefficients[0]
         return self.solution_from_posterior(posterior, u=u, **kwargs)
 
-    def solution_from_posterior(self, posterior, /, *, u, t, output_scale):
+    def solution_from_posterior(self, marginals, posterior, /, *, u, t, output_scale):
         """Use for initialisation but also for interpolation."""
         # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
 
-        # todo: make "marginals" an input to this function, then couple it with the posterior
-        #  and make (marginals, posterior) the "solution" type for the strategies.
+        # todo: make "marginals" an input to this function,
+        #  then couple it with the posterior
+        #  and make (u, marginals, posterior) the "solution" type for strategies.
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         return solution.Solution(
             t=t,
