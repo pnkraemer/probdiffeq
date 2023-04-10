@@ -107,3 +107,10 @@ class Strategy(abc.ABC, Generic[S, P]):
     def init_output_scale(self, *args, **kwargs):
         init_fn = self.implementation.extrapolation.init_output_scale
         return init_fn(*args, **kwargs)
+
+    def begin(self, state: S, /, *, t, dt, parameters, vector_field):
+        output_extra = self.begin_extrapolation(state, dt=dt)
+        output_corr = self.begin_correction(
+            output_extra, vector_field=vector_field, t=t + dt, p=parameters
+        )
+        return output_extra, output_corr

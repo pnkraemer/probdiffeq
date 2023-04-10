@@ -49,12 +49,33 @@ class AbstractSolver(abc.ABC):
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         raise NotImplementedError
 
-    def _strategy_begin(self, state, *, dt, parameters, vector_field):
-        output_extra = self.strategy.begin_extrapolation(state.strategy, dt=dt)
-        output_corr = self.strategy.begin_correction(
-            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
+    # todo: state positional-only?
+    def _strategy_begin(self, state, /, *, dt, parameters, vector_field):
+        # todo: wrap those outputs into a _State type.
+        return self.strategy.begin(
+            state.strategy,
+            t=state.t,
+            dt=dt,
+            parameters=parameters,
+            vector_field=vector_field,
         )
-        return output_extra, output_corr
+        # output_extra = self.strategy.begin_extrapolation(state.strategy, dt=dt)
+        # output_corr = self.strategy.begin_correction(
+        #     output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
+        # )
+        # return output_extra, output_corr
+
+    def _strategy_complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        extrapolated = self.strategy.complete_extrapolation(
+            output_extra,
+            state_previous=state.strategy,
+            output_scale=output_scale,
+        )
+        # Final observation
+        observed, (corrected, _) = self.strategy.complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
 
     @abc.abstractmethod
     def extract_fn(self, state: _State, /) -> solution.Solution:
@@ -191,10 +212,13 @@ class CalibrationFreeSolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         output_extra, (error, _, cache_obs) = self._strategy_begin(
-            dt=dt, parameters=parameters, state=state, vector_field=vector_field
+            state, dt=dt, parameters=parameters, vector_field=vector_field
         )
-        corrected = self._strategy_complete(
-            cache_obs=cache_obs, output_extra=output_extra, state=state
+        _, corrected = self._strategy_complete(
+            output_extra,
+            state,
+            cache_obs=cache_obs,
+            output_scale=state.output_scale_prior,
         )
 
         # Extract and return solution
@@ -212,18 +236,6 @@ class CalibrationFreeSolver(AbstractSolver):
             output_scale_calibrated=state.output_scale_prior,
             num_data_points=state.num_data_points + 1,
         )
-
-    def _strategy_complete(self, *, cache_obs, output_extra, state):
-        extrapolated = self.strategy.complete_extrapolation(
-            output_extra,
-            output_scale=state.output_scale_prior,
-            state_previous=state.strategy,
-        )
-        _, (corrected, _) = self.strategy.complete_correction(
-            extrapolated,
-            cache_obs=cache_obs,
-        )
-        return corrected
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
         posterior = self.strategy.extract(state.strategy)
@@ -261,13 +273,13 @@ class DynamicSolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         output_extra, (error, output_scale, cache_obs) = self._strategy_begin(
-            dt=dt, parameters=parameters, state=state, vector_field=vector_field
+            state, dt=dt, parameters=parameters, vector_field=vector_field
         )
-        corrected = self._strategy_complete(
+        _, corrected = self._strategy_complete(
+            output_extra,
+            state,
             cache_obs=cache_obs,
-            output_extra=output_extra,
             output_scale=output_scale,
-            state=state,
         )
 
         # Return solution
@@ -284,18 +296,6 @@ class DynamicSolver(AbstractSolver):
             output_scale_prior=output_scale,
             num_data_points=state.num_data_points + 1,
         )
-
-    def _strategy_complete(self, *, cache_obs, output_extra, output_scale, state):
-        extrapolated = self.strategy.complete_extrapolation(
-            output_extra,
-            state_previous=state.strategy,
-            output_scale=output_scale,
-        )
-        # Final observation
-        _, (corrected, _) = self.strategy.complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return corrected
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
         posterior = self.strategy.extract(state.strategy)
@@ -331,10 +331,13 @@ class MLESolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         output_extra, (error, _, cache_obs) = self._strategy_begin(
-            dt=dt, parameters=parameters, state=state, vector_field=vector_field
+            state, dt=dt, parameters=parameters, vector_field=vector_field
         )
-        corrected, observed = self._strategy_complete(
-            cache_obs=cache_obs, output_extra=output_extra, state=state
+        observed, corrected = self._strategy_complete(
+            output_extra,
+            state,
+            cache_obs=cache_obs,
+            output_scale=state.output_scale_prior,
         )
 
         # Calibrate
@@ -355,19 +358,6 @@ class MLESolver(AbstractSolver):
             output_scale_calibrated=new_output_scale,
             num_data_points=n + 1,
         )
-
-    def _strategy_complete(self, *, cache_obs, output_extra, state):
-        extrapolated = self.strategy.complete_extrapolation(
-            output_extra,
-            output_scale=state.output_scale_prior,
-            state_previous=state.strategy,
-        )
-        # Complete step (incl. calibration!)
-        observed, (corrected, _) = self.strategy.complete_correction(
-            extrapolated,
-            cache_obs=cache_obs,
-        )
-        return corrected, observed
 
     @staticmethod
     def _update_output_scale(*, diffsqrtm, n, obs):
