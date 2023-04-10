@@ -65,6 +65,7 @@ class AbstractSolver(abc.ABC):
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
+        # todo: this should not call init(), but strategy.sol_from_tcoeffs()!
         posterior = self.strategy.init(taylor_coefficients=taylor_coefficients)
         u = taylor_coefficients[0]
 
@@ -148,11 +149,11 @@ class AbstractSolver(abc.ABC):
         acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
         return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def _interp_make_state(self, posterior, *, t, reference: _State) -> _State:
+    def _interp_make_state(self, state_strategy, *, t, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        u = self.strategy.extract_u(posterior)
+        u = self.strategy.extract_u(state_strategy)
         return _State(
-            posterior=posterior,
+            posterior=state_strategy,
             t=t,
             u=u,
             num_data_points=reference.num_data_points,
@@ -422,12 +423,12 @@ class MLESolver(AbstractSolver):
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
         marginals = marginals_unscaled.scale_covariance(output_scale)
-        posterior = state.posterior.scale_covariance(output_scale)
+        state_strategy = state.posterior.scale_covariance(output_scale)
         u = marginals.extract_qoi()
         return _State(
             t=state.t,
             u=u,
-            posterior=posterior,
+            posterior=state_strategy,
             output_scale_calibrated=output_scale,
             output_scale_prior=None,  # irrelevant, will be removed in next step
             error_estimate=None,  # irrelevant, will be removed in next step.
