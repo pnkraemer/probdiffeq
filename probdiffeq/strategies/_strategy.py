@@ -125,3 +125,7 @@ class Strategy(abc.ABC, Generic[S, P]):
             extrapolated, cache_obs=cache_obs
         )
         return observed, corrected
+
+    @abc.abstractmethod
+    def num_data_points(self, state, /):
+        raise NotImplementedError

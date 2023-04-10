@@ -20,9 +20,10 @@ class _FiState(NamedTuple):
     """Filtering solution."""
 
     ssv: Any
+    num_data_points: float
 
     def scale_covariance(self, s, /):
-        return _FiState(self.ssv.scale_covariance(s))
+        return _FiState(self.ssv.scale_covariance(s), self.num_data_points)
 
     def extract_qoi(self):
         return self.ssv.extract_qoi()
@@ -33,8 +34,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     # todo: this should not operate on taylor_coefficients but on some SSV.
-    def init(self, ssv, /) -> _FiState:
-        return _FiState(ssv)
+    def init(self, ssv, /, *, num_data_points) -> _FiState:
+        return _FiState(ssv, num_data_points=num_data_points)
 
     def solution_from_tcoeffs(self, taylor_coefficients):
         return self.implementation.extrapolation.init_state_space_var(
@@ -104,7 +105,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolate = self.implementation.extrapolation.begin_extrapolation
         ssv = extrapolate(posterior.ssv, dt=dt)
-        return _FiState(ssv)
+        return _FiState(ssv, num_data_points=posterior.num_data_points)
 
     # todo: make "output_extra" positional only. Then rename this mess.
     def begin_correction(
@@ -131,7 +132,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             s0=state_previous.ssv,
             output_scale=output_scale,
         )
-        return _FiState(ssv)
+        return _FiState(ssv, num_data_points=output_extra.num_data_points)
 
     # todo: more type-stability in corrections!
     def complete_correction(
@@ -140,5 +141,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         obs, (corr, gain) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.ssv, cache=cache_obs
         )
-        corr = _FiState(corr)
+        corr = _FiState(corr, num_data_points=extrapolated.num_data_points + 1)
         return obs, (corr, gain)
+
+    def num_data_points(self, state: _FiState, /):
+        return state.num_data_points

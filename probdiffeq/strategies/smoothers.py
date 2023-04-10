@@ -97,6 +97,8 @@ class _SmState(NamedTuple):
     ssv: Any
     backward_model: Any
 
+    num_data_points: Any
+
     def scale_covariance(self, output_scale):
         bw_model = self.backward_model.scale_covariance(output_scale)
         ssv = self.ssv.scale_covariance(output_scale)
@@ -143,8 +145,12 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init(self, posterior, /) -> _SmState:
-        return _SmState(ssv=posterior.init, backward_model=posterior.backward_model)
+    def init(self, posterior, /, *, num_data_points) -> _SmState:
+        return _SmState(
+            ssv=posterior.init,
+            backward_model=posterior.backward_model,
+            num_data_points=num_data_points,
+        )
 
     def solution_from_tcoeffs(self, taylor_coefficients):
         corrected = self.implementation.extrapolation.init_state_space_var(
@@ -162,7 +168,9 @@ class _SmootherCommon(_strategy.Strategy):
         ssv = self.implementation.extrapolation.begin_extrapolation(
             posterior.ssv, dt=dt
         )
-        return _SmState(ssv=ssv, backward_model=None)
+        return _SmState(
+            ssv=ssv, backward_model=None, num_data_points=posterior.num_data_points
+        )
 
     def begin_correction(
         self, output_extra: _SmState, /, *, vector_field, t, p
@@ -179,6 +187,7 @@ class _SmootherCommon(_strategy.Strategy):
         corrected_seq = _SmState(
             ssv=corrected,
             backward_model=extrapolated.backward_model,
+            num_data_points=extrapolated.num_data_points + 1,
         )
 
         return a, (corrected_seq, b)
@@ -202,6 +211,9 @@ class _SmootherCommon(_strategy.Strategy):
         base_samples = jax.random.normal(key=key, shape=shape + posterior.sample_shape)
         return posterior.transform_unit_sample(base_samples)
 
+    def num_data_points(self, state, /):
+        return state.num_data_points
+
     # Auxiliary routines that are the same among all subclasses
 
     def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
@@ -221,7 +233,11 @@ class _SmootherCommon(_strategy.Strategy):
     def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
         init_conditional_fn = self.implementation.extrapolation.init_conditional
         bw_model = init_conditional_fn(ssv_proto=posterior.ssv)
-        return _SmState(ssv=posterior.ssv, backward_model=bw_model)
+        return _SmState(
+            ssv=posterior.ssv,
+            backward_model=bw_model,
+            num_data_points=posterior.num_data_points,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -243,7 +259,11 @@ class Smoother(_SmootherCommon):
             s0=state_previous.ssv,
             output_scale=output_scale,
         )
-        return _SmState(ssv=extrapolated, backward_model=bw_model)
+        return _SmState(
+            ssv=extrapolated,
+            backward_model=bw_model,
+            num_data_points=state_previous.num_data_points,
+        )
 
     def case_right_corner(
         self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
@@ -266,12 +286,20 @@ class Smoother(_SmootherCommon):
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
             rv=s0.ssv, output_scale=output_scale, t=t, t0=t0
         )
-        posterior0 = _SmState(ssv=extrapolated0, backward_model=backward_model0)
+        posterior0 = _SmState(
+            ssv=extrapolated0,
+            backward_model=backward_model0,
+            num_data_points=s0.num_data_points,
+        )
 
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        posterior1 = _SmState(ssv=s1.ssv, backward_model=backward_model1)
+        posterior1 = _SmState(
+            ssv=s1.ssv,
+            backward_model=backward_model1,
+            num_data_points=s1.num_data_points,
+        )
 
         return _collections.InterpRes(
             accepted=posterior1, solution=posterior0, previous=posterior0
@@ -332,7 +360,11 @@ class FixedPointSmoother(_SmootherCommon):
         merge_fn = state_previous.backward_model.merge_with_incoming_conditional
         backward_model = merge_fn(bw_increment)
 
-        return _SmState(ssv=extrapolated, backward_model=backward_model)
+        return _SmState(
+            ssv=extrapolated,
+            backward_model=backward_model,
+            num_data_points=state_previous.num_data_points,
+        )
 
     def case_right_corner(
         self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
@@ -342,7 +374,11 @@ class FixedPointSmoother(_SmootherCommon):
         merge_fn = s0.backward_model.merge_with_incoming_conditional
         backward_model1 = merge_fn(s1.backward_model)
 
-        solution = _SmState(ssv=s1.ssv, backward_model=backward_model1)
+        solution = _SmState(
+            ssv=s1.ssv,
+            backward_model=backward_model1,
+            num_data_points=s1.num_data_points,
+        )
 
         accepted = self._duplicate_with_unit_backward_model(solution)
         previous = accepted
@@ -369,14 +405,22 @@ class FixedPointSmoother(_SmootherCommon):
             t0=t0,
         )
         backward_model0 = s0.backward_model.merge_with_incoming_conditional(bw0)
-        solution = _SmState(ssv=extrapolated0, backward_model=backward_model0)
+        solution = _SmState(
+            ssv=extrapolated0,
+            backward_model=backward_model0,
+            num_data_points=s0.num_data_points,
+        )
 
         previous = self._duplicate_with_unit_backward_model(solution)
 
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        accepted = _SmState(ssv=s1.ssv, backward_model=backward_model1)
+        accepted = _SmState(
+            ssv=s1.ssv,
+            backward_model=backward_model1,
+            num_data_points=s1.num_data_points,
+        )
 
         return _collections.InterpRes(
             accepted=accepted, solution=solution, previous=previous
