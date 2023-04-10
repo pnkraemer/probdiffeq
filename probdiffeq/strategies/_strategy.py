@@ -121,7 +121,6 @@ class Strategy(abc.ABC, Generic[S, P]):
             state_previous=state,
             output_scale=output_scale,
         )
-        # Final observation
         observed, (corrected, _) = self.complete_correction(
             extrapolated, cache_obs=cache_obs
         )

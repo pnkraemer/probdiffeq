@@ -52,13 +52,14 @@ class AbstractSolver(abc.ABC):
     # todo: state positional-only?
     def _strategy_begin(self, state, /, *, dt, parameters, vector_field):
         # todo: wrap those outputs into a _State type.
-        return self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
             t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        return state_strategy
 
     def _strategy_complete(self, output_extra, state, /, *, cache_obs, output_scale):
         return self.strategy.complete(
@@ -67,16 +68,6 @@ class AbstractSolver(abc.ABC):
             output_scale=output_scale,
             cache_obs=cache_obs,
         )
-        # extrapolated = self.strategy.complete_extrapolation(
-        #     output_extra,
-        #     state_previous=state.strategy,
-        #     output_scale=output_scale,
-        # )
-        # # Final observation
-        # observed, (corrected, _) = self.strategy.complete_correction(
-        #     extrapolated, cache_obs=cache_obs
-        # )
-        # return observed, corrected
 
     @abc.abstractmethod
     def extract_fn(self, state: _State, /) -> solution.Solution:
