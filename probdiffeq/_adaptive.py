@@ -307,8 +307,8 @@ class AdaptiveIVPSolver(Generic[T]):
         #  without losing consistency.
         return control_extract, solver_extract
 
-    def extract_terminal_value_fn(self, state: _AdaptiveState[S, C], /) -> S:
-        solver_extract = self.solver.extract_terminal_value_fn(state.solution)
+    def extract_terminal_values_fn(self, state: _AdaptiveState[S, C], /) -> S:
+        solver_extract = self.solver.extract_terminal_values_fn(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
         return control_extract, solver_extract
 

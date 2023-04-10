@@ -16,38 +16,42 @@ from probdiffeq.strategies import _strategy
 #  which allows the solver (!) to satisfy x = extract(init(x)). Then,
 #  the strategy can be made to obey this pattern next.
 # todo: if we happen to keep this class, make it generic.
-class _FilterSol(NamedTuple):
+class _FiState(NamedTuple):
     """Filtering solution."""
 
     ssv: Any
 
     def scale_covariance(self, s, /):
-        return _FilterSol(self.ssv.scale_covariance(s))
+        return _FiState(self.ssv.scale_covariance(s))
 
     def extract_qoi(self):
         return self.ssv.extract_qoi()
 
 
 @jax.tree_util.register_pytree_node_class
-class Filter(_strategy.Strategy[_FilterSol]):
+class Filter(_strategy.Strategy[_FiState]):
     """Filter strategy."""
 
-    def init(self, *, taylor_coefficients) -> _FilterSol:
+    # todo: this should not operate on taylor_coefficients but on some SSV.
+    def init(self, *, taylor_coefficients) -> _FiState:
         ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
-        return _FilterSol(ssv)
+        return _FiState(ssv)
+
+    def extract(self, posterior: _FiState, /):
+        return posterior.ssv
 
     # todo: make interpolation result into a named-tuple.
     #  it is too confusing what those three posteriors mean.
     def case_right_corner(
-        self, *, p0: _FilterSol, p1: _FilterSol, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[_FilterSol]:  # s1.t == t
+        self, *, p0: _FiState, p1: _FiState, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[_FiState]:  # s1.t == t
         return _collections.InterpRes(accepted=p1, solution=p1, previous=p1)
 
     def case_interpolate(
-        self, *, p0: _FilterSol, p1: _FilterSol, t0, t, t1, output_scale
-    ) -> _collections.InterpRes[_FilterSol]:
+        self, *, p0: _FiState, p1: _FiState, t0, t, t1, output_scale
+    ) -> _collections.InterpRes[_FiState]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - t0
@@ -67,15 +71,15 @@ class Filter(_strategy.Strategy[_FilterSol]):
         t,
         marginals,
         posterior,
-        posterior_previous: _FilterSol,
+        posterior_previous,
         t0,
         t1,
         output_scale,
-    ) -> Tuple[jax.Array, _FilterSol]:
+    ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            p1=posterior,
-            p0=posterior_previous,
+            p1=_FiState(posterior),
+            p0=_FiState(posterior_previous),
             t0=t0,
             t1=t1,
             output_scale=output_scale,
@@ -83,26 +87,26 @@ class Filter(_strategy.Strategy[_FilterSol]):
         u = self.extract_u(sol)
         return u, sol
 
-    def sample(self, key, *, posterior: _FilterSol, shape):
+    def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
 
-    def extract_marginals(self, posterior: _FilterSol, /):
-        return posterior.ssv
+    def extract_marginals(self, ssv, /):
+        return ssv
 
-    def extract_marginals_terminal_values(self, posterior: _FilterSol, /):
-        return posterior.ssv
+    def extract_marginals_terminal_values(self, ssv, /):
+        return ssv
 
-    def extract_u(self, posterior: _FilterSol, /):
+    def extract_u(self, posterior: _FiState, /):
         return posterior.ssv.extract_qoi()
 
-    def begin_extrapolation(self, posterior: _FilterSol, /, *, dt) -> _FilterSol:
+    def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolate = self.implementation.extrapolation.begin_extrapolation
         ssv = extrapolate(posterior.ssv, dt=dt)
-        return _FilterSol(ssv)
+        return _FiState(ssv)
 
     # todo: make "output_extra" positional only. Then rename this mess.
     def begin_correction(
-        self, output_extra: _FilterSol, /, *, vector_field, t, p
+        self, output_extra: _FiState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
         ssv = output_extra.ssv
         return self.implementation.correction.begin_correction(
@@ -111,12 +115,12 @@ class Filter(_strategy.Strategy[_FilterSol]):
 
     def complete_extrapolation(
         self,
-        output_extra: _FilterSol,
+        output_extra: _FiState,
         /,
         *,
         output_scale,
-        posterior_previous: _FilterSol,
-    ) -> _FilterSol:
+        posterior_previous: _FiState,
+    ) -> _FiState:
         extra = self.implementation.extrapolation
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
@@ -125,14 +129,14 @@ class Filter(_strategy.Strategy[_FilterSol]):
             p0=posterior_previous.ssv,
             output_scale=output_scale,
         )
-        return _FilterSol(ssv)
+        return _FiState(ssv)
 
     # todo: more type-stability in corrections!
     def complete_correction(
-        self, extrapolated: _FilterSol, /, *, cache_obs
-    ) -> Tuple[Any, Tuple[_FilterSol, Any]]:
+        self, extrapolated: _FiState, /, *, cache_obs
+    ) -> Tuple[Any, Tuple[_FiState, Any]]:
         obs, (corr, gain) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.ssv, cache=cache_obs
         )
-        corr = _FilterSol(corr)
+        corr = _FiState(corr)
         return obs, (corr, gain)

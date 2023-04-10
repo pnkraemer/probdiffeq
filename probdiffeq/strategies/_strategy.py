@@ -27,6 +27,10 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def extract(self, posterior: P, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def extract_u(self, posterior: P, /):
         raise NotImplementedError
 
