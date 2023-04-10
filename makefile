@@ -5,26 +5,26 @@ format:
 	isort .
 	black .
 	nbqa black docs/quickstart/
-	nbqa black docs/examples/
-	nbqa black docs/advanced_examples/
-	nbqa black docs/benchmarks/lotka_volterra/
-	nbqa black docs/benchmarks/pleiades/
-	nbqa black docs/benchmarks/stiff_van_der_pol/
-	nbqa black docs/benchmarks/hires/
+	nbqa black docs/examples_benchmarks/solvers_solutions/
+	nbqa black docs/examples_benchmarks/parameter_estimation/
+	nbqa black docs/examples_benchmarks/benchmarks/lotka_volterra/
+	nbqa black docs/examples_benchmarks/benchmarks/pleiades/
+	nbqa black docs/examples_benchmarks/benchmarks/stiff_van_der_pol/
+	nbqa black docs/examples_benchmarks/benchmarks/hires/
 	nbqa isort docs/quickstart/
-	nbqa isort docs/examples/
-	nbqa isort docs/advanced_examples/
-	nbqa isort docs/benchmarks/lotka_volterra/
-	nbqa isort docs/benchmarks/pleiades/
-	nbqa isort docs/benchmarks/stiff_van_der_pol/
-	nbqa isort docs/benchmarks/hires/
+	nbqa isort docs/examples_benchmarks/solvers_solutions/
+	nbqa isort docs/examples_benchmarks/parameter_estimation/
+	nbqa isort docs/examples_benchmarks/benchmarks/lotka_volterra/
+	nbqa isort docs/examples_benchmarks/benchmarks/pleiades/
+	nbqa isort docs/examples_benchmarks/benchmarks/stiff_van_der_pol/
+	nbqa isort docs/examples_benchmarks/benchmarks/hires/
 	jupytext --sync docs/quickstart/*
-	jupytext --sync docs/examples/*
-	jupytext --sync docs/advanced_examples/*
-	jupytext --sync docs/benchmarks/lotka_volterra/*
-	jupytext --sync docs/benchmarks/pleiades/*
-	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/benchmarks/hires/*
+	jupytext --sync docs/examples_benchmarks/solvers_solutions/*
+	jupytext --sync docs/examples_benchmarks/parameter_estimation/*
+	jupytext --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --sync docs/examples_benchmarks/benchmarks/pleiades/*
+	jupytext --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --sync docs/examples_benchmarks/benchmarks/hires/*
 
 lint:
 	pre-commit run --all-files
@@ -36,32 +36,32 @@ test:
 example:
 	jupytext --sync docs/quickstart/*.ipynb
 	jupytext --execute docs/quickstart/*.ipynb
-	jupytext --sync docs/examples/*
-	jupytext --execute docs/examples/*
-	jupytext --sync docs/examples/*
-	jupytext --sync docs/advanced_examples/*
-	jupytext --execute docs/advanced_examples/*
-	jupytext --sync docs/advanced_examples/*
+	jupytext --sync examples_benchmarks/solvers_solutions/*
+	jupytext --execute examples_benchmarks/solvers_solutions/*
+	jupytext --sync examples_benchmarks/solvers_solutions/*
+	jupytext --sync examples_benchmarks/parameter_estimation/*
+	jupytext --execute examples_benchmarks/parameter_estimation/*
+	jupytext --sync examples_benchmarks/parameter_estimation/*
 	# No --execute for advanced examples and benchmarks (takes too long)
-	jupytext --sync docs/benchmarks/lotka_volterra/*
-	jupytext --sync docs/benchmarks/pleiades/*
-	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/benchmarks/hires/*
+	jupytext --sync examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --sync examples_benchmarks/benchmarks/pleiades/*
+	jupytext --sync examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --sync examples_benchmarks/benchmarks/hires/*
 
 run-benchmarks:
-	jupytext --sync docs/benchmarks/lotka_volterra/*
-	jupytext --sync docs/benchmarks/pleiades/*
-	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/benchmarks/hires/*
-	jupytext --execute docs/benchmarks/lotka_volterra/internal.ipynb
-	jupytext --execute docs/benchmarks/lotka_volterra/external.ipynb
-	jupytext --execute docs/benchmarks/pleiades/external.ipynb
-	jupytext --execute docs/benchmarks/stiff_van_der_pol/external.ipynb
-	jupytext --execute docs/benchmarks/hires/external.ipynb
-	jupytext --sync docs/benchmarks/lotka_volterra/*
-	jupytext --sync docs/benchmarks/pleiades/*
-	jupytext --sync docs/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/benchmarks/hires/*
+	jupytext --sync examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --sync examples_benchmarks/benchmarks/pleiades/*
+	jupytext --sync examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --sync examples_benchmarks/benchmarks/hires/*
+	jupytext --execute examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
+	jupytext --execute examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
+	jupytext --execute examples_benchmarks/benchmarks/pleiades/external.ipynb
+	jupytext --execute examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
+	jupytext --execute examples_benchmarks/benchmarks/hires/external.ipynb
+	jupytext --sync examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --sync examples_benchmarks/benchmarks/pleiades/*
+	jupytext --sync examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --sync examples_benchmarks/benchmarks/hires/*
 
 clean:
 	pre-commit clean
@@ -70,14 +70,14 @@ clean:
 	rm -rf *.egg-info
 	rm -rf dist site build
 	rm -rf *.ipynb_checkpoints
-	rm -rf docs/benchmarks/lotka_volterra/__pycache__
-	rm -rf docs/benchmarks/lotka_volterra/.ipynb_checkpoints
-	rm -rf docs/benchmarks/pleiades/__pycache__
-	rm -rf docs/benchmarks/pleiades/.ipynb_checkpoints
-	rm -rf docs/benchmarks/stiff_van_der_pol/__pycache__
-	rm -rf docs/benchmarks/stiff_van_der_pol/.ipynb_checkpoints
-	rm -rf docs/benchmarks/hires/__pycache__
-	rm -rf docs/benchmarks/hires/.ipynb_checkpoints
+	rm -rf examples_benchmarks/benchmarks/lotka_volterra/__pycache__
+	rm -rf examples_benchmarks/benchmarks/lotka_volterra/.ipynb_checkpoints
+	rm -rf examples_benchmarks/benchmarks/pleiades/__pycache__
+	rm -rf examples_benchmarks/benchmarks/pleiades/.ipynb_checkpoints
+	rm -rf examples_benchmarks/benchmarks/stiff_van_der_pol/__pycache__
+	rm -rf examples_benchmarks/benchmarks/stiff_van_der_pol/.ipynb_checkpoints
+	rm -rf examples_benchmarks/benchmarks/hires/__pycache__
+	rm -rf examples_benchmarks/benchmarks/hires/.ipynb_checkpoints
 
 doc:
 	mkdocs build
