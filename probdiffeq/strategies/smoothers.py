@@ -7,7 +7,7 @@ from typing import Any, Generic, Tuple, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _control_flow
+from probdiffeq import _collections, _control_flow
 from probdiffeq.strategies import _strategy
 
 S = TypeVar("S")
@@ -104,13 +104,13 @@ class _SmootherCommon(_strategy.Strategy):
     @abc.abstractmethod
     def case_interpolate(
         self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
-    ):
+    ) -> _collections.InterpRes[MarkovSequence]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
         self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
-    ):
+    ) -> _collections.InterpRes[MarkovSequence]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -234,15 +234,14 @@ class Smoother(_SmootherCommon):
 
     def case_right_corner(
         self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
-    ):  # s1.t == t
+    ) -> _collections.InterpRes[MarkovSequence]:
         # todo: is this duplication unnecessary?
         accepted = self._duplicate_with_unit_backward_model(posterior=p1)
-
-        return accepted, p1, p1
+        return _collections.InterpRes(accepted=accepted, solution=p1, previous=p1)
 
     def case_interpolate(
         self, *, p0: MarkovSequence, p1: MarkovSequence, t0, t1, t, output_scale
-    ):
+    ) -> _collections.InterpRes[MarkovSequence]:
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -261,7 +260,9 @@ class Smoother(_SmootherCommon):
         )
         posterior1 = MarkovSequence(init=p1.init, backward_model=backward_model1)
 
-        return posterior1, posterior0, posterior0
+        return _collections.InterpRes(
+            accepted=posterior1, solution=posterior0, previous=posterior0
+        )
 
     # todo: move marginals to MarkovSequence/FilterSol
     def offgrid_marginals(
@@ -331,11 +332,13 @@ class FixedPointSmoother(_SmootherCommon):
         accepted = self._duplicate_with_unit_backward_model(posterior=solution)
         previous = accepted
 
-        return accepted, solution, previous
+        return _collections.InterpRes(
+            accepted=accepted, solution=solution, previous=previous
+        )
 
     def case_interpolate(
         self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
-    ):
+    ) -> _collections.InterpRes[MarkovSequence]:
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -359,7 +362,9 @@ class FixedPointSmoother(_SmootherCommon):
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
         accepted = MarkovSequence(init=p1.init, backward_model=backward_model1)
-        return accepted, solution, previous
+        return _collections.InterpRes(
+            accepted=accepted, solution=solution, previous=previous
+        )
 
     def offgrid_marginals(
         self,

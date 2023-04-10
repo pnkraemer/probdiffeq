@@ -5,6 +5,8 @@ from typing import Generic, TypeVar
 
 import jax
 
+from probdiffeq import _collections
+
 P = TypeVar("P")
 """A type-variable to indicate strategy-state ("posterior") types."""
 
@@ -29,11 +31,15 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_right_corner(self, *, p0: P, p1: P, t, t0, t1, output_scale):
+    def case_right_corner(
+        self, *, p0: P, p1: P, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[P]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_interpolate(self, *, p0: P, p1: P, t, t0, t1, output_scale):
+    def case_interpolate(
+        self, *, p0: P, p1: P, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[P]:
         raise NotImplementedError
 
     @abc.abstractmethod

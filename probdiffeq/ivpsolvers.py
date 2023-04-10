@@ -1,13 +1,12 @@
 """Calibrated IVP solvers."""
 
 import abc
-import dataclasses
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util, solution
+from probdiffeq import _collections, _sqrt_util, solution
 
 
 class _State(NamedTuple):
@@ -25,57 +24,6 @@ class _State(NamedTuple):
     error_estimate: Any
     output_scale_calibrated: Any
     output_scale_prior: Any
-
-
-T = TypeVar("T")
-"""A type-variable corresponding to the posterior-type used in interpolation."""
-
-
-@jax.tree_util.register_pytree_node_class
-@dataclasses.dataclass
-class _Interp(Generic[T]):
-    accepted: T
-    """The new 'accepted' field.
-
-    At time `max(t, s1.t)`. Use this as the right-most reference state
-    in future interpolations, or continue time-stepping from here.
-    """
-
-    solution: T
-    """The new 'solution' field.
-
-    At time `t`. This is the interpolation result.
-    """
-
-    previous: T
-    """The new `previous_solution` field.
-
-    At time `t`. Use this as the right-most reference state
-    in future interpolations, or continue time-stepping from here.
-
-    The difference between `solution` and `previous` emerges in save_at* modes.
-    One belongs to the just-concluded time interval, and the other belongs to
-    the to-be-started time interval.
-    Concretely, this means that one has a unit backward model and the other
-    remembers how to step back to the previous state.
-    """
-
-    # make it look like a namedtuple.
-    #  we cannot use normal named tuples because we want to use a type-variable
-    #  and namedtuples don't support that.
-    #  this is a bit ugly, but it does not really matter...
-    def __getitem__(self, item):
-        return dataclasses.astuple(self)[item]
-
-    def tree_flatten(self):
-        aux = ()
-        children = self.previous, self.solution, self.accepted
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        prev, sol, acc = children
-        return cls(previous=prev, solution=sol, accepted=acc)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -163,7 +111,9 @@ class AbstractSolver(abc.ABC):
         apply_branch = jnp.reshape(apply_branch_as_array, ())
         return jax.lax.switch(apply_branch, branches, s0, s1, t)
 
-    def case_interpolate(self, s0: _State, s1: _State, t) -> _Interp[_State]:
+    def case_interpolate(
+        self, s0: _State, s1: _State, t
+    ) -> _collections.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
             p0=s0.posterior,
             p1=s1.posterior,
@@ -179,9 +129,11 @@ class AbstractSolver(abc.ABC):
         prev = self._interp_make_state(prev_p, t=t, reference=s0)
         sol = self._interp_make_state(sol_p, t=t, reference=s1)
         acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
-        return _Interp(accepted=acc, solution=sol, previous=prev)
+        return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def case_right_corner(self, s0: _State, s1: _State, t) -> _Interp[_State]:
+    def case_right_corner(
+        self, s0: _State, s1: _State, t
+    ) -> _collections.InterpRes[_State]:
         # todo: are all these arguments needed?
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
             p0=s0.posterior,
@@ -195,7 +147,7 @@ class AbstractSolver(abc.ABC):
         prev = self._interp_make_state(prev_p, t=t, reference=s0)
         sol = self._interp_make_state(sol_p, t=t, reference=s1)
         acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
-        return _Interp(accepted=acc, solution=sol, previous=prev)
+        return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def _interp_make_state(self, posterior, *, t, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
