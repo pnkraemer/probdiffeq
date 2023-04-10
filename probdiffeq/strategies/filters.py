@@ -17,7 +17,7 @@ from probdiffeq.strategies import _strategy
 #  the strategy can be made to obey this pattern next.
 # todo: if we happen to keep this class, make it generic.
 class _FiState(NamedTuple):
-    """Filtering solution."""
+    """Filtering state."""
 
     ssv: Any
     num_data_points: float
@@ -25,25 +25,33 @@ class _FiState(NamedTuple):
     def scale_covariance(self, s, /):
         return _FiState(self.ssv.scale_covariance(s), self.num_data_points)
 
-    def extract_qoi(self):
-        return self.ssv.extract_qoi()
+
+class FiSolution(NamedTuple):
+    """Filtering solution."""
+
+    rv: Any
+
+    # todo: make a similar field in MarkovSequence
+    num_data_points: float
 
 
 @jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    # todo: this should not operate on taylor_coefficients but on some SSV.
-    def init(self, ssv, /, *, num_data_points) -> _FiState:
-        return _FiState(ssv, num_data_points=num_data_points)
+    def init(self, sol: FiSolution, /) -> _FiState:
+        return _FiState(sol.rv, num_data_points=sol.num_data_points)
 
-    def solution_from_tcoeffs(self, taylor_coefficients):
-        return self.implementation.extrapolation.init_state_space_var(
+    def solution_from_tcoeffs(
+        self, taylor_coefficients, *, num_data_points
+    ) -> FiSolution:
+        ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
+        return FiSolution(ssv, num_data_points=num_data_points)
 
-    def extract(self, posterior: _FiState, /):
-        return posterior.ssv
+    def extract(self, posterior: _FiState, /) -> FiSolution:
+        return FiSolution(posterior.ssv, posterior.num_data_points)
 
     # todo: make interpolation result into a named-tuple.
     #  it is too confusing what those three posteriors mean.
@@ -93,14 +101,14 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
 
-    def extract_marginals(self, ssv, /):
-        return ssv
+    def extract_marginals(self, sol: FiSolution, /):
+        return sol.rv
 
-    def extract_marginals_terminal_values(self, ssv, /):
-        return ssv
+    def extract_marginals_terminal_values(self, sol: FiSolution, /):
+        return sol.rv
 
-    def extract_u(self, ssv: _FiState, /):
-        return ssv.extract_qoi()
+    def extract_u(self, *, state: _FiState):
+        return state.ssv.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolate = self.implementation.extrapolation.begin_extrapolation

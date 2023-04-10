@@ -20,23 +20,24 @@ S = TypeVar("S")
 class MarkovSequence(Generic[S]):
     """Markov sequence. A discretised Markov process."""
 
-    def __init__(self, *, init: S, backward_model):
+    def __init__(self, *, init: S, backward_model, num_data_points):
         self.init = init
         self.backward_model = backward_model
+        self.num_data_points = num_data_points
 
     def __repr__(self):
         name = self.__class__.__name__
         return f"{name}(init={self.init}, backward_model={self.backward_model})"
 
     def tree_flatten(self):
-        children = (self.init, self.backward_model)
+        children = (self.init, self.backward_model, self.num_data_points)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        init, backward_model = children
-        return cls(init=init, backward_model=backward_model)
+        init, backward_model, n = children
+        return cls(init=init, backward_model=backward_model, num_data_points=n)
 
     def transform_unit_sample(self, base_sample, /):
         if base_sample.shape == self.sample_shape:
@@ -145,24 +146,30 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init(self, posterior, /, *, num_data_points) -> _SmState:
+    def init(self, posterior, /) -> _SmState:
         return _SmState(
             ssv=posterior.init,
             backward_model=posterior.backward_model,
-            num_data_points=num_data_points,
+            num_data_points=posterior.num_data_points,
         )
 
-    def solution_from_tcoeffs(self, taylor_coefficients):
+    def solution_from_tcoeffs(self, taylor_coefficients, *, num_data_points):
         corrected = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
 
         init_bw_model = self.implementation.extrapolation.init_conditional
         bw_model = init_bw_model(ssv_proto=corrected)
-        return MarkovSequence(init=corrected, backward_model=bw_model)
+        return MarkovSequence(
+            init=corrected, backward_model=bw_model, num_data_points=num_data_points
+        )
 
     def extract(self, state: _SmState, /) -> MarkovSequence:
-        return MarkovSequence(init=state.ssv, backward_model=state.backward_model)
+        return MarkovSequence(
+            init=state.ssv,
+            backward_model=state.backward_model,
+            num_data_points=state.num_data_points,
+        )
 
     def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
         ssv = self.implementation.extrapolation.begin_extrapolation(
@@ -192,15 +199,19 @@ class _SmootherCommon(_strategy.Strategy):
 
         return a, (corrected_seq, b)
 
-    def extract_u(self, posterior: MarkovSequence, /):
-        return posterior.init.extract_qoi()
+    def extract_u(self, *, state: _SmState):
+        return state.ssv.extract_qoi()
 
     def extract_marginals_terminal_values(self, posterior: MarkovSequence, /):
         return posterior.init
 
     def extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-        markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
+        markov = MarkovSequence(
+            init=init,
+            backward_model=posterior.backward_model,
+            num_data_points=posterior.num_data_points,
+        )
         return markov.marginalise_backwards()
 
     def sample(self, key, *, posterior: MarkovSequence, shape):
