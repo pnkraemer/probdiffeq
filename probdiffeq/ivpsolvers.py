@@ -1,7 +1,8 @@
 """Calibrated IVP solvers."""
 
 import abc
-from typing import Any, NamedTuple
+import dataclasses
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -24,6 +25,56 @@ class _State(NamedTuple):
     error_estimate: Any
     output_scale_calibrated: Any
     output_scale_prior: Any
+
+
+T = TypeVar("T")
+"""A type-variable corresponding to the posterior-type used in interpolation."""
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
+class _Interp(Generic[T]):
+    accepted: T
+    """The new 'accepted' field.
+
+    At time `max(t, s1.t)`. Use this as the right-most reference state
+    in future interpolations, or continue time-stepping from here.
+    """
+
+    solution: T
+    """The new 'solution' field.
+
+    At time `t`. This is the interpolation result.
+    """
+
+    previous: T
+    """The new `previous_solution` field.
+
+    At time `t`. Use this as the right-most reference state
+    in future interpolations, or continue time-stepping from here.
+
+    The difference between `solution` and `previous` emerges in save_at* modes.
+    One belongs to the just-concluded time interval, and the other belongs to
+    the to-be-started time interval.
+    Concretely, this means that one has a unit backward model and the other
+    remembers how to step back to the previous state.
+    """
+
+    # make it look like a namedtuple.
+    #  we cannot use normal named tuples because we want to use a type-variable
+    #  and namedtuples don't support that.
+    def __getitem__(self, item):
+        return dataclasses.astuple(self)[item]
+
+    def tree_flatten(self):
+        aux = ()
+        children = self.previous, self.solution, self.accepted
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        prev, sol, acc = children
+        return cls(previous=prev, solution=sol, accepted=acc)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -59,13 +110,7 @@ class AbstractSolver(abc.ABC):
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
-    # # todo: change to empty_solution_from_tcoeffs?
-    # def posterior_from_tcoeffs(self, taylor_coefficients, /):
-    #     posterior = self.strategy.init_posterior(
-    #         taylor_coefficients=taylor_coefficients
-    #     )
-    #     return posterior
-
+    # todo: remove "empty" from name?
     def empty_solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
         """Construct an initial `Solution` object.
 
@@ -79,7 +124,9 @@ class AbstractSolver(abc.ABC):
         u = taylor_coefficients[0]
         return self.empty_solution_from_posterior(posterior, u=u, **kwargs)
 
+    # todo: remove "empty" from name?
     def empty_solution_from_posterior(self, posterior, /, *, u, t, output_scale):
+        """Use for initialisation but also for interpolation."""
         output_scale = self.strategy.init_output_scale(output_scale)
         return solution.Solution(
             t=t,
@@ -107,72 +154,92 @@ class AbstractSolver(abc.ABC):
 
     def interpolate_fn(self, *, s0: _State, s1: _State, t):
         raise RuntimeError(
-            "Next up: wrap strategy.case_interpolate and case_right_corner "
-            "into solver methods that operate on solver states. "
-            "Currently, we lose too much information and need to use functions "
-            "such as make_state, which should absolutely not be necessary."
-            "Once this is done, make dynamic solver use local_scale as BOTH output scales, "
-            "and keep fixing all the tests (we are in the middle of state having "
-            "two different output scales). Then, remove output_scale from step_fn() "
+            "Next: remove output_scale from step_fn() "
             "and keep fixing all failing tests. Once this is done, "
             "we should be ready to look at the Pull request diff "
             "(as we are done splitting _State from Solution() -- and "
             "maybe even done with extract(init(solver))?"
         )
 
-        def interpolate(s0_: _State, s1_: _State, t_):
-            return self.strategy.case_interpolate(
-                p0=s0_.posterior,
-                rv1=self.strategy.marginals_terminal_value(posterior=s1.posterior),
-                t=t_,
-                t0=s0_.t,
-                t1=s1_.t,
-                output_scale=s1.output_scale_prior,
-            )
-
-        def right_corner(s0_: _State, s1_: _State, t_):
-            # todo: are all these arguments needed?
-            return self.strategy.case_right_corner(
-                p0=s0_.posterior,
-                p1=s1_.posterior,
-                t=t_,
-                t0=s0_.t,
-                t1=s1_.t,
-                output_scale=s1.output_scale_prior,
-            )
-
         # Cases to switch between
-        branches = [right_corner, interpolate]
+        branches = [self.case_right_corner, self.case_interpolate]
 
         # Which case applies
         is_right_corner = (s1.t - t) ** 2 <= 1e-10  # todo: magic constant?
         is_in_between = jnp.logical_not(is_right_corner)
+        index_as_array = jnp.asarray([is_right_corner, is_in_between])
 
-        index_as_array, *_ = jnp.where(
-            jnp.asarray([is_right_corner, is_in_between]), size=1
+        # Select branch and return result
+        apply_branch_as_array, *_ = jnp.where(index_as_array, size=1)
+        apply_branch = jnp.reshape(apply_branch_as_array, ())
+        return jax.lax.switch(apply_branch, branches, s0, s1, t)
+        #
+        # # helper function to make code below more readable
+        # def make_state(p, t_) -> _State:
+        #     return self.empty_solution_from_posterior(
+        #         p,
+        #         t=t_,
+        #         u=self.strategy.extract_u_from_posterior(p),
+        #         output_scale_calibrated=s1.output_scale_calibrated,
+        #         output_scale_prior=s1.output_scale_prior,
+        #         num_data_points=s1.num_data_points,
+        #     )
+        #
+        # # todo: which output scale is used for MLESolver interpolation
+        # #  _during_ the simulation? hopefully the prior one!
+
+        # previous = make_state(prev, t)
+        # solution_ = make_state(sol, t)
+        # accepted = make_state(acc, jnp.maximum(s1.t, t))
+        #
+        # return accepted, solution_, previous
+
+    def case_interpolate(self, s0: _State, s1: _State, t) -> _Interp[_State]:
+        acc_p, sol_p, prev_p = self.strategy.case_interpolate(
+            p0=s0.posterior,
+            rv1=self.strategy.marginals_terminal_value(posterior=s1.posterior),
+            t=t,
+            t0=s0.t,
+            t1=s1.t,
+            # always interpolate with the prior output scale.
+            #  This is important to make the MLE solver behave correctly.
+            #  (Dynamic solvers overwrite the prior output scale at every step anyway).
+            output_scale=s1.output_scale_prior,
         )
-        index = jnp.reshape(index_as_array, ())
-        acc, sol, prev = jax.lax.switch(index, branches, s0, s1, t)
+        t_accepted = jnp.maximum(s1.t, t)
+        prev = self._interp_make_state(prev_p, t=t, reference=s0)
+        sol = self._interp_make_state(sol_p, t=t, reference=s1)
+        acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
+        return _Interp(accepted=acc, solution=sol, previous=prev)
 
-        # helper function to make code below more readable
-        def make_state(p, t_) -> _State:
-            return self.init(
-                posterior=p,
-                t=t_,
-                u=self.strategy.extract_u_from_posterior(p),
-                output_scale_calibrated=s1.output_scale,
-                output_scale=s1.output_scale,
-                num_data_points=s1.num_data_points,
-            )
+    def case_right_corner(self, s0: _State, s1: _State, t) -> _Interp[_State]:
+        # todo: are all these arguments needed?
+        acc_p, sol_p, prev_p = self.strategy.case_right_corner(
+            p0=s0.posterior,
+            p1=s1.posterior,
+            t=t,
+            t0=s0.t,
+            t1=s1.t,
+            output_scale=s1.output_scale_prior,
+        )
+        t_accepted = jnp.maximum(s1.t, t)
+        prev = self._interp_make_state(prev_p, t=t, reference=s0)
+        sol = self._interp_make_state(sol_p, t=t, reference=s1)
+        acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
+        return _Interp(accepted=acc, solution=sol, previous=prev)
 
-        # todo: which output scale is used for MLESolver interpolation
-        #  _during_ the simulation? hopefully the prior one!
-
-        previous = make_state(prev, t)
-        solution_ = make_state(sol, t)
-        accepted = make_state(acc, jnp.maximum(s1.t, t))
-
-        return accepted, solution_, previous
+    def _interp_make_state(self, posterior, *, t, reference: _State) -> _State:
+        error_estimate = self.strategy.init_error_estimate()
+        u = self.strategy.extract_u_from_posterior(posterior)
+        return _State(
+            posterior=posterior,
+            t=t,
+            u=u,
+            num_data_points=reference.num_data_points,
+            error_estimate=error_estimate,
+            output_scale_prior=reference.output_scale_prior,
+            output_scale_calibrated=reference.output_scale_calibrated,
+        )
 
     def tree_flatten(self):
         children = (self.strategy,)
@@ -226,7 +293,11 @@ class CalibrationFreeSolver(AbstractSolver):
             u=u,
             error_estimate=dt * error,
             posterior=corrected,
-            output_scale=scale,
+            output_scale_prior=scale,
+            # Nothing happens in the field below:
+            #  but we cannot use "None" if we want to reuse the init()
+            #  method from abstract solvers (which populate this field).
+            output_scale_calibrated=scale,
             num_data_points=state.num_data_points + 1,
         )
 
@@ -240,7 +311,10 @@ class CalibrationFreeSolver(AbstractSolver):
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale=state.output_scale,
+            # _prior and _calibrated are identical.
+            #  but we use _prior because we might remove the _calibrated
+            #  value in the future.
+            output_scale=state.output_scale_prior,
             num_data_points=state.num_data_points,
         )
 
@@ -252,7 +326,7 @@ class CalibrationFreeSolver(AbstractSolver):
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale=state.output_scale,
+            output_scale=state.output_scale_prior,
             num_data_points=state.num_data_points,
         )
 
@@ -291,7 +365,10 @@ class DynamicSolver(AbstractSolver):
             u=u,
             error_estimate=dt * error,
             posterior=corrected,
-            output_scale=output_scale,
+            output_scale_calibrated=output_scale,
+            # current scale becomes the new prior scale!
+            #  this is because dynamic solvers assume a piecewise-constant model
+            output_scale_prior=output_scale,
             num_data_points=state.num_data_points + 1,
         )
 
@@ -303,7 +380,7 @@ class DynamicSolver(AbstractSolver):
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale=state.output_scale,
+            output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
 
@@ -315,7 +392,7 @@ class DynamicSolver(AbstractSolver):
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=state.posterior,
-            output_scale=state.output_scale,
+            output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
 
@@ -386,15 +463,17 @@ class MLESolver(AbstractSolver):
         return sum / jnp.sqrt(n + 1)
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        s = state.output_scale[-1] * jnp.ones_like(state.output_scale)
+        # promote calibrated scale to the correct batch-shape
+        s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
+
         marginals = self.strategy.marginals(posterior=state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,
             u=state.u,
-            marginals=marginals,  # new!
+            marginals=marginals,
             posterior=state.posterior,
-            output_scale=state.output_scale,
+            output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
 
@@ -405,9 +484,9 @@ class MLESolver(AbstractSolver):
         return solution.Solution(
             t=state.t,
             u=state.u,
-            marginals=marginals,  # new!
+            marginals=marginals,
             posterior=state.posterior,
-            output_scale=state.output_scale,
+            output_scale=state.output_scale_calibrated,
             num_data_points=state.num_data_points,
         )
 
@@ -437,7 +516,8 @@ class MLESolver(AbstractSolver):
             t=state.t,
             u=u,
             posterior=posterior,
-            output_scale=output_scale,
+            output_scale_calibrated=output_scale,
+            output_scale_prior=None,  # irrelevant, will be removed in next step
             error_estimate=None,  # irrelevant, will be removed in next step.
             num_data_points=state.num_data_points,
         )

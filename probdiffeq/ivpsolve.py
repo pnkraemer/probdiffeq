@@ -108,6 +108,7 @@ def solve_and_save_at(
     sol = solver.empty_solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
+
     if dt0 is None:
         f, u0s = vector_field, initial_values
         nugget = propose_dt0_nugget
