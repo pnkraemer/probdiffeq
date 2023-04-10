@@ -33,7 +33,7 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def case_interpolate(self, *, p0: P, rv1, t, t0, t1, output_scale):  # noqa: D102
+    def case_interpolate(self, *, p0: P, p1: P, t, t0, t1, output_scale):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -46,7 +46,7 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: P, t0, t1, output_scale
+        self, *, t, marginals, posterior, posterior_previous: P, t0, t1, output_scale
     ):
         raise NotImplementedError
 
