@@ -199,7 +199,7 @@ class _SmootherCommon(_strategy.Strategy):
         _extra = self.implementation.extrapolation
         extra_fn = _extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            linearisation_pt=linearisation_pt,
+            linearisation_pt,
             p0=rv,
             output_scale=output_scale,
         )
@@ -226,7 +226,7 @@ class Smoother(_SmootherCommon):
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            linearisation_pt=linearisation_pt.init,
+            linearisation_pt.init,
             p0=posterior_previous.init,
             output_scale=output_scale,
         )
@@ -308,7 +308,7 @@ class FixedPointSmoother(_SmootherCommon):
         output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
-            linearisation_pt=linearisation_pt.init,
+            linearisation_pt.init,
             p0=posterior_previous.init,
             output_scale=output_scale,
         )

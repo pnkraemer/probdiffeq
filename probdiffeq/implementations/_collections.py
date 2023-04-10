@@ -137,7 +137,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     @abc.abstractmethod
     def complete_extrapolation_without_reversal(
         self,
-        linearisation_pt: SSVTypeVar,
+        output_begin: SSVTypeVar,
         p0,
         cache: CacheTypeVar,
         output_scale,
@@ -147,7 +147,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     @abc.abstractmethod
     def complete_extrapolation_with_reversal(
         self,
-        linearisation_pt: SSVTypeVar,
+        output_begin: SSVTypeVar,
         p0,
         cache: CacheTypeVar,
         output_scale,
