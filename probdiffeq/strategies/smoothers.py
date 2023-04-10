@@ -130,7 +130,7 @@ class _SmootherCommon(_strategy.Strategy):
     @abc.abstractmethod
     def complete_extrapolation(
         self,
-        linearisation_pt: MarkovSequence,
+        output_extra: MarkovSequence,
         /,
         *,
         output_scale,
@@ -156,9 +156,9 @@ class _SmootherCommon(_strategy.Strategy):
         return MarkovSequence(init=ssv, backward_model=None)
 
     def begin_correction(
-        self, linearisation_pt: MarkovSequence, /, *, vector_field, t, p
+        self, output_extra: MarkovSequence, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        ssv = linearisation_pt.init
+        ssv = output_extra.init
         return self.implementation.correction.begin_correction(
             ssv, vector_field=vector_field, t=t, p=p
         )
@@ -195,14 +195,12 @@ class _SmootherCommon(_strategy.Strategy):
 
     def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
         dt = t - t0
-        linearisation_pt = self.implementation.extrapolation.begin_extrapolation(
-            rv, dt=dt
-        )
+        output_extra = self.implementation.extrapolation.begin_extrapolation(rv, dt=dt)
 
         _extra = self.implementation.extrapolation
         extra_fn = _extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            linearisation_pt,
+            output_extra,
             p0=rv,
             output_scale=output_scale,
         )
@@ -221,7 +219,7 @@ class Smoother(_SmootherCommon):
 
     def complete_extrapolation(
         self,
-        linearisation_pt: MarkovSequence,
+        output_extra: MarkovSequence,
         /,
         *,
         output_scale,
@@ -230,7 +228,7 @@ class Smoother(_SmootherCommon):
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            linearisation_pt.init,
+            output_extra.init,
             p0=posterior_previous.init,
             output_scale=output_scale,
         )
@@ -306,14 +304,14 @@ class FixedPointSmoother(_SmootherCommon):
 
     def complete_extrapolation(
         self,
-        linearisation_pt: MarkovSequence,
+        output_extra: MarkovSequence,
         /,
         *,
         posterior_previous: MarkovSequence,
         output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
-            linearisation_pt.init,
+            output_extra.init,
             p0=posterior_previous.init,
             output_scale=output_scale,
         )

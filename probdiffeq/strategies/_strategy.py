@@ -60,12 +60,12 @@ class Strategy(abc.ABC, Generic[P]):
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, linearisation_pt: P, /, *, output_scale, posterior_previous: P
+        self, output_extra: P, /, *, output_scale, posterior_previous: P
     ):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_correction(self, linearisation_pt: P, /, *, vector_field, t, p):
+    def begin_correction(self, output_extra: P, /, *, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod

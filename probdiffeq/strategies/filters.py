@@ -50,9 +50,9 @@ class Filter(_strategy.Strategy[_FilterSol]):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - t0
-        linearisation_pt = self.begin_extrapolation(p0, dt=dt)
+        output_extra = self.begin_extrapolation(p0, dt=dt)
         extrapolated = self.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             posterior_previous=p0,
             output_scale=output_scale,
         )
@@ -97,18 +97,18 @@ class Filter(_strategy.Strategy[_FilterSol]):
         ssv = extrapolate(posterior.ssv, dt=dt)
         return _FilterSol(ssv)
 
-    # todo: make "linearisation_pt" positional only. Then rename this mess.
+    # todo: make "output_extra" positional only. Then rename this mess.
     def begin_correction(
-        self, linearisation_pt: _FilterSol, /, *, vector_field, t, p
+        self, output_extra: _FilterSol, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        ssv = linearisation_pt.ssv
+        ssv = output_extra.ssv
         return self.implementation.correction.begin_correction(
             ssv, vector_field=vector_field, t=t, p=p
         )
 
     def complete_extrapolation(
         self,
-        linearisation_pt: _FilterSol,
+        output_extra: _FilterSol,
         /,
         *,
         output_scale,
@@ -118,7 +118,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
-            linearisation_pt.ssv,
+            output_extra.ssv,
             p0=posterior_previous.ssv,
             output_scale=output_scale,
         )
