@@ -145,6 +145,7 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
 def _offgrid_marginals(*, solution, t, solution_previous, solver):
     return solver.strategy.offgrid_marginals(
         marginals=solution.marginals,
+        posterior=solution.posterior,
         posterior_previous=solution_previous.posterior,
         t=t,
         t0=solution_previous.t,

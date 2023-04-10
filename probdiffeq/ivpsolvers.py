@@ -166,7 +166,7 @@ class AbstractSolver(abc.ABC):
     def case_interpolate(self, s0: _State, s1: _State, t) -> _Interp[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
             p0=s0.posterior,
-            rv1=self.strategy.marginals_terminal_value(posterior=s1.posterior),
+            p1=s1.posterior,
             t=t,
             t0=s0.t,
             t1=s1.t,

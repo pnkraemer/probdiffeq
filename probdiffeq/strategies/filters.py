@@ -45,7 +45,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         return p1, p1, p1
 
     def case_interpolate(
-        self, *, p0: _FilterSol, rv1, t0, t, t1, output_scale
+        self, *, p0: _FilterSol, p1: _FilterSol, t0, t, t1, output_scale
     ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
@@ -56,14 +56,22 @@ class Filter(_strategy.Strategy[_FilterSol]):
             posterior_previous=p0,
             output_scale=output_scale,
         )
-        return _FilterSol(rv1), extrapolated, extrapolated
+        return p1, extrapolated, extrapolated
 
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: _FilterSol, t0, t1, output_scale
+        self,
+        *,
+        t,
+        marginals,
+        posterior,
+        posterior_previous: _FilterSol,
+        t0,
+        t1,
+        output_scale,
     ) -> Tuple[jax.Array, _FilterSol]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            rv1=marginals,
+            p1=posterior,
             p0=posterior_previous,
             t0=t0,
             t1=t1,

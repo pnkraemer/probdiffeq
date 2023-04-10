@@ -102,7 +102,9 @@ class _SmootherCommon(_strategy.Strategy):
     # Inherited abstract methods
 
     @abc.abstractmethod
-    def case_interpolate(self, *, p0: MarkovSequence, rv1, t, t0, t1, output_scale):
+    def case_interpolate(
+        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -113,7 +115,15 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: MarkovSequence, t0, t1, output_scale
+        self,
+        *,
+        t,
+        marginals,
+        posterior,
+        posterior_previous: MarkovSequence,
+        t0,
+        t1,
+        output_scale,
     ):
         raise NotImplementedError
 
@@ -230,7 +240,9 @@ class Smoother(_SmootherCommon):
 
         return accepted, p1, p1
 
-    def case_interpolate(self, *, p0: MarkovSequence, rv1, t0, t1, t, output_scale):
+    def case_interpolate(
+        self, *, p0: MarkovSequence, p1: MarkovSequence, t0, t1, t, output_scale
+    ):
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -247,16 +259,25 @@ class Smoother(_SmootherCommon):
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        posterior1 = MarkovSequence(init=rv1, backward_model=backward_model1)
+        posterior1 = MarkovSequence(init=p1.init, backward_model=backward_model1)
 
         return posterior1, posterior0, posterior0
 
+    # todo: move marginals to MarkovSequence/FilterSol
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: MarkovSequence, t0, t1, output_scale
+        self,
+        *,
+        t,
+        marginals,
+        posterior: MarkovSequence,
+        posterior_previous: MarkovSequence,
+        t0,
+        t1,
+        output_scale,
     ):
         acc, _sol, _prev = self.case_interpolate(
             t=t,
-            rv1=marginals,
+            p1=posterior,
             p0=posterior_previous,
             t0=t0,
             t1=t1,
@@ -312,7 +333,9 @@ class FixedPointSmoother(_SmootherCommon):
 
         return accepted, solution, previous
 
-    def case_interpolate(self, *, p0: MarkovSequence, rv1, t, t0, t1, output_scale):
+    def case_interpolate(
+        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+    ):
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -335,10 +358,18 @@ class FixedPointSmoother(_SmootherCommon):
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        accepted = MarkovSequence(init=rv1, backward_model=backward_model1)
+        accepted = MarkovSequence(init=p1.init, backward_model=backward_model1)
         return accepted, solution, previous
 
     def offgrid_marginals(
-        self, *, t, marginals, posterior_previous: MarkovSequence, t0, t1, output_scale
+        self,
+        *,
+        t,
+        marginals,
+        posterior,
+        posterior_previous: MarkovSequence,
+        t0,
+        t1,
+        output_scale,
     ):
         raise NotImplementedError
