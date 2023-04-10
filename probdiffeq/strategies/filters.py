@@ -109,7 +109,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
-            linearisation_pt=linearisation_pt.ssv,
+            linearisation_pt.ssv,
             p0=posterior_previous.ssv,
             output_scale=output_scale,
         )

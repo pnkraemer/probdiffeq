@@ -120,7 +120,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         return p, p_inv
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, output_scale
+        self, linearisation_pt, /, p0, output_scale
     ):
         _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
@@ -136,7 +136,9 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
 
-    def complete_extrapolation_with_reversal(self, linearisation_pt, p0, output_scale):
+    def complete_extrapolation_with_reversal(
+        self, linearisation_pt, /, p0, output_scale
+    ):
         m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 

@@ -104,7 +104,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def complete_extrapolation_without_reversal(
-        self, linearisation_pt, p0, output_scale
+        self, linearisation_pt, /, p0, output_scale
     ):
         _, _, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
@@ -120,7 +120,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    def complete_extrapolation_with_reversal(self, linearisation_pt, p0, output_scale):
+    def complete_extrapolation_with_reversal(
+        self, linearisation_pt, /, p0, output_scale
+    ):
         m_ext_p, m0_p, p, p_inv = linearisation_pt.cache
         m_ext = linearisation_pt.hidden_state.mean
 
