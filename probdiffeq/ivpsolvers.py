@@ -111,7 +111,6 @@ class AbstractSolver(abc.ABC):
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
-    # todo: remove "empty" from name?
     def solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
         """Construct an initial `Solution` object.
 
@@ -125,9 +124,9 @@ class AbstractSolver(abc.ABC):
         u = taylor_coefficients[0]
         return self.solution_from_posterior(posterior, u=u, **kwargs)
 
-    # todo: remove "empty" from name?
     def solution_from_posterior(self, posterior, /, *, u, t, output_scale):
         """Use for initialisation but also for interpolation."""
+        # todo: if we `init()` this output scale, should we also `extract()`?
         output_scale = self.strategy.init_output_scale(output_scale)
         return solution.Solution(
             t=t,
@@ -139,10 +138,7 @@ class AbstractSolver(abc.ABC):
         )
 
     def init(self, sol, /) -> _State:
-        # todo: if we `init()` this output scale, should we also `extract()`?
         error_estimate = self.strategy.init_error_estimate()
-
-        # discard sol.marginals. Add an error estimate instead.
         return _State(
             t=sol.t,
             u=sol.u,
@@ -271,8 +267,6 @@ class CalibrationFreeSolver(AbstractSolver):
             num_data_points=state.num_data_points + 1,
         )
 
-    # todo: move this to the abstract solver and overwrite when necessary?
-    #  the dynamic solver uses the same...
     def extract_fn(self, state: _State, /) -> solution.Solution:
         marginals = self.strategy.marginals(posterior=state.posterior)
         u = marginals.extract_qoi()
@@ -394,7 +388,6 @@ class MLESolver(AbstractSolver):
         new_output_scale = self._update_output_scale(
             diffsqrtm=output_scale, n=n, obs=observed
         )
-        # todo: remove output_scale from step_fn() signature.
 
         # Extract and return solution
         u = self.strategy.extract_u_from_posterior(posterior=corrected)
