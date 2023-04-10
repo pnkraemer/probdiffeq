@@ -119,7 +119,6 @@ def solve_and_save_at(
         save_at=save_at,
         solver=solver,
         dt0=dt0,
-        output_scale=output_scale,
         parameters=parameters,
         while_loop_fn_temporal=while_loop_fn_temporal,
         while_loop_fn_per_step=while_loop_fn_per_step,
@@ -173,7 +172,6 @@ def solve_with_python_while_loop(
         t1=t1,
         solver=solver,
         dt0=dt0,
-        output_scale=output_scale,
         parameters=parameters,
         **options,
     )
@@ -209,7 +207,6 @@ def solve_fixed_grid(
         grid=grid,
         solver=solver,
         parameters=parameters,
-        output_scale=output_scale,
         **options,
     )
 

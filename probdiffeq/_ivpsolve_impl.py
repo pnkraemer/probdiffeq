@@ -49,7 +49,6 @@ def solve_and_save_at(
     save_at,
     solver,
     dt0,
-    output_scale,
     parameters,
     while_loop_fn_temporal,
     while_loop_fn_per_step,
@@ -67,7 +66,6 @@ def solve_and_save_at(
             adaptive_solver=adaptive_solver,
             parameters=parameters,
             while_loop_fn=while_loop_fn_temporal,
-            output_scale=output_scale,
         )
         return s_next, s_next
 
@@ -115,7 +113,7 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, *, solution, t1, solver, dt0, parameters, output_scale, **options
+    vector_field, *, solution, t1, solver, dt0, parameters, **options
 ):
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
 
@@ -126,16 +124,13 @@ def solve_with_python_while_loop(
         t1=t1,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
-        output_scale=output_scale,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
     _dt, sol = adaptive_solver.extract_fn(forward_solution)
     return sol
 
 
-def _solution_generator(
-    vector_field, *, state, t1, adaptive_solver, parameters, output_scale
-):
+def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
     while state.solution.t < t1:
         yield state
@@ -144,13 +139,12 @@ def _solution_generator(
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
-            output_scale=output_scale,
         )
 
     yield state
 
 
-def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters, output_scale):
+def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters):
     t0 = grid[0]
     state = solver.init(solution)
 
@@ -162,7 +156,6 @@ def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters, output
             vector_field=vector_field,
             dt=dt,
             parameters=parameters,
-            output_scale=output_scale,
         )
         return (s_new, t_new), (s_new, t_new)
 
