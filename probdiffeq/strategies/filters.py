@@ -10,7 +10,7 @@ from probdiffeq.strategies import _strategy
 # next, add "t" into this solution (and into MarkovSequence)
 # this will simplify a million functions in this code base
 # and is the next step en route to x=extract(init(x)) for solvers, strategies, etc.
-# more specifically, init_posterior(tcoeffs) becomes
+# more specifically, init(tcoeffs) becomes
 # init_posterior_from_tcoeffs(t, tcoeffs)
 #  which allows the solver (!) to satisfy x = extract(init(x)). Then,
 #  the strategy can be made to obey this pattern next.
@@ -31,7 +31,7 @@ class _FilterSol(NamedTuple):
 class Filter(_strategy.Strategy[_FilterSol]):
     """Filter strategy."""
 
-    def init_posterior(self, *, taylor_coefficients) -> _FilterSol:
+    def init(self, *, taylor_coefficients) -> _FilterSol:
         ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )

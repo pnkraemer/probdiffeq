@@ -118,9 +118,7 @@ class AbstractSolver(abc.ABC):
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
-        posterior = self.strategy.init_posterior(
-            taylor_coefficients=taylor_coefficients
-        )
+        posterior = self.strategy.init(taylor_coefficients=taylor_coefficients)
         u = taylor_coefficients[0]
         return self.solution_from_posterior(posterior, u=u, **kwargs)
 

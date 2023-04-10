@@ -21,7 +21,7 @@ class Strategy(abc.ABC, Generic[P]):
         return f"{self.__class__.__name__}({args})"
 
     @abc.abstractmethod
-    def init_posterior(self, *, taylor_coefficients) -> P:
+    def init(self, *, taylor_coefficients) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
