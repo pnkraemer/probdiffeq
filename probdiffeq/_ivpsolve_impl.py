@@ -5,7 +5,7 @@ Essentially, these functions implement the IVP solution routines after
 initialisation of the Taylor coefficients.
 """
 
-from probdiffeq import _adaptive, _control_flow
+from probdiffeq import _control_flow
 
 # todo: rename to _collocate_seq.py ?
 #  rationale: sequential collocation. Initial conditions are available.
@@ -16,33 +16,21 @@ from probdiffeq import _adaptive, _control_flow
 def simulate_terminal_values(
     vector_field,
     *,
-    u0,
-    posterior,
-    t0,
+    solution,
     t1,
-    solver,
+    adaptive_solver,
     parameters,
     dt0,
-    output_scale,
-    while_loop_fn_temporal,
-    while_loop_fn_per_step,
-    **options
+    while_loop_fn,
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
-    )
-
-    state0 = adaptive_solver.init(
-        posterior=posterior, u=u0, t=t0, dt0=dt0, output_scale=output_scale
-    )
+    state0 = adaptive_solver.init(solution, dt0=dt0)
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
         vector_field=vector_field,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
-        while_loop_fn=while_loop_fn_temporal,
-        output_scale=output_scale,
+        while_loop_fn=while_loop_fn,
     )
     _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
     return sol
@@ -51,21 +39,13 @@ def simulate_terminal_values(
 def solve_and_save_at(
     vector_field,
     *,
-    u0,
-    posterior,
+    solution,
     save_at,
-    solver,
+    adaptive_solver,
     dt0,
-    output_scale,
     parameters,
-    while_loop_fn_temporal,
-    while_loop_fn_per_step,
-    **options
+    while_loop_fn,
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn_per_step, **options
-    )
-
     def advance_to_next_checkpoint(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
@@ -73,15 +53,11 @@ def solve_and_save_at(
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
-            while_loop_fn=while_loop_fn_temporal,
-            output_scale=output_scale,
+            while_loop_fn=while_loop_fn,
         )
         return s_next, s_next
 
-    t0 = save_at[0]
-    state0 = adaptive_solver.init(
-        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
-    )
+    state0 = adaptive_solver.init(solution, dt0=dt0)
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
@@ -101,7 +77,6 @@ def _advance_ivp_solution_adaptively(
     adaptive_solver,
     parameters,
     while_loop_fn,
-    output_scale
 ):
     """Advance an IVP solution to the next state."""
 
@@ -114,7 +89,6 @@ def _advance_ivp_solution_adaptively(
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
-            output_scale=output_scale,
         )
         return state
 
@@ -127,39 +101,22 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field,
-    *,
-    u0,
-    posterior,
-    t0,
-    t1,
-    solver,
-    dt0,
-    parameters,
-    output_scale,
-    **options
+    vector_field, *, solution, t1, adaptive_solver, dt0, parameters
 ):
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver=solver, **options)
-
-    state = adaptive_solver.init(
-        posterior=posterior, t=t0, u=u0, dt0=dt0, output_scale=output_scale
-    )
+    state = adaptive_solver.init(solution, dt0=dt0)
     generator = _solution_generator(
         vector_field,
         state=state,
         t1=t1,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
-        output_scale=output_scale,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
     _dt, sol = adaptive_solver.extract_fn(forward_solution)
     return sol
 
 
-def _solution_generator(
-    vector_field, *, state, t1, adaptive_solver, parameters, output_scale
-):
+def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
     while state.solution.t < t1:
         yield state
@@ -168,19 +125,14 @@ def _solution_generator(
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
-            output_scale=output_scale,
         )
 
     yield state
 
 
-def solve_fixed_grid(
-    vector_field, *, u0, posterior, grid, solver, parameters, output_scale
-):
+def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters):
     t0 = grid[0]
-    state = solver.init_solution_from_posterior(
-        posterior, t=t0, u=u0, output_scale=output_scale
-    )
+    state = solver.init(solution)
 
     def body_fn(carry, t_new):
         s, t_old = carry
@@ -190,7 +142,6 @@ def solve_fixed_grid(
             vector_field=vector_field,
             dt=dt,
             parameters=parameters,
-            output_scale=output_scale,
         )
         return (s_new, t_new), (s_new, t_new)
 

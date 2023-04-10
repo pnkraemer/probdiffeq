@@ -98,7 +98,7 @@ Check this out:
 ts = jnp.linspace(t0 + 1e-4, t1 - 1e-3, num=400, endpoint=True)
 _, dense = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
 
-fig, ax = plt.subplots(nrows=2, sharex=True, tight_layout=True)
+fig, ax = plt.subplots(nrows=2, figsize=(4, 4), sharex=True, tight_layout=True)
 
 for i in [0, 1, 2]:  # ["S", "I", "R"]
     ms = dense.hidden_state.mean[:, 0, i]

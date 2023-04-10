@@ -6,7 +6,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _ivpsolve_impl, taylor
+from probdiffeq import _adaptive, _ivpsolve_impl, taylor
 from probdiffeq.strategies import smoothers
 
 # The high-level checkpoint-style routines
@@ -28,10 +28,14 @@ def simulate_terminal_values(
     while_loop_fn_per_step=jax.lax.while_loop,
     taylor_fn=taylor.taylor_mode_fn,
     propose_dt0_nugget=1e-5,
-    **options,
+    **adaptive_solver_options,
 ):
     """Simulate the terminal values of an initial value problem."""
     _assert_tuple(initial_values)
+
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options
+    )
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -41,27 +45,23 @@ def simulate_terminal_values(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
+    sol = solver.solution_from_tcoeffs(
+        taylor_coefficients, t=t0, output_scale=output_scale
+    )
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    # todo: should we already make the solver adaptive here?
     return _ivpsolve_impl.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
-        u0=initial_values[0],
-        t0=t0,
+        solution=sol,
         t1=t1,
-        solver=solver,
+        adaptive_solver=adaptive_solver,
         parameters=parameters,
         dt0=dt0,
-        output_scale=output_scale,
-        while_loop_fn_temporal=while_loop_fn_temporal,
-        while_loop_fn_per_step=while_loop_fn_per_step,
-        **options,
+        while_loop_fn=while_loop_fn_temporal,
     )
 
 
@@ -77,7 +77,7 @@ def solve_and_save_at(
     while_loop_fn_temporal=jax.lax.while_loop,
     while_loop_fn_per_step=jax.lax.while_loop,
     propose_dt0_nugget=1e-5,
-    **options,
+    **adaptive_solver_options,
 ):
     """Solve an initial value problem \
      and return the solution at a pre-determined grid.
@@ -96,6 +96,10 @@ def solve_and_save_at(
         msg2 = "Did you mean ``smoothers.FixedPointSmoother()``?"
         warnings.warn(msg1 + msg2)
 
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options
+    )
+
     t0 = save_at[0]
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -105,7 +109,9 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
+    sol = solver.solution_from_tcoeffs(
+        taylor_coefficients, t=t0, output_scale=output_scale
+    )
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -114,16 +120,12 @@ def solve_and_save_at(
 
     return _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
-        u0=initial_values[0],
+        solution=sol,
         save_at=save_at,
-        solver=solver,
+        adaptive_solver=adaptive_solver,
         dt0=dt0,
-        output_scale=output_scale,
         parameters=parameters,
-        while_loop_fn_temporal=while_loop_fn_temporal,
-        while_loop_fn_per_step=while_loop_fn_per_step,
-        **options,
+        while_loop_fn=while_loop_fn_temporal,
     )
 
 
@@ -141,7 +143,7 @@ def solve_with_python_while_loop(
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     propose_dt0_nugget=1e-5,
-    **options,
+    **adaptive_solver_options,
 ):
     """Solve an initial value problem with a native-Python while loop.
 
@@ -149,6 +151,9 @@ def solve_with_python_while_loop(
         Not JITable, not reverse-mode-differentiable.
     """
     _assert_tuple(initial_values)
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(
+        solver=solver, **adaptive_solver_options
+    )
 
     num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -158,7 +163,9 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
+    sol = solver.solution_from_tcoeffs(
+        taylor_coefficients, t=t0, output_scale=output_scale
+    )
 
     if dt0 is None:
         f, u0s = vector_field, initial_values
@@ -167,15 +174,11 @@ def solve_with_python_while_loop(
 
     return _ivpsolve_impl.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
-        u0=initial_values[0],
-        t0=t0,
+        solution=sol,
         t1=t1,
-        solver=solver,
+        adaptive_solver=adaptive_solver,
         dt0=dt0,
-        output_scale=output_scale,
         parameters=parameters,
-        **options,
     )
 
 
@@ -187,7 +190,6 @@ def solve_fixed_grid(
     output_scale=1.0,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
-    **options,
 ):
     """Solve an initial value problem on a fixed, pre-determined grid."""
     _assert_tuple(initial_values)
@@ -200,17 +202,15 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    posterior = solver.posterior_from_tcoeffs(taylor_coefficients)
-
+    sol = solver.solution_from_tcoeffs(
+        taylor_coefficients, t=grid[0], output_scale=output_scale
+    )
     return _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
-        u0=initial_values[0],
+        solution=sol,
         grid=grid,
         solver=solver,
         parameters=parameters,
-        output_scale=output_scale,
-        **options,
     )
 
 
