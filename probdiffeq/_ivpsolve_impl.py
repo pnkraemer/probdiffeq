@@ -171,11 +171,9 @@ def _solution_generator(
     yield state
 
 
-def solve_fixed_grid(
-    vector_field, *, u0, posterior, grid, solver, parameters, output_scale
-):
+def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters, output_scale):
     t0 = grid[0]
-    state = solver.init(posterior, t=t0, u=u0, output_scale=output_scale)
+    state = solver.init(solution)
 
     def body_fn(carry, t_new):
         s, t_old = carry

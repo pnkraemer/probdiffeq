@@ -202,12 +202,12 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    posterior = solver.empty_solution_from_tcoeffs(taylor_coefficients)
-
+    sol = solver.empty_solution_from_tcoeffs(
+        taylor_coefficients, t=grid[0], output_scale=output_scale
+    )
     return _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        posterior=posterior,
-        u0=initial_values[0],
+        solution=sol,
         grid=grid,
         solver=solver,
         parameters=parameters,

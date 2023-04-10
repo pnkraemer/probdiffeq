@@ -83,6 +83,14 @@ class AbstractSolver(abc.ABC):
 
     def __init__(self, strategy):
         self.strategy = strategy
+        # raise RuntimeError(
+        #     "Next: update all solvers to current API.".
+        #     "Next: remove output_scale from step_fn() "
+        #     "and keep fixing all failing tests. Once this is done, "
+        #     "we should be ready to look at the Pull request diff "
+        #     "(as we are done splitting _State from Solution() -- and "
+        #     "maybe even done with extract(init(solver))?"
+        # )
 
     def __eq__(self, other):
         def all_equal(a, b):
@@ -153,14 +161,6 @@ class AbstractSolver(abc.ABC):
         )
 
     def interpolate_fn(self, *, s0: _State, s1: _State, t):
-        raise RuntimeError(
-            "Next: remove output_scale from step_fn() "
-            "and keep fixing all failing tests. Once this is done, "
-            "we should be ready to look at the Pull request diff "
-            "(as we are done splitting _State from Solution() -- and "
-            "maybe even done with extract(init(solver))?"
-        )
-
         # Cases to switch between
         branches = [self.case_right_corner, self.case_interpolate]
 
