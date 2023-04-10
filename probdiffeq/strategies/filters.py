@@ -3,6 +3,7 @@ from typing import Any, NamedTuple, Tuple
 
 import jax
 
+from probdiffeq import _collections
 from probdiffeq.strategies import _strategy
 
 
@@ -41,12 +42,12 @@ class Filter(_strategy.Strategy[_FilterSol]):
     #  it is too confusing what those three posteriors mean.
     def case_right_corner(
         self, *, p0: _FilterSol, p1: _FilterSol, t, t0, t1, output_scale
-    ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:  # s1.t == t
-        return p1, p1, p1
+    ) -> _collections.InterpRes[_FilterSol]:  # s1.t == t
+        return _collections.InterpRes(accepted=p1, solution=p1, previous=p1)
 
     def case_interpolate(
         self, *, p0: _FilterSol, p1: _FilterSol, t0, t, t1, output_scale
-    ) -> Tuple[_FilterSol, _FilterSol, _FilterSol]:
+    ) -> _collections.InterpRes[_FilterSol]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - t0
@@ -56,7 +57,9 @@ class Filter(_strategy.Strategy[_FilterSol]):
             posterior_previous=p0,
             output_scale=output_scale,
         )
-        return p1, extrapolated, extrapolated
+        return _collections.InterpRes(
+            accepted=p1, solution=extrapolated, previous=extrapolated
+        )
 
     def offgrid_marginals(
         self,
