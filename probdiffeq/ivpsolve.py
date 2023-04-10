@@ -41,7 +41,7 @@ def simulate_terminal_values(
         t=t0,
         parameters=parameters,
     )
-    sol = solver.empty_solution_from_tcoeffs(
+    sol = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -104,7 +104,7 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
-    sol = solver.empty_solution_from_tcoeffs(
+    sol = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -157,7 +157,7 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    sol = solver.empty_solution_from_tcoeffs(
+    sol = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -198,7 +198,7 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    sol = solver.empty_solution_from_tcoeffs(
+    sol = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
     return _ivpsolve_impl.solve_fixed_grid(

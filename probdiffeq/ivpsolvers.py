@@ -63,6 +63,7 @@ class _Interp(Generic[T]):
     # make it look like a namedtuple.
     #  we cannot use normal named tuples because we want to use a type-variable
     #  and namedtuples don't support that.
+    #  this is a bit ugly, but it does not really matter...
     def __getitem__(self, item):
         return dataclasses.astuple(self)[item]
 
@@ -83,13 +84,6 @@ class AbstractSolver(abc.ABC):
 
     def __init__(self, strategy):
         self.strategy = strategy
-        # raise RuntimeError(
-        #     "Next: remove output_scale from step_fn() "
-        #     "and keep fixing all failing tests. Once this is done, "
-        #     "we should be ready to look at the Pull request diff "
-        #     "(as we are done splitting _State from Solution() -- and "
-        #     "maybe even done with extract(init(solver))?"
-        # )
 
     def __eq__(self, other):
         def all_equal(a, b):
@@ -118,7 +112,7 @@ class AbstractSolver(abc.ABC):
         raise NotImplementedError
 
     # todo: remove "empty" from name?
-    def empty_solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
+    def solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
         """Construct an initial `Solution` object.
 
         An (even if empty) solution object is needed to initialise the solver.
@@ -129,10 +123,10 @@ class AbstractSolver(abc.ABC):
             taylor_coefficients=taylor_coefficients
         )
         u = taylor_coefficients[0]
-        return self.empty_solution_from_posterior(posterior, u=u, **kwargs)
+        return self.solution_from_posterior(posterior, u=u, **kwargs)
 
     # todo: remove "empty" from name?
-    def empty_solution_from_posterior(self, posterior, /, *, u, t, output_scale):
+    def solution_from_posterior(self, posterior, /, *, u, t, output_scale):
         """Use for initialisation but also for interpolation."""
         output_scale = self.strategy.init_output_scale(output_scale)
         return solution.Solution(
