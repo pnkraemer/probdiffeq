@@ -7,14 +7,19 @@ import jax
 
 from probdiffeq import _collections
 
+S = TypeVar("S")
+"""A type-variable to indicate strategy-state types."""
+
 P = TypeVar("P")
-"""A type-variable to indicate strategy-state ("posterior") types."""
+"""A type-variable to indicate strategy-solution ("posterior") types."""
 
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(abc.ABC, Generic[P]):
+class Strategy(abc.ABC, Generic[S, P]):
     """Inference strategy interface."""
 
+    # todo: self.extrapolation and self.correction instead of self.implementation.*
+    #  maybe ask for Smoother(*ts0_iso()).
     def __init__(self, implementation):
         self.implementation = implementation
 
@@ -22,41 +27,42 @@ class Strategy(abc.ABC, Generic[P]):
         args = f"implementation={self.implementation}"
         return f"{self.__class__.__name__}({args})"
 
+    # todo: init() should be init(S) -> P. make empty_solution(tcoeffs) fn.
     @abc.abstractmethod
-    def init(self, *, taylor_coefficients) -> P:
+    def init(self, *, taylor_coefficients) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract(self, posterior: P, /):
+    def extract(self, state: S, /) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_u(self, posterior: P, /):
+    def extract_u(self, state: S, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_marginals(self, posterior: P, /):
+    def extract_marginals(self, state: S, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_marginals_terminal_values(self, posterior: P, /):
+    def extract_marginals_terminal_values(self, state: S, /):
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
-        self, *, p0: P, p1: P, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[P]:
+        self, *, s0: S, s1: S, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[S]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_interpolate(
-        self, *, p0: P, p1: P, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[P]:
+        self, *, s0: S, s1: S, t, t0, t1, output_scale
+    ) -> _collections.InterpRes[S]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def offgrid_marginals(
-        self, *, t, marginals, posterior, posterior_previous: P, t0, t1, output_scale
+        self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
     ):
         raise NotImplementedError
 
@@ -65,21 +71,21 @@ class Strategy(abc.ABC, Generic[P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, posterior: P, /, *, dt):
+    def begin_extrapolation(self, state: S, /, *, dt) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_extrapolation(
-        self, output_extra: P, /, *, output_scale, posterior_previous: P
-    ):
+        self, output_extra: S, /, *, output_scale, state_previous: S
+    ) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_correction(self, output_extra: P, /, *, vector_field, t, p):
+    def begin_correction(self, output_extra: S, /, *, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, extrapolated: P, /, *, cache_obs):
+    def complete_correction(self, extrapolated: S, /, *, cache_obs):
         raise NotImplementedError
 
     def tree_flatten(self):

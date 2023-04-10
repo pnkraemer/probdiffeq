@@ -103,13 +103,13 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def case_interpolate(
-        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
     ) -> _collections.InterpRes[MarkovSequence]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
-        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
     ) -> _collections.InterpRes[MarkovSequence]:
         raise NotImplementedError
 
@@ -134,7 +134,7 @@ class _SmootherCommon(_strategy.Strategy):
         /,
         *,
         output_scale,
-        posterior_previous: MarkovSequence,
+        state_previous: MarkovSequence,
     ):
         raise NotImplementedError
 
@@ -205,7 +205,7 @@ class _SmootherCommon(_strategy.Strategy):
         extra_fn = _extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
             output_extra,
-            p0=rv,
+            s0=rv,
             output_scale=output_scale,
         )
         return extrapolated, bw_model  # should this return a MarkovSequence?
@@ -227,26 +227,26 @@ class Smoother(_SmootherCommon):
         /,
         *,
         output_scale,
-        posterior_previous: MarkovSequence,
+        state_previous: MarkovSequence,
     ) -> MarkovSequence:
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
             output_extra.init,
-            p0=posterior_previous.init,
+            s0=state_previous.init,
             output_scale=output_scale,
         )
         return MarkovSequence(init=extrapolated, backward_model=bw_model)
 
     def case_right_corner(
-        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
     ) -> _collections.InterpRes[MarkovSequence]:
         # todo: is this duplication unnecessary?
-        accepted = self._duplicate_with_unit_backward_model(posterior=p1)
-        return _collections.InterpRes(accepted=accepted, solution=p1, previous=p1)
+        accepted = self._duplicate_with_unit_backward_model(posterior=s1)
+        return _collections.InterpRes(accepted=accepted, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, p0: MarkovSequence, p1: MarkovSequence, t0, t1, t, output_scale
+        self, *, s0: MarkovSequence, s1: MarkovSequence, t0, t1, t, output_scale
     ) -> _collections.InterpRes[MarkovSequence]:
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
@@ -257,14 +257,14 @@ class Smoother(_SmootherCommon):
 
         # Extrapolate from t0 to t, and from t to t1
         extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=p0.init, output_scale=output_scale, t=t, t0=t0
+            rv=s0.init, output_scale=output_scale, t=t, t0=t0
         )
         posterior0 = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        posterior1 = MarkovSequence(init=p1.init, backward_model=backward_model1)
+        posterior1 = MarkovSequence(init=s1.init, backward_model=backward_model1)
 
         return _collections.InterpRes(
             accepted=posterior1, solution=posterior0, previous=posterior0
@@ -284,8 +284,8 @@ class Smoother(_SmootherCommon):
     ):
         acc, _sol, _prev = self.case_interpolate(
             t=t,
-            p1=posterior,
-            p0=posterior_previous,
+            s1=posterior,
+            s0=posterior_previous,
             t0=t0,
             t1=t1,
             output_scale=output_scale,
@@ -312,30 +312,30 @@ class FixedPointSmoother(_SmootherCommon):
         output_extra: MarkovSequence,
         /,
         *,
-        posterior_previous: MarkovSequence,
+        state_previous: MarkovSequence,
         output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
             output_extra.init,
-            p0=posterior_previous.init,
+            s0=state_previous.init,
             output_scale=output_scale,
         )
         extrapolated, bw_increment = _temp
 
-        merge_fn = posterior_previous.backward_model.merge_with_incoming_conditional
+        merge_fn = state_previous.backward_model.merge_with_incoming_conditional
         backward_model = merge_fn(bw_increment)
 
         return MarkovSequence(init=extrapolated, backward_model=backward_model)
 
     def case_right_corner(
-        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
     ):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        merge_fn = p0.backward_model.merge_with_incoming_conditional
-        backward_model1 = merge_fn(p1.backward_model)
+        merge_fn = s0.backward_model.merge_with_incoming_conditional
+        backward_model1 = merge_fn(s1.backward_model)
 
-        solution = MarkovSequence(init=p1.init, backward_model=backward_model1)
+        solution = MarkovSequence(init=s1.init, backward_model=backward_model1)
         accepted = self._duplicate_with_unit_backward_model(posterior=solution)
         previous = accepted
 
@@ -344,7 +344,7 @@ class FixedPointSmoother(_SmootherCommon):
         )
 
     def case_interpolate(
-        self, *, p0: MarkovSequence, p1: MarkovSequence, t, t0, t1, output_scale
+        self, *, s0: MarkovSequence, s1: MarkovSequence, t, t0, t1, output_scale
     ) -> _collections.InterpRes[MarkovSequence]:
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
@@ -355,12 +355,12 @@ class FixedPointSmoother(_SmootherCommon):
 
         # From s0.t to t
         extrapolated0, bw0 = self._interpolate_from_to_fn(
-            rv=p0.init,
+            rv=s0.init,
             output_scale=output_scale,
             t=t,
             t0=t0,
         )
-        backward_model0 = p0.backward_model.merge_with_incoming_conditional(bw0)
+        backward_model0 = s0.backward_model.merge_with_incoming_conditional(bw0)
         solution = MarkovSequence(init=extrapolated0, backward_model=backward_model0)
 
         previous = self._duplicate_with_unit_backward_model(posterior=solution)
@@ -368,7 +368,7 @@ class FixedPointSmoother(_SmootherCommon):
         _, backward_model1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=t1, t0=t
         )
-        accepted = MarkovSequence(init=p1.init, backward_model=backward_model1)
+        accepted = MarkovSequence(init=s1.init, backward_model=backward_model1)
         return _collections.InterpRes(
             accepted=accepted, solution=solution, previous=previous
         )
