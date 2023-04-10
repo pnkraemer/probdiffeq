@@ -29,7 +29,11 @@ class Strategy(abc.ABC, Generic[S, P]):
 
     # todo: init() should be init(S) -> P. make empty_solution(tcoeffs) fn.
     @abc.abstractmethod
-    def init(self, *, taylor_coefficients) -> S:
+    def solution_from_tcoeffs(self, taylor_coefficients) -> P:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init(self, posterior: P) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
