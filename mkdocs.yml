@@ -63,13 +63,13 @@ plugins:
     - exclude:
         glob:
           - "quickstart/easy_example.md"
-          - "examples/*.md"
-          - "advanced_examples/*.md"
-          - "benchmarks/lotka_volterra/internal.md"
-          - "benchmarks/lotka_volterra/external.md"
-          - "benchmarks/pleiades/external.md"
-          - "benchmarks/stiff_van_der_pol/external.md"
-          - "benchmarks/hires/external.md"
+          - "examples_benchmarks/solvers_solutions/*.md"
+          - "examples_benchmarks/parameter_estimation/*.md"
+          - "examples_benchmarks/benchmarks/lotka_volterra/internal.md"
+          - "examples_benchmarks/benchmarks/lotka_volterra/external.md"
+          - "examples_benchmarks/benchmarks/pleiades/external.md"
+          - "examples_benchmarks/benchmarks/stiff_van_der_pol/external.md"
+          - "examples_benchmarks/benchmarks/hires/external.md"
     - mknotebooks
 
 
@@ -82,27 +82,27 @@ nav:
         - Troubleshooting: "quickstart/troubleshooting.md"
     - Examples & Benchmarks:
         - Solvers & Solutions:
-            - "examples/posterior_uncertainties.ipynb"
-            - "examples/second_order_problems.ipynb"
-            - "examples/smoothing.ipynb"
-            - "examples/solution_object.ipynb"
-            - "examples/dynamic_output_scales.ipynb"
-            - "examples/conditioning-on-zero-residual.ipynb"
+            - "examples_benchmarks/solvers_solutions/posterior_uncertainties.ipynb"
+            - "examples_benchmarks/solvers_solutions/second_order_problems.ipynb"
+            - "examples_benchmarks/solvers_solutions/smoothing.ipynb"
+            - "examples_benchmarks/solvers_solutions/solution_object.ipynb"
+            - "examples_benchmarks/solvers_solutions/dynamic_output_scales.ipynb"
+            - "examples_benchmarks/solvers_solutions/conditioning-on-zero-residual.ipynb"
         - Parameter estimation:
-            - Parameter estimation with Optax: "advanced_examples/physics_enhanced_regression_1.ipynb"
-            - Parameter estimation with BlackJAX: "advanced_examples/physics_enhanced_regression_2.ipynb"
-            - Neural ODEs with Optax: "advanced_examples/neural_ode.ipynb"
+            - Parameter estimation with Optax: "examples_benchmarks/parameter_estimation/physics_enhanced_regression_1.ipynb"
+            - Parameter estimation with BlackJAX: "examples_benchmarks/parameter_estimation/physics_enhanced_regression_2.ipynb"
+            - Neural ODEs with Optax: "examples_benchmarks/parameter_estimation/neural_ode.ipynb"
         - Benchmarks:
             - Lotka-Volterra:
-              - "benchmarks/lotka_volterra/insights.md"
-              - "benchmarks/lotka_volterra/internal.ipynb"
-              - "benchmarks/lotka_volterra/external.ipynb"
+              - "examples_benchmarks/benchmarks/lotka_volterra/insights.md"
+              - "examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb"
+              - "examples_benchmarks/benchmarks/lotka_volterra/external.ipynb"
             - Pleiades:
-              - "benchmarks/pleiades/external.ipynb"
+              - "examples_benchmarks/benchmarks/pleiades/external.ipynb"
             - Stiff Van der Pol:
-              - "benchmarks/stiff_van_der_pol/external.ipynb"
+              - "examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb"
             - High irradiance response (HIRES):
-              - "benchmarks/hires/external.ipynb"
+              - "examples_benchmarks/benchmarks/hires/external.ipynb"
     - API Documentation:
         - ivpsolve: "api_docs/ivpsolve.md"
         - ivpsolvers: "api_docs/ivpsolvers.md"
