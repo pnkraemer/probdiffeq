@@ -66,9 +66,7 @@ class AbstractSolver(abc.ABC):
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
-        posterior = self.strategy.init_posterior(
-            taylor_coefficients=taylor_coefficients
-        )
+        posterior = self.strategy.init(taylor_coefficients=taylor_coefficients)
         u = taylor_coefficients[0]
         return self.solution_from_posterior(posterior, u=u, **kwargs)
 
@@ -79,7 +77,7 @@ class AbstractSolver(abc.ABC):
         return solution.Solution(
             t=t,
             posterior=posterior,
-            marginals=self.strategy.marginals_terminal_value(posterior),
+            marginals=self.strategy.extract_marginals_terminal_values(posterior),
             output_scale=output_scale,
             u=u,
             num_data_points=1.0,
@@ -151,7 +149,7 @@ class AbstractSolver(abc.ABC):
 
     def _interp_make_state(self, posterior, *, t, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        u = self.strategy.extract_u_from_posterior(posterior)
+        u = self.strategy.extract_u(posterior)
         return _State(
             posterior=posterior,
             t=t,
@@ -182,30 +180,28 @@ class CalibrationFreeSolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
-        linearisation_pt = self.strategy.begin_extrapolation(
-            posterior=state.posterior, dt=dt
-        )
+        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             output_scale=state.output_scale_prior,
             posterior_previous=state.posterior,
         )
 
         # Complete step (incl. calibration!)
         _, (corrected, _) = self.strategy.complete_correction(
-            extrapolated=extrapolated,
+            extrapolated,
             cache_obs=cache_obs,
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u_from_posterior(posterior=corrected)
+        u = self.strategy.extract_u(corrected)
         return _State(
             t=state.t + dt,
             u=u,
@@ -220,7 +216,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.marginals(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -235,7 +231,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -252,26 +248,24 @@ class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        linearisation_pt = self.strategy.begin_extrapolation(
-            posterior=state.posterior, dt=dt
-        )
+        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
         error, output_scale, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         extrapolated = self.strategy.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             posterior_previous=state.posterior,
             output_scale=output_scale,
         )
 
         # Final observation
         _, (corrected, _) = self.strategy.complete_correction(
-            extrapolated=extrapolated, cache_obs=cache_obs
+            extrapolated, cache_obs=cache_obs
         )
 
         # Return solution
-        u = self.strategy.extract_u_from_posterior(posterior=corrected)
+        u = self.strategy.extract_u(corrected)
         return _State(
             t=state.t + dt,
             u=u,
@@ -285,7 +279,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.marginals(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -297,7 +291,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
-        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
             t=state.t,
@@ -316,24 +310,22 @@ class MLESolver(AbstractSolver):
 
     def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
         # Pre-error-estimate steps
-        linearisation_pt = self.strategy.begin_extrapolation(
-            posterior=state.posterior, dt=dt
-        )
+        output_extra = self.strategy.begin_extrapolation(state.posterior, dt=dt)
 
         # Linearise and estimate error
         error, _, cache_obs = self.strategy.begin_correction(
-            linearisation_pt, vector_field=vector_field, t=state.t + dt, p=parameters
+            output_extra, vector_field=vector_field, t=state.t + dt, p=parameters
         )
 
         # Post-error-estimate steps
         extrapolated = self.strategy.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             output_scale=state.output_scale_prior,
             posterior_previous=state.posterior,
         )
         # Complete step (incl. calibration!)
         observed, (corrected, _) = self.strategy.complete_correction(
-            extrapolated=extrapolated,
+            extrapolated,
             cache_obs=cache_obs,
         )
         output_scale, n = state.output_scale_calibrated, state.num_data_points
@@ -342,7 +334,7 @@ class MLESolver(AbstractSolver):
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u_from_posterior(posterior=corrected)
+        u = self.strategy.extract_u(corrected)
         return _State(
             t=state.t + dt,
             u=u,
@@ -374,7 +366,7 @@ class MLESolver(AbstractSolver):
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
 
-        marginals = self.strategy.marginals(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals(state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,
@@ -387,7 +379,7 @@ class MLESolver(AbstractSolver):
 
     def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
         s = state.output_scale_calibrated
-        marginals = self.strategy.marginals_terminal_value(posterior=state.posterior)
+        marginals = self.strategy.extract_marginals_terminal_values(state.posterior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
             t=state.t,

@@ -11,7 +11,7 @@ from probdiffeq.strategies import _strategy
 # next, add "t" into this solution (and into MarkovSequence)
 # this will simplify a million functions in this code base
 # and is the next step en route to x=extract(init(x)) for solvers, strategies, etc.
-# more specifically, init_posterior(tcoeffs) becomes
+# more specifically, init(tcoeffs) becomes
 # init_posterior_from_tcoeffs(t, tcoeffs)
 #  which allows the solver (!) to satisfy x = extract(init(x)). Then,
 #  the strategy can be made to obey this pattern next.
@@ -32,7 +32,7 @@ class _FilterSol(NamedTuple):
 class Filter(_strategy.Strategy[_FilterSol]):
     """Filter strategy."""
 
-    def init_posterior(self, *, taylor_coefficients) -> _FilterSol:
+    def init(self, *, taylor_coefficients) -> _FilterSol:
         ssv = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
@@ -51,9 +51,9 @@ class Filter(_strategy.Strategy[_FilterSol]):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - t0
-        linearisation_pt = self.begin_extrapolation(posterior=p0, dt=dt)
+        output_extra = self.begin_extrapolation(p0, dt=dt)
         extrapolated = self.complete_extrapolation(
-            linearisation_pt,
+            output_extra,
             posterior_previous=p0,
             output_scale=output_scale,
         )
@@ -80,38 +80,39 @@ class Filter(_strategy.Strategy[_FilterSol]):
             t1=t1,
             output_scale=output_scale,
         )
-        u = self.extract_u_from_posterior(posterior=sol)
+        u = self.extract_u(sol)
         return u, sol
 
     def sample(self, key, *, posterior: _FilterSol, shape):
         raise NotImplementedError
 
-    def marginals(self, posterior: _FilterSol):
+    def extract_marginals(self, posterior: _FilterSol, /):
         return posterior.ssv
 
-    def marginals_terminal_value(self, posterior: _FilterSol):
+    def extract_marginals_terminal_values(self, posterior: _FilterSol, /):
         return posterior.ssv
 
-    def extract_u_from_posterior(self, posterior: _FilterSol):
+    def extract_u(self, posterior: _FilterSol, /):
         return posterior.ssv.extract_qoi()
 
-    def begin_extrapolation(self, *, posterior: _FilterSol, dt) -> _FilterSol:
+    def begin_extrapolation(self, posterior: _FilterSol, /, *, dt) -> _FilterSol:
         extrapolate = self.implementation.extrapolation.begin_extrapolation
         ssv = extrapolate(posterior.ssv, dt=dt)
         return _FilterSol(ssv)
 
-    # todo: make "linearisation_pt" positional only. Then rename this mess.
+    # todo: make "output_extra" positional only. Then rename this mess.
     def begin_correction(
-        self, linearisation_pt: _FilterSol, *, vector_field, t, p
+        self, output_extra: _FilterSol, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        ssv = linearisation_pt.ssv
+        ssv = output_extra.ssv
         return self.implementation.correction.begin_correction(
             ssv, vector_field=vector_field, t=t, p=p
         )
 
     def complete_extrapolation(
         self,
-        linearisation_pt: _FilterSol,
+        output_extra: _FilterSol,
+        /,
         *,
         output_scale,
         posterior_previous: _FilterSol,
@@ -120,7 +121,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
-            linearisation_pt.ssv,
+            output_extra.ssv,
             p0=posterior_previous.ssv,
             output_scale=output_scale,
         )
@@ -128,7 +129,7 @@ class Filter(_strategy.Strategy[_FilterSol]):
 
     # todo: more type-stability in corrections!
     def complete_correction(
-        self, *, extrapolated: _FilterSol, cache_obs
+        self, extrapolated: _FilterSol, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FilterSol, Any]]:
         obs, (corr, gain) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.ssv, cache=cache_obs

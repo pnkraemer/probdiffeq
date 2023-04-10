@@ -130,14 +130,15 @@ class _SmootherCommon(_strategy.Strategy):
     @abc.abstractmethod
     def complete_extrapolation(
         self,
-        linearisation_pt: MarkovSequence,
+        output_extra: MarkovSequence,
+        /,
         *,
         output_scale,
         posterior_previous: MarkovSequence,
     ):
         raise NotImplementedError
 
-    def init_posterior(self, *, taylor_coefficients) -> MarkovSequence:
+    def init(self, *, taylor_coefficients) -> MarkovSequence:
         corrected = self.implementation.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
@@ -146,21 +147,23 @@ class _SmootherCommon(_strategy.Strategy):
         bw_model = init_bw_model(ssv_proto=corrected)
         return MarkovSequence(init=corrected, backward_model=bw_model)
 
-    def begin_extrapolation(self, *, posterior: MarkovSequence, dt) -> MarkovSequence:
+    def begin_extrapolation(
+        self, posterior: MarkovSequence, /, *, dt
+    ) -> MarkovSequence:
         ssv = self.implementation.extrapolation.begin_extrapolation(
             posterior.init, dt=dt
         )
         return MarkovSequence(init=ssv, backward_model=None)
 
     def begin_correction(
-        self, linearisation_pt: MarkovSequence, *, vector_field, t, p
+        self, output_extra: MarkovSequence, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        ssv = linearisation_pt.init
+        ssv = output_extra.init
         return self.implementation.correction.begin_correction(
             ssv, vector_field=vector_field, t=t, p=p
         )
 
-    def complete_correction(self, *, extrapolated: MarkovSequence, cache_obs):
+    def complete_correction(self, extrapolated: MarkovSequence, /, *, cache_obs):
         a, (corrected, b) = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.init, cache=cache_obs
         )
@@ -169,13 +172,13 @@ class _SmootherCommon(_strategy.Strategy):
         )
         return a, (corrected_seq, b)
 
-    def extract_u_from_posterior(self, posterior: MarkovSequence):
+    def extract_u(self, posterior: MarkovSequence, /):
         return posterior.init.extract_qoi()
 
-    def marginals_terminal_value(self, posterior: MarkovSequence):
+    def extract_marginals_terminal_values(self, posterior: MarkovSequence, /):
         return posterior.init
 
-    def marginals(self, posterior: MarkovSequence):
+    def extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
         markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
         return markov.marginalise_backwards()
@@ -192,14 +195,12 @@ class _SmootherCommon(_strategy.Strategy):
 
     def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
         dt = t - t0
-        linearisation_pt = self.implementation.extrapolation.begin_extrapolation(
-            rv, dt=dt
-        )
+        output_extra = self.implementation.extrapolation.begin_extrapolation(rv, dt=dt)
 
         _extra = self.implementation.extrapolation
         extra_fn = _extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            linearisation_pt,
+            output_extra,
             p0=rv,
             output_scale=output_scale,
         )
@@ -218,7 +219,8 @@ class Smoother(_SmootherCommon):
 
     def complete_extrapolation(
         self,
-        linearisation_pt: MarkovSequence,
+        output_extra: MarkovSequence,
+        /,
         *,
         output_scale,
         posterior_previous: MarkovSequence,
@@ -226,7 +228,7 @@ class Smoother(_SmootherCommon):
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
-            linearisation_pt.init,
+            output_extra.init,
             p0=posterior_previous.init,
             output_scale=output_scale,
         )
@@ -303,13 +305,14 @@ class FixedPointSmoother(_SmootherCommon):
 
     def complete_extrapolation(
         self,
-        linearisation_pt: MarkovSequence,
+        output_extra: MarkovSequence,
+        /,
         *,
         posterior_previous: MarkovSequence,
         output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
-            linearisation_pt.init,
+            output_extra.init,
             p0=posterior_previous.init,
             output_scale=output_scale,
         )
