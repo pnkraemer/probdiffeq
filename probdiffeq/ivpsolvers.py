@@ -54,7 +54,7 @@ class AbstractSolver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
+    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
     def solution_from_tcoeffs(self, taylor_coefficients, /, **kwargs):
@@ -234,7 +234,7 @@ class CalibrationFreeSolver(AbstractSolver):
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
+    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         posterior = self.strategy.extract(state.posterior)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
@@ -296,7 +296,7 @@ class DynamicSolver(AbstractSolver):
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
+    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         posterior = self.strategy.extract(state.posterior)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
@@ -370,6 +370,8 @@ class MLESolver(AbstractSolver):
         return sum / jnp.sqrt(n + 1)
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
+        # 'state' is batched. Thus, output scale is an array instead of a scalar.
+
         posterior = self.strategy.extract(state.posterior)
         marginals = self.strategy.extract_marginals(posterior)
 
@@ -385,7 +387,9 @@ class MLESolver(AbstractSolver):
             num_data_points=state.num_data_points,
         )
 
-    def extract_terminal_value_fn(self, state: _State, /) -> solution.Solution:
+    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
+        # 'state' is not batched. Thus, output scale is a scalar.
+
         posterior = self.strategy.extract(state.posterior)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
 

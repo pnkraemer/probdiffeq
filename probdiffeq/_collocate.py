@@ -25,7 +25,7 @@ def simulate_terminal_values(
         parameters=parameters,
         while_loop_fn=while_loop_fn,
     )
-    _dt, sol = adaptive_solver.extract_terminal_value_fn(solution)
+    _dt, sol = adaptive_solver.extract_terminal_values_fn(solution)
     return sol
 
 
