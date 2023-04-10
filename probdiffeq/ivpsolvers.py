@@ -193,7 +193,7 @@ class CalibrationFreeSolver(AbstractSolver):
         extrapolated = self.strategy.complete_extrapolation(
             output_extra,
             output_scale=state.output_scale_prior,
-            posterior_previous=state.posterior,
+            state_previous=state.posterior,
         )
 
         # Complete step (incl. calibration!)
@@ -259,7 +259,7 @@ class DynamicSolver(AbstractSolver):
 
         extrapolated = self.strategy.complete_extrapolation(
             output_extra,
-            posterior_previous=state.posterior,
+            state_previous=state.posterior,
             output_scale=output_scale,
         )
 
@@ -327,7 +327,7 @@ class MLESolver(AbstractSolver):
         extrapolated = self.strategy.complete_extrapolation(
             output_extra,
             output_scale=state.output_scale_prior,
-            posterior_previous=state.posterior,
+            state_previous=state.posterior,
         )
         # Complete step (incl. calibration!)
         observed, (corrected, _) = self.strategy.complete_correction(

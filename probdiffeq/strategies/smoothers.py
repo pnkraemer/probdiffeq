@@ -134,7 +134,7 @@ class _SmootherCommon(_strategy.Strategy):
         /,
         *,
         output_scale,
-        posterior_previous: MarkovSequence,
+        state_previous: MarkovSequence,
     ):
         raise NotImplementedError
 
@@ -227,13 +227,13 @@ class Smoother(_SmootherCommon):
         /,
         *,
         output_scale,
-        posterior_previous: MarkovSequence,
+        state_previous: MarkovSequence,
     ) -> MarkovSequence:
         extra = self.implementation.extrapolation
         extra_fn = extra.complete_extrapolation_with_reversal
         extrapolated, bw_model = extra_fn(
             output_extra.init,
-            p0=posterior_previous.init,
+            p0=state_previous.init,
             output_scale=output_scale,
         )
         return MarkovSequence(init=extrapolated, backward_model=bw_model)
@@ -312,17 +312,17 @@ class FixedPointSmoother(_SmootherCommon):
         output_extra: MarkovSequence,
         /,
         *,
-        posterior_previous: MarkovSequence,
+        state_previous: MarkovSequence,
         output_scale,
     ):
         _temp = self.implementation.extrapolation.complete_extrapolation_with_reversal(
             output_extra.init,
-            p0=posterior_previous.init,
+            p0=state_previous.init,
             output_scale=output_scale,
         )
         extrapolated, bw_increment = _temp
 
-        merge_fn = posterior_previous.backward_model.merge_with_incoming_conditional
+        merge_fn = state_previous.backward_model.merge_with_incoming_conditional
         backward_model = merge_fn(bw_increment)
 
         return MarkovSequence(init=extrapolated, backward_model=backward_model)

@@ -29,7 +29,7 @@ class _FiState(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class Filter(_strategy.Strategy[_FiState]):
+class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     # todo: this should not operate on taylor_coefficients but on some SSV.
@@ -58,7 +58,7 @@ class Filter(_strategy.Strategy[_FiState]):
         output_extra = self.begin_extrapolation(p0, dt=dt)
         extrapolated = self.complete_extrapolation(
             output_extra,
-            posterior_previous=p0,
+            state_previous=p0,
             output_scale=output_scale,
         )
         return _collections.InterpRes(
@@ -119,14 +119,14 @@ class Filter(_strategy.Strategy[_FiState]):
         /,
         *,
         output_scale,
-        posterior_previous: _FiState,
+        state_previous: _FiState,
     ) -> _FiState:
         extra = self.implementation.extrapolation
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
             output_extra.ssv,
-            p0=posterior_previous.ssv,
+            p0=state_previous.ssv,
             output_scale=output_scale,
         )
         return _FiState(ssv)
