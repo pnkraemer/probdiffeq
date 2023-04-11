@@ -108,14 +108,14 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=_FiState(posterior),
-            s0=_FiState(posterior_previous),
+            s1=self.init(posterior),
+            s0=self.init(posterior_previous),
             t0=t0,
             t1=t1,
             output_scale=output_scale,
         )
-        u = self.extract_u(sol)
-        return u, sol
+        u = self.extract_u(state=sol)
+        return u, self.extract(sol)
 
     def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
