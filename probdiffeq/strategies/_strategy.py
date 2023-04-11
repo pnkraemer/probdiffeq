@@ -28,7 +28,7 @@ class Strategy(abc.ABC, Generic[S, P]):
         return f"{self.__class__.__name__}({args})"
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients) -> P:
+    def solution_from_tcoeffs(self, taylor_coefficients, *, num_data_points) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -40,7 +40,7 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_u(self, /, state: S):
+    def extract_u(self, *, state: S):
         raise NotImplementedError
 
     @abc.abstractmethod

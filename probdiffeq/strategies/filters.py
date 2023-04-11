@@ -24,7 +24,15 @@ class _FiState(NamedTuple):
     num_data_points: float
 
     def scale_covariance(self, s, /):
-        return _FiState(self.ssv.scale_covariance(s), self.num_data_points)
+        # unexpectedly early call to scale_covariance...
+        if self.extrapolated is not None:
+            raise ValueError
+
+        return _FiState(
+            extrapolated=None,
+            corrected=self.corrected.scale_covariance(s),
+            num_data_points=self.num_data_points,
+        )
 
 
 class FiSolution(NamedTuple):

@@ -105,8 +105,16 @@ class _SmState(NamedTuple):
 
     def scale_covariance(self, output_scale):
         bw_model = self.backward_model.scale_covariance(output_scale)
-        ssv = self.ssv.scale_covariance(output_scale)
-        return _SmState(ssv=ssv, backward_model=bw_model)
+        if self.extrapolated is not None:
+            # unexpectedly early call to scale_covariance...
+            raise ValueError
+        cor = self.corrected.scale_covariance(output_scale)
+        return _SmState(
+            extrapolated=None,
+            corrected=cor,
+            backward_model=bw_model,
+            num_data_points=self.num_data_points,
+        )
 
 
 class _SmootherCommon(_strategy.Strategy):
@@ -307,8 +315,6 @@ class Smoother(_SmootherCommon):
             rv=s0.corrected, output_scale=output_scale, t=t, t0=t0
         )
         posterior0 = _SmState(
-            # seems weird to set extrapolated to None and corrected to the extrapolation?
-            # well, the extrapolation is mostly a cache for inside solver steps.
             # 'corrected' is the solution. We interpolate to get the value for
             # 'corrected' at time 't', which is exactly what happens.
             extrapolated=None,

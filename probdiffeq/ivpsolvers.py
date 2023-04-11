@@ -224,7 +224,6 @@ class CalibrationFreeSolver(AbstractSolver):
             #  but we cannot use "None" if we want to reuse the init()
             #  method from abstract solvers (which populate this field).
             output_scale_calibrated=state.output_scale_prior,
-            num_data_points=state.num_data_points + 1,
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
