@@ -10,6 +10,8 @@ from probdiffeq.implementations.dense import _vars
 
 @jax.tree_util.register_pytree_node_class
 class DenseConditional(_collections.AbstractConditional):
+    """Conditional distribution with dense covariance structure."""
+
     def __init__(self, transition, noise, target_shape):
         self.transition = transition
         self.noise = noise

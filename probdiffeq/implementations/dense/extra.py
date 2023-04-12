@@ -30,6 +30,7 @@ def ibm_dense(ode_shape, num_derivatives):
 class _DenseIBM(_collections.AbstractExtrapolation):
     def __init__(
         self,
+        *,
         a,
         q_sqrtm_lower,
         preconditioner_scales,

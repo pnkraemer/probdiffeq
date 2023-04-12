@@ -119,7 +119,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_output_scale(self) -> float:
+    def init_output_scale(self, output_scale) -> float:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -138,8 +138,8 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def complete_extrapolation_without_reversal(
         self,
         output_begin: SSVTypeVar,
+        /,
         s0,
-        cache: CacheTypeVar,
         output_scale,
     ):
         raise NotImplementedError
@@ -148,8 +148,8 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def complete_extrapolation_with_reversal(
         self,
         output_begin: SSVTypeVar,
+        /,
         s0,
-        cache: CacheTypeVar,
         output_scale,
     ):
         raise NotImplementedError

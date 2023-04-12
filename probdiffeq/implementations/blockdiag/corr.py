@@ -133,7 +133,7 @@ class _BlockDiag(_collections.AbstractCorrection):
         self.corr = corr
 
     def __repr__(self):
-        return f"{self.__name__}({self.corr})"
+        return f"{self.__class__.__name__}({self.corr})"
 
     def tree_flatten(self):
         children = (self.corr,)

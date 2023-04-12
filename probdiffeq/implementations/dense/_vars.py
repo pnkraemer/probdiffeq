@@ -12,6 +12,8 @@ from probdiffeq.implementations.dense import _conds
 
 @jax.tree_util.register_pytree_node_class
 class DenseStateSpaceVar(_collections.StateSpaceVar):
+    """State-space variable with dense covariance structure."""
+
     def __init__(self, hidden_state, *, cache, target_shape):
         super().__init__(hidden_state=hidden_state, cache=cache)
         self.target_shape = target_shape
