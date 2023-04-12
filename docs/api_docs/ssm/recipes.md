@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.recipes
+::: probdiffeq.statespace.recipes

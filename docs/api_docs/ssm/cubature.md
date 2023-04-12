@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.cubature
+::: probdiffeq.statespace.cubature

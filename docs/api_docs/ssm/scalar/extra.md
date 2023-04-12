@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.scalar.extra
+::: probdiffeq.statespace.scalar.extra

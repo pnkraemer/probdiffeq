@@ -3,8 +3,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.ssm import _collections
-from probdiffeq.ssm.scalar import extra as scalar_extra
+from probdiffeq.statespace import _collections
+from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
 def ibm_blockdiag(ode_shape, num_derivatives):

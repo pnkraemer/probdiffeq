@@ -1,16 +1,16 @@
-"""State-space model ssm."""
+"""State-space model statespace."""
 
 from typing import Any, NamedTuple
 
-from probdiffeq.ssm import cubature
-from probdiffeq.ssm.blockdiag import corr as blockdiag_corr
-from probdiffeq.ssm.blockdiag import extra as blockdiag_extra
-from probdiffeq.ssm.dense import corr as dense_corr
-from probdiffeq.ssm.dense import extra as dense_extra
-from probdiffeq.ssm.iso import corr as iso_corr
-from probdiffeq.ssm.iso import extra as iso_extra
-from probdiffeq.ssm.scalar import corr as scalar_corr
-from probdiffeq.ssm.scalar import extra as scalar_extra
+from probdiffeq.statespace import cubature
+from probdiffeq.statespace.blockdiag import corr as blockdiag_corr
+from probdiffeq.statespace.blockdiag import extra as blockdiag_extra
+from probdiffeq.statespace.dense import corr as dense_corr
+from probdiffeq.statespace.dense import extra as dense_extra
+from probdiffeq.statespace.iso import corr as iso_corr
+from probdiffeq.statespace.iso import extra as iso_extra
+from probdiffeq.statespace.scalar import corr as scalar_corr
+from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
 class Implementation(NamedTuple):

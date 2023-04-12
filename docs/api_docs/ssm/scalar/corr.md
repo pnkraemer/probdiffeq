@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.scalar.corr
+::: probdiffeq.statespace.scalar.corr

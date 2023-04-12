@@ -1,7 +1,7 @@
 """Test cases for state-space model implementations."""
 
 from probdiffeq.backend import testing
-from probdiffeq.ssm import cubature, recipes
+from probdiffeq.statespace import cubature, recipes
 
 
 @testing.case(id="IsoTS0", tags=["nd"])

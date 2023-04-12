@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ssm import _collections
-from probdiffeq.ssm.dense import _conds
+from probdiffeq.statespace import _collections
+from probdiffeq.statespace.dense import _conds
 
 
 @jax.tree_util.register_pytree_node_class

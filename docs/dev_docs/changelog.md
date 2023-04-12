@@ -51,7 +51,7 @@ Notable breaking changes:
   This is mathematically more accurate: the parameter models $sigma$, and the `_sqrtm` 
   suffix was previously used to mark that ProbDiffEq estimates $sigma$ not $sigma^2$ (like other packages).
 * The output_scale parameter is not part of the step_fn() API anymore. Instead, it is tracked in the solver state.
-* `probdiffeq.implementations` is now called `probdiffeq.ssm`. The content remains the same.
+* `probdiffeq.implementations` is now called `probdiffeq.statespace`. The content remains the same.
 
 
 Notable enhancements:

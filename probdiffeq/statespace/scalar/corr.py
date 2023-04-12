@@ -5,8 +5,8 @@ import jax.numpy as jnp
 from jax.typing import ArrayLike
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ssm import _collections
-from probdiffeq.ssm.scalar import _vars
+from probdiffeq.statespace import _collections
+from probdiffeq.statespace.scalar import _vars
 
 
 def taylor_order_zero(*args, **kwargs):

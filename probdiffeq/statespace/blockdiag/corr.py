@@ -4,9 +4,9 @@ from typing import Callable, Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.ssm import _collections, cubature
-from probdiffeq.ssm.scalar import _vars as scalar_vars
-from probdiffeq.ssm.scalar import corr as scalar_corr
+from probdiffeq.statespace import _collections, cubature
+from probdiffeq.statespace.scalar import _vars as scalar_vars
+from probdiffeq.statespace.scalar import corr as scalar_corr
 
 _SLR1CacheType = Tuple[Callable]
 """Type-variable for the correction-cache."""

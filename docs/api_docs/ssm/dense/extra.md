@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.dense.extra
+::: probdiffeq.statespace.dense.extra

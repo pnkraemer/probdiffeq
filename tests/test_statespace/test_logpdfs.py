@@ -7,9 +7,9 @@ import jax.numpy as jnp
 import jax.scipy.stats
 
 from probdiffeq.backend import testing
-from probdiffeq.ssm.dense import _vars as vars_dense
-from probdiffeq.ssm.iso import _vars as vars_iso
-from probdiffeq.ssm.scalar import _vars as vars_scalar
+from probdiffeq.statespace.dense import _vars as vars_dense
+from probdiffeq.statespace.iso import _vars as vars_iso
+from probdiffeq.statespace.scalar import _vars as vars_scalar
 
 
 @testing.fixture(name="setup")

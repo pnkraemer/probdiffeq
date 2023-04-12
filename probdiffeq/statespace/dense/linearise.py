@@ -4,7 +4,7 @@
 import jax
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ssm.dense import _vars
+from probdiffeq.statespace.dense import _vars
 
 # todo:
 #  statistical linear regression (zeroth order)

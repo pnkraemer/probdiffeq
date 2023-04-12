@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers
-from probdiffeq.ssm import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
 
 # Make a problem

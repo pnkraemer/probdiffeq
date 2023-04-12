@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import testing
-from probdiffeq.ssm import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
 
 # todo: both this file and test_checkpoint_same_grid.py call

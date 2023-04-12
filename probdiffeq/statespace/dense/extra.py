@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ssm import _collections, _ibm_util
-from probdiffeq.ssm.dense import _conds, _vars
+from probdiffeq.statespace import _collections, _ibm_util
+from probdiffeq.statespace.dense import _conds, _vars
 
 
 def ibm_dense(ode_shape, num_derivatives):

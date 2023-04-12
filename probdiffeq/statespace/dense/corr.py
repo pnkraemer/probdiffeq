@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ssm import _collections, cubature
-from probdiffeq.ssm.dense import _vars, linearise
+from probdiffeq.statespace import _collections, cubature
+from probdiffeq.statespace.dense import _vars, linearise
 
 
 def taylor_order_zero(*args, **kwargs):

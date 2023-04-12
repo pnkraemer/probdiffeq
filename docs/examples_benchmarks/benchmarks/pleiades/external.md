@@ -29,7 +29,7 @@ from jax import config
 
 from probdiffeq import ivpsolvers
 from probdiffeq.doc_util import benchmark, info, notebook, workprecision
-from probdiffeq.ssm import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 ```
 

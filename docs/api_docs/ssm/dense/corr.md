@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.dense.corr
+::: probdiffeq.statespace.dense.corr

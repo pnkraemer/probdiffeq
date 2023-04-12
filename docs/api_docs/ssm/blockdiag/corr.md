@@ -1,1 +1,1 @@
-::: probdiffeq.ssm.blockdiag.corr
+::: probdiffeq.statespace.blockdiag.corr

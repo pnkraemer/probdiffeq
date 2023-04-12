@@ -3,8 +3,8 @@
 import jax
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ssm import _collections
-from probdiffeq.ssm.iso import _vars
+from probdiffeq.statespace import _collections
+from probdiffeq.statespace.iso import _vars
 
 
 @jax.tree_util.register_pytree_node_class

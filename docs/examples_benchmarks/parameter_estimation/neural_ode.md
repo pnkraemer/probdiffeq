@@ -27,7 +27,7 @@ from jax.config import config
 
 from probdiffeq import ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
-from probdiffeq.ssm import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
 ```
 
