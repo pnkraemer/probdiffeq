@@ -202,7 +202,7 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
     def complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
-        a, (corrected, b) = self.implementation.correction.complete_correction(
+        a, corrected = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corrected_seq = _SmState(
@@ -212,7 +212,7 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=extrapolated.num_data_points + 1,
         )
 
-        return a, (corrected_seq, b)
+        return a, corrected_seq
 
     def extract_u(self, *, state: _SmState):
         return state.corrected.extract_qoi()
