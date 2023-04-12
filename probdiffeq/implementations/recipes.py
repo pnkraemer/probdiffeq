@@ -36,9 +36,7 @@ def ts0_iso(*, ode_order=1, num_derivatives=4) -> Implementation:
     return Implementation(correction=correction, extrapolation=extrapolation)
 
 
-def slr1_blockdiag(
-    *, ode_shape, cubature_rule=None, ode_order=1, num_derivatives=4
-) -> Implementation:
+def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> Implementation:
     """First-order statistical linear regression in state-space models \
      with a block-diagonal structure.
 
@@ -49,14 +47,9 @@ def slr1_blockdiag(
         and without any deprecation policy.
 
     """
-    if cubature_rule is None:
-        correction = blockdiag_corr.statistical_order_one(
-            ode_shape=ode_shape, ode_order=ode_order
-        )
-    else:
-        correction = blockdiag_corr.statistical_order_one(
-            ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
-        )
+    correction = blockdiag_corr.statistical_order_one(
+        ode_shape=ode_shape, ode_order=ode_order
+    )
     extrapolation = blockdiag_extra.ibm_blockdiag(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )

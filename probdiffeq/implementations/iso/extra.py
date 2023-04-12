@@ -1,7 +1,5 @@
 """Extrapolations."""
 
-from typing import Any, Tuple
-
 import jax
 import jax.numpy as jnp
 
@@ -88,7 +86,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
 
     def begin_extrapolation(
         self, s0: _vars.IsoStateSpaceVar, /, dt
-    ) -> Tuple[_vars.IsoStateSpaceVar, Any]:
+    ) -> _vars.IsoStateSpaceVar:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
