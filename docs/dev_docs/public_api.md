@@ -9,8 +9,8 @@ All public functions and class-creators in the following modules and packages ar
 * `controls.py`
 * `strategies.filters.py`
 * `strategies.smoothers.py`
-* `implementations.recipes.py`
-* `implementations.cubature.py`
+* `ssm.recipes.py`
+* `ssm.cubature.py`
 
 Exceptions of this rule are all functions and class-creators that are 
 marked as `warning: highly experimental`, e.g., `taylor.taylor_mode_doubling_fn`.
@@ -22,7 +22,7 @@ This means that the minor version number is increased according the the rules of
 It also means that an entry in the  changelog is warranted, and if deprecation policies are introduced in the future, it would apply to these module.
 
 Everything else is either considered private or experimental.
-For example, `implementations.dense.*` is accessible from the standard namespace, but not considered public API.
+For example, `ssm.dense.*` is accessible from the standard namespace, but not considered public API.
 Changes to this code are treated as bugfixes, breaking or not: 
 patch-version increases, changelog entries are optional, and deprecation policy is not considered necessary.
 

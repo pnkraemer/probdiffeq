@@ -1,4 +1,4 @@
-"""Test cases for implementations."""
+"""Test cases for IVP solver implementations."""
 
 from probdiffeq import ivpsolvers
 from probdiffeq.backend import testing

@@ -1,1 +1,1 @@
-::: probdiffeq.implementations.dense.linearise
+::: probdiffeq.ssm.dense.linearise

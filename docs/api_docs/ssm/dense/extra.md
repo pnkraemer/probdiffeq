@@ -1,1 +1,1 @@
-::: probdiffeq.implementations.dense.extra
+::: probdiffeq.ssm.dense.extra

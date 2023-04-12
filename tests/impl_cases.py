@@ -1,4 +1,4 @@
-"""Test cases for implementations."""
+"""Test cases for state-space model implementations."""
 
 from probdiffeq.backend import testing
 from probdiffeq.ssm import cubature, recipes

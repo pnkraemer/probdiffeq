@@ -1,1 +1,1 @@
-::: probdiffeq.implementations.dense.corr
+::: probdiffeq.ssm.dense.corr
