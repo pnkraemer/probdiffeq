@@ -109,22 +109,22 @@ nav:
         - strategies:
           - filters: "api_docs/strategies/filters.md"
           - smoothers: "api_docs/strategies/smoothers.md"
-        - implementations:
-          - recipes: "api_docs/implementations/recipes.md"
-          - cubature: "api_docs/implementations/cubature.md"
+        - ssm:
+          - recipes: "api_docs/ssm/recipes.md"
+          - cubature: "api_docs/ssm/cubature.md"
           - dense:
-              - extra: "api_docs/implementations/dense/extra.md"
-              - linearise: "api_docs/implementations/dense/linearise.md"
-              - corr: "api_docs/implementations/dense/corr.md"
+              - extra: "api_docs/ssm/dense/extra.md"
+              - linearise: "api_docs/ssm/dense/linearise.md"
+              - corr: "api_docs/ssm/dense/corr.md"
           - iso:
-              - extra: "api_docs/implementations/iso/extra.md"
-              - corr: "api_docs/implementations/iso/corr.md"
+              - extra: "api_docs/ssm/iso/extra.md"
+              - corr: "api_docs/ssm/iso/corr.md"
           - blockdiag:
-              - extra: "api_docs/implementations/blockdiag/extra.md"
-              - corr: "api_docs/implementations/blockdiag/corr.md"
+              - extra: "api_docs/ssm/blockdiag/extra.md"
+              - corr: "api_docs/ssm/blockdiag/corr.md"
           - scalar:
-              - extra: "api_docs/implementations/scalar/extra.md"
-              - corr: "api_docs/implementations/scalar/corr.md"
+              - extra: "api_docs/ssm/scalar/extra.md"
+              - corr: "api_docs/ssm/scalar/corr.md"
         - solution: "api_docs/solution.md"
         - taylor: "api_docs/taylor.md"
         - controls: "api_docs/controls.md"

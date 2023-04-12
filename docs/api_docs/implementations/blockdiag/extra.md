@@ -1,1 +1,0 @@
-::: probdiffeq.implementations.blockdiag.extra

@@ -1,7 +1,7 @@
 """Test cases for implementations."""
 
 from probdiffeq.backend import testing
-from probdiffeq.implementations import cubature, recipes
+from probdiffeq.ssm import cubature, recipes
 
 
 @testing.case(id="IsoTS0", tags=["nd"])
