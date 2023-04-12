@@ -131,7 +131,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, s0, /, dt) -> Tuple[SSVTypeVar, CacheTypeVar]:
+    def begin_extrapolation(self, s0, /, dt) -> SSVTypeVar:
         raise NotImplementedError
 
     @abc.abstractmethod
