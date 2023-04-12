@@ -58,8 +58,6 @@ solver = ivpsolvers.MLESolver(
 ```
 
 ```python
-# %#%time
-
 # Solve the ODE with low precision
 sol = ivpsolve.solve_with_python_while_loop(
     vector_field,
@@ -101,7 +99,7 @@ taylor_coefficients = jnp.reshape(
 def extrapolate_fn(rv, model, dt, output_scale):
     ssv = model.begin_extrapolation(rv, dt)
     rv = model.complete_extrapolation_without_reversal(
-        ssv, p0=rv, output_scale=output_scale
+        ssv, s0=rv, output_scale=output_scale
     )
     return rv
 
