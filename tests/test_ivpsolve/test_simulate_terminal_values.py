@@ -29,7 +29,7 @@ class _SimulateTerminalValuesConfig(NamedTuple):
 
 @testing.case
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag="nd")
+@testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag="nd")
 def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
@@ -47,7 +47,7 @@ def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
 @testing.parametrize_with_cases(
     "ode_problem", cases="..problem_cases", has_tag="scalar"
 )
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag="scalar")
+@testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag="scalar")
 def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
