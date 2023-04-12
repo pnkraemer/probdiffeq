@@ -120,7 +120,7 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         cor = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         _shape = ext.target_shape
         corrected = _vars.DenseStateSpaceVar(cor, cache=None, target_shape=_shape)
-        return observed, (corrected, gain)
+        return observed, corrected
 
 
 @jax.tree_util.register_pytree_node_class
@@ -196,7 +196,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
 
         # Return the results
-        return observed, (corrected, gain)
+        return observed, corrected
 
 
 @jax.tree_util.register_pytree_node_class
@@ -306,7 +306,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
 
         # Return the results
-        return marginals, (corrected, gain)
+        return marginals, corrected
 
 
 @jax.tree_util.register_pytree_node_class
@@ -407,7 +407,7 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
 
         # Return the results
-        return marginals, (corrected, gain)
+        return marginals, corrected
 
 
 def _select_derivative_vect(x, i, *, ode_shape):
