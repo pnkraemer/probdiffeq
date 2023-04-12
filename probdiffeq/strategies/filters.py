@@ -173,7 +173,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def complete_correction(
         self, extrapolated: _FiState, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        obs, (corr, gain) = self.implementation.correction.complete_correction(
+        obs, corr = self.implementation.correction.complete_correction(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corr = _FiState(
@@ -181,7 +181,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             corrected=corr,
             num_data_points=extrapolated.num_data_points + 1,
         )
-        return obs, (corr, gain)
+        return obs, corr
 
     def num_data_points(self, state: _FiState, /):
         return state.num_data_points

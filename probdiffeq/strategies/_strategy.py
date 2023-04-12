@@ -123,7 +123,7 @@ class Strategy(abc.ABC, Generic[S, P]):
             state_previous=state,
             output_scale=output_scale,
         )
-        observed, (corrected, _) = self.complete_correction(
+        observed, corrected = self.complete_correction(
             extrapolated, cache_obs=cache_obs
         )
         return observed, corrected
