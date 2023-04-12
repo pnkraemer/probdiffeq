@@ -1,4 +1,4 @@
-"""State-space model statespace."""
+"""State-space model recipes."""
 
 from typing import Any, NamedTuple
 
