@@ -5,7 +5,7 @@
 This version overhauls large parts of the API. 
 Much of the functionality now looks different.
 Almost all implementations remain identical to before, though, and the API changes
-reduce to renaming function parameters.
+reduce to renaming functions and functino parameters.
 Change to the new API according to the instructions below.
 
 Notable breaking changes:
@@ -51,7 +51,7 @@ Notable breaking changes:
   This is mathematically more accurate: the parameter models $sigma$, and the `_sqrtm` 
   suffix was previously used to mark that ProbDiffEq estimates $sigma$ not $sigma^2$ (like other packages).
 * The output_scale parameter is not part of the step_fn() API anymore. Instead, it is tracked in the solver state.
-
+* `probdiffeq.implementations` is now called `probdiffeq.ssm`. The content remains the same.
 
 
 Notable enhancements:
