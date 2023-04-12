@@ -191,7 +191,7 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
     if isinstance(solution.posterior, smoothers.MarkovSequence):
         terminal_value = solution.posterior.init
     else:
-        terminal_value = solution.posterior
+        terminal_value = solution.posterior.rv
 
     obs, _ = terminal_value.observe_qoi(observation_std=observation_std)
     return jnp.sum(obs.logpdf(u))

@@ -28,11 +28,11 @@ class Strategy(abc.ABC, Generic[S, P]):
         return f"{self.__class__.__name__}({args})"
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients) -> P:
+    def solution_from_tcoeffs(self, taylor_coefficients, *, num_data_points) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init(self, posterior: P, /) -> S:
+    def init(self, solution: P, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -40,7 +40,7 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_u(self, state: S, /):
+    def extract_u(self, *, state: S):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -107,3 +107,27 @@ class Strategy(abc.ABC, Generic[S, P]):
     def init_output_scale(self, *args, **kwargs):
         init_fn = self.implementation.extrapolation.init_output_scale
         return init_fn(*args, **kwargs)
+
+    def begin(self, state: S, /, *, t, dt, parameters, vector_field):
+        # todo (next!): make this return a state-type.
+        output_extra = self.begin_extrapolation(state, dt=dt)
+        output_corr = self.begin_correction(
+            output_extra, vector_field=vector_field, t=t + dt, p=parameters
+        )
+        return output_extra, output_corr
+
+    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        # todo: make this operate on state-types.
+        extrapolated = self.complete_extrapolation(
+            output_extra,
+            state_previous=state,
+            output_scale=output_scale,
+        )
+        observed, (corrected, _) = self.complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
+
+    @abc.abstractmethod
+    def num_data_points(self, state, /):
+        raise NotImplementedError

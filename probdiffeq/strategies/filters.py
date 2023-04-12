@@ -17,32 +17,54 @@ from probdiffeq.strategies import _strategy
 #  the strategy can be made to obey this pattern next.
 # todo: if we happen to keep this class, make it generic.
 class _FiState(NamedTuple):
-    """Filtering solution."""
+    """Filtering state."""
 
-    ssv: Any
+    extrapolated: Any
+    corrected: Any
+    num_data_points: float
 
     def scale_covariance(self, s, /):
-        return _FiState(self.ssv.scale_covariance(s))
+        # unexpectedly early call to scale_covariance...
+        if self.extrapolated is not None:
+            raise ValueError
 
-    def extract_qoi(self):
-        return self.ssv.extract_qoi()
+        return _FiState(
+            extrapolated=None,
+            corrected=self.corrected.scale_covariance(s),
+            num_data_points=self.num_data_points,
+        )
+
+
+class FiSolution(NamedTuple):
+    """Filtering solution."""
+
+    rv: Any
+
+    # todo: make a similar field in MarkovSequence
+    num_data_points: float
 
 
 @jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    # todo: this should not operate on taylor_coefficients but on some SSV.
-    def init(self, ssv, /) -> _FiState:
-        return _FiState(ssv)
-
-    def solution_from_tcoeffs(self, taylor_coefficients):
-        return self.implementation.extrapolation.init_state_space_var(
-            taylor_coefficients=taylor_coefficients
+    def init(self, sol: FiSolution, /) -> _FiState:
+        return _FiState(
+            extrapolated=None,
+            corrected=sol.rv,
+            num_data_points=sol.num_data_points,
         )
 
-    def extract(self, posterior: _FiState, /):
-        return posterior.ssv
+    def solution_from_tcoeffs(
+        self, taylor_coefficients, *, num_data_points
+    ) -> FiSolution:
+        ssv = self.implementation.extrapolation.init_state_space_var(
+            taylor_coefficients=taylor_coefficients
+        )
+        return FiSolution(ssv, num_data_points=num_data_points)
+
+    def extract(self, posterior: _FiState, /) -> FiSolution:
+        return FiSolution(posterior.corrected, posterior.num_data_points)
 
     # todo: make interpolation result into a named-tuple.
     #  it is too confusing what those three posteriors mean.
@@ -63,6 +85,12 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             state_previous=s0,
             output_scale=output_scale,
         )
+        # we need to move the extrapolation to the 'correction' field.
+        extrapolated = _FiState(
+            extrapolated=None,
+            corrected=extrapolated.extrapolated,
+            num_data_points=extrapolated.num_data_points,
+        )
         return _collections.InterpRes(
             accepted=s1, solution=extrapolated, previous=extrapolated
         )
@@ -80,39 +108,43 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=_FiState(posterior),
-            s0=_FiState(posterior_previous),
+            s1=self.init(posterior),
+            s0=self.init(posterior_previous),
             t0=t0,
             t1=t1,
             output_scale=output_scale,
         )
-        u = self.extract_u(sol)
-        return u, sol
+        u = self.extract_u(state=sol)
+        return u, self.extract(sol)
 
     def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
 
-    def extract_marginals(self, ssv, /):
-        return ssv
+    def extract_marginals(self, sol: FiSolution, /):
+        return sol.rv
 
-    def extract_marginals_terminal_values(self, ssv, /):
-        return ssv
+    def extract_marginals_terminal_values(self, sol: FiSolution, /):
+        return sol.rv
 
-    def extract_u(self, ssv: _FiState, /):
-        return ssv.extract_qoi()
+    def extract_u(self, *, state: _FiState):
+        # todo: should this point to extrapolated or corrected?
+        return state.corrected.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolate = self.implementation.extrapolation.begin_extrapolation
-        ssv = extrapolate(posterior.ssv, dt=dt)
-        return _FiState(ssv)
+        extrapolated = extrapolate(posterior.corrected, dt=dt)
+        return _FiState(
+            extrapolated=extrapolated,
+            corrected=None,
+            num_data_points=posterior.num_data_points,
+        )
 
     # todo: make "output_extra" positional only. Then rename this mess.
     def begin_correction(
         self, output_extra: _FiState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        ssv = output_extra.ssv
         return self.implementation.correction.begin_correction(
-            ssv, vector_field=vector_field, t=t, p=p
+            output_extra.extrapolated, vector_field=vector_field, t=t, p=p
         )
 
     def complete_extrapolation(
@@ -127,18 +159,29 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
-            output_extra.ssv,
-            s0=state_previous.ssv,
+            output_extra.extrapolated,
+            s0=state_previous.corrected,
             output_scale=output_scale,
         )
-        return _FiState(ssv)
+        return _FiState(
+            extrapolated=ssv,
+            corrected=None,
+            num_data_points=output_extra.num_data_points,
+        )
 
     # todo: more type-stability in corrections!
     def complete_correction(
         self, extrapolated: _FiState, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FiState, Any]]:
         obs, (corr, gain) = self.implementation.correction.complete_correction(
-            extrapolated=extrapolated.ssv, cache=cache_obs
+            extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
-        corr = _FiState(corr)
+        corr = _FiState(
+            extrapolated=None,
+            corrected=corr,
+            num_data_points=extrapolated.num_data_points + 1,
+        )
         return obs, (corr, gain)
+
+    def num_data_points(self, state: _FiState, /):
+        return state.num_data_points
