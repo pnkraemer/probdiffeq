@@ -74,6 +74,7 @@ def _advance_ivp_solution_adaptively(
     """Advance an IVP solution to the next state."""
 
     def cond_fun(s):
+        # todo: adaptive_solver.solution_time(s) < t1?
         return s.solution.t < t1
 
     def body_fun(s):
@@ -111,6 +112,7 @@ def solve_with_python_while_loop(
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
+    # todo: adaptive_solver.solution_time(s) < t1?
     while state.solution.t < t1:
         yield state
         state = adaptive_solver.step_fn(
