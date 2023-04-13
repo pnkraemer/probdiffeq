@@ -19,6 +19,7 @@ from probdiffeq.strategies import _strategy
 class _FiState(NamedTuple):
     """Filtering state."""
 
+    t: Any
     extrapolated: Any
     corrected: Any
     num_data_points: float
@@ -29,6 +30,7 @@ class _FiState(NamedTuple):
             raise ValueError
 
         return _FiState(
+            t=self.t,
             extrapolated=None,
             corrected=self.corrected.scale_covariance(s),
             num_data_points=self.num_data_points,
@@ -64,7 +66,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return FiSolution(ssv, num_data_points=num_data_points)
 
     def extract(self, posterior: _FiState, /) -> FiSolution:
-        return FiSolution(posterior.corrected, posterior.num_data_points)
+        return posterior.t, FiSolution(posterior.corrected, posterior.num_data_points)
 
     def case_right_corner(
         self, *, s0: _FiState, s1: _FiState, t, t0, t1, output_scale
@@ -72,19 +74,19 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return _collections.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, s0: _FiState, s1: _FiState, t0, t, t1, output_scale
+        self, *, s0: _FiState, s1: _FiState, t, output_scale
     ) -> _collections.InterpRes[_FiState]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
-        dt = t - t0
+        dt = t - s0.t
         output_extra = self.begin_extrapolation(s0, dt=dt)
         extrapolated = self.complete_extrapolation(
             output_extra,
             state_previous=s0,
             output_scale=output_scale,
         )
-        # we need to move the extrapolation to the 'correction' field.
         extrapolated = _FiState(
+            t=t,
             extrapolated=None,
             corrected=extrapolated.extrapolated,
             num_data_points=extrapolated.num_data_points,
@@ -132,6 +134,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         extrapolate = self.extrapolation.begin_extrapolation
         extrapolated = extrapolate(posterior.corrected, dt=dt)
         return _FiState(
+            t=posterior.t + dt,
             extrapolated=extrapolated,
             corrected=None,
             num_data_points=posterior.num_data_points,
@@ -160,6 +163,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             output_scale=output_scale,
         )
         return _FiState(
+            t=output_extra.t,
             extrapolated=ssv,
             corrected=None,
             num_data_points=output_extra.num_data_points,
@@ -173,6 +177,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corr = _FiState(
+            t=extrapolated.t,
             extrapolated=None,
             corrected=corr,
             num_data_points=extrapolated.num_data_points + 1,

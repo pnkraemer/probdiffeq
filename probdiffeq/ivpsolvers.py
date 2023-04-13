@@ -142,7 +142,6 @@ class AbstractSolver(abc.ABC):
             #  (Dynamic solvers overwrite the prior output scale at every step anyway).
             output_scale=s1.output_scale_prior,
         )
-        t_accepted = jnp.maximum(s1.t, t)
         prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
@@ -160,7 +159,6 @@ class AbstractSolver(abc.ABC):
             t1=s1.t,
             output_scale=s1.output_scale_prior,
         )
-        t_accepted = jnp.maximum(s1.t, t)
         prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
@@ -209,7 +207,6 @@ class CalibrationFreeSolver(AbstractSolver):
         # Extract and return solution
         u = self.strategy.extract_u(state=corrected)
         return _State(
-            t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             strategy=corrected,
@@ -221,11 +218,11 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -237,11 +234,11 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -278,11 +275,11 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -291,11 +288,11 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -357,14 +354,14 @@ class MLESolver(AbstractSolver):
     def extract_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
 
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=state.u,
             marginals=marginals,
             posterior=posterior,
@@ -375,13 +372,13 @@ class MLESolver(AbstractSolver):
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
 
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
 
         s = state.output_scale_calibrated
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=state.u,
             marginals=marginals,
             posterior=posterior,

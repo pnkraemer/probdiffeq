@@ -180,11 +180,12 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
     def extract(self, state: _SmState, /) -> MarkovSequence:
-        return MarkovSequence(
+        markov_seq = MarkovSequence(
             init=state.corrected,
             backward_model=state.backward_model,
             num_data_points=state.num_data_points,
         )
+        return state.t, markov_seq
 
     def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
         ssv = self.extrapolation.begin_extrapolation(posterior.corrected, dt=dt)
