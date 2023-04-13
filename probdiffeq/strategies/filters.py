@@ -125,8 +125,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return state.corrected.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
-        extrapolate = self.extrapolation.begin
-        extrapolated = extrapolate(posterior.corrected, dt=dt)
+        extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _FiState(
             t=posterior.t + dt,
             extrapolated=extrapolated,
@@ -149,9 +148,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         output_scale,
         state_previous: _FiState,
     ) -> _FiState:
-        extra = self.extrapolation
-        extrapolate_fn = extra.complete_without_reversal
-        ssv = extrapolate_fn(
+        ssv = self.extrapolation.complete_without_reversal(
             output_extra.extrapolated,
             s0=state_previous.corrected,
             output_scale=output_scale,
