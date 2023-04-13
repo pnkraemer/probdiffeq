@@ -183,7 +183,7 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
     @jax.jit
-    def step_fn(self, state, vector_field, t1, parameters):
+    def step(self, state, vector_field, t1, parameters):
         """Perform a full step (including acceptance/rejection)."""
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
@@ -218,7 +218,7 @@ class AdaptiveIVPSolver(Generic[T]):
 
         def body_fn(x):
             _, s = x
-            s = self._attempt_step_fn(
+            s = self._attempt_step(
                 state=s,
                 vector_field=vector_field,
                 t1=t1,
@@ -240,7 +240,7 @@ class AdaptiveIVPSolver(Generic[T]):
             control=state_new.control,
         )
 
-    def _attempt_step_fn(self, *, state, vector_field, t1, parameters):
+    def _attempt_step(self, *, state, vector_field, t1, parameters):
         """Perform a step with an IVP solver and \
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
@@ -250,7 +250,7 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
         # Perform the actual step.
-        posterior = self.solver.step_fn(
+        posterior = self.solver.step(
             state=state.accepted,
             vector_field=vector_field,
             dt=self.control.extract_dt_from_state(state_control),
@@ -285,7 +285,7 @@ class AdaptiveIVPSolver(Generic[T]):
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
     def _interpolate(self, *, state: _AdaptiveState[S, C], t) -> _AdaptiveState[S, C]:
-        accepted, solution, previous = self.solver.interpolate_fn(
+        accepted, solution, previous = self.solver.interpolate(
             s0=state.previous, s1=state.accepted, t=t
         )
         return _AdaptiveState(
@@ -297,8 +297,8 @@ class AdaptiveIVPSolver(Generic[T]):
             control=state.control,
         )
 
-    def extract_fn(self, state: _AdaptiveState[S, C], /) -> S:
-        solver_extract = self.solver.extract_fn(state.solution)
+    def extract(self, state: _AdaptiveState[S, C], /) -> S:
+        solver_extract = self.solver.extract(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
 
         # return BOTH dt & solver_extract.
@@ -308,8 +308,8 @@ class AdaptiveIVPSolver(Generic[T]):
         #  without losing consistency.
         return control_extract, solver_extract
 
-    def extract_terminal_values_fn(self, state: _AdaptiveState[S, C], /) -> S:
-        solver_extract = self.solver.extract_terminal_values_fn(state.solution)
+    def extract_at_terminal_values(self, state: _AdaptiveState[S, C], /) -> S:
+        solver_extract = self.solver.extract_at_terminal_values(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
         return control_extract, solver_extract
 

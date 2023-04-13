@@ -185,7 +185,7 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    # todo: replace with strategy.extract_terminal_values(posterior)
+    # todo: replace with strategy.extract_at_terminal_values(posterior)
     #  (the catch is that this would involve a
     #  new argument "strategy"/"solver" for this function...
     if isinstance(solution.posterior, smoothers.MarkovSequence):
