@@ -84,9 +84,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def begin_extrapolation(
-        self, s0: _vars.IsoStateSpaceVar, /, dt
-    ) -> _vars.IsoStateSpaceVar:
+    def begin(self, s0: _vars.IsoStateSpaceVar, /, dt) -> _vars.IsoStateSpaceVar:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -101,9 +99,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_extrapolation_without_reversal(
-        self, output_begin, /, s0, output_scale
-    ):
+    def complete_without_reversal(self, output_begin, /, s0, output_scale):
         _, _, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
 
@@ -118,7 +114,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    def complete_extrapolation_with_reversal(self, output_begin, /, s0, output_scale):
+    def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
 

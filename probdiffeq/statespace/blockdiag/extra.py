@@ -46,14 +46,12 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         (extra,) = children
         return cls(extra)
 
-    def begin_extrapolation(self, s0, /, dt):
-        fn = jax.vmap(type(self.extra).begin_extrapolation, in_axes=(0, 0, None))
+    def begin(self, s0, /, dt):
+        fn = jax.vmap(type(self.extra).begin, in_axes=(0, 0, None))
         return fn(self.extra, s0, dt)
 
-    def complete_extrapolation_without_reversal(
-        self, output_begin, /, s0, output_scale
-    ):
-        fn = jax.vmap(type(self.extra).complete_extrapolation_without_reversal)
+    def complete_without_reversal(self, output_begin, /, s0, output_scale):
+        fn = jax.vmap(type(self.extra).complete_without_reversal)
         return fn(self.extra, output_begin, s0, output_scale)
 
     def init_conditional(self, ssv_proto):
@@ -75,6 +73,6 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         fn_vmap = jax.vmap(type(self.extra).promote_output_scale)
         return fn_vmap(self.extra, output_scale)
 
-    def complete_extrapolation_with_reversal(self, output_begin, /, s0, output_scale):
-        fn = jax.vmap(type(self.extra).complete_extrapolation_with_reversal)
+    def complete_with_reversal(self, output_begin, /, s0, output_scale):
+        fn = jax.vmap(type(self.extra).complete_with_reversal)
         return fn(self.extra, output_begin, s0, output_scale)
