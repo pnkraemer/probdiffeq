@@ -25,6 +25,12 @@ class _FiState(NamedTuple):
     corrected: Any
     num_data_points: float
 
+    # todo: is this property a bit hacky?
+
+    @property
+    def error_estimate(self):
+        return self.corrected.error_estimate
+
     def scale_covariance(self, s, /):
         # unexpectedly early call to scale_covariance...
         if self.extrapolated is not None:
@@ -72,19 +78,22 @@ _SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    def init(self, t, u, _marginals, solution) -> _FiState:
+    def init(self, t, u, _marginals, solution: FilterDist) -> _FiState:
+        corrected = self.extrapolation.init_without_reversal(solution.rv)
         return _FiState(
             t=t,
             u=u,
             extrapolated=None,
-            corrected=solution.rv,
+            corrected=corrected,
             num_data_points=solution.num_data_points,
         )
 
     def solution_from_tcoeffs(
         self, taylor_coefficients, /, *, num_data_points
     ) -> Tuple[jax.Array, jax.Array, FilterDist]:
-        ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
+        ssv = self.extrapolation.solution_from_tcoeffs_without_reversal(
+            taylor_coefficients
+        )
         sol = FilterDist(ssv, num_data_points=num_data_points)
         marginals = ssv
         u = taylor_coefficients[0]
@@ -92,8 +101,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
 
     def extract(self, posterior: _FiState, /) -> _SolType:
         t = posterior.t
-        solution = FilterDist(posterior.corrected, posterior.num_data_points)
-        marginals = solution.rv
+        marginals = self.extrapolation.extract_without_reversal(posterior.corrected)
+        solution = FilterDist(marginals, posterior.num_data_points)
         u = marginals.extract_qoi()
         return t, u, marginals, solution
 

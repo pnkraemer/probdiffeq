@@ -19,9 +19,11 @@ class _State(NamedTuple):
     # Not contained in _State but in Solution: output_scale, marginals.
 
     # Different to solution.Solution():
-    error_estimate: Any
     output_scale_calibrated: Any
     output_scale_prior: Any
+
+    # Todo: havin those properties is a little bit hacky?
+    #  Would be great to have _one_ place of accessing them from.
 
     @property
     def t(self):
@@ -30,6 +32,10 @@ class _State(NamedTuple):
     @property
     def u(self):
         return self.strategy.u
+
+    @property
+    def error_estimate(self):
+        return self.strategy.error_estimate
 
 
 @jax.tree_util.register_pytree_node_class
@@ -100,10 +106,8 @@ class AbstractSolver(abc.ABC):
         )
 
     def init(self, sol, /) -> _State:
-        error_estimate = self.strategy.init_error_estimate()
         strategy_state = self.strategy.init(sol.t, sol.u, sol.marginals, sol.posterior)
         return _State(
-            error_estimate=error_estimate,
             strategy=strategy_state,
             output_scale_prior=sol.output_scale,
             output_scale_calibrated=sol.output_scale,

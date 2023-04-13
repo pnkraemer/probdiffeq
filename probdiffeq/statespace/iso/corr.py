@@ -35,7 +35,14 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
         error_estimate_unscaled = obs.marginal_std()
         error_estimate = error_estimate_unscaled * output_scale
-        return error_estimate, output_scale, (bias,)
+
+        x = _vars.IsoStateSpaceVar(
+            x.hidden_state,
+            error_estimate=error_estimate,
+            cache_extra=x.cache_extra,
+            cache_corr=(bias,),
+        )
+        return x, output_scale
 
     def complete(
         self, extrapolated: _vars.IsoStateSpaceVar, cache

@@ -30,20 +30,55 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
+    def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
             raise ValueError(msg1 + msg2)
         m0_corrected = jnp.stack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
+
+        # todo: smoothers should return rv + conditional
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return rv
+
+    def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
+        raise RuntimeError
+
+    def extract_with_reversal(self, s, /):
+        raise RuntimeError
+
+    def extract_without_reversal(self, s, /):
+        raise RuntimeError  # todo
+
+    # todo: should this be a classmethod in _conds.IsoConditional?
+    def _init_conditional(self, ssv_proto):
+        op = self._init_backward_transition()
+        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
+        return _conds.IsoConditionalHiddenState(op, noise=noi)
+
+    def _init_backward_transition(self):
+        return jnp.eye(*self.a.shape)
+
+    def _init_backward_noise(self, rv_proto):
+        return _vars.IsoNormalHiddenState(
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+        )
+
+    def init_without_reversal(self, rv, /):
+        error_estimate = jnp.zeros(())
+        return _vars.IsoStateSpaceVar(
+            rv, error_estimate=error_estimate, cache_extra=None, cache_corr=None
+        )
+
+    def init_with_reversal(self, rv, conds, /):
+        raise RuntimeError  # todo
 
     # todo: why does this method have the same name as the above?
-    def init_ssv(self, ode_shape):
+    def _init_ssv(self, ode_shape):
         assert len(ode_shape) == 1
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
@@ -51,8 +86,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(m0, c0)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    def init_error_estimate(self):
-        return jnp.zeros(())  # the initialisation is error-free
+    #
+    # def init_error_estimate(self):
+    #     return jnp.zeros(())  # the initialisation is error-free
 
     def promote_output_scale(self, output_scale):
         return output_scale
@@ -65,7 +101,12 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoStateSpaceVar(ext, cache=(m_ext_p, m0_p, p, p_inv))
+        return _vars.IsoStateSpaceVar(
+            ext,
+            error_estimate=None,
+            cache_extra=(m_ext_p, m0_p, p, p_inv),
+            cache_corr=None,
+        )
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -85,7 +126,8 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        # Use output_begin as an error estimate?
+        return _vars.IsoStateSpaceVar(rv, error_estimate=None, cache=None)
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
@@ -112,18 +154,3 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoStateSpaceVar(extrapolated, cache=None), bw_model
-
-    # todo: should this be a classmethod in _conds.IsoConditional?
-    def init_conditional(self, ssv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _conds.IsoConditionalHiddenState(op, noise=noi)
-
-    def _init_backward_transition(self):
-        return jnp.eye(*self.a.shape)
-
-    def _init_backward_noise(self, rv_proto):
-        return _vars.IsoNormalHiddenState(
-            mean=jnp.zeros_like(rv_proto.mean),
-            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-        )

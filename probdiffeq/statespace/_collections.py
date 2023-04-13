@@ -63,19 +63,35 @@ class StateSpaceVar(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
-    def __init__(self, hidden_state, *, cache):
+    def __init__(self, hidden_state, *, error_estimate, cache_extra, cache_corr):
         self.hidden_state = hidden_state
-        self.cache = cache
+
+        # todo: add conditional here
+        #  (and make init_with_reversal, extract_with_reversal methods in extrapolation)
+
+        self.error_estimate = error_estimate
+        self.cache_extra = cache_extra
+        self.cache_corr = cache_corr
 
     def tree_flatten(self):
-        children = (self.hidden_state, self.cache)
+        children = (
+            self.hidden_state,
+            self.error_estimate,
+            self.cache_extra,
+            self.cache_corr,
+        )
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (hidden_state, cache) = children
-        return cls(hidden_state=hidden_state, cache=cache)
+        (hidden_state, error_estimate, cache_e, cache_c) = children
+        return cls(
+            hidden_state=hidden_state,
+            error_estimate=error_estimate,
+            cache_extra=cache_e,
+            cache_corr=cache_c,
+        )
 
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
@@ -146,7 +162,29 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients, /) -> SSVTypeVar:
+    def solution_from_tcoeffs_without_reversal(
+        self, taylor_coefficients, /
+    ) -> SSVTypeVar:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /) -> SSVTypeVar:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init_without_reversal(self, rv, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init_with_reversal(self, rv, cond, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_without_reversal(self, s, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract_with_reversal(self, s, /):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -171,16 +209,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         s0,
         output_scale,
     ):
-        raise NotImplementedError
-
-    # todo: bundle in an init() method:
-
-    @abc.abstractmethod
-    def init_error_estimate(self) -> jax.Array:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def init_conditional(self, ssv_proto):
         raise NotImplementedError
 
 
