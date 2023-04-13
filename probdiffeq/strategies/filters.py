@@ -58,11 +58,9 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
 
     def solution_from_tcoeffs(
-        self, taylor_coefficients, *, num_data_points
+        self, taylor_coefficients, /, *, num_data_points
     ) -> FiSolution:
-        ssv = self.extrapolation.init_state_space_var(
-            taylor_coefficients=taylor_coefficients
-        )
+        ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
         return FiSolution(ssv, num_data_points=num_data_points)
 
     def extract(self, posterior: _FiState, /) -> FiSolution:

@@ -169,10 +169,8 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
 
-    def solution_from_tcoeffs(self, taylor_coefficients, *, num_data_points):
-        corrected = self.extrapolation.init_state_space_var(
-            taylor_coefficients=taylor_coefficients
-        )
+    def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
+        corrected = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
         init_bw_model = self.extrapolation.init_conditional
         bw_model = init_bw_model(ssv_proto=corrected)
