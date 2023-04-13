@@ -86,16 +86,9 @@ class AbstractSolver(abc.ABC):
         initialisation code a bit simpler.
         """
         # todo: this should not call init(), but strategy.sol_from_tcoeffs()!
-        posterior = self.strategy.solution_from_tcoeffs(
+        u, marginals, posterior = self.strategy.solution_from_tcoeffs(
             taylor_coefficients, num_data_points=num_data_points
         )
-        u = taylor_coefficients[0]
-
-        # todo: make "marginals" an input to this function,
-        #  then couple it with the posterior
-        #  and make (u, marginals, posterior) the "solution" type for strategies.
-        marginals = self.strategy.extract_marginals_terminal_values(posterior)
-
         output_scale = self.strategy.promote_output_scale(output_scale)
         return solution.Solution(
             t=t,
@@ -226,8 +219,6 @@ class CalibrationFreeSolver(AbstractSolver):
         t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
             state.strategy
         )
-        # marginals = self.strategy.extract_marginals_terminal_values(posterior)
-        # u = marginals.extract_qoi()
         return solution.Solution(
             t=t,
             u=u,  # new!
@@ -357,10 +348,8 @@ class MLESolver(AbstractSolver):
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
 
-        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
-            state.strategy
-        )
-        # marginals = self.strategy.extract_marginals_terminal_values(posterior)
+        _sol = self.strategy.extract_at_terminal_values(state.strategy)
+        t, u, marginals, posterior = _sol
 
         s = state.output_scale_calibrated
         marginals, state = self._rescale_covs(marginals, state, output_scale=s)

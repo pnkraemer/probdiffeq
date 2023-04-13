@@ -44,15 +44,6 @@ class Strategy(abc.ABC, Generic[S, P]):
     def extract_at_terminal_values(self, state: S, /) -> P:
         raise NotImplementedError
 
-    #
-    # @abc.abstractmethod
-    # def extract_marginals(self, state: P, /):
-    #     raise NotImplementedError
-    #
-    # @abc.abstractmethod
-    # def extract_marginals_terminal_values(self, state: P, /):
-    #     raise NotImplementedError
-
     @abc.abstractmethod
     def case_right_corner(self, t, *, s0: S, s1: S, output_scale) -> InterpRes[S]:
         raise NotImplementedError

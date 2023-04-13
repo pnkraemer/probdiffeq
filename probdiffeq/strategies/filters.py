@@ -65,14 +65,17 @@ class Filter(_strategy.Strategy[_FiState, Any]):
 
     def solution_from_tcoeffs(
         self, taylor_coefficients, /, *, num_data_points
-    ) -> FilterDist:
+    ) -> Tuple[jax.Array, jax.Array, FilterDist]:
         ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
-        return FilterDist(ssv, num_data_points=num_data_points)
+        sol = FilterDist(ssv, num_data_points=num_data_points)
+        marginals = ssv
+        u = taylor_coefficients[0]
+        return u, marginals, sol
 
     def extract(self, posterior: _FiState, /) -> _SolType:
         t = posterior.t
         solution = FilterDist(posterior.corrected, posterior.num_data_points)
-        marginals = self.extract_marginals(solution)
+        marginals = solution.rv
         u = marginals.extract_qoi()
         return t, u, marginals, solution
 
@@ -126,12 +129,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
 
     def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
-
-    def extract_marginals(self, sol: FilterDist, /):
-        return sol.rv
-
-    def extract_marginals_terminal_values(self, sol: FilterDist, /):
-        return sol.rv
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)

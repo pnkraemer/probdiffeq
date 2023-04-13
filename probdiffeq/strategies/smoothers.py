@@ -180,9 +180,12 @@ class _SmootherCommon(_strategy.Strategy):
 
         init_bw_model = self.extrapolation.init_conditional
         bw_model = init_bw_model(ssv_proto=corrected)
-        return MarkovSequence(
+        sol = MarkovSequence(
             init=corrected, backward_model=bw_model, num_data_points=num_data_points
         )
+        marginals = corrected
+        u = taylor_coefficients[0]
+        return u, marginals, sol
 
     def extract(self, state: _SmState, /) -> _SolType:
         markov_seq = MarkovSequence(
@@ -190,7 +193,7 @@ class _SmootherCommon(_strategy.Strategy):
             backward_model=state.backward_model,
             num_data_points=state.num_data_points,
         )
-        marginals = self.extract_marginals(markov_seq)
+        marginals = self._extract_marginals(markov_seq)
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
@@ -200,7 +203,7 @@ class _SmootherCommon(_strategy.Strategy):
             backward_model=state.backward_model,
             num_data_points=state.num_data_points,
         )
-        marginals = self.extract_marginals_terminal_values(markov_seq)
+        marginals = state.corrected
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
@@ -237,13 +240,7 @@ class _SmootherCommon(_strategy.Strategy):
 
         return a, corrected_seq
 
-    def extract_u(self, *, state: _SmState):
-        return state.corrected.extract_qoi()
-
-    def extract_marginals_terminal_values(self, posterior: MarkovSequence, /):
-        return posterior.init
-
-    def extract_marginals(self, posterior: MarkovSequence, /):
+    def _extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
         markov = MarkovSequence(
             init=init,
