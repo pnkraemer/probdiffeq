@@ -284,7 +284,7 @@ class AdaptiveIVPSolver(Generic[T]):
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
-    def _interpolate(self, *, state: _AdaptiveState[S, C], t) -> _AdaptiveState[S, C]:
+    def _interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
         accepted, solution, previous = self.solver.interpolate(
             s0=state.previous, s1=state.accepted, t=t
         )
@@ -297,7 +297,7 @@ class AdaptiveIVPSolver(Generic[T]):
             control=state.control,
         )
 
-    def extract(self, state: _AdaptiveState[S, C], /) -> S:
+    def extract(self, state: _AdaptiveState, /):
         solver_extract = self.solver.extract(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
 
@@ -308,7 +308,7 @@ class AdaptiveIVPSolver(Generic[T]):
         #  without losing consistency.
         return control_extract, solver_extract
 
-    def extract_at_terminal_values(self, state: _AdaptiveState[S, C], /) -> S:
+    def extract_at_terminal_values(self, state: _AdaptiveState, /):
         solver_extract = self.solver.extract_at_terminal_values(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
         return control_extract, solver_extract

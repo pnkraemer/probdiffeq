@@ -15,18 +15,18 @@ class AbstractControl(abc.ABC, Generic[S]):
     """Interface for control-algorithms."""
 
     @abc.abstractmethod
-    def init_state_from_dt(self, dt0: jax.Array) -> S:
+    def init_state_from_dt(self, dt0: float) -> S:
         """Initialise the controller state."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def clip(self, t: jax.Array, t1: jax.Array, state: S) -> S:
+    def clip(self, t: float, t1: float, state: S) -> S:
         """(Optionally) clip the current step to not exceed t1."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def apply(
-        self, error_normalised: jax.Array, error_contraction_rate: jax.Array, state: S
+        self, error_normalised: float, error_contraction_rate: float, state: S
     ) -> S:
         r"""Propose a time-step $\Delta t$."""
         raise NotImplementedError
@@ -40,18 +40,18 @@ class AbstractControl(abc.ABC, Generic[S]):
 class _PIState(NamedTuple):
     """Proportional-integral controller state."""
 
-    dt_proposed: jax.Array  # usually a float
-    error_norm_previously_accepted: jax.Array  # usually a float
+    dt_proposed: jax.Array
+    error_norm_previously_accepted: float
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class _ProportionalIntegralCommon(AbstractControl[_PIState]):
-    safety: jax.Array = 0.95
-    factor_min: jax.Array = 0.2
-    factor_max: jax.Array = 10.0
-    power_integral_unscaled: jax.Array = 0.3
-    power_proportional_unscaled: jax.Array = 0.4
+    safety: float = 0.95
+    factor_min: float = 0.2
+    factor_max: float = 10.0
+    power_integral_unscaled: float = 0.3
+    power_proportional_unscaled: float = 0.4
 
     def tree_flatten(self):
         children = (
@@ -129,15 +129,15 @@ class ProportionalIntegralClipped(_ProportionalIntegralCommon):
 
 
 class _IState(NamedTuple):
-    dt_proposed: jax.Array  # usually a float
+    dt_proposed: jax.Array
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class _IntegralCommon(AbstractControl[_IState]):
-    safety: jax.Array = 0.95
-    factor_min: jax.Array = 0.2
-    factor_max: jax.Array = 10.0
+    safety: float = 0.95
+    factor_min: float = 0.2
+    factor_max: float = 10.0
 
     def tree_flatten(self):
         children = (self.safety, self.factor_min, self.factor_max)
@@ -177,7 +177,7 @@ class _IntegralCommon(AbstractControl[_IState]):
 class Integral(_IntegralCommon):
     r"""Integral (I) controller."""
 
-    def clip(self, t: jax.Array, t1: jax.Array, state: _IState) -> _IState:
+    def clip(self, t: float, t1: float, state: _IState) -> _IState:
         return state
 
 
@@ -189,6 +189,6 @@ class IntegralClipped(_IntegralCommon):
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    def clip(self, t: jax.Array, t1: jax.Array, state: _IState) -> _IState:
+    def clip(self, t: float, t1: float, state: _IState) -> _IState:
         dt_clipped = jnp.minimum(state.dt_proposed, t1 - t)
         return _IState(dt_clipped)
