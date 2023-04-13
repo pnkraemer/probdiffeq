@@ -39,19 +39,18 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
 
         # todo: smoothers should return rv + conditional
-        rv = _vars.IsoNormalHiddenState(
+        return _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return rv
 
     def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
-        raise RuntimeError
+        raise RuntimeError  # todo
 
     def extract_with_reversal(self, s, /):
-        raise RuntimeError
+        raise RuntimeError  # todo
 
     def extract_without_reversal(self, s, /):
-        raise RuntimeError  # todo
+        return s.hidden_state
 
     # todo: should this be a classmethod in _conds.IsoConditional?
     def _init_conditional(self, ssv_proto):
@@ -69,9 +68,28 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def init_without_reversal(self, rv, /):
-        error_estimate = jnp.zeros(())
+        observed = _vars.IsoNormalQOI(
+            mean=jnp.zeros_like(rv.mean[..., 0, :]),
+            cov_sqrtm_lower=jnp.zeros_like(rv.cov_sqrtm_lower[..., 0, 0]),
+        )
+
+        error_estimate = jnp.empty(())
+        output_scale_dynamic = jnp.empty(())
+
+        # Prepare caches
+        m_like = jnp.empty(rv.mean.shape)
+        p_like = m_like[..., 0]
+        d_like = m_like[..., 0, :]
+        cache_extra = (m_like, m_like, p_like, p_like)
+        cache_obs = (d_like,)  # todo: let correction initialise it!
         return _vars.IsoStateSpaceVar(
-            rv, error_estimate=error_estimate, cache_extra=None, cache_corr=None
+            rv,
+            # A bunch of caches that are filled at some point:
+            observed_state=observed,
+            output_scale_dynamic=output_scale_dynamic,
+            error_estimate=error_estimate,
+            cache_extra=cache_extra,
+            cache_corr=cache_obs,
         )
 
     def init_with_reversal(self, rv, conds, /):
@@ -86,10 +104,6 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(m0, c0)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    #
-    # def init_error_estimate(self):
-    #     return jnp.zeros(())  # the initialisation is error-free
-
     def promote_output_scale(self, output_scale):
         return output_scale
 
@@ -102,10 +116,12 @@ class _IsoIBM(_collections.AbstractExtrapolation):
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
         return _vars.IsoStateSpaceVar(
-            ext,
-            error_estimate=None,
-            cache_extra=(m_ext_p, m0_p, p, p_inv),
-            cache_corr=None,
+            ext,  # NEW!!
+            observed_state=s0.observed_state,  # irrelevant
+            output_scale_dynamic=s0.output_scale_dynamic,  # irrelevant
+            error_estimate=s0.error_estimate,  # irrelevant
+            cache_extra=(m_ext_p, m0_p, p, p_inv),  # NEW!!
+            cache_corr=s0.cache_corr,  # irrelevant
         )
 
     def _assemble_preconditioner(self, dt):
@@ -113,11 +129,18 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_without_reversal(self, output_begin, /, s0, output_scale):
-        _, _, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def complete_without_reversal(
+        self,
+        state: _vars.IsoStateSpaceVar,
+        /,
+        state_previous: _vars.IsoStateSpaceVar,
+        output_scale: float,
+    ) -> _vars.IsoStateSpaceVar:
+        _, _, p, p_inv = state.cache_extra
+        m_ext = state.hidden_state.mean
+        l0 = state_previous.hidden_state.cov_sqrtm_lower
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
+        l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
                 (self.a @ l0_p).T,
@@ -127,7 +150,14 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
         # Use output_begin as an error estimate?
-        return _vars.IsoStateSpaceVar(rv, error_estimate=None, cache=None)
+        return _vars.IsoStateSpaceVar(
+            rv,  # NEW !!
+            observed_state=state.observed_state,
+            output_scale_dynamic=state.output_scale_dynamic,
+            error_estimate=state.error_estimate,
+            cache_corr=state.cache_corr,
+            cache_extra=state.cache_extra,  # irrelevant
+        )
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache

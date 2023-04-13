@@ -68,21 +68,21 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_extrapolation(self, state: S, /, *, dt) -> S:
+    def _begin_extrapolation(self, state: S, /, *, dt) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self, output_extra: S, /, *, output_scale, state_previous: S
     ) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin_correction(self, output_extra: S, /, *, vector_field, t, p):
+    def _begin_correction(self, output_extra: S, /, *, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, extrapolated: S, /, *, cache_obs):
+    def _complete_correction(self, extrapolated: S, /, *, cache_obs):
         raise NotImplementedError
 
     def tree_flatten(self):
@@ -95,33 +95,29 @@ class Strategy(abc.ABC, Generic[S, P]):
         (extra, correct) = children
         return cls(extra, correct)
 
-    def init_error_estimate(self):
-        return self.extrapolation.init_error_estimate()
-
     def promote_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.promote_output_scale
-        return init_fn(*args, **kwargs)
+        return self.extrapolation.promote_output_scale(*args, **kwargs)
 
-    def begin(self, state: S, /, *, t, dt, parameters, vector_field):
+    def begin(self, state: S, /, *, dt, parameters, vector_field):
         # todo (next!): make this return a state-type.
-        output_extra = self.begin_extrapolation(state, dt=dt)
-        output_corr = self.begin_correction(
-            output_extra, vector_field=vector_field, t=t + dt, p=parameters
-        )
-        return output_extra, output_corr
+        state = self._begin_extrapolation(state, dt=dt)
+        state = self._begin_correction(state, vector_field=vector_field, p=parameters)
+        return state
 
-    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+    def complete(self, state, state_previous, /, *, output_scale):
         # todo: make this operate on state-types.
-        extrapolated = self.complete_extrapolation(
-            output_extra,
-            state_previous=state,
+        state = self._complete_extrapolation(
+            state,
+            state_previous=state_previous,
             output_scale=output_scale,
         )
-        observed, corrected = self.complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return observed, corrected
+        state = self._complete_correction(state)
+        return state
 
     @abc.abstractmethod
     def num_data_points(self, state, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def observation(self, state, /):
         raise NotImplementedError

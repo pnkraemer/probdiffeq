@@ -167,7 +167,7 @@ class AdaptiveIVPSolver(Generic[T]):
 
         # Initialise (prototypes for) proposed values
         error_norm_proposed = self._normalise_error(
-            error_estimate=state_solver.error_estimate,
+            error_estimate=dt0 * state_solver.error_estimate,
             u=state_solver.u,
             atol=self.atol,
             rtol=self.rtol,
@@ -228,7 +228,7 @@ class AdaptiveIVPSolver(Generic[T]):
             return proceed_iteration, s
 
         def init(s):
-            return True, s
+            return jnp.asarray(True), s
 
         _, state_new = self.while_loop_fn(cond_fn, body_fn, init(state0))
         return _AdaptiveState(
@@ -250,15 +250,17 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
         # Perform the actual step.
+        dt = self.control.extract_dt_from_state(state_control)
         posterior = self.solver.step(
             state=state.accepted,
             vector_field=vector_field,
-            dt=self.control.extract_dt_from_state(state_control),
+            dt=dt,
             parameters=parameters,
         )
+
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(
-            error_estimate=posterior.error_estimate,
+            error_estimate=posterior.error_estimate * dt,
             u=self.reference_state_fn(posterior.u, state.accepted.u),
             atol=self.atol,
             rtol=self.rtol,

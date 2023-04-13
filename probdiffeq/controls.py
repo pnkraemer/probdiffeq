@@ -32,7 +32,7 @@ class AbstractControl(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_dt_from_state(self, state: S) -> jax.Array:
+    def extract_dt_from_state(self, state: S):
         """Extract the time-step from the controller state."""
         raise NotImplementedError
 
@@ -40,7 +40,7 @@ class AbstractControl(abc.ABC, Generic[S]):
 class _PIState(NamedTuple):
     """Proportional-integral controller state."""
 
-    dt_proposed: jax.Array
+    dt_proposed: float
     error_norm_previously_accepted: float
 
 
@@ -101,7 +101,7 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
         )
         return state
 
-    def extract_dt_from_state(self, state: _PIState) -> jax.Array:
+    def extract_dt_from_state(self, state: _PIState):
         return state.dt_proposed
 
 
@@ -168,7 +168,7 @@ class _IntegralCommon(AbstractControl[_IState]):
         dt = scale_factor * state.dt_proposed
         return _IState(dt)
 
-    def extract_dt_from_state(self, state: _IState) -> jax.Array:
+    def extract_dt_from_state(self, state: _IState):
         return state.dt_proposed
 
 

@@ -36,18 +36,19 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate_unscaled = obs.marginal_std()
         error_estimate = error_estimate_unscaled * output_scale
 
-        x = _vars.IsoStateSpaceVar(
+        return _vars.IsoStateSpaceVar(
             x.hidden_state,
+            observed_state=x.observed_state,  # irrelevant
+            output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
             cache_extra=x.cache_extra,
             cache_corr=(bias,),
         )
-        return x, output_scale
 
     def complete(
-        self, extrapolated: _vars.IsoStateSpaceVar, cache
+        self, extrapolated: _vars.IsoStateSpaceVar
     ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoStateSpaceVar]:
-        (bias,) = cache
+        (bias,) = extrapolated.cache_corr
 
         m_ext = extrapolated.hidden_state.mean
         l_ext = extrapolated.hidden_state.cov_sqrtm_lower
@@ -62,4 +63,11 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
         corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, _vars.IsoStateSpaceVar(corrected, cache=None)
+        return _vars.IsoStateSpaceVar(
+            corrected,
+            observed_state=observed,
+            output_scale_dynamic=extrapolated.output_scale_dynamic,
+            error_estimate=extrapolated.error_estimate,
+            cache_extra=extrapolated.cache_extra,  # irrelevant
+            cache_corr=extrapolated.cache_corr,  # irrelevant
+        )

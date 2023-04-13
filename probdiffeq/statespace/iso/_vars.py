@@ -30,14 +30,23 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         return obs, cond
 
     def extract_qoi(self) -> jax.Array:
-        return self.hidden_state.mean[..., 0, :]
+        return self.hidden_state.extract_qoi()
 
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
         return u[..., 0, :]
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return IsoStateSpaceVar(rv, cache=self.cache)
+        rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
+
+        return IsoStateSpaceVar(
+            hidden_state=rv,
+            observed_state=rv_obs,
+            output_scale_dynamic=self.output_scale_dynamic,
+            error_estimate=self.error_estimate,
+            cache_extra=self.cache_extra,
+            cache_corr=self.cache_corr,
+        )
 
     def marginal_nth_derivative(self, n):
         # if the variable has batch-axes, vmap the result
@@ -57,6 +66,10 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
         return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
+    def log_marginal_likelihood_constraints(self):
+        u = jnp.zeros_like(self.observed_state.mean)
+        return self.observed_state.logpdf(u)
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoNormalHiddenState(_collections.AbstractNormal):
@@ -72,6 +85,9 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
 
     def transform_unit_sample(self, base, /) -> jax.Array:
         return self.mean + self.cov_sqrtm_lower @ base
+
+    def extract_qoi(self):
+        return self.mean[..., 0, :]
 
 
 @jax.tree_util.register_pytree_node_class

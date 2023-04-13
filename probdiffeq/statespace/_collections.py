@@ -63,12 +63,22 @@ class StateSpaceVar(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
-    def __init__(self, hidden_state, *, error_estimate, cache_extra, cache_corr):
-        self.hidden_state = hidden_state
+    def __init__(
+        self,
+        hidden_state,
+        *,
+        observed_state,
+        output_scale_dynamic,
+        error_estimate,
+        cache_extra,
+        cache_corr,
+    ):
+        self.hidden_state = hidden_state  # todo: 'hidden'
+        self.observed_state = observed_state  # todo: 'observed'
 
         # todo: add conditional here
         #  (and make init_with_reversal, extract_with_reversal methods in extrapolation)
-
+        self.output_scale_dynamic = output_scale_dynamic
         self.error_estimate = error_estimate
         self.cache_extra = cache_extra
         self.cache_corr = cache_corr
@@ -76,6 +86,8 @@ class StateSpaceVar(abc.ABC):
     def tree_flatten(self):
         children = (
             self.hidden_state,
+            self.observed_state,
+            self.output_scale_dynamic,
             self.error_estimate,
             self.cache_extra,
             self.cache_corr,
@@ -85,19 +97,41 @@ class StateSpaceVar(abc.ABC):
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (hidden_state, error_estimate, cache_e, cache_c) = children
+        (
+            hidden_state,
+            observed_state,
+            output_scale_dynamic,
+            error_estimate,
+            cache_e,
+            cache_c,
+        ) = children
         return cls(
             hidden_state=hidden_state,
+            observed_state=observed_state,
+            output_scale_dynamic=output_scale_dynamic,
             error_estimate=error_estimate,
             cache_extra=cache_e,
             cache_corr=cache_c,
         )
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
+        return (
+            f"{self.__class__.__name__}("
+            f"hidden_state={self.hidden_state},"
+            f"observed_state={self.observed_state},"
+            f"output_scale_dynamic={self.output_scale_dynamic},"
+            f"error_estimate={self.error_estimate},"
+            f"cache_extra={self.cache_extra},"
+            f"cache_corr={self.cache_corr},"
+            f")"
+        )
 
     @abc.abstractmethod
     def observe_qoi(self, observation_std):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def log_marginal_likelihood_constraints(self):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -163,7 +197,9 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
     @abc.abstractmethod
     def solution_from_tcoeffs_without_reversal(
-        self, taylor_coefficients, /
+        self,
+        taylor_coefficients,
+        /,
     ) -> SSVTypeVar:
         raise NotImplementedError
 

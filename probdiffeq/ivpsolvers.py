@@ -135,10 +135,8 @@ class AbstractSolver(abc.ABC):
         return InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def _interp_make_state(self, state_strategy, *, reference: _State) -> _State:
-        error_estimate = self.strategy.init_error_estimate()
         return _State(
             strategy=state_strategy,
-            error_estimate=error_estimate,
             output_scale_prior=reference.output_scale_prior,
             output_scale_calibrated=reference.output_scale_calibrated,
         )
@@ -277,30 +275,28 @@ class MLESolver(AbstractSolver):
      calibration of the output-scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self.strategy.begin(
-            state.strategy,
-            t=state.t,
+        state_strategy_previous = state.strategy
+        state_strategy = self.strategy.begin(
+            state_strategy_previous,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
-
-        observed, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
+            state_strategy_previous,
             output_scale=state.output_scale_prior,
         )
 
         # Calibrate
         output_scale = state.output_scale_calibrated
-        n = self.strategy.num_data_points(state.strategy)
+        n = self.strategy.num_data_points(state_strategy)
+        obs = self.strategy.observation(state_strategy)
         new_output_scale = self._update_output_scale(
-            diffsqrtm=output_scale, n=n, obs=observed
+            diffsqrtm=output_scale, n=n, obs=obs
         )
         return _State(
-            error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             output_scale_calibrated=new_output_scale,
         )
@@ -381,6 +377,5 @@ class MLESolver(AbstractSolver):
             strategy=state_strategy,
             output_scale_calibrated=output_scale,
             output_scale_prior=None,  # irrelevant, will be removed in next step
-            error_estimate=None,  # irrelevant, will be removed in next step.
         )
         return marginals, state_rescaled
