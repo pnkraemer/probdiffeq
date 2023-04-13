@@ -179,8 +179,7 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    _impl = recipes.ts0_iso(num_derivatives=num)
-    extrapolation = _impl.extrapolation
+    extrapolation, _ = recipes.ts0_iso(num_derivatives=num)
 
     # Initialise
     init_ssv = extrapolation.init_ssv(ode_shape=initial_values[0].shape)
@@ -216,10 +215,8 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     (rv, bw_old) = carry
 
     # Extrapolate (with fixed-point-style merging)
-    x = extrapolation.begin_extrapolation(rv, dt=dt)
-    extra, bw_model = extrapolation.complete_extrapolation_with_reversal(
-        x, s0=rv, output_scale=1.0
-    )
+    x = extrapolation.begin(rv, dt=dt)
+    extra, bw_model = extrapolation.complete_with_reversal(x, s0=rv, output_scale=1.0)
     bw_new = bw_old.merge_with_incoming_conditional(bw_model)  # sqrt-fp-smoother!
 
     # Correct
