@@ -3,7 +3,7 @@ from typing import Any, NamedTuple, Tuple
 
 import jax
 
-from probdiffeq import _collections
+from probdiffeq._collections import InterpRes
 from probdiffeq.strategies import _strategy
 
 
@@ -69,13 +69,13 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return posterior.t, FiSolution(posterior.corrected, posterior.num_data_points)
 
     def case_right_corner(
-        self, *, s0: _FiState, s1: _FiState, t, output_scale
-    ) -> _collections.InterpRes[_FiState]:  # s1.t == t
-        return _collections.InterpRes(accepted=s1, solution=s1, previous=s1)
+        self, t, *, s0: _FiState, s1: _FiState, output_scale
+    ) -> InterpRes[_FiState]:  # s1.t == t
+        return InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, s0: _FiState, s1: _FiState, t, output_scale
-    ) -> _collections.InterpRes[_FiState]:
+        self, t, *, s0: _FiState, s1: _FiState, output_scale
+    ) -> InterpRes[_FiState]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - s0.t
@@ -91,9 +91,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             corrected=extrapolated.extrapolated,
             num_data_points=extrapolated.num_data_points,
         )
-        return _collections.InterpRes(
-            accepted=s1, solution=extrapolated, previous=extrapolated
-        )
+        return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
     def offgrid_marginals(
         self,

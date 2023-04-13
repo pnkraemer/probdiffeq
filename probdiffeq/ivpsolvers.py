@@ -6,7 +6,8 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _collections, _sqrt_util, solution
+from probdiffeq import _sqrt_util, solution
+from probdiffeq._collections import InterpRes  # simplify type signatures
 
 
 class _State(NamedTuple):
@@ -126,15 +127,13 @@ class AbstractSolver(abc.ABC):
         # Select branch and return result
         apply_branch_as_array, *_ = jnp.where(index_as_array, size=1)
         apply_branch = jnp.reshape(apply_branch_as_array, ())
-        return jax.lax.switch(apply_branch, branches, s0, s1, t)
+        return jax.lax.switch(apply_branch, branches, t, s0, s1)
 
-    def case_interpolate(
-        self, s0: _State, s1: _State, t
-    ) -> _collections.InterpRes[_State]:
+    def case_interpolate(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
+            t,
             s0=s0.strategy,
             s1=s1.strategy,
-            t=t,
             # always interpolate with the prior output scale.
             #  This is important to make the MLE solver behave correctly.
             #  (Dynamic solvers overwrite the prior output scale at every step anyway).
@@ -143,22 +142,19 @@ class AbstractSolver(abc.ABC):
         prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
-        return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
+        return InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def case_right_corner(
-        self, s0: _State, s1: _State, t
-    ) -> _collections.InterpRes[_State]:
-        # todo: are all these arguments needed?
+    def case_right_corner(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
+            t,
             s0=s0.strategy,
             s1=s1.strategy,
-            t=t,
             output_scale=s1.output_scale_prior,
         )
         prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
-        return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
+        return InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def _interp_make_state(self, state_strategy, *, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()

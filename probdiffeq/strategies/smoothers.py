@@ -7,7 +7,8 @@ from typing import Any, Generic, NamedTuple, Tuple, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _collections, _control_flow
+from probdiffeq import _control_flow
+from probdiffeq._collections import InterpRes
 from probdiffeq.strategies import _strategy
 
 S = TypeVar("S")
@@ -125,13 +126,13 @@ class _SmootherCommon(_strategy.Strategy):
     @abc.abstractmethod
     def case_interpolate(
         self, *, s0: _SmState, s1: _SmState, t, output_scale
-    ) -> _collections.InterpRes[_SmState]:
+    ) -> InterpRes[_SmState]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
         self, *, s0: _SmState, s1: _SmState, t, output_scale
-    ) -> _collections.InterpRes[_SmState]:
+    ) -> InterpRes[_SmState]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -301,15 +302,15 @@ class Smoother(_SmootherCommon):
         )
 
     def case_right_corner(
-        self, *, s0: _SmState, s1: _SmState, t, output_scale
-    ) -> _collections.InterpRes[_SmState]:
+        self, t, *, s0: _SmState, s1: _SmState, output_scale
+    ) -> InterpRes[_SmState]:
         # todo: is this duplication unnecessary?
         accepted = self._duplicate_with_unit_backward_model(s1)
-        return _collections.InterpRes(accepted=accepted, solution=s1, previous=s1)
+        return InterpRes(accepted=accepted, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, s0: _SmState, s1: _SmState, t, output_scale
-    ) -> _collections.InterpRes[_SmState]:
+        self, t, *, s0: _SmState, s1: _SmState, output_scale
+    ) -> InterpRes[_SmState]:
         # A smoother interpolates by reverting the Markov kernels between s0.t and t
         # which gives an extrapolation and a backward transition;
         # and by reverting the Markov kernels between t and s1.t
@@ -343,9 +344,7 @@ class Smoother(_SmootherCommon):
             num_data_points=s1.num_data_points,
         )
 
-        return _collections.InterpRes(
-            accepted=posterior1, solution=posterior0, previous=posterior0
-        )
+        return InterpRes(accepted=posterior1, solution=posterior0, previous=posterior0)
 
     # todo: move marginals to _SmState/FilterSol
     def offgrid_marginals(
@@ -409,7 +408,7 @@ class FixedPointSmoother(_SmootherCommon):
         )
 
     def case_right_corner(
-        self, *, s0: _SmState, s1: _SmState, t, output_scale
+        self, t, *, s0: _SmState, s1: _SmState, output_scale
     ):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
@@ -429,13 +428,11 @@ class FixedPointSmoother(_SmootherCommon):
         accepted = self._duplicate_with_unit_backward_model(solution)
         previous = accepted
 
-        return _collections.InterpRes(
-            accepted=accepted, solution=solution, previous=previous
-        )
+        return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
     def case_interpolate(
-        self, *, s0: _SmState, s1: _SmState, t, output_scale
-    ) -> _collections.InterpRes[_SmState]:
+        self, t, *, s0: _SmState, s1: _SmState, output_scale
+    ) -> InterpRes[_SmState]:
         # A fixed-point smoother interpolates almost like a smoother.
         # The key difference is that when interpolating from s0.t to t,
         # the backward models in s0.t and the incoming model are condensed into one.
@@ -473,9 +470,7 @@ class FixedPointSmoother(_SmootherCommon):
             num_data_points=s1.num_data_points,
         )
 
-        return _collections.InterpRes(
-            accepted=accepted, solution=solution, previous=previous
-        )
+        return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
     def offgrid_marginals(
         self,
