@@ -95,8 +95,12 @@ class MarkovSequence(Generic[S]):
         return self.backward_model.noise.sample_shape
 
 
+_SolType = Tuple[float, jax.Array, jax.Array, MarkovSequence]
+
+
 class _SmState(NamedTuple):
     t: Any
+    u: Any
     extrapolated: Any
 
     corrected: Any
@@ -113,6 +117,7 @@ class _SmState(NamedTuple):
         cor = self.corrected.scale_covariance(output_scale)
         return _SmState(
             t=self.t,
+            u=self.u,
             extrapolated=None,
             corrected=cor,
             backward_model=bw_model,
@@ -160,9 +165,10 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init(self, t, posterior, /) -> _SmState:
+    def init(self, t, u, marginals, posterior, /) -> _SmState:
         return _SmState(
             t=t,
+            u=u,
             corrected=posterior.init,
             extrapolated=None,
             backward_model=posterior.backward_model,
@@ -178,18 +184,31 @@ class _SmootherCommon(_strategy.Strategy):
             init=corrected, backward_model=bw_model, num_data_points=num_data_points
         )
 
-    def extract(self, state: _SmState, /) -> Tuple[float, MarkovSequence]:
+    def extract(self, state: _SmState, /) -> _SolType:
         markov_seq = MarkovSequence(
             init=state.corrected,
             backward_model=state.backward_model,
             num_data_points=state.num_data_points,
         )
-        return state.t, markov_seq
+        marginals = self.extract_marginals(markov_seq)
+        u = marginals.extract_qoi()
+        return state.t, u, marginals, markov_seq
+
+    def extract_at_terminal_values(self, state: _SmState, /) -> _SolType:
+        markov_seq = MarkovSequence(
+            init=state.corrected,
+            backward_model=state.backward_model,
+            num_data_points=state.num_data_points,
+        )
+        marginals = self.extract_marginals_terminal_values(markov_seq)
+        u = marginals.extract_qoi()
+        return state.t, u, marginals, markov_seq
 
     def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
         ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _SmState(
             t=posterior.t + dt,
+            u=None,
             extrapolated=ssv,
             corrected=None,
             backward_model=None,
@@ -209,6 +228,7 @@ class _SmootherCommon(_strategy.Strategy):
         )
         corrected_seq = _SmState(
             t=extrapolated.t,
+            u=corrected.extract_qoi(),
             corrected=corrected,
             extrapolated=None,  # not relevant anymore
             backward_model=extrapolated.backward_model,
@@ -263,6 +283,7 @@ class _SmootherCommon(_strategy.Strategy):
         bw_model = init_conditional_fn(ssv_proto=posterior.corrected)
         return _SmState(
             t=posterior.t,
+            u=posterior.u,
             extrapolated=posterior.extrapolated,
             corrected=posterior.corrected,
             backward_model=bw_model,
@@ -289,6 +310,7 @@ class Smoother(_SmootherCommon):
         )
         return _SmState(
             t=output_extra.t,
+            u=None,
             extrapolated=extrapolated,
             corrected=None,
             backward_model=bw_model,
@@ -318,6 +340,7 @@ class Smoother(_SmootherCommon):
         )
         posterior0 = _SmState(
             t=t,
+            u=extrapolated0.extract_qoi(),
             # 'corrected' is the solution. We interpolate to get the value for
             # 'corrected' at time 't', which is exactly what happens.
             extrapolated=None,
@@ -332,6 +355,7 @@ class Smoother(_SmootherCommon):
         t_accepted = jnp.maximum(s1.t, t)
         posterior1 = _SmState(
             t=t_accepted,
+            u=s1.u,
             extrapolated=s1.extrapolated,  # None
             corrected=s1.corrected,
             backward_model=backward_model1,
@@ -354,8 +378,8 @@ class Smoother(_SmootherCommon):
     ):
         acc, _sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(t1, posterior),
-            s0=self.init(t0, posterior_previous),
+            s1=self.init(t1, None, None, posterior),
+            s0=self.init(t0, None, None, posterior_previous),
             output_scale=output_scale,
         )
         marginals_at_t = acc.backward_model.marginalise(marginals)
@@ -394,6 +418,7 @@ class FixedPointSmoother(_SmootherCommon):
 
         return _SmState(
             t=output_extra.t,
+            u=None,
             extrapolated=extrapolated,
             corrected=None,
             backward_model=backward_model,
@@ -412,6 +437,7 @@ class FixedPointSmoother(_SmootherCommon):
         #  t_accepted = jnp.maximum(s1.t, t) ?
         solution = _SmState(
             t=t,
+            u=s1.u,
             extrapolated=s1.extrapolated,
             corrected=s1.corrected,
             backward_model=backward_model1,
@@ -443,6 +469,7 @@ class FixedPointSmoother(_SmootherCommon):
         backward_model0 = s0.backward_model.merge_with_incoming_conditional(bw0)
         solution = _SmState(
             t=t,
+            u=extrapolated0.extract_qoi(),
             extrapolated=None,
             corrected=extrapolated0,
             backward_model=backward_model0,
@@ -457,6 +484,7 @@ class FixedPointSmoother(_SmootherCommon):
         t_accepted = jnp.maximum(s1.t, t)
         accepted = _SmState(
             t=t_accepted,
+            u=s1.u,
             extrapolated=s1.extrapolated,  # None
             corrected=s1.corrected,
             backward_model=backward_model1,

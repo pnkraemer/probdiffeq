@@ -196,9 +196,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
         # Extract and return solution
-        u = self.strategy.extract_u(state=corrected)
         return _State(
-            u=u,
             error_estimate=dt * error,
             strategy=corrected,
             output_scale_prior=state.output_scale_prior,
@@ -225,7 +223,7 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract_terminal_values(
+        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
             state.strategy
         )
         # marginals = self.strategy.extract_marginals_terminal_values(posterior)
@@ -256,9 +254,7 @@ class DynamicSolver(AbstractSolver):
         )
 
         # Return solution
-        u = self.strategy.extract_u(state=corrected)
         return _State(
-            u=u,
             error_estimate=dt * error,
             strategy=corrected,
             output_scale_calibrated=output_scale,
@@ -281,9 +277,9 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
-        t, posterior = self.strategy.extract(state.strategy)
-        marginals = self.strategy.extract_marginals_terminal_values(posterior)
-        u = marginals.extract_qoi()
+        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
+            state.strategy
+        )
         return solution.Solution(
             t=t,
             u=u,  # new!
@@ -361,7 +357,9 @@ class MLESolver(AbstractSolver):
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
 
-        t, u, marginals, posterior = self.strategy.extract(state.strategy)
+        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
+            state.strategy
+        )
         # marginals = self.strategy.extract_marginals_terminal_values(posterior)
 
         s = state.output_scale_calibrated

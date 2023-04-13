@@ -76,6 +76,9 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         u = marginals.extract_qoi()
         return t, u, marginals, solution
 
+    def extract_at_terminal_values(self, posterior: _FiState, /) -> _SolType:
+        return self.extract(posterior)
+
     def case_right_corner(
         self, t, *, s0: _FiState, s1: _FiState, output_scale
     ) -> InterpRes[_FiState]:  # s1.t == t
