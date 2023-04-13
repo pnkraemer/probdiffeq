@@ -42,7 +42,7 @@ class AbstractSolver(abc.ABC):
     # Abstract methods
 
     @abc.abstractmethod
-    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
+    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         raise NotImplementedError
 
     # todo: state positional-only?
@@ -66,11 +66,11 @@ class AbstractSolver(abc.ABC):
         )
 
     @abc.abstractmethod
-    def extract_fn(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
 
     def solution_from_tcoeffs(
@@ -114,7 +114,7 @@ class AbstractSolver(abc.ABC):
             output_scale_calibrated=sol.output_scale,
         )
 
-    def interpolate_fn(self, *, s0: _State, s1: _State, t):
+    def interpolate(self, *, s0: _State, s1: _State, t):
         # Cases to switch between
         branches = [self._case_right_corner, self._case_interpolate]
 
@@ -184,7 +184,7 @@ class CalibrationFreeSolver(AbstractSolver):
     No automatic output-scale calibration.
     """
 
-    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
+    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         output_extra, (error, _, cache_obs) = self._strategy_begin(
             state, dt=dt, parameters=parameters, vector_field=vector_field
         )
@@ -208,7 +208,7 @@ class CalibrationFreeSolver(AbstractSolver):
             output_scale_calibrated=state.output_scale_prior,
         )
 
-    def extract_fn(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /) -> solution.Solution:
         t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
@@ -224,7 +224,7 @@ class CalibrationFreeSolver(AbstractSolver):
             num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
-    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
@@ -242,7 +242,7 @@ class CalibrationFreeSolver(AbstractSolver):
 class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
-    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
+    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         output_extra, (error, output_scale, cache_obs) = self._strategy_begin(
             state, dt=dt, parameters=parameters, vector_field=vector_field
         )
@@ -265,7 +265,7 @@ class DynamicSolver(AbstractSolver):
             output_scale_prior=output_scale,
         )
 
-    def extract_fn(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /) -> solution.Solution:
         t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
@@ -278,7 +278,7 @@ class DynamicSolver(AbstractSolver):
             num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
-    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
@@ -297,7 +297,7 @@ class MLESolver(AbstractSolver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
-    def step_fn(self, *, state: _State, vector_field, dt, parameters) -> _State:
+    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         output_extra, (error, _, cache_obs) = self._strategy_begin(
             state, dt=dt, parameters=parameters, vector_field=vector_field
         )
@@ -342,7 +342,7 @@ class MLESolver(AbstractSolver):
         sum_updated = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
         return sum_updated / jnp.sqrt(n + 1)
 
-    def extract_fn(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
         t, posterior = self.strategy.extract(state.strategy)
@@ -360,7 +360,7 @@ class MLESolver(AbstractSolver):
             num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
-    def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
 
         t, posterior = self.strategy.extract(state.strategy)

@@ -25,7 +25,7 @@ def simulate_terminal_values(
         parameters=parameters,
         while_loop_fn=while_loop_fn,
     )
-    _dt, sol = adaptive_solver.extract_terminal_values_fn(solution)
+    _dt, sol = adaptive_solver.extract_at_terminal_values(solution)
     return sol
 
 
@@ -58,7 +58,7 @@ def solve_and_save_at(
         xs=save_at[1:],
         reverse=False,
     )
-    _dt, sol = adaptive_solver.extract_fn(solution)
+    _dt, sol = adaptive_solver.extract(solution)
     return sol
 
 
@@ -78,7 +78,7 @@ def _advance_ivp_solution_adaptively(
         return s.solution.t < t1
 
     def body_fun(s):
-        state = adaptive_solver.step_fn(
+        state = adaptive_solver.step(
             state=s,
             vector_field=vector_field,
             t1=t1,
@@ -106,7 +106,7 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
-    _dt, sol = adaptive_solver.extract_fn(forward_solution)
+    _dt, sol = adaptive_solver.extract(forward_solution)
     return sol
 
 
@@ -115,7 +115,7 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
     # todo: adaptive_solver.solution_time(s) < t1?
     while state.solution.t < t1:
         yield state
-        state = adaptive_solver.step_fn(
+        state = adaptive_solver.step(
             state=state,
             vector_field=vector_field,
             t1=t1,
@@ -132,7 +132,7 @@ def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters):
     def body_fn(carry, t_new):
         s, t_old = carry
         dt = t_new - t_old
-        s_new = solver.step_fn(
+        s_new = solver.step(
             state=s,
             vector_field=vector_field,
             dt=dt,
@@ -143,5 +143,5 @@ def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters):
     _, (result, _) = _control_flow.scan_with_init(
         f=body_fn, init=(state, t0), xs=grid[1:]
     )
-    sol = solver.extract_fn(result)
+    sol = solver.extract(result)
     return sol
