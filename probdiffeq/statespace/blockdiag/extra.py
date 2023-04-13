@@ -57,10 +57,9 @@ class _BlockDiag(_collections.AbstractExtrapolation):
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)
 
-    def solution_from_tcoeffs(self, taylor_coefficients):
-        return jax.vmap(type(self.extra).solution_from_tcoeffs)(
-            self.extra, taylor_coefficients
-        )
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
+        solution_fn = jax.vmap(type(self.extra).solution_from_tcoeffs)
+        return solution_fn(self.extra, taylor_coefficients)
 
     # todo: move to correction?
     def init_error_estimate(self):

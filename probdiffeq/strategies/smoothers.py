@@ -383,12 +383,11 @@ class FixedPointSmoother(_SmootherCommon):
         state_previous: _SmState,
         output_scale,
     ):
-        _temp = self.extrapolation.complete_with_reversal(
+        extrapolated, bw_increment = self.extrapolation.complete_with_reversal(
             output_extra.extrapolated,
             s0=state_previous.corrected,
             output_scale=output_scale,
         )
-        extrapolated, bw_increment = _temp
 
         merge_fn = state_previous.backward_model.merge_with_incoming_conditional
         backward_model = merge_fn(bw_increment)

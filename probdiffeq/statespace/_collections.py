@@ -146,7 +146,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients) -> SSVTypeVar:
+    def solution_from_tcoeffs(self, taylor_coefficients, /) -> SSVTypeVar:
         raise NotImplementedError
 
     @abc.abstractmethod
