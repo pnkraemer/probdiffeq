@@ -34,4 +34,3 @@ You may verify the installation by running
 ```commandline
 pre-commit run
 ```
-

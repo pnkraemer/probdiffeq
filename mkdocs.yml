@@ -1,44 +1,38 @@
+---
 theme:
-    name: material
-    features:
-        - toc.integrate
-    palette:
-        - scheme: default
-          primary: red
-          accent: red
-          toggle:
-             icon: material/weather-night
-             name: Switch to dark mode
-        - scheme: slate
-          primary: black
-          accent: black
-          toggle:
-             icon: material/weather-sunny
-             name: Switch to light mode
-
+  name: material
+  features: [toc.integrate]
+  palette:
+    - scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: black
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
 site_name: probdiffeq
 site_description: The documentation for the probdiffeq software library.
 site_author: Nicholas Krämer
-
 strict: true
 
 # Credit for a good amount of this setup: https://github.com/patrick-kidger/diffrax
-
-extra_css:
-    - _static/custom.css
-
+extra_css: [_static/custom.css]
 markdown_extensions:
-    - pymdownx.arithmatex:
-        generic: true
-    - pymdownx.superfences
-    - pymdownx.details
-    - pymdownx.snippets:
-        base_path: docs
-    - admonition
-    - toc:
-        permalink: "¤"
-        toc_depth: 3
-
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.snippets:
+      base_path: docs
+  - admonition
+  - toc:
+      permalink: ¤
+      toc_depth: 3
 extra_javascript:
   # Credit:
   #  https://github.com/patrick-kidger/diffrax
@@ -46,93 +40,86 @@ extra_javascript:
   - _javascripts/mathjax.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
-
 plugins:
-    - mkdocstrings:
-        handlers:
-            python:
-                options:
-                    inherited_members: alphabetical
-                    show_root_full_path: true
-                    show_if_no_docstring: true
-                    show_signature_annotations: true
-                    show_source: true
-                    docstring_style: numpy
-                    show_root_heading: true
-                    heading_level: 2
-    - exclude:
-        glob:
-          - "quickstart/easy_example.md"
-          - "examples_benchmarks/solvers_solutions/*.md"
-          - "examples_benchmarks/parameter_estimation/*.md"
-          - "examples_benchmarks/benchmarks/lotka_volterra/internal.md"
-          - "examples_benchmarks/benchmarks/lotka_volterra/external.md"
-          - "examples_benchmarks/benchmarks/pleiades/external.md"
-          - "examples_benchmarks/benchmarks/stiff_van_der_pol/external.md"
-          - "examples_benchmarks/benchmarks/hires/external.md"
-    - mknotebooks
-
-
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            inherited_members: alphabetical
+            show_root_full_path: true
+            show_if_no_docstring: true
+            show_signature_annotations: true
+            show_source: true
+            docstring_style: numpy
+            show_root_heading: true
+            heading_level: 2
+  - exclude:
+      glob:
+        - quickstart/easy_example.md
+        - examples_benchmarks/solvers_solutions/*.md
+        - examples_benchmarks/parameter_estimation/*.md
+        - examples_benchmarks/benchmarks/lotka_volterra/internal.md
+        - examples_benchmarks/benchmarks/lotka_volterra/external.md
+        - examples_benchmarks/benchmarks/pleiades/external.md
+        - examples_benchmarks/benchmarks/stiff_van_der_pol/external.md
+        - examples_benchmarks/benchmarks/hires/external.md
+  - mknotebooks
 nav:
-    - Getting started:
-        - Getting started: "index.md"
-        - An easy example: "quickstart/easy_example.ipynb"
-        - Transitioning: "quickstart/transitioning_from_other_packages.md"
-        - Choosing a solver: "quickstart/choosing_a_solver.md"
-        - Troubleshooting: "quickstart/troubleshooting.md"
-    - Examples & Benchmarks:
-        - Solvers & Solutions:
-            - "examples_benchmarks/solvers_solutions/posterior_uncertainties.ipynb"
-            - "examples_benchmarks/solvers_solutions/second_order_problems.ipynb"
-            - "examples_benchmarks/solvers_solutions/smoothing.ipynb"
-            - "examples_benchmarks/solvers_solutions/solution_object.ipynb"
-            - "examples_benchmarks/solvers_solutions/dynamic_output_scales.ipynb"
-            - "examples_benchmarks/solvers_solutions/conditioning-on-zero-residual.ipynb"
-        - Parameter estimation:
-            - Parameter estimation with Optax: "examples_benchmarks/parameter_estimation/physics_enhanced_regression_1.ipynb"
-            - Parameter estimation with BlackJAX: "examples_benchmarks/parameter_estimation/physics_enhanced_regression_2.ipynb"
-            - Neural ODEs with Optax: "examples_benchmarks/parameter_estimation/neural_ode.ipynb"
-        - Benchmarks:
-            - Lotka-Volterra:
-              - "examples_benchmarks/benchmarks/lotka_volterra/insights.md"
-              - "examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb"
-              - "examples_benchmarks/benchmarks/lotka_volterra/external.ipynb"
-            - Pleiades:
-              - "examples_benchmarks/benchmarks/pleiades/external.ipynb"
-            - Stiff Van der Pol:
-              - "examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb"
-            - High irradiance response (HIRES):
-              - "examples_benchmarks/benchmarks/hires/external.ipynb"
-    - API Documentation:
-        - ivpsolve: "api_docs/ivpsolve.md"
-        - ivpsolvers: "api_docs/ivpsolvers.md"
-        - strategies:
-          - filters: "api_docs/strategies/filters.md"
-          - smoothers: "api_docs/strategies/smoothers.md"
-        - statespace:
-          - recipes: "api_docs/statespace/recipes.md"
-          - cubature: "api_docs/statespace/cubature.md"
+  - Getting started:
+      - Getting started: index.md
+      - An easy example: quickstart/easy_example.ipynb
+      - Transitioning: quickstart/transitioning_from_other_packages.md
+      - Choosing a solver: quickstart/choosing_a_solver.md
+      - Troubleshooting: quickstart/troubleshooting.md
+  - Examples & Benchmarks:
+      - Solvers & Solutions:
+          - examples_benchmarks/solvers_solutions/posterior_uncertainties.ipynb
+          - examples_benchmarks/solvers_solutions/second_order_problems.ipynb
+          - examples_benchmarks/solvers_solutions/smoothing.ipynb
+          - examples_benchmarks/solvers_solutions/solution_object.ipynb
+          - examples_benchmarks/solvers_solutions/dynamic_output_scales.ipynb
+          - examples_benchmarks/solvers_solutions/conditioning-on-zero-residual.ipynb
+      - Parameter estimation:
+          - Parameter estimation with Optax: examples_benchmarks/parameter_estimation/physics_enhanced_regression_1.ipynb
+          - Parameter estimation with BlackJAX: examples_benchmarks/parameter_estimation/physics_enhanced_regression_2.ipynb
+          - Neural ODEs with Optax: examples_benchmarks/parameter_estimation/neural_ode.ipynb
+      - Benchmarks:
+          - Lotka-Volterra:
+              - examples_benchmarks/benchmarks/lotka_volterra/insights.md
+              - examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
+              - examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
+          - Pleiades: [examples_benchmarks/benchmarks/pleiades/external.ipynb]
+          - Stiff Van der Pol:
+              - examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
+          - High irradiance response (HIRES):
+              - examples_benchmarks/benchmarks/hires/external.ipynb
+  - API Documentation:
+      - ivpsolve: api_docs/ivpsolve.md
+      - ivpsolvers: api_docs/ivpsolvers.md
+      - strategies:
+          - filters: api_docs/strategies/filters.md
+          - smoothers: api_docs/strategies/smoothers.md
+      - statespace:
+          - recipes: api_docs/statespace/recipes.md
+          - cubature: api_docs/statespace/cubature.md
           - dense:
-              - extra: "api_docs/statespace/dense/extra.md"
-              - linearise: "api_docs/statespace/dense/linearise.md"
-              - corr: "api_docs/statespace/dense/corr.md"
+              - extra: api_docs/statespace/dense/extra.md
+              - linearise: api_docs/statespace/dense/linearise.md
+              - corr: api_docs/statespace/dense/corr.md
           - iso:
-              - extra: "api_docs/statespace/iso/extra.md"
-              - corr: "api_docs/statespace/iso/corr.md"
+              - extra: api_docs/statespace/iso/extra.md
+              - corr: api_docs/statespace/iso/corr.md
           - blockdiag:
-              - extra: "api_docs/statespace/blockdiag/extra.md"
-              - corr: "api_docs/statespace/blockdiag/corr.md"
+              - extra: api_docs/statespace/blockdiag/extra.md
+              - corr: api_docs/statespace/blockdiag/corr.md
           - scalar:
-              - extra: "api_docs/statespace/scalar/extra.md"
-              - corr: "api_docs/statespace/scalar/corr.md"
-        - solution: "api_docs/solution.md"
-        - taylor: "api_docs/taylor.md"
-        - controls: "api_docs/controls.md"
-
-    - Developer Documentation:
-        - Changelog: "dev_docs/changelog.md"
-        - "dev_docs/public_api.md"
-        - "dev_docs/creating_example_notebook.md"
-        - "dev_docs/continuous_integration.md"
-
-
+              - extra: api_docs/statespace/scalar/extra.md
+              - corr: api_docs/statespace/scalar/corr.md
+      - solution: api_docs/solution.md
+      - taylor: api_docs/taylor.md
+      - controls: api_docs/controls.md
+  - Developer Documentation:
+      - Changelog: dev_docs/changelog.md
+      - dev_docs/public_api.md
+      - dev_docs/creating_example_notebook.md
+      - dev_docs/continuous_integration.md
