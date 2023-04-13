@@ -32,13 +32,6 @@ class AbstractSolver(abc.ABC):
     def __init__(self, strategy):
         self.strategy = strategy
 
-    def __eq__(self, other):
-        def all_equal(a, b):
-            return jnp.all(jnp.equal(a, b))
-
-        tree_equal = jax.tree_util.tree_map(all_equal, self, other)
-        return jax.tree_util.tree_all(tree_equal)
-
     def __repr__(self):
         return f"{self.__class__.__name__}({self.strategy})"
 

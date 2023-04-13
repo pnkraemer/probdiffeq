@@ -73,15 +73,6 @@ plt.show()
 ```
 
 The default configuration assumes that the ODE to be solved is of first order.
-In fact, above, we used the following solver:
-
-
-```python
-implementation = recipes.ts0_iso(ode_order=1, num_derivatives=4)
-ts0_1_granular = ivpsolvers.MLESolver(filters.Filter(*implementation))
-assert ts0_1_granular == ts0_1
-```
-
 Now, the same game with a second-order ODE
 
 ```python
