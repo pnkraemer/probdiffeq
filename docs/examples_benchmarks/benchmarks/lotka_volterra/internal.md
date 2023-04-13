@@ -27,9 +27,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax import config
 
-from probdiffeq import controls, cubature, ivpsolvers
+from probdiffeq import controls, ivpsolvers
 from probdiffeq.doc_util import benchmark, info, notebook, workprecision
-from probdiffeq.implementations import recipes
+from probdiffeq.statespace import cubature, recipes
 from probdiffeq.strategies import filters, smoothers
 ```
 

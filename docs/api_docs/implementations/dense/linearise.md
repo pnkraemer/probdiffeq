@@ -1,1 +1,0 @@
-::: probdiffeq.implementations.dense.linearise

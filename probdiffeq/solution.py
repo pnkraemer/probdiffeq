@@ -279,7 +279,7 @@ def log_marginal_likelihood(*, observation_std, u, solution):
     # todo: this should return a Filtering posterior or a smoothing posterior
     #  which could then be plotted. Right?
     #  (We might also want some dense-output/checkpoint kind of thing here)
-    # todo: we should reuse the extrapolation model implementations.
+    # todo: we should reuse the extrapolation model statespace.
     #  But this only works if the ODE posterior uses the preconditioner (I think).
     # todo: we should allow proper noise, and proper information functions.
     #  But it is not clear which data structure that should be.

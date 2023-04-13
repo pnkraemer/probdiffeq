@@ -1,7 +1,7 @@
 """Test utilities."""
 
 from probdiffeq import ivpsolvers
-from probdiffeq.implementations import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 
 
@@ -20,7 +20,7 @@ def generate_solver(
     >>> config.update("jax_platform_name", "cpu")
 
     >>> from probdiffeq import ivpsolvers
-    >>> from probdiffeq.implementations import recipes
+    >>> from probdiffeq.statespace import recipes
     >>> from probdiffeq.strategies import smoothers
 
     >>> print(generate_solver())

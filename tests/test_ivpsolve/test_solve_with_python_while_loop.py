@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers, test_util
 from probdiffeq.backend import testing
-from probdiffeq.implementations import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
@@ -21,7 +21,7 @@ class _SolveWithPythonWhileLoopConfig(NamedTuple):
 
 @testing.case
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag=["nd"])
 def case_setup_all_nd_configs(ode_problem, impl_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,
@@ -37,7 +37,9 @@ def case_setup_all_nd_configs(ode_problem, impl_fn, solver_config):
 @testing.parametrize_with_cases(
     "ode_problem", cases="..problem_cases", has_tag=["scalar"]
 )
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["scalar"])
+@testing.parametrize_with_cases(
+    "impl_fn", cases="..statespace_cases", has_tag=["scalar"]
+)
 def case_setup_all_scalar_configs(ode_problem, impl_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,

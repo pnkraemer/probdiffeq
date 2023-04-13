@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.backend import testing
-from probdiffeq.implementations import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 
 # Generate interesting test cases
@@ -25,8 +25,8 @@ class _SolveAndSaveAtConfig(NamedTuple):
 
 @testing.case
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["nd"])
-def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
+@testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag=["nd"])
+def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
@@ -42,8 +42,10 @@ def case_setup_all_implementations_nd(ode_problem, impl_fn, solver_config):
 @testing.parametrize_with_cases(
     "ode_problem", cases="..problem_cases", has_tag=["scalar"]
 )
-@testing.parametrize_with_cases("impl_fn", cases="..impl_cases", has_tag=["scalar"])
-def case_setup_all_implementations_scalar(ode_problem, impl_fn, solver_config):
+@testing.parametrize_with_cases(
+    "impl_fn", cases="..statespace_cases", has_tag=["scalar"]
+)
+def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,

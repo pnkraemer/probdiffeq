@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers, solution, test_util
 from probdiffeq.backend import testing
-from probdiffeq.implementations import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 
 

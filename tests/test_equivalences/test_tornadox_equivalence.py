@@ -7,7 +7,7 @@ from tornadox import ek0, ek1, init, ivp, step
 
 from probdiffeq import controls, ivpsolve, ivpsolvers
 from probdiffeq.backend import testing
-from probdiffeq.implementations import recipes
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 
 
