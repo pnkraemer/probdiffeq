@@ -51,7 +51,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = ivpsolvers.DynamicSolver(strategy=smoothers.Smoother(recipes.ts0_iso()))
+solver = ivpsolvers.DynamicSolver(strategy=smoothers.Smoother(*recipes.ts0_iso()))
 ```
 
 ```python

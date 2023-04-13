@@ -52,9 +52,8 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = ivpsolvers.MLESolver(
-    smoothers.Smoother(recipes.slr1_dense(ode_shape=(1,), num_derivatives=1))
-)
+impl = recipes.slr1_dense(ode_shape=(1,), num_derivatives=1)
+solver = ivpsolvers.MLESolver(smoothers.Smoother(*impl))
 ```
 
 ```python
@@ -87,7 +86,7 @@ posterior_du = marginals.marginal_nth_derivative(1).mean
 ```python
 # Extrapolate the prior on the dense grid
 
-extrapolation_model = solver.strategy.implementation.extrapolation
+extrapolation_model = solver.strategy.extrapolation
 taylor_coefficients = jnp.reshape(
     sol.marginals.hidden_state.mean[0, ...],
     sol.marginals.target_shape,

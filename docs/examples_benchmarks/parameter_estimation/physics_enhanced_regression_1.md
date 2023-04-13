@@ -67,9 +67,8 @@ def vf(y, t, p):
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 
-strategy = smoothers.Smoother(
-    recipes.ts0_iso(num_derivatives=1),
-)
+impl = recipes.ts0_iso(num_derivatives=1)
+strategy = smoothers.Smoother(*impl)
 solver = ivpsolvers.CalibrationFreeSolver(strategy)
 
 

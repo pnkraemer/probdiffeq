@@ -145,7 +145,7 @@ plt.show()
 
 
 def impl_to_method_config(impl, *, key, label):
-    return strategy_to_method_config(filters.Filter(impl), key=key, label=label)
+    return strategy_to_method_config(filters.Filter(*impl), key=key, label=label)
 
 
 def strategy_to_method_config(strategy, *, key, label):
