@@ -6,14 +6,14 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _collections, _sqrt_util, solution
+from probdiffeq import _sqrt_util, solution
+from probdiffeq._collections import InterpRes  # simplify type signatures
 
 
 class _State(NamedTuple):
     """Solver state."""
 
     # Same as in solution.Solution()
-    t: Any
     u: Any
     strategy: Any
 
@@ -23,6 +23,10 @@ class _State(NamedTuple):
     error_estimate: Any
     output_scale_calibrated: Any
     output_scale_prior: Any
+
+    @property
+    def t(self):
+        return self.strategy.t
 
 
 @jax.tree_util.register_pytree_node_class
@@ -101,9 +105,8 @@ class AbstractSolver(abc.ABC):
 
     def init(self, sol, /) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        strategy_state = self.strategy.init(sol.posterior)
+        strategy_state = self.strategy.init(sol.t, sol.posterior)
         return _State(
-            t=sol.t,
             u=sol.u,
             error_estimate=error_estimate,
             strategy=strategy_state,
@@ -123,52 +126,40 @@ class AbstractSolver(abc.ABC):
         # Select branch and return result
         apply_branch_as_array, *_ = jnp.where(index_as_array, size=1)
         apply_branch = jnp.reshape(apply_branch_as_array, ())
-        return jax.lax.switch(apply_branch, branches, s0, s1, t)
+        return jax.lax.switch(apply_branch, branches, t, s0, s1)
 
-    def case_interpolate(
-        self, s0: _State, s1: _State, t
-    ) -> _collections.InterpRes[_State]:
+    def case_interpolate(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
+            t,
             s0=s0.strategy,
             s1=s1.strategy,
-            t=t,
-            t0=s0.t,
-            t1=s1.t,
             # always interpolate with the prior output scale.
             #  This is important to make the MLE solver behave correctly.
             #  (Dynamic solvers overwrite the prior output scale at every step anyway).
             output_scale=s1.output_scale_prior,
         )
-        t_accepted = jnp.maximum(s1.t, t)
-        prev = self._interp_make_state(prev_p, t=t, reference=s0)
-        sol = self._interp_make_state(sol_p, t=t, reference=s1)
-        acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
-        return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
+        prev = self._interp_make_state(prev_p, reference=s0)
+        sol = self._interp_make_state(sol_p, reference=s1)
+        acc = self._interp_make_state(acc_p, reference=s1)
+        return InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def case_right_corner(
-        self, s0: _State, s1: _State, t
-    ) -> _collections.InterpRes[_State]:
-        # todo: are all these arguments needed?
+    def case_right_corner(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
+            t,
             s0=s0.strategy,
             s1=s1.strategy,
-            t=t,
-            t0=s0.t,
-            t1=s1.t,
             output_scale=s1.output_scale_prior,
         )
-        t_accepted = jnp.maximum(s1.t, t)
-        prev = self._interp_make_state(prev_p, t=t, reference=s0)
-        sol = self._interp_make_state(sol_p, t=t, reference=s1)
-        acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
-        return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
+        prev = self._interp_make_state(prev_p, reference=s0)
+        sol = self._interp_make_state(sol_p, reference=s1)
+        acc = self._interp_make_state(acc_p, reference=s1)
+        return InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def _interp_make_state(self, state_strategy, *, t, reference: _State) -> _State:
+    def _interp_make_state(self, state_strategy, *, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
         u = self.strategy.extract_u(state=state_strategy)
         return _State(
             strategy=state_strategy,
-            t=t,
             u=u,
             error_estimate=error_estimate,
             output_scale_prior=reference.output_scale_prior,
@@ -207,7 +198,6 @@ class CalibrationFreeSolver(AbstractSolver):
         # Extract and return solution
         u = self.strategy.extract_u(state=corrected)
         return _State(
-            t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             strategy=corrected,
@@ -219,11 +209,11 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -235,11 +225,11 @@ class CalibrationFreeSolver(AbstractSolver):
         )
 
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -266,7 +256,6 @@ class DynamicSolver(AbstractSolver):
         # Return solution
         u = self.strategy.extract_u(state=corrected)
         return _State(
-            t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             strategy=corrected,
@@ -277,11 +266,11 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -290,11 +279,11 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
         u = marginals.extract_qoi()
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=u,  # new!
             marginals=marginals,  # new!
             posterior=posterior,
@@ -329,7 +318,6 @@ class MLESolver(AbstractSolver):
         # Extract and return solution
         u = self.strategy.extract_u(state=corrected)
         return _State(
-            t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             strategy=corrected,
@@ -357,14 +345,14 @@ class MLESolver(AbstractSolver):
     def extract_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals(posterior)
 
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=state.u,
             marginals=marginals,
             posterior=posterior,
@@ -375,13 +363,13 @@ class MLESolver(AbstractSolver):
     def extract_terminal_values_fn(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
 
-        posterior = self.strategy.extract(state.strategy)
+        t, posterior = self.strategy.extract(state.strategy)
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
 
         s = state.output_scale_calibrated
         state = self._rescale_covs(state, output_scale=s, marginals_unscaled=marginals)
         return solution.Solution(
-            t=state.t,
+            t=t,
             u=state.u,
             marginals=marginals,
             posterior=posterior,
@@ -412,7 +400,6 @@ class MLESolver(AbstractSolver):
         state_strategy = state.strategy.scale_covariance(output_scale)
         u = marginals.extract_qoi()
         return _State(
-            t=state.t,
             u=u,
             strategy=state_strategy,
             output_scale_calibrated=output_scale,

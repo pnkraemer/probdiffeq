@@ -3,7 +3,7 @@ from typing import Any, NamedTuple, Tuple
 
 import jax
 
-from probdiffeq import _collections
+from probdiffeq._collections import InterpRes
 from probdiffeq.strategies import _strategy
 
 
@@ -19,6 +19,7 @@ from probdiffeq.strategies import _strategy
 class _FiState(NamedTuple):
     """Filtering state."""
 
+    t: Any
     extrapolated: Any
     corrected: Any
     num_data_points: float
@@ -29,6 +30,7 @@ class _FiState(NamedTuple):
             raise ValueError
 
         return _FiState(
+            t=self.t,
             extrapolated=None,
             corrected=self.corrected.scale_covariance(s),
             num_data_points=self.num_data_points,
@@ -47,8 +49,9 @@ class FiSolution(NamedTuple):
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    def init(self, sol: FiSolution, /) -> _FiState:
+    def init(self, t, sol: FiSolution, /) -> _FiState:
         return _FiState(
+            t=t,
             extrapolated=None,
             corrected=sol.rv,
             num_data_points=sol.num_data_points,
@@ -63,34 +66,32 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return FiSolution(ssv, num_data_points=num_data_points)
 
     def extract(self, posterior: _FiState, /) -> FiSolution:
-        return FiSolution(posterior.corrected, posterior.num_data_points)
+        return posterior.t, FiSolution(posterior.corrected, posterior.num_data_points)
 
     def case_right_corner(
-        self, *, s0: _FiState, s1: _FiState, t, t0, t1, output_scale
-    ) -> _collections.InterpRes[_FiState]:  # s1.t == t
-        return _collections.InterpRes(accepted=s1, solution=s1, previous=s1)
+        self, t, *, s0: _FiState, s1: _FiState, output_scale
+    ) -> InterpRes[_FiState]:  # s1.t == t
+        return InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, *, s0: _FiState, s1: _FiState, t0, t, t1, output_scale
-    ) -> _collections.InterpRes[_FiState]:
+        self, t, *, s0: _FiState, s1: _FiState, output_scale
+    ) -> InterpRes[_FiState]:
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
-        dt = t - t0
+        dt = t - s0.t
         output_extra = self.begin_extrapolation(s0, dt=dt)
         extrapolated = self.complete_extrapolation(
             output_extra,
             state_previous=s0,
             output_scale=output_scale,
         )
-        # we need to move the extrapolation to the 'correction' field.
         extrapolated = _FiState(
+            t=t,
             extrapolated=None,
             corrected=extrapolated.extrapolated,
             num_data_points=extrapolated.num_data_points,
         )
-        return _collections.InterpRes(
-            accepted=s1, solution=extrapolated, previous=extrapolated
-        )
+        return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
     def offgrid_marginals(
         self,
@@ -105,10 +106,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(posterior),
-            s0=self.init(posterior_previous),
-            t0=t0,
-            t1=t1,
+            s1=self.init(t1, posterior),
+            s0=self.init(t0, posterior_previous),
             output_scale=output_scale,
         )
         u = self.extract_u(state=sol)
@@ -131,6 +130,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         extrapolate = self.extrapolation.begin_extrapolation
         extrapolated = extrapolate(posterior.corrected, dt=dt)
         return _FiState(
+            t=posterior.t + dt,
             extrapolated=extrapolated,
             corrected=None,
             num_data_points=posterior.num_data_points,
@@ -159,6 +159,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             output_scale=output_scale,
         )
         return _FiState(
+            t=output_extra.t,
             extrapolated=ssv,
             corrected=None,
             num_data_points=output_extra.num_data_points,
@@ -172,6 +173,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corr = _FiState(
+            t=extrapolated.t,
             extrapolated=None,
             corrected=corr,
             num_data_points=extrapolated.num_data_points + 1,
