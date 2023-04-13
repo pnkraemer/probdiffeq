@@ -104,7 +104,7 @@ plt.show()
 
 
 def impl_to_method_config(impl, *, label):
-    return strategy_to_method_config(filters.Filter(impl), label=label)
+    return strategy_to_method_config(filters.Filter(*impl), label=label)
 
 
 def strategy_to_method_config(strategy, *, label):

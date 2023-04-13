@@ -49,11 +49,9 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         self.ode_shape = ode_shape
 
     def __repr__(self):
-        name = self.__class__.__name__
-        args1 = f"a={self.a}, q={self.q_sqrtm_lower}"
         args2 = f"num_derivatives={self.num_derivatives}"
         args3 = f"ode_shape={self.ode_shape}"
-        return f"{name}({args1}, {args2}, {args3})"
+        return f"<Dense IBM with {args2}, {args3}>"
 
     def tree_flatten(self):
         children = (

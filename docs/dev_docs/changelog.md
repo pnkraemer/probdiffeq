@@ -52,7 +52,10 @@ Notable breaking changes:
   suffix was previously used to mark that ProbDiffEq estimates $sigma$ not $sigma^2$ (like other packages).
 * The output_scale parameter is not part of the step_fn() API anymore. Instead, it is tracked in the solver state.
 * `probdiffeq.implementations` is now called `probdiffeq.statespace`. The content remains the same.
-
+* All strategies (filters, smoothers, fixed-point smoothers) expect separate extrapolation and correction models
+  instead of a single `Implementation` object. To update, use tuple-unpacking: e.g. Smoother(*ts0_iso()) instead of Smoother(ts0_iso()).
+  Why this change? Bundling extrapolation and correction models up into a single data structure leads to
+  unnecessary code duplication, and the lower-level implementations simplify.
 
 Notable enhancements:
 

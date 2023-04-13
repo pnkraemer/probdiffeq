@@ -108,7 +108,7 @@ Let's start with finding the fastest probabilistic IVP solver.
 
 
 def impl_to_method_config(impl, *, label):
-    return strategy_to_method_config(filters.Filter(impl), label=label)
+    return strategy_to_method_config(filters.Filter(*impl), label=label)
 
 
 def strategy_to_method_config(strategy, *, label):
@@ -182,9 +182,9 @@ ts0_dense = recipes.ts0_dense(ode_shape=ode_shape)
 
 # Methods
 methods = [
-    impl_to_method_config(impl=ts0_iso, label="IsoTS0()"),
-    impl_to_method_config(impl=ts0_batch, label="BatchTS0()"),
-    impl_to_method_config(impl=ts0_dense, label="DenseTS0()"),
+    impl_to_method_config(ts0_iso, label="IsoTS0()"),
+    impl_to_method_config(ts0_batch, label="BatchTS0()"),
+    impl_to_method_config(ts0_dense, label="DenseTS0()"),
 ]
 ```
 
@@ -210,10 +210,10 @@ The isotropic solver and the dense solver actually compute the same posterior (t
 # Methods
 impl = recipes.ts0_iso()
 methods = [
-    strategy_to_method_config(filters.Filter(impl), label="Filter"),
-    strategy_to_method_config(smoothers.Smoother(impl), label="Smoother"),
+    strategy_to_method_config(filters.Filter(*impl), label="Filter"),
+    strategy_to_method_config(smoothers.Smoother(*impl), label="Smoother"),
     strategy_to_method_config(
-        smoothers.FixedPointSmoother(impl), label="FixedPointSmoother"
+        smoothers.FixedPointSmoother(*impl), label="FixedPointSmoother"
     ),
 ]
 ```

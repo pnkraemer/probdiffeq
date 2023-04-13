@@ -106,9 +106,8 @@ def vf(y, *, t, p):
 
 
 # Make a solver
-strategy = smoothers.Smoother(
-    recipes.ts0_iso(num_derivatives=1),
-)
+impl = recipes.ts0_iso(num_derivatives=1)
+strategy = smoothers.Smoother(*impl)
 solver = ivpsolvers.CalibrationFreeSolver(strategy)
 ```
 

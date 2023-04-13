@@ -40,7 +40,7 @@ class AbstractSolver(abc.ABC):
         return jax.tree_util.tree_all(tree_equal)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(strategy={self.strategy})"
+        return f"{self.__class__.__name__}({self.strategy})"
 
     # Abstract methods
 

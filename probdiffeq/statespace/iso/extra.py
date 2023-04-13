@@ -30,8 +30,8 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         self.preconditioner_powers = preconditioner_powers
 
     def __repr__(self):
-        name = self.__class__.__name__
-        return f"{name}(a={self.a}, q_sqrtm_lower={self.q_sqrtm_lower})"
+        args2 = f"num_derivatives={self.num_derivatives}"
+        return f"<Isotropic IBM with {args2}>"
 
     def tree_flatten(self):
         children = (

@@ -136,9 +136,8 @@ theta_true = u0 + 0.5 * jnp.flip(u0)
 theta_guess = u0  # initial guess
 
 # Create a probabilistic solver
-strategy = filters.Filter(
-    recipes.ts0_iso(num_derivatives=2),
-)
+impl = recipes.ts0_iso(num_derivatives=2)
+strategy = filters.Filter(*impl)
 solver = ivpsolvers.CalibrationFreeSolver(strategy)
 ```
 

@@ -15,6 +15,9 @@ def taylor_order_zero(*args, **kwargs):
 
 @jax.tree_util.register_pytree_node_class
 class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
+    def __repr__(self):
+        return f"<TS0 with ode_order={self.ode_order}>"
+
     def begin_correction(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]

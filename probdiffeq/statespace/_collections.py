@@ -182,9 +182,6 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def __init__(self, ode_order):
         self.ode_order = ode_order
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(ode_order={self.ode_order})"
-
     def tree_flatten(self):
         children = ()
         aux = (self.ode_order,)

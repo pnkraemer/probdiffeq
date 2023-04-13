@@ -18,14 +18,15 @@ P = TypeVar("P")
 class Strategy(abc.ABC, Generic[S, P]):
     """Inference strategy interface."""
 
-    # todo: self.extrapolation and self.correction instead of self.implementation.*
-    #  maybe ask for Smoother(*ts0_iso()).
-    def __init__(self, implementation):
-        self.implementation = implementation
+    def __init__(self, extrapolation, correction):
+        self.extrapolation = extrapolation
+        self.correction = correction
 
     def __repr__(self):
-        args = f"implementation={self.implementation}"
-        return f"{self.__class__.__name__}({args})"
+        name = self.__class__.__name__
+        arg1 = self.extrapolation
+        arg2 = self.correction
+        return f"{name}({arg1}, {arg2})"
 
     @abc.abstractmethod
     def solution_from_tcoeffs(self, taylor_coefficients, *, num_data_points) -> P:
@@ -92,20 +93,20 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     def tree_flatten(self):
-        children = (self.implementation,)
+        children = (self.extrapolation, self.correction)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (implementation,) = children
-        return cls(implementation=implementation)
+        (extra, correct) = children
+        return cls(extra, correct)
 
     def init_error_estimate(self):
-        return self.implementation.extrapolation.init_error_estimate()
+        return self.extrapolation.init_error_estimate()
 
     def init_output_scale(self, *args, **kwargs):
-        init_fn = self.implementation.extrapolation.init_output_scale
+        init_fn = self.extrapolation.init_output_scale
         return init_fn(*args, **kwargs)
 
     def begin(self, state: S, /, *, t, dt, parameters, vector_field):

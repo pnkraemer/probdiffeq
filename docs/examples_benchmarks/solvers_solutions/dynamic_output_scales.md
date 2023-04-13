@@ -58,10 +58,10 @@ def vf(*ys, t, p):
 num_derivatives = 1
 
 implementation = recipes.ts1_dense(ode_shape=(1,), num_derivatives=num_derivatives)
-strategy = filters.Filter(implementation=implementation)
+strategy = filters.Filter(*implementation)
 
-dynamic = ivpsolvers.DynamicSolver(strategy=strategy)
-mle = ivpsolvers.MLESolver(strategy=strategy)
+dynamic = ivpsolvers.DynamicSolver(strategy)
+mle = ivpsolvers.MLESolver(strategy)
 ```
 
 ```python

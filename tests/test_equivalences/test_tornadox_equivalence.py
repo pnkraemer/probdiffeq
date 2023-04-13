@@ -85,7 +85,7 @@ def fixture_solver_tornadox_kronecker_ek0(num, steprule_tornadox):
 @testing.fixture(name="solver_probdiffeq_kronecker_ek0")
 def fixture_solver_probdiffeq_kronecker_ek0(num):
     implementation = recipes.ts0_iso(num_derivatives=num)
-    strategy = filters.Filter(implementation=implementation)
+    strategy = filters.Filter(*implementation)
     return ivpsolvers.DynamicSolver(strategy=strategy)
 
 
@@ -154,7 +154,7 @@ def fixture_solver_tornadox_reference_ek1(num, steprule_tornadox):
 @testing.fixture(name="solver_probdiffeq_reference_ek1")
 def fixture_solver_probdiffeq_reference_ek1(num):
     implementation = recipes.ts1_dense(num_derivatives=num, ode_shape=(2,))
-    strategy = filters.Filter(implementation=implementation)
+    strategy = filters.Filter(*implementation)
     return ivpsolvers.DynamicSolver(strategy=strategy)
 
 

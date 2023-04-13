@@ -137,7 +137,7 @@ def test_log_marginal_likelihood_terminal_values_error_for_wrong_shapes(
 def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
     recipe = recipes.ts0_iso(num_derivatives=4)
-    strategy = strategy_fn(recipe)
+    strategy = strategy_fn(*recipe)
     solver = ivpsolvers.CalibrationFreeSolver(strategy)
     sol = ivpsolve.simulate_terminal_values(
         ode_problem.vector_field,
@@ -160,7 +160,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
 def test_nmll_raises_error_for_filter(ode_problem):
     """Non-terminal value calls are not possible for filters."""
     recipe = recipes.ts0_iso(num_derivatives=4)
-    strategy = filters.Filter(recipe)
+    strategy = filters.Filter(*recipe)
     solver = ivpsolvers.CalibrationFreeSolver(strategy)
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1)
 
