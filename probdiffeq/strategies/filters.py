@@ -40,7 +40,6 @@ class FiSolution(NamedTuple):
 
     rv: Any
 
-    # todo: make a similar field in MarkovSequence
     num_data_points: float
 
 
@@ -66,8 +65,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def extract(self, posterior: _FiState, /) -> FiSolution:
         return FiSolution(posterior.corrected, posterior.num_data_points)
 
-    # todo: make interpolation result into a named-tuple.
-    #  it is too confusing what those three posteriors mean.
     def case_right_corner(
         self, *, s0: _FiState, s1: _FiState, t, t0, t1, output_scale
     ) -> _collections.InterpRes[_FiState]:  # s1.t == t
@@ -139,7 +136,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             num_data_points=posterior.num_data_points,
         )
 
-    # todo: make "output_extra" positional only. Then rename this mess.
     def begin_correction(
         self, output_extra: _FiState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
@@ -157,7 +153,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> _FiState:
         extra = self.extrapolation
         extrapolate_fn = extra.complete_extrapolation_without_reversal
-        # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
             output_extra.extrapolated,
             s0=state_previous.corrected,
