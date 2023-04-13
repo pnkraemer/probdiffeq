@@ -48,26 +48,6 @@ class AbstractSolver(abc.ABC):
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         raise NotImplementedError
 
-    # todo: state positional-only?
-    def _strategy_begin(self, state, /, *, dt, parameters, vector_field):
-        # todo: wrap those outputs into a _State type.
-        state_strategy = self.strategy.begin(
-            state.strategy,
-            t=state.t,
-            dt=dt,
-            parameters=parameters,
-            vector_field=vector_field,
-        )
-        return state_strategy
-
-    def _strategy_complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        return self.strategy.complete(
-            output_extra,
-            state.strategy,
-            output_scale=output_scale,
-            cache_obs=cache_obs,
-        )
-
     @abc.abstractmethod
     def extract(self, state: _State, /) -> solution.Solution:
         raise NotImplementedError
@@ -178,12 +158,17 @@ class CalibrationFreeSolver(AbstractSolver):
     """
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self._strategy_begin(
-            state, dt=dt, parameters=parameters, vector_field=vector_field
+        output_extra, (error, _, cache_obs) = self.strategy.begin(
+            state.strategy,
+            t=state.t,
+            dt=dt,
+            parameters=parameters,
+            vector_field=vector_field,
         )
-        _, corrected = self._strategy_complete(
+
+        _, corrected = self.strategy.complete(
             output_extra,
-            state,
+            state.strategy,
             cache_obs=cache_obs,
             output_scale=state.output_scale_prior,
         )
@@ -232,12 +217,17 @@ class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, output_scale, cache_obs) = self._strategy_begin(
-            state, dt=dt, parameters=parameters, vector_field=vector_field
+        output_extra, (error, output_scale, cache_obs) = self.strategy.begin(
+            state.strategy,
+            t=state.t,
+            dt=dt,
+            parameters=parameters,
+            vector_field=vector_field,
         )
-        _, corrected = self._strategy_complete(
+
+        _, corrected = self.strategy.complete(
             output_extra,
-            state,
+            state.strategy,
             cache_obs=cache_obs,
             output_scale=output_scale,
         )
@@ -283,12 +273,17 @@ class MLESolver(AbstractSolver):
      calibration of the output-scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self._strategy_begin(
-            state, dt=dt, parameters=parameters, vector_field=vector_field
+        output_extra, (error, _, cache_obs) = self.strategy.begin(
+            state.strategy,
+            t=state.t,
+            dt=dt,
+            parameters=parameters,
+            vector_field=vector_field,
         )
-        observed, corrected = self._strategy_complete(
+
+        observed, corrected = self.strategy.complete(
             output_extra,
-            state,
+            state.strategy,
             cache_obs=cache_obs,
             output_scale=state.output_scale_prior,
         )
