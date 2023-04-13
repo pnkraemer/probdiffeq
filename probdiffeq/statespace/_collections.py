@@ -111,6 +111,33 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     """Extrapolation model interface."""
 
+    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+
+        self.preconditioner_scales = preconditioner_scales
+        self.preconditioner_powers = preconditioner_powers
+
+    def tree_flatten(self):
+        children = (
+            self.a,
+            self.q_sqrtm_lower,
+            self.preconditioner_scales,
+            self.preconditioner_powers,
+        )
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        a, q_sqrtm_lower, scales, powers = children
+        return cls(
+            a=a,
+            q_sqrtm_lower=q_sqrtm_lower,
+            preconditioner_scales=scales,
+            preconditioner_powers=powers,
+        )
+
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
@@ -120,14 +147,6 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
     @abc.abstractmethod
     def solution_from_tcoeffs(self, taylor_coefficients) -> SSVTypeVar:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def init_error_estimate(self) -> jax.Array:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def init_conditional(self, ssv_proto):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -154,12 +173,40 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     ):
         raise NotImplementedError
 
+    # todo: bundle in an init() method:
+
+    @abc.abstractmethod
+    def init_error_estimate(self) -> jax.Array:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init_conditional(self, ssv_proto):
+        raise NotImplementedError
+
 
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     """Conditional distribution interface.
 
     Used as a backward model for backward-Gauss--Markov process representations.
     """
+
+    def __init__(self, transition, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
 
     @abc.abstractmethod
     def __call__(self, x, /):

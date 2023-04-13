@@ -22,36 +22,9 @@ def ibm_scalar(num_derivatives):
 
 @jax.tree_util.register_pytree_node_class
 class _IBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-
-        self.preconditioner_scales = preconditioner_scales
-        self.preconditioner_powers = preconditioner_powers
-
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"
-
-    def tree_flatten(self):
-        children = (
-            self.a,
-            self.q_sqrtm_lower,
-            self.preconditioner_scales,
-            self.preconditioner_powers,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        a, q_sqrtm_lower, scales, powers = children
-        return cls(
-            a=a,
-            q_sqrtm_lower=q_sqrtm_lower,
-            preconditioner_scales=scales,
-            preconditioner_powers=powers,
-        )
 
     @property
     def num_derivatives(self):

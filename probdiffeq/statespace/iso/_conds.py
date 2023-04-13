@@ -8,28 +8,7 @@ from probdiffeq.statespace.iso import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoConditional(_collections.AbstractConditional):
-    def __init__(self, transition, noise):
-        self.transition = transition
-        self.noise = noise
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        return f"{name}(transition={self.transition}, noise={self.noise})"
-
-    def tree_flatten(self):
-        children = self.transition, self.noise
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        transition, noise = children
-        return cls(transition=transition, noise=noise)
-
-
-@jax.tree_util.register_pytree_node_class
-class IsoConditionalHiddenState(_IsoConditional):
+class IsoConditionalHiddenState(_collections.AbstractConditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
@@ -74,7 +53,7 @@ class IsoConditionalHiddenState(_IsoConditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditionalQOI(_IsoConditional):
+class IsoConditionalQOI(_collections.AbstractConditional):
     # Conditional between hidden state and QOI
     def __call__(self, x, /):
         mv = self.transition[:, None] * x[None, :]

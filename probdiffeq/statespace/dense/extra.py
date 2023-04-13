@@ -31,18 +31,11 @@ class _DenseIBM(_collections.AbstractExtrapolation):
     def __init__(
         self,
         *,
-        a,
-        q_sqrtm_lower,
-        preconditioner_scales,
-        preconditioner_powers,
         num_derivatives,
         ode_shape,
+        **kwargs,
     ):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-
-        self.preconditioner_scales = preconditioner_scales
-        self.preconditioner_powers = preconditioner_powers
+        super().__init__(**kwargs)
 
         self.num_derivatives = num_derivatives
         assert len(ode_shape) == 1
