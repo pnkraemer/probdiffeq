@@ -33,15 +33,11 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init(self, t, solution: P, /) -> S:
+    def init(self, t, u, marginals, solution: P, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
     def extract(self, state: S, /) -> P:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_u(self, *, state: S):
         raise NotImplementedError
 
     @abc.abstractmethod
