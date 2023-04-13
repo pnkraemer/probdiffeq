@@ -13,7 +13,6 @@ class _State(NamedTuple):
     """Solver state."""
 
     # Same as in solution.Solution()
-    t: Any
     u: Any
     strategy: Any
 
@@ -23,6 +22,10 @@ class _State(NamedTuple):
     error_estimate: Any
     output_scale_calibrated: Any
     output_scale_prior: Any
+
+    @property
+    def t(self):
+        return self.strategy.t
 
 
 @jax.tree_util.register_pytree_node_class
@@ -102,9 +105,8 @@ class AbstractSolver(abc.ABC):
 
     def init(self, sol, /) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        strategy_state = self.strategy.init(sol.posterior)
+        strategy_state = self.strategy.init(sol.t, sol.posterior)
         return _State(
-            t=sol.t,
             u=sol.u,
             error_estimate=error_estimate,
             strategy=strategy_state,
@@ -133,17 +135,17 @@ class AbstractSolver(abc.ABC):
             s0=s0.strategy,
             s1=s1.strategy,
             t=t,
-            t0=s0.t,
-            t1=s1.t,
+            # t0=s0.t,
+            # t1=s1.t,
             # always interpolate with the prior output scale.
             #  This is important to make the MLE solver behave correctly.
             #  (Dynamic solvers overwrite the prior output scale at every step anyway).
             output_scale=s1.output_scale_prior,
         )
         t_accepted = jnp.maximum(s1.t, t)
-        prev = self._interp_make_state(prev_p, t=t, reference=s0)
-        sol = self._interp_make_state(sol_p, t=t, reference=s1)
-        acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
+        prev = self._interp_make_state(prev_p, reference=s0)
+        sol = self._interp_make_state(sol_p, reference=s1)
+        acc = self._interp_make_state(acc_p, reference=s1)
         return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def case_right_corner(
@@ -159,17 +161,16 @@ class AbstractSolver(abc.ABC):
             output_scale=s1.output_scale_prior,
         )
         t_accepted = jnp.maximum(s1.t, t)
-        prev = self._interp_make_state(prev_p, t=t, reference=s0)
-        sol = self._interp_make_state(sol_p, t=t, reference=s1)
-        acc = self._interp_make_state(acc_p, t=t_accepted, reference=s1)
+        prev = self._interp_make_state(prev_p, reference=s0)
+        sol = self._interp_make_state(sol_p, reference=s1)
+        acc = self._interp_make_state(acc_p, reference=s1)
         return _collections.InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def _interp_make_state(self, state_strategy, *, t, reference: _State) -> _State:
+    def _interp_make_state(self, state_strategy, *, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()
         u = self.strategy.extract_u(state=state_strategy)
         return _State(
             strategy=state_strategy,
-            t=t,
             u=u,
             error_estimate=error_estimate,
             output_scale_prior=reference.output_scale_prior,
@@ -267,7 +268,6 @@ class DynamicSolver(AbstractSolver):
         # Return solution
         u = self.strategy.extract_u(state=corrected)
         return _State(
-            t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             strategy=corrected,
@@ -330,7 +330,6 @@ class MLESolver(AbstractSolver):
         # Extract and return solution
         u = self.strategy.extract_u(state=corrected)
         return _State(
-            t=state.t + dt,
             u=u,
             error_estimate=dt * error,
             strategy=corrected,
@@ -413,7 +412,6 @@ class MLESolver(AbstractSolver):
         state_strategy = state.strategy.scale_covariance(output_scale)
         u = marginals.extract_qoi()
         return _State(
-            t=state.t,
             u=u,
             strategy=state_strategy,
             output_scale_calibrated=output_scale,

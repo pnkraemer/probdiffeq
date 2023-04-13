@@ -33,7 +33,7 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init(self, solution: P, /) -> S:
+    def init(self, t, solution: P, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod

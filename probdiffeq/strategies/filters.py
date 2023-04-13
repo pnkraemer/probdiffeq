@@ -47,8 +47,9 @@ class FiSolution(NamedTuple):
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    def init(self, sol: FiSolution, /) -> _FiState:
+    def init(self, t, sol: FiSolution, /) -> _FiState:
         return _FiState(
+            t=t,
             extrapolated=None,
             corrected=sol.rv,
             num_data_points=sol.num_data_points,
