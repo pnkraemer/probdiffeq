@@ -125,13 +125,13 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def case_interpolate(
-        self, *, s0: _SmState, s1: _SmState, t, output_scale
+        self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
-        self, *, s0: _SmState, s1: _SmState, t, output_scale
+        self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
         raise NotImplementedError
 
