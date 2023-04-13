@@ -363,8 +363,6 @@ class Smoother(_SmootherCommon):
             t=t,
             s1=self.init(t1, posterior),
             s0=self.init(t0, posterior_previous),
-            # t0=t0,
-            # t1=t1,
             output_scale=output_scale,
         )
         marginals_at_t = acc.backward_model.marginalise(marginals)

@@ -135,8 +135,6 @@ class AbstractSolver(abc.ABC):
             s0=s0.strategy,
             s1=s1.strategy,
             t=t,
-            # t0=s0.t,
-            # t1=s1.t,
             # always interpolate with the prior output scale.
             #  This is important to make the MLE solver behave correctly.
             #  (Dynamic solvers overwrite the prior output scale at every step anyway).
