@@ -240,11 +240,11 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         return cls(ode_order=ode_order)
 
     @abc.abstractmethod
-    def begin_correction(
+    def begin(
         self, x: SSVTypeVar, /, vector_field, t, p
     ) -> Tuple[jax.Array, float, CacheTypeVar]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
+    def complete(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
         raise NotImplementedError

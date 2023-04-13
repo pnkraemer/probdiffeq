@@ -136,9 +136,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def begin_correction(
         self, output_extra: _FiState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        return self.correction.begin_correction(
-            output_extra.extrapolated, vector_field=vector_field, t=t, p=p
-        )
+        x = output_extra.extrapolated
+        return self.correction.begin(x, vector_field=vector_field, t=t, p=p)
 
     def complete_extrapolation(
         self,
@@ -164,7 +163,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def complete_correction(
         self, extrapolated: _FiState, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        obs, corr = self.correction.complete_correction(
+        obs, corr = self.correction.complete(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corr = _FiState(

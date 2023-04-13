@@ -77,7 +77,7 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin_correction(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         m0 = self.e0(x.hidden_state.mean)
         m1 = self.e1(x.hidden_state.mean)
         cov_sqrtm_lower = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
@@ -105,7 +105,7 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         # Return scaled error estimate and other quantities
         return error_estimate, output_scale, (b,)
 
-    def complete_correction(self, extrapolated, cache):
+    def complete(self, extrapolated, cache):
         ext = extrapolated  # alias for readability
         l_obs_nonsquare = self.e1_vect(ext.hidden_state.cov_sqrtm_lower)
 
@@ -151,7 +151,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin_correction(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -178,7 +178,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         # Return scaled error estimate and other quantities
         return error_estimate, output_scale, (jvp_fn, (b,))
 
-    def complete_correction(self, extrapolated: _vars.DenseStateSpaceVar, cache):
+    def complete(self, extrapolated: _vars.DenseStateSpaceVar, cache):
         # Assign short-named variables for readability
         ext = extrapolated
 
@@ -249,7 +249,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin_correction(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
@@ -282,7 +282,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         # Return scaled error estimate and other quantities
         return error_estimate, output_scale, cache
 
-    def complete_correction(self, extrapolated, cache):
+    def complete(self, extrapolated, cache):
         # Select the required derivatives
         _x = extrapolated  # readability in current code block
         m_0 = self.e0(_x.hidden_state.mean)
@@ -352,7 +352,7 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin_correction(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
@@ -385,7 +385,7 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         # Return scaled error estimate and other quantities
         return error_estimate, output_scale, cache
 
-    def complete_correction(self, extrapolated, cache):
+    def complete(self, extrapolated, cache):
         # Select the required derivatives
         _x = extrapolated  # readability in current code block
         m_0 = self.e0(_x.hidden_state.mean)

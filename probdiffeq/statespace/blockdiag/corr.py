@@ -62,7 +62,7 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
             ode_order=ode_order, ode_shape=ode_shape, cubature_rule=cubature_rule
         )
 
-    def begin_correction(self, extrapolated, /, vector_field, t, p):
+    def begin(self, extrapolated, /, vector_field, t, p):
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         cache = (vmap_f,)
@@ -84,12 +84,12 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         )
         return output_scale * error_estimate, output_scale, cache
 
-    def complete_correction(self, extrapolated, cache):
+    def complete(self, extrapolated, cache):
         (vmap_f,) = cache
 
         H, noise = self.linearize(extrapolated, vmap_f)
 
-        compl_fn = scalar_corr.StatisticalFirstOrder.complete_correction_post_linearize
+        compl_fn = scalar_corr.StatisticalFirstOrder.complete_post_linearize
         fn = jax.vmap(compl_fn)
         return fn(self._mm, H, extrapolated.hidden_state, noise)
 
@@ -145,7 +145,7 @@ class _BlockDiag(_collections.AbstractCorrection):
         (corr,) = children
         return cls(corr)
 
-    def begin_correction(self, x, /, vector_field, t, p):
+    def begin(self, x, /, vector_field, t, p):
         select_fn = jax.vmap(type(self.corr).select_derivatives)
         m0, m1 = select_fn(self.corr, x.hidden_state)
 
@@ -160,8 +160,8 @@ class _BlockDiag(_collections.AbstractCorrection):
         error_estimate = obs_unbatch.cov_sqrtm_lower
         return output_scale * error_estimate, output_scale, cache
 
-    def complete_correction(self, extrapolated, cache: _TS0CacheType):
-        fn = jax.vmap(type(self.corr).complete_correction)
+    def complete(self, extrapolated, cache: _TS0CacheType):
+        fn = jax.vmap(type(self.corr).complete)
         return fn(self.corr, extrapolated, cache)
 
     def _cov_sqrtm_lower(self, cov_sqrtm_lower):

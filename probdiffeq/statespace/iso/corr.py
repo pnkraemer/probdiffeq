@@ -18,7 +18,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
-    def begin_correction(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -37,7 +37,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate = error_estimate_unscaled * output_scale
         return error_estimate, output_scale, (bias,)
 
-    def complete_correction(
+    def complete(
         self, extrapolated: _vars.IsoStateSpaceVar, cache
     ) -> Tuple[_vars.IsoNormalQOI, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
         (bias,) = cache

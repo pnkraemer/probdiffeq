@@ -199,12 +199,12 @@ class _SmootherCommon(_strategy.Strategy):
     def begin_correction(
         self, output_extra: _SmState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        return self.correction.begin_correction(
+        return self.correction.begin(
             output_extra.extrapolated, vector_field=vector_field, t=t, p=p
         )
 
     def complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
-        a, corrected = self.correction.complete_correction(
+        a, corrected = self.correction.complete(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corrected_seq = _SmState(
