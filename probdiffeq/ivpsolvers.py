@@ -201,8 +201,6 @@ class CalibrationFreeSolver(AbstractSolver):
 
     def extract(self, state: _State, /) -> solution.Solution:
         t, u, marginals, posterior = self.strategy.extract(state.strategy)
-        # marginals = self.strategy.extract_marginals(posterior)
-        # u = marginals.extract_qoi()
         return solution.Solution(
             t=t,
             u=u,  # new!
@@ -329,7 +327,6 @@ class MLESolver(AbstractSolver):
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
         t, u, marginals, posterior = self.strategy.extract(state.strategy)
-        # marginals = self.strategy.extract_marginals(posterior)
 
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
