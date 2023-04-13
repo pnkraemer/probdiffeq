@@ -4,6 +4,8 @@
 format:
 	isort .
 	black .
+	yamlfix .
+	eof .
 	nbqa black docs/quickstart/
 	nbqa black docs/examples_benchmarks/solvers_solutions/
 	nbqa black docs/examples_benchmarks/parameter_estimation/

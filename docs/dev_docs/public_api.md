@@ -25,5 +25,3 @@ Everything else is either considered private or experimental.
 For example, `statespace.dense.*` is accessible from the standard namespace, but not considered public API.
 Changes to this code are treated as bugfixes, breaking or not: 
 patch-version increases, changelog entries are optional, and deprecation policy is not considered necessary.
-
-
