@@ -94,13 +94,6 @@ taylor_coefficients = jnp.reshape(
 )
 
 
-@jax.jit
-def extrapolate_fn(rv, model, dt, output_scale):
-    ssv = model.begin_extrapolation(rv, dt)
-    rv = model.complete_without_reversal(ssv, s0=rv, output_scale=output_scale)
-    return rv
-
-
 prior_u = []
 prior_du = []
 rv = extrapolation_model.solution_from_tcoeffs(taylor_coefficients)
@@ -109,7 +102,11 @@ for t_old, t_new in zip(mesh[:-1], mesh[1:]):
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 
     dt = t_new - t_old
-    rv = extrapolate_fn(rv, extrapolation_model, dt, sol.output_scale.mean())
+    ssv = extrapolation_model.begin(rv, dt)
+    rv = extrapolation_model.complete_without_reversal(
+        ssv, s0=rv, output_scale=sol.output_scale.mean()
+    )
+
 
 prior_u.append(rv.marginal_nth_derivative(0).mean)
 prior_du.append(rv.marginal_nth_derivative(1).mean)
