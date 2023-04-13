@@ -63,7 +63,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
         return FiSolution(ssv, num_data_points=num_data_points)
 
-    def extract(self, posterior: _FiState, /) -> FiSolution:
+    def extract(self, posterior: _FiState, /) -> Tuple[float, FiSolution]:
         return posterior.t, FiSolution(posterior.corrected, posterior.num_data_points)
 
     def case_right_corner(
@@ -101,7 +101,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         t0,
         t1,
         output_scale,
-    ) -> Tuple[jax.Array, _FiState]:
+    ) -> Tuple[jax.Array, Tuple[float, FiSolution]]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
             s1=self.init(t1, posterior),

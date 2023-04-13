@@ -45,11 +45,11 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_marginals(self, state: S, /):
+    def extract_marginals(self, state: P, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_marginals_terminal_values(self, state: S, /):
+    def extract_marginals_terminal_values(self, state: P, /):
         raise NotImplementedError
 
     @abc.abstractmethod
