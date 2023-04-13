@@ -118,14 +118,15 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         t0,
         t1,
         output_scale,
-    ) -> Tuple[float, jax.Array, jax.Array, FilterDist]:
+    ) -> Tuple[jax.Array, jax.Array]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
             s1=self.init(t1, None, None, posterior),
             s0=self.init(t0, None, None, posterior_previous),
             output_scale=output_scale,
         )
-        return self.extract(sol)
+        _, u, marginals, _ = self.extract(sol)
+        return u, marginals
 
     def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
