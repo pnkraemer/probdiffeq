@@ -52,8 +52,7 @@ class MarkovSequence(_strategy.Posterior[S]):
         if base_sample.shape == self.sample_shape:
             return self._transform_one_unit_sample(base_sample)
 
-        transform = self.transform_unit_sample
-        transform_vmap = jax.vmap(transform, in_axes=0)
+        transform_vmap = jax.vmap(self._transform_unit_sample, in_axes=0)
         return transform_vmap(base_sample)
 
     def _transform_one_unit_sample(self, base_sample, /):
