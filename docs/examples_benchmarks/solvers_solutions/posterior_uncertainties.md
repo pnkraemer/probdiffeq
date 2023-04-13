@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.doc_util import notebook
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -132,7 +132,7 @@ sol = ivpsolve.solve_and_save_at(
 
 ```python
 key = jax.random.PRNGKey(seed=1)
-u, samples = solution.sample(key, solution=sol, shape=(2,), solver=ts0)
+u, samples = sol.posterior.sample(key, shape=(2,))
 ```
 
 ```python

@@ -99,12 +99,6 @@ class Solution(Generic[R]):
             yield self[i]
 
 
-# todo: this function is a bit of a meaningless wrapper.
-#  Either document its use-case or remove.
-def sample(key, *, solution, solver, shape=()):
-    return solver.strategy.sample(key, posterior=solution.posterior, shape=shape)
-
-
 # todo: the functions in here should only depend on posteriors / strategies!
 
 

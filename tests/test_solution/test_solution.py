@@ -116,11 +116,11 @@ def fixture_solution_save_at(ode_problem):
 
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_grid_samples(solution_save_at, shape):
+def test_sample_shape(solution_save_at, shape):
     sol, solver = solution_save_at
 
     key = jax.random.PRNGKey(seed=15)
-    u, samples = solution.sample(key, solution=sol, solver=solver, shape=shape)
+    u, samples = sol.posterior.sample(key, shape=shape)
     assert u.shape == shape + sol.u.shape
     assert samples.shape == shape + sol.marginals.hidden_state.sample_shape
 

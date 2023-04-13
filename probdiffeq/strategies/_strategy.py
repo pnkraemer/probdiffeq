@@ -13,6 +13,15 @@ S = TypeVar("S")
 P = TypeVar("P")
 """A type-variable to indicate strategy-solution ("posterior") types."""
 
+R = TypeVar("R")
+"""A type-variable to indicate random-variable types."""
+
+
+class Posterior(abc.ABC, Generic[R]):
+    @abc.abstractmethod
+    def sample(self, key, *, shape):
+        raise NotImplementedError
+
 
 @jax.tree_util.register_pytree_node_class
 class Strategy(abc.ABC, Generic[S, P]):
@@ -56,10 +65,6 @@ class Strategy(abc.ABC, Generic[S, P]):
     def offgrid_marginals(
         self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
     ):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def sample(self, key, *, posterior: P, shape):
         raise NotImplementedError
 
     @abc.abstractmethod

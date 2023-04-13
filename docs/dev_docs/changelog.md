@@ -56,6 +56,8 @@ Notable breaking changes:
   instead of a single `Implementation` object. To update, use tuple-unpacking: e.g. Smoother(*ts0_iso()) instead of Smoother(ts0_iso()).
   Why this change? Bundling extrapolation and correction models up into a single data structure leads to
   unnecessary code duplication, and the lower-level implementations simplify.
+* `solution.sample()` has been removed. Use `sol.posterior.sample()` instead, (where `sol` is the solution-type as return by solve*() methods.)
+
 
 Notable enhancements:
 

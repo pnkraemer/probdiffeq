@@ -2,7 +2,7 @@
 
 import abc
 import functools
-from typing import Any, Generic, NamedTuple, Tuple, TypeVar
+from typing import Any, NamedTuple, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -18,7 +18,7 @@ S = TypeVar("S")
 
 
 @jax.tree_util.register_pytree_node_class
-class MarkovSequence(Generic[S]):
+class MarkovSequence(_strategy.Posterior[S]):
     """Markov sequence. A discretised Markov process."""
 
     def __init__(self, *, init: S, backward_model, num_data_points):
@@ -39,6 +39,14 @@ class MarkovSequence(Generic[S]):
     def tree_unflatten(cls, _aux, children):
         init, backward_model, n = children
         return cls(init=init, backward_model=backward_model, num_data_points=n)
+
+    def sample(self, key, *, shape):
+        # A smoother samples on the grid by sampling i.i.d values
+        # from the terminal RV x_N and the backward noises z_(1:N)
+        # and then combining them backwards as
+        # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
+        base_samples = jax.random.normal(key=key, shape=shape + self.sample_shape)
+        return self.transform_unit_sample(base_samples)
 
     def transform_unit_sample(self, base_sample, /):
         if base_sample.shape == self.sample_shape:
@@ -248,14 +256,6 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
         return markov.marginalise_backwards()
-
-    def sample(self, key, *, posterior: MarkovSequence, shape):
-        # A smoother samples on the grid by sampling i.i.d values
-        # from the terminal RV x_N and the backward noises z_(1:N)
-        # and then combining them backwards as
-        # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-        base_samples = jax.random.normal(key=key, shape=shape + posterior.sample_shape)
-        return posterior.transform_unit_sample(base_samples)
 
     def num_data_points(self, state, /):
         return state.num_data_points
