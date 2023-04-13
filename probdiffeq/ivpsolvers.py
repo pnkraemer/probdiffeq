@@ -155,8 +155,6 @@ class AbstractSolver(abc.ABC):
             s0=s0.strategy,
             s1=s1.strategy,
             t=t,
-            t0=s0.t,
-            t1=s1.t,
             output_scale=s1.output_scale_prior,
         )
         prev = self._interp_make_state(prev_p, reference=s0)

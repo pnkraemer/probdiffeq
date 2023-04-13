@@ -54,13 +54,13 @@ class Strategy(abc.ABC, Generic[S, P]):
 
     @abc.abstractmethod
     def case_right_corner(
-        self, *, s0: S, s1: S, t, t0, t1, output_scale
+        self, *, s0: S, s1: S, t, output_scale
     ) -> _collections.InterpRes[S]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_interpolate(
-        self, *, s0: S, s1: S, t, t0, t1, output_scale
+        self, *, s0: S, s1: S, t, output_scale
     ) -> _collections.InterpRes[S]:
         raise NotImplementedError
 

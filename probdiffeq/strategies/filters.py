@@ -69,7 +69,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return posterior.t, FiSolution(posterior.corrected, posterior.num_data_points)
 
     def case_right_corner(
-        self, *, s0: _FiState, s1: _FiState, t, t0, t1, output_scale
+        self, *, s0: _FiState, s1: _FiState, t, output_scale
     ) -> _collections.InterpRes[_FiState]:  # s1.t == t
         return _collections.InterpRes(accepted=s1, solution=s1, previous=s1)
 
@@ -108,10 +108,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, _FiState]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(posterior),
-            s0=self.init(posterior_previous),
-            t0=t0,
-            t1=t1,
+            s1=self.init(t1, posterior),
+            s0=self.init(t0, posterior_previous),
             output_scale=output_scale,
         )
         u = self.extract_u(state=sol)

@@ -124,13 +124,13 @@ class _SmootherCommon(_strategy.Strategy):
 
     @abc.abstractmethod
     def case_interpolate(
-        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+        self, *, s0: _SmState, s1: _SmState, t, output_scale
     ) -> _collections.InterpRes[_SmState]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def case_right_corner(
-        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+        self, *, s0: _SmState, s1: _SmState, t, output_scale
     ) -> _collections.InterpRes[_SmState]:
         raise NotImplementedError
 
@@ -301,7 +301,7 @@ class Smoother(_SmootherCommon):
         )
 
     def case_right_corner(
-        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+        self, *, s0: _SmState, s1: _SmState, t, output_scale
     ) -> _collections.InterpRes[_SmState]:
         # todo: is this duplication unnecessary?
         accepted = self._duplicate_with_unit_backward_model(s1)
@@ -411,13 +411,15 @@ class FixedPointSmoother(_SmootherCommon):
         )
 
     def case_right_corner(
-        self, *, s0: _SmState, s1: _SmState, t, t0, t1, output_scale
+        self, *, s0: _SmState, s1: _SmState, t, output_scale
     ):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
         merge_fn = s0.backward_model.merge_with_incoming_conditional
         backward_model1 = merge_fn(s1.backward_model)
 
+        # Do we need:
+        #  t_accepted = jnp.maximum(s1.t, t) ?
         solution = _SmState(
             t=t,
             extrapolated=s1.extrapolated,
