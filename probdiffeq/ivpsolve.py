@@ -37,7 +37,7 @@ def simulate_terminal_values(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options
     )
 
-    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
+    num_derivatives = solver.strategy.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
@@ -101,7 +101,7 @@ def solve_and_save_at(
     )
 
     t0 = save_at[0]
-    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
+    num_derivatives = solver.strategy.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
@@ -154,8 +154,8 @@ def solve_with_python_while_loop(
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, **adaptive_solver_options
     )
-
-    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
+    # todo: call solver.num_derivatives()?
+    num_derivatives = solver.strategy.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,
@@ -194,7 +194,7 @@ def solve_fixed_grid(
     """Solve an initial value problem on a fixed, pre-determined grid."""
     _assert_tuple(initial_values)
 
-    num_derivatives = solver.strategy.implementation.extrapolation.num_derivatives
+    num_derivatives = solver.strategy.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
         initial_values=initial_values,

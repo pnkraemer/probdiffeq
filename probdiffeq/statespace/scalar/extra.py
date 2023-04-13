@@ -30,11 +30,8 @@ class _IBM(_collections.AbstractExtrapolation):
         self.preconditioner_powers = preconditioner_powers
 
     def __repr__(self):
-        name = self.__class__.__name__
-        args1 = f"a={self.a}, q={self.q_sqrtm_lower}"
-        args2 = f"preconditioner_scales={self.preconditioner_scales}"
-        args3 = f"preconditioner_powers={self.preconditioner_powers}"
-        return f"{name}({args1}, {args2}, {args3})"
+        args2 = f"num_derivatives={self.num_derivatives}"
+        return f"<IBM with {args2}>"
 
     def tree_flatten(self):
         children = (

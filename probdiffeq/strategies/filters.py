@@ -58,7 +58,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def solution_from_tcoeffs(
         self, taylor_coefficients, *, num_data_points
     ) -> FiSolution:
-        ssv = self.implementation.extrapolation.init_state_space_var(
+        ssv = self.extrapolation.init_state_space_var(
             taylor_coefficients=taylor_coefficients
         )
         return FiSolution(ssv, num_data_points=num_data_points)
@@ -131,7 +131,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return state.corrected.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
-        extrapolate = self.implementation.extrapolation.begin_extrapolation
+        extrapolate = self.extrapolation.begin_extrapolation
         extrapolated = extrapolate(posterior.corrected, dt=dt)
         return _FiState(
             extrapolated=extrapolated,
@@ -143,7 +143,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def begin_correction(
         self, output_extra: _FiState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        return self.implementation.correction.begin_correction(
+        return self.correction.begin_correction(
             output_extra.extrapolated, vector_field=vector_field, t=t, p=p
         )
 
@@ -155,7 +155,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         output_scale,
         state_previous: _FiState,
     ) -> _FiState:
-        extra = self.implementation.extrapolation
+        extra = self.extrapolation
         extrapolate_fn = extra.complete_extrapolation_without_reversal
         # todo: extrapolation needs a serious signature-variable-renaming...
         ssv = extrapolate_fn(
@@ -173,7 +173,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def complete_correction(
         self, extrapolated: _FiState, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        obs, corr = self.implementation.correction.complete_correction(
+        obs, corr = self.correction.complete_correction(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corr = _FiState(

@@ -15,6 +15,9 @@ def taylor_order_zero(*args, **kwargs):
 
 @jax.tree_util.register_pytree_node_class
 class _TaylorZerothOrder(_collections.AbstractCorrection):
+    def __repr__(self):
+        return f"<TS0 with ode_order={self.ode_order}>"
+
     def begin_correction(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
@@ -67,6 +70,9 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
         super().__init__(ode_order=ode_order)
         self.cubature_rule = cubature_rule
+
+    def __repr__(self):
+        return f"<SLR0 with ode_order={self.ode_order}>"
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?

@@ -155,7 +155,7 @@ def fixture_parameter_to_solution(setup):
     # until the VJP/JVP behaviour has been cleaned up.
     # (It is easier to skip them all for now than to investigate how to skip
     # this very specific instance.) See: Issue #500.
-    corr = solver.strategy.implementation.correction
+    corr = solver.strategy.correction
     skip_jvp_and_vjp = isinstance(corr, dense_corr._DenseStatisticalFirstOrder)
     return fn, setup.ode_problem.initial_values, skip_jvp_and_vjp
 

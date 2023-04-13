@@ -64,6 +64,9 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         self.e1 = functools.partial(select, i=self.ode_order)
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
 
+    def __repr__(self):
+        return f"<TS0 with ode_order={self.ode_order}>"
+
     def tree_flatten(self):
         children = ()
         aux = self.ode_order, self.ode_shape
@@ -134,6 +137,9 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         select = functools.partial(_select_derivative, ode_shape=self.ode_shape)
         self.e0 = functools.partial(select, i=slice(0, self.ode_order))
         self.e1 = functools.partial(select, i=self.ode_order)
+
+    def __repr__(self):
+        return f"<TS1 with ode_order={self.ode_order}>"
 
     def tree_flatten(self):
         children = ()
@@ -228,6 +234,9 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         self.e1 = functools.partial(select, i=1)
         self.e0_vect = functools.partial(select_vect, i=0)
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
+
+    def __repr__(self):
+        return f"<SLR0 with ode_order={self.ode_order}>"
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
@@ -328,6 +337,9 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         self.e1 = functools.partial(select, i=1)
         self.e0_vect = functools.partial(select_vect, i=0)
         self.e1_vect = functools.partial(select_vect, i=self.ode_order)
+
+    def __repr__(self):
+        return f"<SLR1 with ode_order={self.ode_order}>"
 
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?

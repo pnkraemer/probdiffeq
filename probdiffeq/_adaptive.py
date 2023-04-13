@@ -155,7 +155,8 @@ class AdaptiveIVPSolver(Generic[T]):
     @property
     def error_contraction_rate(self):
         """Error order."""
-        return self.solver.strategy.implementation.extrapolation.num_derivatives + 1
+        # call self.solver.num_derivatives() ?
+        return self.solver.strategy.extrapolation.num_derivatives + 1
 
     @jax.jit
     def init(self, *solver_init_args, dt0):
