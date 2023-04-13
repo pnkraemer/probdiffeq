@@ -20,6 +20,7 @@ class _FiState(NamedTuple):
     """Filtering state."""
 
     t: Any
+    u: Any
     extrapolated: Any
     corrected: Any
     num_data_points: float
@@ -31,13 +32,14 @@ class _FiState(NamedTuple):
 
         return _FiState(
             t=self.t,
+            u=self.u,
             extrapolated=None,
             corrected=self.corrected.scale_covariance(s),
             num_data_points=self.num_data_points,
         )
 
 
-class FiSolution(NamedTuple):
+class FilterDist(NamedTuple):
     """Filtering solution."""
 
     rv: Any
@@ -45,26 +47,40 @@ class FiSolution(NamedTuple):
     num_data_points: float
 
 
+_SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
+
+
 @jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    def init(self, t, sol: FiSolution, /) -> _FiState:
+    def init(self, t, u, _marginals, solution) -> _FiState:
         return _FiState(
             t=t,
+            u=u,
             extrapolated=None,
-            corrected=sol.rv,
-            num_data_points=sol.num_data_points,
+            corrected=solution.rv,
+            num_data_points=solution.num_data_points,
         )
 
     def solution_from_tcoeffs(
         self, taylor_coefficients, /, *, num_data_points
-    ) -> FiSolution:
+    ) -> Tuple[jax.Array, jax.Array, FilterDist]:
         ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
-        return FiSolution(ssv, num_data_points=num_data_points)
+        sol = FilterDist(ssv, num_data_points=num_data_points)
+        marginals = ssv
+        u = taylor_coefficients[0]
+        return u, marginals, sol
 
-    def extract(self, posterior: _FiState, /) -> Tuple[float, FiSolution]:
-        return posterior.t, FiSolution(posterior.corrected, posterior.num_data_points)
+    def extract(self, posterior: _FiState, /) -> _SolType:
+        t = posterior.t
+        solution = FilterDist(posterior.corrected, posterior.num_data_points)
+        marginals = solution.rv
+        u = marginals.extract_qoi()
+        return t, u, marginals, solution
+
+    def extract_at_terminal_values(self, posterior: _FiState, /) -> _SolType:
+        return self.extract(posterior)
 
     def case_right_corner(
         self, t, *, s0: _FiState, s1: _FiState, output_scale
@@ -85,6 +101,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
         extrapolated = _FiState(
             t=t,
+            u=extrapolated.extrapolated.extract_qoi(),
             extrapolated=None,
             corrected=extrapolated.extrapolated,
             num_data_points=extrapolated.num_data_points,
@@ -101,43 +118,28 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         t0,
         t1,
         output_scale,
-    ) -> Tuple[jax.Array, Tuple[float, FiSolution]]:
+    ) -> Tuple[jax.Array, jax.Array]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(t1, posterior),
-            s0=self.init(t0, posterior_previous),
+            s1=self.init(t1, None, None, posterior),
+            s0=self.init(t0, None, None, posterior_previous),
             output_scale=output_scale,
         )
-        u = self.extract_u(state=sol)
-        return u, self.extract(sol)
+        _, u, marginals, _ = self.extract(sol)
+        return u, marginals
 
     def sample(self, key, *, posterior: _FiState, shape):
         raise NotImplementedError
-
-    def extract_marginals(self, sol: FiSolution, /):
-        return sol.rv
-
-    def extract_marginals_terminal_values(self, sol: FiSolution, /):
-        return sol.rv
-
-    def extract_u(self, *, state: _FiState):
-        # todo: should this point to extrapolated or corrected?
-        return state.corrected.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _FiState(
             t=posterior.t + dt,
+            u=None,
             extrapolated=extrapolated,
             corrected=None,
             num_data_points=posterior.num_data_points,
         )
-
-    def begin_correction(
-        self, output_extra: _FiState, /, *, vector_field, t, p
-    ) -> Tuple[jax.Array, float, Any]:
-        x = output_extra.extrapolated
-        return self.correction.begin(x, vector_field=vector_field, t=t, p=p)
 
     def complete_extrapolation(
         self,
@@ -154,10 +156,17 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
         return _FiState(
             t=output_extra.t,
+            u=None,
             extrapolated=ssv,
             corrected=None,
             num_data_points=output_extra.num_data_points,
         )
+
+    def begin_correction(
+        self, output_extra: _FiState, /, *, vector_field, t, p
+    ) -> Tuple[jax.Array, float, Any]:
+        x = output_extra.extrapolated
+        return self.correction.begin(x, vector_field=vector_field, t=t, p=p)
 
     # todo: more type-stability in corrections!
     def complete_correction(
@@ -168,6 +177,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
         corr = _FiState(
             t=extrapolated.t,
+            u=corr.extract_qoi(),
             extrapolated=None,
             corrected=corr,
             num_data_points=extrapolated.num_data_points + 1,
