@@ -1,5 +1,5 @@
 """Forward-only estimation: filtering."""
-from typing import Any, NamedTuple, Tuple
+from typing import Any, NamedTuple, Tuple, TypeVar
 
 import jax
 
@@ -39,12 +39,30 @@ class _FiState(NamedTuple):
         )
 
 
-class FilterDist(NamedTuple):
+S = TypeVar("S")
+"""A type-variable to alias appropriate state-space variable types."""
+
+
+@jax.tree_util.register_pytree_node_class
+class FilterDist(_strategy.Posterior[S]):
     """Filtering solution."""
 
-    rv: Any
+    def __init__(self, rv: S, num_data_points):
+        self.rv = rv
+        self.num_data_points = num_data_points
 
-    num_data_points: float
+    def sample(self, key, *, shape):
+        raise NotImplementedError
+
+    def tree_flatten(self):
+        children = self.rv, self.num_data_points
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        rv, num_data_points = children
+        return cls(rv, num_data_points=num_data_points)
 
 
 _SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
@@ -127,9 +145,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
         _, u, marginals, _ = self.extract(sol)
         return u, marginals
-
-    def sample(self, key, *, posterior: _FiState, shape):
-        raise NotImplementedError
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)
