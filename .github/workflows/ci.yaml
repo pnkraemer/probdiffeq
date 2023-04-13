@@ -1,19 +1,15 @@
+---
 name: ci
-
 # We test as follows:
 # - Execute tests on Python 3.8, 3.9, 3.10
 # - Lint, execute examples, build docs on Python 3.10.
 #     Why on Python 3.10?
 #     Because we develop on 3.10 and this causes the least friction.
-
 on:
   push:
-    branches:
-    - main
+    branches: [main]
   pull_request:
-    branches:
-    - main
-
+    branches: [main]
 jobs:
   lint:
     name: Lint with ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -22,23 +18,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]
-        os: [ ubuntu-latest ]
+        python-version: ['3.10']
+        os: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        sudo apt-get install pandoc
-        pip install --upgrade pip
-        pip install .[cpu,lint]
-    - name: Apply linter
-      run:
-        make lint
-
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get install pandoc
+          pip install --upgrade pip
+          pip install .[cpu,lint]
+      - name: Apply linter
+        run: make lint
   test:
     name: Test with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -46,22 +40,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ ubuntu-latest ]
+        python-version: ['3.8', '3.9', '3.10']
+        os: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run:
-        pip install --upgrade pip
-        pip install .[cpu,test]
-    - name: Run tests
-      run:
-        make test
-
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: pip install --upgrade pip pip install .[cpu,test]
+      - name: Run tests
+        run: make test
   example:
     name: Execute examples with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -69,22 +59,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]
-        os: [ ubuntu-latest ]
+        python-version: ['3.10']
+        os: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run:
-        pip install --upgrade pip
-        pip install .[cpu,example]
-    - name: Sync and execute notebooks
-      run:
-        make example
-
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: pip install --upgrade pip pip install .[cpu,example]
+      - name: Sync and execute notebooks
+        run: make example
   doc:
     name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -92,19 +78,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]
-        os: [ ubuntu-latest ]
+        python-version: ['3.10']
+        os: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        sudo apt-get install pandoc
-        pip install --upgrade pip
-        pip install .[cpu,doc]
-    - name: Build the HTML docs
-      run:
-        make doc
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get install pandoc
+          pip install --upgrade pip
+          pip install .[cpu,doc]
+      - name: Build the HTML docs
+        run: make doc
