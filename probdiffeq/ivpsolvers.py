@@ -116,7 +116,7 @@ class AbstractSolver(abc.ABC):
 
     def interpolate_fn(self, *, s0: _State, s1: _State, t):
         # Cases to switch between
-        branches = [self.case_right_corner, self.case_interpolate]
+        branches = [self._case_right_corner, self._case_interpolate]
 
         # Which case applies
         is_right_corner = (s1.t - t) ** 2 <= 1e-10  # todo: magic constant?
@@ -128,7 +128,7 @@ class AbstractSolver(abc.ABC):
         apply_branch = jnp.reshape(apply_branch_as_array, ())
         return jax.lax.switch(apply_branch, branches, t, s0, s1)
 
-    def case_interpolate(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
+    def _case_interpolate(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
             t,
             s0=s0.strategy,
@@ -143,7 +143,7 @@ class AbstractSolver(abc.ABC):
         acc = self._interp_make_state(acc_p, reference=s1)
         return InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def case_right_corner(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
+    def _case_right_corner(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
             t,
             s0=s0.strategy,
