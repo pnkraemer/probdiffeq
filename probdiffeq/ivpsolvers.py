@@ -255,9 +255,7 @@ class DynamicSolver(AbstractSolver):
         )
 
     def extract(self, state: _State, /) -> solution.Solution:
-        t, posterior = self.strategy.extract(state.strategy)
-        marginals = self.strategy.extract_marginals(posterior)
-        u = marginals.extract_qoi()
+        t, u, marginals, posterior = self.strategy.extract(state.strategy)
         return solution.Solution(
             t=t,
             u=u,  # new!
