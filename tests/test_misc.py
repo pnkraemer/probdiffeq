@@ -19,6 +19,6 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     solver = test_util.generate_solver(num_derivatives=n)
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
 
-    init_fn = solver.strategy.implementation.extrapolation.init_state_space_var
+    init_fn = solver.strategy.extrapolation.init_state_space_var
     with testing.raises(ValueError):
         init_fn(taylor_coefficients=tcoeffs_wrong_length)
