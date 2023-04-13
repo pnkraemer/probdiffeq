@@ -81,7 +81,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 
-    def init_output_scale(self, output_scale):
+    def promote_output_scale(self, output_scale):
         return output_scale
 
     def begin_extrapolation(

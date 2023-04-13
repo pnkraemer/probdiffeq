@@ -184,5 +184,5 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
         )
 
-    def init_output_scale(self, output_scale):
+    def promote_output_scale(self, output_scale):
         return output_scale

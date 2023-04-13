@@ -105,8 +105,8 @@ class Strategy(abc.ABC, Generic[S, P]):
     def init_error_estimate(self):
         return self.extrapolation.init_error_estimate()
 
-    def init_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.init_output_scale
+    def promote_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.promote_output_scale
         return init_fn(*args, **kwargs)
 
     def begin(self, state: S, /, *, t, dt, parameters, vector_field):

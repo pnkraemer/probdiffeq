@@ -91,13 +91,12 @@ class AbstractSolver(abc.ABC):
         )
         u = taylor_coefficients[0]
 
-        # todo: if we `init()` this output scale, should we also `extract()`?
-        output_scale = self.strategy.init_output_scale(output_scale)
-
         # todo: make "marginals" an input to this function,
         #  then couple it with the posterior
         #  and make (u, marginals, posterior) the "solution" type for strategies.
         marginals = self.strategy.extract_marginals_terminal_values(posterior)
+
+        output_scale = self.strategy.promote_output_scale(output_scale)
         return solution.Solution(
             t=t,
             posterior=posterior,

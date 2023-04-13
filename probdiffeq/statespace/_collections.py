@@ -119,7 +119,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_output_scale(self, output_scale) -> float:
+    def promote_output_scale(self, output_scale) -> float:
         raise NotImplementedError
 
     @abc.abstractmethod
