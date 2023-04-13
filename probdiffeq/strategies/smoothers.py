@@ -169,10 +169,8 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
 
-    def solution_from_tcoeffs(self, taylor_coefficients, *, num_data_points):
-        corrected = self.extrapolation.init_state_space_var(
-            taylor_coefficients=taylor_coefficients
-        )
+    def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
+        corrected = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
         init_bw_model = self.extrapolation.init_conditional
         bw_model = init_bw_model(ssv_proto=corrected)
@@ -189,7 +187,7 @@ class _SmootherCommon(_strategy.Strategy):
         return state.t, markov_seq
 
     def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
-        ssv = self.extrapolation.begin_extrapolation(posterior.corrected, dt=dt)
+        ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _SmState(
             t=posterior.t + dt,
             extrapolated=ssv,
@@ -201,12 +199,12 @@ class _SmootherCommon(_strategy.Strategy):
     def begin_correction(
         self, output_extra: _SmState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        return self.correction.begin_correction(
+        return self.correction.begin(
             output_extra.extrapolated, vector_field=vector_field, t=t, p=p
         )
 
     def complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
-        a, corrected = self.correction.complete_correction(
+        a, corrected = self.correction.complete(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corrected_seq = _SmState(
@@ -250,11 +248,9 @@ class _SmootherCommon(_strategy.Strategy):
     def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
         # todo: act on state instead of rv+t0
         dt = t - t0
-        output_extra = self.extrapolation.begin_extrapolation(rv, dt=dt)
+        output_extra = self.extrapolation.begin(rv, dt=dt)
 
-        _extra = self.extrapolation
-        extra_fn = _extra.complete_extrapolation_with_reversal
-        extrapolated, bw_model = extra_fn(
+        extrapolated, bw_model = self.extrapolation.complete_with_reversal(
             output_extra,
             s0=rv,
             output_scale=output_scale,
@@ -286,9 +282,7 @@ class Smoother(_SmootherCommon):
         output_scale,
         state_previous: _SmState,
     ) -> _SmState:
-        extra = self.extrapolation
-        extra_fn = extra.complete_extrapolation_with_reversal
-        extrapolated, bw_model = extra_fn(
+        extrapolated, bw_model = self.extrapolation.complete_with_reversal(
             output_extra.extrapolated,
             s0=state_previous.corrected,
             output_scale=output_scale,
@@ -389,12 +383,11 @@ class FixedPointSmoother(_SmootherCommon):
         state_previous: _SmState,
         output_scale,
     ):
-        _temp = self.extrapolation.complete_extrapolation_with_reversal(
+        extrapolated, bw_increment = self.extrapolation.complete_with_reversal(
             output_extra.extrapolated,
             s0=state_previous.corrected,
             output_scale=output_scale,
         )
-        extrapolated, bw_increment = _temp
 
         merge_fn = state_previous.backward_model.merge_with_incoming_conditional
         backward_model = merge_fn(bw_increment)

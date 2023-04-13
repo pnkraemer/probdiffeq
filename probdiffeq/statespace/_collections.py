@@ -111,16 +111,69 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     """Extrapolation model interface."""
 
+    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+
+        self.preconditioner_scales = preconditioner_scales
+        self.preconditioner_powers = preconditioner_powers
+
+    def tree_flatten(self):
+        children = (
+            self.a,
+            self.q_sqrtm_lower,
+            self.preconditioner_scales,
+            self.preconditioner_powers,
+        )
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        a, q_sqrtm_lower, scales, powers = children
+        return cls(
+            a=a,
+            q_sqrtm_lower=q_sqrtm_lower,
+            preconditioner_scales=scales,
+            preconditioner_powers=powers,
+        )
+
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
-    def init_state_space_var(self, taylor_coefficients) -> SSVTypeVar:
+    def promote_output_scale(self, output_scale) -> float:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def promote_output_scale(self, output_scale) -> float:
+    def solution_from_tcoeffs(self, taylor_coefficients, /) -> SSVTypeVar:
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def begin(self, s0, /, dt) -> SSVTypeVar:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def complete_without_reversal(
+        self,
+        output_begin: SSVTypeVar,
+        /,
+        s0,
+        output_scale,
+    ):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def complete_with_reversal(
+        self,
+        output_begin: SSVTypeVar,
+        /,
+        s0,
+        output_scale,
+    ):
+        raise NotImplementedError
+
+    # todo: bundle in an init() method:
 
     @abc.abstractmethod
     def init_error_estimate(self) -> jax.Array:
@@ -130,36 +183,30 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def init_conditional(self, ssv_proto):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def begin_extrapolation(self, s0, /, dt) -> SSVTypeVar:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_extrapolation_without_reversal(
-        self,
-        output_begin: SSVTypeVar,
-        /,
-        s0,
-        output_scale,
-    ):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_extrapolation_with_reversal(
-        self,
-        output_begin: SSVTypeVar,
-        /,
-        s0,
-        output_scale,
-    ):
-        raise NotImplementedError
-
 
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     """Conditional distribution interface.
 
     Used as a backward model for backward-Gauss--Markov process representations.
     """
+
+    def __init__(self, transition, noise):
+        self.transition = transition
+        self.noise = noise
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f"{name}(transition={self.transition}, noise={self.noise})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        transition, noise = children
+        return cls(transition=transition, noise=noise)
 
     @abc.abstractmethod
     def __call__(self, x, /):
@@ -193,11 +240,11 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         return cls(ode_order=ode_order)
 
     @abc.abstractmethod
-    def begin_correction(
+    def begin(
         self, x: SSVTypeVar, /, vector_field, t, p
     ) -> Tuple[jax.Array, float, CacheTypeVar]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_correction(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
+    def complete(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
         raise NotImplementedError

@@ -22,42 +22,15 @@ def ibm_iso(num_derivatives):
 
 @jax.tree_util.register_pytree_node_class
 class _IsoIBM(_collections.AbstractExtrapolation):
-    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-
-        self.preconditioner_scales = preconditioner_scales
-        self.preconditioner_powers = preconditioner_powers
-
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
-
-    def tree_flatten(self):
-        children = (
-            self.a,
-            self.q_sqrtm_lower,
-            self.preconditioner_scales,
-            self.preconditioner_powers,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        a, q_sqrtm_lower, scales, powers = children
-        return cls(
-            a=a,
-            q_sqrtm_lower=q_sqrtm_lower,
-            preconditioner_scales=scales,
-            preconditioner_powers=powers,
-        )
 
     @property
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def init_state_space_var(self, taylor_coefficients):
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -84,9 +57,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def begin_extrapolation(
-        self, s0: _vars.IsoStateSpaceVar, /, dt
-    ) -> _vars.IsoStateSpaceVar:
+    def begin(self, s0: _vars.IsoStateSpaceVar, /, dt) -> _vars.IsoStateSpaceVar:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -101,9 +72,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_extrapolation_without_reversal(
-        self, output_begin, /, s0, output_scale
-    ):
+    def complete_without_reversal(self, output_begin, /, s0, output_scale):
         _, _, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
 
@@ -118,7 +87,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
         return _vars.IsoStateSpaceVar(rv, cache=None)
 
-    def complete_extrapolation_with_reversal(self, output_begin, /, s0, output_scale):
+    def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
 

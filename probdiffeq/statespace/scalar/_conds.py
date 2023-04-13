@@ -8,28 +8,7 @@ from probdiffeq.statespace.scalar import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class _Conditional(_collections.AbstractConditional):
-    def __init__(self, transition, noise):
-        self.transition = transition
-        self.noise = noise
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        return f"{name}(transition={self.transition}, noise={self.noise})"
-
-    def tree_flatten(self):
-        children = self.transition, self.noise
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        transition, noise = children
-        return cls(transition=transition, noise=noise)
-
-
-@jax.tree_util.register_pytree_node_class
-class ConditionalHiddenState(_Conditional):
+class ConditionalHiddenState(_collections.AbstractConditional):
     def __call__(self, x, /):
         if self.transition.ndim > 2:
             return jax.vmap(ConditionalHiddenState.__call__)(self, x)
@@ -80,7 +59,7 @@ class ConditionalHiddenState(_Conditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class ConditionalQOI(_Conditional):
+class ConditionalQOI(_collections.AbstractConditional):
     def __call__(self, x, /):
         if self.transition.ndim > 1:
             return jax.vmap(ConditionalQOI.__call__)(self, x)

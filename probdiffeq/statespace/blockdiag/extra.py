@@ -46,23 +46,20 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         (extra,) = children
         return cls(extra)
 
-    def begin_extrapolation(self, s0, /, dt):
-        fn = jax.vmap(type(self.extra).begin_extrapolation, in_axes=(0, 0, None))
+    def begin(self, s0, /, dt):
+        fn = jax.vmap(type(self.extra).begin, in_axes=(0, 0, None))
         return fn(self.extra, s0, dt)
 
-    def complete_extrapolation_without_reversal(
-        self, output_begin, /, s0, output_scale
-    ):
-        fn = jax.vmap(type(self.extra).complete_extrapolation_without_reversal)
+    def complete_without_reversal(self, output_begin, /, s0, output_scale):
+        fn = jax.vmap(type(self.extra).complete_without_reversal)
         return fn(self.extra, output_begin, s0, output_scale)
 
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)
 
-    def init_state_space_var(self, taylor_coefficients):
-        return jax.vmap(type(self.extra).init_state_space_var)(
-            self.extra, taylor_coefficients
-        )
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
+        solution_fn = jax.vmap(type(self.extra).solution_from_tcoeffs)
+        return solution_fn(self.extra, taylor_coefficients)
 
     # todo: move to correction?
     def init_error_estimate(self):
@@ -75,6 +72,6 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         fn_vmap = jax.vmap(type(self.extra).promote_output_scale)
         return fn_vmap(self.extra, output_scale)
 
-    def complete_extrapolation_with_reversal(self, output_begin, /, s0, output_scale):
-        fn = jax.vmap(type(self.extra).complete_extrapolation_with_reversal)
+    def complete_with_reversal(self, output_begin, /, s0, output_scale):
+        fn = jax.vmap(type(self.extra).complete_with_reversal)
         return fn(self.extra, output_begin, s0, output_scale)

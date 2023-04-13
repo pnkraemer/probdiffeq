@@ -12,9 +12,8 @@ from probdiffeq.statespace.dense import _vars
 class DenseConditional(_collections.AbstractConditional):
     """Conditional distribution with dense covariance structure."""
 
-    def __init__(self, transition, noise, target_shape):
-        self.transition = transition
-        self.noise = noise
+    def __init__(self, *args, target_shape, **kwargs):
+        super().__init__(*args, **kwargs)
         self.target_shape = target_shape
 
     def __repr__(self):

@@ -31,18 +31,11 @@ class _DenseIBM(_collections.AbstractExtrapolation):
     def __init__(
         self,
         *,
-        a,
-        q_sqrtm_lower,
-        preconditioner_scales,
-        preconditioner_powers,
         num_derivatives,
         ode_shape,
+        **kwargs,
     ):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-
-        self.preconditioner_scales = preconditioner_scales
-        self.preconditioner_powers = preconditioner_powers
+        super().__init__(**kwargs)
 
         self.num_derivatives = num_derivatives
         assert len(ode_shape) == 1
@@ -76,7 +69,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             preconditioner_scales=scales,
         )
 
-    def init_state_space_var(self, taylor_coefficients):
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -95,7 +88,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
-    def begin_extrapolation(self, s0, /, dt):
+    def begin(self, s0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -118,9 +111,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_extrapolation_without_reversal(
-        self, output_begin, /, s0, output_scale
-    ):
+    def complete_without_reversal(self, output_begin, /, s0, output_scale):
         _, _, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
@@ -135,7 +126,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
 
-    def complete_extrapolation_with_reversal(self, output_begin, /, s0, output_scale):
+    def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
         m_ext = output_begin.hidden_state.mean
 

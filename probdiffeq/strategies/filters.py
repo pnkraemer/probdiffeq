@@ -58,11 +58,9 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
 
     def solution_from_tcoeffs(
-        self, taylor_coefficients, *, num_data_points
+        self, taylor_coefficients, /, *, num_data_points
     ) -> FiSolution:
-        ssv = self.extrapolation.init_state_space_var(
-            taylor_coefficients=taylor_coefficients
-        )
+        ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
         return FiSolution(ssv, num_data_points=num_data_points)
 
     def extract(self, posterior: _FiState, /) -> FiSolution:
@@ -127,8 +125,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return state.corrected.extract_qoi()
 
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
-        extrapolate = self.extrapolation.begin_extrapolation
-        extrapolated = extrapolate(posterior.corrected, dt=dt)
+        extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _FiState(
             t=posterior.t + dt,
             extrapolated=extrapolated,
@@ -139,9 +136,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def begin_correction(
         self, output_extra: _FiState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
-        return self.correction.begin_correction(
-            output_extra.extrapolated, vector_field=vector_field, t=t, p=p
-        )
+        x = output_extra.extrapolated
+        return self.correction.begin(x, vector_field=vector_field, t=t, p=p)
 
     def complete_extrapolation(
         self,
@@ -151,9 +147,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         output_scale,
         state_previous: _FiState,
     ) -> _FiState:
-        extra = self.extrapolation
-        extrapolate_fn = extra.complete_extrapolation_without_reversal
-        ssv = extrapolate_fn(
+        ssv = self.extrapolation.complete_without_reversal(
             output_extra.extrapolated,
             s0=state_previous.corrected,
             output_scale=output_scale,
@@ -169,7 +163,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def complete_correction(
         self, extrapolated: _FiState, /, *, cache_obs
     ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        obs, corr = self.correction.complete_correction(
+        obs, corr = self.correction.complete(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
         corr = _FiState(

@@ -18,7 +18,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
-    def begin_correction(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
@@ -41,7 +41,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
         return m0, m1
 
-    def complete_correction(self, extrapolated, cache):
+    def complete(self, extrapolated, cache):
         (b,) = cache
         m_ext, l_ext = (
             extrapolated.hidden_state.mean,
@@ -86,7 +86,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         (ode_order,) = aux
         return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
-    def begin_correction(self, x: _vars.NormalHiddenState, /, vector_field, t, p):
+    def begin(self, x: _vars.NormalHiddenState, /, vector_field, t, p):
         raise NotImplementedError
 
     def calibrate(
@@ -120,7 +120,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         error_estimate = error_estimate_unscaled * output_scale
         return error_estimate, output_scale
 
-    def complete_correction(self, extrapolated, cache):
+    def complete(self, extrapolated, cache):
         raise NotImplementedError
 
     def linearize(self, rv, vmap_f):
@@ -178,7 +178,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         m_noi = fx_mean - linop * rv.mean[0]
         return linop, _vars.NormalQOI(m_noi, std_noi)
 
-    def complete_correction_post_linearize(self, linop, extrapolated, noise):
+    def complete_post_linearize(self, linop, extrapolated, noise):
         # Compute the cubature-correction
         L0, L1 = (
             extrapolated.cov_sqrtm_lower[0, :],
