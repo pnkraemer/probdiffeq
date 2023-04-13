@@ -39,7 +39,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
     def complete(
         self, extrapolated: _vars.IsoStateSpaceVar, cache
-    ) -> Tuple[_vars.IsoNormalQOI, Tuple[_vars.IsoStateSpaceVar, jax.Array]]:
+    ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoStateSpaceVar]:
         (bias,) = cache
 
         m_ext = extrapolated.hidden_state.mean

@@ -134,7 +134,7 @@ def relative_rmse(*, solution: ArrayLike, atol=1e-5):
     solution = jnp.asarray(solution)
 
     @jax.jit
-    def error_fn(u: ArrayLike, /):
+    def error_fn(u: jax.Array, /):
         ratio = (u - solution) / (atol + solution)
         return jnp.linalg.norm(ratio) / jnp.sqrt(ratio.size)
 
@@ -146,7 +146,7 @@ def absolute_rmse(*, solution: ArrayLike):
     solution = jnp.asarray(solution)
 
     @jax.jit
-    def error_fn(u: ArrayLike, /):
+    def error_fn(u: jax.Array, /):
         ratio = u - solution
         return jnp.linalg.norm(ratio) / jnp.sqrt(ratio.size)
 

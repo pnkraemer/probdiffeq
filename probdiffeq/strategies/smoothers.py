@@ -178,7 +178,7 @@ class _SmootherCommon(_strategy.Strategy):
             init=corrected, backward_model=bw_model, num_data_points=num_data_points
         )
 
-    def extract(self, state: _SmState, /) -> MarkovSequence:
+    def extract(self, state: _SmState, /) -> Tuple[float, MarkovSequence]:
         markov_seq = MarkovSequence(
             init=state.corrected,
             backward_model=state.backward_model,
