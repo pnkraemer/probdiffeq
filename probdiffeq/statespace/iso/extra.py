@@ -80,26 +80,14 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def init_with_reversal(self, rv, conds, /):
-        observed = _vars.IsoNormalQOI(
-            mean=jnp.zeros_like(rv.mean[..., 0, :]),
-            cov_sqrtm_lower=jnp.zeros_like(rv.cov_sqrtm_lower[..., 0, 0]),
-        )
-
-        error_estimate = jnp.empty(())
-        output_scale_dynamic = jnp.empty(())
-
-        # Prepare caches
-        m_like = jnp.empty(rv.mean.shape)
-        p_like = m_like[..., 0]
-        cache_extra = (m_like, m_like, p_like, p_like)
         return _vars.IsoSSV(
             rv,
+            hidden_shape=rv.mean.shape,
             backward_model=conds,
-            # A bunch of caches that are filled at some point:
-            observed_state=observed,
-            output_scale_dynamic=output_scale_dynamic,
-            error_estimate=error_estimate,
-            cache_extra=cache_extra,
+            observed_state=None,
+            output_scale_dynamic=None,
+            error_estimate=None,
+            cache_extra=None,
             cache_corr=None,
         )
 
@@ -125,9 +113,9 @@ class _IsoIBM(_collections.AbstractExtrapolation):
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
         return _vars.IsoSSV(
-            ext,  # NEW!!
+            ext,
+            cache_extra=(m_ext_p, m0_p, p, p_inv),
             hidden_shape=s0.hidden_shape,
-            cache_extra=(m_ext_p, m0_p, p, p_inv),  # NEW!!
             output_scale_dynamic=None,
             cache_corr=None,
             backward_model=None,
@@ -162,7 +150,6 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        # Use output_begin as an error estimate?
         return _vars.IsoSSV(
             rv,
             hidden_shape=state.hidden_shape,
@@ -200,21 +187,23 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoSSV(
             extrapolated,
-            observed_state=state.observed_state,
-            error_estimate=state.error_estimate,
-            output_scale_dynamic=state.output_scale_dynamic,
-            cache_extra=state.cache_extra,
-            cache_corr=state.cache_corr,
+            hidden_shape=state.hidden_shape,
             backward_model=bw_model,
+            error_estimate=state.error_estimate,
+            cache_corr=state.cache_corr,
+            observed_state=state.observed_state,  # usually None?
+            output_scale_dynamic=None,
+            cache_extra=None,
         )
 
     def replace_backward_model(self, s, /, backward_model):
         return _vars.IsoSSV(
             s.hidden_state,
+            backward_model=backward_model,  # new
+            hidden_shape=s.hidden_shape,
             observed_state=s.observed_state,
             error_estimate=s.error_estimate,
             output_scale_dynamic=s.output_scale_dynamic,
             cache_extra=s.cache_extra,
             cache_corr=s.cache_corr,
-            backward_model=backward_model,  # new
         )
