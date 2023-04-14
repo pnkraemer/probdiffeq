@@ -74,7 +74,7 @@ class _IBM(_collections.AbstractExtrapolation):
         p_like = m_like
         cache_extra = (m_like, m_like, p_like, p_like)
 
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             rv,
             observed_state=observed,
             output_scale_dynamic=output_scale_dynamic,
@@ -97,7 +97,7 @@ class _IBM(_collections.AbstractExtrapolation):
         p_like = m_like
         cache_extra = (m_like, m_like, p_like, p_like)
 
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             rv,
             observed_state=observed,
             output_scale_dynamic=output_scale_dynamic,
@@ -120,7 +120,7 @@ class _IBM(_collections.AbstractExtrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             extrapolated,
             observed_state=s0.observed_state,
             error_estimate=s0.error_estimate,
@@ -149,7 +149,7 @@ class _IBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
 
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             rv,
             observed_state=state.observed_state,
             error_estimate=state.error_estimate,
@@ -183,7 +183,7 @@ class _IBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             rv,
             observed_state=state.observed_state,
             error_estimate=state.error_estimate,
@@ -197,7 +197,7 @@ class _IBM(_collections.AbstractExtrapolation):
         return output_scale
 
     def replace_backward_model(self, s, /, backward_model):
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             hidden_state=s.hidden_state,
             output_scale_dynamic=s.output_scale_dynamic,
             error_estimate=s.error_estimate,

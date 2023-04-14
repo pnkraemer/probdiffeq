@@ -111,7 +111,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         p_like = m_like
         cache_extra = (m_like, m_like, p_like, p_like)
 
-        return _vars.DenseStateSpaceVar(
+        return _vars.DenseSSV(
             rv,
             observed_state=observed,
             output_scale_dynamic=output_scale_dynamic,
@@ -144,7 +144,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         # todo: only initialise meaningful values.
         #  Error, scale, cache_corr, etc., should be None.
         #  Backward_model should be None (for both, begin_without* and begin_with*)
-        return _vars.DenseStateSpaceVar(
+        return _vars.DenseSSV(
             ext,
             observed_state=s0.observed_state,
             output_scale_dynamic=s0.output_scale_dynamic,
@@ -179,7 +179,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
 
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.DenseStateSpaceVar(
+        return _vars.DenseSSV(
             rv,
             target_shape=state.target_shape,
             backward_model=state.backward_model,
@@ -217,7 +217,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             g_bw, noise=backward_noise, target_shape=shape
         )
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ext = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
+        ext = _vars.DenseSSV(rv, cache=None, target_shape=shape)
         return ext, bw_model
 
     def extract_with_reversal(self, s, /):

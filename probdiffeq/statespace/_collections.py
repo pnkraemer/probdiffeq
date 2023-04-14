@@ -5,7 +5,10 @@ from typing import Generic, Tuple, TypeVar
 
 import jax
 
+# todo: split into multiple files.
 
+
+# todo: necessary? All "normal" information should be encapsulated in the implementations.
 class AbstractNormal(abc.ABC):
     """Normal-distributed random variables.
 
@@ -52,7 +55,7 @@ class AbstractNormal(abc.ABC):
         return self.mean.shape
 
 
-class StateSpaceVar(abc.ABC):
+class SSV(abc.ABC):
     """State-space variables.
 
     Hidden states, and knowledge about extracting a quantity of interest.
@@ -67,13 +70,16 @@ class StateSpaceVar(abc.ABC):
         self,
         hidden_state,
         *,
-        backward_model,  # todo: optional
+        hidden_shape,
         observed_state,
-        output_scale_dynamic,
         error_estimate,
+        backward_model,
+        # temporary:
+        output_scale_dynamic,
         cache_extra,
         cache_corr,
     ):
+        self.hidden_shape = hidden_shape
         self.hidden_state = hidden_state  # todo: 'hidden'
         self.backward_model = backward_model
         self.observed_state = observed_state  # todo: 'observed'
@@ -95,11 +101,11 @@ class StateSpaceVar(abc.ABC):
             self.cache_corr,
             self.backward_model,
         )
-        aux = ()
+        aux = (self.hidden_shape,)
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, _aux, children):
+    def tree_unflatten(cls, aux, children):
         (
             hidden_state,
             observed_state,
@@ -109,8 +115,10 @@ class StateSpaceVar(abc.ABC):
             cache_c,
             backward_model,
         ) = children
+        (hidden_shape,) = aux
         return cls(
             hidden_state=hidden_state,
+            hidden_shape=hidden_shape,
             observed_state=observed_state,
             output_scale_dynamic=output_scale_dynamic,
             error_estimate=error_estimate,
@@ -122,6 +130,7 @@ class StateSpaceVar(abc.ABC):
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
+            f"hidden_shape={self.hidden_shape},"
             f"hidden_state={self.hidden_state},"
             f"observed_state={self.observed_state},"
             f"output_scale_dynamic={self.output_scale_dynamic},"
@@ -153,9 +162,11 @@ class StateSpaceVar(abc.ABC):
         raise NotImplementedError
 
 
-SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVar)
+SSVTypeVar = TypeVar("SSVTypeVar", bound=SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
+
+# todo: remove
 CacheTypeVar = TypeVar("CacheTypeVar")
 """A type-variable to alias extrapolation- and correction-caches."""
 

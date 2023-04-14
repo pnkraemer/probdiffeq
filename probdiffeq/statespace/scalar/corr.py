@@ -22,7 +22,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         # todo: init error estimate, output scale,
         #  and maybe observed_state here as well?
         cache = (jnp.zeros(()),)
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             hidden_state=x.hidden_state,
             observed_state=x.observed_state,
             error_estimate=x.error_estimate,
@@ -32,7 +32,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
             backward_model=x.backward_model,
         )
 
-    def begin(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.SSV, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
@@ -40,7 +40,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             hidden_state=x.hidden_state,
             observed_state=observed,
             error_estimate=error_estimate,
@@ -78,7 +78,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
 
         rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             rv_cor,
             observed_state=observed,
             error_estimate=extrapolated.error_estimate,
@@ -233,7 +233,7 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         # Catch up the backward noise and return result
         m_bw = extrapolated.hidden_state.mean - gain * m_marg
         rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        return _vars.StateSpaceVar(
+        return _vars.SSV(
             rv_cor,
             observed_state=observed,
             error_estimate=extrapolated.error_estimate,

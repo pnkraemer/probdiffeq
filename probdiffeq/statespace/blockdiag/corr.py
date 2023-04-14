@@ -69,7 +69,7 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
 
         # todo: if it is a per-step cache, why does it have to be allocated in advance?
         # Should not be necessary!
-        return scalar_vars.StateSpaceVar(
+        return scalar_vars.SSV(
             hidden_state=x.hidden_state,
             observed_state=x.observed_state,
             error_estimate=x.error_estimate,
@@ -98,7 +98,7 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         error_estimate, output_scale = calibrate_fn(
             self._mm, fx_mean, fx_centered_normed, extrapolated.hidden_state
         )
-        return scalar_vars.StateSpaceVar(
+        return scalar_vars.SSV(
             hidden_state=extrapolated.hidden_state,
             observed_state=extrapolated.observed_state,
             error_estimate=output_scale * error_estimate,
@@ -187,7 +187,7 @@ class _BlockDiag(_collections.AbstractCorrection):
         output_scale = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
         error_estimate = obs_unbatch.cov_sqrtm_lower
 
-        return scalar_vars.StateSpaceVar(
+        return scalar_vars.SSV(
             hidden_state=x.hidden_state,
             observed_state=x.observed_state,
             error_estimate=output_scale * error_estimate,

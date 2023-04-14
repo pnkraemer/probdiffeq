@@ -77,7 +77,7 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         m0 = self.e0(x.hidden_state.mean)
         m1 = self.e1(x.hidden_state.mean)
         cov_sqrtm_lower = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
@@ -122,7 +122,7 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = ext.hidden_state.mean - gain @ b
         cor = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         _shape = ext.target_shape
-        corrected = _vars.DenseStateSpaceVar(cor, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(cor, cache=None, target_shape=_shape)
         return observed, corrected
 
 
@@ -159,7 +159,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         # cache = (jvp_dummy, (b_dummy,))
         # print("ok?", jax.tree_util.tree_map(jnp.shape, cache))
 
-        return _vars.DenseStateSpaceVar(
+        return _vars.DenseSSV(
             hidden_state=x.hidden_state,
             observed_state=x.observed_state,
             error_estimate=x.error_estimate,
@@ -170,7 +170,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
             backward_model=x.backward_model,
         )
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -197,7 +197,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        return _vars.DenseStateSpaceVar(
+        return _vars.DenseSSV(
             x.hidden_state,
             observed_state=x.observed_state,  # irrelevant
             output_scale_dynamic=output_scale,
@@ -208,7 +208,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
             target_shape=x.target_shape,
         )
 
-    def complete(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def complete(self, x: _vars.DenseSSV, /, vector_field, t, p):
         # Assign short-named variables for readability
         print(jax.tree_util.tree_map(jnp.shape, x.cache_corr))
 
@@ -230,7 +230,7 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         m_cor = x.hidden_state.mean - gain @ b
         corrected = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
 
-        return _vars.DenseStateSpaceVar(
+        return _vars.DenseSSV(
             corrected,
             target_shape=x.target_shape,
             observed_state=observed,
@@ -286,7 +286,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
@@ -349,7 +349,7 @@ class _DenseStatisticalZerothOrder(_collections.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return marginals, corrected
@@ -389,7 +389,7 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
@@ -453,7 +453,7 @@ class _DenseStatisticalFirstOrder(_collections.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return marginals, corrected

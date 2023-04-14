@@ -9,7 +9,7 @@ from probdiffeq.statespace.iso import _conds
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoStateSpaceVar(_collections.StateSpaceVar):
+class IsoSSV(_collections.SSV):
     def observe_qoi(self, observation_std):
         hc = self.hidden_state.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.hidden_state.mean[0, ...]
@@ -43,20 +43,21 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
             bw_model = self.backward_model.scale_covariance(output_scale=output_scale)
         else:
             bw_model = None
-        return IsoStateSpaceVar(
+        return IsoSSV(
             hidden_state=rv,
             observed_state=rv_obs,
+            backward_model=bw_model,
+            hidden_shape=self.hidden_shape,
             output_scale_dynamic=self.output_scale_dynamic,
             error_estimate=self.error_estimate,
             cache_extra=self.cache_extra,
             cache_corr=self.cache_corr,
-            backward_model=bw_model,
         )
 
     def marginal_nth_derivative(self, n):
         # if the variable has batch-axes, vmap the result
         if self.hidden_state.mean.ndim > 2:
-            fn = IsoStateSpaceVar.marginal_nth_derivative
+            fn = IsoSSV.marginal_nth_derivative
             vect_fn = jax.vmap(fn, in_axes=(0, None))
             return vect_fn(self, n)
 

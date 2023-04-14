@@ -18,18 +18,24 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         return f"<TS0 with ode_order={self.ode_order}>"
 
     def init(self, s, /):
-        cache = (jnp.zeros_like(s.hidden_state.mean[..., 0, :]),)
-        return _vars.IsoStateSpaceVar(
-            hidden_state=s.hidden_state,
-            observed_state=s.observed_state,
-            output_scale_dynamic=s.output_scale_dynamic,
-            error_estimate=s.error_estimate,
-            cache_extra=s.cache_extra,
-            cache_corr=cache,
-            backward_model=s.backward_model,
-        )
+        m_like = jnp.zeros_like(s.hidden_state.mean[..., 0, :])
+        l_like = jnp.zeros_like(s.hidden_state.cov_sqrtm_lower[..., 0, 0])
+        obs_like = _vars.IsoNormalQOI(mean=m_like, cov_sqrtm_lower=l_like)
 
-    def begin(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
+        error_estimate = jnp.zeros(())
+        return _vars.IsoSSV(
+            observed_state=obs_like,
+            error_estimate=error_estimate,
+            hidden_state=s.hidden_state,
+            hidden_shape=s.hidden_shape,
+            backward_model=s.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
+        )
+        return s
+
+    def begin(self, x: _vars.IsoSSV, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -47,9 +53,10 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate_unscaled = obs.marginal_std()
         error_estimate = error_estimate_unscaled * output_scale
 
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             x.hidden_state,
-            observed_state=x.observed_state,  # irrelevant
+            hidden_shape=x.hidden_shape,
+            observed_state=None,
             output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
             cache_extra=x.cache_extra,
@@ -57,9 +64,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
             backward_model=x.backward_model,
         )
 
-    def complete(
-        self, x: _vars.IsoStateSpaceVar, /, _vector_field, _t, _p
-    ) -> _vars.IsoStateSpaceVar:
+    def complete(self, x: _vars.IsoSSV, /, _vector_field, _t, _p) -> _vars.IsoSSV:
         (bias,) = x.cache_corr
 
         m_ext = x.hidden_state.mean
@@ -75,12 +80,13 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
         corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             corrected,
             observed_state=observed,
-            output_scale_dynamic=x.output_scale_dynamic,
+            hidden_shape=x.hidden_shape,
             error_estimate=x.error_estimate,
-            cache_extra=x.cache_extra,  # irrelevant
-            cache_corr=x.cache_corr,  # irrelevant
             backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
         )

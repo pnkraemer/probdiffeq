@@ -68,27 +68,15 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         return s.hidden_state
 
     def init_without_reversal(self, rv, /):
-        observed = _vars.IsoNormalQOI(
-            mean=jnp.zeros_like(rv.mean[..., 0, :]),
-            cov_sqrtm_lower=jnp.zeros_like(rv.cov_sqrtm_lower[..., 0, 0]),
-        )
-
-        error_estimate = jnp.empty(())
-        output_scale_dynamic = jnp.empty(())
-
-        # Prepare caches
-        m_like = jnp.empty(rv.mean.shape)
-        p_like = m_like[..., 0]
-        cache_extra = (m_like, m_like, p_like, p_like)
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             rv,
-            # A bunch of caches that are filled at some point:
-            observed_state=observed,
-            output_scale_dynamic=output_scale_dynamic,
-            error_estimate=error_estimate,
-            cache_extra=cache_extra,
-            cache_corr=None,
+            hidden_shape=rv.mean.shape,
+            observed_state=None,
+            error_estimate=None,
             backward_model=None,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
     def init_with_reversal(self, rv, conds, /):
@@ -104,7 +92,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         m_like = jnp.empty(rv.mean.shape)
         p_like = m_like[..., 0]
         cache_extra = (m_like, m_like, p_like, p_like)
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             rv,
             backward_model=conds,
             # A bunch of caches that are filled at some point:
@@ -122,12 +110,13 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
         rv = _vars.IsoNormalHiddenState(m0, c0)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
 
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def begin(self, s0: _vars.IsoStateSpaceVar, /, dt) -> _vars.IsoStateSpaceVar:
+    # todo: split into begin_with and begin_without
+    def begin(self, s0: _vars.IsoSSV, /, dt) -> _vars.IsoSSV:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -135,14 +124,17 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             ext,  # NEW!!
-            observed_state=s0.observed_state,  # irrelevant
-            output_scale_dynamic=s0.output_scale_dynamic,  # irrelevant
-            error_estimate=s0.error_estimate,  # irrelevant
+            hidden_shape=s0.hidden_shape,
             cache_extra=(m_ext_p, m0_p, p, p_inv),  # NEW!!
-            cache_corr=s0.cache_corr,  # irrelevant
-            backward_model=s0.backward_model,  # None or will-be-overwritten-later
+            output_scale_dynamic=None,
+            cache_corr=None,
+            backward_model=None,
+            # todo: The below should not be necessary
+            #  but currently, it is: because of pytree-shape stability in interpolation
+            observed_state=jax.tree_util.tree_map(jnp.zeros_like, s0.observed_state),
+            error_estimate=jax.tree_util.tree_map(jnp.zeros_like, s0.error_estimate),
         )
 
     def _assemble_preconditioner(self, dt):
@@ -152,11 +144,11 @@ class _IsoIBM(_collections.AbstractExtrapolation):
 
     def complete_without_reversal(
         self,
-        state: _vars.IsoStateSpaceVar,
+        state: _vars.IsoSSV,
         /,
-        state_previous: _vars.IsoStateSpaceVar,
+        state_previous: _vars.IsoSSV,
         output_scale: float,
-    ) -> _vars.IsoStateSpaceVar:
+    ) -> _vars.IsoSSV:
         _, _, p, p_inv = state.cache_extra
         m_ext = state.hidden_state.mean
         l0 = state_previous.hidden_state.cov_sqrtm_lower
@@ -171,13 +163,14 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
         # Use output_begin as an error estimate?
-        return _vars.IsoStateSpaceVar(
-            rv,  # NEW !!
-            observed_state=state.observed_state,
-            output_scale_dynamic=state.output_scale_dynamic,
+        return _vars.IsoSSV(
+            rv,
+            hidden_shape=state.hidden_shape,
             error_estimate=state.error_estimate,
             cache_corr=state.cache_corr,
-            cache_extra=state.cache_extra,  # irrelevant
+            observed_state=state.observed_state,  # usually None?
+            output_scale_dynamic=None,
+            cache_extra=None,
             backward_model=None,
         )
 
@@ -205,7 +198,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             extrapolated,
             observed_state=state.observed_state,
             error_estimate=state.error_estimate,
@@ -216,7 +209,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def replace_backward_model(self, s, /, backward_model):
-        return _vars.IsoStateSpaceVar(
+        return _vars.IsoSSV(
             s.hidden_state,
             observed_state=s.observed_state,
             error_estimate=s.error_estimate,

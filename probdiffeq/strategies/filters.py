@@ -2,6 +2,7 @@
 from typing import Any, NamedTuple, Tuple, TypeVar
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq._collections import InterpRes
 from probdiffeq.strategies import _strategy
@@ -106,11 +107,16 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def case_right_corner(
         self, t, *, s0: _FiState, s1: _FiState, output_scale
     ) -> InterpRes[_FiState]:  # s1.t == t
+        # s1 = self.init(*self.extract(s1))
+        print(jax.tree_util.tree_map(jnp.shape, s1))
+        print()
         return InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
         self, t, *, s0: _FiState, s1: _FiState, output_scale
     ) -> InterpRes[_FiState]:
+        # s0 = self.init(*self.extract(s0))
+        # s1 = self.init(*self.extract(s1))
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - s0.t
@@ -126,6 +132,9 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv=ssv,
             num_data_points=s0.num_data_points,
         )
+        print(jax.tree_util.tree_map(jnp.shape, extrapolated))
+        print(jax.tree_util.tree_map(jnp.shape, extrapolated))
+        print(jax.tree_util.tree_map(jnp.shape, s1))
         return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
     def offgrid_marginals(

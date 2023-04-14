@@ -285,7 +285,7 @@ class AdaptiveIVPSolver(Generic[T]):
         accepted, solution, previous = self.solver.interpolate(
             s0=state.previous, s1=state.accepted, t=t
         )
-        # todo: update control.dt_proposed ??
+        # todo: update control.dt_proposed?
         return _AdaptiveState(
             error_norm_proposed=state.error_norm_proposed,
             proposed=_inf_like(state.proposed),
