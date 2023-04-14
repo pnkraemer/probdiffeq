@@ -53,12 +53,17 @@ def case_setup_all_strategy_statespace_nd(
     "ode_problem", cases="..problem_cases", has_tag="scalar"
 )
 @testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag="scalar")
-def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
+@testing.parametrize(
+    "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
+)
+def case_setup_all_strategy_statespace_scalar(
+    ode_problem, impl_fn, strat_fn, solver_config
+):
     return _SimulateTerminalValuesConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
-        strat_fn=filters.Filter,
+        strat_fn=strat_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=controls.ProportionalIntegral(),
