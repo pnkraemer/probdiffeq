@@ -11,17 +11,17 @@ from probdiffeq.statespace.dense import _vars, linearise
 
 
 def taylor_order_zero(*args, **kwargs):
-    return _DenseTaylorZerothOrder(*args, **kwargs)
+    return _DenseTaylorZerothOrder(*args, linearise_fn=linearise.ts0, **kwargs)
 
 
 def taylor_order_one(*args, **kwargs):
-    return _DenseTaylorFirstOrder(*args, **kwargs)
+    return _DenseTaylorFirstOrder(*args, linearise_fn=linearise.ts1, **kwargs)
 
 
 def statistical_order_zero(
     ode_shape,
     ode_order,
-    cubature_rule_fn=cubature.third_order_spherical,
+    cubature_rule_fn=cubature.unscented_transform,
 ):
     if ode_order > 1:
         raise ValueError
@@ -38,7 +38,7 @@ def statistical_order_zero(
 def statistical_order_one(
     ode_shape,
     ode_order,
-    cubature_rule_fn=cubature.third_order_spherical,
+    cubature_rule_fn=cubature.unscented_transform,
 ):
     if ode_order > 1:
         raise ValueError
@@ -53,7 +53,7 @@ def statistical_order_one(
 
 
 class _DenseCorrection(_collections.AbstractCorrection, abc.ABC):
-    def __init__(self, ode_shape, ode_order, linearise_fn=None):
+    def __init__(self, ode_shape, ode_order, linearise_fn):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
@@ -111,9 +111,6 @@ class _DenseCorrection(_collections.AbstractCorrection, abc.ABC):
 
 @jax.tree_util.register_pytree_node_class
 class _DenseTaylorZerothOrder(_DenseCorrection):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, linearise_fn=linearise.ts0, **kwargs)
-
     def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         m0 = self.e0(x.hidden_state.mean)
         m1 = self.e1(x.hidden_state.mean)
@@ -190,7 +187,7 @@ class _DenseTaylorFirstOrder(_DenseCorrection):
         # Linearise the ODE residual (not the vector field!)
         # todo: can we pass jvp_fn around in a cache?
         #  If not, we have to rethink the line below.:
-        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=x.hidden_state.mean)
+        jvp_fn, (b,) = self.linearise_fn(fn=ode_residual, m=x.hidden_state.mean)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
