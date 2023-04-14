@@ -31,41 +31,41 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         return self.a.shape[0] - 1
 
     def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /):
+        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
+        return _vars.IsoNormalHiddenState(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
+
+    def _stack_tcoeffs(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
             raise ValueError(msg1 + msg2)
         m0_corrected = jnp.stack(taylor_coefficients)
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-
-        # todo: smoothers should return rv + conditional
-        return _vars.IsoNormalHiddenState(
-            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
-        )
+        return m0_corrected, c_sqrtm0_corrected
 
     def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
-        raise RuntimeError  # todo
+        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
+        rv = _vars.IsoNormalHiddenState(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
+        cond = self._init_conditional(rv_proto=rv)
+        return rv, cond
+
+    def _init_conditional(self, rv_proto):
+        op = jnp.eye(*self.a.shape)
+        noi = _vars.IsoNormalHiddenState(
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+        )
+        return _conds.IsoConditionalHiddenState(op, noise=noi)
 
     def extract_with_reversal(self, s, /):
         raise RuntimeError  # todo
 
     def extract_without_reversal(self, s, /):
         return s.hidden_state
-
-    # todo: should this be a classmethod in _conds.IsoConditional?
-    def _init_conditional(self, ssv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _conds.IsoConditionalHiddenState(op, noise=noi)
-
-    def _init_backward_transition(self):
-        return jnp.eye(*self.a.shape)
-
-    def _init_backward_noise(self, rv_proto):
-        return _vars.IsoNormalHiddenState(
-            mean=jnp.zeros_like(rv_proto.mean),
-            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-        )
 
     def init_without_reversal(self, rv, /):
         observed = _vars.IsoNormalQOI(
@@ -91,7 +91,28 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         )
 
     def init_with_reversal(self, rv, conds, /):
-        raise RuntimeError  # todo
+        observed = _vars.IsoNormalQOI(
+            mean=jnp.zeros_like(rv.mean[..., 0, :]),
+            cov_sqrtm_lower=jnp.zeros_like(rv.cov_sqrtm_lower[..., 0, 0]),
+        )
+
+        error_estimate = jnp.empty(())
+        output_scale_dynamic = jnp.empty(())
+
+        # Prepare caches
+        m_like = jnp.empty(rv.mean.shape)
+        p_like = m_like[..., 0]
+        cache_extra = (m_like, m_like, p_like, p_like)
+        return _vars.IsoStateSpaceVar(
+            rv,
+            backward_model=conds,
+            # A bunch of caches that are filled at some point:
+            observed_state=observed,
+            output_scale_dynamic=output_scale_dynamic,
+            error_estimate=error_estimate,
+            cache_extra=cache_extra,
+            cache_corr=None,
+        )
 
     # todo: why does this method have the same name as the above?
     def _init_ssv(self, ode_shape):
@@ -120,6 +141,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             error_estimate=s0.error_estimate,  # irrelevant
             cache_extra=(m_ext_p, m0_p, p, p_inv),  # NEW!!
             cache_corr=s0.cache_corr,  # irrelevant
+            backward_model=s0.backward_model,  # either None or will-be-overwritten-later
         )
 
     def _assemble_preconditioner(self, dt):
@@ -157,11 +179,11 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             cache_extra=state.cache_extra,  # irrelevant
         )
 
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
-        m_ext_p, m0_p, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def complete_with_reversal(self, state, /, state_previous, output_scale):
+        m_ext_p, m0_p, p, p_inv = state.cache_extra
+        m_ext = state.hidden_state.mean
+        l0_p = p_inv[:, None] * state_previous.hidden_state.cov_sqrtm_lower
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -181,4 +203,23 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoStateSpaceVar(extrapolated, cache=None), bw_model
+        return _vars.IsoStateSpaceVar(
+            extrapolated,
+            observed_state=state.observed_state,
+            error_estimate=state.error_estimate,
+            output_scale_dynamic=state.output_scale_dynamic,
+            cache_extra=state.cache_extra,
+            cache_corr=state.cache_corr,
+            backward_model=bw_model,
+        )
+
+    def replace_backward_model(self, s, /, backward_model):
+        return _vars.IsoStateSpaceVar(
+            s.hidden_state,
+            observed_state=s.observed_state,
+            error_estimate=s.error_estimate,
+            output_scale_dynamic=s.output_scale_dynamic,
+            cache_extra=s.cache_extra,
+            cache_corr=s.cache_corr,
+            backward_model=backward_model,  # new
+        )

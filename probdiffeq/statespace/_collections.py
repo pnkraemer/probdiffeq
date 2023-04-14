@@ -67,6 +67,7 @@ class StateSpaceVar(abc.ABC):
         self,
         hidden_state,
         *,
+        backward_model,  # todo: optional
         observed_state,
         output_scale_dynamic,
         error_estimate,
@@ -74,6 +75,7 @@ class StateSpaceVar(abc.ABC):
         cache_corr,
     ):
         self.hidden_state = hidden_state  # todo: 'hidden'
+        self.backward_model = backward_model
         self.observed_state = observed_state  # todo: 'observed'
 
         # todo: add conditional here
@@ -91,6 +93,7 @@ class StateSpaceVar(abc.ABC):
             self.error_estimate,
             self.cache_extra,
             self.cache_corr,
+            self.backward_model,
         )
         aux = ()
         return children, aux
@@ -104,6 +107,7 @@ class StateSpaceVar(abc.ABC):
             error_estimate,
             cache_e,
             cache_c,
+            backward_model,
         ) = children
         return cls(
             hidden_state=hidden_state,
@@ -112,6 +116,7 @@ class StateSpaceVar(abc.ABC):
             error_estimate=error_estimate,
             cache_extra=cache_e,
             cache_corr=cache_c,
+            backward_model=backward_model,
         )
 
     def __repr__(self):
@@ -123,6 +128,7 @@ class StateSpaceVar(abc.ABC):
             f"error_estimate={self.error_estimate},"
             f"cache_extra={self.cache_extra},"
             f"cache_corr={self.cache_corr}"
+            f"backward_model={self.backward_model}"
             f")"
         )
 
@@ -241,6 +247,10 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         s0,
         output_scale,
     ):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def replace_backward_model(self, s: SSVTypeVar, /, backward_model) -> SSVTypeVar:
         raise NotImplementedError
 
 

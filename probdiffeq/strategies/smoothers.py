@@ -108,26 +108,22 @@ _SolType = Tuple[float, jax.Array, jax.Array, MarkovSequence]
 class _SmState(NamedTuple):
     t: Any
     u: Any
-    extrapolated: Any
+    ssv: Any
 
-    corrected: Any
-
-    backward_model: Any
-
+    # todo: move to StateSpaceVar
+    #  (only the SLR knows that it needs `d` data points per step...)
     num_data_points: Any
 
+    @property
+    def error_estimate(self):
+        return self.ssv.error_estimate
+
     def scale_covariance(self, output_scale):
-        bw_model = self.backward_model.scale_covariance(output_scale)
-        if self.extrapolated is not None:
-            # unexpectedly early call to scale_covariance...
-            raise ValueError
-        cor = self.corrected.scale_covariance(output_scale)
+        ssv = self.ssv.scale_covariance(output_scale)
         return _SmState(
             t=self.t,
             u=self.u,
-            extrapolated=None,
-            corrected=cor,
-            backward_model=bw_model,
+            ssv=ssv,
             num_data_points=self.num_data_points,
         )
 
@@ -162,7 +158,7 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self,
         output_extra: _SmState,
         /,
@@ -173,24 +169,28 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     def init(self, t, u, marginals, posterior, /) -> _SmState:
+        ssv = self.extrapolation.init_with_reversal(
+            posterior.init, posterior.backward_model
+        )
+        ssv = self.correction.init(ssv)
         return _SmState(
             t=t,
             u=u,
-            corrected=posterior.init,
-            extrapolated=None,
-            backward_model=posterior.backward_model,
+            ssv=ssv,
             num_data_points=posterior.num_data_points,
         )
 
     def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
-        corrected = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
-
-        init_bw_model = self.extrapolation.init_conditional
-        bw_model = init_bw_model(ssv_proto=corrected)
-        sol = MarkovSequence(
-            init=corrected, backward_model=bw_model, num_data_points=num_data_points
+        rv, cond = self.extrapolation.solution_from_tcoeffs_with_reversal(
+            taylor_coefficients
         )
-        marginals = corrected
+        #
+        # init_bw_model = self.extrapolation.init_conditional
+        # bw_model = init_bw_model(ssv_proto=corrected)
+        sol = MarkovSequence(
+            init=rv, backward_model=cond, num_data_points=num_data_points
+        )
+        marginals = rv
         u = taylor_coefficients[0]
         return u, marginals, sol
 
@@ -206,46 +206,42 @@ class _SmootherCommon(_strategy.Strategy):
 
     def extract_at_terminal_values(self, state: _SmState, /) -> _SolType:
         markov_seq = MarkovSequence(
-            init=state.corrected,
-            backward_model=state.backward_model,
+            init=state.ssv.hidden_state,
+            backward_model=state.ssv.backward_model,
             num_data_points=state.num_data_points,
         )
-        marginals = state.corrected
+        marginals = state.ssv.hidden_state
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
-    def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
-        ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
+    def _begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
+        ssv = self.extrapolation.begin(posterior.ssv, dt=dt)
         return _SmState(
             t=posterior.t + dt,
             u=None,
-            extrapolated=ssv,
-            corrected=None,
-            backward_model=None,
+            ssv=ssv,
             num_data_points=posterior.num_data_points,
         )
 
-    def begin_correction(
-        self, output_extra: _SmState, /, *, vector_field, t, p
+    def _begin_correction(
+        self, x: _SmState, /, *, vector_field, p
     ) -> Tuple[jax.Array, float, Any]:
-        return self.correction.begin(
-            output_extra.extrapolated, vector_field=vector_field, t=t, p=p
+        ssv = self.correction.begin(x.ssv, vector_field, x.t, p)
+        return _SmState(
+            t=x.t,
+            u=x.u,
+            ssv=ssv,
+            num_data_points=x.num_data_points,
         )
 
-    def complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
-        a, corrected = self.correction.complete(
-            extrapolated=extrapolated.extrapolated, cache=cache_obs
+    def _complete_correction(self, x: _SmState, /, *, vector_field, p):
+        ssv = self.correction.complete(x.ssv, vector_field, x.t, p)
+        return _SmState(
+            t=x.t,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            num_data_points=x.num_data_points + 1,  # todo: move this info to SSV
         )
-        corrected_seq = _SmState(
-            t=extrapolated.t,
-            u=corrected.extract_qoi(),
-            corrected=corrected,
-            extrapolated=None,  # not relevant anymore
-            backward_model=extrapolated.backward_model,
-            num_data_points=extrapolated.num_data_points + 1,
-        )
-
-        return a, corrected_seq
 
     def _extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
@@ -259,57 +255,56 @@ class _SmootherCommon(_strategy.Strategy):
     def num_data_points(self, state, /):
         return state.num_data_points
 
+    def observation(self, state, /):
+        return state.ssv.observed_state
+
     # Auxiliary routines that are the same among all subclasses
 
     def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
         # todo: act on state instead of rv+t0
         dt = t - t0
         output_extra = self.extrapolation.begin(rv, dt=dt)
-
-        extrapolated, bw_model = self.extrapolation.complete_with_reversal(
+        return self.extrapolation.complete_with_reversal(
             output_extra,
-            s0=rv,
+            state_previous=rv,
             output_scale=output_scale,
         )
-        return extrapolated, bw_model  # should this return a MarkovSequence?
 
-    # todo: should this be a classmethod of MarkovSequence?
-    def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
-        init_conditional_fn = self.extrapolation.init_conditional
-        bw_model = init_conditional_fn(ssv_proto=posterior.corrected)
-        return _SmState(
-            t=posterior.t,
-            u=posterior.u,
-            extrapolated=posterior.extrapolated,
-            corrected=posterior.corrected,
-            backward_model=bw_model,
-            num_data_points=posterior.num_data_points,
-        )
+    # # todo: should this be a classmethod of MarkovSequence?
+    # def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
+    #     init_conditional_fn = self.extrapolation.init_conditional
+    #     bw_model = init_conditional_fn(ssv_proto=posterior.corrected)
+    #     return _SmState(
+    #         t=posterior.t,
+    #         u=posterior.u,
+    #         extrapolated=posterior.extrapolated,
+    #         corrected=posterior.corrected,
+    #         backward_model=bw_model,
+    #         num_data_points=posterior.num_data_points,
+    #     )
 
 
 @jax.tree_util.register_pytree_node_class
 class Smoother(_SmootherCommon):
     """Smoother."""
 
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self,
-        output_extra: _SmState,
+        x: _SmState,
         /,
         *,
         output_scale,
         state_previous: _SmState,
     ) -> _SmState:
-        extrapolated, bw_model = self.extrapolation.complete_with_reversal(
-            output_extra.extrapolated,
-            s0=state_previous.corrected,
+        ssv = self.extrapolation.complete_with_reversal(
+            x.ssv,
+            state_previous=state_previous.ssv,
             output_scale=output_scale,
         )
         return _SmState(
-            t=output_extra.t,
+            t=x.t,
             u=None,
-            extrapolated=extrapolated,
-            corrected=None,
-            backward_model=bw_model,
+            ssv=ssv,
             num_data_points=state_previous.num_data_points,
         )
 
@@ -317,7 +312,8 @@ class Smoother(_SmootherCommon):
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
         # todo: is this duplication unnecessary?
-        accepted = self._duplicate_with_unit_backward_model(s1)
+        # accepted = self._duplicate_with_unit_backward_model(s1)
+        accepted = s1
         return InterpRes(accepted=accepted, solution=s1, previous=s1)
 
     def case_interpolate(
@@ -331,30 +327,31 @@ class Smoother(_SmootherCommon):
         # but the backward transition is kept.
 
         # Extrapolate from t0 to t, and from t to t1
-        extrapolated0, backward_model0 = self._interpolate_from_to_fn(
-            rv=s0.corrected, output_scale=output_scale, t=t, t0=s0.t
+        extrapolated0 = self._interpolate_from_to_fn(
+            rv=s0.ssv, output_scale=output_scale, t=t, t0=s0.t
         )
         posterior0 = _SmState(
             t=t,
             u=extrapolated0.extract_qoi(),
             # 'corrected' is the solution. We interpolate to get the value for
             # 'corrected' at time 't', which is exactly what happens.
-            extrapolated=None,
-            corrected=extrapolated0,
-            backward_model=backward_model0,
+            ssv=extrapolated0,
             num_data_points=s0.num_data_points,
         )
 
-        _, backward_model1 = self._interpolate_from_to_fn(
+        extrapolated1 = self._interpolate_from_to_fn(
             rv=extrapolated0, output_scale=output_scale, t=s1.t, t0=t
         )
+        backward_model1 = extrapolated1.backward_model
+        ssv1 = self.extrapolation.replace_backward_model(
+            s1.ssv, backward_model=backward_model1
+        )
+
         t_accepted = jnp.maximum(s1.t, t)
         posterior1 = _SmState(
             t=t_accepted,
             u=s1.u,
-            extrapolated=s1.extrapolated,  # None
-            corrected=s1.corrected,
-            backward_model=backward_model1,
+            ssv=ssv1,
             num_data_points=s1.num_data_points,
         )
 
@@ -395,29 +392,32 @@ class FixedPointSmoother(_SmootherCommon):
 
     """
 
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self,
-        output_extra: _SmState,
+        state: _SmState,
         /,
         *,
         state_previous: _SmState,
         output_scale,
     ):
-        extrapolated, bw_increment = self.extrapolation.complete_with_reversal(
-            output_extra.extrapolated,
-            s0=state_previous.corrected,
+        ssv = self.extrapolation.complete_with_reversal(
+            state.ssv,
+            state_previous=state_previous.ssv,
             output_scale=output_scale,
         )
 
-        merge_fn = state_previous.backward_model.merge_with_incoming_conditional
+        merge_fn = state_previous.ssv.backward_model.merge_with_incoming_conditional
+        bw_increment = ssv.backward_model
         backward_model = merge_fn(bw_increment)
 
+        ssv = self.extrapolation.replace_backward_model(
+            ssv, backward_model=backward_model
+        )
+
         return _SmState(
-            t=output_extra.t,
+            t=state.t,
             u=None,
-            extrapolated=extrapolated,
-            corrected=None,
-            backward_model=backward_model,
+            ssv=ssv,
             num_data_points=state_previous.num_data_points,
         )
 
@@ -426,21 +426,24 @@ class FixedPointSmoother(_SmootherCommon):
     ):  # s1.t == t
         # can we guarantee that the backward model in s1 is the
         # correct backward model to get from s0 to s1?
-        merge_fn = s0.backward_model.merge_with_incoming_conditional
-        backward_model1 = merge_fn(s1.backward_model)
+        merge_fn = s0.ssv.backward_model.merge_with_incoming_conditional
+        backward_model1 = merge_fn(s1.ssv.backward_model)
+        ssv1 = self.extrapolation.replace_backward_model(
+            s1.ssv, backward_model=backward_model1
+        )
 
         # Do we need:
         #  t_accepted = jnp.maximum(s1.t, t) ?
         solution = _SmState(
             t=t,
             u=s1.u,
-            extrapolated=s1.extrapolated,
-            corrected=s1.corrected,
-            backward_model=backward_model1,
+            ssv=ssv1,
             num_data_points=s1.num_data_points,
         )
 
-        accepted = self._duplicate_with_unit_backward_model(solution)
+        # accepted = self._duplicate_with_unit_backward_model(solution)
+        accepted = solution
+
         previous = accepted
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
@@ -456,34 +459,41 @@ class FixedPointSmoother(_SmootherCommon):
         # The rest remains the same as for the smoother.
 
         # From s0.t to t
-        extrapolated0, bw0 = self._interpolate_from_to_fn(
-            rv=s0.corrected,
+        ssv0 = self._interpolate_from_to_fn(
+            rv=s0.ssv,
             output_scale=output_scale,
             t=t,
             t0=s0.t,
         )
-        backward_model0 = s0.backward_model.merge_with_incoming_conditional(bw0)
+        bw0 = ssv0.backward_model
+        backward_model0 = s0.ssv.backward_model.merge_with_incoming_conditional(bw0)
+        ssv0 = self.extrapolation.replace_backward_model(
+            ssv0, backward_model=backward_model0
+        )
+
         solution = _SmState(
             t=t,
-            u=extrapolated0.extract_qoi(),
-            extrapolated=None,
-            corrected=extrapolated0,
-            backward_model=backward_model0,
+            u=ssv0.extract_qoi(),
+            ssv=ssv0,
             num_data_points=s0.num_data_points,
         )
 
-        previous = self._duplicate_with_unit_backward_model(solution)
+        # previous = self._duplicate_with_unit_backward_model(solution)
+        previous = solution
 
-        _, backward_model1 = self._interpolate_from_to_fn(
-            rv=extrapolated0, output_scale=output_scale, t=s1.t, t0=t
+        extra1 = self._interpolate_from_to_fn(
+            rv=ssv0, output_scale=output_scale, t=s1.t, t0=t
         )
+        backward_model1 = extra1.backward_model
+        ssv1 = self.extrapolation.replace_backward_model(
+            s1.ssv, backward_model=backward_model1
+        )
+
         t_accepted = jnp.maximum(s1.t, t)
         accepted = _SmState(
             t=t_accepted,
             u=s1.u,
-            extrapolated=s1.extrapolated,  # None
-            corrected=s1.corrected,
-            backward_model=backward_model1,
+            ssv=ssv1,
             num_data_points=s1.num_data_points,
         )
 

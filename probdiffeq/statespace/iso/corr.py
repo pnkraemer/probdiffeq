@@ -27,6 +27,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
             error_estimate=s.error_estimate,
             cache_extra=s.cache_extra,
             cache_corr=cache,
+            backward_model=s.backward_model,
         )
 
     def begin(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
@@ -54,15 +55,16 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
             error_estimate=error_estimate,
             cache_extra=x.cache_extra,
             cache_corr=(bias,),
+            backward_model=x.backward_model,
         )
 
     def complete(
-        self, extrapolated: _vars.IsoStateSpaceVar, /, _vector_field, _t, _p
+        self, x: _vars.IsoStateSpaceVar, /, _vector_field, _t, _p
     ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoStateSpaceVar]:
-        (bias,) = extrapolated.cache_corr
+        (bias,) = x.cache_corr
 
-        m_ext = extrapolated.hidden_state.mean
-        l_ext = extrapolated.hidden_state.cov_sqrtm_lower
+        m_ext = x.hidden_state.mean
+        l_ext = x.hidden_state.cov_sqrtm_lower
         l_obs = l_ext[self.ode_order, ...]
 
         l_obs_nonscalar = _sqrt_util.sqrtm_to_upper_triangular(R=l_obs[:, None])
@@ -77,8 +79,9 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         return _vars.IsoStateSpaceVar(
             corrected,
             observed_state=observed,
-            output_scale_dynamic=extrapolated.output_scale_dynamic,
-            error_estimate=extrapolated.error_estimate,
-            cache_extra=extrapolated.cache_extra,  # irrelevant
-            cache_corr=extrapolated.cache_corr,  # irrelevant
+            output_scale_dynamic=x.output_scale_dynamic,
+            error_estimate=x.error_estimate,
+            cache_extra=x.cache_extra,  # irrelevant
+            cache_corr=x.cache_corr,  # irrelevant
+            backward_model=x.backward_model,
         )

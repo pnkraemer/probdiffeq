@@ -198,11 +198,6 @@ class AdaptiveIVPSolver(Generic[T]):
             state,
         )
 
-        # todo: which output scale does this interpolation use?
-        #  the MLE solver should use the prior one, but it looks like
-        #  we are using the calibrated scale.
-        #  to test this, assert that MLESolver and calibrated_solver(mle) are IDENTICAL.
-        #  they will not be if the configuration is such that interpolation matters.
         state = jax.lax.cond(
             state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
@@ -290,6 +285,7 @@ class AdaptiveIVPSolver(Generic[T]):
         accepted, solution, previous = self.solver.interpolate(
             s0=state.previous, s1=state.accepted, t=t
         )
+        # todo: update control.dt_proposed ??
         return _AdaptiveState(
             error_norm_proposed=state.error_norm_proposed,
             proposed=_inf_like(state.proposed),
