@@ -29,6 +29,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
             output_scale_dynamic=x.output_scale_dynamic,
             cache_extra=x.cache_extra,
             cache_corr=cache,
+            backward_model=x.backward_model,
         )
 
     def begin(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
@@ -46,6 +47,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
             output_scale_dynamic=output_scale,
             cache_extra=x.cache_extra,
             cache_corr=cache,
+            backward_model=x.backward_model,
         )
 
     def marginalise_observation(self, fx, m1, x):
@@ -83,6 +85,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
             output_scale_dynamic=extrapolated.output_scale_dynamic,
             cache_extra=extrapolated.cache_extra,
             cache_corr=extrapolated.cache_corr,
+            backward_model=extrapolated.backward_model,
         )
 
 

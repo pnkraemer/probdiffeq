@@ -97,6 +97,11 @@ class StateSpaceVar(_collections.StateSpaceVar):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
         rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
 
+        if self.backward_model is not None:
+            backward_model = self.backward_model.scale_covariance(output_scale)
+        else:
+            backward_model = None
+
         return StateSpaceVar(
             hidden_state=rv,
             observed_state=rv_obs,
@@ -104,6 +109,7 @@ class StateSpaceVar(_collections.StateSpaceVar):
             error_estimate=self.error_estimate,
             cache_extra=self.cache_extra,
             cache_corr=self.cache_corr,
+            backward_model=backward_model,
         )
 
     def marginal_nth_derivative(self, n):

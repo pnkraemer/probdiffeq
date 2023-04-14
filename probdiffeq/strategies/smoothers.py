@@ -235,7 +235,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     # Auxiliary routines that are the same among all subclasses
 
-    def _interpolate_from_to_fn(self, *, rv, output_scale, t, t0):
+    def _interpolate_from_t0_to_t(self, *, rv, output_scale, t, t0):
         # todo: act on state instead of rv+t0
         dt = t - t0
         output_extra = self.extrapolation.begin(rv, dt=dt)
@@ -298,7 +298,7 @@ class Smoother(_SmootherCommon):
         # but the backward transition is kept.
 
         # Extrapolate from t0 to t, and from t to t1
-        extrapolated0 = self._interpolate_from_to_fn(
+        extrapolated0 = self._interpolate_from_t0_to_t(
             rv=s0.ssv, output_scale=output_scale, t=t, t0=s0.t
         )
         posterior0 = _SmState(
@@ -310,7 +310,7 @@ class Smoother(_SmootherCommon):
             num_data_points=s0.num_data_points,
         )
 
-        extrapolated1 = self._interpolate_from_to_fn(
+        extrapolated1 = self._interpolate_from_t0_to_t(
             rv=extrapolated0, output_scale=output_scale, t=s1.t, t0=t
         )
         backward_model1 = extrapolated1.backward_model
@@ -426,7 +426,7 @@ class FixedPointSmoother(_SmootherCommon):
         # The rest remains the same as for the smoother.
 
         # From s0.t to t
-        ssv0 = self._interpolate_from_to_fn(
+        ssv0 = self._interpolate_from_t0_to_t(
             rv=s0.ssv,
             output_scale=output_scale,
             t=t,
@@ -448,7 +448,7 @@ class FixedPointSmoother(_SmootherCommon):
         # previous = self._duplicate_with_unit_backward_model(solution)
         previous = solution
 
-        extra1 = self._interpolate_from_to_fn(
+        extra1 = self._interpolate_from_t0_to_t(
             rv=ssv0, output_scale=output_scale, t=s1.t, t0=t
         )
         backward_model1 = extra1.backward_model

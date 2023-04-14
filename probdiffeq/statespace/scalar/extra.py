@@ -70,6 +70,7 @@ class _IBM(_collections.AbstractExtrapolation):
             error_estimate=error_estimate,
             cache_extra=cache_extra,
             cache_corr=None,
+            backward_model=None,
         )
 
     def extract_without_reversal(self, s, /):
@@ -95,6 +96,7 @@ class _IBM(_collections.AbstractExtrapolation):
             output_scale_dynamic=s0.output_scale_dynamic,
             cache_corr=s0.cache_corr,
             cache_extra=(m_ext_p, m0_p, p, p_inv),
+            backward_model=s0.backward_model,  # irrelevant
         )
 
     def _assemble_preconditioner(self, dt):
@@ -123,6 +125,7 @@ class _IBM(_collections.AbstractExtrapolation):
             output_scale_dynamic=output_begin.output_scale_dynamic,
             cache_extra=output_begin.cache_extra,
             cache_corr=output_begin.cache_corr,
+            backward_model=output_begin.backward_model,
         )
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
@@ -168,3 +171,14 @@ class _IBM(_collections.AbstractExtrapolation):
 
     def promote_output_scale(self, output_scale):
         return output_scale
+
+    def replace_backward_model(self, s, /, backward_model):
+        return _vars.StateSpaceVar(
+            hidden_state=s.hidden_state,
+            output_scale_dynamic=s.output_scale_dynamic,
+            error_estimate=s.error_estimate,
+            observed_state=s.observed_state,
+            cache_extra=s.cache_extra,
+            cache_obs=s.cache_obs,
+            backward_model=backward_model,  # new
+        )
