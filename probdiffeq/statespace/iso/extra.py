@@ -88,6 +88,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             error_estimate=error_estimate,
             cache_extra=cache_extra,
             cache_corr=None,
+            backward_model=None,
         )
 
     def init_with_reversal(self, rv, conds, /):
@@ -141,7 +142,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             error_estimate=s0.error_estimate,  # irrelevant
             cache_extra=(m_ext_p, m0_p, p, p_inv),  # NEW!!
             cache_corr=s0.cache_corr,  # irrelevant
-            backward_model=s0.backward_model,  # either None or will-be-overwritten-later
+            backward_model=s0.backward_model,  # None or will-be-overwritten-later
         )
 
     def _assemble_preconditioner(self, dt):
@@ -177,6 +178,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             error_estimate=state.error_estimate,
             cache_corr=state.cache_corr,
             cache_extra=state.cache_extra,  # irrelevant
+            backward_model=None,
         )
 
     def complete_with_reversal(self, state, /, state_previous, output_scale):

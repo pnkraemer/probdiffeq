@@ -157,17 +157,6 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def _complete_extrapolation(
-        self,
-        output_extra: _SmState,
-        /,
-        *,
-        output_scale,
-        state_previous: _SmState,
-    ):
-        raise NotImplementedError
-
     def init(self, t, u, marginals, posterior, /) -> _SmState:
         ssv = self.extrapolation.init_with_reversal(
             posterior.init, posterior.backward_model
@@ -180,13 +169,26 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
 
+    def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
+        ssv = self.extrapolation.begin(state.ssv, dt=dt)
+        ssv = self.correction.begin(ssv, vector_field, state.t + dt, parameters)
+        return _SmState(
+            t=state.t + dt,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            num_data_points=state.num_data_points,
+        )
+
+    @abc.abstractmethod
+    def complete(
+        self, state, state_previous, /, *, vector_field, parameters, output_scale
+    ):
+        raise NotImplementedError
+
     def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
         rv, cond = self.extrapolation.solution_from_tcoeffs_with_reversal(
             taylor_coefficients
         )
-        #
-        # init_bw_model = self.extrapolation.init_conditional
-        # bw_model = init_bw_model(ssv_proto=corrected)
         sol = MarkovSequence(
             init=rv, backward_model=cond, num_data_points=num_data_points
         )
@@ -215,35 +217,6 @@ class _SmootherCommon(_strategy.Strategy):
         marginals = state.ssv.hidden_state
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
-
-    def _begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
-        ssv = self.extrapolation.begin(posterior.ssv, dt=dt)
-        return _SmState(
-            t=posterior.t + dt,
-            u=None,
-            ssv=ssv,
-            num_data_points=posterior.num_data_points,
-        )
-
-    def _begin_correction(
-        self, x: _SmState, /, *, vector_field, p
-    ) -> Tuple[jax.Array, float, Any]:
-        ssv = self.correction.begin(x.ssv, vector_field, x.t, p)
-        return _SmState(
-            t=x.t,
-            u=x.u,
-            ssv=ssv,
-            num_data_points=x.num_data_points,
-        )
-
-    def _complete_correction(self, x: _SmState, /, *, vector_field, p):
-        ssv = self.correction.complete(x.ssv, vector_field, x.t, p)
-        return _SmState(
-            t=x.t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            num_data_points=x.num_data_points + 1,  # todo: move this info to SSV
-        )
 
     def _extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
@@ -290,24 +263,20 @@ class _SmootherCommon(_strategy.Strategy):
 class Smoother(_SmootherCommon):
     """Smoother."""
 
-    def _complete_extrapolation(
-        self,
-        x: _SmState,
-        /,
-        *,
-        output_scale,
-        state_previous: _SmState,
-    ) -> _SmState:
+    def complete(
+        self, state, state_previous, /, *, vector_field, parameters, output_scale
+    ):
         ssv = self.extrapolation.complete_with_reversal(
-            x.ssv,
+            state.ssv,
             state_previous=state_previous.ssv,
             output_scale=output_scale,
         )
+        ssv = self.correction.complete(ssv, vector_field, state.t, parameters)
         return _SmState(
-            t=x.t,
-            u=None,
+            t=state.t,
+            u=ssv.extract_qoi(),
             ssv=ssv,
-            num_data_points=state_previous.num_data_points,
+            num_data_points=state_previous.num_data_points + 1,
         )
 
     def case_right_corner(
@@ -371,12 +340,13 @@ class Smoother(_SmootherCommon):
         t1,
         output_scale,
     ):
-        acc, _sol, _prev = self.case_interpolate(
+        acc_p, _sol, _prev = self.case_interpolate(
             t=t,
             s1=self.init(t1, None, None, posterior),
             s0=self.init(t0, None, None, posterior_previous),
             output_scale=output_scale,
         )
+        _, _, _, acc = self.extract_at_terminal_values(acc_p)
         marginals = acc.backward_model.marginalise(marginals)
         u = marginals.extract_qoi()
         return u, marginals
@@ -394,13 +364,8 @@ class FixedPointSmoother(_SmootherCommon):
 
     """
 
-    def _complete_extrapolation(
-        self,
-        state: _SmState,
-        /,
-        *,
-        state_previous: _SmState,
-        output_scale,
+    def complete(
+        self, state, state_previous, /, *, vector_field, parameters, output_scale
     ):
         ssv = self.extrapolation.complete_with_reversal(
             state.ssv,
@@ -411,16 +376,16 @@ class FixedPointSmoother(_SmootherCommon):
         merge_fn = state_previous.ssv.backward_model.merge_with_incoming_conditional
         bw_increment = ssv.backward_model
         backward_model = merge_fn(bw_increment)
-
         ssv = self.extrapolation.replace_backward_model(
             ssv, backward_model=backward_model
         )
 
+        ssv = self.correction.complete(ssv, vector_field, state.t, parameters)
         return _SmState(
             t=state.t,
-            u=None,
+            u=ssv.extract_qoi(),
             ssv=ssv,
-            num_data_points=state_previous.num_data_points,
+            num_data_points=state_previous.num_data_points + 1,
         )
 
     def case_right_corner(

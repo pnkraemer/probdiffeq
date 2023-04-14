@@ -114,17 +114,17 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - s0.t
-        output_extra = self._begin_extrapolation(s0, dt=dt)
-        extrapolated = self._complete_extrapolation(
-            output_extra,
-            state_previous=s0,
+        ssv = self.extrapolation.begin(s0.ssv, dt=dt)
+        ssv = self.extrapolation.complete_without_reversal(
+            ssv,
+            state_previous=s0.ssv,
             output_scale=output_scale,
         )
         extrapolated = _FiState(
             t=t,
-            u=extrapolated.ssv.extract_qoi(),
-            ssv=extrapolated.ssv,
-            num_data_points=extrapolated.num_data_points,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            num_data_points=s0.num_data_points,
         )
         return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
@@ -148,57 +148,30 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         _, u, marginals, _ = self.extract(sol)
         return u, marginals
 
-    def _begin_extrapolation(self, x: _FiState, /, *, dt) -> _FiState:
-        extrapolated = self.extrapolation.begin(x.ssv, dt=dt)
+    def begin(self, state: _FiState, /, *, dt, parameters, vector_field) -> _FiState:
+        ssv = self.extrapolation.begin(state.ssv, dt=dt)
+        ssv = self.correction.begin(ssv, vector_field, state.t + dt, parameters)
         return _FiState(
-            t=x.t + dt,
-            u=None,
-            ssv=extrapolated,
-            num_data_points=x.num_data_points,
+            t=state.t + dt,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            num_data_points=state.num_data_points,
         )
 
-    def _complete_extrapolation(
-        self,
-        x: _FiState,
-        /,
-        *,
-        output_scale,
-        state_previous: _FiState,
-    ) -> _FiState:
+    def complete(
+        self, state, state_previous, /, *, vector_field, parameters, output_scale
+    ):
         ssv = self.extrapolation.complete_without_reversal(
-            x.ssv,
+            state.ssv,
             state_previous=state_previous.ssv,
             output_scale=output_scale,
         )
+        ssv = self.correction.complete(ssv, vector_field, state.t, parameters)
         return _FiState(
-            t=x.t,
-            u=None,
-            ssv=ssv,
-            num_data_points=x.num_data_points,
-        )
-
-    def _begin_correction(
-        self, x: _FiState, /, *, vector_field, p
-    ) -> Tuple[jax.Array, float, Any]:
-        ssv = self.correction.begin(x.ssv, vector_field=vector_field, t=x.t, p=p)
-        corrected = _FiState(
-            t=x.t,
-            u=None,
-            ssv=ssv,
-            num_data_points=x.num_data_points,
-        )
-        return corrected
-
-    # todo: more type-stability in corrections!
-    def _complete_correction(
-        self, x: _FiState, /, *, vector_field, p
-    ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        ssv = self.correction.complete(x.ssv, vector_field, x.t, p)
-        return _FiState(
-            t=x.t,
+            t=state.t,
             u=ssv.extract_qoi(),
             ssv=ssv,
-            num_data_points=x.num_data_points + 1,
+            num_data_points=state.num_data_points + 1,
         )
 
     def num_data_points(self, state: _FiState, /):
