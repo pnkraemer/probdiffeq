@@ -61,9 +61,7 @@ class _IBM(_collections.AbstractExtrapolation):
         #  Only 'observed' should be allocated ahead of time.
         m_like = jnp.empty(rv.mean.shape)
         p_like = m_like
-        d_like = m_like[..., 0]
         cache_extra = (m_like, m_like, p_like, p_like)
-        cache_obs = (d_like,)  # todo: let correction initialise it!
 
         return _vars.StateSpaceVar(
             rv,
@@ -71,7 +69,7 @@ class _IBM(_collections.AbstractExtrapolation):
             output_scale_dynamic=output_scale_dynamic,
             error_estimate=error_estimate,
             cache_extra=cache_extra,
-            cache_corr=cache_obs,
+            cache_corr=None,
         )
 
     def extract_without_reversal(self, s, /):

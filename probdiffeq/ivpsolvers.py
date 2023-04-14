@@ -285,6 +285,8 @@ class MLESolver(AbstractSolver):
         state_strategy = self.strategy.complete(
             state_strategy,
             state_strategy_previous,
+            parameters=parameters,
+            vector_field=vector_field,
             output_scale=state.output_scale_prior,
         )
 

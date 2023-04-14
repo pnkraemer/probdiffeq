@@ -73,11 +73,12 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     def init(self, t, u, _marginals, solution: FilterDist) -> _FiState:
-        corrected = self.extrapolation.init_without_reversal(solution.rv)
+        x = self.extrapolation.init_without_reversal(solution.rv)
+        x = self.correction.init(x)
         return _FiState(
             t=t,
             u=u,
-            ssv=corrected,
+            ssv=x,
             num_data_points=solution.num_data_points,
         )
 
@@ -189,8 +190,10 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return corrected
 
     # todo: more type-stability in corrections!
-    def _complete_correction(self, x: _FiState, /) -> Tuple[Any, Tuple[_FiState, Any]]:
-        ssv = self.correction.complete(x.ssv)
+    def _complete_correction(
+        self, x: _FiState, /, *, vector_field, p
+    ) -> Tuple[Any, Tuple[_FiState, Any]]:
+        ssv = self.correction.complete(x.ssv, vector_field=vector_field, t=x.t, p=p)
         return _FiState(
             t=x.t,
             u=ssv.extract_qoi(),

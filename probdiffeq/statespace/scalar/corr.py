@@ -18,6 +18,19 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
+    def init(self, x, /):
+        # todo: init error estimate, output scale,
+        #  and maybe observed_state here as well?
+        cache = (jnp.zeros(()),)
+        return _vars.StateSpaceVar(
+            hidden_state=x.hidden_state,
+            observed_state=x.observed_state,
+            error_estimate=x.error_estimate,
+            output_scale_dynamic=x.output_scale_dynamic,
+            cache_extra=x.cache_extra,
+            cache_corr=cache,
+        )
+
     def begin(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
@@ -48,7 +61,7 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
         return m0, m1
 
-    def complete(self, extrapolated, /):
+    def complete(self, extrapolated, /, _vector_field, _t, _p):
         (b,) = extrapolated.cache_corr
         m_ext = extrapolated.hidden_state.mean
         l_ext = extrapolated.hidden_state.cov_sqrtm_lower
@@ -96,6 +109,9 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         (cubature_rule,) = children
         (ode_order,) = aux
         return cls(ode_order=ode_order, cubature_rule=cubature_rule)
+
+    def init(self, s, /):
+        raise NotImplementedError
 
     def begin(self, x: _vars.NormalHiddenState, /, vector_field, t, p):
         raise NotImplementedError
@@ -191,29 +207,34 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
 
     def complete_post_linearize(self, linop, extrapolated, noise):
         # Compute the cubature-correction
-        L0, L1 = (
-            extrapolated.cov_sqrtm_lower[0, :],
-            extrapolated.cov_sqrtm_lower[1, :],
-        )
+        L0 = extrapolated.hidden_state.cov_sqrtm_lower[0, :]
+        L1 = extrapolated.hidden_state.cov_sqrtm_lower[1, :]
         HL = L1 - linop * L0
         std_marg_mat, (r_bw, gain_mat) = _sqrt_util.revert_conditional(
-            R_X=extrapolated.cov_sqrtm_lower.T,
+            R_X=extrapolated.hidden_state.cov_sqrtm_lower.T,
             R_X_F=HL[:, None],
             R_YX=noise.cov_sqrtm_lower[None, None],
         )
 
         # Reshape the matrices into appropriate scalar-valued versions
-        (n,) = extrapolated.mean.shape
+        (n,) = extrapolated.hidden_state.mean.shape
         std_marg = jnp.reshape(std_marg_mat, ())
         gain = jnp.reshape(gain_mat, (n,))
 
         # Catch up the marginals
-        x0, x1 = extrapolated.mean[0], extrapolated.mean[1]
+        x0 = extrapolated.hidden_state.mean[0]
+        x1 = extrapolated.hidden_state.mean[1]
         m_marg = x1 - (linop * x0 + noise.mean)
-        obs = _vars.NormalQOI(m_marg, std_marg)
+        observed = _vars.NormalQOI(m_marg, std_marg)
 
         # Catch up the backward noise and return result
-        m_bw = extrapolated.mean - gain * m_marg
+        m_bw = extrapolated.hidden_state.mean - gain * m_marg
         rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        cor = _vars.StateSpaceVar(rv_cor, cache=None)
-        return obs, cor
+        return _vars.StateSpaceVar(
+            rv_cor,
+            observed_state=observed,
+            error_estimate=extrapolated.error_estimate,
+            output_scale_dynamic=extrapolated.output_scale_dynamic,
+            cache_extra=extrapolated.cache_extra,
+            cache_corr=extrapolated.cache_corr,
+        )

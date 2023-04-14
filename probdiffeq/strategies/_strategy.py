@@ -104,14 +104,18 @@ class Strategy(abc.ABC, Generic[S, P]):
         state = self._begin_correction(state, vector_field=vector_field, p=parameters)
         return state
 
-    def complete(self, state, state_previous, /, *, output_scale):
+    def complete(
+        self, state, state_previous, /, *, vector_field, parameters, output_scale
+    ):
         # todo: make this operate on state-types.
         state = self._complete_extrapolation(
             state,
             state_previous=state_previous,
             output_scale=output_scale,
         )
-        state = self._complete_correction(state)
+        state = self._complete_correction(
+            state, p=parameters, vector_field=vector_field
+        )
         return state
 
     @abc.abstractmethod

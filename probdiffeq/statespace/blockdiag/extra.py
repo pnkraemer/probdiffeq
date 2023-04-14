@@ -22,6 +22,7 @@ def _tree_stack_duplicates(tree, n):
 @jax.tree_util.register_pytree_node_class
 class _BlockDiag(_collections.AbstractExtrapolation):
     def __init__(self, extra, /):
+        # todo: init of superclass?
         self.extra = extra
 
     def __repr__(self):
@@ -46,20 +47,47 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         (extra,) = children
         return cls(extra)
 
+    def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /):
+        solution_fn = jax.vmap(type(self.extra).solution_from_tcoeffs_without_reversal)
+        return solution_fn(self.extra, taylor_coefficients)
+
+    def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
+        solution_fn = jax.vmap(type(self.extra).solution_from_tcoeffs_with_reversal)
+        return solution_fn(self.extra, taylor_coefficients)
+
+    def init_without_reversal(self, rv, /):
+        solution_fn = jax.vmap(type(self.extra).init_without_reversal)
+        return solution_fn(self.extra, rv)
+
+    def init_with_reversal(self, rv, /):
+        solution_fn = jax.vmap(type(self.extra).init_with_reversal)
+        return solution_fn(self.extra, rv)
+
+    def extract_with_reversal(self, s, /):
+        solution_fn = jax.vmap(type(self.extra).extract_with_reversal)
+        return solution_fn(self.extra, s)
+
+    def extract_without_reversal(self, s, /):
+        solution_fn = jax.vmap(type(self.extra).extract_without_reversal)
+
+        # In save-at-mode (i.e. not terminal values), the vmapping requires extra
+        #  vmapping in the `s` variable.
+        # if s.hidden_state.mean.ndim > 2:
+        #     solution_fn = jax.vmap(solution_fn, in_axes=(None, 0))
+
+        return solution_fn(self.extra, s)
+
     def begin(self, s0, /, dt):
         fn = jax.vmap(type(self.extra).begin, in_axes=(0, 0, None))
         return fn(self.extra, s0, dt)
 
-    def complete_without_reversal(self, output_begin, /, s0, output_scale):
-        fn = jax.vmap(type(self.extra).complete_without_reversal)
-        return fn(self.extra, output_begin, s0, output_scale)
+    def complete_without_reversal(self, state, /, state_previous, output_scale):
+        fn = type(self.extra).complete_without_reversal
+        fn_vmap = jax.vmap(fn)
+        return fn_vmap(self.extra, state, state_previous, output_scale)
 
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)
-
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        solution_fn = jax.vmap(type(self.extra).solution_from_tcoeffs)
-        return solution_fn(self.extra, taylor_coefficients)
 
     # todo: move to correction?
     def init_error_estimate(self):

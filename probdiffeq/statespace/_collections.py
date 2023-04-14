@@ -122,7 +122,7 @@ class StateSpaceVar(abc.ABC):
             f"output_scale_dynamic={self.output_scale_dynamic},"
             f"error_estimate={self.error_estimate},"
             f"cache_extra={self.cache_extra},"
-            f"cache_corr={self.cache_corr},"
+            f"cache_corr={self.cache_corr}"
             f")"
         )
 
@@ -298,6 +298,10 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def tree_unflatten(cls, aux, _children):
         (ode_order,) = aux
         return cls(ode_order=ode_order)
+
+    @abc.abstractmethod
+    def init(self, s, /):
+        raise NotImplementedError
 
     @abc.abstractmethod
     def begin(
