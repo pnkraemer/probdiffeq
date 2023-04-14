@@ -2,12 +2,12 @@
 
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace.dense import _vars
 
 # todo:
-#  statistical linear regression (zeroth order)
 #  statistical linear regression (cov-free)
 #  statistical linear regression (Jacobian)
 #  statistical linear regression (Bayesian cubature)
@@ -26,6 +26,8 @@ def ts1(*, fn, m):
 
 def slr1(*, fn, x, cubature_rule):
     """Linearise a function with first-order statistical linear regression."""
+    assert jnp.ndim(x.mean) == 1
+    assert jnp.ndim(x.cov_sqrtm_lower) == 2
     # Create sigma-points
     pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
     pts = x.mean[None, :] + pts_centered
