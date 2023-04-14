@@ -69,7 +69,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             preconditioner_scales=scales,
         )
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
+    def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -85,6 +85,16 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         corr = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
         return _vars.DenseStateSpaceVar(corr, cache=None, target_shape=m0_matrix.shape)
 
+    def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
+        raise RuntimeError  # todo
+
+    def init_without_reversal(self, rv, /):
+        raise RuntimeError  # todo
+
+    def init_with_reversal(self, rv, cond, /):
+        raise RuntimeError  # todo
+
+    # todo: remove
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
@@ -156,6 +166,13 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         ext = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
         return ext, bw_model
 
+    def extract_with_reversal(self, s, /):
+        raise RuntimeError  # todo
+
+    def extract_without_reversal(self, s, /):
+        raise RuntimeError  # todo
+
+    # todo: private (remove sub-functions)
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
@@ -177,3 +194,6 @@ class _DenseIBM(_collections.AbstractExtrapolation):
 
     def promote_output_scale(self, output_scale):
         return output_scale
+
+    def replace_backward_model(self, s, /, backward_model):
+        raise RuntimeError  # todo

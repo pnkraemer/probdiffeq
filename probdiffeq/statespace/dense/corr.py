@@ -151,6 +151,9 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
+    def init(self, s, /):
+        raise RuntimeError  # todo
+
     def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
