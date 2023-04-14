@@ -14,23 +14,59 @@ from probdiffeq.statespace.dense import _conds
 class DenseStateSpaceVar(_collections.StateSpaceVar):
     """State-space variable with dense covariance structure."""
 
-    def __init__(self, hidden_state, *, cache, target_shape):
-        super().__init__(hidden_state=hidden_state, cache=cache)
+    def __init__(self, *args, target_shape, **kwargs):
+        super().__init__(*args, **kwargs)
         self.target_shape = target_shape
 
     def tree_flatten(self):
-        children = (self.hidden_state, self.cache)
+        children = (
+            self.hidden_state,
+            self.observed_state,
+            self.output_scale_dynamic,
+            self.error_estimate,
+            self.cache_extra,
+            self.cache_corr,
+            self.backward_model,
+        )
         aux = (self.target_shape,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (hidden_state, cache) = children
+        (
+            hidden_state,
+            observed_state,
+            output_scale_dynamic,
+            error_estimate,
+            cache_e,
+            cache_c,
+            backward_model,
+        ) = children
         (target_shape,) = aux
-        return cls(hidden_state=hidden_state, cache=cache, target_shape=target_shape)
+        return cls(
+            hidden_state=hidden_state,
+            observed_state=observed_state,
+            output_scale_dynamic=output_scale_dynamic,
+            error_estimate=error_estimate,
+            cache_extra=cache_e,
+            cache_corr=cache_c,
+            backward_model=backward_model,
+            target_shape=target_shape,
+        )
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
+        return (
+            f"{self.__class__.__name__}("
+            f"hidden_state={self.hidden_state},"
+            f"observed_state={self.observed_state},"
+            f"output_scale_dynamic={self.output_scale_dynamic},"
+            f"error_estimate={self.error_estimate},"
+            f"cache_extra={self.cache_extra},"
+            f"cache_corr={self.cache_corr},"
+            f"backward_model={self.backward_model},"
+            f"target_shape={self.target_shape}"
+            f")"
+        )
 
     # todo: move to _conds.DenseConditional(H=E0, noise=noise).observe()
     def observe_qoi(self, observation_std):
@@ -62,7 +98,24 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale)
-        return DenseStateSpaceVar(rv, cache=self.cache, target_shape=self.target_shape)
+
+        rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
+
+        if self.backward_model is not None:
+            backward_model = self.backward_model.scale_covariance(output_scale)
+        else:
+            backward_model = None
+
+        return DenseStateSpaceVar(
+            hidden_state=rv,
+            observed_state=rv_obs,
+            output_scale_dynamic=self.output_scale_dynamic,
+            error_estimate=self.error_estimate,
+            cache_extra=self.cache_extra,
+            cache_corr=self.cache_corr,
+            backward_model=backward_model,
+            target_shape=self.target_shape,
+        )
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:

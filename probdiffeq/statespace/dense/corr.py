@@ -151,8 +151,24 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def init(self, s, /):
-        raise RuntimeError  # todo
+    def init(self, x, /):
+        # jvp_dummy = jax.tree_util.Partial(
+        #     lambda s: s,
+        # )
+        # b_dummy = jnp.zeros(x.target_shape[1:])
+        # cache = (jvp_dummy, (b_dummy,))
+        # print("ok?", jax.tree_util.tree_map(jnp.shape, cache))
+
+        return _vars.DenseStateSpaceVar(
+            hidden_state=x.hidden_state,
+            observed_state=x.observed_state,
+            error_estimate=x.error_estimate,
+            output_scale_dynamic=x.output_scale_dynamic,
+            cache_extra=x.cache_extra,
+            cache_corr=None,
+            target_shape=x.target_shape,
+            backward_model=x.backward_model,
+        )
 
     def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         def ode_residual(s):
@@ -162,7 +178,10 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
             return x1 - fx0
 
         # Linearise the ODE residual (not the vector field!)
+        # todo: can we pass jvp_fn around in a cache?
+        #  If not, we have to rethink the line below.:
         jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=x.hidden_state.mean)
+        cache_corr = jvp_fn, (b,)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
@@ -178,34 +197,49 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, (jvp_fn, (b,))
+        return _vars.DenseStateSpaceVar(
+            x.hidden_state,
+            observed_state=x.observed_state,  # irrelevant
+            output_scale_dynamic=output_scale,
+            error_estimate=error_estimate,
+            cache_extra=x.cache_extra,
+            cache_corr=cache_corr,
+            backward_model=x.backward_model,
+            target_shape=x.target_shape,
+        )
 
-    def complete(self, extrapolated: _vars.DenseStateSpaceVar, cache):
+    def complete(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
         # Assign short-named variables for readability
-        ext = extrapolated
+        print(jax.tree_util.tree_map(jnp.shape, x.cache_corr))
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        jvp_fn, (b,) = cache
+        jvp_fn, (b,) = x.cache_corr
+
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        l_obs_nonsquare = jvp_fn_vect(ext.hidden_state.cov_sqrtm_lower)
+        l_obs_nonsquare = jvp_fn_vect(x.hidden_state.cov_sqrtm_lower)
 
         # Compute the correction matrices
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
+            R_X_F=l_obs_nonsquare.T, R_X=x.hidden_state.cov_sqrtm_lower.T
         )
 
         # Gather the observed variable
         observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T)
 
         # Gather the corrected variable
-        m_cor = ext.hidden_state.mean - gain @ b
-        rv = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        _shape = ext.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
+        m_cor = x.hidden_state.mean - gain @ b
+        corrected = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
 
-        # Return the results
-        return observed, corrected
+        return _vars.DenseStateSpaceVar(
+            corrected,
+            target_shape=x.target_shape,
+            observed_state=observed,
+            output_scale_dynamic=x.output_scale_dynamic,
+            error_estimate=x.error_estimate,
+            cache_extra=x.cache_extra,  # irrelevant
+            cache_corr=None,  # irrelevant
+            backward_model=x.backward_model,
+        )
 
 
 @jax.tree_util.register_pytree_node_class

@@ -127,7 +127,7 @@ class StateSpaceVar(abc.ABC):
             f"output_scale_dynamic={self.output_scale_dynamic},"
             f"error_estimate={self.error_estimate},"
             f"cache_extra={self.cache_extra},"
-            f"cache_corr={self.cache_corr}"
+            f"cache_corr={self.cache_corr},"
             f"backward_model={self.backward_model}"
             f")"
         )

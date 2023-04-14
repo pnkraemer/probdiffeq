@@ -41,6 +41,10 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
 
+    @property
+    def target_shape(self):
+        return (self.num_derivatives + 1,) + self.ode_shape
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         args3 = f"ode_shape={self.ode_shape}"
@@ -70,26 +74,53 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         )
 
     def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /):
+        c_sqrtm0_corrected, m0_corrected, m0_matrix = self._stack_tcoeffs(
+            taylor_coefficients
+        )
+        return _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+
+    def _stack_tcoeffs(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
             raise ValueError(msg1 + msg2)
-
         if taylor_coefficients[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
-
         m0_matrix = jnp.stack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        corr = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        return _vars.DenseStateSpaceVar(corr, cache=None, target_shape=m0_matrix.shape)
+        return c_sqrtm0_corrected, m0_corrected, m0_matrix
 
     def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
         raise RuntimeError  # todo
 
     def init_without_reversal(self, rv, /):
-        raise RuntimeError  # todo
+        observed = _vars.DenseNormal(
+            mean=jnp.zeros(self.ode_shape),
+            cov_sqrtm_lower=jnp.zeros(self.ode_shape + self.ode_shape),
+        )
+
+        error_estimate = jnp.zeros(self.ode_shape)
+        output_scale_dynamic = jnp.empty(())
+
+        # Prepare caches
+        # todo: no need to initialise those?
+        #  Only 'observed' should be allocated ahead of time.
+        m_like = jnp.empty_like(rv.mean)
+        p_like = m_like
+        cache_extra = (m_like, m_like, p_like, p_like)
+
+        return _vars.DenseStateSpaceVar(
+            rv,
+            observed_state=observed,
+            output_scale_dynamic=output_scale_dynamic,
+            error_estimate=error_estimate,
+            cache_extra=cache_extra,
+            cache_corr=None,
+            backward_model=None,
+            target_shape=self.target_shape,
+        )
 
     def init_with_reversal(self, rv, cond, /):
         raise RuntimeError  # todo
@@ -109,8 +140,20 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm)
         cache = (m_ext_p, m0_p, p, p_inv)
-        ssv = _vars.DenseStateSpaceVar(ext, target_shape=shape, cache=cache)
-        return ssv
+
+        # todo: only initialise meaningful values.
+        #  Error, scale, cache_corr, etc., should be None.
+        #  Backward_model should be None (for both, begin_without* and begin_with*)
+        return _vars.DenseStateSpaceVar(
+            ext,
+            observed_state=s0.observed_state,
+            output_scale_dynamic=s0.output_scale_dynamic,
+            error_estimate=s0.error_estimate,
+            cache_corr=s0.cache_corr,
+            target_shape=shape,
+            backward_model=s0.backward_model,
+            cache_extra=cache,
+        )
 
     def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
@@ -121,20 +164,31 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_without_reversal(self, output_begin, /, s0, output_scale):
-        _, _, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def complete_without_reversal(self, state, /, state_previous, output_scale):
+        _, _, p, p_inv = state.cache_extra
+        m_ext = state.hidden_state.mean
+        l0 = state_previous.hidden_state.cov_sqrtm_lower
+
+        l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
-                (self.a @ (p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower)).T,
+                (self.a @ l0_p).T,
                 (output_scale * self.q_sqrtm_lower).T,
             )
         ).T
         l_ext = p[:, None] * l_ext_p
 
-        shape = output_begin.target_shape
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.DenseStateSpaceVar(rv, cache=None, target_shape=shape)
+        return _vars.DenseStateSpaceVar(
+            rv,
+            target_shape=state.target_shape,
+            backward_model=state.backward_model,
+            output_scale_dynamic=state.output_scale_dynamic,
+            error_estimate=state.error_estimate,
+            observed_state=state.observed_state,
+            cache_extra=state.cache_extra,
+            cache_corr=state.cache_corr,
+        )
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
@@ -170,7 +224,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         raise RuntimeError  # todo
 
     def extract_without_reversal(self, s, /):
-        raise RuntimeError  # todo
+        return s.hidden_state
 
     # todo: private (remove sub-functions)
     def init_conditional(self, ssv_proto):
