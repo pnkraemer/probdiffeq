@@ -322,7 +322,6 @@ class MLESolver(AbstractSolver):
 
     def extract(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
-
         t, u, marginals, posterior = self.strategy.extract(state.strategy)
 
         # promote calibrated scale to the correct batch-shape
@@ -339,16 +338,14 @@ class MLESolver(AbstractSolver):
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
-
-        _sol = self.strategy.extract_at_terminal_values(state.strategy)
-        t, u, marginals, posterior = _sol
+        t, u, marg, posterior = self.strategy.extract_at_terminal_values(state.strategy)
 
         s = state.output_scale_calibrated
-        marginals, state = self._rescale_covs(marginals, state, output_scale=s)
+        marg, state = self._rescale_covs(marg, state, output_scale=s)
         return solution.Solution(
             t=t,
             u=state.u,
-            marginals=marginals,
+            marginals=marg,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
             num_data_points=self.strategy.num_data_points(state.strategy),

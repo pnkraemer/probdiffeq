@@ -19,17 +19,19 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         return f"<TS0 with ode_order={self.ode_order}>"
 
     def init(self, x, /):
-        # todo: init error estimate, output scale,
-        #  and maybe observed_state here as well?
-        cache = (jnp.zeros(()),)
+        mean_like = jnp.zeros(())
+        cholesky_like = jnp.zeros(())
+        observed_like = _vars.NormalQOI(mean=mean_like, cov_sqrtm_lower=cholesky_like)
+        error_estimate = jnp.empty(())
         return _vars.SSV(
+            observed_state=observed_like,
+            error_estimate=error_estimate,
             hidden_state=x.hidden_state,
-            observed_state=x.observed_state,
-            error_estimate=x.error_estimate,
-            output_scale_dynamic=x.output_scale_dynamic,
-            cache_extra=x.cache_extra,
-            cache_corr=cache,
+            hidden_shape=x.hidden_shape,
             backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
     def begin(self, x: _vars.SSV, /, vector_field, t, p):
@@ -41,13 +43,14 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
         return _vars.SSV(
-            hidden_state=x.hidden_state,
-            observed_state=observed,
             error_estimate=error_estimate,
             output_scale_dynamic=output_scale,
-            cache_extra=x.cache_extra,
             cache_corr=cache,
+            hidden_state=x.hidden_state,
+            hidden_shape=x.hidden_shape,
+            cache_extra=x.cache_extra,
             backward_model=x.backward_model,
+            observed_state=None,
         )
 
     def marginalise_observation(self, fx, m1, x):
@@ -63,10 +66,10 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
         m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
         return m0, m1
 
-    def complete(self, extrapolated, /, _vector_field, _t, _p):
-        (b,) = extrapolated.cache_corr
-        m_ext = extrapolated.hidden_state.mean
-        l_ext = extrapolated.hidden_state.cov_sqrtm_lower
+    def complete(self, x, /, _vector_field, _t, _p):
+        (b,) = x.cache_corr
+        m_ext = x.hidden_state.mean
+        l_ext = x.hidden_state.cov_sqrtm_lower
 
         l_obs_nonsquare = l_ext[self.ode_order, :]
         r_obs_mat, (r_cor, gain_mat) = _sqrt_util.revert_conditional_noisefree(
@@ -79,13 +82,14 @@ class _TaylorZerothOrder(_collections.AbstractCorrection):
 
         rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         return _vars.SSV(
-            rv_cor,
+            hidden_state=rv_cor,
             observed_state=observed,
-            error_estimate=extrapolated.error_estimate,
-            output_scale_dynamic=extrapolated.output_scale_dynamic,
-            cache_extra=extrapolated.cache_extra,
-            cache_corr=extrapolated.cache_corr,
-            backward_model=extrapolated.backward_model,
+            hidden_shape=x.hidden_shape,
+            error_estimate=x.error_estimate,
+            backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
 
@@ -236,9 +240,10 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
         return _vars.SSV(
             rv_cor,
             observed_state=observed,
+            hidden_shape=extrapolated.hidden_shape,
             error_estimate=extrapolated.error_estimate,
-            output_scale_dynamic=extrapolated.output_scale_dynamic,
             cache_extra=extrapolated.cache_extra,
-            cache_corr=extrapolated.cache_corr,
             backward_model=extrapolated.backward_model,
+            output_scale_dynamic=None,
+            cache_corr=None,
         )

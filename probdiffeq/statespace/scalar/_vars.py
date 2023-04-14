@@ -105,11 +105,12 @@ class SSV(_collections.SSV):
         return SSV(
             hidden_state=rv,
             observed_state=rv_obs,
+            backward_model=backward_model,
+            hidden_shape=self.hidden_shape,
             output_scale_dynamic=self.output_scale_dynamic,
             error_estimate=self.error_estimate,
             cache_extra=self.cache_extra,
             cache_corr=self.cache_corr,
-            backward_model=backward_model,
         )
 
     def marginal_nth_derivative(self, n):

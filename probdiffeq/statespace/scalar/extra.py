@@ -62,49 +62,29 @@ class _IBM(_collections.AbstractExtrapolation):
         return _conds.ConditionalHiddenState(op, noise=noi)
 
     def init_with_reversal(self, rv, cond, /):
-        observed = _vars.NormalQOI(mean=jnp.zeros(()), cov_sqrtm_lower=jnp.zeros(()))
-
-        error_estimate = jnp.empty(())
-        output_scale_dynamic = jnp.empty(())
-
-        # Prepare caches
-        # todo: no need to initialise those?
-        #  Only 'observed' should be allocated ahead of time.
-        m_like = jnp.empty(rv.mean.shape)
-        p_like = m_like
-        cache_extra = (m_like, m_like, p_like, p_like)
-
         return _vars.SSV(
             rv,
-            observed_state=observed,
-            output_scale_dynamic=output_scale_dynamic,
-            error_estimate=error_estimate,
-            cache_extra=cache_extra,
-            cache_corr=None,
             backward_model=cond,
+            hidden_shape=rv.mean.shape,
+            observed_state=None,
+            output_scale_dynamic=None,
+            error_estimate=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
     def init_without_reversal(self, rv, /):
-        observed = _vars.NormalQOI(mean=jnp.zeros(()), cov_sqrtm_lower=jnp.zeros(()))
-
-        error_estimate = jnp.empty(())
-        output_scale_dynamic = jnp.empty(())
-
         # Prepare caches
-        # todo: no need to initialise those?
-        #  Only 'observed' should be allocated ahead of time.
-        m_like = jnp.empty(rv.mean.shape)
-        p_like = m_like
-        cache_extra = (m_like, m_like, p_like, p_like)
 
         return _vars.SSV(
             rv,
-            observed_state=observed,
-            output_scale_dynamic=output_scale_dynamic,
-            error_estimate=error_estimate,
-            cache_extra=cache_extra,
-            cache_corr=None,
+            hidden_shape=rv.mean.shape,
             backward_model=None,
+            observed_state=None,
+            output_scale_dynamic=None,
+            error_estimate=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
     def extract_without_reversal(self, s, /):
@@ -121,13 +101,16 @@ class _IBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
         return _vars.SSV(
-            extrapolated,
-            observed_state=s0.observed_state,
-            error_estimate=s0.error_estimate,
-            output_scale_dynamic=s0.output_scale_dynamic,
-            cache_corr=s0.cache_corr,
+            hidden_state=extrapolated,
             cache_extra=(m_ext_p, m0_p, p, p_inv),
+            hidden_shape=s0.hidden_shape,
             backward_model=s0.backward_model,  # irrelevant
+            output_scale_dynamic=None,
+            cache_corr=None,
+            # todo: The below should not be necessary
+            #  but currently, it is: because of pytree-shape stability in interpolation
+            observed_state=jax.tree_util.tree_map(jnp.zeros_like, s0.observed_state),
+            error_estimate=jax.tree_util.tree_map(jnp.zeros_like, s0.error_estimate),
         )
 
     def _assemble_preconditioner(self, dt):
@@ -151,12 +134,13 @@ class _IBM(_collections.AbstractExtrapolation):
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.SSV(
             rv,
+            hidden_shape=state.hidden_shape,
             observed_state=state.observed_state,
             error_estimate=state.error_estimate,
-            output_scale_dynamic=state.output_scale_dynamic,
-            cache_extra=state.cache_extra,
             cache_corr=state.cache_corr,
-            backward_model=state.backward_model,
+            backward_model=None,
+            output_scale_dynamic=None,
+            cache_extra=None,
         )
 
     def complete_with_reversal(self, state, /, state_previous, output_scale):
@@ -185,12 +169,13 @@ class _IBM(_collections.AbstractExtrapolation):
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.SSV(
             rv,
-            observed_state=state.observed_state,
-            error_estimate=state.error_estimate,
-            output_scale_dynamic=state.output_scale_dynamic,
-            cache_extra=state.cache_extra,
-            cache_corr=state.cache_corr,
             backward_model=bw_model,
+            hidden_shape=state.hidden_shape,
+            error_estimate=state.error_estimate,
+            cache_corr=state.cache_corr,
+            observed_state=state.observed_state,  # usually None?
+            output_scale_dynamic=None,
+            cache_extra=None,
         )
 
     def promote_output_scale(self, output_scale):
@@ -199,6 +184,7 @@ class _IBM(_collections.AbstractExtrapolation):
     def replace_backward_model(self, s, /, backward_model):
         return _vars.SSV(
             hidden_state=s.hidden_state,
+            hidden_shape=s.hidden_shape,
             output_scale_dynamic=s.output_scale_dynamic,
             error_estimate=s.error_estimate,
             observed_state=s.observed_state,

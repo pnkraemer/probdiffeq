@@ -63,20 +63,21 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         )
 
     def init(self, x, /):
-        # todo: init error estimate, output scale,
-        #  and maybe observed_state here as well?
-        cache = None
-
-        # todo: if it is a per-step cache, why does it have to be allocated in advance?
-        # Should not be necessary!
+        mean_like = jnp.zeros(self.ode_shape)
+        cholesky_like = jnp.zeros(self.ode_shape)
+        observed_like = scalar_vars.NormalQOI(
+            mean=mean_like, cov_sqrtm_lower=cholesky_like
+        )
+        error_estimate = jnp.zeros(self.ode_shape)
         return scalar_vars.SSV(
+            observed_state=observed_like,
+            error_estimate=error_estimate,
             hidden_state=x.hidden_state,
-            observed_state=x.observed_state,
-            error_estimate=x.error_estimate,
-            output_scale_dynamic=x.output_scale_dynamic,
-            cache_extra=x.cache_extra,
-            cache_corr=cache,
+            hidden_shape=x.hidden_shape,
             backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
     def begin(self, extrapolated, /, vector_field, t, p):
@@ -99,13 +100,14 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
             self._mm, fx_mean, fx_centered_normed, extrapolated.hidden_state
         )
         return scalar_vars.SSV(
-            hidden_state=extrapolated.hidden_state,
-            observed_state=extrapolated.observed_state,
             error_estimate=output_scale * error_estimate,
             output_scale_dynamic=output_scale,
+            hidden_state=extrapolated.hidden_state,
+            hidden_shape=extrapolated.hidden_shape,
+            observed_state=extrapolated.observed_state,
             cache_extra=extrapolated.cache_extra,
-            cache_corr=None,
             backward_model=extrapolated.backward_model,
+            cache_corr=None,
         )
 
     def complete(self, extrapolated, vector_field, t, p):
@@ -188,13 +190,14 @@ class _BlockDiag(_collections.AbstractCorrection):
         error_estimate = obs_unbatch.cov_sqrtm_lower
 
         return scalar_vars.SSV(
-            hidden_state=x.hidden_state,
-            observed_state=x.observed_state,
             error_estimate=output_scale * error_estimate,
             output_scale_dynamic=output_scale,
-            cache_extra=x.cache_extra,
             cache_corr=cache,
+            hidden_state=x.hidden_state,
+            hidden_shape=x.hidden_shape,
+            cache_extra=x.cache_extra,
             backward_model=x.backward_model,
+            observed_state=None,
         )
 
     def complete(self, extrapolated, /, vector_field, t, p):
