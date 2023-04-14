@@ -64,16 +64,12 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     tols = {"atol": 1e-2, "rtol": 1e-2}
     assert jnp.allclose(fp_smo_sol.t, smo_sol.t, **tols)
     assert jnp.allclose(fp_smo_sol.u, smo_sol.u, **tols)
-    assert jnp.allclose(
-        fp_smo_sol.marginals.hidden_state.mean,
-        smo_sol.marginals.hidden_state.mean,
-        **tols
-    )
-    assert jnp.allclose(
-        fp_smo_sol.posterior.backward_model.noise.mean,
-        smo_sol.posterior.backward_model.noise.mean,
-        **tols
-    )
+    smo_mean = smo_sol.marginals.mean
+    fp_smo_mean = fp_smo_sol.marginals.mean
+    assert jnp.allclose(fp_smo_mean, smo_mean, **tols), (fp_smo_mean, smo_mean)
+    smo_mean = smo_sol.posterior.backward_model.noise.mean
+    fp_smo_mean = fp_smo_sol.posterior.backward_model.noise.mean
+    assert jnp.allclose(fp_smo_mean, smo_mean, **tols)
     assert jnp.allclose(fp_smo_sol.output_scale, smo_sol.output_scale, **tols)
 
     # covariances are equal, but cov_sqrtm_lower might not be
@@ -81,8 +77,8 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     def cov(x):
         return jnp.einsum("...jk,...lk->...jl", x, x)
 
-    l0 = fp_smo_sol.marginals.hidden_state.cov_sqrtm_lower
-    l1 = smo_sol.marginals.hidden_state.cov_sqrtm_lower
+    l0 = fp_smo_sol.marginals.cov_sqrtm_lower
+    l1 = smo_sol.marginals.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1), **tols)
 
     l0 = fp_smo_sol.posterior.backward_model.noise.cov_sqrtm_lower

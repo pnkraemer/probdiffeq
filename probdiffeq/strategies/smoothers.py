@@ -198,13 +198,14 @@ class _SmootherCommon(_strategy.Strategy):
 
     def extract(self, state: _SmState, /) -> _SolType:
         init, bw_model = self.extrapolation.extract_with_reversal(state.ssv)
-        u = state.ssv.extract_qoi()
         markov_seq = MarkovSequence(
             init=init,
             backward_model=bw_model,
             num_data_points=state.num_data_points,
         )
         marginals = self._extract_marginals(markov_seq)
+        u = marginals.extract_qoi()
+
         return state.t, u, marginals, markov_seq
 
     def extract_at_terminal_values(self, state: _SmState, /) -> _SolType:
@@ -246,17 +247,21 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
     # # todo: should this be a classmethod of MarkovSequence?
-    # def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
-    #     init_conditional_fn = self.extrapolation.init_conditional
-    #     bw_model = init_conditional_fn(ssv_proto=posterior.corrected)
-    #     return _SmState(
-    #         t=posterior.t,
-    #         u=posterior.u,
-    #         extrapolated=posterior.extrapolated,
-    #         corrected=posterior.corrected,
-    #         backward_model=bw_model,
-    #         num_data_points=posterior.num_data_points,
-    #     )
+    def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
+
+        # todo: this should be the init() method of a fixed-point extrapolation model
+        #  once this is implemented, we can use simulate_terminal_values() between
+        #  checkpoints and remove sooo much code.
+        ssv = self.extrapolation.duplicate_with_unit_backward_model(posterior.ssv)
+        #
+        # init_conditional_fn = self.extrapolation.init_conditional
+        # bw_model = init_conditional_fn(ssv_proto=posterior.corrected)
+        return _SmState(
+            t=posterior.t,
+            u=posterior.u,
+            ssv=ssv,
+            num_data_points=posterior.num_data_points,
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -284,8 +289,8 @@ class Smoother(_SmootherCommon):
     ) -> InterpRes[_SmState]:
         # todo: is this duplication unnecessary?
         # accepted = self._duplicate_with_unit_backward_model(s1)
-        accepted = s1
-        return InterpRes(accepted=accepted, solution=s1, previous=s1)
+        # accepted = s1
+        return InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
@@ -304,8 +309,6 @@ class Smoother(_SmootherCommon):
         posterior0 = _SmState(
             t=t,
             u=extrapolated0.extract_qoi(),
-            # 'corrected' is the solution. We interpolate to get the value for
-            # 'corrected' at time 't', which is exactly what happens.
             ssv=extrapolated0,
             num_data_points=s0.num_data_points,
         )
@@ -408,10 +411,11 @@ class FixedPointSmoother(_SmootherCommon):
             num_data_points=s1.num_data_points,
         )
 
-        # accepted = self._duplicate_with_unit_backward_model(solution)
-        accepted = solution
 
+        accepted = self._duplicate_with_unit_backward_model(solution)
+        # accepted = solution
         previous = accepted
+
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
@@ -432,21 +436,19 @@ class FixedPointSmoother(_SmootherCommon):
             t=t,
             t0=s0.t,
         )
-        bw0 = ssv0.backward_model
-        backward_model0 = s0.ssv.backward_model.merge_with_incoming_conditional(bw0)
-        ssv0 = self.extrapolation.replace_backward_model(
+        backward_model0 = s0.ssv.backward_model.merge_with_incoming_conditional(ssv0.backward_model)
+        ssv0_ = self.extrapolation.replace_backward_model(
             ssv0, backward_model=backward_model0
         )
 
         solution = _SmState(
             t=t,
-            u=ssv0.extract_qoi(),
-            ssv=ssv0,
+            u=ssv0_.extract_qoi(),
+            ssv=ssv0_,
             num_data_points=s0.num_data_points,
         )
-
-        # previous = self._duplicate_with_unit_backward_model(solution)
-        previous = solution
+        previous = self._duplicate_with_unit_backward_model(solution)
+        # previous = solution
 
         extra1 = self._interpolate_from_t0_to_t(
             rv=ssv0, output_scale=output_scale, t=s1.t, t0=t
