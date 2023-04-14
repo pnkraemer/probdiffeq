@@ -160,25 +160,25 @@ class CalibrationFreeSolver(AbstractSolver):
     """
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self.strategy.begin(
-            state.strategy,
-            t=state.t,
+        state_strategy_previous = state.strategy
+        state_strategy = self.strategy.begin(
+            state_strategy_previous,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
 
-        _, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
+            state_strategy_previous,
+            parameters=parameters,
+            vector_field=vector_field,
             output_scale=state.output_scale_prior,
         )
 
         # Extract and return solution
         return _State(
-            error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             # Nothing happens in the field below:
             #  but we cannot use "None" if we want to reuse the init()
@@ -219,25 +219,25 @@ class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, output_scale, cache_obs) = self.strategy.begin(
-            state.strategy,
-            t=state.t,
+        state_strategy_previous = state.strategy
+        state_strategy = self.strategy.begin(
+            state_strategy_previous,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
-
-        _, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        output_scale = state_strategy.ssv.output_scale_dynamic
+        state_strategy = self.strategy.complete(
+            state_strategy,
+            state_strategy_previous,
             output_scale=output_scale,
+            parameters=parameters,
+            vector_field=vector_field,
         )
 
         # Return solution
         return _State(
-            error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_calibrated=output_scale,
             # current scale becomes the new prior scale!
             #  this is because dynamic solvers assume a piecewise-constant model
@@ -285,9 +285,9 @@ class MLESolver(AbstractSolver):
         state_strategy = self.strategy.complete(
             state_strategy,
             state_strategy_previous,
+            output_scale=state.output_scale_prior,
             parameters=parameters,
             vector_field=vector_field,
-            output_scale=state.output_scale_prior,
         )
 
         # Calibrate

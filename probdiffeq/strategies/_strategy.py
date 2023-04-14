@@ -78,7 +78,7 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _begin_correction(self, output_extra: S, /, *, vector_field, t, p):
+    def _begin_correction(self, output_extra: S, /, *, vector_field, p):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -99,7 +99,6 @@ class Strategy(abc.ABC, Generic[S, P]):
         return self.extrapolation.promote_output_scale(*args, **kwargs)
 
     def begin(self, state: S, /, *, dt, parameters, vector_field):
-        # todo (next!): make this return a state-type.
         state = self._begin_extrapolation(state, dt=dt)
         state = self._begin_correction(state, vector_field=vector_field, p=parameters)
         return state
@@ -107,7 +106,6 @@ class Strategy(abc.ABC, Generic[S, P]):
     def complete(
         self, state, state_previous, /, *, vector_field, parameters, output_scale
     ):
-        # todo: make this operate on state-types.
         state = self._complete_extrapolation(
             state,
             state_previous=state_previous,
