@@ -152,22 +152,19 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
     def init(self, x, /):
-        # jvp_dummy = jax.tree_util.Partial(
-        #     lambda s: s,
-        # )
-        # b_dummy = jnp.zeros(x.target_shape[1:])
-        # cache = (jvp_dummy, (b_dummy,))
-        # print("ok?", jax.tree_util.tree_map(jnp.shape, cache))
-
+        m_like = jnp.zeros(self.ode_shape)
+        cholesky_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        observed_like = _vars.DenseNormal(mean=m_like, cov_sqrtm_lower=cholesky_like)
+        error_estimate = jnp.zeros(self.ode_shape)
         return _vars.DenseSSV(
+            observed_state=observed_like,
+            error_estimate=error_estimate,
             hidden_state=x.hidden_state,
-            observed_state=x.observed_state,
-            error_estimate=x.error_estimate,
-            output_scale_dynamic=x.output_scale_dynamic,
+            hidden_shape=x.hidden_shape,
             cache_extra=x.cache_extra,
-            cache_corr=None,
-            target_shape=x.target_shape,
             backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_corr=None,
         )
 
     def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
@@ -198,20 +195,17 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
         error_estimate = output_scale * error_estimate_unscaled
 
         return _vars.DenseSSV(
-            x.hidden_state,
-            observed_state=x.observed_state,  # irrelevant
             output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
-            cache_extra=x.cache_extra,
             cache_corr=cache_corr,
+            hidden_state=x.hidden_state,
+            hidden_shape=x.hidden_shape,
+            cache_extra=x.cache_extra,
             backward_model=x.backward_model,
-            target_shape=x.target_shape,
+            observed_state=None,
         )
 
     def complete(self, x: _vars.DenseSSV, /, vector_field, t, p):
-        # Assign short-named variables for readability
-        print(jax.tree_util.tree_map(jnp.shape, x.cache_corr))
-
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         jvp_fn, (b,) = x.cache_corr
 
@@ -232,13 +226,13 @@ class _DenseTaylorFirstOrder(_collections.AbstractCorrection):
 
         return _vars.DenseSSV(
             corrected,
-            target_shape=x.target_shape,
             observed_state=observed,
-            output_scale_dynamic=x.output_scale_dynamic,
+            hidden_shape=x.hidden_shape,
             error_estimate=x.error_estimate,
-            cache_extra=x.cache_extra,  # irrelevant
-            cache_corr=None,  # irrelevant
             backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
         )
 
 

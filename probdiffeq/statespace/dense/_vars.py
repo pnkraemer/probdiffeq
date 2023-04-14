@@ -19,7 +19,7 @@ class DenseSSV(_collections.SSV):
         hc = self._select_derivative_vect(self.hidden_state.cov_sqrtm_lower, 0)
         m_obs = self._select_derivative(self.hidden_state.mean, 0)
 
-        r_yx = observation_std * jnp.eye(self.target_shape[1])
+        r_yx = observation_std * jnp.eye(self.hidden_shape[1])
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional(
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
@@ -27,7 +27,7 @@ class DenseSSV(_collections.SSV):
         obs = DenseNormal(m_obs, r_obs.T)
 
         noise = DenseNormal(m_cor, r_cor.T)
-        cor = _conds.DenseConditional(gain, noise=noise, target_shape=self.target_shape)
+        cor = _conds.DenseConditional(gain, noise=noise, target_shape=self.hidden_shape)
         return obs, cor
 
     def extract_qoi(self):
@@ -39,12 +39,11 @@ class DenseSSV(_collections.SSV):
 
     def extract_qoi_from_sample(self, u, /):
         if u.ndim == 1:
-            return u.reshape(self.target_shape, order="F")[0, ...]
+            return u.reshape(self.hidden_shape, order="F")[0, ...]
         return jax.vmap(self.extract_qoi_from_sample)(u)
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale)
-
         rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
 
         if self.backward_model is not None:
@@ -55,12 +54,12 @@ class DenseSSV(_collections.SSV):
         return DenseSSV(
             hidden_state=rv,
             observed_state=rv_obs,
+            backward_model=backward_model,
             output_scale_dynamic=self.output_scale_dynamic,
             error_estimate=self.error_estimate,
             cache_extra=self.cache_extra,
             cache_corr=self.cache_corr,
-            backward_model=backward_model,
-            target_shape=self.target_shape,
+            hidden_shape=self.hidden_shape,
         )
 
     def marginal_nth_derivative(self, n):
@@ -70,7 +69,7 @@ class DenseSSV(_collections.SSV):
             vect_fn = jax.vmap(fn, in_axes=(0, None))
             return vect_fn(self, n)
 
-        if n >= self.target_shape[0]:
+        if n >= self.hidden_shape[0]:
             msg = f"The {n}th derivative not available in the state-space variable."
             raise ValueError(msg)
 
@@ -89,7 +88,7 @@ class DenseSSV(_collections.SSV):
         return select(x)
 
     def _select_derivative(self, x, i):
-        x_reshaped = jnp.reshape(x, self.target_shape, order="F")
+        x_reshaped = jnp.reshape(x, self.hidden_shape, order="F")
         return x_reshaped[i, ...]
 
 

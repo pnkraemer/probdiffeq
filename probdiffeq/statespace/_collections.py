@@ -8,7 +8,8 @@ import jax
 # todo: split into multiple files.
 
 
-# todo: necessary? All "normal" information should be encapsulated in the implementations.
+# todo: necessary? All "normal" information should be
+#  encapsulated in the implementations.
 class AbstractNormal(abc.ABC):
     """Normal-distributed random variables.
 
@@ -66,11 +67,20 @@ class SSV(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
+    # todo: hidden_state & hidden_shape are important for extrapolation and correction.
+    #  The others uniquely correspond to either one, so why don't we access
+    #  ssv.hidden_shape, ssv.hidden_shape
+    #  ssv.extrapolation.backward_model, ssv.extrapolation.cache
+    #  ssv.correction.error_estimate, ssv.correction.output_scale_dynamic,
+    #  ssv.correction.cache, ssv.correction.observed, ...
+    #  which would simplify SSV to
+    #  SSV(hidden_state, /, *, hidden_shape, extrapolation: T, correction: S)
+    #  and we think less about which quantity is None at which step.
     def __init__(
         self,
         hidden_state,
         *,
-        hidden_shape,
+        hidden_shape,  # not always = hidden_state.shape! E.g. vectorised SSMs.
         observed_state,
         error_estimate,
         backward_model,
