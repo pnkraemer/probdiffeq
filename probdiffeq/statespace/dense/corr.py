@@ -77,6 +77,22 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
+    def init(self, x, /):
+        m_like = jnp.zeros(self.ode_shape)
+        cholesky_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        observed_like = _vars.DenseNormal(mean=m_like, cov_sqrtm_lower=cholesky_like)
+        error_estimate = jnp.zeros(self.ode_shape)
+        return _vars.DenseSSV(
+            observed_state=observed_like,
+            error_estimate=error_estimate,
+            hidden_state=x.hidden_state,
+            hidden_shape=x.hidden_shape,
+            cache_extra=x.cache_extra,
+            backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_corr=None,
+        )
+
     def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         m0 = self.e0(x.hidden_state.mean)
         m1 = self.e1(x.hidden_state.mean)
@@ -102,28 +118,43 @@ class _DenseTaylorZerothOrder(_collections.AbstractCorrection):
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, (b,)
+        return _vars.DenseSSV(
+            output_scale_dynamic=output_scale,
+            error_estimate=error_estimate,
+            cache_corr=(b,),
+            hidden_state=x.hidden_state,
+            hidden_shape=x.hidden_shape,
+            cache_extra=x.cache_extra,
+            backward_model=x.backward_model,
+            observed_state=None,
+        )
 
-    def complete(self, extrapolated, cache):
-        ext = extrapolated  # alias for readability
-        l_obs_nonsquare = self.e1_vect(ext.hidden_state.cov_sqrtm_lower)
+    def complete(self, x: _vars.DenseSSV, /, vector_field, t, p):
+        l_obs_nonsquare = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
 
         # Compute correction according to ext -> obs
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
+            R_X_F=l_obs_nonsquare.T, R_X=x.hidden_state.cov_sqrtm_lower.T
         )
 
         # Gather observation terms
-        (b,) = cache
+        (b,) = x.cache_corr
         observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T)
 
         # Gather correction terms
-        m_cor = ext.hidden_state.mean - gain @ b
-        cor = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        _shape = ext.target_shape
-        corrected = _vars.DenseSSV(cor, cache=None, target_shape=_shape)
-        return observed, corrected
+        m_cor = x.hidden_state.mean - gain @ b
+        corrected = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+
+        return _vars.DenseSSV(
+            corrected,
+            observed_state=observed,
+            hidden_shape=x.hidden_shape,
+            error_estimate=x.error_estimate,
+            backward_model=x.backward_model,
+            output_scale_dynamic=None,
+            cache_extra=None,
+            cache_corr=None,
+        )
 
 
 @jax.tree_util.register_pytree_node_class

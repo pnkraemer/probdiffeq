@@ -231,7 +231,7 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         )
 
     def extract_with_reversal(self, s, /):
-        raise RuntimeError  # todo
+        return s.hidden_state, s.backward_model
 
     def extract_without_reversal(self, s, /):
         return s.hidden_state
@@ -241,4 +241,13 @@ class _DenseIBM(_collections.AbstractExtrapolation):
         return output_scale
 
     def replace_backward_model(self, s, /, backward_model):
-        raise RuntimeError  # todo
+        return _vars.DenseSSV(
+            s.hidden_state,
+            backward_model=backward_model,  # new
+            hidden_shape=s.hidden_shape,
+            observed_state=s.observed_state,
+            error_estimate=s.error_estimate,
+            output_scale_dynamic=s.output_scale_dynamic,
+            cache_extra=s.cache_extra,
+            cache_corr=s.cache_corr,
+        )

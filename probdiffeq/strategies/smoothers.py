@@ -198,24 +198,24 @@ class _SmootherCommon(_strategy.Strategy):
 
     def extract(self, state: _SmState, /) -> _SolType:
         init, bw_model = self.extrapolation.extract_with_reversal(state.ssv)
+        u = state.ssv.extract_qoi()
         markov_seq = MarkovSequence(
             init=init,
             backward_model=bw_model,
             num_data_points=state.num_data_points,
         )
         marginals = self._extract_marginals(markov_seq)
-        u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
     def extract_at_terminal_values(self, state: _SmState, /) -> _SolType:
         init, bw_model = self.extrapolation.extract_with_reversal(state.ssv)
+        u = state.ssv.extract_qoi()
         markov_seq = MarkovSequence(
             init=init,
             backward_model=bw_model,
             num_data_points=state.num_data_points,
         )
         marginals = state.ssv.hidden_state
-        u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
     def _extract_marginals(self, posterior: MarkovSequence, /):

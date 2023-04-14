@@ -76,6 +76,33 @@ class SSV(abc.ABC):
     #  which would simplify SSV to
     #  SSV(hidden_state, /, *, hidden_shape, extrapolation: T, correction: S)
     #  and we think less about which quantity is None at which step.
+    #  In other words: SSV() is getting too powerful.
+    #
+    # todo: change SSV to only contain hidden_shape and hidden_state.
+    #  then, extrapolation and correction models have their own types
+    #  and we aim for:
+    #     # x, ex, co = strategy.init(**sol)
+    #     x, ex = extra.init(*sol)
+    #     x, co = corr.init(x)
+    #     for _ in range(10):
+    #         # x, ex, co = strategy.begin(x, **pro_ex, **pro_co)
+    #         x, ex = extra.begin(x, ex, **pro_ex)
+    #         x, co = corr.begin(x, co, **pro_co)
+    #         # x, ex, co = strategy.complete(x, **pro_ex, **pro_co)
+    #         x, ex = extra.complete(x, ex, **pro_ex)
+    #         x, co = corr.complete(x, co, **pro_sol)
+    #         # sol = strategy.extract(x, ex, co)
+    #         yield extra.extract(corr.extract(x, co), ex)
+    #     x: hidden_state, hidden_shape(optional)
+    #     ex: backward_model(optional), cache_extra(tmp)
+    #     co: error_estimate, observed, output_scale_dynamic(tmp?), cache_corr(tmp)
+    #     # interpolation
+    #     x, ex = extra.init(*sol)
+    #     for _ in range(10):
+    #         x, ex = extra.begin(x, ex, **pro_ex)
+    #         x, ex = extra.complete(x, ex, **pro_ex)
+    #         yield extra.extract(x, ex)
+
     def __init__(
         self,
         hidden_state,
