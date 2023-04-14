@@ -248,7 +248,6 @@ class _SmootherCommon(_strategy.Strategy):
 
     # # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, posterior: _SmState, /) -> _SmState:
-
         # todo: this should be the init() method of a fixed-point extrapolation model
         #  once this is implemented, we can use simulate_terminal_values() between
         #  checkpoints and remove sooo much code.
@@ -411,11 +410,9 @@ class FixedPointSmoother(_SmootherCommon):
             num_data_points=s1.num_data_points,
         )
 
-
         accepted = self._duplicate_with_unit_backward_model(solution)
         # accepted = solution
         previous = accepted
-
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
@@ -436,7 +433,9 @@ class FixedPointSmoother(_SmootherCommon):
             t=t,
             t0=s0.t,
         )
-        backward_model0 = s0.ssv.backward_model.merge_with_incoming_conditional(ssv0.backward_model)
+        backward_model0 = s0.ssv.backward_model.merge_with_incoming_conditional(
+            ssv0.backward_model
+        )
         ssv0_ = self.extrapolation.replace_backward_model(
             ssv0, backward_model=backward_model0
         )

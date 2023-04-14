@@ -192,3 +192,7 @@ class _IBM(_collections.AbstractExtrapolation):
             cache_corr=s.cache_corr,
             backward_model=backward_model,  # new
         )
+
+    def duplicate_with_unit_backward_model(self, s, /):
+        unit_bw_model = self._init_conditional(rv_proto=s.hidden_state)
+        return self.replace_backward_model(s, unit_bw_model)

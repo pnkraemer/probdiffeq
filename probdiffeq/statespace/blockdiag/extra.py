@@ -113,3 +113,7 @@ class _BlockDiag(_collections.AbstractExtrapolation):
     def replace_backward_model(self, s, /, backward_model):
         fn = jax.vmap(type(self.extra).replace_backward_model)
         return fn(self.extra, s, backward_model)
+
+    def duplicate_with_unit_backward_model(self, s, /):
+        fn = jax.vmap(type(self.extra).duplicate_with_unit_backward_model)
+        return fn(self.extra, s)

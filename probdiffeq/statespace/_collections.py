@@ -301,6 +301,10 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     def replace_backward_model(self, s: SSVTypeVar, /, backward_model) -> SSVTypeVar:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def duplicate_with_unit_backward_model(self, s: SSVTypeVar, /) -> SSVTypeVar:
+        raise NotImplementedError
+
 
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     """Conditional distribution interface.
