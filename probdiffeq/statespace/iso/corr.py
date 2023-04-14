@@ -18,6 +18,17 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
+    def init(self, s, /):
+        cache = (jnp.zeros_like(s.hidden_state.mean[..., 0, :]),)
+        return _vars.IsoStateSpaceVar(
+            hidden_state=s.hidden_state,
+            observed_state=s.observed_state,
+            output_scale_dynamic=s.output_scale_dynamic,
+            error_estimate=s.error_estimate,
+            cache_extra=s.cache_extra,
+            cache_corr=cache,
+        )
+
     def begin(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
@@ -46,7 +57,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
         )
 
     def complete(
-        self, extrapolated: _vars.IsoStateSpaceVar
+        self, extrapolated: _vars.IsoStateSpaceVar, /, _vector_field, _t, _p
     ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoStateSpaceVar]:
         (bias,) = extrapolated.cache_corr
 

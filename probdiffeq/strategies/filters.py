@@ -193,7 +193,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def _complete_correction(
         self, x: _FiState, /, *, vector_field, p
     ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        ssv = self.correction.complete(x.ssv, vector_field=vector_field, t=x.t, p=p)
+        ssv = self.correction.complete(x.ssv, vector_field, x.t, p)
         return _FiState(
             t=x.t,
             u=ssv.extract_qoi(),

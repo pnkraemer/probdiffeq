@@ -79,9 +79,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         # Prepare caches
         m_like = jnp.empty(rv.mean.shape)
         p_like = m_like[..., 0]
-        d_like = m_like[..., 0, :]
         cache_extra = (m_like, m_like, p_like, p_like)
-        cache_obs = (d_like,)  # todo: let correction initialise it!
         return _vars.IsoStateSpaceVar(
             rv,
             # A bunch of caches that are filled at some point:
@@ -89,7 +87,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             output_scale_dynamic=output_scale_dynamic,
             error_estimate=error_estimate,
             cache_extra=cache_extra,
-            cache_corr=cache_obs,
+            cache_corr=None,
         )
 
     def init_with_reversal(self, rv, conds, /):
