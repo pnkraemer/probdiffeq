@@ -1,5 +1,4 @@
 """Corrections."""
-from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -60,7 +59,7 @@ class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
 
     def complete(
         self, x: _vars.IsoStateSpaceVar, /, _vector_field, _t, _p
-    ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoStateSpaceVar]:
+    ) -> _vars.IsoStateSpaceVar:
         (bias,) = x.cache_corr
 
         m_ext = x.hidden_state.mean

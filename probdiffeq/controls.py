@@ -40,7 +40,7 @@ class AbstractControl(abc.ABC, Generic[S]):
 class _PIState(NamedTuple):
     """Proportional-integral controller state."""
 
-    dt_proposed: float
+    dt_proposed: jax.Array
     error_norm_previously_accepted: float
 
 
