@@ -240,4 +240,5 @@ class StatisticalFirstOrder(_collections.AbstractCorrection):
             output_scale_dynamic=extrapolated.output_scale_dynamic,
             cache_extra=extrapolated.cache_extra,
             cache_corr=extrapolated.cache_corr,
+            backward_model=extrapolated.backward_model,
         )

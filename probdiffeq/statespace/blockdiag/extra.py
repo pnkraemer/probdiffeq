@@ -59,12 +59,18 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         solution_fn = jax.vmap(type(self.extra).init_without_reversal)
         return solution_fn(self.extra, rv)
 
-    def init_with_reversal(self, rv, /):
+    def init_with_reversal(self, rv, conds, /):
         solution_fn = jax.vmap(type(self.extra).init_with_reversal)
-        return solution_fn(self.extra, rv)
+        return solution_fn(self.extra, rv, conds)
 
     def extract_with_reversal(self, s, /):
         solution_fn = jax.vmap(type(self.extra).extract_with_reversal)
+
+        # In save-at-mode (i.e. not terminal values), the vmapping requires extra
+        #  vmapping in the `s` variable.
+        if s.hidden_state.mean.ndim > 2:
+            solution_fn = jax.vmap(solution_fn, in_axes=(None, 0))
+
         return solution_fn(self.extra, s)
 
     def extract_without_reversal(self, s, /):
@@ -72,8 +78,8 @@ class _BlockDiag(_collections.AbstractExtrapolation):
 
         # In save-at-mode (i.e. not terminal values), the vmapping requires extra
         #  vmapping in the `s` variable.
-        # if s.hidden_state.mean.ndim > 2:
-        #     solution_fn = jax.vmap(solution_fn, in_axes=(None, 0))
+        if s.hidden_state.mean.ndim > 2:
+            solution_fn = jax.vmap(solution_fn, in_axes=(None, 0))
 
         return solution_fn(self.extra, s)
 
@@ -100,6 +106,10 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         fn_vmap = jax.vmap(type(self.extra).promote_output_scale)
         return fn_vmap(self.extra, output_scale)
 
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
+    def complete_with_reversal(self, state, /, state_previous, output_scale):
         fn = jax.vmap(type(self.extra).complete_with_reversal)
-        return fn(self.extra, output_begin, s0, output_scale)
+        return fn(self.extra, state, state_previous, output_scale)
+
+    def replace_backward_model(self, s, /, backward_model):
+        fn = jax.vmap(type(self.extra).replace_backward_model)
+        return fn(self.extra, s, backward_model)

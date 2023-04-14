@@ -67,6 +67,8 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
         #  and maybe observed_state here as well?
         cache = None
 
+        # todo: if it is a per-step cache, why does it have to be allocated in advance?
+        # Should not be necessary!
         return scalar_vars.StateSpaceVar(
             hidden_state=x.hidden_state,
             observed_state=x.observed_state,
@@ -74,6 +76,7 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
             output_scale_dynamic=x.output_scale_dynamic,
             cache_extra=x.cache_extra,
             cache_corr=cache,
+            backward_model=x.backward_model,
         )
 
     def begin(self, extrapolated, /, vector_field, t, p):
@@ -102,6 +105,7 @@ class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
             output_scale_dynamic=output_scale,
             cache_extra=extrapolated.cache_extra,
             cache_corr=None,
+            backward_model=extrapolated.backward_model,
         )
 
     def complete(self, extrapolated, vector_field, t, p):
@@ -190,6 +194,7 @@ class _BlockDiag(_collections.AbstractCorrection):
             output_scale_dynamic=output_scale,
             cache_extra=x.cache_extra,
             cache_corr=cache,
+            backward_model=x.backward_model,
         )
 
     def complete(self, extrapolated, /, vector_field, t, p):
