@@ -62,7 +62,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         return _conds.IsoConditionalHiddenState(op, noise=noi)
 
     def extract_with_reversal(self, s, /):
-        raise RuntimeError  # todo
+        return s.hidden_state, s.backward_model
 
     def extract_without_reversal(self, s, /):
         return s.hidden_state

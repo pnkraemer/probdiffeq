@@ -72,6 +72,11 @@ def _advance_ivp_solution_adaptively(
     while_loop_fn,
 ):
     """Advance an IVP solution to the next state."""
+    # todo: if we init() and extract() here, the duplicate_with_backward_model()
+    #  (and even the case_right_corner()) functionality can be removed for good.
+    #  open Q: we should probably use extract_at_terminal_values, right?
+    #  if so, how do we go about MLE-Solver scaling and
+    #  smoother marginalisation? one final init() + extract()?
 
     def cond_fun(s):
         # todo: adaptive_solver.solution_time(s) < t1?
