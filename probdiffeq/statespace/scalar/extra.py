@@ -31,24 +31,58 @@ class _IBM(_collections.AbstractExtrapolation):
         return self.a.shape[0] - 1
 
     def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-
+        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
         return _vars.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
 
     def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /):
-        raise RuntimeError  # todo
+        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
+        rv = _vars.NormalHiddenState(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
+        cond = self._init_conditional(rv_proto=rv)
+        return rv, cond
+
+    def _stack_tcoeffs(self, taylor_coefficients):
+        if len(taylor_coefficients) != self.num_derivatives + 1:
+            msg1 = "The number of Taylor coefficients does not match "
+            msg2 = "the number of derivatives in the implementation."
+            raise ValueError(msg1 + msg2)
+        m0_matrix = jnp.stack(taylor_coefficients)
+        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
+        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
+        return m0_corrected, c_sqrtm0_corrected
+
+    def _init_conditional(self, rv_proto):
+        op = jnp.eye(self.num_derivatives + 1)
+        mean = jnp.zeros_like(rv_proto.mean)
+        cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
+        noi = _vars.NormalHiddenState(mean, cov_sqrtm_lower)
+        return _conds.ConditionalHiddenState(op, noise=noi)
 
     def init_with_reversal(self, rv, cond, /):
-        raise RuntimeError  # todo
+        observed = _vars.NormalQOI(mean=jnp.zeros(()), cov_sqrtm_lower=jnp.zeros(()))
+
+        error_estimate = jnp.empty(())
+        output_scale_dynamic = jnp.empty(())
+
+        # Prepare caches
+        # todo: no need to initialise those?
+        #  Only 'observed' should be allocated ahead of time.
+        m_like = jnp.empty(rv.mean.shape)
+        p_like = m_like
+        cache_extra = (m_like, m_like, p_like, p_like)
+
+        return _vars.StateSpaceVar(
+            rv,
+            observed_state=observed,
+            output_scale_dynamic=output_scale_dynamic,
+            error_estimate=error_estimate,
+            cache_extra=cache_extra,
+            cache_corr=None,
+            backward_model=cond,
+        )
 
     def init_without_reversal(self, rv, /):
         observed = _vars.NormalQOI(mean=jnp.zeros(()), cov_sqrtm_lower=jnp.zeros(()))
@@ -77,10 +111,7 @@ class _IBM(_collections.AbstractExtrapolation):
         return s.hidden_state
 
     def extract_with_reversal(self, s, /):
-        raise RuntimeError  # todo
-
-    def init_error_estimate(self):
-        return jnp.zeros(())
+        return s.hidden_state, s.backward_model
 
     def begin(self, s0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -104,9 +135,9 @@ class _IBM(_collections.AbstractExtrapolation):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_without_reversal(self, output_begin, /, state_previous, output_scale):
-        _, _, p, p_inv = output_begin.cache_extra
-        m_ext = output_begin.hidden_state.mean
+    def complete_without_reversal(self, state, /, state_previous, output_scale):
+        _, _, p, p_inv = state.cache_extra
+        m_ext = state.hidden_state.mean
         l0 = state_previous.hidden_state.cov_sqrtm_lower
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
@@ -120,19 +151,19 @@ class _IBM(_collections.AbstractExtrapolation):
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.StateSpaceVar(
             rv,
-            observed_state=output_begin.observed_state,
-            error_estimate=output_begin.error_estimate,
-            output_scale_dynamic=output_begin.output_scale_dynamic,
-            cache_extra=output_begin.cache_extra,
-            cache_corr=output_begin.cache_corr,
-            backward_model=output_begin.backward_model,
+            observed_state=state.observed_state,
+            error_estimate=state.error_estimate,
+            output_scale_dynamic=state.output_scale_dynamic,
+            cache_extra=state.cache_extra,
+            cache_corr=state.cache_corr,
+            backward_model=state.backward_model,
         )
 
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
-        m_ext_p, m0_p, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def complete_with_reversal(self, state, /, state_previous, output_scale):
+        m_ext_p, m0_p, p, p_inv = state.cache_extra
+        m_ext = state.hidden_state.mean
+        l0_p = p_inv[:, None] * state_previous.hidden_state.cov_sqrtm_lower
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -151,23 +182,16 @@ class _IBM(_collections.AbstractExtrapolation):
 
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.StateSpaceVar(extrapolated, cache=None), bw_model
-
-    def init_conditional(self, ssv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _conds.ConditionalHiddenState(op, noise=noi)
-
-    def _init_backward_transition(self):
-        k = self.num_derivatives + 1
-        return jnp.eye(k)
-
-    @staticmethod
-    def _init_backward_noise(rv_proto):
-        mean = jnp.zeros_like(rv_proto.mean)
-        cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
-        return _vars.NormalHiddenState(mean, cov_sqrtm_lower)
+        rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return _vars.StateSpaceVar(
+            rv,
+            observed_state=state.observed_state,
+            error_estimate=state.error_estimate,
+            output_scale_dynamic=state.output_scale_dynamic,
+            cache_extra=state.cache_extra,
+            cache_corr=state.cache_corr,
+            backward_model=bw_model,
+        )
 
     def promote_output_scale(self, output_scale):
         return output_scale
@@ -179,6 +203,6 @@ class _IBM(_collections.AbstractExtrapolation):
             error_estimate=s.error_estimate,
             observed_state=s.observed_state,
             cache_extra=s.cache_extra,
-            cache_obs=s.cache_obs,
+            cache_corr=s.cache_corr,
             backward_model=backward_model,  # new
         )
