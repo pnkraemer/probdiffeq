@@ -59,6 +59,7 @@ class StateSpaceVar(_collections.StateSpaceVar):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
     def extract_qoi(self):
+        return self.hidden_state.extract_qoi()
         return self.hidden_state.mean[..., 0]
 
     def observe_qoi(self, observation_std):
@@ -94,7 +95,16 @@ class StateSpaceVar(_collections.StateSpaceVar):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return StateSpaceVar(rv, cache=self.cache)
+        rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
+
+        return StateSpaceVar(
+            hidden_state=rv,
+            observed_state=rv_obs,
+            output_scale_dynamic=self.output_scale_dynamic,
+            error_estimate=self.error_estimate,
+            cache_extra=self.cache_extra,
+            cache_corr=self.cache_corr,
+        )
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
@@ -132,3 +142,6 @@ class NormalHiddenState(_collections.AbstractNormal):
     def transform_unit_sample(self, base, /):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
+
+    def extract_qoi(self):
+        return self.mean[..., 0]

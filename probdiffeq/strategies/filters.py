@@ -190,7 +190,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
 
     # todo: more type-stability in corrections!
     def _complete_correction(self, x: _FiState, /) -> Tuple[Any, Tuple[_FiState, Any]]:
-        ssv = self.correction.complete(extrapolated=x.ssv)
+        ssv = self.correction.complete(x.ssv)
         return _FiState(
             t=x.t,
             u=ssv.extract_qoi(),

@@ -66,10 +66,6 @@ class IsoStateSpaceVar(_collections.StateSpaceVar):
         cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
         return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
-    def log_marginal_likelihood_constraints(self):
-        u = jnp.zeros_like(self.observed_state.mean)
-        return self.observed_state.logpdf(u)
-
 
 @jax.tree_util.register_pytree_node_class
 class IsoNormalHiddenState(_collections.AbstractNormal):

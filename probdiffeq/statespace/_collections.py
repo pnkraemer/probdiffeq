@@ -131,10 +131,6 @@ class StateSpaceVar(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def log_marginal_likelihood_constraints(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def extract_qoi(self):
         raise NotImplementedError
 
