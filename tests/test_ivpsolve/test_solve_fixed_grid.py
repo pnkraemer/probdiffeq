@@ -25,12 +25,17 @@ class _SolveFixedGridConfig(NamedTuple):
 @testing.case
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 @testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag="nd")
-def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
+@testing.parametrize(
+    "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
+)
+def case_setup_all_strategy_statespace_nd(
+    ode_problem, strat_fn, impl_fn, solver_config
+):
     return _SolveFixedGridConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
-        strat_fn=filters.Filter,
+        strat_fn=strat_fn,
         solver_config=solver_config,
         output_scale=1.0,
     )
@@ -41,12 +46,17 @@ def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
     "ode_problem", cases="..problem_cases", has_tag="scalar"
 )
 @testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag="scalar")
-def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
+@testing.parametrize(
+    "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
+)
+def case_setup_all_strategy_statespace_scalar(
+    ode_problem, strat_fn, impl_fn, solver_config
+):
     return _SolveFixedGridConfig(
         ode_problem=ode_problem,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
-        strat_fn=filters.Filter,
+        strat_fn=strat_fn,
         solver_config=solver_config,
         output_scale=1.0,
     )
@@ -57,26 +67,13 @@ def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
 @testing.parametrize(
     "strat_fn", [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
 )
-def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
-    return _SolveFixedGridConfig(
-        ode_problem=ode_problem,
-        solver_fn=ivpsolvers.MLESolver,
-        impl_fn=recipes.ts0_blockdiag,
-        strat_fn=strat_fn,
-        solver_config=solver_config,
-        output_scale=1.0,
-    )
-
-
-@testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
 @testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
+def case_setup_all_solvers_strategies(ode_problem, solver_fn, strat_fn, solver_config):
     return _SolveFixedGridConfig(
         ode_problem=ode_problem,
         solver_fn=solver_fn,
         impl_fn=recipes.ts0_blockdiag,
-        strat_fn=filters.Filter,
+        strat_fn=strat_fn,
         solver_config=solver_config,
         output_scale=1.0,
     )

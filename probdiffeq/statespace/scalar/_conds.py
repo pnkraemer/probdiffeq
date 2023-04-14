@@ -44,18 +44,17 @@ class ConditionalHiddenState(_collections.AbstractConditional):
     def marginalise(self, rv, /):
         # Todo: this auto-batch is a bit hacky,
         #  but single-handedly replaces the entire BatchConditional class
-        if rv.hidden_state.mean.ndim > 1:
+        if rv.mean.ndim > 1:
             return jax.vmap(ConditionalHiddenState.marginalise)(self, rv)
 
-        m0, l0 = rv.hidden_state.mean, rv.hidden_state.cov_sqrtm_lower
+        m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
         m_new = self.transition @ m0 + self.noise.mean
         l_new = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
-        rv = _vars.NormalHiddenState(m_new, l_new)
-        return _vars.StateSpaceVar(rv, cache=None)
+        return _vars.NormalHiddenState(m_new, l_new)
 
 
 @jax.tree_util.register_pytree_node_class
