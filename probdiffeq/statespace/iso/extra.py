@@ -53,14 +53,6 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         cond = self._init_conditional(rv_proto=rv)
         return rv, cond
 
-    def _init_conditional(self, rv_proto):
-        op = jnp.eye(*self.a.shape)
-        noi = _vars.IsoNormalHiddenState(
-            mean=jnp.zeros_like(rv_proto.mean),
-            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-        )
-        return _conds.IsoConditionalHiddenState(op, noise=noi)
-
     def extract_with_reversal(self, s, /):
         return s.hidden_state, s.backward_model
 
@@ -90,6 +82,27 @@ class _IsoIBM(_collections.AbstractExtrapolation):
             cache_extra=None,
             cache_corr=None,
         )
+
+    def init_with_reversal_and_reset(self, rv, _conds, /):
+        cond = self._init_conditional(rv_proto=rv)
+        return _vars.IsoSSV(
+            rv,
+            backward_model=cond,
+            hidden_shape=rv.mean.shape,
+            observed_state=None,
+            output_scale_dynamic=None,
+            error_estimate=None,
+            cache_extra=None,
+            cache_corr=None,
+        )
+
+    def _init_conditional(self, rv_proto):
+        op = jnp.eye(*self.a.shape)
+        noi = _vars.IsoNormalHiddenState(
+            mean=jnp.zeros_like(rv_proto.mean),
+            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+        )
+        return _conds.IsoConditionalHiddenState(op, noise=noi)
 
     # todo: why does this method have the same name as the above?
     def _init_ssv(self, ode_shape):

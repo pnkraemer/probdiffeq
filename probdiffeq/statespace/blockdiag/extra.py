@@ -63,6 +63,10 @@ class _BlockDiag(_collections.AbstractExtrapolation):
         solution_fn = jax.vmap(type(self.extra).init_with_reversal)
         return solution_fn(self.extra, rv, conds)
 
+    def init_with_reversal_and_reset(self, rv, conds, /):
+        solution_fn = jax.vmap(type(self.extra).init_with_reversal_and_reset)
+        return solution_fn(self.extra, rv, conds)
+
     def extract_with_reversal(self, s, /):
         solution_fn = jax.vmap(type(self.extra).extract_with_reversal)
 

@@ -22,7 +22,7 @@ class _State(NamedTuple):
     output_scale_calibrated: Any
     output_scale_prior: Any
 
-    # Todo: havin those properties is a little bit hacky?
+    # Todo: having those properties is a little bit hacky?
     #  Would be great to have _one_ place of accessing them from.
 
     @property

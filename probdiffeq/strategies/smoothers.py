@@ -157,18 +157,6 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init(self, t, u, marginals, posterior, /) -> _SmState:
-        ssv = self.extrapolation.init_with_reversal(
-            posterior.init, posterior.backward_model
-        )
-        ssv = self.correction.init(ssv)
-        return _SmState(
-            t=t,
-            u=u,
-            ssv=ssv,
-            num_data_points=posterior.num_data_points,
-        )
-
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
         ssv = self.extrapolation.begin(state.ssv, dt=dt)
         ssv = self.correction.begin(ssv, vector_field, state.t + dt, parameters)
@@ -252,9 +240,6 @@ class _SmootherCommon(_strategy.Strategy):
         #  once this is implemented, we can use simulate_terminal_values() between
         #  checkpoints and remove sooo much code.
         ssv = self.extrapolation.duplicate_with_unit_backward_model(posterior.ssv)
-        #
-        # init_conditional_fn = self.extrapolation.init_conditional
-        # bw_model = init_conditional_fn(ssv_proto=posterior.corrected)
         return _SmState(
             t=posterior.t,
             u=posterior.u,
@@ -266,6 +251,18 @@ class _SmootherCommon(_strategy.Strategy):
 @jax.tree_util.register_pytree_node_class
 class Smoother(_SmootherCommon):
     """Smoother."""
+
+    def init(self, t, u, marginals, posterior, /) -> _SmState:
+        ssv = self.extrapolation.init_with_reversal(
+            posterior.init, posterior.backward_model
+        )
+        ssv = self.correction.init(ssv)
+        return _SmState(
+            t=t,
+            u=u,
+            ssv=ssv,
+            num_data_points=posterior.num_data_points,
+        )
 
     def complete(
         self, state, state_previous, /, *, vector_field, parameters, output_scale
@@ -288,9 +285,8 @@ class Smoother(_SmootherCommon):
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
-        # todo: is this duplication unnecessary?
+        # todo: is this duplication necessary?
         # accepted = self._duplicate_with_unit_backward_model(s1)
-        # accepted = s1
         return InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
@@ -367,6 +363,18 @@ class FixedPointSmoother(_SmootherCommon):
         and without any deprecation policy.
 
     """
+
+    def init(self, t, u, marginals, posterior, /) -> _SmState:
+        ssv = self.extrapolation.init_with_reversal_and_reset(
+            posterior.init, posterior.backward_model
+        )
+        ssv = self.correction.init(ssv)
+        return _SmState(
+            t=t,
+            u=u,
+            ssv=ssv,
+            num_data_points=posterior.num_data_points,
+        )
 
     def complete(
         self, state, state_previous, /, *, vector_field, parameters, output_scale
@@ -449,7 +457,6 @@ class FixedPointSmoother(_SmootherCommon):
             num_data_points=s0.num_data_points,
         )
         previous = self._duplicate_with_unit_backward_model(solution)
-        # previous = solution
 
         extra1 = self._interpolate_from_t0_to_t(
             rv=ssv0, output_scale=output_scale, t=s1.t, t0=t

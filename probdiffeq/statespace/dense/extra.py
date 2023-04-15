@@ -135,6 +135,19 @@ class _DenseIBM(_collections.AbstractExtrapolation):
             cache_corr=None,
         )
 
+    def init_with_reversal_and_reset(self, rv, _cond, /):
+        cond = self._init_conditional(rv_proto=rv)
+        return _vars.DenseSSV(
+            rv,
+            backward_model=cond,
+            hidden_shape=self.target_shape,
+            observed_state=None,
+            output_scale_dynamic=None,
+            error_estimate=None,
+            cache_extra=None,
+            cache_corr=None,
+        )
+
     def begin(self, s0, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * s0.hidden_state.mean

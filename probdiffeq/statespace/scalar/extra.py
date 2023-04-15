@@ -54,13 +54,6 @@ class _IBM(_collections.AbstractExtrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def _init_conditional(self, rv_proto):
-        op = jnp.eye(self.num_derivatives + 1)
-        mean = jnp.zeros_like(rv_proto.mean)
-        cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
-        noi = _vars.NormalHiddenState(mean, cov_sqrtm_lower)
-        return _conds.ConditionalHiddenState(op, noise=noi)
-
     def init_with_reversal(self, rv, cond, /):
         return _vars.SSV(
             rv,
@@ -72,6 +65,26 @@ class _IBM(_collections.AbstractExtrapolation):
             cache_extra=None,
             cache_corr=None,
         )
+
+    def init_with_reversal_and_reset(self, rv, _cond, /):
+        cond = self._init_conditional(rv_proto=rv)
+        return _vars.SSV(
+            rv,
+            backward_model=cond,
+            hidden_shape=rv.mean.shape,
+            observed_state=None,
+            output_scale_dynamic=None,
+            error_estimate=None,
+            cache_extra=None,
+            cache_corr=None,
+        )
+
+    def _init_conditional(self, rv_proto):
+        op = jnp.eye(self.num_derivatives + 1)
+        mean = jnp.zeros_like(rv_proto.mean)
+        cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
+        noi = _vars.NormalHiddenState(mean, cov_sqrtm_lower)
+        return _conds.ConditionalHiddenState(op, noise=noi)
 
     def init_without_reversal(self, rv, /):
         # Prepare caches

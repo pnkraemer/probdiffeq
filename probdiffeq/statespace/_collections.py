@@ -266,6 +266,10 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def init_with_reversal_and_reset(self, rv, cond, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def extract_without_reversal(self, s, /):
         raise NotImplementedError
 
