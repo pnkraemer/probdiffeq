@@ -103,9 +103,5 @@ class Extrapolation(abc.ABC, Generic[S, E]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def replace_backward_model(self, e: E, /, backward_model) -> E:
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def duplicate_with_unit_backward_model(self, e: E, /) -> E:
         raise NotImplementedError

@@ -55,8 +55,8 @@ class _IsoIBM(_extra.Extrapolation):
         cond = self._init_conditional(rv_proto=rv)
         return rv, cond
 
-    def extract_with_reversal(self, s, /):
-        return s.hidden_state, s.backward_model
+    def extract_with_reversal(self, s, e, /):
+        return s.hidden_state, e.backward_model
 
     def extract_without_reversal(self, s, /):
         return s.hidden_state
@@ -67,29 +67,15 @@ class _IsoIBM(_extra.Extrapolation):
         return ssv, extra
 
     def init_with_reversal(self, rv, conds, /):
-        return _vars.IsoSSV(
-            rv,
-            hidden_shape=rv.mean.shape,
-            backward_model=conds,
-            observed_state=None,
-            output_scale_dynamic=None,
-            error_estimate=None,
-            cache_extra=None,
-            cache_corr=None,
-        )
+        ssv = _vars.IsoSSV(rv)
+        extra = _extra.State(backward_model=conds, cache=None)
+        return ssv, extra
 
     def init_with_reversal_and_reset(self, rv, _conds, /):
         cond = self._init_conditional(rv_proto=rv)
-        return _vars.IsoSSV(
-            rv,
-            backward_model=cond,
-            hidden_shape=rv.mean.shape,
-            observed_state=None,
-            output_scale_dynamic=None,
-            error_estimate=None,
-            cache_extra=None,
-            cache_corr=None,
-        )
+        ssv = _vars.IsoSSV(rv)
+        extra = _extra.State(backward_model=cond, cache=None)
+        return ssv, extra
 
     def _init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
@@ -125,7 +111,12 @@ class _IsoIBM(_extra.Extrapolation):
         ssv = _vars.IsoSSV(rv)
 
         l0 = s0.hidden_state.cov_sqrtm_lower
-        ext = _extra.State(cache=(m_ext_p, m0_p, p, p_inv, l0), backward_model=None)
+        # todo: once we have different begin() methods
+        #  (and once fixed-point smoothing does its own complete())
+        #  backward_model should be None here.
+        ext = _extra.State(
+            cache=(m_ext_p, m0_p, p, p_inv, l0), backward_model=ex.backward_model
+        )
         return ssv, ext
         # return _vars.IsoSSV(
         #     ext,
@@ -178,11 +169,11 @@ class _IsoIBM(_extra.Extrapolation):
         #     backward_model=None,
         # )
 
-    def complete_with_reversal(self, state, /, state_previous, output_scale):
-        m_ext_p, m0_p, p, p_inv = state.cache_extra
+    def complete_with_reversal(self, state, extra, /, output_scale):
+        m_ext_p, m0_p, p, p_inv, l0 = extra.cache
         m_ext = state.hidden_state.mean
-        l0_p = p_inv[:, None] * state_previous.hidden_state.cov_sqrtm_lower
 
+        l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -199,32 +190,33 @@ class _IsoIBM(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
+        # Gather outputs
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoSSV(
-            extrapolated,
-            hidden_shape=state.hidden_shape,
-            backward_model=bw_model,
-            error_estimate=state.error_estimate,
-            cache_corr=state.cache_corr,
-            observed_state=state.observed_state,  # usually None?
-            output_scale_dynamic=None,
-            cache_extra=None,
-        )
 
-    def duplicate_with_unit_backward_model(self, s, /):
-        unit_bw_model = self._init_conditional(rv_proto=s.hidden_state)
-        return self.replace_backward_model(s, unit_bw_model)
+        # Return results
+        ssv = _vars.IsoSSV(extrapolated)
+        extra = _extra.State(backward_model=bw_model, cache=None)
+        return ssv, extra
 
-    def replace_backward_model(self, s, /, backward_model):
-        return _vars.IsoSSV(
-            s.hidden_state,
-            backward_model=backward_model,  # new
-            hidden_shape=s.hidden_shape,
-            observed_state=s.observed_state,
-            error_estimate=s.error_estimate,
-            output_scale_dynamic=s.output_scale_dynamic,
-            cache_extra=s.cache_extra,
-            cache_corr=s.cache_corr,
-        )
+    def duplicate_with_unit_backward_model(self, e, /):
+        unit_bw_model = self._init_conditional(rv_proto=e.backward_model.noise)
+        return self.replace_backward_model(e, unit_bw_model)
+
+    def replace_backward_model(self, e, /, backward_model):
+        extra = _extra.State(backward_model=backward_model, cache=e.cache)
+        return extra
+
+    #
+    #
+    #     return _vars.IsoSSV(
+    #         s.hidden_state,
+    #         backward_model=backward_model,  # new
+    #         hidden_shape=s.hidden_shape,
+    #         observed_state=s.observed_state,
+    #         error_estimate=s.error_estimate,
+    #         output_scale_dynamic=s.output_scale_dynamic,
+    #         cache_extra=s.cache_extra,
+    #         cache_corr=s.cache_corr,
+    #     )

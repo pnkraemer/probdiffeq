@@ -219,17 +219,15 @@ class DynamicSolver(AbstractSolver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        state_strategy_previous = state.strategy
         state_strategy = self.strategy.begin(
-            state_strategy_previous,
+            state.strategy,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
-        output_scale = state_strategy.ssv.output_scale_dynamic
+        output_scale = state_strategy.corr.output_scale_dynamic
         state_strategy = self.strategy.complete(
             state_strategy,
-            state_strategy_previous,
             output_scale=output_scale,
             parameters=parameters,
             vector_field=vector_field,
