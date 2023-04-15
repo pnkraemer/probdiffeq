@@ -502,7 +502,7 @@ class FixedPointSmoother(_SmootherCommon):
         accepted = _SmState(
             t=t_accepted,
             u=s1.u,
-            ssv=posterior1.ssv,
+            ssv=s1.ssv,
             extra=extra1,
             corr=posterior1.corr,
             num_data_points=s1.num_data_points,
