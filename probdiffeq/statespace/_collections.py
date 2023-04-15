@@ -101,35 +101,29 @@ class SSV(abc.ABC):
     #         x, ex = extra.complete(x, ex, **pro_ex)
     #         yield extra.extract(x, ex)
 
-    def __init__(self, hidden_state, /, *, extra, corr, hidden_shape=None):
+    def __init__(self, hidden_state, /, *, hidden_shape=None):
         self.hidden_shape = hidden_shape
         self.hidden_state = hidden_state  # todo: 'hidden'
-        self.extra = extra
-        self.corr = corr
 
     def tree_flatten(self):
-        children = (self.hidden_state, self.extra, self.corr)
+        children = (self.hidden_state,)
         aux = (self.hidden_shape,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (hidden_state, extra, corr) = children
+        (hidden_state,) = children
         (hidden_shape,) = aux
         return cls(
             hidden_state,
             hidden_shape=hidden_shape,
-            extra=extra,
-            corr=corr,
         )
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
             f"{self.hidden_shape},"
-            f"hidden_state={self.hidden_state},"
-            f"extra={self.extra},"
-            f"cor={self.corr},"
+            f"hidden_state={self.hidden_state}"
             f")"
         )
 

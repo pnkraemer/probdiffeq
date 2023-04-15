@@ -21,7 +21,7 @@ def ibm_scalar(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IBM(_extra.AbstractExtrapolation):
+class _IBM(_extra.Extrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"

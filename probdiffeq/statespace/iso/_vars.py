@@ -37,22 +37,7 @@ class IsoSSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
-
-        if self.backward_model is not None:
-            bw_model = self.backward_model.scale_covariance(output_scale=output_scale)
-        else:
-            bw_model = None
-        return IsoSSV(
-            hidden_state=rv,
-            observed_state=rv_obs,
-            backward_model=bw_model,
-            hidden_shape=self.hidden_shape,
-            output_scale_dynamic=self.output_scale_dynamic,
-            error_estimate=self.error_estimate,
-            cache_extra=self.cache_extra,
-            cache_corr=self.cache_corr,
-        )
+        return IsoSSV(rv, hidden_shape=self.hidden_shape)
 
     def marginal_nth_derivative(self, n):
         # if the variable has batch-axes, vmap the result

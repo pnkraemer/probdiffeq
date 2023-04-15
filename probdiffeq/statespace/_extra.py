@@ -1,25 +1,31 @@
 """Various interfaces."""
 
 import abc
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, Tuple, TypeVar
 
 from probdiffeq.statespace import _collections
 
 # todo: split into multiple files.
 
 
-class Extra(NamedTuple):
+class State(NamedTuple):
     backward_model: Any
     cache: Any
+
+    def scale_covariance(self, s, /):
+        if self.backward_model is not None:
+            bw = self.backward_model.scale_covariance(s)
+            return State(backward_model=bw, cache=self.cache)
+        return self
 
 
 S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
-E = TypeVar("E", bound=Extra)
+E = TypeVar("E", bound=State)
 
 
-class AbstractExtrapolation(abc.ABC, Generic[S, E]):
+class Extrapolation(abc.ABC, Generic[S, E]):
     """Extrapolation model interface."""
 
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):

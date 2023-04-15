@@ -1,5 +1,7 @@
 """Extrapolations."""
 
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -21,7 +23,7 @@ def ibm_iso(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoIBM(_extra.AbstractExtrapolation):
+class _IsoIBM(_extra.Extrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
@@ -60,8 +62,8 @@ class _IsoIBM(_extra.AbstractExtrapolation):
         return s.hidden_state
 
     def init_without_reversal(self, rv, /):
-        extra = _extra.Extra(backward_model=None, cache=None)
-        ssv = _vars.IsoSSV(rv, hidden_shape=rv.mean.shape)
+        extra = _extra.State(backward_model=None, cache=None)
+        ssv = _vars.IsoSSV(rv)
         return ssv, extra
 
     def init_with_reversal(self, rv, conds, /):
@@ -110,26 +112,33 @@ class _IsoIBM(_extra.AbstractExtrapolation):
         return output_scale
 
     # todo: split into begin_with and begin_without
-    def begin(self, s0: _vars.IsoSSV, /, dt) -> _vars.IsoSSV:
+    def begin(
+        self, s0: _vars.IsoSSV, ex: _extra.State, /, dt
+    ) -> Tuple[_vars.IsoSSV, _extra.State]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
-        ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoSSV(
-            ext,
-            cache_extra=(m_ext_p, m0_p, p, p_inv),
-            hidden_shape=s0.hidden_shape,
-            output_scale_dynamic=None,
-            cache_corr=None,
-            backward_model=None,
-            # todo: The below should not be necessary
-            #  but currently, it is: because of pytree-shape stability in interpolation
-            observed_state=jax.tree_util.tree_map(jnp.zeros_like, s0.observed_state),
-            error_estimate=jax.tree_util.tree_map(jnp.zeros_like, s0.error_estimate),
-        )
+        rv = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
+        ssv = _vars.IsoSSV(rv)
+
+        l0 = s0.hidden_state.cov_sqrtm_lower
+        ext = _extra.State(cache=(m_ext_p, m0_p, p, p_inv, l0), backward_model=None)
+        return ssv, ext
+        # return _vars.IsoSSV(
+        #     ext,
+        #     cache_extra=,
+        #     hidden_shape=s0.hidden_shape,
+        #     output_scale_dynamic=None,
+        #     cache_corr=None,
+        #     backward_model=None,
+        #     # todo: The below should not be necessary
+        #     #  but currently, it is: because of pytree-shape stability in interpolation
+        #     observed_state=jax.tree_util.tree_map(jnp.zeros_like, s0.observed_state),
+        #     error_estimate=jax.tree_util.tree_map(jnp.zeros_like, s0.error_estimate),
+        # )
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -139,13 +148,12 @@ class _IsoIBM(_extra.AbstractExtrapolation):
     def complete_without_reversal(
         self,
         state: _vars.IsoSSV,
+        extra: _extra.State,
         /,
-        state_previous: _vars.IsoSSV,
         output_scale: float,
     ) -> _vars.IsoSSV:
-        _, _, p, p_inv = state.cache_extra
         m_ext = state.hidden_state.mean
-        l0 = state_previous.hidden_state.cov_sqrtm_lower
+        _, _, p, p_inv, l0 = extra.cache
 
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
@@ -156,16 +164,19 @@ class _IsoIBM(_extra.AbstractExtrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        return _vars.IsoSSV(
-            rv,
-            hidden_shape=state.hidden_shape,
-            error_estimate=state.error_estimate,
-            cache_corr=state.cache_corr,
-            observed_state=state.observed_state,  # usually None?
-            output_scale_dynamic=None,
-            cache_extra=None,
-            backward_model=None,
-        )
+        ssv = _vars.IsoSSV(rv)
+        extra = _extra.State(backward_model=None, cache=None)
+        return ssv, extra
+        # return _vars.IsoSSV(
+        #     rv,
+        #     hidden_shape=state.hidden_shape,
+        #     error_estimate=state.error_estimate,
+        #     cache_corr=state.cache_corr,
+        #     observed_state=state.observed_state,  # usually None?
+        #     output_scale_dynamic=None,
+        #     cache_extra=None,
+        #     backward_model=None,
+        # )
 
     def complete_with_reversal(self, state, /, state_previous, output_scale):
         m_ext_p, m0_p, p, p_inv = state.cache_extra

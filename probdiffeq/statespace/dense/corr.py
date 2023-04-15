@@ -52,7 +52,7 @@ def statistical_order_one(
     )
 
 
-class _DenseCorrection(_corr.AbstractCorrection, abc.ABC):
+class _DenseCorrection(_corr.Correction, abc.ABC):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1

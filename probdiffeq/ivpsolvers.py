@@ -275,16 +275,14 @@ class MLESolver(AbstractSolver):
      calibration of the output-scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        state_strategy_previous = state.strategy
         state_strategy = self.strategy.begin(
-            state_strategy_previous,
+            state.strategy,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
         state_strategy = self.strategy.complete(
             state_strategy,
-            state_strategy_previous,
             output_scale=state.output_scale_prior,
             parameters=parameters,
             vector_field=vector_field,

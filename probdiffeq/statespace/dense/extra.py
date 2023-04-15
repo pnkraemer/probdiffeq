@@ -27,7 +27,7 @@ def ibm_dense(ode_shape, num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseIBM(_extra.AbstractExtrapolation):
+class _DenseIBM(_extra.Extrapolation):
     def __init__(
         self,
         *,
