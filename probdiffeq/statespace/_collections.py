@@ -3,8 +3,6 @@
 import abc
 from typing import Generic, Tuple, TypeVar
 
-import jax
-
 # todo: split into multiple files.
 
 
@@ -203,11 +201,6 @@ SSVTypeVar = TypeVar("SSVTypeVar", bound=SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
 
-# todo: remove
-CacheTypeVar = TypeVar("CacheTypeVar")
-"""A type-variable to alias extrapolation- and correction-caches."""
-
-
 class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
     """Conditional distribution interface.
 
@@ -243,34 +236,4 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
         raise NotImplementedError
 
     def marginalise(self, rv, /):
-        raise NotImplementedError
-
-
-@jax.tree_util.register_pytree_node_class
-class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
-    """Correction model interface."""
-
-    def __init__(self, ode_order):
-        self.ode_order = ode_order
-
-    def tree_flatten(self):
-        children = ()
-        aux = (self.ode_order,)
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, _children):
-        (ode_order,) = aux
-        return cls(ode_order=ode_order)
-
-    @abc.abstractmethod
-    def init(self, s, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def begin(self, x: SSVTypeVar, /, vector_field, t, p) -> SSVTypeVar:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete(self, x: SSVTypeVar, /, vector_field, t, p) -> SSVTypeVar:
         raise NotImplementedError

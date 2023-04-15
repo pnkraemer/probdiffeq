@@ -4,7 +4,7 @@ from typing import Callable, Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _collections, cubature
+from probdiffeq.statespace import _corr, cubature
 from probdiffeq.statespace.scalar import _vars as scalar_vars
 from probdiffeq.statespace.scalar import corr as scalar_corr
 
@@ -21,7 +21,7 @@ def statistical_order_one(ode_shape, ode_order):
 
 
 @jax.tree_util.register_pytree_node_class
-class _BlockDiagStatisticalFirstOrder(_collections.AbstractCorrection):
+class _BlockDiagStatisticalFirstOrder(_corr.AbstractCorrection):
     """First-order statistical linear regression in state-space models \
      with block-diagonal covariance structure.
 
@@ -153,7 +153,7 @@ _TS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
-class _BlockDiag(_collections.AbstractCorrection):
+class _BlockDiag(_corr.AbstractCorrection):
     def __init__(self, corr, /):
         super().__init__(ode_order=corr.ode_order)
         self.corr = corr

@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections, cubature
+from probdiffeq.statespace import _corr, cubature
 from probdiffeq.statespace.dense import _vars, linearise
 
 
@@ -52,7 +52,7 @@ def statistical_order_one(
     )
 
 
-class _DenseCorrection(_collections.AbstractCorrection, abc.ABC):
+class _DenseCorrection(_corr.AbstractCorrection, abc.ABC):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1

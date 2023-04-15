@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections
+from probdiffeq.statespace import _corr
 from probdiffeq.statespace.iso import _vars
 
 
@@ -13,7 +13,7 @@ def taylor_order_zero(*args, **kwargs):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoTaylorZerothOrder(_collections.AbstractCorrection):
+class _IsoTaylorZerothOrder(_corr.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
