@@ -26,7 +26,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \
      the results should be identical."""
-    # todo: make a similar test that CalibrationFreeSolver(sigma_mle) == MLESolver() holds.
+    # todo: make a similar test that CalibrationFreeSolver(sigma_mle) == MLESolver()
     # smo_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.

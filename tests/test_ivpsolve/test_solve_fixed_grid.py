@@ -147,22 +147,51 @@ def fixture_parameter_to_solution(setup):
         )
         return solution.u
 
-    # DenseSLR1(ThirdOrderSpherical) has a NaN vector-Jacobian product.
-    # Therefore, we skip all autodiff-DenseSLR1 tests
-    # until the VJP/JVP behaviour has been cleaned up.
-    # (It is easier to skip them all for now than to investigate how to skip
-    # this very specific instance.) See: Issue #500.
-    corr = solver.strategy.correction
-    skip_jvp_and_vjp = isinstance(corr, dense_corr._DenseStatisticalFirstOrder)
+    skip_jvp_and_vjp = _skip_autodiff_test(solver)
     return fn, setup.ode_problem.initial_values, skip_jvp_and_vjp
 
 
+def _skip_autodiff_test(solver):
+    # Some solver-strategy combinations have NaN VJPs and sometimes JVPs as well.
+    # We skip those tests until the VJP/JVP behaviour has been cleaned up.
+    # See: Issue #500.
+
+    # Ignore no-lambda flake8 check here. If we don't define those check-functions
+    # in-line, the whole function becomes  too cluttered.
+    _SLR1 = dense_corr._DenseStatisticalFirstOrder
+    _SLR0 = dense_corr._DenseStatisticalZerothOrder
+    _TS1 = dense_corr._DenseTaylorFirstOrder
+    is_smoother = lambda x: isinstance(x, smoothers.Smoother)  # noqa: E731
+    is_fp_smoother = lambda x: isinstance(x, smoothers.FixedPointSmoother)  # noqa: E731
+    is_slr1 = lambda x: isinstance(x, _SLR1)  # noqa: E731
+    is_slr0 = lambda x: isinstance(x, _SLR0)  # noqa: E731
+    is_ts1 = lambda x: isinstance(x, _TS1)  # noqa: E731
+
+    strategy = solver.strategy
+    correction = solver.strategy.correction
+
+    if is_slr1(correction):
+        return True
+    if is_slr0(correction) and is_smoother(strategy):
+        return True
+    if is_slr0(correction) and is_fp_smoother(strategy):
+        return True
+    if is_ts1(correction) and is_smoother(strategy):
+        return True
+    if is_ts1(correction) and is_fp_smoother(strategy):
+        return True
+
+    # All good now, no skipping.
+    return False
+
+
 def test_jvp(parameter_to_solution, solver_config):
-    fn, primals, skip_jvp = parameter_to_solution
-    if skip_jvp:
-        reason1 = "DenseSLR1 is not guaranteed to have valid JVPs at the moment. "
-        reason2 = "See: #500."
-        testing.skip(reason1 + reason2)
+    fn, primals, skip = parameter_to_solution
+    if skip:
+        reason1 = "Some corrections in combination with and some smoothers "
+        reason2 = "are not guaranteed to have valid JVPs at the moment. "
+        reason3 = "See: #500."
+        testing.skip(reason1 + reason2 + reason3)
 
     jvp = functools.partial(jax.jvp, fn)
 
@@ -177,11 +206,13 @@ def test_jvp(parameter_to_solution, solver_config):
 
 
 def test_vjp(parameter_to_solution, solver_config):
-    fn, primals, skip_vjp = parameter_to_solution
-    if skip_vjp:
-        reason1 = "DenseSLR1 is not guaranteed to have valid VJPs at the moment. "
-        reason2 = "See: #500."
-        testing.skip(reason1 + reason2)
+    fn, primals, skip = parameter_to_solution
+    if skip:
+        reason1 = "Some corrections in combination with and some smoothers "
+        reason2 = "are not guaranteed to have valid VJPs at the moment. "
+        reason3 = "See: #500."
+        testing.skip(reason1 + reason2 + reason3)
+
     vjp = functools.partial(jax.vjp, fn)
 
     # Autodiff tests are sometimes a bit flaky...

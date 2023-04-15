@@ -37,12 +37,32 @@ class Strategy(abc.ABC, Generic[S, P]):
         arg2 = self.correction
         return f"{name}({arg1}, {arg2})"
 
+    def tree_flatten(self):
+        children = (self.extrapolation, self.correction)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        (extra, correct) = children
+        return cls(extra, correct)
+
     @abc.abstractmethod
     def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
     def init(self, t, u, marginals, solution: P, /) -> S:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def begin(self, state: S, /, *, dt, parameters, vector_field):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def complete(
+        self, state, state_previous, /, *, vector_field, parameters, output_scale
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -67,41 +87,6 @@ class Strategy(abc.ABC, Generic[S, P]):
     ):
         raise NotImplementedError
 
-    def tree_flatten(self):
-        children = (self.extrapolation, self.correction)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (extra, correct) = children
-        return cls(extra, correct)
-
-    def promote_output_scale(self, *args, **kwargs):
-        return self.extrapolation.promote_output_scale(*args, **kwargs)
-
-    @abc.abstractmethod
-    def begin(self, state: S, /, *, dt, parameters, vector_field):
-        raise NotImplementedError
-        # state = self._begin_extrapolation(state, dt=dt)
-        # state = self._begin_correction(state, vector_field=vector_field, p=parameters)
-        # return state
-
-    @abc.abstractmethod
-    def complete(
-        self, state, state_previous, /, *, vector_field, parameters, output_scale
-    ):
-        raise NotImplementedError
-        # state = self._complete_extrapolation(
-        #     state,
-        #     state_previous=state_previous,
-        #     output_scale=output_scale,
-        # )
-        # state = self._complete_correction(
-        #     state, p=parameters, vector_field=vector_field
-        # )
-        # return state
-
     @abc.abstractmethod
     def num_data_points(self, state, /):
         raise NotImplementedError
@@ -109,3 +94,7 @@ class Strategy(abc.ABC, Generic[S, P]):
     @abc.abstractmethod
     def observation(self, state, /):
         raise NotImplementedError
+
+    # todo: this feels dirty.
+    def promote_output_scale(self, *args, **kwargs):
+        return self.extrapolation.promote_output_scale(*args, **kwargs)

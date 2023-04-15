@@ -204,19 +204,19 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=state.num_data_points,
         )
         marginals = self._extract_marginals(markov_seq)
-        u = marginals.extract_qoi()
+        u = state.ssv.extract_qoi_from_sample(marginals.mean)
 
         return state.t, u, marginals, markov_seq
 
     def extract_at_terminal_values(self, state: _SmState, /) -> _SolType:
         init, bw_model = self.extrapolation.extract_with_reversal(state.ssv)
-        u = state.ssv.extract_qoi()
         markov_seq = MarkovSequence(
             init=init,
             backward_model=bw_model,
             num_data_points=state.num_data_points,
         )
         marginals = state.ssv.hidden_state
+        u = state.ssv.extract_qoi_from_sample(marginals.mean)
         return state.t, u, marginals, markov_seq
 
     def _extract_marginals(self, posterior: MarkovSequence, /):
@@ -270,6 +270,8 @@ class Smoother(_SmootherCommon):
     def complete(
         self, state, state_previous, /, *, vector_field, parameters, output_scale
     ):
+        # todo: state_previous.ssv (resp. whatever we need from it)
+        #  should be cached in state.ssv.extrapolation_cache. Right?
         ssv = self.extrapolation.complete_with_reversal(
             state.ssv,
             state_previous=state_previous.ssv,
@@ -350,7 +352,7 @@ class Smoother(_SmootherCommon):
         )
         _, _, _, acc = self.extract_at_terminal_values(acc_p)
         marginals = acc.backward_model.marginalise(marginals)
-        u = marginals.extract_qoi()
+        u = acc_p.ssv.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
 
@@ -436,14 +438,14 @@ class FixedPointSmoother(_SmootherCommon):
         backward_model0 = s0.ssv.backward_model.merge_with_incoming_conditional(
             ssv0.backward_model
         )
-        ssv0_ = self.extrapolation.replace_backward_model(
+        ssv0 = self.extrapolation.replace_backward_model(
             ssv0, backward_model=backward_model0
         )
 
         solution = _SmState(
             t=t,
-            u=ssv0_.extract_qoi(),
-            ssv=ssv0_,
+            u=ssv0.extract_qoi(),
+            ssv=ssv0,
             num_data_points=s0.num_data_points,
         )
         previous = self._duplicate_with_unit_backward_model(solution)
