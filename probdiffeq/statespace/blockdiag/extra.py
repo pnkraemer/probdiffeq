@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _collections
+from probdiffeq.statespace import _extra
 from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
@@ -20,7 +20,7 @@ def _tree_stack_duplicates(tree, n):
 
 
 @jax.tree_util.register_pytree_node_class
-class _BlockDiag(_collections.AbstractExtrapolation):
+class _BlockDiag(_extra.AbstractExtrapolation):
     def __init__(self, extra, /):
         # todo: init of superclass?
         self.extra = extra

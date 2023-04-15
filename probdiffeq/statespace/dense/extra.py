@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections, _ibm_util
+from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.dense import _conds, _vars
 
 
@@ -27,7 +27,7 @@ def ibm_dense(ode_shape, num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseIBM(_collections.AbstractExtrapolation):
+class _DenseIBM(_extra.AbstractExtrapolation):
     def __init__(
         self,
         *,

@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections, _ibm_util
+from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.scalar import _conds, _vars
 
 
@@ -21,7 +21,7 @@ def ibm_scalar(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IBM(_collections.AbstractExtrapolation):
+class _IBM(_extra.AbstractExtrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"
