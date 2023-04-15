@@ -1,23 +1,25 @@
 """Various interfaces."""
 
 import abc
-from typing import Generic, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 from probdiffeq.statespace import _collections
 
 # todo: split into multiple files.
 
 
-SSVTypeVar = TypeVar("SSVTypeVar", bound=_collections.SSV)
+class Extra(NamedTuple):
+    backward_model: Any
+    cache: Any
+
+
+S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
-
-# todo: remove
-CacheTypeVar = TypeVar("CacheTypeVar")
-"""A type-variable to alias extrapolation- and correction-caches."""
+E = TypeVar("E", bound=Extra)
 
 
-class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
+class AbstractExtrapolation(abc.ABC, Generic[S, E]):
     """Extrapolation model interface."""
 
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
@@ -55,65 +57,49 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def solution_from_tcoeffs_without_reversal(
-        self,
-        taylor_coefficients,
-        /,
-    ) -> SSVTypeVar:
+    def solution_from_tcoeffs_without_reversal(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /) -> SSVTypeVar:
+    def solution_from_tcoeffs_with_reversal(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_without_reversal(self, rv, /):
+    def init_without_reversal(self, rv, /) -> Tuple[S, E]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_with_reversal(self, rv, cond, /):
+    def init_with_reversal(self, rv, cond, /) -> Tuple[S, E]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init_with_reversal_and_reset(self, rv, cond, /):
+    def init_with_reversal_and_reset(self, rv, cond, /) -> Tuple[S, E]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_without_reversal(self, s, /):
+    def extract_without_reversal(self, s: S, e: E, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_with_reversal(self, s, /):
+    def extract_with_reversal(self, s: S, e: E, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin(self, s0, /, dt) -> SSVTypeVar:
+    def begin(self, s: S, e: E, /, dt) -> Tuple[S, E]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_without_reversal(
-        self,
-        output_begin: SSVTypeVar,
-        /,
-        s0,
-        output_scale,
-    ):
+    def complete_without_reversal(self, s: S, e: E, /, output_scale) -> Tuple[S, E]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_with_reversal(
-        self,
-        output_begin: SSVTypeVar,
-        /,
-        s0,
-        output_scale,
-    ):
+    def complete_with_reversal(self, s: S, e: E, /, output_scale) -> Tuple[S, E]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def replace_backward_model(self, s: SSVTypeVar, /, backward_model) -> SSVTypeVar:
+    def replace_backward_model(self, e: E, /, backward_model) -> E:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def duplicate_with_unit_backward_model(self, s: SSVTypeVar, /) -> SSVTypeVar:
+    def duplicate_with_unit_backward_model(self, e: E, /) -> E:
         raise NotImplementedError

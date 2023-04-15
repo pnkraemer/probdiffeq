@@ -60,16 +60,9 @@ class _IsoIBM(_extra.AbstractExtrapolation):
         return s.hidden_state
 
     def init_without_reversal(self, rv, /):
-        return _vars.IsoSSV(
-            rv,
-            hidden_shape=rv.mean.shape,
-            observed_state=None,
-            error_estimate=None,
-            backward_model=None,
-            output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
-        )
+        extra = _extra.Extra(backward_model=None, cache=None)
+        ssv = _vars.IsoSSV(rv, hidden_shape=rv.mean.shape)
+        return ssv, extra
 
     def init_with_reversal(self, rv, conds, /):
         return _vars.IsoSSV(
