@@ -66,13 +66,14 @@ class _IsoIBM(_extra.Extrapolation):
         ssv = _vars.IsoSSV(t, u, rv, num_data_points=num_data_points)
         return ssv, extra
 
-    def init_with_reversal(self, rv, conds, /, num_data_points):
-        ssv = _vars.IsoSSV(rv, num_data_points=num_data_points)
+    # todo: make extract() return those.
+    def init_with_reversal(self, t, u, rv, conds, /, num_data_points):
+        ssv = _vars.IsoSSV(t, u, rv, num_data_points=num_data_points)
         extra = _extra.State(backward_model=conds, cache=None)
         return ssv, extra
 
-    def init_with_reversal_and_reset(self, rv, _conds, /, num_data_points):
-        ssv = _vars.IsoSSV(rv, num_data_points=num_data_points)
+    def init_with_reversal_and_reset(self, t, u, rv, _conds, /, num_data_points):
+        ssv = _vars.IsoSSV(t, u, rv, num_data_points=num_data_points)
         cond = self._init_conditional(rv_proto=rv)
         extra = _extra.State(backward_model=cond, cache=None)
         return ssv, extra
@@ -172,10 +173,11 @@ class _IsoIBM(_extra.Extrapolation):
         # Gather outputs
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        rv = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
 
         # Return results
-        ssv = _vars.IsoSSV(extrapolated, num_data_points=state.num_data_points)
+        u = m_ext[0, :]
+        ssv = _vars.IsoSSV(state.t, u, rv, num_data_points=state.num_data_points)
         extra = _extra.State(backward_model=bw_model, cache=None)
         return ssv, extra
 

@@ -112,11 +112,15 @@ class _SmState(NamedTuple):
     extra: Any
     corr: Any
 
-    # todo: move to StateSpaceVar
-    #  (only the SLR knows that it needs `d` data points per step...)
-    t: Any
-    u: Any
-    num_data_points: Any
+    # todo: are these properties a bit hacky?
+
+    @property
+    def t(self):
+        return self.ssv.t
+
+    @property
+    def u(self):
+        return self.ssv.u
 
     @property
     def error_estimate(self):
@@ -126,14 +130,7 @@ class _SmState(NamedTuple):
         ssv = self.ssv.scale_covariance(output_scale)
         extra = self.extra.scale_covariance(output_scale)
         corr = self.corr.scale_covariance(output_scale)
-        return _SmState(
-            t=self.t,
-            u=self.u,
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            num_data_points=self.num_data_points,
-        )
+        return _SmState(ssv=ssv, extra=extra, corr=corr)
 
 
 class _SmootherCommon(_strategy.Strategy):
@@ -167,17 +164,8 @@ class _SmootherCommon(_strategy.Strategy):
 
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
-        ssv, corr = self.correction.begin(
-            ssv, state.corr, vector_field, state.t + dt, parameters
-        )
-        return _SmState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            num_data_points=state.num_data_points,
-        )
+        ssv, corr = self.correction.begin(ssv, state.corr, vector_field, parameters)
+        return _SmState(ssv=ssv, extra=extra, corr=corr)
 
     @abc.abstractmethod
     def complete(self, state, /, *, vector_field, parameters, output_scale):
@@ -201,7 +189,7 @@ class _SmootherCommon(_strategy.Strategy):
         markov_seq = MarkovSequence(
             init=init,
             backward_model=bw_model,
-            num_data_points=state.num_data_points,
+            num_data_points=state.ssv.num_data_points,
         )
         marginals = self._extract_marginals(markov_seq)
         u = state.ssv.extract_qoi_from_sample(marginals.mean)
@@ -215,7 +203,7 @@ class _SmootherCommon(_strategy.Strategy):
         markov_seq = MarkovSequence(
             init=init,
             backward_model=bw_model,
-            num_data_points=state.num_data_points,
+            num_data_points=state.ssv.num_data_points,
         )
         marginals = state.ssv.hidden_state
         u = state.ssv.extract_qoi_from_sample(marginals.mean)
@@ -231,7 +219,7 @@ class _SmootherCommon(_strategy.Strategy):
         return markov.marginalise_backwards()
 
     def num_data_points(self, state, /):
-        return state.num_data_points
+        return state.ssv.num_data_points
 
     def observation(self, state, /):
         return state.corr.observed
@@ -246,12 +234,9 @@ class _SmootherCommon(_strategy.Strategy):
             ssv, extra, output_scale=output_scale
         )
         return _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
             ssv=ssv,
             extra=extra,
             corr=jax.tree_util.tree_map(jnp.empty_like, state.corr),
-            num_data_points=state.num_data_points,
         )
 
     # # todo: should this be a classmethod of MarkovSequence?
@@ -260,14 +245,7 @@ class _SmootherCommon(_strategy.Strategy):
         #  once this is implemented, we can use simulate_terminal_values() between
         #  checkpoints and remove sooo much code.
         extra = self.extrapolation.duplicate_with_unit_backward_model(posterior.extra)
-        return _SmState(
-            t=posterior.t,
-            u=posterior.u,
-            ssv=posterior.ssv,
-            extra=extra,
-            corr=posterior.corr,
-            num_data_points=posterior.num_data_points,
-        )
+        return _SmState(ssv=posterior.ssv, extra=extra, corr=posterior.corr)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -278,37 +256,17 @@ class Smoother(_SmootherCommon):
         # todo: should "extrapolation" see the "posterior" as a solution?
         #  I.e., should we move "MarkovSequence" to statespace.py?
         ssv, extra = self.extrapolation.init_with_reversal(
-            posterior.init, posterior.backward_model, posterior.num_data_points
+            t, u, posterior.init, posterior.backward_model, posterior.num_data_points
         )
         ssv, corr = self.correction.init(ssv)
-        return _SmState(
-            t=t,
-            u=u,
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            num_data_points=posterior.num_data_points,
-        )
+        return _SmState(ssv=ssv, extra=extra, corr=corr)
 
     def complete(self, state, /, *, vector_field, parameters, output_scale):
         ssv, extra = self.extrapolation.complete_with_reversal(
-            state.ssv,
-            state.extra,
-            output_scale=output_scale,
+            state.ssv, state.extra, output_scale=output_scale
         )
-        ssv, corr = self.correction.complete(
-            ssv, state.corr, vector_field, state.t, parameters
-        )
-        return _SmState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            # todo: move this info to SSV -> to corrections.
-            #  (only the SLR can know how many data points it needs!)
-            num_data_points=state.num_data_points + 1,
-        )
+        ssv, corr = self.correction.complete(ssv, state.corr, vector_field, parameters)
+        return _SmState(ssv=ssv, extra=extra, corr=corr)
 
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
@@ -341,15 +299,12 @@ class Smoother(_SmootherCommon):
         posterior1 = self._interpolate_from_t0_to_t(
             state=posterior0, output_scale=output_scale, t=s1.t, t0=t
         )
-        t_accepted = jnp.maximum(s1.t, t)
+        # t_accepted = jnp.maximum(s1.t, t)
         posterior1 = _SmState(
-            t=t_accepted,
-            u=s1.u,
             ssv=s1.ssv,
             corr=s1.corr,
             # replace backward model:
             extra=posterior1.extra,
-            num_data_points=s1.num_data_points,
         )
 
         return InterpRes(accepted=posterior1, solution=posterior0, previous=posterior0)
@@ -392,17 +347,10 @@ class FixedPointSmoother(_SmootherCommon):
 
     def init(self, t, u, marginals, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.init_with_reversal_and_reset(
-            posterior.init, posterior.backward_model, posterior.num_data_points
+            t, u, posterior.init, posterior.backward_model, posterior.num_data_points
         )
         ssv, corr = self.correction.init(ssv)
-        return _SmState(
-            t=t,
-            u=u,
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            num_data_points=posterior.num_data_points,
-        )
+        return _SmState(ssv=ssv, extra=extra, corr=corr)
 
     def complete(self, state, /, *, vector_field, parameters, output_scale):
         bw_previous = state.extra.backward_model
@@ -417,18 +365,8 @@ class FixedPointSmoother(_SmootherCommon):
             extra, backward_model=backward_model
         )
 
-        ssv, corr = self.correction.complete(
-            ssv, state.corr, vector_field, state.t, parameters
-        )
-        return _SmState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            # todo: move this info to SSV.
-            num_data_points=state.num_data_points + 1,
-        )
+        ssv, corr = self.correction.complete(ssv, state.corr, vector_field, parameters)
+        return _SmState(ssv=ssv, extra=extra, corr=corr)
 
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
@@ -443,14 +381,8 @@ class FixedPointSmoother(_SmootherCommon):
 
         # Do we need:
         #  t_accepted = jnp.maximum(s1.t, t) ?
-        solution = _SmState(
-            t=t,
-            u=s1.u,
-            ssv=s1.ssv,
-            extra=extra1,
-            corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
-            num_data_points=s1.num_data_points,
-        )
+        corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
+        solution = _SmState(ssv=s1.ssv, extra=extra1, corr=corr_like)
 
         accepted = self._duplicate_with_unit_backward_model(solution)
         # accepted = solution
@@ -482,14 +414,7 @@ class FixedPointSmoother(_SmootherCommon):
             posterior0.extra, backward_model=backward_model0
         )
 
-        solution = _SmState(
-            t=posterior0.t,
-            u=posterior0.u,
-            ssv=posterior0.ssv,
-            corr=posterior0.corr,
-            extra=extra0,
-            num_data_points=s0.num_data_points,
-        )
+        solution = _SmState(ssv=posterior0.ssv, corr=posterior0.corr, extra=extra0)
         previous = self._duplicate_with_unit_backward_model(solution)
 
         posterior1 = self._interpolate_from_t0_to_t(
@@ -500,15 +425,8 @@ class FixedPointSmoother(_SmootherCommon):
             s1.extra, backward_model=backward_model1
         )
 
-        t_accepted = jnp.maximum(s1.t, t)
-        accepted = _SmState(
-            t=t_accepted,
-            u=s1.u,
-            ssv=s1.ssv,
-            extra=extra1,
-            corr=posterior1.corr,
-            num_data_points=s1.num_data_points,
-        )
+        # t_accepted = jnp.maximum(s1.t, t)
+        accepted = _SmState(ssv=s1.ssv, extra=extra1, corr=posterior1.corr)
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
