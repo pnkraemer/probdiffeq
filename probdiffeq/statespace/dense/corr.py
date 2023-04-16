@@ -246,7 +246,7 @@ class _DenseStatisticalZerothOrder(_DenseCorrection):
 
     """
 
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, c, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)[0]
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower)[0]
@@ -275,18 +275,15 @@ class _DenseStatisticalZerothOrder(_DenseCorrection):
         error_estimate_unscaled = marginals.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        return _vars.DenseSSV(
+        corr = _corr.State(
+            observed=None,
             output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            cache_extra=x.cache_extra,
-            backward_model=x.backward_model,
-            cache_corr=None,
-            observed_state=None,
+            cache=None,
         )
+        return x, corr
 
-    def complete(self, x, /, vector_field, t, p):
+    def complete(self, x, c, /, vector_field, t, p):
         # Select the required derivatives
         m_0 = self.e0(x.hidden_state.mean)[0]
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower)[0]
@@ -317,21 +314,20 @@ class _DenseStatisticalZerothOrder(_DenseCorrection):
         # Compute the corrected mean and gather the correction
         m_bw = x.hidden_state.mean - gain @ m_marg
         corrected = _vars.DenseNormal(m_bw, r_bw.T)
-        return _vars.DenseSSV(
-            corrected,
-            observed_state=observed,
-            hidden_shape=x.hidden_shape,
-            error_estimate=x.error_estimate,
-            backward_model=x.backward_model,
+
+        ssv = _vars.DenseSSV(corrected, hidden_shape=x.hidden_shape)
+        corr = _corr.State(
+            observed,
+            error_estimate=c.error_estimate,
+            cache=None,
             output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
         )
+        return ssv, corr
 
 
 @jax.tree_util.register_pytree_node_class
 class _DenseStatisticalFirstOrder(_DenseCorrection):
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, corr, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)[0]  # only first-order ODEs
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower)[0]
@@ -360,18 +356,15 @@ class _DenseStatisticalFirstOrder(_DenseCorrection):
         error_estimate_unscaled = marginals.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        return _vars.DenseSSV(
+        corr = _corr.State(
+            observed=None,
             output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            cache_extra=x.cache_extra,
-            backward_model=x.backward_model,
-            cache_corr=None,
-            observed_state=None,
+            cache=None,
         )
+        return x, corr
 
-    def complete(self, x, /, vector_field, t, p):
+    def complete(self, x, c, /, vector_field, t, p):
         # todo: higher-order ODEs
         def f_wrapped(s):
             return vector_field(s, t=t, p=p)
@@ -404,16 +397,14 @@ class _DenseStatisticalFirstOrder(_DenseCorrection):
         m_bw = x.hidden_state.mean - gain @ m_marg
         corrected = _vars.DenseNormal(m_bw, r_bw.T)
 
-        return _vars.DenseSSV(
-            corrected,
-            observed_state=observed,
-            hidden_shape=x.hidden_shape,
-            error_estimate=x.error_estimate,
-            backward_model=x.backward_model,
+        ssv = _vars.DenseSSV(corrected, hidden_shape=x.hidden_shape)
+        corr = _corr.State(
+            observed,
+            error_estimate=c.error_estimate,
+            cache=None,
             output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
         )
+        return ssv, corr
 
 
 def _select_derivative_vect(x, i, *, ode_shape):
