@@ -58,7 +58,7 @@ class _IsoIBM(_extra.Extrapolation):
     def extract_with_reversal(self, s, e, /):
         return s.hidden_state, e.backward_model
 
-    def extract_without_reversal(self, s, /):
+    def extract_without_reversal(self, s, e, /):
         return s.hidden_state
 
     def init_without_reversal(self, rv, /):
@@ -130,7 +130,7 @@ class _IsoIBM(_extra.Extrapolation):
         extra: _extra.State,
         /,
         output_scale: float,
-    ) -> _vars.IsoSSV:
+    ) -> Tuple[_vars.IsoSSV, _extra.State]:
         m_ext = state.hidden_state.mean
         _, _, p, p_inv, l0 = extra.cache
 

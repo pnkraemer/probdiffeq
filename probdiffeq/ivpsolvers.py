@@ -19,6 +19,8 @@ class _State(NamedTuple):
     # Not contained in _State but in Solution: output_scale, marginals.
 
     # Different to solution.Solution():
+    # todo: I think this is information that should be "zipped" with the strategy
+    #  (just like strategy "zip"s extrapolation and correction)
     output_scale_calibrated: Any
     output_scale_prior: Any
 
@@ -82,7 +84,6 @@ class AbstractSolver(abc.ABC):
             marginals=marginals,
             output_scale=output_scale,
             u=u,
-            num_data_points=self.strategy.num_data_points(posterior),
         )
 
     def init(self, sol, /) -> _State:
@@ -160,9 +161,8 @@ class CalibrationFreeSolver(AbstractSolver):
     """
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        state_strategy_previous = state.strategy
         state_strategy = self.strategy.begin(
-            state_strategy_previous,
+            state.strategy,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
@@ -170,7 +170,6 @@ class CalibrationFreeSolver(AbstractSolver):
 
         state_strategy = self.strategy.complete(
             state_strategy,
-            state_strategy_previous,
             parameters=parameters,
             vector_field=vector_field,
             output_scale=state.output_scale_prior,
@@ -197,7 +196,6 @@ class CalibrationFreeSolver(AbstractSolver):
             #  but we use _prior because we might remove the _calibrated
             #  value in the future.
             output_scale=state.output_scale_prior,
-            num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -210,7 +208,6 @@ class CalibrationFreeSolver(AbstractSolver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_prior,
-            num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
 
@@ -250,7 +247,6 @@ class DynamicSolver(AbstractSolver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -263,7 +259,6 @@ class DynamicSolver(AbstractSolver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
 
@@ -329,7 +324,6 @@ class MLESolver(AbstractSolver):
             marginals=marginals,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -344,7 +338,6 @@ class MLESolver(AbstractSolver):
             marginals=marg,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
         )
 
     @staticmethod
