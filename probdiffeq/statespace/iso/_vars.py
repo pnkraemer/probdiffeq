@@ -38,7 +38,11 @@ class IsoSSV(_collections.SSV):
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
         return IsoSSV(
-            rv, hidden_shape=self.hidden_shape, num_data_points=self.num_data_points
+            self.t,
+            self.u,
+            rv,
+            hidden_shape=self.hidden_shape,
+            num_data_points=self.num_data_points,
         )
 
     def marginal_nth_derivative(self, n):

@@ -61,9 +61,9 @@ class _IsoIBM(_extra.Extrapolation):
     def extract_without_reversal(self, s, e, /):
         return s.hidden_state
 
-    def init_without_reversal(self, rv, /, num_data_points):
+    def init_without_reversal(self, t, u, rv, /, num_data_points):
         extra = _extra.State(backward_model=None, cache=None)
-        ssv = _vars.IsoSSV(rv, num_data_points=num_data_points)
+        ssv = _vars.IsoSSV(t, u, rv, num_data_points=num_data_points)
         return ssv, extra
 
     def init_with_reversal(self, rv, conds, /, num_data_points):
@@ -108,7 +108,7 @@ class _IsoIBM(_extra.Extrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         rv = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(rv, num_data_points=s0.num_data_points)
+        ssv = _vars.IsoSSV(s0.t + dt, None, rv, num_data_points=s0.num_data_points)
 
         l0 = s0.hidden_state.cov_sqrtm_lower
         # todo: once we have different begin() methods
@@ -143,7 +143,8 @@ class _IsoIBM(_extra.Extrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        ssv = _vars.IsoSSV(rv, num_data_points=state.num_data_points)
+        u = m_ext[0, :]
+        ssv = _vars.IsoSSV(state.t, u, rv, num_data_points=state.num_data_points)
         extra = _extra.State(backward_model=None, cache=None)
         return ssv, extra
 
