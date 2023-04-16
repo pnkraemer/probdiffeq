@@ -1,5 +1,7 @@
 """Corrections."""
 
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -49,7 +51,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         error_estimate_unscaled = obs.marginal_std()
         error_estimate = error_estimate_unscaled * output_scale
 
-        ssv = _vars.IsoSSV(x.hidden_state)
+        ssv = _vars.IsoSSV(x.hidden_state, num_data_points=x.num_data_points + 1)
         corr = _corr.State(
             observed=None,
             output_scale_dynamic=output_scale,
@@ -60,7 +62,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
 
     def complete(
         self, x: _vars.IsoSSV, c: _corr.State, /, _vector_field, _t, _p
-    ) -> _vars.IsoSSV:
+    ) -> Tuple[_vars.IsoSSV, _corr.State]:
         (bias,) = c.cache
 
         m_ext = x.hidden_state.mean
@@ -77,7 +79,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
         corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
 
-        ssv = _vars.IsoSSV(corrected)
+        ssv = _vars.IsoSSV(corrected, num_data_points=x.num_data_points)
         corr = _corr.State(
             observed=observed,
             output_scale_dynamic=None,

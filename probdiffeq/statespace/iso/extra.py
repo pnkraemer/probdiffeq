@@ -61,19 +61,19 @@ class _IsoIBM(_extra.Extrapolation):
     def extract_without_reversal(self, s, e, /):
         return s.hidden_state
 
-    def init_without_reversal(self, rv, /):
+    def init_without_reversal(self, rv, /, num_data_points):
         extra = _extra.State(backward_model=None, cache=None)
-        ssv = _vars.IsoSSV(rv)
+        ssv = _vars.IsoSSV(rv, num_data_points=num_data_points)
         return ssv, extra
 
-    def init_with_reversal(self, rv, conds, /):
-        ssv = _vars.IsoSSV(rv)
+    def init_with_reversal(self, rv, conds, /, num_data_points):
+        ssv = _vars.IsoSSV(rv, num_data_points=num_data_points)
         extra = _extra.State(backward_model=conds, cache=None)
         return ssv, extra
 
-    def init_with_reversal_and_reset(self, rv, _conds, /):
+    def init_with_reversal_and_reset(self, rv, _conds, /, num_data_points):
+        ssv = _vars.IsoSSV(rv, num_data_points=num_data_points)
         cond = self._init_conditional(rv_proto=rv)
-        ssv = _vars.IsoSSV(rv)
         extra = _extra.State(backward_model=cond, cache=None)
         return ssv, extra
 
@@ -108,12 +108,12 @@ class _IsoIBM(_extra.Extrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         rv = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(rv)
+        ssv = _vars.IsoSSV(rv, num_data_points=s0.num_data_points)
 
         l0 = s0.hidden_state.cov_sqrtm_lower
         # todo: once we have different begin() methods
         #  (and once fixed-point smoothing does its own complete())
-        #  backward_model should be None here.
+        #  backward_model should be 'None' here.
         ext = _extra.State(
             cache=(m_ext_p, m0_p, p, p_inv, l0), backward_model=ex.backward_model
         )
@@ -143,7 +143,7 @@ class _IsoIBM(_extra.Extrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        ssv = _vars.IsoSSV(rv)
+        ssv = _vars.IsoSSV(rv, num_data_points=state.num_data_points)
         extra = _extra.State(backward_model=None, cache=None)
         return ssv, extra
 
@@ -174,7 +174,7 @@ class _IsoIBM(_extra.Extrapolation):
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
 
         # Return results
-        ssv = _vars.IsoSSV(extrapolated)
+        ssv = _vars.IsoSSV(extrapolated, num_data_points=state.num_data_points)
         extra = _extra.State(backward_model=bw_model, cache=None)
         return ssv, extra
 

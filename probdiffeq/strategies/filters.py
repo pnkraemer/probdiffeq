@@ -21,7 +21,6 @@ class _FiState(NamedTuple):
     # Todo: move this info to ssv
     t: Any
     u: Any
-    num_data_points: float
 
     # todo: is this property a bit hacky?
 
@@ -36,7 +35,6 @@ class _FiState(NamedTuple):
             ssv=self.ssv.scale_covariance(s),
             extra=self.extra.scale_covariance(s),
             corr=self.corr.scale_covariance(s),
-            num_data_points=self.num_data_points,
         )
 
 
@@ -85,16 +83,11 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return u, marginals, sol
 
     def init(self, t, u, _marginals, solution: FilterDist) -> _FiState:
-        s, e = self.extrapolation.init_without_reversal(solution.rv)
-        s, c = self.correction.init(s)
-        return _FiState(
-            t=t,
-            u=u,
-            ssv=s,
-            extra=e,
-            corr=c,
-            num_data_points=solution.num_data_points,
+        s, e = self.extrapolation.init_without_reversal(
+            solution.rv, solution.num_data_points
         )
+        s, c = self.correction.init(s)
+        return _FiState(t=t, u=u, ssv=s, extra=e, corr=c)
 
     def begin(self, state: _FiState, /, *, dt, parameters, vector_field) -> _FiState:
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
@@ -102,12 +95,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv, state.corr, vector_field, state.t + dt, parameters
         )
         return _FiState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            num_data_points=state.num_data_points,
+            t=state.t + dt, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr
         )
 
     def complete(self, state, /, *, vector_field, parameters, output_scale):
@@ -117,19 +105,12 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         ssv, corr = self.correction.complete(
             ssv, state.corr, vector_field, state.t, parameters
         )
-        return _FiState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-            num_data_points=state.num_data_points + 1,
-        )
+        return _FiState(t=state.t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
 
     def extract(self, post: _FiState, /) -> _SolType:
         t = post.t
         marginals = self.extrapolation.extract_without_reversal(post.ssv, post.extra)
-        solution = FilterDist(marginals, post.num_data_points)
+        solution = FilterDist(marginals, self.num_data_points(post))
         u = post.ssv.extract_qoi()
         return t, u, marginals, solution
 
@@ -137,7 +118,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return self.extract(posterior)
 
     def num_data_points(self, state: _FiState, /):
-        return state.num_data_points
+        return state.ssv.num_data_points
 
     def observation(self, state, /):
         return state.corr.observed
@@ -161,10 +142,9 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             t=t,
             u=ssv.extract_qoi(),
             ssv=ssv,
-            # Interpolation must by shape- and dtype-stable
+            # Interpolation must be shape- and dtype-stable
             extra=jax.tree_util.tree_map(jnp.empty_like, s1.extra),
             corr=jax.tree_util.tree_map(jnp.empty_like, s1.corr),
-            num_data_points=s0.num_data_points,
         )
         return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 

@@ -31,7 +31,7 @@ C = TypeVar("C", bound=State)
 
 
 @jax.tree_util.register_pytree_node_class
-class Correction(abc.ABC, Generic[S]):
+class Correction(abc.ABC, Generic[S, C]):
     """Correction model interface."""
 
     def __init__(self, ode_order):

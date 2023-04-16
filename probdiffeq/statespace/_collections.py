@@ -65,28 +65,29 @@ class SSV(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
-    def __init__(self, hidden_state, /, *, hidden_shape=None):
-        self.hidden_shape = hidden_shape
+    def __init__(self, hidden_state, /, *, num_data_points, hidden_shape=None):
         self.hidden_state = hidden_state  # todo: 'hidden'
+        self.hidden_shape = hidden_shape
+        self.num_data_points = num_data_points
 
     def tree_flatten(self):
-        children = (self.hidden_state,)
+        children = (self.hidden_state, self.num_data_points)
         aux = (self.hidden_shape,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (hidden_state,) = children
+        (hidden_state, num_data_points) = children
         (hidden_shape,) = aux
         return cls(
-            hidden_state,
-            hidden_shape=hidden_shape,
+            hidden_state, num_data_points=num_data_points, hidden_shape=hidden_shape
         )
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
-            f"{self.hidden_shape},"
+            f"{self.hidden_state},"
+            f"num_data_points={self.num_data_points},"
             f"hidden_state={self.hidden_state}"
             f")"
         )

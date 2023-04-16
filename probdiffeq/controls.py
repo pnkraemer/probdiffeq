@@ -69,6 +69,8 @@ class _ProportionalIntegralCommon(AbstractControl[_PIState]):
         return cls(*children)
 
     def init_state_from_dt(self, dt0):
+        # todo: make error_norm_prev... an (optional) argument.
+        #  otherwise, x=init(extract(init)) does not hold.
         return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
 
     @abc.abstractmethod

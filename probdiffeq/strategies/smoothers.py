@@ -15,6 +15,8 @@ S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
 
 # todo: markov sequences should not necessarily be backwards
+# todo: move markov sequence to state-space level
+#  (solution type of smoother-style algos)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -276,7 +278,7 @@ class Smoother(_SmootherCommon):
         # todo: should "extrapolation" see the "posterior" as a solution?
         #  I.e., should we move "MarkovSequence" to statespace.py?
         ssv, extra = self.extrapolation.init_with_reversal(
-            posterior.init, posterior.backward_model
+            posterior.init, posterior.backward_model, posterior.num_data_points
         )
         ssv, corr = self.correction.init(ssv)
         return _SmState(
@@ -390,7 +392,7 @@ class FixedPointSmoother(_SmootherCommon):
 
     def init(self, t, u, marginals, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.init_with_reversal_and_reset(
-            posterior.init, posterior.backward_model
+            posterior.init, posterior.backward_model, posterior.num_data_points
         )
         ssv, corr = self.correction.init(ssv)
         return _SmState(

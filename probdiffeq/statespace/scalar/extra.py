@@ -72,9 +72,9 @@ class _IBM(_extra.Extrapolation):
         noi = _vars.NormalHiddenState(mean, cov_sqrtm_lower)
         return _conds.ConditionalHiddenState(op, noise=noi)
 
-    def init_without_reversal(self, rv, /):
+    def init_without_reversal(self, rv, /, num_data_points):
         extra = _extra.State(backward_model=None, cache=None)
-        ssv = _vars.SSV(rv)
+        ssv = _vars.SSV(rv, num_data_points=num_data_points)
         return ssv, extra
 
     def extract_without_reversal(self, s, e, /):
