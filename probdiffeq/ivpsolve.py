@@ -54,7 +54,7 @@ def simulate_terminal_values(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _collocate.simulate_terminal_values(
+    _dt, sol = _collocate.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
         solution=sol,
         t1=t1,
@@ -63,6 +63,7 @@ def simulate_terminal_values(
         dt0=dt0,
         while_loop_fn=while_loop_fn_temporal,
     )
+    return sol
 
 
 def solve_and_save_at(
@@ -118,7 +119,7 @@ def solve_and_save_at(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _collocate.solve_and_save_at(
+    _dt, sol = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         solution=sol,
         save_at=save_at,
@@ -127,6 +128,7 @@ def solve_and_save_at(
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
     )
+    return sol
 
 
 # Full solver routines
