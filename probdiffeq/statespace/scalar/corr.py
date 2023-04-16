@@ -18,23 +18,22 @@ class _TaylorZerothOrder(_corr.Correction):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
-    def init(self, x, /):
+    def init(self, s, /):
         mean_like = jnp.zeros(())
         cholesky_like = jnp.zeros(())
+        # todo: rename 'cov_sqrtm_lower' to 'cholesky' or 'cholesky_lower'.
         observed_like = _vars.NormalQOI(mean=mean_like, cov_sqrtm_lower=cholesky_like)
-        error_estimate = jnp.empty(())
-        return _vars.SSV(
-            observed_state=observed_like,
-            error_estimate=error_estimate,
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            backward_model=x.backward_model,
-            output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
-        )
 
-    def begin(self, x: _vars.SSV, /, vector_field, t, p):
+        error_estimate = jnp.zeros(())
+        corr = _corr.State(
+            observed=observed_like,
+            output_scale_dynamic=None,
+            error_estimate=error_estimate,
+            cache=None,
+        )
+        return s, corr
+
+    def begin(self, x: _vars.SSV, c, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
@@ -42,16 +41,15 @@ class _TaylorZerothOrder(_corr.Correction):
         output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
-        return _vars.SSV(
-            error_estimate=error_estimate,
+
+        ssv = _vars.SSV(x.hidden_state)
+        corr = _corr.State(
+            observed=None,
             output_scale_dynamic=output_scale,
-            cache_corr=cache,
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            cache_extra=x.cache_extra,
-            backward_model=x.backward_model,
-            observed_state=None,
+            error_estimate=error_estimate,
+            cache=cache,
         )
+        return ssv, corr
 
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
@@ -66,8 +64,8 @@ class _TaylorZerothOrder(_corr.Correction):
         m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
         return m0, m1
 
-    def complete(self, x, /, _vector_field, _t, _p):
-        (b,) = x.cache_corr
+    def complete(self, x, c, /, _vector_field, _t, _p):
+        (b,) = c.cache
         m_ext = x.hidden_state.mean
         l_ext = x.hidden_state.cov_sqrtm_lower
 
@@ -79,18 +77,16 @@ class _TaylorZerothOrder(_corr.Correction):
         gain = jnp.reshape(gain_mat, (-1,))
         m_cor = m_ext - gain * b
         observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
+        corrected = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
 
-        rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        return _vars.SSV(
-            hidden_state=rv_cor,
-            observed_state=observed,
-            hidden_shape=x.hidden_shape,
-            error_estimate=x.error_estimate,
-            backward_model=x.backward_model,
+        ssv = _vars.SSV(corrected)
+        corr = _corr.State(
+            observed=observed,
             output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
+            error_estimate=c.error_estimate,
+            cache=None,
         )
+        return ssv, corr
 
 
 @jax.tree_util.register_pytree_node_class

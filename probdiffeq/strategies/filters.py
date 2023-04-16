@@ -126,11 +126,11 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             num_data_points=state.num_data_points + 1,
         )
 
-    def extract(self, posterior: _FiState, /) -> _SolType:
-        t = posterior.t
-        marginals = self.extrapolation.extract_without_reversal(posterior.ssv)
-        solution = FilterDist(marginals, posterior.num_data_points)
-        u = posterior.ssv.extract_qoi()
+    def extract(self, post: _FiState, /) -> _SolType:
+        t = post.t
+        marginals = self.extrapolation.extract_without_reversal(post.ssv, post.extra)
+        solution = FilterDist(marginals, post.num_data_points)
+        u = post.ssv.extract_qoi()
         return t, u, marginals, solution
 
     def extract_at_terminal_values(self, posterior: _FiState, /) -> _SolType:
