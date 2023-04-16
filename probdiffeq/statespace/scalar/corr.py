@@ -116,7 +116,7 @@ class StatisticalFirstOrder(_corr.Correction):
     def init(self, s, /):
         raise NotImplementedError
 
-    def begin(self, x: _vars.NormalHiddenState, /, vector_field, t, p):
+    def begin(self, x: _vars.NormalHiddenState, c, /, vector_field, t, p):
         raise NotImplementedError
 
     def calibrate(
@@ -208,7 +208,7 @@ class StatisticalFirstOrder(_corr.Correction):
         m_noi = fx_mean - linop * rv.mean[0]
         return linop, _vars.NormalQOI(m_noi, std_noi)
 
-    def complete_post_linearize(self, linop, extrapolated, noise):
+    def complete_post_linearize(self, linop, extrapolated, corr, noise):
         # Compute the cubature-correction
         L0 = extrapolated.hidden_state.cov_sqrtm_lower[0, :]
         L1 = extrapolated.hidden_state.cov_sqrtm_lower[1, :]
@@ -232,14 +232,13 @@ class StatisticalFirstOrder(_corr.Correction):
 
         # Catch up the backward noise and return result
         m_bw = extrapolated.hidden_state.mean - gain * m_marg
-        rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        return _vars.SSV(
-            rv_cor,
-            observed_state=observed,
-            hidden_shape=extrapolated.hidden_shape,
-            error_estimate=extrapolated.error_estimate,
-            cache_extra=extrapolated.cache_extra,
-            backward_model=extrapolated.backward_model,
+        corrected = _vars.NormalHiddenState(m_bw, r_bw.T)
+
+        ssv = _vars.SSV(corrected)
+        corr = _corr.State(
+            observed=observed,
             output_scale_dynamic=None,
-            cache_corr=None,
+            error_estimate=corr.error_estimate,
+            cache=None,
         )
+        return ssv, corr

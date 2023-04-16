@@ -67,34 +67,34 @@ class _BlockDiag(_extra.Extrapolation):
         solution_fn = jax.vmap(type(self.extra).init_with_reversal_and_reset)
         return solution_fn(self.extra, rv, conds)
 
-    def extract_with_reversal(self, s, /):
+    def extract_with_reversal(self, s, e, /):
         solution_fn = jax.vmap(type(self.extra).extract_with_reversal)
 
         # In save-at-mode (i.e. not terminal values), the vmapping requires extra
         #  vmapping in the `s` variable.
         if s.hidden_state.mean.ndim > 2:
-            solution_fn = jax.vmap(solution_fn, in_axes=(None, 0))
+            solution_fn = jax.vmap(solution_fn, in_axes=(None, 0, 0))
 
-        return solution_fn(self.extra, s)
+        return solution_fn(self.extra, s, e)
 
-    def extract_without_reversal(self, s, /):
+    def extract_without_reversal(self, s, e, /):
         solution_fn = jax.vmap(type(self.extra).extract_without_reversal)
 
         # In save-at-mode (i.e. not terminal values), the vmapping requires extra
         #  vmapping in the `s` variable.
         if s.hidden_state.mean.ndim > 2:
-            solution_fn = jax.vmap(solution_fn, in_axes=(None, 0))
+            solution_fn = jax.vmap(solution_fn, in_axes=(None, 0, 0))
 
-        return solution_fn(self.extra, s)
+        return solution_fn(self.extra, s, e)
 
-    def begin(self, s0, /, dt):
-        fn = jax.vmap(type(self.extra).begin, in_axes=(0, 0, None))
-        return fn(self.extra, s0, dt)
+    def begin(self, s0, e0, /, dt):
+        fn = jax.vmap(type(self.extra).begin, in_axes=(0, 0, 0, None))
+        return fn(self.extra, s0, e0, dt)
 
-    def complete_without_reversal(self, state, /, state_previous, output_scale):
+    def complete_without_reversal(self, state, extra, /, output_scale):
         fn = type(self.extra).complete_without_reversal
         fn_vmap = jax.vmap(fn)
-        return fn_vmap(self.extra, state, state_previous, output_scale)
+        return fn_vmap(self.extra, state, extra, output_scale)
 
     def init_conditional(self, ssv_proto):
         return jax.vmap(type(self.extra).init_conditional)(self.extra, ssv_proto)

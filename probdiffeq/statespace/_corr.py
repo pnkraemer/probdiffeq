@@ -27,7 +27,7 @@ class State(NamedTuple):
 S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
-C = TypeVar("S", bound=State)
+C = TypeVar("C", bound=State)
 
 
 @jax.tree_util.register_pytree_node_class
