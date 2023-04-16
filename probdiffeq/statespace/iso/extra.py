@@ -118,18 +118,6 @@ class _IsoIBM(_extra.Extrapolation):
             cache=(m_ext_p, m0_p, p, p_inv, l0), backward_model=ex.backward_model
         )
         return ssv, ext
-        # return _vars.IsoSSV(
-        #     ext,
-        #     cache_extra=,
-        #     hidden_shape=s0.hidden_shape,
-        #     output_scale_dynamic=None,
-        #     cache_corr=None,
-        #     backward_model=None,
-        #     # todo: The below should not be necessary
-        #     #  but currently, it is: because of pytree-shape stability in interpolation
-        #     observed_state=jax.tree_util.tree_map(jnp.zeros_like, s0.observed_state),
-        #     error_estimate=jax.tree_util.tree_map(jnp.zeros_like, s0.error_estimate),
-        # )
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -158,16 +146,6 @@ class _IsoIBM(_extra.Extrapolation):
         ssv = _vars.IsoSSV(rv)
         extra = _extra.State(backward_model=None, cache=None)
         return ssv, extra
-        # return _vars.IsoSSV(
-        #     rv,
-        #     hidden_shape=state.hidden_shape,
-        #     error_estimate=state.error_estimate,
-        #     cache_corr=state.cache_corr,
-        #     observed_state=state.observed_state,  # usually None?
-        #     output_scale_dynamic=None,
-        #     cache_extra=None,
-        #     backward_model=None,
-        # )
 
     def complete_with_reversal(self, state, extra, /, output_scale):
         m_ext_p, m0_p, p, p_inv, l0 = extra.cache
@@ -207,16 +185,3 @@ class _IsoIBM(_extra.Extrapolation):
     def replace_backward_model(self, e, /, backward_model):
         extra = _extra.State(backward_model=backward_model, cache=e.cache)
         return extra
-
-    #
-    #
-    #     return _vars.IsoSSV(
-    #         s.hidden_state,
-    #         backward_model=backward_model,  # new
-    #         hidden_shape=s.hidden_shape,
-    #         observed_state=s.observed_state,
-    #         error_estimate=s.error_estimate,
-    #         output_scale_dynamic=s.output_scale_dynamic,
-    #         cache_extra=s.cache_extra,
-    #         cache_corr=s.cache_corr,
-    #     )

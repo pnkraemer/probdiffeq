@@ -23,7 +23,6 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         obs_like = _vars.IsoNormalQOI(mean=m_like, cov_sqrtm_lower=l_like)
 
         error_estimate = jnp.zeros(())
-
         corr = _corr.State(
             observed=obs_like,
             output_scale_dynamic=None,
