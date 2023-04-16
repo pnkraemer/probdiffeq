@@ -88,30 +88,28 @@ class _DenseCorrection(_corr.Correction, abc.ABC):
         m_like = jnp.zeros(self.ode_shape)
         cholesky_like = jnp.zeros(self.ode_shape + self.ode_shape)
         observed_like = _vars.DenseNormal(mean=m_like, cov_sqrtm_lower=cholesky_like)
+
         error_estimate = jnp.zeros(self.ode_shape)
-        return _vars.DenseSSV(
-            observed_state=observed_like,
+        corr = _corr.State(
+            cache=None,
             error_estimate=error_estimate,
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            cache_extra=x.cache_extra,
-            backward_model=x.backward_model,
             output_scale_dynamic=None,
-            cache_corr=None,
+            observed=observed_like,
         )
+        return x, corr
 
     @abc.abstractmethod
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, c, /, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def complete(self, x: _vars.DenseSSV, c, /, vector_field, t, p):
         raise NotImplementedError
 
 
 @jax.tree_util.register_pytree_node_class
 class _DenseTaylorZerothOrder(_DenseCorrection):
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, corr, /, vector_field, t, p):
         m0 = self.e0(x.hidden_state.mean)
         m1 = self.e1(x.hidden_state.mean)
         cov_sqrtm_lower = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
@@ -136,18 +134,15 @@ class _DenseTaylorZerothOrder(_DenseCorrection):
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        return _vars.DenseSSV(
+        corr = _corr.State(
+            observed=None,
             output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
-            cache_corr=(b,),
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            cache_extra=x.cache_extra,
-            backward_model=x.backward_model,
-            observed_state=None,
+            cache=(b,),
         )
+        return x, corr
 
-    def complete(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def complete(self, x: _vars.DenseSSV, corr, /, vector_field, t, p):
         l_obs_nonsquare = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
 
         # Compute correction according to ext -> obs
@@ -156,28 +151,26 @@ class _DenseTaylorZerothOrder(_DenseCorrection):
         )
 
         # Gather observation terms
-        (b,) = x.cache_corr
+        (b,) = corr.cache
         observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T)
 
         # Gather correction terms
         m_cor = x.hidden_state.mean - gain @ b
         corrected = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
 
-        return _vars.DenseSSV(
-            corrected,
-            observed_state=observed,
-            hidden_shape=x.hidden_shape,
-            error_estimate=x.error_estimate,
-            backward_model=x.backward_model,
+        ssv = _vars.DenseSSV(corrected, hidden_shape=x.hidden_shape)
+        corr = _corr.State(
+            observed=observed,
+            error_estimate=corr.error_estimate,
             output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
+            cache=None,
         )
+        return ssv, corr
 
 
 @jax.tree_util.register_pytree_node_class
 class _DenseTaylorFirstOrder(_DenseCorrection):
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, c, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -203,20 +196,17 @@ class _DenseTaylorFirstOrder(_DenseCorrection):
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
 
-        return _vars.DenseSSV(
+        corr = _corr.State(
+            observed=None,
             output_scale_dynamic=output_scale,
             error_estimate=error_estimate,
-            cache_corr=(jvp_fn, (b,)),
-            hidden_state=x.hidden_state,
-            hidden_shape=x.hidden_shape,
-            cache_extra=x.cache_extra,
-            backward_model=x.backward_model,
-            observed_state=None,
+            cache=(jvp_fn, (b,)),
         )
+        return x, corr
 
-    def complete(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def complete(self, x: _vars.DenseSSV, corr, /, vector_field, t, p):
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        jvp_fn, (b,) = x.cache_corr
+        jvp_fn, (b,) = corr.cache
 
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
         l_obs_nonsquare = jvp_fn_vect(x.hidden_state.cov_sqrtm_lower)
@@ -233,16 +223,14 @@ class _DenseTaylorFirstOrder(_DenseCorrection):
         m_cor = x.hidden_state.mean - gain @ b
         corrected = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
 
-        return _vars.DenseSSV(
-            corrected,
-            observed_state=observed,
-            hidden_shape=x.hidden_shape,
-            error_estimate=x.error_estimate,
-            backward_model=x.backward_model,
+        ssv = _vars.DenseSSV(corrected, hidden_shape=x.hidden_shape)
+        corr = _corr.State(
+            observed=observed,
+            error_estimate=corr.error_estimate,
             output_scale_dynamic=None,
-            cache_extra=None,
-            cache_corr=None,
+            cache=None,
         )
+        return ssv, corr
 
 
 @jax.tree_util.register_pytree_node_class

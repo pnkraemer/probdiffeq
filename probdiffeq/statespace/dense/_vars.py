@@ -44,23 +44,7 @@ class DenseSSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale)
-        rv_obs = self.observed_state.scale_covariance(output_scale=output_scale)
-
-        if self.backward_model is not None:
-            backward_model = self.backward_model.scale_covariance(output_scale)
-        else:
-            backward_model = None
-
-        return DenseSSV(
-            hidden_state=rv,
-            observed_state=rv_obs,
-            backward_model=backward_model,
-            output_scale_dynamic=self.output_scale_dynamic,
-            error_estimate=self.error_estimate,
-            cache_extra=self.cache_extra,
-            cache_corr=self.cache_corr,
-            hidden_shape=self.hidden_shape,
-        )
+        return DenseSSV(rv, hidden_shape=self.hidden_shape)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:

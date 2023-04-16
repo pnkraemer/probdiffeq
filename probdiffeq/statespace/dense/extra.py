@@ -112,62 +112,36 @@ class _DenseIBM(_extra.Extrapolation):
     #  methods. This should be changed very soon.
 
     def init_without_reversal(self, rv, /):
-        return _vars.DenseSSV(
-            rv,
-            hidden_shape=self.target_shape,
-            observed_state=None,
-            output_scale_dynamic=None,
-            error_estimate=None,
-            cache_extra=None,
-            cache_corr=None,
-            backward_model=None,
-        )
+        ssv = _vars.DenseSSV(rv, hidden_shape=self.target_shape)
+        extra = _extra.State(cache=None, backward_model=None)
+        return ssv, extra
 
     def init_with_reversal(self, rv, cond, /):
-        return _vars.DenseSSV(
-            rv,
-            backward_model=cond,
-            hidden_shape=self.target_shape,
-            observed_state=None,
-            output_scale_dynamic=None,
-            error_estimate=None,
-            cache_extra=None,
-            cache_corr=None,
-        )
+        ssv = _vars.DenseSSV(rv, hidden_shape=self.target_shape)
+        extra = _extra.State(cache=None, backward_model=cond)
+        return ssv, extra
 
     def init_with_reversal_and_reset(self, rv, _cond, /):
         cond = self._init_conditional(rv_proto=rv)
-        return _vars.DenseSSV(
-            rv,
-            backward_model=cond,
-            hidden_shape=self.target_shape,
-            observed_state=None,
-            output_scale_dynamic=None,
-            error_estimate=None,
-            cache_extra=None,
-            cache_corr=None,
-        )
+        ssv = _vars.DenseSSV(rv, hidden_shape=self.target_shape)
+        extra = _extra.State(cache=None, backward_model=cond)
+        return ssv, extra
 
-    def begin(self, s0, /, dt):
+    def begin(self, s0, e, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * s0.hidden_state.mean
+
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.DenseNormal(m_ext, q_sqrtm)
-        return _vars.DenseSSV(
-            ext,
-            cache_extra=(m_ext_p, m0_p, p, p_inv),
-            hidden_shape=s0.hidden_shape,
-            output_scale_dynamic=None,
-            cache_corr=None,
-            backward_model=None,
-            # todo: The below should not be necessary
-            #  but currently, it is: because of pytree-shape stability in interpolation
-            observed_state=jax.tree_util.tree_map(jnp.zeros_like, s0.observed_state),
-            error_estimate=jax.tree_util.tree_map(jnp.zeros_like, s0.error_estimate),
+        ssv = _vars.DenseSSV(ext, hidden_shape=s0.hidden_shape)
+        l0 = s0.hidden_state.cov_sqrtm_lower
+        extra = _extra.State(
+            backward_model=e.backward_model, cache=(m_ext_p, m0_p, p, p_inv, l0)
         )
+        return ssv, extra
 
     def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
@@ -178,10 +152,9 @@ class _DenseIBM(_extra.Extrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_without_reversal(self, state, /, state_previous, output_scale):
-        _, _, p, p_inv = state.cache_extra
+    def complete_without_reversal(self, state, extra, /, output_scale):
+        _, _, p, p_inv, l0 = extra.cache
         m_ext = state.hidden_state.mean
-        l0 = state_previous.hidden_state.cov_sqrtm_lower
 
         l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
@@ -193,21 +166,13 @@ class _DenseIBM(_extra.Extrapolation):
         l_ext = p[:, None] * l_ext_p
 
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.DenseSSV(
-            rv,
-            hidden_shape=state.hidden_shape,
-            error_estimate=state.error_estimate,
-            cache_corr=state.cache_corr,
-            observed_state=state.observed_state,  # usually None?
-            backward_model=None,
-            output_scale_dynamic=None,
-            cache_extra=None,
-        )
+        ssv = _vars.DenseSSV(rv, hidden_shape=state.hidden_shape)
+        extra = _extra.State(backward_model=None, cache=None)
+        return ssv, extra
 
-    def complete_with_reversal(self, state, /, state_previous, output_scale):
-        m_ext_p, m0_p, p, p_inv = state.cache_extra
+    def complete_with_reversal(self, state, extra, /, output_scale):
+        m_ext_p, m0_p, p, p_inv, l0 = extra.cache
         m_ext = state.hidden_state.mean
-        l0 = state_previous.hidden_state.cov_sqrtm_lower
 
         l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
@@ -231,40 +196,25 @@ class _DenseIBM(_extra.Extrapolation):
             g_bw, noise=backward_noise, target_shape=state.hidden_shape
         )
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        ssv = _vars.DenseSSV(rv, hidden_shape=state.hidden_shape)
 
-        return _vars.DenseSSV(
-            rv,
-            backward_model=bw_model,
-            hidden_shape=state.hidden_shape,
-            error_estimate=state.error_estimate,
-            cache_corr=state.cache_corr,
-            observed_state=state.observed_state,  # usually None?
-            output_scale_dynamic=None,
-            cache_extra=None,
-        )
+        extra = _extra.State(backward_model=bw_model, cache=None)
+        return ssv, extra
 
-    def extract_with_reversal(self, s, /):
-        return s.hidden_state, s.backward_model
+    def extract_with_reversal(self, s, e, /):
+        return s.hidden_state, e.backward_model
 
-    def extract_without_reversal(self, s, /):
+    def extract_without_reversal(self, s, e, /):
         return s.hidden_state
 
     # todo: private (remove sub-functions)
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def replace_backward_model(self, s, /, backward_model):
-        return _vars.DenseSSV(
-            s.hidden_state,
-            backward_model=backward_model,  # new
-            hidden_shape=s.hidden_shape,
-            observed_state=s.observed_state,
-            error_estimate=s.error_estimate,
-            output_scale_dynamic=s.output_scale_dynamic,
-            cache_extra=s.cache_extra,
-            cache_corr=s.cache_corr,
-        )
+    def duplicate_with_unit_backward_model(self, e, /):
+        unit_bw_model = self._init_conditional(rv_proto=e.backward_model.noise)
+        return self.replace_backward_model(e, unit_bw_model)
 
-    def duplicate_with_unit_backward_model(self, s, /):
-        unit_bw_model = self._init_conditional(rv_proto=s.hidden_state)
-        return self.replace_backward_model(s, unit_bw_model)
+    def replace_backward_model(self, e, /, backward_model):
+        extra = _extra.State(backward_model=backward_model, cache=e.cache)
+        return extra
