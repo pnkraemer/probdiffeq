@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections, _ibm_util
+from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.iso import _conds, _vars
 
 
@@ -21,7 +21,7 @@ def ibm_iso(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoIBM(_collections.AbstractExtrapolation):
+class _IsoIBM(_extra.AbstractExtrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
