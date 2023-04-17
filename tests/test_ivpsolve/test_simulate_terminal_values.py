@@ -30,7 +30,7 @@ class _SimulateTerminalValuesConfig(NamedTuple):
 _ALL_STRATEGY_FNS = [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
 
 
-@testing.case
+@testing.case(tags=["jvp"])
 @testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag="nd")
 @testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag="nd")
 @testing.parametrize("strategy_fn", _ALL_STRATEGY_FNS)
@@ -68,7 +68,7 @@ def case_setup_all_strategy_statespace_combinations_scalar(
     )
 
 
-@testing.case
+@testing.case(tags=["jvp"])
 @testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag="nd")
 @testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
 @testing.parametrize("strategy_fn", _ALL_STRATEGY_FNS)
@@ -102,7 +102,7 @@ def case_loop_eqx():
     return lo
 
 
-@testing.case
+@testing.case(tags=["jvp"])
 @testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag="nd")
 @testing.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
 def case_setup_all_loops(ivp, loop_fn, solver_config):
@@ -215,27 +215,24 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
     assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)
 
 
-# todo: use 'setup' to test the below for all cases
-
-
-@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag="nd")
-def test_jvp(ivp, solver_config):
-    ode_shape = ivp.initial_values[0].shape
+@testing.parametrize_with_cases("setup", cases=".", prefix="case_setup_", has_tag="jvp")
+def test_jvp(setup, solver_config):
+    ode_shape = setup.ivp.initial_values[0].shape
     solver = test_util.generate_solver(
-        solver_factory=ivpsolvers.MLESolver,
-        strategy_factory=filters.Filter,
-        impl_factory=recipes.ts0_blockdiag,
+        solver_factory=setup.solver_fn,
+        strategy_factory=setup.strategy_fn,
+        impl_factory=setup.impl_fn,
         ode_shape=ode_shape,
-        num_derivatives=2,
+        num_derivatives=1,
     )
 
     fn = functools.partial(
         _init_to_terminal_value,
-        ivp=ivp,
+        ivp=setup.ivp,
         solver=solver,
         solver_config=solver_config,
     )
-    u0 = ivp.initial_values[0]
+    u0 = setup.ivp.initial_values[0]
 
     jvp = functools.partial(jax.jvp, fn)
     jax.test_util.check_jvp(fn, jvp, (u0,))
