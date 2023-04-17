@@ -15,7 +15,7 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractCorrection(abc.ABC, Generic[S, CacheTypeVar]):
+class Correction(abc.ABC, Generic[S, CacheTypeVar]):
     """Correction model interface."""
 
     def __init__(self, ode_order):

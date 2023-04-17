@@ -9,7 +9,7 @@ from probdiffeq.statespace.scalar import _conds
 
 
 @jax.tree_util.register_pytree_node_class
-class NormalQOI(_collections.AbstractNormal):
+class NormalQOI(_collections.Normal):
     # Normal RV. Shapes (), (). No QOI.
 
     def transform_unit_sample(self, base, /):
@@ -116,7 +116,7 @@ class SSV(_collections.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class NormalHiddenState(_collections.AbstractNormal):
+class NormalHiddenState(_collections.Normal):
     def logpdf(self, u, /):
         raise NotImplementedError
 

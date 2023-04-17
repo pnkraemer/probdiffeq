@@ -59,7 +59,7 @@ class IsoSSV(_collections.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormalHiddenState(_collections.AbstractNormal):
+class IsoNormalHiddenState(_collections.Normal):
     def logpdf(self, u, /) -> jax.Array:
         raise NotImplementedError
 
@@ -75,7 +75,7 @@ class IsoNormalHiddenState(_collections.AbstractNormal):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormalQOI(_collections.AbstractNormal):
+class IsoNormalQOI(_collections.Normal):
     def logpdf(self, u, /) -> jax.Array:
         x1 = self.mahalanobis_norm_squared(u)
         x2 = u.size * 2.0 * jnp.log(jnp.abs(self.cov_sqrtm_lower))

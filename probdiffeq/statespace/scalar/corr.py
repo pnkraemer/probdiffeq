@@ -14,7 +14,7 @@ def taylor_order_zero(*args, **kwargs):
 
 
 @jax.tree_util.register_pytree_node_class
-class _TaylorZerothOrder(_corr.AbstractCorrection):
+class _TaylorZerothOrder(_corr.Correction):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
@@ -63,7 +63,7 @@ class _TaylorZerothOrder(_corr.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class StatisticalFirstOrder(_corr.AbstractCorrection):
+class StatisticalFirstOrder(_corr.Correction):
     def __init__(self, ode_order, cubature_rule):
         if ode_order > 1:
             raise ValueError

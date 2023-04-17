@@ -9,7 +9,7 @@ from probdiffeq.statespace.dense import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseConditional(_collections.AbstractConditional):
+class DenseConditional(_collections.Conditional):
     """Conditional distribution with dense covariance structure."""
 
     def __init__(self, *args, target_shape, **kwargs):

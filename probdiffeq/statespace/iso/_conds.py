@@ -8,7 +8,7 @@ from probdiffeq.statespace.iso import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditionalHiddenState(_collections.AbstractConditional):
+class IsoConditionalHiddenState(_collections.Conditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
@@ -53,7 +53,7 @@ class IsoConditionalHiddenState(_collections.AbstractConditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditionalQOI(_collections.AbstractConditional):
+class IsoConditionalQOI(_collections.Conditional):
     # Conditional between hidden state and QOI
     def __call__(self, x, /):
         mv = self.transition[:, None] * x[None, :]

@@ -47,7 +47,7 @@ def statistical_order_one(
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseTaylorZerothOrder(_corr.AbstractCorrection):
+class _DenseTaylorZerothOrder(_corr.Correction):
     def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -127,7 +127,7 @@ class _DenseTaylorZerothOrder(_corr.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseTaylorFirstOrder(_corr.AbstractCorrection):
+class _DenseTaylorFirstOrder(_corr.Correction):
     def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -206,7 +206,7 @@ class _DenseTaylorFirstOrder(_corr.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseStatisticalZerothOrder(_corr.AbstractCorrection):
+class _DenseStatisticalZerothOrder(_corr.Correction):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
 
@@ -319,7 +319,7 @@ class _DenseStatisticalZerothOrder(_corr.AbstractCorrection):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseStatisticalFirstOrder(_corr.AbstractCorrection):
+class _DenseStatisticalFirstOrder(_corr.Correction):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError

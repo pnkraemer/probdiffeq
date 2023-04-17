@@ -21,7 +21,7 @@ def ibm_iso(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoIBM(_extra.AbstractExtrapolation):
+class _IsoIBM(_extra.Extrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"

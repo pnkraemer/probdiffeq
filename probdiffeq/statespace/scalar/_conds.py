@@ -8,7 +8,7 @@ from probdiffeq.statespace.scalar import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class ConditionalHiddenState(_collections.AbstractConditional):
+class ConditionalHiddenState(_collections.Conditional):
     def __call__(self, x, /):
         if self.transition.ndim > 2:
             return jax.vmap(ConditionalHiddenState.__call__)(self, x)
@@ -59,7 +59,7 @@ class ConditionalHiddenState(_collections.AbstractConditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class ConditionalQOI(_collections.AbstractConditional):
+class ConditionalQOI(_collections.Conditional):
     def __call__(self, x, /):
         if self.transition.ndim > 1:
             return jax.vmap(ConditionalQOI.__call__)(self, x)

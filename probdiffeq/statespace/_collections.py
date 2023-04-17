@@ -4,7 +4,7 @@ import abc
 from typing import Tuple
 
 
-class AbstractNormal(abc.ABC):
+class Normal(abc.ABC):
     """Normal-distributed random variables.
 
     Means, covariances, log-probability-density functions, sampling, and so on.
@@ -99,7 +99,7 @@ class SSV(abc.ABC):
         raise NotImplementedError
 
 
-class AbstractConditional(abc.ABC):
+class Conditional(abc.ABC):
     """Conditional distribution interface.
 
     Used as a backward model for backward-Gauss--Markov process representations.
