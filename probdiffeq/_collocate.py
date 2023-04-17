@@ -6,29 +6,6 @@ Sequentially (and often, adaptively) constrain a random process to an ODE.
 from probdiffeq import _control_flow
 
 
-def simulate_terminal_values(
-    vector_field,
-    *,
-    solution,
-    t1,
-    adaptive_solver,
-    parameters,
-    dt0,
-    while_loop_fn,
-):
-    state0 = adaptive_solver.init(solution, dt0=dt0)
-    solution = _advance_ivp_solution_adaptively(
-        state0=state0,
-        t1=t1,
-        vector_field=vector_field,
-        adaptive_solver=adaptive_solver,
-        parameters=parameters,
-        while_loop_fn=while_loop_fn,
-    )
-    _dt, sol = adaptive_solver.extract_at_terminal_values(solution)
-    return sol
-
-
 def solve_and_save_at(
     vector_field,
     *,
@@ -59,6 +36,29 @@ def solve_and_save_at(
         reverse=False,
     )
     _dt, sol = adaptive_solver.extract(solution)
+    return sol
+
+
+def simulate_terminal_values(
+    vector_field,
+    *,
+    solution,
+    t1,
+    adaptive_solver,
+    parameters,
+    dt0,
+    while_loop_fn,
+):
+    state0 = adaptive_solver.init(solution, dt0=dt0)
+    solution = _advance_ivp_solution_adaptively(
+        state0=state0,
+        t1=t1,
+        vector_field=vector_field,
+        adaptive_solver=adaptive_solver,
+        parameters=parameters,
+        while_loop_fn=while_loop_fn,
+    )
+    _dt, sol = adaptive_solver.extract_at_terminal_values(solution)
     return sol
 
 
