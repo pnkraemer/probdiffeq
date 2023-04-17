@@ -14,7 +14,7 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 """A type-variable to alias extrapolation- and correction-caches."""
 
 
-class AbstractExtrapolation(abc.ABC, Generic[S, CacheTypeVar]):
+class Extrapolation(abc.ABC, Generic[S, CacheTypeVar]):
     """Extrapolation model interface."""
 
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):

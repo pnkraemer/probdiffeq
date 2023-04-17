@@ -9,10 +9,10 @@ from probdiffeq import controls, ivpsolvers
 S = TypeVar("S")
 """A type-variable for generic IVP solver states."""
 
-C = TypeVar("C", bound=controls.AbstractControl)
+C = TypeVar("C", bound=controls.Control)
 """A type-variable for generic controller states."""
 
-T = TypeVar("T", bound=ivpsolvers.AbstractSolver)
+T = TypeVar("T", bound=ivpsolvers.Solver)
 """A type-variable for (non-adaptive) IVP solvers."""
 
 

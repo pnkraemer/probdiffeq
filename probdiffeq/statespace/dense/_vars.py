@@ -95,7 +95,7 @@ class DenseSSV(_collections.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseNormal(_collections.AbstractNormal):
+class DenseNormal(_collections.Normal):
     """Random variables with a normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.

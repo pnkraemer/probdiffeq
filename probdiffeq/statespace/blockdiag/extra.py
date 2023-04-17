@@ -20,7 +20,7 @@ def _tree_stack_duplicates(tree, n):
 
 
 @jax.tree_util.register_pytree_node_class
-class _BlockDiag(_extra.AbstractExtrapolation):
+class _BlockDiag(_extra.Extrapolation):
     def __init__(self, extra, /):
         self.extra = extra
 

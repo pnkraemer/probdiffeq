@@ -11,7 +11,7 @@ S = TypeVar("S")
 """Controller state."""
 
 
-class AbstractControl(abc.ABC, Generic[S]):
+class Control(abc.ABC, Generic[S]):
     """Interface for control-algorithms."""
 
     @abc.abstractmethod
@@ -46,7 +46,7 @@ class _PIState(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class _ProportionalIntegralCommon(AbstractControl[_PIState]):
+class _ProportionalIntegralCommon(Control[_PIState]):
     safety: float = 0.95
     factor_min: float = 0.2
     factor_max: float = 10.0
@@ -134,7 +134,7 @@ class _IState(NamedTuple):
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class _IntegralCommon(AbstractControl[_IState]):
+class _IntegralCommon(Control[_IState]):
     safety: float = 0.95
     factor_min: float = 0.2
     factor_max: float = 10.0

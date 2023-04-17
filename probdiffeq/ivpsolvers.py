@@ -33,7 +33,7 @@ class _State(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractSolver(abc.ABC):
+class Solver(abc.ABC):
     """Interface for initial value problem solvers."""
 
     def __init__(self, strategy):
@@ -42,7 +42,7 @@ class AbstractSolver(abc.ABC):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.strategy})"
 
-    # Abstract methods
+    #  methods
 
     @abc.abstractmethod
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
@@ -151,7 +151,7 @@ class AbstractSolver(abc.ABC):
 
 
 @jax.tree_util.register_pytree_node_class
-class CalibrationFreeSolver(AbstractSolver):
+class CalibrationFreeSolver(Solver):
     """Initial value problem solver.
 
     No automatic output-scale calibration.
@@ -213,7 +213,7 @@ class CalibrationFreeSolver(AbstractSolver):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicSolver(AbstractSolver):
+class DynamicSolver(Solver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
@@ -268,7 +268,7 @@ class DynamicSolver(AbstractSolver):
 
 
 @jax.tree_util.register_pytree_node_class
-class MLESolver(AbstractSolver):
+class MLESolver(Solver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
@@ -357,12 +357,12 @@ class MLESolver(AbstractSolver):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
-        #  Instead, we could move the collections.AbstractNormal
+        #  Instead, we could move the collections.Normal
         #  to the top-level and implement this via tree_map:
         #  def scale_cov(tree):
         #      def is_leaf(x):
-        #          return isinstance(x, AbstractNormal)
-        #      def fn(x: AbstractNormal):
+        #          return isinstance(x, Normal)
+        #      def fn(x: Normal):
         #          return x.scale_covariance(output_scale)
         #      return tree_map(fn, tree, is_leaf=is_leaf)
         #  marginals = scale_cov(marginals_unscaled)

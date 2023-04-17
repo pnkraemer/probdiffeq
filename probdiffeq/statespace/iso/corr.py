@@ -14,7 +14,7 @@ def taylor_order_zero(*args, **kwargs):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoTaylorZerothOrder(_corr.AbstractCorrection):
+class _IsoTaylorZerothOrder(_corr.Correction):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
