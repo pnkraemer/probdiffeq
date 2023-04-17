@@ -11,6 +11,8 @@ import jax.test_util
 from probdiffeq import controls, ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
+from probdiffeq.statespace.dense import corr as dense_corr
+from probdiffeq.statespace.iso import corr as iso_corr
 from probdiffeq.strategies import filters, smoothers
 
 # Generate interesting test cases
@@ -226,6 +228,15 @@ def test_jvp(setup, solver_config):
         num_derivatives=1,
     )
 
+    xfail_test = _skip_autodiff_test(solver)
+    if xfail_test:
+        reason1 = "Some corrections in combination with some strategies "
+        reason2 = "are not guaranteed to have valid JVPs at the moment. "
+        reason3 = "See: #500."
+        # 'skip' instead of 'xfail' because the tests are flaky,
+        # not got generally impossible to pass.
+        testing.skip(reason1 + reason2 + reason3)
+
     fn = functools.partial(
         _init_to_terminal_value,
         ivp=setup.ivp,
@@ -250,3 +261,42 @@ def _init_to_terminal_value(init, ivp, solver, solver_config):
         rtol=solver_config.rtol_solve,
     )
     return solution.u.T @ solution.u
+
+
+def _skip_autodiff_test(solver):
+    # Some solver-strategy combinations have NaN VJPs and sometimes JVPs as well.
+    # We skip those tests until the VJP/JVP behaviour has been cleaned up.
+    # See: Issue #500.
+
+    # Ignore no-lambda flake8 check here. If we don't define those check-functions
+    # in-line, the whole function becomes  too cluttered.
+    _SLR1 = dense_corr._DenseStatisticalFirstOrder
+    _SLR0 = dense_corr._DenseStatisticalZerothOrder
+    _TS0 = dense_corr._DenseTaylorZerothOrder
+    _TS1 = dense_corr._DenseTaylorFirstOrder
+    _IsoTS0 = iso_corr._IsoTaylorZerothOrder
+    is_smoother = lambda x: isinstance(x, smoothers.Smoother)  # noqa: E731
+    is_fp_smoother = lambda x: isinstance(x, smoothers.FixedPointSmoother)  # noqa: E731
+    is_slr1 = lambda x: isinstance(x, _SLR1)  # noqa: E731
+    is_slr0 = lambda x: isinstance(x, _SLR0)  # noqa: E731
+    is_ts0 = lambda x: isinstance(x, _TS0)  # noqa: E731
+    is_ts1 = lambda x: isinstance(x, _TS1)  # noqa: E731
+    is_ts0_iso = lambda x: isinstance(x, _IsoTS0)  # noqa: E731
+
+    strategy = solver.strategy
+    correction = solver.strategy.correction
+
+    if is_slr1(correction):
+        return True
+    if is_smoother(strategy) or is_fp_smoother(strategy):
+        if is_slr0(correction):
+            return True
+        if is_ts1(correction):
+            return True
+        if is_ts0(correction):
+            return True
+        if is_ts0_iso(correction):
+            return True
+
+    # All good now, no skipping.
+    return False

@@ -181,9 +181,11 @@ def _skip_autodiff_test(solver):
 def test_jvp(parameter_to_solution, solver_config):
     fn, primals, skip = parameter_to_solution
     if skip:
-        reason1 = "Some corrections in combination with and some smoothers "
+        reason1 = "Some corrections in combination with some smoothers "
         reason2 = "are not guaranteed to have valid JVPs at the moment. "
         reason3 = "See: #500."
+        # 'skip' instead of 'xfail' because the tests are flaky,
+        # not got generally impossible to pass.
         testing.skip(reason1 + reason2 + reason3)
 
     jvp = functools.partial(jax.jvp, fn)
@@ -201,9 +203,11 @@ def test_jvp(parameter_to_solution, solver_config):
 def test_vjp(parameter_to_solution, solver_config):
     fn, primals, skip = parameter_to_solution
     if skip:
-        reason1 = "Some corrections in combination with and some smoothers "
+        reason1 = "Some corrections in combination with some smoothers "
         reason2 = "are not guaranteed to have valid VJPs at the moment. "
         reason3 = "See: #500."
+        # 'skip' instead of 'xfail' because the tests are flaky,
+        # not got generally impossible to pass.
         testing.skip(reason1 + reason2 + reason3)
 
     vjp = functools.partial(jax.vjp, fn)
