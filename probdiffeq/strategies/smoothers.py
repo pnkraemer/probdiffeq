@@ -162,7 +162,7 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self,
         output_extra: _SmState,
         /,
@@ -183,19 +183,19 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
     def begin(self, state: _SmState, /, *, t, dt, parameters, vector_field):
-        extrapolated = self.begin_extrapolation(state, dt=dt)
-        output_corr = self.begin_correction(
+        extrapolated = self._begin_extrapolation(state, dt=dt)
+        output_corr = self._begin_correction(
             extrapolated, vector_field=vector_field, t=t + dt, p=parameters
         )
         return extrapolated, output_corr
 
     def complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        extrapolated = self.complete_extrapolation(
+        extrapolated = self._complete_extrapolation(
             output_extra,
             state_previous=state,
             output_scale=output_scale,
         )
-        observed, corrected = self.complete_correction(
+        observed, corrected = self._complete_correction(
             extrapolated, cache_obs=cache_obs
         )
         return observed, corrected
@@ -232,7 +232,7 @@ class _SmootherCommon(_strategy.Strategy):
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
-    def begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
+    def _begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
         ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _SmState(
             t=posterior.t + dt,
@@ -243,14 +243,14 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
 
-    def begin_correction(
+    def _begin_correction(
         self, output_extra: _SmState, /, *, vector_field, t, p
     ) -> Tuple[jax.Array, float, Any]:
         return self.correction.begin(
             output_extra.extrapolated, vector_field=vector_field, t=t, p=p
         )
 
-    def complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
+    def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
         a, corrected = self.correction.complete(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
         )
@@ -309,7 +309,7 @@ class _SmootherCommon(_strategy.Strategy):
 class Smoother(_SmootherCommon):
     """Smoother."""
 
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self,
         output_extra: _SmState,
         /,
@@ -413,7 +413,7 @@ class FixedPointSmoother(_SmootherCommon):
 
     """
 
-    def complete_extrapolation(
+    def _complete_extrapolation(
         self,
         output_extra: _SmState,
         /,
