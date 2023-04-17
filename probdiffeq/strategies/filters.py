@@ -179,44 +179,5 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
         return obs, corr
 
-    #
-    #
-    # def _complete_extrapolation(
-    #     self,
-    #     output_extra: _FiState,
-    #     /,
-    #     *,
-    #     output_scale,
-    #     state_previous: _FiState,
-    # ) -> _FiState:
-    #     ssv = self.extrapolation.complete_without_reversal(
-    #         output_extra.extrapolated,
-    #         s0=state_previous.corrected,
-    #         output_scale=output_scale,
-    #     )
-    #     return _FiState(
-    #         t=output_extra.t,
-    #         u=None,
-    #         extrapolated=ssv,
-    #         corrected=None,
-    #         num_data_points=output_extra.num_data_points,
-    #     )
-    #
-    # # todo: more type-stability in corrections!
-    # def _complete_correction(
-    #     self, extrapolated: _FiState, /, *, cache_obs
-    # ) -> Tuple[Any, Tuple[_FiState, Any]]:
-    #     obs, corr = self.correction.complete(
-    #         extrapolated=extrapolated.extrapolated, cache=cache_obs
-    #     )
-    #     corr = _FiState(
-    #         t=extrapolated.t,
-    #         u=corr.extract_qoi(),
-    #         extrapolated=None,
-    #         corrected=corr,
-    #         num_data_points=extrapolated.num_data_points + 1,
-    #     )
-    #     return obs, corr
-
     def num_data_points(self, state: _FiState, /):
         return state.num_data_points
