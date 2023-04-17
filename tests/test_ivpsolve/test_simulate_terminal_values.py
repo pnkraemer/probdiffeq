@@ -244,9 +244,16 @@ def test_jvp(setup, solver_config):
         solver_config=solver_config,
     )
     u0 = setup.ivp.initial_values[0]
-
     jvp = functools.partial(jax.jvp, fn)
-    jax.test_util.check_jvp(fn, jvp, (u0,))
+
+    # Autodiff tests are sometimes a bit flaky...
+    # There is also no clear mathematical argument that solutions that
+    # have been computed with atol A and rtol R should have
+    # gradients that coincide with their finite difference approximations with
+    # accuracies A and R. Therefore, we relax them a little bit.
+    # todo: move autodiff_atol_assert, autodiff_rtol_assert into solver config.
+    atol, rtol = 10 * solver_config.atol_assert, 10 * solver_config.rtol_assert
+    jax.test_util.check_jvp(f=fn, f_jvp=jvp, args=(u0,), atol=atol, rtol=rtol)
 
 
 def _init_to_terminal_value(init, ivp, solver, solver_config):
