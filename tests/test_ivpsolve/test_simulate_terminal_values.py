@@ -11,8 +11,6 @@ import jax.test_util
 from probdiffeq import controls, ivpsolve, ivpsolvers, taylor, test_util
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
-from probdiffeq.statespace.dense import corr as dense_corr
-from probdiffeq.statespace.iso import corr as iso_corr
 from probdiffeq.strategies import filters, smoothers
 
 # Generate interesting test cases
@@ -217,33 +215,24 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
     assert jnp.allclose(u, u_ref, atol=atol, rtol=rtol)
 
 
-@testing.parametrize_with_cases("setup", cases=".", prefix="case_setup_", has_tag="jvp")
-def test_jvp(setup, solver_config):
-    ode_shape = setup.ivp.initial_values[0].shape
+@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag="nd")
+def test_jvp(ivp, solver_config):
+    ode_shape = ivp.initial_values[0].shape
     solver = test_util.generate_solver(
-        solver_factory=setup.solver_fn,
-        strategy_factory=setup.strategy_fn,
-        impl_factory=setup.impl_fn,
+        solver_factory=ivpsolvers.CalibrationFreeSolver,
+        strategy_factory=filters.Filter,
+        impl_factory=recipes.ts0_blockdiag,
         ode_shape=ode_shape,
         num_derivatives=1,
     )
 
-    is_unreliable = _skip_autodiff_test(solver)
-    if is_unreliable:
-        reason1 = "Some corrections in combination with some strategies "
-        reason2 = "are not guaranteed to have valid JVPs at the moment. "
-        reason3 = "See: #500."
-        # 'skip' instead of 'xfail' because the tests are flaky,
-        # not got generally impossible to pass.
-        testing.skip(reason1 + reason2 + reason3)
-
     fn = functools.partial(
         _init_to_terminal_value,
-        ivp=setup.ivp,
+        ivp=ivp,
         solver=solver,
         solver_config=solver_config,
     )
-    u0 = setup.ivp.initial_values[0]
+    u0 = ivp.initial_values[0]
     jvp = functools.partial(jax.jvp, fn)
 
     # Autodiff tests are sometimes a bit flaky...
@@ -268,42 +257,3 @@ def _init_to_terminal_value(init, ivp, solver, solver_config):
         rtol=solver_config.rtol_solve,
     )
     return solution.u.T @ solution.u
-
-
-def _skip_autodiff_test(solver):
-    # Some solver-strategy combinations have NaN VJPs and sometimes JVPs as well.
-    # We skip those tests until the VJP/JVP behaviour has been cleaned up.
-    # See: Issue #500.
-
-    # Ignore no-lambda flake8 check here. If we don't define those check-functions
-    # in-line, the whole function becomes  too cluttered.
-    _SLR1 = dense_corr._DenseStatisticalFirstOrder
-    _SLR0 = dense_corr._DenseStatisticalZerothOrder
-    _TS0 = dense_corr._DenseTaylorZerothOrder
-    _TS1 = dense_corr._DenseTaylorFirstOrder
-    _IsoTS0 = iso_corr._IsoTaylorZerothOrder
-    is_smoother = lambda x: isinstance(x, smoothers.Smoother)  # noqa: E731
-    is_fp_smoother = lambda x: isinstance(x, smoothers.FixedPointSmoother)  # noqa: E731
-    is_slr1 = lambda x: isinstance(x, _SLR1)  # noqa: E731
-    is_slr0 = lambda x: isinstance(x, _SLR0)  # noqa: E731
-    is_ts0 = lambda x: isinstance(x, _TS0)  # noqa: E731
-    is_ts1 = lambda x: isinstance(x, _TS1)  # noqa: E731
-    is_ts0_iso = lambda x: isinstance(x, _IsoTS0)  # noqa: E731
-
-    strategy = solver.strategy
-    correction = solver.strategy.correction
-
-    if is_slr1(correction):
-        return True
-    if is_smoother(strategy) or is_fp_smoother(strategy):
-        if is_slr0(correction):
-            return True
-        if is_ts1(correction):
-            return True
-        if is_ts0(correction):
-            return True
-        if is_ts0_iso(correction):
-            return True
-
-    # All good now, no skipping.
-    return False
