@@ -146,6 +146,24 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         _, u, marginals, _ = self.extract(sol)
         return u, marginals
 
+    def begin(self, state: _FiState, /, *, t, dt, parameters, vector_field):
+        extrapolated = self.begin_extrapolation(state, dt=dt)
+        output_corr = self.begin_correction(
+            extrapolated, vector_field=vector_field, t=t + dt, p=parameters
+        )
+        return extrapolated, output_corr
+
+    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        extrapolated = self.complete_extrapolation(
+            output_extra,
+            state_previous=state,
+            output_scale=output_scale,
+        )
+        observed, corrected = self.complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
+
     def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
         extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)
         return _FiState(

@@ -182,6 +182,24 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
 
+    def begin(self, state: _SmState, /, *, t, dt, parameters, vector_field):
+        extrapolated = self.begin_extrapolation(state, dt=dt)
+        output_corr = self.begin_correction(
+            extrapolated, vector_field=vector_field, t=t + dt, p=parameters
+        )
+        return extrapolated, output_corr
+
+    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        extrapolated = self.complete_extrapolation(
+            output_extra,
+            state_previous=state,
+            output_scale=output_scale,
+        )
+        observed, corrected = self.complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
+
     def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
         corrected = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
