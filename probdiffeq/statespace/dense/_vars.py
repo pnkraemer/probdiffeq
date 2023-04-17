@@ -14,21 +14,6 @@ from probdiffeq.statespace.dense import _conds
 class DenseSSV(_collections.SSV):
     """State-space variable with dense covariance structure."""
 
-    def __init__(self, hidden_state, *, cache, target_shape):
-        super().__init__(hidden_state=hidden_state, cache=cache)
-        self.target_shape = target_shape
-
-    def tree_flatten(self):
-        children = (self.hidden_state, self.cache)
-        aux = (self.target_shape,)
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, children):
-        (hidden_state, cache) = children
-        (target_shape,) = aux
-        return cls(hidden_state=hidden_state, cache=cache, target_shape=target_shape)
-
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
