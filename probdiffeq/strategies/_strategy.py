@@ -102,25 +102,13 @@ class Strategy(abc.ABC, Generic[S, P]):
         init_fn = self.extrapolation.promote_output_scale
         return init_fn(*args, **kwargs)
 
+    @abc.abstractmethod
     def begin(self, state: S, /, *, t, dt, parameters, vector_field):
-        # todo (next!): make this return a state-type.
-        output_extra = self.begin_extrapolation(state, dt=dt)
-        output_corr = self.begin_correction(
-            output_extra, vector_field=vector_field, t=t + dt, p=parameters
-        )
-        return output_extra, output_corr
+        raise NotImplementedError
 
+    @abc.abstractmethod
     def complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        # todo: make this operate on state-types.
-        extrapolated = self.complete_extrapolation(
-            output_extra,
-            state_previous=state,
-            output_scale=output_scale,
-        )
-        observed, corrected = self.complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return observed, corrected
+        raise NotImplementedError
 
     @abc.abstractmethod
     def num_data_points(self, state, /):
