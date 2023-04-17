@@ -50,7 +50,7 @@ class AbstractNormal(abc.ABC):
         return self.mean.shape
 
 
-class StateSpaceVar(abc.ABC):
+class SSV(abc.ABC):
     """State-space variables.
 
     Hidden states, and knowledge about extracting a quantity of interest.

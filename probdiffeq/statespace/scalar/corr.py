@@ -18,7 +18,7 @@ class _TaylorZerothOrder(_corr.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
-    def begin(self, x: _vars.StateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.SSV, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(x.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, x.hidden_state)
@@ -58,7 +58,7 @@ class _TaylorZerothOrder(_corr.AbstractCorrection):
         observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
 
         rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        corrected = _vars.StateSpaceVar(rv_cor, cache=None)
+        corrected = _vars.SSV(rv_cor, cache=None)
         return observed, corrected
 
 
@@ -204,5 +204,5 @@ class StatisticalFirstOrder(_corr.AbstractCorrection):
         # Catch up the backward noise and return result
         m_bw = extrapolated.mean - gain * m_marg
         rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        cor = _vars.StateSpaceVar(rv_cor, cache=None)
+        cor = _vars.SSV(rv_cor, cache=None)
         return obs, cor

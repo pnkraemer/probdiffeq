@@ -77,7 +77,7 @@ class _DenseTaylorZerothOrder(_corr.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         m0 = self.e0(x.hidden_state.mean)
         m1 = self.e1(x.hidden_state.mean)
         cov_sqrtm_lower = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
@@ -122,7 +122,7 @@ class _DenseTaylorZerothOrder(_corr.AbstractCorrection):
         m_cor = ext.hidden_state.mean - gain @ b
         cor = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         _shape = ext.target_shape
-        corrected = _vars.DenseStateSpaceVar(cor, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(cor, cache=None, target_shape=_shape)
         return observed, corrected
 
 
@@ -151,7 +151,7 @@ class _DenseTaylorFirstOrder(_corr.AbstractCorrection):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -178,7 +178,7 @@ class _DenseTaylorFirstOrder(_corr.AbstractCorrection):
         # Return scaled error estimate and other quantities
         return error_estimate, output_scale, (jvp_fn, (b,))
 
-    def complete(self, extrapolated: _vars.DenseStateSpaceVar, cache):
+    def complete(self, extrapolated: _vars.DenseSSV, cache):
         # Assign short-named variables for readability
         ext = extrapolated
 
@@ -199,7 +199,7 @@ class _DenseTaylorFirstOrder(_corr.AbstractCorrection):
         m_cor = ext.hidden_state.mean - gain @ b
         rv = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
         _shape = ext.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return observed, corrected
@@ -249,7 +249,7 @@ class _DenseStatisticalZerothOrder(_corr.AbstractCorrection):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
@@ -312,7 +312,7 @@ class _DenseStatisticalZerothOrder(_corr.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return marginals, corrected
@@ -352,7 +352,7 @@ class _DenseStatisticalFirstOrder(_corr.AbstractCorrection):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, x: _vars.DenseStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(x.hidden_state.mean)
         r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
@@ -416,7 +416,7 @@ class _DenseStatisticalFirstOrder(_corr.AbstractCorrection):
         m_bw = extrapolated.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T)
         _shape = extrapolated.target_shape
-        corrected = _vars.DenseStateSpaceVar(rv, cache=None, target_shape=_shape)
+        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
 
         # Return the results
         return marginals, corrected

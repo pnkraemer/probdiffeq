@@ -55,7 +55,7 @@ class NormalQOI(_collections.AbstractNormal):
 
 
 @jax.tree_util.register_pytree_node_class
-class StateSpaceVar(_collections.StateSpaceVar):
+class SSV(_collections.SSV):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
     def extract_qoi(self):
@@ -65,7 +65,7 @@ class StateSpaceVar(_collections.StateSpaceVar):
         # what is this for? batched calls? If so, that seems wrong.
         #  the scalar state should not worry about the context it is called in.
         if self.hidden_state.cov_sqrtm_lower.ndim > 2:
-            fn = StateSpaceVar.observe_qoi
+            fn = SSV.observe_qoi
             fn_vmap = jax.vmap(fn, in_axes=(0, None), out_axes=(0, 0))
             return fn_vmap(self, observation_std)
 
@@ -94,12 +94,12 @@ class StateSpaceVar(_collections.StateSpaceVar):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return StateSpaceVar(rv, cache=self.cache)
+        return SSV(rv, cache=self.cache)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
             # if the variable has batch-axes, vmap the result
-            fn = StateSpaceVar.marginal_nth_derivative
+            fn = SSV.marginal_nth_derivative
             vect_fn = jax.vmap(fn, in_axes=(0, None))
             return vect_fn(self, n)
 

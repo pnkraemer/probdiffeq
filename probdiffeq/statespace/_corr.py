@@ -7,7 +7,7 @@ import jax
 
 from probdiffeq.statespace import _collections
 
-SSVTypeVar = TypeVar("SSVTypeVar", bound=_collections.StateSpaceVar)
+S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
 CacheTypeVar = TypeVar("CacheTypeVar")
@@ -15,7 +15,7 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 
 
 @jax.tree_util.register_pytree_node_class
-class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
+class AbstractCorrection(abc.ABC, Generic[S, CacheTypeVar]):
     """Correction model interface."""
 
     def __init__(self, ode_order):
@@ -33,10 +33,10 @@ class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
 
     @abc.abstractmethod
     def begin(
-        self, x: SSVTypeVar, /, vector_field, t, p
+        self, x: S, /, vector_field, t, p
     ) -> Tuple[jax.Array, float, CacheTypeVar]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
+    def complete(self, extrapolated: S, cache: CacheTypeVar):
         raise NotImplementedError

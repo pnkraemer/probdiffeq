@@ -7,14 +7,14 @@ import jax
 
 from probdiffeq.statespace import _collections
 
-SSVTypeVar = TypeVar("SSVTypeVar", bound=_collections.StateSpaceVar)
+S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
 CacheTypeVar = TypeVar("CacheTypeVar")
 """A type-variable to alias extrapolation- and correction-caches."""
 
 
-class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
+class AbstractExtrapolation(abc.ABC, Generic[S, CacheTypeVar]):
     """Extrapolation model interface."""
 
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
@@ -52,17 +52,17 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients, /) -> SSVTypeVar:
+    def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin(self, s0, /, dt) -> SSVTypeVar:
+    def begin(self, s0, /, dt) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete_without_reversal(
         self,
-        output_begin: SSVTypeVar,
+        output_begin: S,
         /,
         s0,
         output_scale,
@@ -72,7 +72,7 @@ class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
     @abc.abstractmethod
     def complete_with_reversal(
         self,
-        output_begin: SSVTypeVar,
+        output_begin: S,
         /,
         s0,
         output_scale,

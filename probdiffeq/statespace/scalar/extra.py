@@ -43,7 +43,7 @@ class _IBM(_extra.AbstractExtrapolation):
         rv = _vars.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.StateSpaceVar(rv, cache=None)
+        return _vars.SSV(rv, cache=None)
 
     def init_error_estimate(self):
         return jnp.zeros(())
@@ -55,7 +55,7 @@ class _IBM(_extra.AbstractExtrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.StateSpaceVar(extrapolated, cache=(m_ext_p, m0_p, p, p_inv))
+        return _vars.SSV(extrapolated, cache=(m_ext_p, m0_p, p, p_inv))
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -74,7 +74,7 @@ class _IBM(_extra.AbstractExtrapolation):
         l_ext = p[:, None] * l_ext_p
 
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.StateSpaceVar(rv, cache=None)
+        return _vars.SSV(rv, cache=None)
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
@@ -100,7 +100,7 @@ class _IBM(_extra.AbstractExtrapolation):
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.StateSpaceVar(extrapolated, cache=None), bw_model
+        return _vars.SSV(extrapolated, cache=None), bw_model
 
     def init_conditional(self, ssv_proto):
         op = self._init_backward_transition()

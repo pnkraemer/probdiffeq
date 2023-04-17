@@ -18,7 +18,7 @@ class _IsoTaylorZerothOrder(_corr.AbstractCorrection):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
-    def begin(self, x: _vars.IsoStateSpaceVar, /, vector_field, t, p):
+    def begin(self, x: _vars.IsoSSV, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -38,8 +38,8 @@ class _IsoTaylorZerothOrder(_corr.AbstractCorrection):
         return error_estimate, output_scale, (bias,)
 
     def complete(
-        self, extrapolated: _vars.IsoStateSpaceVar, cache
-    ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoStateSpaceVar]:
+        self, extrapolated: _vars.IsoSSV, cache
+    ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoSSV]:
         (bias,) = cache
 
         m_ext = extrapolated.hidden_state.mean
@@ -55,4 +55,4 @@ class _IsoTaylorZerothOrder(_corr.AbstractCorrection):
         m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
         corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, _vars.IsoStateSpaceVar(corrected, cache=None)
+        return observed, _vars.IsoSSV(corrected, cache=None)

@@ -11,7 +11,7 @@ from probdiffeq.statespace.dense import _conds
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseStateSpaceVar(_collections.StateSpaceVar):
+class DenseSSV(_collections.SSV):
     """State-space variable with dense covariance structure."""
 
     def __init__(self, hidden_state, *, cache, target_shape):
@@ -62,12 +62,12 @@ class DenseStateSpaceVar(_collections.StateSpaceVar):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale)
-        return DenseStateSpaceVar(rv, cache=self.cache, target_shape=self.target_shape)
+        return DenseSSV(rv, cache=self.cache, target_shape=self.target_shape)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
             # if the variable has batch-axes, vmap the result
-            fn = DenseStateSpaceVar.marginal_nth_derivative
+            fn = DenseSSV.marginal_nth_derivative
             vect_fn = jax.vmap(fn, in_axes=(0, None))
             return vect_fn(self, n)
 
