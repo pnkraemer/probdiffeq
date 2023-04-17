@@ -228,8 +228,8 @@ def test_jvp(setup, solver_config):
         num_derivatives=1,
     )
 
-    xfail_test = _skip_autodiff_test(solver)
-    if xfail_test:
+    is_unreliable = _skip_autodiff_test(solver)
+    if is_unreliable:
         reason1 = "Some corrections in combination with some strategies "
         reason2 = "are not guaranteed to have valid JVPs at the moment. "
         reason3 = "See: #500."
