@@ -14,24 +14,27 @@ from probdiffeq.strategies import filters, smoothers
 
 
 class _SolveAndSaveAtConfig(NamedTuple):
-    ode_problem: Any
+    ivp: Any
     solver_fn: Any
     impl_fn: Any
-    strat_fn: Any
+    strategy_fn: Any
     loop_fn: Any
     solver_config: Any
     output_scale: Any
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag=["nd"])
-def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
+@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+def case_setup_all_strategy_statespace_combinations_nd(
+    ivp, impl_fn, strategy_fn, solver_config
+):
     return _SolveAndSaveAtConfig(
-        ode_problem=ode_problem,
+        ivp=ivp,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
-        strat_fn=filters.Filter,
+        strategy_fn=strategy_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         output_scale=1.0,
@@ -39,18 +42,19 @@ def case_setup_all_statespace_nd(ode_problem, impl_fn, solver_config):
 
 
 @testing.case
-@testing.parametrize_with_cases(
-    "ode_problem", cases="..problem_cases", has_tag=["scalar"]
-)
+@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["scalar"])
 @testing.parametrize_with_cases(
     "impl_fn", cases="..statespace_cases", has_tag=["scalar"]
 )
-def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
+@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+def case_setup_all_stratgy_statespace_combinations_scalar(
+    ivp, impl_fn, strategy_fn, solver_config
+):
     return _SolveAndSaveAtConfig(
-        ode_problem=ode_problem,
+        ivp=ivp,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=impl_fn,
-        strat_fn=filters.Filter,
+        strategy_fn=strategy_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         output_scale=1.0,
@@ -58,29 +62,15 @@ def case_setup_all_statespace_scalar(ode_problem, impl_fn, solver_config):
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-@testing.parametrize("strat_fn", [filters.Filter, smoothers.FixedPointSmoother])
-def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
-    return _SolveAndSaveAtConfig(
-        ode_problem=ode_problem,
-        solver_fn=ivpsolvers.MLESolver,
-        impl_fn=recipes.ts0_blockdiag,
-        strat_fn=strat_fn,
-        solver_config=solver_config,
-        loop_fn=jax.lax.while_loop,
-        output_scale=1.0,
-    )
-
-
-@testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-def case_setup_all_ivpsolvers(ode_problem, solver_fn, solver_config):
+@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+def case_setup_all_solvers_strategies(ivp, solver_fn, strategy_fn, solver_config):
     return _SolveAndSaveAtConfig(
-        ode_problem=ode_problem,
+        ivp=ivp,
         solver_fn=solver_fn,
         impl_fn=recipes.ts0_blockdiag,
-        strat_fn=filters.Filter,
+        strategy_fn=strategy_fn,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         output_scale=1.0,
@@ -103,14 +93,14 @@ def case_loop_eqx():
 
 
 @testing.case
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize_with_cases("loop_fn", cases=".", prefix="case_loop_")
-def case_setup_all_loops(ode_problem, loop_fn, solver_config):
+def case_setup_all_loops(ivp, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
-        ode_problem=ode_problem,
+        ivp=ivp,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.ts0_blockdiag,
-        strat_fn=filters.Filter,
+        strategy_fn=filters.Filter,
         solver_config=solver_config,
         loop_fn=loop_fn,
         output_scale=1.0,
@@ -118,36 +108,34 @@ def case_setup_all_loops(ode_problem, loop_fn, solver_config):
 
 
 @testing.fixture(name="solution_save_at")
-@testing.parametrize_with_cases(
-    "setup", cases=".", prefix="case_setup_", scope="session"
-)
+@testing.parametrize_with_cases("setup", cases=".", prefix="case_setup_")
 def fixture_solution_save_at(setup):
-    ode_shape = setup.ode_problem.initial_values[0].shape
+    ode_shape = setup.ivp.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=setup.solver_fn,
-        strategy_factory=setup.strat_fn,
+        strategy_factory=setup.strategy_fn,
         impl_factory=setup.impl_fn,
         ode_shape=ode_shape,
         num_derivatives=4,
     )
 
-    t0, t1 = setup.ode_problem.t0, setup.ode_problem.t1
+    t0, t1 = setup.ivp.t0, setup.ivp.t1
     save_at = setup.solver_config.grid_for_save_at_fn(t0, t1)
 
     # todo: move to solver config?
     #  (But this would involve knowing the IVP at solver-config-creation time,
     #  which would be a non-trivial change.)
-    ode = setup.ode_problem.vector_field
-    u0s = setup.ode_problem.initial_values
-    t0 = setup.ode_problem.t0
-    parameters = setup.ode_problem.args
+    ode = setup.ivp.vector_field
+    u0s = setup.ivp.initial_values
+    t0 = setup.ivp.t0
+    parameters = setup.ivp.args
     dt0 = ivpsolve.propose_dt0(ode, u0s, t0=t0, parameters=parameters)
 
     solution = ivpsolve.solve_and_save_at(
-        setup.ode_problem.vector_field,
-        setup.ode_problem.initial_values,
+        setup.ivp.vector_field,
+        setup.ivp.initial_values,
         save_at=save_at,
-        parameters=setup.ode_problem.args,
+        parameters=setup.ivp.args,
         solver=solver,
         dt0=dt0,
         output_scale=setup.output_scale,
@@ -157,7 +145,7 @@ def fixture_solution_save_at(setup):
         while_loop_fn_temporal=setup.loop_fn,
         while_loop_fn_per_step=setup.loop_fn,
     )
-    return solution.u, jax.vmap(setup.ode_problem.solution)(solution.t)
+    return solution.u, jax.vmap(setup.ivp.solution)(solution.t)
 
 
 def test_solution_correct(solution_save_at, solver_config):
@@ -170,18 +158,18 @@ def test_solution_correct(solution_save_at, solver_config):
     )
 
 
-@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-def test_smoother_warning(ode_problem):
+@testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["nd"])
+def test_smoother_warning(ivp):
     """A non-fixed-point smoother is not usable in save-at-simulation."""
-    ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=3)
+    ts = jnp.linspace(ivp.t0, ivp.t1, num=3)
     solver = test_util.generate_solver(strategy_factory=smoothers.Smoother)
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with testing.warns():
         ivpsolve.solve_and_save_at(
-            ode_problem.vector_field,
-            ode_problem.initial_values,
+            ivp.vector_field,
+            ivp.initial_values,
             save_at=ts,
-            parameters=ode_problem.args,
+            parameters=ivp.args,
             solver=solver,
         )
