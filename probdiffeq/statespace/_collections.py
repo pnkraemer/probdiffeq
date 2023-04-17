@@ -1,9 +1,7 @@
 """Various interfaces."""
 
 import abc
-from typing import Generic, Tuple, TypeVar
-
-import jax
+from typing import Tuple
 
 
 class AbstractNormal(abc.ABC):
@@ -52,7 +50,7 @@ class AbstractNormal(abc.ABC):
         return self.mean.shape
 
 
-class StateSpaceVar(abc.ABC):
+class SSV(abc.ABC):
     """State-space variables.
 
     Hidden states, and knowledge about extracting a quantity of interest.
@@ -101,90 +99,7 @@ class StateSpaceVar(abc.ABC):
         raise NotImplementedError
 
 
-SSVTypeVar = TypeVar("SSVTypeVar", bound=StateSpaceVar)
-"""A type-variable to alias appropriate state-space variable types."""
-
-CacheTypeVar = TypeVar("CacheTypeVar")
-"""A type-variable to alias extrapolation- and correction-caches."""
-
-
-class AbstractExtrapolation(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
-    """Extrapolation model interface."""
-
-    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-
-        self.preconditioner_scales = preconditioner_scales
-        self.preconditioner_powers = preconditioner_powers
-
-    def tree_flatten(self):
-        children = (
-            self.a,
-            self.q_sqrtm_lower,
-            self.preconditioner_scales,
-            self.preconditioner_powers,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        a, q_sqrtm_lower, scales, powers = children
-        return cls(
-            a=a,
-            q_sqrtm_lower=q_sqrtm_lower,
-            preconditioner_scales=scales,
-            preconditioner_powers=powers,
-        )
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}()"
-
-    @abc.abstractmethod
-    def promote_output_scale(self, output_scale) -> float:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients, /) -> SSVTypeVar:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def begin(self, s0, /, dt) -> SSVTypeVar:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_without_reversal(
-        self,
-        output_begin: SSVTypeVar,
-        /,
-        s0,
-        output_scale,
-    ):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_with_reversal(
-        self,
-        output_begin: SSVTypeVar,
-        /,
-        s0,
-        output_scale,
-    ):
-        raise NotImplementedError
-
-    # todo: bundle in an init() method:
-
-    @abc.abstractmethod
-    def init_error_estimate(self) -> jax.Array:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def init_conditional(self, ssv_proto):
-        raise NotImplementedError
-
-
-class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
+class AbstractConditional(abc.ABC):
     """Conditional distribution interface.
 
     Used as a backward model for backward-Gauss--Markov process representations.
@@ -219,32 +134,4 @@ class AbstractConditional(abc.ABC, Generic[SSVTypeVar]):
         raise NotImplementedError
 
     def marginalise(self, rv, /):
-        raise NotImplementedError
-
-
-@jax.tree_util.register_pytree_node_class
-class AbstractCorrection(abc.ABC, Generic[SSVTypeVar, CacheTypeVar]):
-    """Correction model interface."""
-
-    def __init__(self, ode_order):
-        self.ode_order = ode_order
-
-    def tree_flatten(self):
-        children = ()
-        aux = (self.ode_order,)
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, _children):
-        (ode_order,) = aux
-        return cls(ode_order=ode_order)
-
-    @abc.abstractmethod
-    def begin(
-        self, x: SSVTypeVar, /, vector_field, t, p
-    ) -> Tuple[jax.Array, float, CacheTypeVar]:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete(self, extrapolated: SSVTypeVar, cache: CacheTypeVar):
         raise NotImplementedError

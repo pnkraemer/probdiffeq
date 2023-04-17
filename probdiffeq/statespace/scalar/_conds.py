@@ -15,7 +15,7 @@ class ConditionalHiddenState(_collections.AbstractConditional):
 
         m = self.transition @ x + self.noise.mean
         rv = _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.StateSpaceVar(rv, cache=None)
+        return _vars.SSV(rv, cache=None)
 
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)
@@ -55,7 +55,7 @@ class ConditionalHiddenState(_collections.AbstractConditional):
         ).T
 
         rv = _vars.NormalHiddenState(m_new, l_new)
-        return _vars.StateSpaceVar(rv, cache=None)
+        return _vars.SSV(rv, cache=None)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -65,4 +65,4 @@ class ConditionalQOI(_collections.AbstractConditional):
             return jax.vmap(ConditionalQOI.__call__)(self, x)
         m = self.transition * x + self.noise.mean
         rv = _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.StateSpaceVar(rv, cache=None)
+        return _vars.SSV(rv, cache=None)

@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections, _ibm_util
+from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.iso import _conds, _vars
 
 
@@ -21,7 +21,7 @@ def ibm_iso(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoIBM(_collections.AbstractExtrapolation):
+class _IsoIBM(_extra.AbstractExtrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
@@ -40,7 +40,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
 
     # todo: why does this method have the same name as the above?
     def init_ssv(self, ode_shape):
@@ -49,7 +49,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
         rv = _vars.IsoNormalHiddenState(m0, c0)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -57,7 +57,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def begin(self, s0: _vars.IsoStateSpaceVar, /, dt) -> _vars.IsoStateSpaceVar:
+    def begin(self, s0: _vars.IsoSSV, /, dt) -> _vars.IsoSSV:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -65,7 +65,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoStateSpaceVar(ext, cache=(m_ext_p, m0_p, p, p_inv))
+        return _vars.IsoSSV(ext, cache=(m_ext_p, m0_p, p, p_inv))
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -85,7 +85,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache
@@ -111,7 +111,7 @@ class _IsoIBM(_collections.AbstractExtrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoStateSpaceVar(extrapolated, cache=None), bw_model
+        return _vars.IsoSSV(extrapolated, cache=None), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
     def init_conditional(self, ssv_proto):

@@ -13,7 +13,7 @@ class IsoConditionalHiddenState(_collections.AbstractConditional):
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -45,7 +45,7 @@ class IsoConditionalHiddenState(_collections.AbstractConditional):
         ).T
 
         rv = _vars.IsoNormalHiddenState(mean=m_new, cov_sqrtm_lower=l_new)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
 
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)
@@ -59,4 +59,4 @@ class IsoConditionalQOI(_collections.AbstractConditional):
         mv = self.transition[:, None] * x[None, :]
         m = mv + self.noise.mean
         rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.IsoStateSpaceVar(rv, cache=None)
+        return _vars.IsoSSV(rv, cache=None)
