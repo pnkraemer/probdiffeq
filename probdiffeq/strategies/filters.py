@@ -111,18 +111,19 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         # A filter interpolates by extrapolating from the previous time-point
         # to the in-between variable. That's it.
         dt = t - s0.t
-        output_extra = self.begin_extrapolation(s0, dt=dt)
-        extrapolated = self.complete_extrapolation(
+
+        output_extra = self.extrapolation.begin(s0.corrected, dt=dt)
+        extrapolated = self.extrapolation.complete_without_reversal(
             output_extra,
-            state_previous=s0,
+            s0=s0.corrected,
             output_scale=output_scale,
         )
         extrapolated = _FiState(
             t=t,
-            u=extrapolated.extrapolated.extract_qoi(),
+            u=extrapolated.extract_qoi(),
             extrapolated=None,
-            corrected=extrapolated.extrapolated,
-            num_data_points=extrapolated.num_data_points,
+            corrected=extrapolated,
+            num_data_points=s0.num_data_points,
         )
         return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
@@ -147,73 +148,34 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return u, marginals
 
     def begin(self, state: _FiState, /, *, t, dt, parameters, vector_field):
-        extrapolated = self.begin_extrapolation(state, dt=dt)
-        output_corr = self.begin_correction(
+        extrapolated = self.extrapolation.begin(state.corrected, dt=dt)
+        output_corr = self.correction.begin(
             extrapolated, vector_field=vector_field, t=t + dt, p=parameters
+        )
+
+        extrapolated = _FiState(
+            t=t + dt,
+            u=None,
+            corrected=None,
+            extrapolated=extrapolated,
+            num_data_points=state.num_data_points,
         )
         return extrapolated, output_corr
 
     def complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        extrapolated = self.complete_extrapolation(
-            output_extra,
-            state_previous=state,
-            output_scale=output_scale,
-        )
-        observed, corrected = self.complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return observed, corrected
-
-    def begin_extrapolation(self, posterior: _FiState, /, *, dt) -> _FiState:
-        extrapolated = self.extrapolation.begin(posterior.corrected, dt=dt)
-        return _FiState(
-            t=posterior.t + dt,
-            u=None,
-            extrapolated=extrapolated,
-            corrected=None,
-            num_data_points=posterior.num_data_points,
-        )
-
-    def complete_extrapolation(
-        self,
-        output_extra: _FiState,
-        /,
-        *,
-        output_scale,
-        state_previous: _FiState,
-    ) -> _FiState:
-        ssv = self.extrapolation.complete_without_reversal(
+        extrapolated = self.extrapolation.complete_without_reversal(
             output_extra.extrapolated,
-            s0=state_previous.corrected,
+            s0=state.corrected,
             output_scale=output_scale,
         )
-        return _FiState(
-            t=output_extra.t,
-            u=None,
-            extrapolated=ssv,
-            corrected=None,
-            num_data_points=output_extra.num_data_points,
-        )
 
-    def begin_correction(
-        self, output_extra: _FiState, /, *, vector_field, t, p
-    ) -> Tuple[jax.Array, float, Any]:
-        x = output_extra.extrapolated
-        return self.correction.begin(x, vector_field=vector_field, t=t, p=p)
-
-    # todo: more type-stability in corrections!
-    def complete_correction(
-        self, extrapolated: _FiState, /, *, cache_obs
-    ) -> Tuple[Any, Tuple[_FiState, Any]]:
-        obs, corr = self.correction.complete(
-            extrapolated=extrapolated.extrapolated, cache=cache_obs
-        )
+        obs, corr = self.correction.complete(extrapolated=extrapolated, cache=cache_obs)
         corr = _FiState(
-            t=extrapolated.t,
+            t=output_extra.t,
             u=corr.extract_qoi(),
             extrapolated=None,
             corrected=corr,
-            num_data_points=extrapolated.num_data_points + 1,
+            num_data_points=output_extra.num_data_points + 1,
         )
         return obs, corr
 

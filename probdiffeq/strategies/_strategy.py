@@ -67,24 +67,6 @@ class Strategy(abc.ABC, Generic[S, P]):
     ):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def begin_extrapolation(self, state: S, /, *, dt) -> S:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_extrapolation(
-        self, output_extra: S, /, *, output_scale, state_previous: S
-    ) -> S:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def begin_correction(self, output_extra: S, /, *, vector_field, t, p):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def complete_correction(self, extrapolated: S, /, *, cache_obs):
-        raise NotImplementedError
-
     def tree_flatten(self):
         children = (self.extrapolation, self.correction)
         aux = ()
