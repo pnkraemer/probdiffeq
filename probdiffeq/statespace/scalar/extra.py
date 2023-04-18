@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
+from probdiffeq import _collections, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.scalar import _conds, _vars
 
@@ -30,7 +30,21 @@ class _IBM(_extra.Extrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
+    def filter_solution_from_tcoeffs(self, taylor_coefficients, /):
+        if len(taylor_coefficients) != self.num_derivatives + 1:
+            msg1 = "The number of Taylor coefficients does not match "
+            msg2 = "the number of derivatives in the implementation."
+            raise ValueError(msg1 + msg2)
+
+        m0_matrix = jnp.stack(taylor_coefficients)
+        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
+        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
+
+        return _vars.NormalHiddenState(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
+
+    def smoother_solution_from_tcoeffs(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -43,44 +57,71 @@ class _IBM(_extra.Extrapolation):
         rv = _vars.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.SSV(rv, cache=None)
+        cond = self.init_conditional(rv_proto=rv)
+        return _collections.MarkovSequence(init=rv, backward_model=cond)
+
+    def filter_init(self, sol, /):
+        return _vars.SSV(sol), None
+
+    def smoother_init(self, sol: _collections.MarkovSequence, /):
+        ssv = _vars.SSV(sol.init)
+        extra = sol.backward_model
+        return ssv, extra
+
+    def filter_extract(self, ssv, extra, /):
+        return ssv.hidden_state
+
+    def smoother_extract(self, ssv, extra, /):
+        return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
 
     def init_error_estimate(self):
         return jnp.zeros(())
 
-    def begin(self, s0, /, dt):
+    def filter_begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv * s0.hidden_state.mean
+        m0_p = p_inv * ssv.hidden_state.mean
+        l0 = ssv.hidden_state.cov_sqrtm_lower
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.SSV(extrapolated, cache=(m_ext_p, m0_p, p, p_inv))
+        return _vars.SSV(extrapolated), (m_ext_p, m0_p, p, p_inv, l0)
+
+    def smoother_begin(self, ssv, extra, /, dt):
+        p, p_inv = self._assemble_preconditioner(dt=dt)
+        m0_p = p_inv * ssv.hidden_state.mean
+        l0 = ssv.hidden_state.cov_sqrtm_lower
+        m_ext_p = self.a @ m0_p
+        m_ext = p * m_ext_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
+        return _vars.SSV(extrapolated), (extra, m_ext_p, m0_p, p, p_inv, l0)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_without_reversal(self, output_begin, /, s0, output_scale):
-        _, _, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def filter_complete(self, ssv, extra, /, output_scale):
+        _, _, p, p_inv, l0 = extra  # todo: remove those unneeded caches
+        m_ext = ssv.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
-                (self.a @ (p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower)).T,
+                (self.a @ (p_inv[:, None] * l0)).T,
                 (output_scale * self.q_sqrtm_lower).T,
             )
         ).T
         l_ext = p[:, None] * l_ext_p
 
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.SSV(rv, cache=None)
+        ssv = _vars.SSV(rv)
+        return ssv, None
 
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
-        m_ext_p, m0_p, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def smoother_complete(self, ssv, extra, /, output_scale):
+        _, m_ext_p, m0_p, p, p_inv, l0 = extra
+        m_ext = ssv.hidden_state.mean
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
+        l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -100,11 +141,11 @@ class _IBM(_extra.Extrapolation):
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.SSV(extrapolated, cache=None), bw_model
+        return _vars.SSV(extrapolated), bw_model
 
-    def init_conditional(self, ssv_proto):
+    def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
+        noi = self._init_backward_noise(rv_proto=rv_proto)
         return _conds.ConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):

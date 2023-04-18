@@ -160,7 +160,6 @@ class CalibrationFreeSolver(Solver):
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         state_strategy = self.strategy.begin(
             state.strategy,
-            t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
@@ -276,7 +275,6 @@ class MLESolver(Solver):
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         state_strategy = self.strategy.begin(
             state.strategy,
-            t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
