@@ -160,7 +160,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
 
         ssv, corr = self.correction.complete(
-            ssv, state.corr, p=parameters, vector_field=vector_field
+            ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
         return _FiState(
             t=state.t,
