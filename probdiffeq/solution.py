@@ -217,7 +217,6 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
         msg1 = "Time-series marginal likelihoods "
         msg2 = "cannot be computed with a filtering solution."
         raise TypeError(msg1 + msg2)
-    markov_seq = posterior.rv
 
     if jnp.shape(observation_std) != (jnp.shape(u)[0],):
         raise ValueError(
@@ -271,10 +270,12 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     #
 
     # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], markov_seq.backward_model)
+    bw_models = jax.tree_util.tree_map(
+        lambda x: x[1:, ...], posterior.rand.backward_model
+    )
 
     # Incorporate final data point
-    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
+    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.rand.init)
     init = init_fn(rv_terminal, observation_std[-1], u[-1])
     (_, _, nmll), _ = jax.lax.scan(
         f=filter_step,
