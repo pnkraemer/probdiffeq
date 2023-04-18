@@ -48,7 +48,10 @@ def test_log_marginal_likelihood(solution_save_at):
     k = sol.u.shape[0]
 
     mll = solution.log_marginal_likelihood(
-        observation_std=jnp.ones((k,)), u=data, solution=sol
+        observation_std=jnp.ones((k,)),
+        u=data,
+        posterior=sol.posterior,
+        strategy=solver.strategy,
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)
@@ -62,7 +65,10 @@ def test_log_marginal_likelihood_error_for_wrong_std_shape_1(solution_save_at):
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones((k + 1,)), u=data, solution=sol
+            observation_std=jnp.ones((k + 1,)),
+            u=data,
+            posterior=sol.posterior,
+            strategy=solver.strategy,
         )
 
 
@@ -73,18 +79,10 @@ def test_log_marginal_likelihood_error_for_wrong_std_shape_2(solution_save_at):
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones((k, 1)), u=data, solution=sol
-        )
-
-
-def test_log_marginal_likelihood_error_for_wrong_u_shape_1(solution_save_at):
-    sol, solver = solution_save_at
-    data = sol.u + 0.005
-    k = sol.u.shape[0]
-
-    with testing.raises(ValueError, match="does not match"):
-        _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones((k,)), u=data[..., None], solution=sol
+            observation_std=jnp.ones((k, 1)),
+            u=data,
+            posterior=sol.posterior,
+            strategy=solver.strategy,
         )
 
 
@@ -94,7 +92,10 @@ def test_log_marginal_likelihood_error_for_terminal_values(solution_save_at):
 
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones_like(data[-1]), u=data[-1], solution=sol[-1]
+            observation_std=jnp.ones_like(data[-1]),
+            u=data[-1],
+            posterior=sol[-1].posterior,
+            strategy=solver.strategy,
         )
 
 
@@ -103,7 +104,10 @@ def test_log_marginal_likelihood_terminal_values(solution_save_at):
     data = sol.u + 0.005
 
     mll = solution.log_marginal_likelihood_terminal_values(
-        observation_std=jnp.ones(()), u=data[-1], solution=sol[-1]
+        observation_std=jnp.ones(()),
+        u=data[-1],
+        posterior=sol[-1].posterior,
+        strategy=solver.strategy,
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)
@@ -118,17 +122,18 @@ def test_log_marginal_likelihood_terminal_values_error_for_wrong_shapes(
 
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
-            observation_std=jnp.ones((1,)), u=data[-1], solution=sol[-1]
-        )
-
-    with testing.raises(ValueError, match="does not match"):
-        _ = solution.log_marginal_likelihood_terminal_values(
-            observation_std=jnp.ones(()), u=data[-1, None], solution=sol[-1]
+            observation_std=jnp.ones((1,)),
+            u=data[-1],
+            posterior=sol[-1].posterior,
+            strategy=solver.strategy,
         )
 
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
-            observation_std=jnp.ones(()), u=data[-1:], solution=sol[-1:]
+            observation_std=jnp.ones(()),
+            u=data[-1:],
+            posterior=sol[-1:].posterior,
+            strategy=solver.strategy,
         )
 
 
@@ -149,7 +154,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     )
     data = sol.u + 0.1
     mll = solution.log_marginal_likelihood_terminal_values(
-        observation_std=1e-2, u=data, solution=sol
+        observation_std=1e-2, u=data, posterior=sol.posterior, strategy=strategy
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)

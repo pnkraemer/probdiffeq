@@ -55,8 +55,8 @@ class _IsoIBM(_extra.Extrapolation):
         cond = self.init_conditional(rv_proto=rv)
         return _collections.MarkovSequence(init=rv, backward_model=cond)
 
-    def filter_init(self, sol, /):
-        ssv = _vars.IsoSSV(sol.rv)
+    def filter_init(self, rv, /):
+        ssv = _vars.IsoSSV(rv)
         cache = None
         return ssv, cache
 
@@ -64,8 +64,8 @@ class _IsoIBM(_extra.Extrapolation):
         return ssv.hidden_state
 
     def smoother_init(self, sol, /):
-        ssv = _vars.IsoSSV(sol.rv.init)
-        cache = sol.rv.backward_model
+        ssv = _vars.IsoSSV(sol.init)
+        cache = sol.backward_model
         return ssv, cache
 
     def smoother_extract(self, ssv, ex, /):

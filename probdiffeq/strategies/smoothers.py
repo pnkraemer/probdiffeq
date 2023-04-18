@@ -72,7 +72,7 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     def init(self, t, u, marginals, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.smoother_init(posterior)
+        ssv, extra = self.extrapolation.smoother_init(posterior.rv)
         ssv, corr = self.correction.init(ssv)
         return _SmState(
             t=t,
@@ -109,14 +109,17 @@ class _SmootherCommon(_strategy.Strategy):
         markov_seq = self.extrapolation.smoother_extract(ssv, state.extra)
         marginals = self._extract_marginals(markov_seq)
         u = ssv.extract_qoi_from_sample(marginals.mean)
-        return state.t, u, marginals, markov_seq
+
+        sol = SmootherSol(markov_seq, num_data_points=state.num_data_points)
+        return state.t, u, marginals, sol
 
     def extract_at_terminal_values(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
         markov_seq = self.extrapolation.smoother_extract(ssv, state.extra)
         marginals = markov_seq.init
         u = state.u
-        return state.t, u, marginals, markov_seq
+        sol = SmootherSol(markov_seq, num_data_points=state.num_data_points)
+        return state.t, u, marginals, sol
 
     def _extract_marginals(self, posterior: SmootherSol, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)

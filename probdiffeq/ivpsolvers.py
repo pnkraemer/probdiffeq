@@ -158,25 +158,26 @@ class CalibrationFreeSolver(Solver):
     """
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
             t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        (error, _, cache_obs) = state_strategy.corr
 
-        _, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
+            parameters=parameters,
+            vector_field=vector_field,
             output_scale=state.output_scale_prior,
         )
 
         # Extract and return solution
         return _State(
             error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             # Nothing happens in the field below:
             #  but we cannot use "None" if we want to reuse the init()

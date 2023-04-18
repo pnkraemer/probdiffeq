@@ -57,5 +57,4 @@ class IsoConditionalQOI(_collections.Conditional):
     def __call__(self, x, /):
         mv = self.transition[:, None] * x[None, :]
         m = mv + self.noise.mean
-        rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.IsoSSV(rv, cache=None)
+        return _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)

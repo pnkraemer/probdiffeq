@@ -9,6 +9,7 @@ from typing import Any, Generic, NamedTuple, TypeVar
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _collections
 from probdiffeq.strategies import smoothers
 
 R = TypeVar("R")
@@ -148,7 +149,7 @@ def _offgrid_marginals(*, solution, t, solution_previous, solver):
     )
 
 
-def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
+def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, strategy):
     """Compute the log-marginal-likelihood of \
      observations of the IVP solution at the terminal value.
 
@@ -167,27 +168,14 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, solution):
             f"Shape {jnp.shape(observation_std)} received."
         )
 
-    if jnp.shape(u) != jnp.shape(solution.u):
-        raise ValueError(
-            f"Observation shape {jnp.shape(u)} does not match "
-            f"the solution shape {jnp.shape(solution.u)}."
-        )
-
     if jnp.ndim(u) >= 2:  # not valid for scalar or matrix-valued solutions
         raise ValueError(
             "Terminal-value solution (ndim=1, shape=(n,)) expected. "
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    # todo: replace with strategy.extract_at_terminal_values(posterior)
-    #  (the catch is that this would involve a
-    #  new argument "strategy"/"solver" for this function...
-    if isinstance(solution.posterior, smoothers.MarkovSequence):
-        terminal_value = solution.posterior.init
-    else:
-        terminal_value = solution.posterior.rv
-
-    obs, _ = terminal_value.observe_qoi(observation_std=observation_std)
+    ssv = strategy.init(None, None, None, posterior).ssv
+    obs, _ = ssv.observe_qoi(observation_std=observation_std)
     return jnp.sum(obs.logpdf(u))
 
 
@@ -197,7 +185,7 @@ class _NMLLState(NamedTuple):
     nmll: float
 
 
-def log_marginal_likelihood(*, observation_std, u, solution):
+def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     """Compute the log-marginal-likelihood of \
      observations of the IVP solution.
 
@@ -207,9 +195,12 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         Standard deviation of the observation. Expected to be have shape (n,).
     u
         Observation. Expected to have shape (n, d) for an ODE with shape (d,).
-    solution
-        Solution object. Expected to correspond to a solution of an ODE with shape (d,).
-
+    posterior
+        Posterior distribution.
+        Expected to correspond to a solution of an ODE with shape (d,).
+    extrapolation
+        Extrapolation model (that has been used to compute the solution).
+        Expected to correspond to a solution of an ODE with shape (d,).
 
     !!! note
         Use `log_marginal_likelihood_terminal_values`
@@ -219,10 +210,11 @@ def log_marginal_likelihood(*, observation_std, u, solution):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for log-posterior
 
-    if not isinstance(solution.posterior, smoothers.MarkovSequence):
+    if not isinstance(posterior, smoothers.SmootherSol):
         msg1 = "Time-series marginal likelihoods "
         msg2 = "cannot be computed with a filtering solution."
         raise TypeError(msg1 + msg2)
+    markov_seq = posterior.rv
 
     if jnp.shape(observation_std) != (jnp.shape(u)[0],):
         raise ValueError(
@@ -232,12 +224,6 @@ def log_marginal_likelihood(*, observation_std, u, solution):
             f"{(jnp.shape(u)[0],)} != {jnp.shape(observation_std)}. "
         )
 
-    if jnp.shape(u) != jnp.shape(solution.u):
-        raise ValueError(
-            f"Observation shape {jnp.shape(u)} does not match "
-            f"the solution shape {jnp.shape(solution.u)}."
-        )
-
     if jnp.ndim(u) < 2:
         raise ValueError(
             "Time-series solution (ndim=2, shape=(n, m)) expected. "
@@ -245,7 +231,8 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         )
 
     def init_fn(rv, obs_std, data):
-        obs, cond_cor = rv.observe_qoi(observation_std=obs_std)
+        ssv, _ = strategy.extrapolation.filter_init(rv)
+        obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
         cor = cond_cor(data)
         nmll_new = jnp.sum(obs.logpdf(data))
         return _NMLLState(cor, 1.0, nmll_new)
@@ -259,7 +246,8 @@ def log_marginal_likelihood(*, observation_std, u, solution):
         rv_ext = bw_model.marginalise(rv)
 
         # Correct (with an alias for long function names)
-        obs, cond_cor = rv_ext.observe_qoi(observation_std=obs_std)
+        ssv, _ = strategy.extrapolation.filter_init(rv_ext)
+        obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
         cor = cond_cor(data)
 
         # Compute marginal log likelihood (with an alias for long function names)
@@ -280,12 +268,10 @@ def log_marginal_likelihood(*, observation_std, u, solution):
     #
 
     # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(
-        lambda x: x[1:, ...], solution.posterior.backward_model
-    )
+    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], markov_seq.backward_model)
 
     # Incorporate final data point
-    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], solution.posterior.init)
+    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
     init = init_fn(rv_terminal, observation_std[-1], u[-1])
     (_, _, nmll), _ = jax.lax.scan(
         f=filter_step,

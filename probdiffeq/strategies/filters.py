@@ -74,7 +74,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def solution_from_tcoeffs(
         self, taylor_coefficients, /, *, num_data_points
     ) -> Tuple[jax.Array, jax.Array, FilterDist]:
-        sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
+        sol = self.extrapolation.filter_solution_from_tcoeffs(taylor_coefficients)
         sol = FilterDist(sol, num_data_points=num_data_points)
         marginals = sol
         u = taylor_coefficients[0]
@@ -105,8 +105,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         # to the in-between variable. That's it.
         dt = t - s0.t
 
-        ssv, extra = self.extrapolation.begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.complete_without_reversal(
+        ssv, extra = self.extrapolation.filter_begin(s0.ssv, s0.extra, dt=dt)
+        ssv, extra = self.extrapolation.filter_complete(
             ssv, extra, output_scale=output_scale
         )
 
@@ -141,7 +141,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return u, marginals
 
     def begin(self, state: _FiState, /, *, t, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
+        ssv, extra = self.extrapolation.filter_begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=t + dt, p=parameters
         )
@@ -155,7 +155,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
-        ssv, extra = self.extrapolation.complete_without_reversal(
+        ssv, extra = self.extrapolation.filter_complete(
             state.ssv, state.extra, output_scale=output_scale
         )
 
