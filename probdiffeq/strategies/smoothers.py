@@ -215,7 +215,7 @@ class Smoother(_SmootherCommon):
             output_scale=output_scale,
         )
         t, posterior = self.extract(acc)
-        marginals = posterior.rand.backward_model.marginalise(posterior.rand.init)
+        marginals = posterior.rand.backward_model.marginalise(marginals)
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
