@@ -240,24 +240,6 @@ class _SmootherCommon(_strategy.Strategy):
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
-    # def _begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
-    #     ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
-    #     return _SmState(
-    #         t=posterior.t + dt,
-    #         u=None,
-    #         extrapolated=ssv,
-    #         corrected=None,
-    #         backward_model=None,
-    #         num_data_points=posterior.num_data_points,
-    #     )
-
-    # def _begin_correction(
-    #     self, output_extra: _SmState, /, *, vector_field, t, p
-    # ) -> Tuple[jax.Array, float, Any]:
-    #     return self.correction.begin(
-    #         output_extra.extrapolated, vector_field=vector_field, t=t, p=p
-    #     )
-
     def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
         a, corrected = self.correction.complete(
             extrapolated=extrapolated.extrapolated, cache=cache_obs
