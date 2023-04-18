@@ -158,25 +158,25 @@ class CalibrationFreeSolver(Solver):
     """
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
-            t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        (error, _, cache_obs) = state_strategy.corr
 
-        _, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
+            parameters=parameters,
+            vector_field=vector_field,
             output_scale=state.output_scale_prior,
         )
 
         # Extract and return solution
         return _State(
             error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             # Nothing happens in the field below:
             #  but we cannot use "None" if we want to reuse the init()
@@ -217,25 +217,25 @@ class DynamicSolver(Solver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, output_scale, cache_obs) = self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
-            t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        (error, output_scale, _) = state_strategy.corr  # clean this up next?
 
-        _, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
+            parameters=parameters,
+            vector_field=vector_field,
             output_scale=output_scale,
         )
 
         # Return solution
         return _State(
             error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_calibrated=output_scale,
             # current scale becomes the new prior scale!
             #  this is because dynamic solvers assume a piecewise-constant model
@@ -273,20 +273,21 @@ class MLESolver(Solver):
      calibration of the output-scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
-            t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        (error, output_scale, _) = state_strategy.corr  # clean this up next?
 
-        observed, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
             output_scale=state.output_scale_prior,
+            parameters=parameters,
+            vector_field=vector_field,
         )
+        observed = state_strategy.corr  # clean this up next?
 
         # Calibrate
         output_scale = state.output_scale_calibrated
@@ -296,7 +297,7 @@ class MLESolver(Solver):
         )
         return _State(
             error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             output_scale_calibrated=new_output_scale,
         )
@@ -321,11 +322,13 @@ class MLESolver(Solver):
     def extract(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
-        t, u, marginals, posterior = self.strategy.extract(state.strategy)
+        # Important: Rescale before extracting! Otherwise backward samples are wrong.
 
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
-        marginals, state = self._rescale_covs(marginals, state, output_scale=s)
+        state = self._rescale_covs(state, output_scale=s)
+
+        t, u, marginals, posterior = self.strategy.extract(state.strategy)
         return solution.Solution(
             t=t,
             u=state.u,
@@ -337,12 +340,12 @@ class MLESolver(Solver):
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
+        # Important: Rescale before extracting! Otherwise backward samples are wrong.
+        s = state.output_scale_calibrated
+        state = self._rescale_covs(state, output_scale=s)
 
         _sol = self.strategy.extract_at_terminal_values(state.strategy)
         t, u, marginals, posterior = _sol
-
-        s = state.output_scale_calibrated
-        marginals, state = self._rescale_covs(marginals, state, output_scale=s)
         return solution.Solution(
             t=t,
             u=state.u,
@@ -353,7 +356,7 @@ class MLESolver(Solver):
         )
 
     @staticmethod
-    def _rescale_covs(marginals_unscaled, state, /, *, output_scale):
+    def _rescale_covs(state, /, *, output_scale):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
@@ -371,7 +374,6 @@ class MLESolver(Solver):
         #  in intermediate objects
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
-        marginals = marginals_unscaled.scale_covariance(output_scale)
         state_strategy = state.strategy.scale_covariance(output_scale)
         state_rescaled = _State(
             strategy=state_strategy,
@@ -379,4 +381,4 @@ class MLESolver(Solver):
             output_scale_prior=None,  # irrelevant, will be removed in next step
             error_estimate=None,  # irrelevant, will be removed in next step.
         )
-        return marginals, state_rescaled
+        return state_rescaled

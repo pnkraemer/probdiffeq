@@ -72,7 +72,10 @@ def build_loss_fn(vf, initial_values, obs_stdev=1e-2):
 
         observation_std = jnp.ones_like(grid) * obs_stdev
         return -1.0 * solution.log_marginal_likelihood(
-            observation_std=observation_std, u=data[:, None], solution=sol
+            observation_std=observation_std,
+            u=data[:, None],
+            posterior=sol.posterior,
+            strategy=solver.strategy,
         )
 
     return loss_fn

@@ -55,12 +55,12 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
     assert _tree_all_allclose(filter_solution.t, smoother_solution.t)
     assert _tree_all_allclose(filter_solution.u, smoother_solution.u)
     assert _tree_all_allclose(
-        filter_solution.marginals.hidden_state.mean,
-        smoother_solution.marginals.hidden_state.mean,
+        filter_solution.marginals.mean,
+        smoother_solution.marginals.mean,
     )
     assert _tree_all_allclose(
-        cov(filter_solution.marginals.hidden_state.cov_sqrtm_lower),
-        cov(smoother_solution.marginals.hidden_state.cov_sqrtm_lower),
+        cov(filter_solution.marginals.cov_sqrtm_lower),
+        cov(smoother_solution.marginals.cov_sqrtm_lower),
     )
     assert _tree_all_allclose(
         filter_solution.output_scale, smoother_solution.output_scale

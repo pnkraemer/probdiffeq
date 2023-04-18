@@ -12,8 +12,7 @@ class IsoConditionalHiddenState(_collections.Conditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.IsoSSV(rv, cache=None)
+        return _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
@@ -35,8 +34,8 @@ class IsoConditionalHiddenState(_collections.Conditional):
     def marginalise(self, rv, /):
         """Marginalise the output of a linear model."""
         # Read
-        m0 = rv.hidden_state.mean
-        l0 = rv.hidden_state.cov_sqrtm_lower
+        m0 = rv.mean
+        l0 = rv.cov_sqrtm_lower
 
         # Apply transition
         m_new = self.transition @ m0 + self.noise.mean
@@ -44,8 +43,7 @@ class IsoConditionalHiddenState(_collections.Conditional):
             R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
         ).T
 
-        rv = _vars.IsoNormalHiddenState(mean=m_new, cov_sqrtm_lower=l_new)
-        return _vars.IsoSSV(rv, cache=None)
+        return _vars.IsoNormalHiddenState(mean=m_new, cov_sqrtm_lower=l_new)
 
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)
@@ -58,5 +56,4 @@ class IsoConditionalQOI(_collections.Conditional):
     def __call__(self, x, /):
         mv = self.transition[:, None] * x[None, :]
         m = mv + self.noise.mean
-        rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.IsoSSV(rv, cache=None)
+        return _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)

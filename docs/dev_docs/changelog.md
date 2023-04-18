@@ -57,7 +57,9 @@ Notable breaking changes:
   Why this change? Bundling extrapolation and correction models up into a single data structure leads to
   unnecessary code duplication, and the lower-level implementations simplify.
 * `solution.sample()` has been removed. Use `sol.posterior.sample()` instead, (where `sol` is the solution-type as return by solve*() methods.)
-
+* `log_marginal_likelihood*` functions now operator on posterior and strategy, instead of the solution/solver. The solution and solver carry a lot of information that is unnecessary for log-marginal-likelihood computation.
+  To update, replace `log_marginal_likelihood*(..., solution=sol)`
+  with `log_marginal_likelihood*(..., posterior=sol.posterior, strategy=solver.strategy)`
 
 Notable enhancements:
 

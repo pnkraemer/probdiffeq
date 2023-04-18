@@ -4,13 +4,31 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, solution, test_util
 from probdiffeq.backend import testing
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 
 
 @testing.fixture(scope="function", name="solution_native_python_while_loop")
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
-def fixture_solution_native_python_while_loop(ode_problem, strategy_fn):
-    solver = test_util.generate_solver(num_derivatives=1, strategy_factory=strategy_fn)
+@testing.parametrize(
+    "impl_fn",
+    # one for each SSM factorisation
+    [
+        lambda num_derivatives, **kwargs: recipes.ts0_iso(
+            num_derivatives=num_derivatives
+        ),
+        recipes.ts0_blockdiag,
+        recipes.ts0_dense,
+    ],
+    ids=["IsoTS0", "BlockDiagTS0", "DenseTS0"],
+)
+def fixture_solution_native_python_while_loop(ode_problem, strategy_fn, impl_fn):
+    solver = test_util.generate_solver(
+        num_derivatives=1,
+        strategy_factory=strategy_fn,
+        impl_factory=impl_fn,
+        ode_shape=ode_problem.initial_values[0].shape,
+    )
     sol = ivpsolve.solve_with_python_while_loop(
         ode_problem.vector_field,
         ode_problem.initial_values,
@@ -120,9 +138,10 @@ def test_sample_shape(solution_save_at, shape):
     sol, solver = solution_save_at
 
     key = jax.random.PRNGKey(seed=15)
+    # todo: remove "u" from this output?
     u, samples = sol.posterior.sample(key, shape=shape)
     assert u.shape == shape + sol.u.shape
-    assert samples.shape == shape + sol.marginals.hidden_state.sample_shape
+    assert samples.shape == shape + sol.marginals.sample_shape
 
     # Todo: test values of the samples by checking a chi2 statistic
     #  in terms of the joint posterior. But this requires a joint_posterior()

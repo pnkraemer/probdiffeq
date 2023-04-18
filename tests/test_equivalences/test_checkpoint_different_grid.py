@@ -56,9 +56,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     # The backward models are not expected to be equal.
     assert jnp.allclose(fixedpoint_smo_sol.t, ts[1:-1])
     assert jnp.allclose(fixedpoint_smo_sol.u, u)
-    assert jnp.allclose(
-        fixedpoint_smo_sol.marginals.hidden_state.mean, dense.hidden_state.mean
-    )
+    assert jnp.allclose(fixedpoint_smo_sol.marginals.mean, dense.mean)
 
     # covariances are equal, but cov_sqrtm_lower might not be
 
@@ -66,8 +64,8 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     def cov(x):
         return x @ x.T
 
-    l0 = fixedpoint_smo_sol.marginals.hidden_state.cov_sqrtm_lower
-    l1 = dense.hidden_state.cov_sqrtm_lower
+    l0 = fixedpoint_smo_sol.marginals.cov_sqrtm_lower
+    l1 = dense.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1))
 
 

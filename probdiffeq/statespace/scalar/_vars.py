@@ -53,6 +53,9 @@ class NormalQOI(_collections.Normal):
         res_white = (obs_pt - u) / l_obs
         return res_white
 
+    def marginal_nth_derivative(self, n):
+        raise NotImplementedError
+
 
 @jax.tree_util.register_pytree_node_class
 class SSV(_collections.SSV):
@@ -94,7 +97,7 @@ class SSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return SSV(rv, cache=self.cache)
+        return SSV(rv)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
@@ -132,3 +135,24 @@ class NormalHiddenState(_collections.Normal):
     def transform_unit_sample(self, base, /):
         m, l_sqrtm = self.mean, self.cov_sqrtm_lower
         return (m[..., None] + l_sqrtm @ base[..., None])[..., 0]
+
+    def marginal_nth_derivative(self, n):
+        if self.mean.ndim > 1:
+            # if the variable has batch-axes, vmap the result
+            fn = NormalHiddenState.marginal_nth_derivative
+            vect_fn = jax.vmap(fn, in_axes=(0, None))
+            return vect_fn(self, n)
+
+        if n >= self.mean.shape[0]:
+            msg = f"The {n}th derivative not available in the state-space variable."
+            raise ValueError(msg)
+
+        mean = self.mean[n]
+        cov_sqrtm_lower_nonsquare = self.cov_sqrtm_lower[n, :]
+        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
+            R=cov_sqrtm_lower_nonsquare[:, None]
+        ).T
+        return NormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
+
+    def extract_qoi_from_sample(self, u, /):
+        return u[0]

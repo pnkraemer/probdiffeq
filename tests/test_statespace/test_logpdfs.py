@@ -28,7 +28,7 @@ def test_logpdf_dense(setup):
     m, cov_cholesky = setup
 
     def fn1(x):
-        return vars_dense.DenseNormal(m, cov_cholesky).logpdf(x)
+        return vars_dense.DenseNormal(m, cov_cholesky, target_shape=None).logpdf(x)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(

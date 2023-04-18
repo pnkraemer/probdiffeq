@@ -191,7 +191,10 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
     y_T = solve_fixed(theta, ts=ts, solver=solver)
     logpdf_data = solution.log_marginal_likelihood_terminal_values(
-        u=data, solution=y_T, observation_std=obs_stdev
+        u=data,
+        posterior=y_T.posterior,
+        strategy=solver.strategy,
+        observation_std=obs_stdev,
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior

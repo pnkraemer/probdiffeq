@@ -35,8 +35,9 @@ class DenseConditional(_collections.Conditional):
 
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        cond = _vars.DenseNormal(m, self.noise.cov_sqrtm_lower)
-        return _vars.DenseSSV(cond, cache=None, target_shape=self.target_shape)
+        return _vars.DenseNormal(
+            m, self.noise.cov_sqrtm_lower, target_shape=self.target_shape
+        )
 
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)
@@ -56,13 +57,15 @@ class DenseConditional(_collections.Conditional):
             R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
         ).T
 
-        noise = _vars.DenseNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = _vars.DenseNormal(
+            mean=xi, cov_sqrtm_lower=Xi, target_shape=self.target_shape
+        )
         return DenseConditional(g, noise=noise, target_shape=self.target_shape)
 
     def marginalise(self, rv, /):
         # Pull into preconditioned space
-        m0_p = rv.hidden_state.mean
-        l0_p = rv.hidden_state.cov_sqrtm_lower
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
 
         # Apply transition
         m_new_p = self.transition @ m0_p + self.noise.mean
@@ -74,5 +77,5 @@ class DenseConditional(_collections.Conditional):
         m_new = m_new_p
         l_new = l_new_p
 
-        marg = _vars.DenseNormal(m_new, l_new)
-        return _vars.DenseSSV(marg, cache=None, target_shape=rv.target_shape)
+        marg = _vars.DenseNormal(m_new, l_new, target_shape=self.target_shape)
+        return marg

@@ -18,6 +18,20 @@ R = TypeVar("R")
 
 
 class Posterior(abc.ABC, Generic[R]):
+    def __init__(self, rv: S, /, num_data_points):
+        self.rv = rv
+        self.num_data_points = num_data_points
+
+    def tree_flatten(self):
+        children = self.rv, self.num_data_points
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        rv, num_data_points = children
+        return cls(rv, num_data_points=num_data_points)
+
     @abc.abstractmethod
     def sample(self, key, *, shape):
         raise NotImplementedError
@@ -85,11 +99,11 @@ class Strategy(abc.ABC, Generic[S, P]):
         return init_fn(*args, **kwargs)
 
     @abc.abstractmethod
-    def begin(self, state: S, /, *, t, dt, parameters, vector_field):
+    def begin(self, state: S, /, *, dt, parameters, vector_field):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+    def complete(self, state, /, *, parameters, vector_field, output_scale):
         raise NotImplementedError
 
     @abc.abstractmethod

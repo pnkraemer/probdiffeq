@@ -49,6 +49,14 @@ class Normal(abc.ABC):
     def sample_shape(self) -> Tuple[int]:
         return self.mean.shape
 
+    @abc.abstractmethod
+    def extract_qoi_from_sample(self, u, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginal_nth_derivative(self, n):
+        raise NotImplementedError
+
 
 class SSV(abc.ABC):
     """State-space variables.
@@ -61,27 +69,25 @@ class SSV(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
-    def __init__(self, hidden_state, /, *, cache, target_shape=None):
+    def __init__(self, hidden_state, /, *, target_shape=None):
         self.hidden_state = hidden_state
-        self.cache = cache
         self.target_shape = target_shape
 
     def tree_flatten(self):
-        children = (self.hidden_state, self.cache)
+        children = (self.hidden_state,)
         aux = (self.target_shape,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (hidden_state, cache) = children
+        (hidden_state,) = children
         (target_shape,) = aux
-        return cls(hidden_state, cache=cache, target_shape=target_shape)
+        return cls(hidden_state, target_shape=target_shape)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
             f"{self.hidden_state},"
-            f"cache={self.cache},"
             f"target_shape={self.target_shape}"
             f")"
         )
@@ -100,10 +106,6 @@ class SSV(abc.ABC):
 
     @abc.abstractmethod
     def scale_covariance(self, output_scale):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def marginal_nth_derivative(self, n):
         raise NotImplementedError
 
 

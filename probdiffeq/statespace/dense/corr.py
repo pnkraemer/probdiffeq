@@ -77,10 +77,16 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
-        m0 = self.e0(x.hidden_state.mean)
-        m1 = self.e1(x.hidden_state.mean)
-        cov_sqrtm_lower = self.e1_vect(x.hidden_state.cov_sqrtm_lower)
+    def init(self, ssv, /):
+        m_like = jnp.zeros(self.ode_shape)
+        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        obs_like = _vars.DenseNormal(m_like, chol_like, target_shape=None)
+        return ssv, obs_like
+
+    def begin(self, ssv: _vars.DenseSSV, corr, /, vector_field, t, p):
+        m0 = self.e0(ssv.hidden_state.mean)
+        m1 = self.e1(ssv.hidden_state.mean)
+        cov_sqrtm_lower = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         def f_wrapped(s):
             """Evaluate the ODE vector field at (x, Dx, D^2x, ...).
@@ -95,7 +101,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
 
         b = m1 - fx
         l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        observed = _vars.DenseNormal(b, l_obs_raw)
+        observed = _vars.DenseNormal(b, l_obs_raw, target_shape=None)
 
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
         output_scale = mahalanobis_norm / jnp.sqrt(b.size)
@@ -103,27 +109,30 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, (b,)
+        return ssv, (error_estimate, output_scale, (b,))
 
-    def complete(self, extrapolated, cache):
-        ext = extrapolated  # alias for readability
-        l_obs_nonsquare = self.e1_vect(ext.hidden_state.cov_sqrtm_lower)
+    def complete(self, ssv, corr, /, vector_field, t, p):
+        l_obs_nonsquare = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         # Compute correction according to ext -> obs
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
+            R_X_F=l_obs_nonsquare.T, R_X=ssv.hidden_state.cov_sqrtm_lower.T
         )
 
         # Gather observation terms
-        (b,) = cache
-        observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T)
+        *_, (b,) = corr
+        observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=None)
 
         # Gather correction terms
-        m_cor = ext.hidden_state.mean - gain @ b
-        cor = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        _shape = ext.target_shape
-        corrected = _vars.DenseSSV(cor, cache=None, target_shape=_shape)
-        return observed, corrected
+        m_cor = ssv.hidden_state.mean - gain @ b
+        cor = _vars.DenseNormal(
+            mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=ssv.target_shape
+        )
+        ssv = _vars.DenseSSV(cor, target_shape=ssv.target_shape)
+        return ssv, observed
+
+    def extract(self, ssv, corr, /):
+        return ssv
 
 
 @jax.tree_util.register_pytree_node_class
@@ -151,7 +160,13 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def init(self, ssv, /):
+        m_like = jnp.zeros(self.ode_shape)
+        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        obs_like = _vars.DenseNormal(m_like, chol_like, target_shape=None)
+        return ssv, obs_like
+
+    def begin(self, ssv: _vars.DenseSSV, corr, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -159,15 +174,15 @@ class _DenseTaylorFirstOrder(_corr.Correction):
             return x1 - fx0
 
         # Linearise the ODE residual (not the vector field!)
-        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=x.hidden_state.mean)
+        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=ssv.hidden_state.mean)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        cov_sqrtm_lower = jvp_fn_vect(x.hidden_state.cov_sqrtm_lower)
+        cov_sqrtm_lower = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         # Gather the observed variable
         l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
-        observed = _vars.DenseNormal(b, l_obs_raw)
+        observed = _vars.DenseNormal(b, l_obs_raw, target_shape=None)
 
         # Extract the output scale and the error estimate
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
@@ -176,33 +191,32 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, (jvp_fn, (b,))
+        return ssv, (error_estimate, output_scale, (jvp_fn, (b,)))
 
-    def complete(self, extrapolated: _vars.DenseSSV, cache):
-        # Assign short-named variables for readability
-        ext = extrapolated
-
+    def complete(self, ssv: _vars.DenseSSV, corr, /, vector_field, t, p):
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        jvp_fn, (b,) = cache
+        *_, (jvp_fn, (b,)) = corr
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        l_obs_nonsquare = jvp_fn_vect(ext.hidden_state.cov_sqrtm_lower)
+        l_obs_nonsquare = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         # Compute the correction matrices
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
+            R_X_F=l_obs_nonsquare.T, R_X=ssv.hidden_state.cov_sqrtm_lower.T
         )
 
         # Gather the observed variable
-        observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T)
+        observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T, target_shape=None)
 
         # Gather the corrected variable
-        m_cor = ext.hidden_state.mean - gain @ b
-        rv = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        _shape = ext.target_shape
-        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
+        m_cor = ssv.hidden_state.mean - gain @ b
+        rv = _vars.DenseNormal(
+            mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=ssv.target_shape
+        )
+        ssv = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
+        return ssv, observed
 
-        # Return the results
-        return observed, corrected
+    def extract(self, ssv, _corr, /):
+        return ssv
 
 
 @jax.tree_util.register_pytree_node_class
@@ -238,6 +252,12 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
     def __repr__(self):
         return f"<SLR0 with ode_order={self.ode_order}>"
 
+    def init(self, ssv, /):
+        m_like = jnp.zeros(self.ode_shape)
+        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        obs_like = _vars.DenseNormal(m_like, chol_like, target_shape=None)
+        return ssv, obs_like
+
     def tree_flatten(self):
         # todo: should this call super().tree_flatten()?
         children = ()
@@ -249,12 +269,12 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def begin(self, ssv: _vars.DenseSSV, corr, /, vector_field, t, p):
         # Compute the linearisation point
-        m_0 = self.e0(x.hidden_state.mean)
-        r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
+        m_0 = self.e0(ssv.hidden_state.mean)
+        r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
         r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
-        lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
+        lin_pt = _vars.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # todo: higher-order ODEs
         def f_wrapped(s):
@@ -265,13 +285,13 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         cache = (f_wrapped,)
 
         # Compute the marginal observation
-        m_1 = self.e1(x.hidden_state.mean)
-        r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
+        m_1 = self.e1(ssv.hidden_state.mean)
+        r_1 = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower).T
         m_marg = m_1 - noise.mean
         l_marg = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(r_1, noise.cov_sqrtm_lower.T)
         ).T
-        marginals = _vars.DenseNormal(m_marg, l_marg)
+        marginals = _vars.DenseNormal(m_marg, l_marg, target_shape=None)
 
         # Compute output scale and error estimate
         mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
@@ -280,42 +300,41 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, cache
+        return ssv, (error_estimate, output_scale, cache)
 
-    def complete(self, extrapolated, cache):
+    def complete(self, ssv, corr, /, vector_field, t, p):
         # Select the required derivatives
-        _x = extrapolated  # readability in current code block
-        m_0 = self.e0(_x.hidden_state.mean)
-        m_1 = self.e1(_x.hidden_state.mean)
-        r_0 = self.e0_vect(_x.hidden_state.cov_sqrtm_lower).T
-        r_1 = self.e1_vect(_x.hidden_state.cov_sqrtm_lower).T
+        m_0 = self.e0(ssv.hidden_state.mean)
+        m_1 = self.e1(ssv.hidden_state.mean)
+        r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
+        r_1 = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower).T
 
         # Extract the linearisation point
         r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
-        lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
+        lin_pt = _vars.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # Apply statistical linear regression to the ODE vector field
-        f_wrapped, *_ = cache
+        *_, (f_wrapped, *_) = corr
         noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
-        L = extrapolated.hidden_state.cov_sqrtm_lower
+        L = ssv.hidden_state.cov_sqrtm_lower
         HL = r_1.T
         r_marg, (r_bw, gain) = _sqrt_util.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
         )
         # Compute the marginal mean and gather the marginals
         m_marg = m_1 - noise.mean
-        marginals = _vars.DenseNormal(m_marg, r_marg.T)
+        marginals = _vars.DenseNormal(m_marg, r_marg.T, target_shape=None)
 
         # Compute the corrected mean and gather the correction
-        m_bw = extrapolated.hidden_state.mean - gain @ m_marg
-        rv = _vars.DenseNormal(m_bw, r_bw.T)
-        _shape = extrapolated.target_shape
-        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
+        m_bw = ssv.hidden_state.mean - gain @ m_marg
+        rv = _vars.DenseNormal(m_bw, r_bw.T, target_shape=ssv.target_shape)
+        corrected = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
+        return corrected, marginals
 
-        # Return the results
-        return marginals, corrected
+    def extract(self, ssv, corr, /):
+        return ssv
 
 
 @jax.tree_util.register_pytree_node_class
@@ -352,12 +371,18 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def init(self, ssv, /):
+        m_like = jnp.zeros(self.ode_shape)
+        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        obs_like = _vars.DenseNormal(m_like, chol_like, target_shape=None)
+        return ssv, obs_like
+
+    def begin(self, ssv: _vars.DenseSSV, corr, /, vector_field, t, p):
         # Compute the linearisation point
-        m_0 = self.e0(x.hidden_state.mean)
-        r_0 = self.e0_vect(x.hidden_state.cov_sqrtm_lower).T
+        m_0 = self.e0(ssv.hidden_state.mean)
+        r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
         r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
-        lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
+        lin_pt = _vars.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # todo: higher-order ODEs
         def f_wrapped(s):
@@ -368,13 +393,13 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         cache = (f_wrapped,)
 
         # Compute the marginal observation
-        m_1 = self.e1(x.hidden_state.mean)
-        r_1 = self.e1_vect(x.hidden_state.cov_sqrtm_lower).T
+        m_1 = self.e1(ssv.hidden_state.mean)
+        r_1 = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower).T
         m_marg = m_1 - (linop @ m_0 + noise.mean)
         l_marg = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(r_1, r_0_square @ linop.T, noise.cov_sqrtm_lower.T)
         ).T
-        marginals = _vars.DenseNormal(m_marg, l_marg)
+        marginals = _vars.DenseNormal(m_marg, l_marg, target_shape=None)
 
         # Compute output scale and error estimate
         mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros_like(m_marg))
@@ -383,26 +408,25 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, cache
+        return ssv, (error_estimate, output_scale, cache)
 
-    def complete(self, extrapolated, cache):
+    def complete(self, ssv, corr, /, vector_field, t, p):
         # Select the required derivatives
-        _x = extrapolated  # readability in current code block
-        m_0 = self.e0(_x.hidden_state.mean)
-        m_1 = self.e1(_x.hidden_state.mean)
-        r_0 = self.e0_vect(_x.hidden_state.cov_sqrtm_lower).T
-        r_1 = self.e1_vect(_x.hidden_state.cov_sqrtm_lower).T
+        m_0 = self.e0(ssv.hidden_state.mean)
+        m_1 = self.e1(ssv.hidden_state.mean)
+        r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
+        r_1 = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower).T
 
         # Extract the linearisation point
         r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
-        lin_pt = _vars.DenseNormal(m_0, r_0_square.T)
+        lin_pt = _vars.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # Apply statistical linear regression to the ODE vector field
-        f_wrapped, *_ = cache
+        *_, (f_wrapped, *_) = corr
         H, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
-        L = extrapolated.hidden_state.cov_sqrtm_lower
+        L = ssv.hidden_state.cov_sqrtm_lower
         HL = r_1.T - H @ r_0.T
         r_marg, (r_bw, gain) = _sqrt_util.revert_conditional(
             R_X_F=HL.T, R_X=L.T, R_YX=noise.cov_sqrtm_lower.T
@@ -410,16 +434,18 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
 
         # Compute the marginal mean and gather the marginals
         m_marg = m_1 - (H @ m_0 + noise.mean)
-        marginals = _vars.DenseNormal(m_marg, r_marg.T)
+        marginals = _vars.DenseNormal(m_marg, r_marg.T, target_shape=None)
 
         # Compute the corrected mean and gather the correction
-        m_bw = extrapolated.hidden_state.mean - gain @ m_marg
-        rv = _vars.DenseNormal(m_bw, r_bw.T)
-        _shape = extrapolated.target_shape
-        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
+        m_bw = ssv.hidden_state.mean - gain @ m_marg
+        rv = _vars.DenseNormal(m_bw, r_bw.T, target_shape=ssv.target_shape)
+        corrected = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
 
         # Return the results
-        return marginals, corrected
+        return corrected, marginals
+
+    def extract(self, ssv, corr, /):
+        return ssv
 
 
 def _select_derivative_vect(x, i, *, ode_shape):
