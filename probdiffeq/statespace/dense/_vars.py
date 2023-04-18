@@ -67,7 +67,7 @@ class DenseSSV(_collections.SSV):
         cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
             R=cov_sqrtm_lower_nonsquare.T
         ).T
-        return DenseNormal(mean, cov_sqrtm_lower)
+        return DenseNormal(mean, cov_sqrtm_lower, target_shape=None)
 
     def _select_derivative_vect(self, x, i):
         fn = functools.partial(self._select_derivative, i=i)
@@ -87,6 +87,21 @@ class DenseNormal(_collections.Normal):
     However, it is more of a matrix-normal distribution:
     The mean is a (d*n,)-shaped array that represents a (d,n)-shaped matrix.
     """
+
+    def __init__(self, *args, target_shape, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.target_shape = target_shape
+
+    def tree_flatten(self):
+        children = self.mean, self.cov_sqrtm_lower
+        aux = self.target_shape
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        target_shape = aux
+        m, l_ = children
+        return cls(mean=m, cov_sqrtm_lower=l_, target_shape=target_shape)
 
     def logpdf(self, u, /):
         # todo: cache those?
@@ -122,7 +137,9 @@ class DenseNormal(_collections.Normal):
 
     def scale_covariance(self, output_scale):
         cov_scaled = output_scale[..., None, None] * self.cov_sqrtm_lower
-        return DenseNormal(mean=self.mean, cov_sqrtm_lower=cov_scaled)
+        return DenseNormal(
+            mean=self.mean, cov_sqrtm_lower=cov_scaled, target_shape=self.target_shape
+        )
 
     # automatically batched because of numpy's broadcasting rules?
     def transform_unit_sample(self, base, /):
@@ -132,3 +149,40 @@ class DenseNormal(_collections.Normal):
     @property
     def sample_shape(self):
         return self.mean.shape
+
+    def extract_qoi_from_sample(self, u, /):
+        if u.ndim == 1:
+            return u.reshape(self.target_shape, order="F")[0, ...]
+        return jax.vmap(self.extract_qoi_from_sample)(u)
+
+    def marginal_nth_derivative(self, n):
+        if self.mean.ndim > 1:
+            # if the variable has batch-axes, vmap the result
+            fn = DenseNormal.marginal_nth_derivative
+            vect_fn = jax.vmap(fn, in_axes=(0, None))
+            return vect_fn(self, n)
+
+        if n >= self.target_shape[0]:
+            msg = f"The {n}th derivative not available in the state-space variable."
+            raise ValueError(msg)
+
+        mean = self._select_derivative(self.mean, n)
+        cov_sqrtm_lower_nonsquare = self._select_derivative_vect(
+            self.cov_sqrtm_lower, n
+        )
+        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
+            R=cov_sqrtm_lower_nonsquare.T
+        ).T
+        return DenseNormal(mean, cov_sqrtm_lower, target_shape=None)
+
+    def _select_derivative_vect(self, x, i):
+        fn = functools.partial(self._select_derivative, i=i)
+        select = jax.vmap(fn, in_axes=1, out_axes=1)
+        return select(x)
+
+    # todo: there is a lot of duplication between SSV and NormalHiddenState
+    # todo: target_shape only makes sens if DenseNormal is a hidden state.
+    #  should we split the normals?
+    def _select_derivative(self, x, i):
+        x_reshaped = jnp.reshape(x, self.target_shape, order="F")
+        return x_reshaped[i, ...]

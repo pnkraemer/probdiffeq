@@ -86,7 +86,11 @@ class _DenseIBM(_extra.Extrapolation):
         m0_matrix = jnp.stack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        return _vars.DenseNormal(
+            mean=m0_corrected,
+            cov_sqrtm_lower=c_sqrtm0_corrected,
+            target_shape=self.target_shape,
+        )
 
     def smoother_solution_from_tcoeffs(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
@@ -101,7 +105,11 @@ class _DenseIBM(_extra.Extrapolation):
         m0_matrix = jnp.stack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        rv = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        rv = _vars.DenseNormal(
+            mean=m0_corrected,
+            cov_sqrtm_lower=c_sqrtm0_corrected,
+            target_shape=self.target_shape,
+        )
         conds = self.init_conditional(rv_proto=rv)
         return _collections.MarkovSequence(init=rv, backward_model=conds)
 
@@ -137,7 +145,7 @@ class _DenseIBM(_extra.Extrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        ext = _vars.DenseNormal(m_ext, q_sqrtm)
+        ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (m_ext_p, m0_p, p, p_inv, l0)
         ssv = _vars.DenseSSV(ext, target_shape=shape)
         return ssv, cache
@@ -153,7 +161,7 @@ class _DenseIBM(_extra.Extrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        ext = _vars.DenseNormal(m_ext, q_sqrtm)
+        ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         ssv = _vars.DenseSSV(ext, target_shape=shape)
         return ssv, cache
@@ -179,7 +187,7 @@ class _DenseIBM(_extra.Extrapolation):
         l_ext = p[:, None] * l_ext_p
 
         shape = ssv.target_shape
-        rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
         ssv = _vars.DenseSSV(rv, target_shape=shape)
         return ssv, None
 
@@ -205,11 +213,15 @@ class _DenseIBM(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.DenseNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
+        backward_noise = _vars.DenseNormal(
+            mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=self.target_shape
+        )
         bw_model = _conds.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
-        rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
+        rv = _vars.DenseNormal(
+            mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
+        )
         ext = _vars.DenseSSV(rv, target_shape=self.target_shape)
         return ext, bw_model
 
@@ -228,6 +240,7 @@ class _DenseIBM(_extra.Extrapolation):
         return _vars.DenseNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
+            target_shape=rv_proto.target_shape,
         )
 
     def promote_output_scale(self, output_scale):

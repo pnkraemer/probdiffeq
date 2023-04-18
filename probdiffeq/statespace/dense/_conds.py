@@ -55,7 +55,9 @@ class DenseConditional(_collections.Conditional):
             R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
         ).T
 
-        noise = _vars.DenseNormal(mean=xi, cov_sqrtm_lower=Xi)
+        noise = _vars.DenseNormal(
+            mean=xi, cov_sqrtm_lower=Xi, target_shape=self.target_shape
+        )
         return DenseConditional(g, noise=noise, target_shape=self.target_shape)
 
     def marginalise(self, rv, /):
@@ -73,5 +75,5 @@ class DenseConditional(_collections.Conditional):
         m_new = m_new_p
         l_new = l_new_p
 
-        marg = _vars.DenseNormal(m_new, l_new)
+        marg = _vars.DenseNormal(m_new, l_new, target_shape=self.target_shape)
         return marg

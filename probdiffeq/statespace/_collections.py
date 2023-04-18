@@ -49,6 +49,14 @@ class Normal(abc.ABC):
     def sample_shape(self) -> Tuple[int]:
         return self.mean.shape
 
+    @abc.abstractmethod
+    def extract_qoi_from_sample(self, u, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginal_nth_derivative(self, n):
+        raise NotImplementedError
+
 
 class SSV(abc.ABC):
     """State-space variables.
@@ -98,10 +106,6 @@ class SSV(abc.ABC):
 
     @abc.abstractmethod
     def scale_covariance(self, output_scale):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def marginal_nth_derivative(self, n):
         raise NotImplementedError
 
 

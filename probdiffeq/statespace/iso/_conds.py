@@ -12,9 +12,7 @@ class IsoConditionalHiddenState(_collections.Conditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        # todo: this should return an 'RV', not an 'SSV'
-        return _vars.IsoSSV(rv, cache=None)
+        return _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
 
     def merge_with_incoming_conditional(self, incoming, /):
         A = self.transition
