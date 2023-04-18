@@ -60,9 +60,6 @@ class FilterDist(_strategy.Posterior[S]):
         return u, marginals
 
 
-_SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
-
-
 @jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
@@ -77,24 +74,15 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def init(self, t, _u, _marginals, solution) -> _FiState:
         ssv, extra = self.extrapolation.filter_init(solution.rv)
         ssv, corr = self.correction.init(ssv)
-        return _FiState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
+        return _FiState(t=t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
 
-    def extract(self, posterior: _FiState, /) -> _SolType:
+    def extract(self, posterior: _FiState, /):
         t = posterior.t
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
         rv = self.extrapolation.filter_extract(ssv, posterior.extra)
 
         solution = FilterDist(rv)  # type: ignore
         return t, solution
-
-    def extract_at_terminal_values(self, posterior: _FiState, /) -> _SolType:
-        return self.extract(posterior)
 
     def case_right_corner(
         self, t, *, s0: _FiState, s1: _FiState, output_scale
@@ -148,25 +136,14 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv, state.corr, vector_field=vector_field, t=state.t + dt, p=parameters
         )
         return _FiState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            corr=corr,
-            extra=extra,
+            t=state.t + dt, u=ssv.extract_qoi(), ssv=ssv, corr=corr, extra=extra
         )
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
         ssv, extra = self.extrapolation.filter_complete(
             state.ssv, state.extra, output_scale=output_scale
         )
-
         ssv, corr = self.correction.complete(
             ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
-        return _FiState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
+        return _FiState(t=state.t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)

@@ -122,12 +122,6 @@ class _SmootherCommon(_strategy.Strategy):
         sol = SmootherSol(mseq)  # type: ignore
         return state.t, sol
 
-    def extract_at_terminal_values(self, state: _SmState, /):
-        ssv = self.correction.extract(state.ssv, state.corr)
-        mseq = self.extrapolation.smoother_extract(ssv, state.extra)
-        sol = SmootherSol(mseq)  # type: ignore
-        return state.t, sol
-
     # Auxiliary routines that are the same among all subclasses
 
     def _interpolate_from_to_fn(self, *, s0, output_scale, t):
