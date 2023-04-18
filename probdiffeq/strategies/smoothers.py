@@ -20,6 +20,20 @@ class SmootherSol(_strategy.Posterior[S]):
     def sample(self, key, *, shape):
         return self.rv.sample(key, shape=shape)
 
+    def marginals_terminal_value(self):
+        marginals = self.rv.init
+        #
+        # marginals = self._extract_marginals(self.rv)
+        u = marginals.extract_qoi_from_sample(marginals.mean)
+        return u, marginals
+
+    def _extract_marginals(self, posterior: MarkovSequence, /):
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
+
+        # todo: this should not happen here...
+        markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
+        return markov.marginalise_backwards()
+
 
 class _SmState(NamedTuple):
     t: Any
@@ -68,12 +82,12 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init(self, t, u, marginals, posterior, /) -> _SmState:
+    def init(self, t, _u, _marginals, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.smoother_init(posterior.rv)
         ssv, corr = self.correction.init(ssv)
         return _SmState(
             t=t,
-            u=u,
+            u=ssv.extract_qoi(),
             ssv=ssv,
             extra=extra,
             corr=corr,
@@ -102,11 +116,12 @@ class _SmootherCommon(_strategy.Strategy):
     def extract(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
         mseq = self.extrapolation.smoother_extract(ssv, state.extra)
-        marginals = self._extract_marginals(mseq)
-        u = ssv.extract_qoi_from_sample(marginals.mean)
-
         sol = SmootherSol(mseq)  # type: ignore
-        return state.t, u, marginals, sol
+        return state.t, sol
+        # marginals = self._extract_marginals(mseq)
+        # u = ssv.extract_qoi_from_sample(marginals.mean)
+
+        # return state.t, u, marginals, sol
 
     def extract_at_terminal_values(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
@@ -115,13 +130,6 @@ class _SmootherCommon(_strategy.Strategy):
         u = state.u
         sol = SmootherSol(mseq)  # type: ignore
         return state.t, u, marginals, sol
-
-    def _extract_marginals(self, posterior: MarkovSequence, /):
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
-
-        # todo: this should not happen here...
-        markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
-        return markov.marginalise_backwards()
 
     # Auxiliary routines that are the same among all subclasses
 
