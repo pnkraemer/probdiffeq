@@ -183,11 +183,19 @@ class _SmootherCommon(_strategy.Strategy):
         )
 
     def begin(self, state: _SmState, /, *, t, dt, parameters, vector_field):
-        extrapolated = self._begin_extrapolation(state, dt=dt)
-        output_corr = self._begin_correction(
-            extrapolated, vector_field=vector_field, t=t + dt, p=parameters
+        extrapolated = self.extrapolation.begin(state.corrected, dt=dt)
+        output_corr = self.correction.begin(
+            extrapolated, vector_field=vector_field, t=t, p=parameters
         )
-        return extrapolated, output_corr
+        ssv = _SmState(
+            t=state.t + dt,
+            u=None,
+            extrapolated=extrapolated,
+            corrected=None,
+            backward_model=None,
+            num_data_points=state.num_data_points,
+        )
+        return ssv, output_corr
 
     def complete(self, output_extra, state, /, *, cache_obs, output_scale):
         extrapolated = self._complete_extrapolation(
@@ -232,23 +240,23 @@ class _SmootherCommon(_strategy.Strategy):
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
 
-    def _begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
-        ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
-        return _SmState(
-            t=posterior.t + dt,
-            u=None,
-            extrapolated=ssv,
-            corrected=None,
-            backward_model=None,
-            num_data_points=posterior.num_data_points,
-        )
+    # def _begin_extrapolation(self, posterior: _SmState, /, *, dt) -> _SmState:
+    #     ssv = self.extrapolation.begin(posterior.corrected, dt=dt)
+    #     return _SmState(
+    #         t=posterior.t + dt,
+    #         u=None,
+    #         extrapolated=ssv,
+    #         corrected=None,
+    #         backward_model=None,
+    #         num_data_points=posterior.num_data_points,
+    #     )
 
-    def _begin_correction(
-        self, output_extra: _SmState, /, *, vector_field, t, p
-    ) -> Tuple[jax.Array, float, Any]:
-        return self.correction.begin(
-            output_extra.extrapolated, vector_field=vector_field, t=t, p=p
-        )
+    # def _begin_correction(
+    #     self, output_extra: _SmState, /, *, vector_field, t, p
+    # ) -> Tuple[jax.Array, float, Any]:
+    #     return self.correction.begin(
+    #         output_extra.extrapolated, vector_field=vector_field, t=t, p=p
+    #     )
 
     def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
         a, corrected = self.correction.complete(
