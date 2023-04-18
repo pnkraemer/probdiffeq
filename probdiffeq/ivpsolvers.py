@@ -23,6 +23,8 @@ class _State(NamedTuple):
     output_scale_calibrated: Any
     output_scale_prior: Any
 
+    num_steps: Any
+
     @property
     def t(self):
         return self.strategy.t
@@ -65,10 +67,10 @@ class Solver(abc.ABC):
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
-        # todo: this should not call init(), but strategy.sol_from_tcoeffs()!
         u, marginals, posterior = self.strategy.solution_from_tcoeffs(
-            taylor_coefficients, num_steps=num_steps
+            taylor_coefficients
         )
+        # todo: remove!?
         output_scale = self.strategy.promote_output_scale(output_scale)
         return solution.Solution(
             t=t,
@@ -76,7 +78,7 @@ class Solver(abc.ABC):
             marginals=marginals,
             output_scale=output_scale,
             u=u,
-            num_steps=self.strategy.num_steps(posterior),
+            num_steps=num_steps,
         )
 
     def init(self, sol, /) -> _State:
@@ -87,6 +89,7 @@ class Solver(abc.ABC):
             strategy=strategy_state,
             output_scale_prior=sol.output_scale,
             output_scale_calibrated=sol.output_scale,
+            num_steps=sol.num_steps,
         )
 
     def interpolate(self, *, s0: _State, s1: _State, t):
@@ -137,6 +140,7 @@ class Solver(abc.ABC):
             error_estimate=error_estimate,
             output_scale_prior=reference.output_scale_prior,
             output_scale_calibrated=reference.output_scale_calibrated,
+            num_steps=reference.num_steps,
         )
 
     def tree_flatten(self):
@@ -182,6 +186,7 @@ class CalibrationFreeSolver(Solver):
             #  but we cannot use "None" if we want to reuse the init()
             #  method from abstract solvers (which populate this field).
             output_scale_calibrated=state.output_scale_prior,
+            num_steps=state.num_steps + 1,
         )
 
     def extract(self, state: _State, /) -> solution.Solution:
@@ -195,7 +200,7 @@ class CalibrationFreeSolver(Solver):
             #  but we use _prior because we might remove the _calibrated
             #  value in the future.
             output_scale=state.output_scale_prior,
-            num_steps=self.strategy.num_steps(state.strategy),
+            num_steps=state.num_steps,
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -208,7 +213,7 @@ class CalibrationFreeSolver(Solver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_prior,
-            num_steps=self.strategy.num_steps(state.strategy),
+            num_steps=state.num_steps,
         )
 
 
@@ -240,6 +245,7 @@ class DynamicSolver(Solver):
             # current scale becomes the new prior scale!
             #  this is because dynamic solvers assume a piecewise-constant model
             output_scale_prior=output_scale,
+            num_steps=state.num_steps + 1,
         )
 
     def extract(self, state: _State, /) -> solution.Solution:
@@ -250,7 +256,7 @@ class DynamicSolver(Solver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_steps=self.strategy.num_steps(state.strategy),
+            num_steps=state.num_steps,
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -263,7 +269,7 @@ class DynamicSolver(Solver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_steps=self.strategy.num_steps(state.strategy),
+            num_steps=state.num_steps,
         )
 
 
@@ -291,7 +297,7 @@ class MLESolver(Solver):
 
         # Calibrate
         output_scale = state.output_scale_calibrated
-        n = self.strategy.num_steps(state.strategy)
+        n = state.num_steps
         new_output_scale = self._update_output_scale(
             diffsqrtm=output_scale, n=n, obs=observed
         )
@@ -300,6 +306,7 @@ class MLESolver(Solver):
             strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             output_scale_calibrated=new_output_scale,
+            num_steps=state.num_steps + 1,
         )
 
     @staticmethod
@@ -335,7 +342,7 @@ class MLESolver(Solver):
             marginals=marginals,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_steps=self.strategy.num_steps(state.strategy),
+            num_steps=state.num_steps,
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -352,7 +359,7 @@ class MLESolver(Solver):
             marginals=marginals,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_steps=self.strategy.num_steps(state.strategy),
+            num_steps=state.num_steps,
         )
 
     @staticmethod
