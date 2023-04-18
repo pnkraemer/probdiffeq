@@ -63,5 +63,4 @@ class ConditionalQOI(_collections.Conditional):
         if self.transition.ndim > 1:
             return jax.vmap(ConditionalQOI.__call__)(self, x)
         m = self.transition * x + self.noise.mean
-        rv = _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return _vars.SSV(rv, cache=None)
+        return _vars.NormalHiddenState(m, self.noise.cov_sqrtm_lower)

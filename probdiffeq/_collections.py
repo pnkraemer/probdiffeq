@@ -109,14 +109,14 @@ class MarkovSequence(Generic[S]):
             conditional, base = conditionals_and_base_samples
 
             cond = conditional(samp_prev)
-            samp = cond.hidden_state.transform_unit_sample(base)
+            samp = cond.transform_unit_sample(base)
             qoi = cond.extract_qoi_from_sample(samp)
 
             return (qoi, samp), (qoi, samp)
 
         # Compute a sample at the terminal value
         init = jax.tree_util.tree_map(lambda s: s[-1, ...], self.init)
-        init_sample = init.hidden_state.transform_unit_sample(base_sample[-1])
+        init_sample = init.transform_unit_sample(base_sample[-1])
         init_qoi = init.extract_qoi_from_sample(init_sample)
         init_val = (init_qoi, init_sample)
 

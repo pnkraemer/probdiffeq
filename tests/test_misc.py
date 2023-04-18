@@ -20,4 +20,11 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
 
     with testing.raises(ValueError):
-        _ = solver.strategy.extrapolation.solution_from_tcoeffs(tcoeffs_wrong_length)
+        _ = solver.strategy.extrapolation.filter_solution_from_tcoeffs(
+            tcoeffs_wrong_length
+        )
+
+    with testing.raises(ValueError):
+        _ = solver.strategy.extrapolation.smoother_solution_from_tcoeffs(
+            tcoeffs_wrong_length
+        )

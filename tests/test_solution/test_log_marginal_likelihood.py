@@ -179,4 +179,6 @@ def test_nmll_raises_error_for_filter(ode_problem):
     data = sol.u + 0.1
     std = jnp.ones((sol.u.shape[0],))  # values irrelevant
     with testing.raises(TypeError, match="ilter"):
-        _ = solution.log_marginal_likelihood(observation_std=std, u=data, solution=sol)
+        _ = solution.log_marginal_likelihood(
+            observation_std=std, u=data, posterior=sol.posterior, strategy=strategy
+        )
