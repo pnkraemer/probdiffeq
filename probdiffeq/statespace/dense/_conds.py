@@ -61,8 +61,8 @@ class DenseConditional(_collections.Conditional):
 
     def marginalise(self, rv, /):
         # Pull into preconditioned space
-        m0_p = rv.hidden_state.mean
-        l0_p = rv.hidden_state.cov_sqrtm_lower
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
 
         # Apply transition
         m_new_p = self.transition @ m0_p + self.noise.mean
@@ -75,4 +75,4 @@ class DenseConditional(_collections.Conditional):
         l_new = l_new_p
 
         marg = _vars.DenseNormal(m_new, l_new)
-        return _vars.DenseSSV(marg, cache=None, target_shape=rv.target_shape)
+        return marg

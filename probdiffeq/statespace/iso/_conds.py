@@ -13,6 +13,7 @@ class IsoConditionalHiddenState(_collections.Conditional):
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         rv = _vars.IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
+        # todo: this should return an 'RV', not an 'SSV'
         return _vars.IsoSSV(rv, cache=None)
 
     def merge_with_incoming_conditional(self, incoming, /):

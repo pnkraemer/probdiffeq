@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
+from probdiffeq import _collections, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.dense import _conds, _vars
 
@@ -87,7 +87,23 @@ class _DenseIBM(_extra.Extrapolation):
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        # return _vars.DenseSSV(corr, cache=None, target_shape=m0_matrix.shape)
+
+    def smoother_solution_from_tcoeffs(self, taylor_coefficients, /):
+        if len(taylor_coefficients) != self.num_derivatives + 1:
+            msg1 = "The number of Taylor coefficients does not match "
+            msg2 = "the number of derivatives in the implementation."
+            raise ValueError(msg1 + msg2)
+
+        if taylor_coefficients[0].shape != self.ode_shape:
+            msg = "The solver's ODE dimension does not match the initial condition."
+            raise ValueError(msg)
+
+        m0_matrix = jnp.stack(taylor_coefficients)
+        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
+        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
+        rv = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        conds = self.init_conditional(rv_proto=rv)
+        return _collections.MarkovSequence(init=rv, backward_model=conds)
 
     def filter_init(self, sol, /):
         ssv = _vars.DenseSSV(sol, target_shape=self.target_shape)
@@ -96,6 +112,16 @@ class _DenseIBM(_extra.Extrapolation):
 
     def filter_extract(self, ssv, _extra, /):
         return ssv.hidden_state
+
+    def smoother_init(self, sol: _collections.MarkovSequence, /):
+        ssv = _vars.DenseSSV(sol.init, target_shape=self.target_shape)
+        extra = sol.backward_model
+        return ssv, extra
+
+    def smoother_extract(self, ssv, extra, /) -> _collections.MarkovSequence:
+        rv = ssv.hidden_state
+        cond = extra
+        return _collections.MarkovSequence(init=rv, backward_model=cond)
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
@@ -113,6 +139,22 @@ class _DenseIBM(_extra.Extrapolation):
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm)
         cache = (m_ext_p, m0_p, p, p_inv, l0)
+        ssv = _vars.DenseSSV(ext, target_shape=shape)
+        return ssv, cache
+
+    def smoother_begin(self, ssv, extra, /, dt):
+        p, p_inv = self._assemble_preconditioner(dt=dt)
+        m0_p = p_inv * ssv.hidden_state.mean
+        m_ext_p = self.a @ m0_p
+        m_ext = p * m_ext_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+
+        l0 = ssv.hidden_state.cov_sqrtm_lower
+
+        (d,) = self.ode_shape
+        shape = (self.num_derivatives + 1, d)
+        ext = _vars.DenseNormal(m_ext, q_sqrtm)
+        cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         ssv = _vars.DenseSSV(ext, target_shape=shape)
         return ssv, cache
 
@@ -141,11 +183,12 @@ class _DenseIBM(_extra.Extrapolation):
         ssv = _vars.DenseSSV(rv, target_shape=shape)
         return ssv, None
 
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
-        m_ext_p, m0_p, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def smoother_complete(self, ssv, extra, /, output_scale):
+        _, m_ext_p, m0_p, p, p_inv, l0 = extra
+        # todo: move this to cache? it may be modified by correction models
+        m_ext = ssv.hidden_state.mean
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
+        l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -162,21 +205,18 @@ class _DenseIBM(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        shape = output_begin.target_shape
         backward_noise = _vars.DenseNormal(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.DenseConditional(
-            g_bw, noise=backward_noise, target_shape=shape
+            g_bw, noise=backward_noise, target_shape=self.target_shape
         )
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ext = _vars.DenseSSV(rv, cache=None, target_shape=shape)
+        ext = _vars.DenseSSV(rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    def init_conditional(self, ssv_proto):
+    def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
-        return _conds.DenseConditional(
-            op, noise=noi, target_shape=ssv_proto.target_shape
-        )
+        noi = self._init_backward_noise(rv_proto=rv_proto)
+        return _conds.DenseConditional(op, noise=noi, target_shape=self.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape

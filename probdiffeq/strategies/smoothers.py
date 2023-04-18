@@ -121,7 +121,7 @@ class _SmootherCommon(_strategy.Strategy):
         sol = SmootherSol(markov_seq, num_data_points=state.num_data_points)
         return state.t, u, marginals, sol
 
-    def _extract_marginals(self, posterior: SmootherSol, /):
+    def _extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
 
         # todo: this should not happen here...
@@ -171,7 +171,7 @@ class Smoother(_SmootherCommon):
             state.ssv, state.extra, output_scale=output_scale
         )
         ssv, corr = self.correction.complete(
-            ssv, state.corr, vector_field=vector_field, p=parameters
+            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
         return _SmState(
             t=state.t,
@@ -257,7 +257,7 @@ class FixedPointSmoother(_SmootherCommon):
         bw_model, *_ = state.extra
         extra = bw_model.merge_with_incoming_conditional(extra)
         ssv, corr = self.correction.complete(
-            ssv, state.corr, vector_field=vector_field, p=parameters
+            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
         return _SmState(
             t=state.t,
