@@ -101,8 +101,8 @@ _, dense = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=s
 fig, ax = plt.subplots(nrows=2, figsize=(4, 4), sharex=True, tight_layout=True)
 
 for i in [0, 1, 2]:  # ["S", "I", "R"]
-    ms = dense.hidden_state.mean[:, 0, i]
-    ls = dense.hidden_state.cov_sqrtm_lower[:, 0]
+    ms = dense.mean[:, 0, i]
+    ls = dense.cov_sqrtm_lower[:, 0]
 
     # Exaggerate the uncertainty (for plotting reasons)
     stds = 10 * jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))

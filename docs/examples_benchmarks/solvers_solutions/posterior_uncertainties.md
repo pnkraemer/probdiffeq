@@ -75,7 +75,7 @@ sol = ivpsolve.solve_and_save_at(
 Plot the solution
 
 ```python
-_, num_derivatives, _ = sol.marginals.hidden_state.mean.shape
+_, num_derivatives, _ = sol.marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -87,8 +87,8 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = sol.marginals.hidden_state.mean[:, i, :]
-    ls = sol.marginals.hidden_state.cov_sqrtm_lower[:, i, :]
+    ms = sol.marginals.mean[:, i, :]
+    ls = sol.marginals.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
@@ -136,7 +136,7 @@ u, samples = sol.posterior.sample(key, shape=(2,))
 ```
 
 ```python
-_, num_derivatives, _ = sol.marginals.hidden_state.mean.shape
+_, num_derivatives, _ = sol.marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -148,9 +148,9 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = sol.marginals.hidden_state.mean[:, i, :]
+    ms = sol.marginals.mean[:, i, :]
     samps = samples[..., i, :]
-    ls = sol.marginals.hidden_state.cov_sqrtm_lower[:, i, :]
+    ls = sol.marginals.cov_sqrtm_lower[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:

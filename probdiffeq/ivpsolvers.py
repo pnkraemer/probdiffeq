@@ -322,11 +322,13 @@ class MLESolver(Solver):
     def extract(self, state: _State, /) -> solution.Solution:
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
-        t, u, marginals, posterior = self.strategy.extract(state.strategy)
+        # Important: Rescale before extracting! Otherwise backward samples are wrong.
 
         # promote calibrated scale to the correct batch-shape
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
-        marginals, state = self._rescale_covs(marginals, state, output_scale=s)
+        state = self._rescale_covs(state, output_scale=s)
+
+        t, u, marginals, posterior = self.strategy.extract(state.strategy)
         return solution.Solution(
             t=t,
             u=state.u,
@@ -338,12 +340,12 @@ class MLESolver(Solver):
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
         # 'state' is not batched. Thus, output scale is a scalar.
+        # Important: Rescale before extracting! Otherwise backward samples are wrong.
+        s = state.output_scale_calibrated
+        state = self._rescale_covs(state, output_scale=s)
 
         _sol = self.strategy.extract_at_terminal_values(state.strategy)
         t, u, marginals, posterior = _sol
-
-        s = state.output_scale_calibrated
-        marginals, state = self._rescale_covs(marginals, state, output_scale=s)
         return solution.Solution(
             t=t,
             u=state.u,
@@ -354,7 +356,7 @@ class MLESolver(Solver):
         )
 
     @staticmethod
-    def _rescale_covs(marginals_unscaled, state, /, *, output_scale):
+    def _rescale_covs(state, /, *, output_scale):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
@@ -372,7 +374,6 @@ class MLESolver(Solver):
         #  in intermediate objects
         #  (Conditionals, Posteriors, StateSpaceVars, ...)
 
-        marginals = marginals_unscaled.scale_covariance(output_scale)
         state_strategy = state.strategy.scale_covariance(output_scale)
         state_rescaled = _State(
             strategy=state_strategy,
@@ -380,4 +381,4 @@ class MLESolver(Solver):
             output_scale_prior=None,  # irrelevant, will be removed in next step
             error_estimate=None,  # irrelevant, will be removed in next step.
         )
-        return marginals, state_rescaled
+        return state_rescaled

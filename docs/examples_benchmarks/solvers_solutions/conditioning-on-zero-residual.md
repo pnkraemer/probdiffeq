@@ -88,7 +88,7 @@ posterior_du = marginals.marginal_nth_derivative(1).mean
 
 extrapolation_model = solver.strategy.extrapolation
 taylor_coefficients = jnp.reshape(
-    sol.marginals.hidden_state.mean[0, ...],
+    sol.marginals.mean[0, ...],
     sol.marginals.target_shape,
     order="F",
 )
@@ -96,16 +96,18 @@ taylor_coefficients = jnp.reshape(
 
 prior_u = []
 prior_du = []
-rv = extrapolation_model.solution_from_tcoeffs(taylor_coefficients)
+rv = extrapolation_model.filter_solution_from_tcoeffs(taylor_coefficients)
+ssv, extra = extrapolation_model.filter_init(rv)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
     prior_u.append(rv.marginal_nth_derivative(0).mean)
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 
     dt = t_new - t_old
-    ssv = extrapolation_model.begin(rv, dt)
-    rv = extrapolation_model.complete_without_reversal(
-        ssv, s0=rv, output_scale=sol.output_scale.mean()
+    ssv, extra = extrapolation_model.filter_begin(ssv, extra, dt)
+    ssv, extra = extrapolation_model.filter_complete(
+        ssv, extra, output_scale=sol.output_scale.mean()
     )
+    rv = extrapolation_model.filter_extract(ssv, extra)
 
 
 prior_u.append(rv.marginal_nth_derivative(0).mean)
