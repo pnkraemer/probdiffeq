@@ -263,52 +263,24 @@ class Smoother(_SmootherCommon):
     """Smoother."""
 
     def complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        extrapolated = self._complete_extrapolation(
-            output_extra,
-            state_previous=state,
+        extrapolated, bw_model = self.extrapolation.complete_with_reversal(
+            output_extra.extrapolated,
+            s0=state.corrected,
             output_scale=output_scale,
         )
-        observed, corrected = self._complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return observed, corrected
-
-    def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
-        a, corrected = self.correction.complete(
-            extrapolated=extrapolated.extrapolated, cache=cache_obs
+        observed, corrected = self.correction.complete(
+            extrapolated=extrapolated, cache=cache_obs
         )
         corrected_seq = _SmState(
-            t=extrapolated.t,
+            t=output_extra.t,
             u=corrected.extract_qoi(),
             corrected=corrected,
             extrapolated=None,  # not relevant anymore
-            backward_model=extrapolated.backward_model,
-            num_data_points=extrapolated.num_data_points + 1,
-        )
-
-        return a, corrected_seq
-
-    def _complete_extrapolation(
-        self,
-        output_extra: _SmState,
-        /,
-        *,
-        output_scale,
-        state_previous: _SmState,
-    ) -> _SmState:
-        extrapolated, bw_model = self.extrapolation.complete_with_reversal(
-            output_extra.extrapolated,
-            s0=state_previous.corrected,
-            output_scale=output_scale,
-        )
-        return _SmState(
-            t=output_extra.t,
-            u=None,
-            extrapolated=extrapolated,
-            corrected=None,
             backward_model=bw_model,
-            num_data_points=state_previous.num_data_points,
+            num_data_points=state.num_data_points + 1,
         )
+
+        return observed, corrected_seq
 
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
