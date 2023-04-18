@@ -6,7 +6,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _adaptive, _collocate, taylor
+from probdiffeq import _adaptive, _collocate, solution, taylor
 from probdiffeq.strategies import smoothers
 
 # The high-level checkpoint-style routines
@@ -54,14 +54,26 @@ def simulate_terminal_values(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _collocate.simulate_terminal_values(
+    t, posterior, output_scale, num_steps = _collocate.simulate_terminal_values(
         jax.tree_util.Partial(vector_field),
-        solution=sol,
+        t=sol.t,
+        posterior=sol.posterior,
+        output_scale=sol.output_scale,
+        num_steps=sol.num_steps,
         t1=t1,
         adaptive_solver=adaptive_solver,
         parameters=parameters,
         dt0=dt0,
         while_loop_fn=while_loop_fn_temporal,
+    )
+    u, marginals = posterior.marginals_terminal_value()
+    return solution.Solution(
+        t=t,
+        u=u,
+        marginals=marginals,
+        posterior=posterior,
+        output_scale=output_scale,
+        num_steps=num_steps,
     )
 
 

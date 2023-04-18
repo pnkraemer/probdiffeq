@@ -49,6 +49,11 @@ class FilterDist(_strategy.Posterior[S]):
     def sample(self, key, *, shape):
         raise NotImplementedError
 
+    def marginals_terminal_value(self):
+        marginals = self.rv
+        u = marginals.extract_qoi_from_sample(marginals.mean)
+        return u, marginals
+
 
 _SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
 
@@ -64,12 +69,12 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def init(self, t, u, _marginals, solution) -> _FiState:
+    def init(self, t, _u, _marginals, solution) -> _FiState:
         ssv, extra = self.extrapolation.filter_init(solution.rv)
         ssv, corr = self.correction.init(ssv)
         return _FiState(
             t=t,
-            u=u,
+            u=ssv.extract_qoi(),
             ssv=ssv,
             extra=extra,
             corr=corr,

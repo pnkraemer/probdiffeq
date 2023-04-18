@@ -42,14 +42,17 @@ def solve_and_save_at(
 def simulate_terminal_values(
     vector_field,
     *,
-    solution,
+    t,
+    posterior,
+    output_scale,
+    num_steps,
     t1,
     adaptive_solver,
     parameters,
     dt0,
     while_loop_fn,
 ):
-    state0 = adaptive_solver.init(solution, dt0=dt0)
+    state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
     solution = _advance_ivp_solution_adaptively(
         state0=state0,
         t1=t1,
@@ -58,8 +61,8 @@ def simulate_terminal_values(
         parameters=parameters,
         while_loop_fn=while_loop_fn,
     )
-    _dt, sol = adaptive_solver.extract_at_terminal_values(solution)
-    return sol
+    (sol_solver, _sol_control) = adaptive_solver.extract_at_terminal_values(solution)
+    return sol_solver
 
 
 def _advance_ivp_solution_adaptively(

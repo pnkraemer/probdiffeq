@@ -155,4 +155,6 @@ class NormalHiddenState(_collections.Normal):
         return NormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
 
     def extract_qoi_from_sample(self, u, /):
-        return u[0]
+        if u.ndim == 1:
+            return u[0]
+        return jax.vmap(self.extract_qoi_from_sample)(u)

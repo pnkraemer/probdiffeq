@@ -78,15 +78,15 @@ class Solver(abc.ABC):
             num_steps=num_steps,
         )
 
-    def init(self, sol, /) -> _State:
+    def init(self, t, posterior, /, output_scale, num_steps) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        strategy_state = self.strategy.init(sol.t, sol.u, sol.marginals, sol.posterior)
+        strategy_state = self.strategy.init(t, None, None, posterior)
         return _State(
             error_estimate=error_estimate,
             strategy=strategy_state,
-            output_scale_prior=sol.output_scale,
-            output_scale_calibrated=sol.output_scale,
-            num_steps=sol.num_steps,
+            output_scale_prior=output_scale,
+            output_scale_calibrated=output_scale,
+            num_steps=num_steps,
         )
 
     def interpolate(self, *, s0: _State, s1: _State, t):
@@ -342,7 +342,7 @@ class MLESolver(Solver):
             num_steps=state.num_steps,
         )
 
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /):
         # 'state' is not batched. Thus, output scale is a scalar.
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
         s = state.output_scale_calibrated
@@ -350,14 +350,15 @@ class MLESolver(Solver):
 
         _sol = self.strategy.extract_at_terminal_values(state.strategy)
         t, u, marginals, posterior = _sol
-        return solution.Solution(
-            t=t,
-            u=state.u,
-            marginals=marginals,
-            posterior=posterior,
-            output_scale=state.output_scale_calibrated,
-            num_steps=state.num_steps,
-        )
+        return t, posterior, state.output_scale_calibrated, state.num_steps
+        # return solution.Solution(
+        #     t=t,
+        #     u=state.u,
+        #     marginals=marginals,
+        #     posterior=posterior,
+        #     output_scale=state.output_scale_calibrated,
+        #     num_steps=state.num_steps,
+        # )
 
     def _rescale_covs(self, state, /, *, output_scale):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
