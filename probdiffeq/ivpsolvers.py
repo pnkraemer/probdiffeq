@@ -306,7 +306,6 @@ class MLESolver(Solver):
         state = self._rescale_covs(state, output_scale=s)
 
         t, posterior = self.strategy.extract_at_terminal_values(state.strategy)
-        # t, u, marginals, posterior = _sol
         return t, posterior, state.output_scale_calibrated, state.num_steps
 
     def _rescale_covs(self, state, /, *, output_scale):

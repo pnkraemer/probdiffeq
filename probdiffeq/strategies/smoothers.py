@@ -22,8 +22,6 @@ class SmootherSol(_strategy.Posterior[S]):
 
     def marginals_terminal_value(self):
         marginals = self.rv.init
-        #
-        # marginals = self._extract_marginals(self.rv)
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
@@ -123,10 +121,6 @@ class _SmootherCommon(_strategy.Strategy):
         mseq = self.extrapolation.smoother_extract(ssv, state.extra)
         sol = SmootherSol(mseq)  # type: ignore
         return state.t, sol
-        # marginals = self._extract_marginals(mseq)
-        # u = ssv.extract_qoi_from_sample(marginals.mean)
-
-        # return state.t, u, marginals, sol
 
     def extract_at_terminal_values(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
@@ -137,7 +131,6 @@ class _SmootherCommon(_strategy.Strategy):
     # Auxiliary routines that are the same among all subclasses
 
     def _interpolate_from_to_fn(self, *, s0, output_scale, t):
-        # todo: act on state instead of rv+t0
         dt = t - s0.t
         ssv, extra = self.extrapolation.smoother_begin(s0.ssv, s0.extra, dt=dt)
         ssv, extra = self.extrapolation.smoother_complete(
@@ -204,7 +197,6 @@ class Smoother(_SmootherCommon):
         state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
         backward_model1 = state1.extra
 
-        # t_accepted = jnp.maximum(s1.t, t)
         s_1 = _SmState(
             t=s1.t,
             u=s1.u,
@@ -272,8 +264,6 @@ class FixedPointSmoother(_SmootherCommon):
         # correct backward model to get from s0 to s1?
         backward_model1 = s0.extra.merge_with_incoming_conditional(s1.extra)
 
-        # Do we need:
-        #  t_accepted = jnp.maximum(s1.t, t) ?
         solution = _SmState(
             t=t,
             u=s1.u,
