@@ -92,7 +92,7 @@ class StatisticalFirstOrder(_corr.Correction):
         (ode_order,) = aux
         return cls(ode_order=ode_order, cubature_rule=cubature_rule)
 
-    def begin(self, x: _vars.NormalHiddenState, /, vector_field, t, p):
+    def begin(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError
 
     def calibrate(
@@ -126,7 +126,7 @@ class StatisticalFirstOrder(_corr.Correction):
         error_estimate = error_estimate_unscaled * output_scale
         return error_estimate, output_scale
 
-    def complete(self, extrapolated, cache):
+    def complete(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError
 
     def linearize(self, rv, vmap_f):

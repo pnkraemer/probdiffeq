@@ -1,5 +1,7 @@
 """Extrapolations."""
 
+from typing import Any, Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -21,7 +23,7 @@ def ibm_iso(num_derivatives):
 
 
 @jax.tree_util.register_pytree_node_class
-class _IsoIBM(_extra.Extrapolation):
+class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
@@ -86,7 +88,7 @@ class _IsoIBM(_extra.Extrapolation):
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def filter_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> _vars.IsoSSV:
+    def filter_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -99,7 +101,7 @@ class _IsoIBM(_extra.Extrapolation):
         cache = (m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
-    def smoother_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> _vars.IsoSSV:
+    def smoother_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p

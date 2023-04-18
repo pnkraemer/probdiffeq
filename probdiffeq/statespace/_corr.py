@@ -1,6 +1,5 @@
 """Various interfaces."""
 
-import abc
 from typing import Generic, Tuple, TypeVar
 
 import jax
@@ -10,12 +9,12 @@ from probdiffeq.statespace import _collections
 S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
-CacheTypeVar = TypeVar("CacheTypeVar")
-"""A type-variable to alias extrapolation- and correction-caches."""
+C = TypeVar("C")
+"""A type-variable to alias correction-caches."""
 
 
 @jax.tree_util.register_pytree_node_class
-class Correction(abc.ABC, Generic[S, CacheTypeVar]):
+class Correction(Generic[S, C]):
     """Correction model interface."""
 
     def __init__(self, ode_order):
@@ -31,12 +30,8 @@ class Correction(abc.ABC, Generic[S, CacheTypeVar]):
         (ode_order,) = aux
         return cls(ode_order=ode_order)
 
-    @abc.abstractmethod
-    def begin(
-        self, x: S, /, vector_field, t, p
-    ) -> Tuple[jax.Array, float, CacheTypeVar]:
+    def begin(self, ssv: S, corr: C, /, vector_field, t, p) -> Tuple[S, C]:
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def complete(self, extrapolated: S, cache: CacheTypeVar):
+    def complete(self, ssv: S, corr: C, /, vector_field, t, p) -> Tuple[S, C]:
         raise NotImplementedError

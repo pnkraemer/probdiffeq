@@ -9,7 +9,6 @@ from typing import Any, Generic, NamedTuple, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _collections
 from probdiffeq.strategies import smoothers
 
 R = TypeVar("R")

@@ -1,6 +1,6 @@
 """Various interfaces."""
 
-from typing import Generic, TypeVar
+from typing import Generic, Tuple, TypeVar
 
 import jax
 
@@ -9,11 +9,11 @@ from probdiffeq.statespace import _collections
 S = TypeVar("S", bound=_collections.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
-CacheTypeVar = TypeVar("CacheTypeVar")
-"""A type-variable to alias extrapolation- and correction-caches."""
+C = TypeVar("C")
+"""A type-variable to alias extrapolation-caches."""
 
 
-class Extrapolation(Generic[S, CacheTypeVar]):
+class Extrapolation(Generic[S, C]):
     """Extrapolation model interface."""
 
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
@@ -52,28 +52,16 @@ class Extrapolation(Generic[S, CacheTypeVar]):
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
-    def filter_begin(self, s0, /, dt) -> S:
+    def filter_begin(self, ssv: S, extra: C, /, dt) -> Tuple[S, C]:
         raise NotImplementedError
 
-    def smoother_begin(self, s0, /, dt) -> S:
+    def smoother_begin(self, ssv: S, extra: C, /, dt) -> Tuple[S, C]:
         raise NotImplementedError
 
-    def filter_complete(
-        self,
-        output_begin: S,
-        /,
-        s0,
-        output_scale,
-    ):
+    def filter_complete(self, ssv: S, extra: C, /, output_scale) -> Tuple[S, C]:
         raise NotImplementedError
 
-    def smoother_complete(
-        self,
-        output_begin: S,
-        /,
-        s0,
-        output_scale,
-    ):
+    def smoother_complete(self, ssv: S, extra: C, /, output_scale) -> Tuple[S, C]:
         raise NotImplementedError
 
     # todo: bundle in an init() method:

@@ -85,7 +85,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
         rv = self.extrapolation.filter_extract(ssv, posterior.extra)
 
-        solution = FilterDist(rv, posterior.num_data_points)
+        solution = FilterDist(rv, posterior.num_data_points)  # type: ignore
         marginals = rv
         u = posterior.u
         return t, u, marginals, solution

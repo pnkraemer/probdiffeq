@@ -106,19 +106,19 @@ class _SmootherCommon(_strategy.Strategy):
 
     def extract(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
-        markov_seq = self.extrapolation.smoother_extract(ssv, state.extra)
-        marginals = self._extract_marginals(markov_seq)
+        mseq = self.extrapolation.smoother_extract(ssv, state.extra)
+        marginals = self._extract_marginals(mseq)
         u = ssv.extract_qoi_from_sample(marginals.mean)
 
-        sol = SmootherSol(markov_seq, num_data_points=state.num_data_points)
+        sol = SmootherSol(mseq, num_data_points=state.num_data_points)  # type: ignore
         return state.t, u, marginals, sol
 
     def extract_at_terminal_values(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
-        markov_seq = self.extrapolation.smoother_extract(ssv, state.extra)
-        marginals = markov_seq.init
+        mseq = self.extrapolation.smoother_extract(ssv, state.extra)
+        marginals = mseq.init
         u = state.u
-        sol = SmootherSol(markov_seq, num_data_points=state.num_data_points)
+        sol = SmootherSol(mseq, num_data_points=state.num_data_points)  # type: ignore
         return state.t, u, marginals, sol
 
     def _extract_marginals(self, posterior: MarkovSequence, /):

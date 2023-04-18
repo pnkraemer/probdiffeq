@@ -99,11 +99,11 @@ class Strategy(abc.ABC, Generic[S, P]):
         return init_fn(*args, **kwargs)
 
     @abc.abstractmethod
-    def begin(self, state: S, /, *, t, dt, parameters, vector_field):
+    def begin(self, state: S, /, *, dt, parameters, vector_field):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+    def complete(self, state, /, *, parameters, vector_field, output_scale):
         raise NotImplementedError
 
     @abc.abstractmethod
