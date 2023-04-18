@@ -14,7 +14,7 @@ CacheTypeVar = TypeVar("CacheTypeVar")
 """A type-variable to alias extrapolation- and correction-caches."""
 
 
-class Extrapolation(abc.ABC, Generic[S, CacheTypeVar]):
+class Extrapolation(Generic[S, CacheTypeVar]):
     """Extrapolation model interface."""
 
     def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
@@ -47,19 +47,15 @@ class Extrapolation(abc.ABC, Generic[S, CacheTypeVar]):
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
-    @abc.abstractmethod
     def promote_output_scale(self, output_scale) -> float:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def begin(self, s0, /, dt) -> S:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def complete_without_reversal(
         self,
         output_begin: S,
@@ -69,7 +65,6 @@ class Extrapolation(abc.ABC, Generic[S, CacheTypeVar]):
     ):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def complete_with_reversal(
         self,
         output_begin: S,
@@ -81,10 +76,8 @@ class Extrapolation(abc.ABC, Generic[S, CacheTypeVar]):
 
     # todo: bundle in an init() method:
 
-    @abc.abstractmethod
     def init_error_estimate(self) -> jax.Array:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def init_conditional(self, ssv_proto):
         raise NotImplementedError

@@ -15,24 +15,23 @@ S = TypeVar("S")
 class MarkovSequence(Generic[S]):
     """Markov sequence. A discretised Markov process."""
 
-    def __init__(self, *, init: S, backward_model, num_data_points):
+    def __init__(self, *, init: S, backward_model):
         self.init = init
         self.backward_model = backward_model
-        self.num_data_points = num_data_points
 
     def __repr__(self):
         name = self.__class__.__name__
         return f"{name}(init={self.init}, backward_model={self.backward_model})"
 
     def tree_flatten(self):
-        children = (self.init, self.backward_model, self.num_data_points)
+        children = (self.init, self.backward_model)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        init, backward_model, n = children
-        return cls(init=init, backward_model=backward_model, num_data_points=n)
+        init, backward_model = children
+        return cls(init=init, backward_model=backward_model)
 
     def sample(self, key, *, shape):
         # A smoother samples on the grid by sampling i.i.d values

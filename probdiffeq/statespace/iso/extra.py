@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _extra, _ibm_util
+from probdiffeq.statespace import _collections, _extra, _ibm_util
 from probdiffeq.statespace.iso import _conds, _vars
 
 
@@ -30,7 +30,7 @@ class _IsoIBM(_extra.Extrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
+    def filter_solution_from_tcoeffs(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -42,13 +42,34 @@ class _IsoIBM(_extra.Extrapolation):
         )
         return rv
 
-    def filter_init(self, rv):
-        ssv = _vars.IsoSSV(rv)
+    def smoother_solution_from_tcoeffs(self, taylor_coefficients, /):
+        if len(taylor_coefficients) != self.num_derivatives + 1:
+            msg1 = "The number of Taylor coefficients does not match "
+            msg2 = "the number of derivatives in the implementation."
+            raise ValueError(msg1 + msg2)
+        m0_corrected = jnp.stack(taylor_coefficients)
+        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
+        rv = _vars.IsoNormalHiddenState(
+            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
+        )
+        cond = self.init_conditional(rv_proto=rv)
+        return _collections.MarkovSequence(init=rv, backward_model=cond)
+
+    def filter_init(self, sol, /):
+        ssv = _vars.IsoSSV(sol.rv)
         cache = None
         return ssv, cache
 
     def filter_extract(self, ssv, ex, /):
         return ssv.hidden_state
+
+    def smoother_init(self, sol, /):
+        ssv = _vars.IsoSSV(sol.rv.init)
+        cache = sol.rv.backward_model
+        return ssv, cache
+
+    def smoother_extract(self, ssv, ex, /):
+        return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
 
     # todo: why does this method have the same name as the above?
     def init_ssv(self, ode_shape):
@@ -83,7 +104,7 @@ class _IsoIBM(_extra.Extrapolation):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_without_reversal(self, st, ex, /, output_scale):
+    def filter_complete(self, st, ex, /, output_scale):
         _, _, p, p_inv, l0 = ex
         m_ext = st.hidden_state.mean
 
@@ -99,11 +120,11 @@ class _IsoIBM(_extra.Extrapolation):
         ssv = _vars.IsoSSV(rv)
         return ssv, None
 
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
-        m_ext_p, m0_p, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def smoother_complete(self, ssv, extra, /, output_scale):
+        m_ext_p, m0_p, p, p_inv, l0 = extra
+        m_ext = ssv.hidden_state.mean
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
+        l0_p = p_inv[:, None] * l0
         r_ext_p, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
             R_X_F=(self.a @ l0_p).T,
             R_X=l0_p.T,
@@ -123,12 +144,12 @@ class _IsoIBM(_extra.Extrapolation):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoSSV(extrapolated, cache=None), bw_model
+        return _vars.IsoSSV(extrapolated), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
-    def init_conditional(self, ssv_proto):
+    def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=ssv_proto.hidden_state)
+        noi = self._init_backward_noise(rv_proto=rv_proto)
         return _conds.IsoConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):

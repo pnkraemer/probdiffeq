@@ -74,8 +74,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def solution_from_tcoeffs(
         self, taylor_coefficients, /, *, num_data_points
     ) -> Tuple[jax.Array, jax.Array, FilterDist]:
-        ssv = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
-        sol = FilterDist(ssv, num_data_points=num_data_points)
+        sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
+        sol = FilterDist(sol, num_data_points=num_data_points)
         marginals = ssv
         u = taylor_coefficients[0]
         return u, marginals, sol
