@@ -43,7 +43,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         cache = (error_estimate, output_scale, (bias,))
         return x, cache
 
-    def complete(self, x: _vars.IsoSSV, co, /, vector_field, p):
+    def complete(self, x: _vars.IsoSSV, co, /, vector_field, t, p):
         *_, (bias,) = co
 
         m_ext = x.hidden_state.mean

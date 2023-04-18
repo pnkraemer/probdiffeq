@@ -140,13 +140,13 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         _, u, marginals, _ = self.extract(sol)
         return u, marginals
 
-    def begin(self, state: _FiState, /, *, t, dt, parameters, vector_field):
+    def begin(self, state: _FiState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.filter_begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
-            ssv, state.corr, vector_field=vector_field, t=t + dt, p=parameters
+            ssv, state.corr, vector_field=vector_field, t=state.t + dt, p=parameters
         )
         return _FiState(
-            t=t + dt,
+            t=state.t + dt,
             u=ssv.extract_qoi(),
             ssv=ssv,
             corr=corr,

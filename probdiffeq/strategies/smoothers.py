@@ -83,10 +83,10 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=posterior.num_data_points,
         )
 
-    def begin(self, state: _SmState, /, *, t, dt, parameters, vector_field):
+    def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.smoother_begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
-            ssv, state.corr, vector_field=vector_field, t=t, p=parameters
+            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
         return _SmState(
             t=state.t + dt,
@@ -215,7 +215,6 @@ class Smoother(_SmootherCommon):
         )
         return InterpRes(accepted=s_1, solution=s_t, previous=s_t)
 
-    # todo: move marginals to _SmState/FilterSol
     def offgrid_marginals(
         self,
         *,
@@ -233,8 +232,8 @@ class Smoother(_SmootherCommon):
             s0=self.init(t0, None, None, posterior_previous),
             output_scale=output_scale,
         )
-        marginals = acc.backward_model.marginalise(marginals)
-        u = marginals.extract_qoi()
+        marginals = acc.extra.marginalise(marginals)
+        u = acc.ssv.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
 

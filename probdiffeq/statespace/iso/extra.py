@@ -71,14 +71,13 @@ class _IsoIBM(_extra.Extrapolation):
     def smoother_extract(self, ssv, ex, /):
         return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
 
-    # todo: why does this method have the same name as the above?
-    def init_ssv(self, ode_shape):
+    def standard_normal(self, ode_shape):
+        # Used for Runge-Kutta initialisation.
         assert len(ode_shape) == 1
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        rv = _vars.IsoNormalHiddenState(m0, c0)
-        return _vars.IsoSSV(rv, cache=None)
+        return _vars.IsoNormalHiddenState(m0, c0)
 
     # Unnecessary?
     def init_error_estimate(self):

@@ -220,7 +220,6 @@ class DynamicSolver(Solver):
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         state_strategy = self.strategy.begin(
             state.strategy,
-            t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
@@ -229,7 +228,8 @@ class DynamicSolver(Solver):
 
         state_strategy = self.strategy.complete(
             state_strategy,
-            cache_obs=cache_obs,
+            parameters=parameters,
+            vector_field=vector_field,
             output_scale=output_scale,
         )
 

@@ -8,6 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
+from probdiffeq import _collections
 from probdiffeq.statespace import recipes
 
 
@@ -179,52 +180,55 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    extrapolation, _ = recipes.ts0_iso(num_derivatives=num)
+    extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
 
     # Initialise
-    init_ssv = extrapolation.init_ssv(ode_shape=initial_values[0].shape)
+    rv0 = extrapolation.standard_normal(ode_shape=initial_values[0].shape)
+    cond0 = extrapolation.init_conditional(rv_proto=rv0)
+    sol0 = _collections.MarkovSequence(init=rv0, backward_model=cond0)
 
     # Estimate
-    u0_full = _runge_kutta_starter_improve(init_ssv, extrapolation, ys=ys, dt=dt0)
+    u0_full = _runge_kutta_starter_improve(extrapolation, sol0, ys=ys, dt=dt0)
 
     # Turn the mean into a tuple of arrays and return
-    taylor_coefficients = tuple(u0_full.hidden_state.mean)
+    taylor_coefficients = tuple(u0_full.mean)
     return taylor_coefficients
 
 
-def _runge_kutta_starter_improve(init_ssv, extrapolation, ys, dt):
+def _runge_kutta_starter_improve(extrapolation, solution, ys, dt):
     """Improve the current estimate of a Runge-Kutta starter.
 
     Fit a Gauss-Markov process to observations of the ODE solution.
     """
     # Initialise backward-transitions
-    init_bw = extrapolation.init_conditional(ssv_proto=init_ssv)
-    init_val = init_ssv, init_bw
+    ssv0, extra0 = extrapolation.smoother_init(solution)
 
     # Scan
     fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
-    carry_fin, _ = jax.lax.scan(fn, init=init_val, xs=ys, reverse=False)
-    (corrected_fin, bw_fin) = carry_fin
+    (ssv_fi, extra_fi), _ = jax.lax.scan(fn, init=(ssv0, extra0), xs=ys, reverse=False)
 
     # Backward-marginalise to get the initial value
-    return bw_fin.marginalise(corrected_fin)
+    return extra_fi.marginalise(ssv_fi.hidden_state)
 
 
 def _rk_filter_step(carry, y, extrapolation, dt):
     # Read
-    (rv, bw_old) = carry
+    (ssv, extra_old) = carry
 
     # Extrapolate (with fixed-point-style merging)
-    x = extrapolation.begin(rv, dt=dt)
-    extra, bw_model = extrapolation.complete_with_reversal(x, s0=rv, output_scale=1.0)
-    bw_new = bw_old.merge_with_incoming_conditional(bw_model)  # sqrt-fp-smoother!
+    ssv, extra = extrapolation.smoother_begin(ssv, extra_old, dt=dt)
+    ssv, extra_new = extrapolation.smoother_complete(ssv, extra, output_scale=1.0)
+    extra = extra_old.merge_with_incoming_conditional(extra_new)  # sqrt-fp-smoother!
 
     # Correct
-    _, cond_cor = extra.observe_qoi(observation_std=0.0)
-    corr = cond_cor(y)
+    _, cond_cor = ssv.observe_qoi(observation_std=0.0)
+
+    rv = cond_cor(y)
+    # hack! This should rather be handled by some correction scheme.
+    corr = type(ssv)(rv)
 
     # Return correction and backward-model
-    return (corr, bw_new), None
+    return (corr, extra), None
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
