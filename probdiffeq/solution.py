@@ -177,7 +177,7 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, st
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    ssv = strategy.init(None, None, None, posterior).ssv
+    ssv = strategy.init(None, posterior).ssv
     obs, _ = ssv.observe_qoi(observation_std=observation_std)
     return jnp.sum(obs.logpdf(u))
 
