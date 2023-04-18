@@ -35,7 +35,9 @@ class DenseConditional(_collections.Conditional):
 
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
-        return _vars.DenseNormal(m, self.noise.cov_sqrtm_lower)
+        return _vars.DenseNormal(
+            m, self.noise.cov_sqrtm_lower, target_shape=self.target_shape
+        )
 
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)
