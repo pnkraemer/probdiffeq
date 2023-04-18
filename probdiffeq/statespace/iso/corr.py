@@ -18,7 +18,13 @@ class _IsoTaylorZerothOrder(_corr.Correction):
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
 
-    def begin(self, x: _vars.IsoSSV, /, vector_field, t, p):
+    def init(self, x, /):
+        bias_like = jnp.empty_like(x.hidden_state.mean[0, :])
+        chol_like = jnp.empty(())
+        obs_like = _vars.IsoNormalQOI(bias_like, chol_like)
+        return x, obs_like
+
+    def begin(self, x: _vars.IsoSSV, c, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -35,15 +41,14 @@ class _IsoTaylorZerothOrder(_corr.Correction):
 
         error_estimate_unscaled = obs.marginal_std()
         error_estimate = error_estimate_unscaled * output_scale
-        return error_estimate, output_scale, (bias,)
+        cache = (error_estimate, output_scale, (bias,))
+        return x, cache
 
-    def complete(
-        self, extrapolated: _vars.IsoSSV, cache
-    ) -> Tuple[_vars.IsoNormalQOI, _vars.IsoSSV]:
-        (bias,) = cache
+    def complete(self, x: _vars.IsoSSV, co, /, vector_field, p):
+        *_, (bias,) = co
 
-        m_ext = extrapolated.hidden_state.mean
-        l_ext = extrapolated.hidden_state.cov_sqrtm_lower
+        m_ext = x.hidden_state.mean
+        l_ext = x.hidden_state.cov_sqrtm_lower
         l_obs = l_ext[self.ode_order, ...]
 
         l_obs_nonscalar = _sqrt_util.sqrtm_to_upper_triangular(R=l_obs[:, None])
@@ -55,4 +60,8 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
         corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        return observed, _vars.IsoSSV(corrected, cache=None)
+        ssv = _vars.IsoSSV(corrected)
+        return ssv, observed
+
+    def extract(self, x, c, /):
+        return x

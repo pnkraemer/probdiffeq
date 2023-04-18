@@ -40,7 +40,15 @@ class _IsoIBM(_extra.Extrapolation):
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        return _vars.IsoSSV(rv, cache=None)
+        return rv
+
+    def filter_init(self, rv):
+        ssv = _vars.IsoSSV(rv)
+        cache = None
+        return ssv, cache
+
+    def filter_extract(self, ssv, ex, /):
+        return ssv.hidden_state
 
     # todo: why does this method have the same name as the above?
     def init_ssv(self, ode_shape):
@@ -57,26 +65,29 @@ class _IsoIBM(_extra.Extrapolation):
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def begin(self, s0: _vars.IsoSSV, /, dt) -> _vars.IsoSSV:
+    def begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> _vars.IsoSSV:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p[:, None] * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        l0 = s0.hidden_state.cov_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        return _vars.IsoSSV(ext, cache=(m_ext_p, m0_p, p, p_inv))
+        ssv = _vars.IsoSSV(ext)
+        cache = (m_ext_p, m0_p, p, p_inv, l0)
+        return ssv, cache
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def complete_without_reversal(self, output_begin, /, s0, output_scale):
-        _, _, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def complete_without_reversal(self, st, ex, /, output_scale):
+        _, _, p, p_inv, l0 = ex
+        m_ext = st.hidden_state.mean
 
-        l0_p = p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower
+        l0_p = p_inv[:, None] * l0
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
                 (self.a @ l0_p).T,
@@ -85,7 +96,8 @@ class _IsoIBM(_extra.Extrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        return _vars.IsoSSV(rv, cache=None)
+        ssv = _vars.IsoSSV(rv)
+        return ssv, None
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache

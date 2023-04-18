@@ -217,17 +217,17 @@ class DynamicSolver(Solver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, output_scale, cache_obs) = self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
             t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        (error, output_scale, _) = state_strategy.corr  # clean this up next?
 
-        _, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
+        state_strategy = self.strategy.complete(
+            state_strategy,
             cache_obs=cache_obs,
             output_scale=output_scale,
         )
@@ -235,7 +235,7 @@ class DynamicSolver(Solver):
         # Return solution
         return _State(
             error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_calibrated=output_scale,
             # current scale becomes the new prior scale!
             #  this is because dynamic solvers assume a piecewise-constant model
@@ -273,20 +273,22 @@ class MLESolver(Solver):
      calibration of the output-scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        output_extra, (error, _, cache_obs) = self.strategy.begin(
+        state_strategy = self.strategy.begin(
             state.strategy,
             t=state.t,
             dt=dt,
             parameters=parameters,
             vector_field=vector_field,
         )
+        (error, output_scale, _) = state_strategy.corr  # clean this up next?
 
-        observed, corrected = self.strategy.complete(
-            output_extra,
-            state.strategy,
-            cache_obs=cache_obs,
+        state_strategy = self.strategy.complete(
+            state_strategy,
             output_scale=state.output_scale_prior,
+            parameters=parameters,
+            vector_field=vector_field,
         )
+        observed = state_strategy.corr  # clean this up next?
 
         # Calibrate
         output_scale = state.output_scale_calibrated
@@ -296,7 +298,7 @@ class MLESolver(Solver):
         )
         return _State(
             error_estimate=dt * error,
-            strategy=corrected,
+            strategy=state_strategy,
             output_scale_prior=state.output_scale_prior,
             output_scale_calibrated=new_output_scale,
         )

@@ -37,7 +37,7 @@ class IsoSSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return IsoSSV(rv, cache=self.cache)
+        return IsoSSV(rv)
 
     def marginal_nth_derivative(self, n):
         # if the variable has batch-axes, vmap the result
