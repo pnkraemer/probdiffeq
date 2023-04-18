@@ -158,8 +158,12 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, st
         Standard deviation of the observation. Expected to be a scalar.
     u
         Observation. Expected to have shape (d,) for an ODE with shape (d,).
-    solution
-        Solution object. Expected to correspond to a solution of an ODE with shape (d,).
+    posterior
+        Posterior distribution.
+        Expected to correspond to a solution of an ODE with shape (d,).
+    strategy
+        Strategy (that has been used to compute the solution).
+        Expected to correspond to a solution of an ODE with shape (d,).
     """
     if jnp.shape(observation_std) != ():
         raise ValueError(
@@ -197,8 +201,8 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     posterior
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
-    extrapolation
-        Extrapolation model (that has been used to compute the solution).
+    strategy
+        Strategy (that has been used to compute the solution).
         Expected to correspond to a solution of an ODE with shape (d,).
 
     !!! note
