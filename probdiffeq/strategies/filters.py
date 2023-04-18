@@ -54,6 +54,11 @@ class FilterDist(_strategy.Posterior[S]):
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
+    def marginals(self):
+        marginals = self.rv
+        u = marginals.extract_qoi_from_sample(marginals.mean)
+        return u, marginals
+
 
 _SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
 

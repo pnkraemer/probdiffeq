@@ -9,7 +9,10 @@ from probdiffeq import _control_flow
 def solve_and_save_at(
     vector_field,
     *,
-    solution,
+    t,
+    posterior,
+    output_scale,
+    num_steps,
     save_at,
     adaptive_solver,
     dt0,
@@ -27,7 +30,7 @@ def solve_and_save_at(
         )
         return s_next, s_next
 
-    state0 = adaptive_solver.init(solution, dt0=dt0)
+    state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
 
     _, solution = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
@@ -35,8 +38,8 @@ def solve_and_save_at(
         xs=save_at[1:],
         reverse=False,
     )
-    _dt, sol = adaptive_solver.extract(solution)
-    return sol
+    sol_solver, _sol_control = adaptive_solver.extract(solution)
+    return sol_solver
 
 
 def simulate_terminal_values(

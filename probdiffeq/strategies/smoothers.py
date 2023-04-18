@@ -27,6 +27,11 @@ class SmootherSol(_strategy.Posterior[S]):
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
+    def marginals(self):
+        marginals = self._extract_marginals(self.rv)
+        u = marginals.extract_qoi_from_sample(marginals.mean)
+        return u, marginals
+
     def _extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
 

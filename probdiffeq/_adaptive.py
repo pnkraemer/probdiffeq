@@ -300,13 +300,7 @@ class AdaptiveIVPSolver(Generic[T]):
     def extract(self, state: _AdaptiveState, /):
         solver_extract = self.solver.extract(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
-
-        # return BOTH dt & solver_extract.
-        #  Usually, only the latter is necessary.
-        #  but we return both because this way, extract is inverse to init,
-        #  and it becomes much easier to restart the solver at a new point
-        #  without losing consistency.
-        return control_extract, solver_extract
+        return solver_extract, control_extract
 
     def extract_at_terminal_values(self, state: _AdaptiveState, /):
         solver_extract = self.solver.extract_at_terminal_values(state.solution)

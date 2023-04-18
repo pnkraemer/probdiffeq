@@ -130,14 +130,26 @@ def solve_and_save_at(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _collocate.solve_and_save_at(
+    t, posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        solution=sol,
+        t=sol.t,
+        posterior=sol.posterior,
+        output_scale=sol.output_scale,
+        num_steps=sol.num_steps,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
+    )
+    u, marginals = posterior.marginals()
+    return solution.Solution(
+        t=t,
+        u=u,
+        marginals=marginals,
+        posterior=posterior,
+        output_scale=output_scale,
+        num_steps=num_steps,
     )
 
 
