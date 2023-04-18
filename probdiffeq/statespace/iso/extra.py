@@ -3,8 +3,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections, _extra, _ibm_util
+from probdiffeq import _collections, _sqrt_util
+from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.iso import _conds, _vars
 
 
@@ -86,7 +86,7 @@ class _IsoIBM(_extra.Extrapolation):
     def promote_output_scale(self, output_scale):
         return output_scale
 
-    def begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> _vars.IsoSSV:
+    def filter_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> _vars.IsoSSV:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -97,6 +97,19 @@ class _IsoIBM(_extra.Extrapolation):
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
         ssv = _vars.IsoSSV(ext)
         cache = (m_ext_p, m0_p, p, p_inv, l0)
+        return ssv, cache
+
+    def smoother_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> _vars.IsoSSV:
+        p, p_inv = self._assemble_preconditioner(dt=dt)
+        m0_p = p_inv[:, None] * s0.hidden_state.mean
+        m_ext_p = self.a @ m0_p
+        m_ext = p[:, None] * m_ext_p
+        q_sqrtm = p[:, None] * self.q_sqrtm_lower
+        l0 = s0.hidden_state.cov_sqrtm_lower
+
+        ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
+        ssv = _vars.IsoSSV(ext)
+        cache = (ex0, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
     def _assemble_preconditioner(self, dt):
@@ -121,7 +134,7 @@ class _IsoIBM(_extra.Extrapolation):
         return ssv, None
 
     def smoother_complete(self, ssv, extra, /, output_scale):
-        m_ext_p, m0_p, p, p_inv, l0 = extra
+        _, m_ext_p, m0_p, p, p_inv, l0 = extra
         m_ext = ssv.hidden_state.mean
 
         l0_p = p_inv[:, None] * l0

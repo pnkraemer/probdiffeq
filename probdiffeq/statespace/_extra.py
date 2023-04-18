@@ -53,10 +53,13 @@ class Extrapolation(Generic[S, CacheTypeVar]):
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
-    def begin(self, s0, /, dt) -> S:
+    def filter_begin(self, s0, /, dt) -> S:
         raise NotImplementedError
 
-    def complete_without_reversal(
+    def smoother_begin(self, s0, /, dt) -> S:
+        raise NotImplementedError
+
+    def filter_complete(
         self,
         output_begin: S,
         /,
@@ -65,7 +68,7 @@ class Extrapolation(Generic[S, CacheTypeVar]):
     ):
         raise NotImplementedError
 
-    def complete_with_reversal(
+    def smoother_complete(
         self,
         output_begin: S,
         /,
