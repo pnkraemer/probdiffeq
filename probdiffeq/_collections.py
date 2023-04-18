@@ -1,9 +1,8 @@
 """Various utility types."""
 
-import abc
 import dataclasses
 import functools
-from typing import Any, Generic, Iterator, NamedTuple, Tuple, TypeVar
+from typing import Generic, Iterator, TypeVar
 
 import jax
 import jax.numpy as jnp

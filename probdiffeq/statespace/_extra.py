@@ -1,6 +1,5 @@
 """Various interfaces."""
 
-import abc
 from typing import Generic, TypeVar
 
 import jax

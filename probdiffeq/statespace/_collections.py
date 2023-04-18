@@ -1,9 +1,7 @@
 """Various interfaces."""
 
 import abc
-from typing import Generic, Tuple, TypeVar
-
-import jax
+from typing import Tuple
 
 
 class Normal(abc.ABC):

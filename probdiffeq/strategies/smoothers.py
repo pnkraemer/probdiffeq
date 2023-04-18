@@ -1,13 +1,11 @@
 """''Global'' estimation: smoothing."""
 
 import abc
-import functools
-from typing import Any, NamedTuple, Tuple, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _control_flow
 from probdiffeq._collections import InterpRes, MarkovSequence
 from probdiffeq.strategies import _strategy
 
@@ -98,7 +96,6 @@ class _SmootherCommon(_strategy.Strategy):
             corr=corr,
             num_data_points=state.num_data_points,
         )
-        return ssv, output_corr
 
     def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
         seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
