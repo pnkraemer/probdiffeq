@@ -159,10 +159,10 @@ class AdaptiveIVPSolver(Generic[T]):
         return self.solver.strategy.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init(self, *solver_init_args, dt0):
+    def init(self, solution, dt0):
         """Initialise the IVP solver state."""
         # Initialise the components
-        state_solver = self.solver.init(*solver_init_args)
+        state_solver = self.solver.init(solution)
         state_control = self.control.init_state_from_dt(dt0)
 
         # Initialise (prototypes for) proposed values
