@@ -161,17 +161,6 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def _complete_extrapolation(
-        self,
-        output_extra: _SmState,
-        /,
-        *,
-        output_scale,
-        state_previous: _SmState,
-    ):
-        raise NotImplementedError
-
     def init(self, t, u, marginals, posterior, /) -> _SmState:
         return _SmState(
             t=t,
@@ -196,17 +185,6 @@ class _SmootherCommon(_strategy.Strategy):
             num_data_points=state.num_data_points,
         )
         return ssv, output_corr
-
-    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
-        extrapolated = self._complete_extrapolation(
-            output_extra,
-            state_previous=state,
-            output_scale=output_scale,
-        )
-        observed, corrected = self._complete_correction(
-            extrapolated, cache_obs=cache_obs
-        )
-        return observed, corrected
 
     def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
         corrected = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
@@ -239,21 +217,6 @@ class _SmootherCommon(_strategy.Strategy):
         marginals = state.corrected
         u = marginals.extract_qoi()
         return state.t, u, marginals, markov_seq
-
-    def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
-        a, corrected = self.correction.complete(
-            extrapolated=extrapolated.extrapolated, cache=cache_obs
-        )
-        corrected_seq = _SmState(
-            t=extrapolated.t,
-            u=corrected.extract_qoi(),
-            corrected=corrected,
-            extrapolated=None,  # not relevant anymore
-            backward_model=extrapolated.backward_model,
-            num_data_points=extrapolated.num_data_points + 1,
-        )
-
-        return a, corrected_seq
 
     def _extract_marginals(self, posterior: MarkovSequence, /):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
@@ -298,6 +261,32 @@ class _SmootherCommon(_strategy.Strategy):
 @jax.tree_util.register_pytree_node_class
 class Smoother(_SmootherCommon):
     """Smoother."""
+
+    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        extrapolated = self._complete_extrapolation(
+            output_extra,
+            state_previous=state,
+            output_scale=output_scale,
+        )
+        observed, corrected = self._complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
+
+    def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
+        a, corrected = self.correction.complete(
+            extrapolated=extrapolated.extrapolated, cache=cache_obs
+        )
+        corrected_seq = _SmState(
+            t=extrapolated.t,
+            u=corrected.extract_qoi(),
+            corrected=corrected,
+            extrapolated=None,  # not relevant anymore
+            backward_model=extrapolated.backward_model,
+            num_data_points=extrapolated.num_data_points + 1,
+        )
+
+        return a, corrected_seq
 
     def _complete_extrapolation(
         self,
@@ -402,6 +391,32 @@ class FixedPointSmoother(_SmootherCommon):
         and without any deprecation policy.
 
     """
+
+    def complete(self, output_extra, state, /, *, cache_obs, output_scale):
+        extrapolated = self._complete_extrapolation(
+            output_extra,
+            state_previous=state,
+            output_scale=output_scale,
+        )
+        observed, corrected = self._complete_correction(
+            extrapolated, cache_obs=cache_obs
+        )
+        return observed, corrected
+
+    def _complete_correction(self, extrapolated: _SmState, /, *, cache_obs):
+        a, corrected = self.correction.complete(
+            extrapolated=extrapolated.extrapolated, cache=cache_obs
+        )
+        corrected_seq = _SmState(
+            t=extrapolated.t,
+            u=corrected.extract_qoi(),
+            corrected=corrected,
+            extrapolated=None,  # not relevant anymore
+            backward_model=extrapolated.backward_model,
+            num_data_points=extrapolated.num_data_points + 1,
+        )
+
+        return a, corrected_seq
 
     def _complete_extrapolation(
         self,
