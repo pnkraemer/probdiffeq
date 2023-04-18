@@ -101,9 +101,18 @@ def _advance_ivp_solution_adaptively(
 
 
 def solve_with_python_while_loop(
-    vector_field, *, solution, t1, adaptive_solver, dt0, parameters
+    vector_field,
+    *,
+    t,
+    posterior,
+    output_scale,
+    num_steps,
+    t1,
+    adaptive_solver,
+    dt0,
+    parameters,
 ):
-    state = adaptive_solver.init(solution, dt0=dt0)
+    state = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
     generator = _solution_generator(
         vector_field,
         state=state,
@@ -112,8 +121,8 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
     forward_solution = _control_flow.tree_stack(list(generator))
-    _dt, sol = adaptive_solver.extract(forward_solution)
-    return sol
+    sol_solver, _sol_control = adaptive_solver.extract(forward_solution)
+    return sol_solver
 
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
@@ -131,9 +140,11 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
     yield state
 
 
-def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters):
+def solve_fixed_grid(
+    vector_field, *, posterior, output_scale, num_steps, grid, solver, parameters
+):
     t0 = grid[0]
-    state = solver.init(solution)
+    state = solver.init(t0, posterior, output_scale, num_steps)
 
     def body_fn(carry, t_new):
         s, t_old = carry
@@ -149,5 +160,5 @@ def solve_fixed_grid(vector_field, *, solution, grid, solver, parameters):
     _, (result, _) = _control_flow.scan_with_init(
         f=body_fn, init=(state, t0), xs=grid[1:]
     )
-    sol = solver.extract(result)
+    _ts, *sol = solver.extract(result)
     return sol

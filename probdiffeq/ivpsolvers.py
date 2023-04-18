@@ -13,7 +13,6 @@ from probdiffeq._collections import InterpRes  # simplify type signatures
 class _State(NamedTuple):
     """Solver state."""
 
-    # Same as in solution.Solution()
     strategy: Any
 
     error_estimate: Any
@@ -48,11 +47,11 @@ class Solver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /):
         raise NotImplementedError
 
     def solution_from_tcoeffs(
@@ -186,11 +185,11 @@ class CalibrationFreeSolver(Solver):
             num_steps=state.num_steps + 1,
         )
 
-    def extract(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /):
         t, posterior = self.strategy.extract(state.strategy)
         return t, posterior, state.output_scale_prior, state.num_steps
 
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /):
         t, posterior = self.strategy.extract_at_terminal_values(state.strategy)
         return t, posterior, state.output_scale_prior, state.num_steps
 
@@ -226,11 +225,11 @@ class DynamicSolver(Solver):
             num_steps=state.num_steps + 1,
         )
 
-    def extract(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /):
         t, posterior = self.strategy.extract(state.strategy)
         return t, posterior, state.output_scale_calibrated, state.num_steps
 
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /):
         t, posterior = self.strategy.extract_at_terminal_values(state.strategy)
         return t, posterior, state.output_scale_calibrated, state.num_steps
 
@@ -288,7 +287,7 @@ class MLESolver(Solver):
         sum_updated = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
         return sum_updated / jnp.sqrt(n + 1)
 
-    def extract(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /):
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
         # Important: Rescale before extracting! Otherwise backward samples are wrong.

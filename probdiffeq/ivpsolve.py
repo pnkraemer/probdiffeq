@@ -196,13 +196,25 @@ def solve_with_python_while_loop(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    return _collocate.solve_with_python_while_loop(
+    t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        solution=sol,
+        t=sol.t,
+        posterior=sol.posterior,
+        output_scale=sol.output_scale,
+        num_steps=sol.num_steps,
         t1=t1,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
+    )
+    u, marginals = posterior.marginals()
+    return solution.Solution(
+        t=t,
+        u=u,
+        marginals=marginals,
+        posterior=posterior,
+        output_scale=output_scale,
+        num_steps=num_steps,
     )
 
 
@@ -229,12 +241,23 @@ def solve_fixed_grid(
     sol = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
-    return _collocate.solve_fixed_grid(
+    posterior, output_scale, num_steps = _collocate.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        solution=sol,
+        posterior=sol.posterior,
+        output_scale=sol.output_scale,
+        num_steps=sol.num_steps,
         grid=grid,
         solver=solver,
         parameters=parameters,
+    )
+    u, marginals = posterior.marginals()
+    return solution.Solution(
+        t=grid,
+        u=u,
+        marginals=marginals,
+        posterior=posterior,
+        output_scale=output_scale,
+        num_steps=num_steps,
     )
 
 
