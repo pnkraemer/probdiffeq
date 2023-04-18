@@ -57,7 +57,7 @@ class Solver(abc.ABC):
         raise NotImplementedError
 
     def solution_from_tcoeffs(
-        self, taylor_coefficients, /, t, output_scale, num_data_points=1.0
+        self, taylor_coefficients, /, t, output_scale, num_steps=1.0
     ):
         """Construct an initial `Solution` object.
 
@@ -67,7 +67,7 @@ class Solver(abc.ABC):
         """
         # todo: this should not call init(), but strategy.sol_from_tcoeffs()!
         u, marginals, posterior = self.strategy.solution_from_tcoeffs(
-            taylor_coefficients, num_data_points=num_data_points
+            taylor_coefficients, num_steps=num_steps
         )
         output_scale = self.strategy.promote_output_scale(output_scale)
         return solution.Solution(
@@ -76,7 +76,7 @@ class Solver(abc.ABC):
             marginals=marginals,
             output_scale=output_scale,
             u=u,
-            num_data_points=self.strategy.num_data_points(posterior),
+            num_steps=self.strategy.num_steps(posterior),
         )
 
     def init(self, sol, /) -> _State:
@@ -195,7 +195,7 @@ class CalibrationFreeSolver(Solver):
             #  but we use _prior because we might remove the _calibrated
             #  value in the future.
             output_scale=state.output_scale_prior,
-            num_data_points=self.strategy.num_data_points(state.strategy),
+            num_steps=self.strategy.num_steps(state.strategy),
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -208,7 +208,7 @@ class CalibrationFreeSolver(Solver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_prior,
-            num_data_points=self.strategy.num_data_points(state.strategy),
+            num_steps=self.strategy.num_steps(state.strategy),
         )
 
 
@@ -250,7 +250,7 @@ class DynamicSolver(Solver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
+            num_steps=self.strategy.num_steps(state.strategy),
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -263,7 +263,7 @@ class DynamicSolver(Solver):
             marginals=marginals,  # new!
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
+            num_steps=self.strategy.num_steps(state.strategy),
         )
 
 
@@ -291,7 +291,7 @@ class MLESolver(Solver):
 
         # Calibrate
         output_scale = state.output_scale_calibrated
-        n = self.strategy.num_data_points(state.strategy)
+        n = self.strategy.num_steps(state.strategy)
         new_output_scale = self._update_output_scale(
             diffsqrtm=output_scale, n=n, obs=observed
         )
@@ -335,7 +335,7 @@ class MLESolver(Solver):
             marginals=marginals,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
+            num_steps=self.strategy.num_steps(state.strategy),
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
@@ -352,7 +352,7 @@ class MLESolver(Solver):
             marginals=marginals,
             posterior=posterior,
             output_scale=state.output_scale_calibrated,
-            num_data_points=self.strategy.num_data_points(state.strategy),
+            num_steps=self.strategy.num_steps(state.strategy),
         )
 
     @staticmethod

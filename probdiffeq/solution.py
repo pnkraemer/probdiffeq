@@ -27,14 +27,14 @@ class Solution(Generic[R]):
         output_scale,
         marginals: R,
         posterior,
-        num_data_points,
+        num_steps,
     ):
         self.t = t
         self.u = u
         self.output_scale = output_scale
         self.marginals = marginals
         self.posterior = posterior
-        self.num_data_points = num_data_points
+        self.num_steps = num_steps
 
     def __repr__(self):
         return (
@@ -44,7 +44,7 @@ class Solution(Generic[R]):
             f"output_scale={self.output_scale},"
             f"marginals={self.marginals},"
             f"posterior={self.posterior},"
-            f"num_data_points={self.num_data_points},"
+            f"num_steps={self.num_steps},"
             ")"
         )
 
@@ -55,7 +55,7 @@ class Solution(Generic[R]):
             self.marginals,
             self.posterior,
             self.output_scale,
-            self.num_data_points,
+            self.num_steps,
         )
         aux = ()
         return children, aux
@@ -69,7 +69,7 @@ class Solution(Generic[R]):
             marginals=marginals,
             posterior=posterior,
             output_scale=output_scale,
-            num_data_points=n,
+            num_steps=n,
         )
 
     def __len__(self):
@@ -91,7 +91,7 @@ class Solution(Generic[R]):
             marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
             # todo: make iterable?
             posterior=jax.tree_util.tree_map(lambda x: x[item], self.posterior),
-            num_data_points=self.num_data_points[item],
+            num_steps=self.num_steps[item],
         )
 
     def __iter__(self):

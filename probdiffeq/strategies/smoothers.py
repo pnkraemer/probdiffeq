@@ -29,8 +29,6 @@ class _SmState(NamedTuple):
 
     corr: Any
 
-    num_data_points: Any
-
     def scale_covariance(self, output_scale):
         return _SmState(
             t=self.t,
@@ -38,7 +36,6 @@ class _SmState(NamedTuple):
             extra=self.extra.scale_covariance(output_scale),
             ssv=self.ssv.scale_covariance(output_scale),
             corr=self.corr.scale_covariance(output_scale),
-            num_data_points=self.num_data_points,
         )
 
 
@@ -80,7 +77,6 @@ class _SmootherCommon(_strategy.Strategy):
             ssv=ssv,
             extra=extra,
             corr=corr,
-            num_data_points=posterior.num_data_points,
         )
 
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
@@ -94,12 +90,11 @@ class _SmootherCommon(_strategy.Strategy):
             ssv=ssv,
             extra=extra,
             corr=corr,
-            num_data_points=state.num_data_points,
         )
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /, *, num_data_points):
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
         seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
-        sol = SmootherSol(seq, num_data_points=num_data_points)
+        sol = SmootherSol(seq)
         marginals = seq.init
         u = taylor_coefficients[0]
         return u, marginals, sol
@@ -110,7 +105,7 @@ class _SmootherCommon(_strategy.Strategy):
         marginals = self._extract_marginals(mseq)
         u = ssv.extract_qoi_from_sample(marginals.mean)
 
-        sol = SmootherSol(mseq, num_data_points=state.num_data_points)  # type: ignore
+        sol = SmootherSol(mseq)  # type: ignore
         return state.t, u, marginals, sol
 
     def extract_at_terminal_values(self, state: _SmState, /):
@@ -118,7 +113,7 @@ class _SmootherCommon(_strategy.Strategy):
         mseq = self.extrapolation.smoother_extract(ssv, state.extra)
         marginals = mseq.init
         u = state.u
-        sol = SmootherSol(mseq, num_data_points=state.num_data_points)  # type: ignore
+        sol = SmootherSol(mseq)  # type: ignore
         return state.t, u, marginals, sol
 
     def _extract_marginals(self, posterior: MarkovSequence, /):
@@ -127,9 +122,6 @@ class _SmootherCommon(_strategy.Strategy):
         # todo: this should not happen here...
         markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
         return markov.marginalise_backwards()
-
-    def num_data_points(self, state, /):
-        return state.num_data_points
 
     # Auxiliary routines that are the same among all subclasses
 
@@ -146,7 +138,6 @@ class _SmootherCommon(_strategy.Strategy):
             ssv=ssv,
             extra=extra,
             corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
-            num_data_points=s0.num_data_points,
         )
 
     # todo: should this be a classmethod of MarkovSequence?
@@ -158,7 +149,6 @@ class _SmootherCommon(_strategy.Strategy):
             extra=extra,  # new!
             corr=state.corr,
             ssv=state.ssv,
-            num_data_points=state.num_data_points,
         )
 
 
@@ -179,7 +169,6 @@ class Smoother(_SmootherCommon):
             corr=corr,
             extra=extra,
             ssv=ssv,
-            num_data_points=state.num_data_points + 1,
         )
 
     def case_right_corner(
@@ -211,7 +200,6 @@ class Smoother(_SmootherCommon):
             ssv=s1.ssv,
             corr=s1.corr,
             extra=backward_model1,
-            num_data_points=s1.num_data_points,
         )
         return InterpRes(accepted=s_1, solution=s_t, previous=s_t)
 
@@ -264,7 +252,6 @@ class FixedPointSmoother(_SmootherCommon):
             corr=corr,
             extra=extra,
             ssv=ssv,
-            num_data_points=state.num_data_points + 1,
         )
 
     def case_right_corner(
@@ -282,7 +269,6 @@ class FixedPointSmoother(_SmootherCommon):
             ssv=s1.ssv,
             corr=s1.corr,
             extra=backward_model1,
-            num_data_points=s1.num_data_points,
         )
 
         accepted = self._duplicate_with_unit_backward_model(solution)
@@ -313,7 +299,6 @@ class FixedPointSmoother(_SmootherCommon):
             ssv=s_t.ssv,
             extra=extra,  # new
             corr=s_t.corr,
-            num_data_points=s_t.num_data_points,
         )
 
         previous = self._duplicate_with_unit_backward_model(solution)
@@ -325,7 +310,6 @@ class FixedPointSmoother(_SmootherCommon):
             ssv=s1.ssv,
             corr=s1.corr,
             extra=s_1.extra,  # new!
-            num_data_points=s1.num_data_points,
         )
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)

@@ -27,7 +27,6 @@ class _FiState(NamedTuple):
     # Todo: move those to `ssv`
     t: Any
     u: Any
-    num_data_points: float
 
     def scale_covariance(self, s, /):
         return _FiState(
@@ -36,7 +35,6 @@ class _FiState(NamedTuple):
             extra=None,
             ssv=self.ssv.scale_covariance(s),
             corr=self.corr.scale_covariance(s),
-            num_data_points=self.num_data_points,
         )
 
 
@@ -59,11 +57,9 @@ _SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
-    def solution_from_tcoeffs(
-        self, taylor_coefficients, /, *, num_data_points
-    ) -> Tuple[jax.Array, jax.Array, FilterDist]:
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
         sol = self.extrapolation.filter_solution_from_tcoeffs(taylor_coefficients)
-        sol = FilterDist(sol, num_data_points=num_data_points)
+        sol = FilterDist(sol)
         marginals = sol
         u = taylor_coefficients[0]
         return u, marginals, sol
@@ -77,7 +73,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv=ssv,
             extra=extra,
             corr=corr,
-            num_data_points=solution.num_data_points,
         )
 
     def extract(self, posterior: _FiState, /) -> _SolType:
@@ -85,7 +80,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
         rv = self.extrapolation.filter_extract(ssv, posterior.extra)
 
-        solution = FilterDist(rv, posterior.num_data_points)  # type: ignore
+        solution = FilterDist(rv)  # type: ignore
         marginals = rv
         u = posterior.u
         return t, u, marginals, solution
@@ -116,7 +111,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv=ssv,
             extra=extra,
             corr=jax.tree_util.tree_map(jnp.zeros_like, s0.corr),
-            num_data_points=s0.num_data_points,
         )
         return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
@@ -151,7 +145,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv=ssv,
             corr=corr,
             extra=extra,
-            num_data_points=state.num_data_points,
         )
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
@@ -168,8 +161,4 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv=ssv,
             extra=extra,
             corr=corr,
-            num_data_points=state.num_data_points + 1,
         )
-
-    def num_data_points(self, state: _FiState, /):
-        return state.num_data_points
