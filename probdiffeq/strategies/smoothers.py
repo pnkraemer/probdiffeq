@@ -126,10 +126,8 @@ class _SmootherCommon(_strategy.Strategy):
     def extract_at_terminal_values(self, state: _SmState, /):
         ssv = self.correction.extract(state.ssv, state.corr)
         mseq = self.extrapolation.smoother_extract(ssv, state.extra)
-        marginals = mseq.init
-        u = state.u
         sol = SmootherSol(mseq)  # type: ignore
-        return state.t, u, marginals, sol
+        return state.t, sol
 
     # Auxiliary routines that are the same among all subclasses
 

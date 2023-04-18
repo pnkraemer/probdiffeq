@@ -86,9 +86,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         rv = self.extrapolation.filter_extract(ssv, posterior.extra)
 
         solution = FilterDist(rv)  # type: ignore
-        marginals = rv
-        u = posterior.u
-        return t, u, marginals, solution
+        return t, solution
 
     def extract_at_terminal_values(self, posterior: _FiState, /) -> _SolType:
         return self.extract(posterior)

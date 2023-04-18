@@ -201,17 +201,8 @@ class CalibrationFreeSolver(Solver):
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
-            state.strategy
-        )
-        return solution.Solution(
-            t=t,
-            u=u,  # new!
-            marginals=marginals,  # new!
-            posterior=posterior,
-            output_scale=state.output_scale_prior,
-            num_steps=state.num_steps,
-        )
+        t, posterior = self.strategy.extract_at_terminal_values(state.strategy)
+        return t, posterior, state.output_scale_prior, state.num_steps
 
 
 @jax.tree_util.register_pytree_node_class
@@ -257,17 +248,8 @@ class DynamicSolver(Solver):
         )
 
     def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
-            state.strategy
-        )
-        return solution.Solution(
-            t=t,
-            u=u,  # new!
-            marginals=marginals,  # new!
-            posterior=posterior,
-            output_scale=state.output_scale_calibrated,
-            num_steps=state.num_steps,
-        )
+        t, posterior = self.strategy.extract_at_terminal_values(state.strategy)
+        return t, posterior, state.output_scale_calibrated, state.num_steps
 
 
 @jax.tree_util.register_pytree_node_class
@@ -348,8 +330,8 @@ class MLESolver(Solver):
         s = state.output_scale_calibrated
         state = self._rescale_covs(state, output_scale=s)
 
-        _sol = self.strategy.extract_at_terminal_values(state.strategy)
-        t, u, marginals, posterior = _sol
+        t, posterior = self.strategy.extract_at_terminal_values(state.strategy)
+        # t, u, marginals, posterior = _sol
         return t, posterior, state.output_scale_calibrated, state.num_steps
         # return solution.Solution(
         #     t=t,
