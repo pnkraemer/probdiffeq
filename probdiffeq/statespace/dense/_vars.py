@@ -27,9 +27,9 @@ class DenseSSV(_collections.SSV):
             R_X_F=hc.T, R_X=self.hidden_state.cov_sqrtm_lower.T, R_YX=r_yx
         )
         m_cor = self.hidden_state.mean - gain @ m_obs
-        obs = DenseNormal(m_obs, r_obs.T)
+        obs = DenseNormal(m_obs, r_obs.T, target_shape=None)
 
-        noise = DenseNormal(m_cor, r_cor.T)
+        noise = DenseNormal(m_cor, r_cor.T, target_shape=self.target_shape)
         cor = _conds.DenseConditional(gain, noise=noise, target_shape=self.target_shape)
         return obs, cor
 
