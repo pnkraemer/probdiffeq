@@ -151,7 +151,13 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         ode_order, ode_shape = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape)
 
-    def begin(self, x: _vars.DenseSSV, /, vector_field, t, p):
+    def init(self, ssv, /):
+        m_like = jnp.zeros(self.ode_shape)
+        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
+        obs_like = _vars.DenseNormal(m_like, chol_like)
+        return ssv, obs_like
+
+    def begin(self, ssv: _vars.DenseSSV, corr, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -159,11 +165,11 @@ class _DenseTaylorFirstOrder(_corr.Correction):
             return x1 - fx0
 
         # Linearise the ODE residual (not the vector field!)
-        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=x.hidden_state.mean)
+        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=ssv.hidden_state.mean)
 
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        cov_sqrtm_lower = jvp_fn_vect(x.hidden_state.cov_sqrtm_lower)
+        cov_sqrtm_lower = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         # Gather the observed variable
         l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
@@ -176,33 +182,30 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return error_estimate, output_scale, (jvp_fn, (b,))
+        return ssv, (error_estimate, output_scale, (jvp_fn, (b,)))
 
-    def complete(self, extrapolated: _vars.DenseSSV, cache):
-        # Assign short-named variables for readability
-        ext = extrapolated
-
+    def complete(self, ssv: _vars.DenseSSV, corr, /, vector_field, p):
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        jvp_fn, (b,) = cache
+        *_, (jvp_fn, (b,)) = corr
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        l_obs_nonsquare = jvp_fn_vect(ext.hidden_state.cov_sqrtm_lower)
+        l_obs_nonsquare = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         # Compute the correction matrices
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ext.hidden_state.cov_sqrtm_lower.T
+            R_X_F=l_obs_nonsquare.T, R_X=ssv.hidden_state.cov_sqrtm_lower.T
         )
 
         # Gather the observed variable
         observed = _vars.DenseNormal(mean=b, cov_sqrtm_lower=r_obs.T)
 
         # Gather the corrected variable
-        m_cor = ext.hidden_state.mean - gain @ b
+        m_cor = ssv.hidden_state.mean - gain @ b
         rv = _vars.DenseNormal(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        _shape = ext.target_shape
-        corrected = _vars.DenseSSV(rv, cache=None, target_shape=_shape)
+        ssv = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
+        return ssv, observed
 
-        # Return the results
-        return observed, corrected
+    def extract(self, ssv, _corr, /):
+        return ssv
 
 
 @jax.tree_util.register_pytree_node_class

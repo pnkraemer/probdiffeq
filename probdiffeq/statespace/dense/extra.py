@@ -41,6 +41,10 @@ class _DenseIBM(_extra.Extrapolation):
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
 
+    @property
+    def target_shape(self):
+        return (self.num_derivatives + 1,) + self.ode_shape
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         args3 = f"ode_shape={self.ode_shape}"
@@ -69,7 +73,7 @@ class _DenseIBM(_extra.Extrapolation):
             preconditioner_scales=scales,
         )
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
+    def filter_solution_from_tcoeffs(self, taylor_coefficients, /):
         if len(taylor_coefficients) != self.num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "
             msg2 = "the number of derivatives in the implementation."
@@ -82,25 +86,35 @@ class _DenseIBM(_extra.Extrapolation):
         m0_matrix = jnp.stack(taylor_coefficients)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        corr = _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
-        return _vars.DenseSSV(corr, cache=None, target_shape=m0_matrix.shape)
+        return _vars.DenseNormal(mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected)
+        # return _vars.DenseSSV(corr, cache=None, target_shape=m0_matrix.shape)
+
+    def filter_init(self, sol, /):
+        ssv = _vars.DenseSSV(sol, target_shape=self.target_shape)
+        extra = None
+        return ssv, extra
+
+    def filter_extract(self, ssv, _extra, /):
+        return ssv.hidden_state
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
-    def begin(self, s0, /, dt):
+    def filter_begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
-        m0_p = p_inv * s0.hidden_state.mean
+        m0_p = p_inv * ssv.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
 
+        l0 = ssv.hidden_state.cov_sqrtm_lower
+
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm)
-        cache = (m_ext_p, m0_p, p, p_inv)
-        ssv = _vars.DenseSSV(ext, target_shape=shape, cache=cache)
-        return ssv
+        cache = (m_ext_p, m0_p, p, p_inv, l0)
+        ssv = _vars.DenseSSV(ext, target_shape=shape)
+        return ssv, cache
 
     def _assemble_preconditioner(self, dt):
         p, p_inv = _ibm_util.preconditioner_diagonal(
@@ -111,20 +125,21 @@ class _DenseIBM(_extra.Extrapolation):
         p_inv = jnp.tile(p_inv, d)
         return p, p_inv
 
-    def complete_without_reversal(self, output_begin, /, s0, output_scale):
-        _, _, p, p_inv = output_begin.cache
-        m_ext = output_begin.hidden_state.mean
+    def filter_complete(self, ssv, extra, /, output_scale):
+        _, _, p, p_inv, l0 = extra
+        m_ext = ssv.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
-                (self.a @ (p_inv[:, None] * s0.hidden_state.cov_sqrtm_lower)).T,
+                (self.a @ (p_inv[:, None] * l0)).T,
                 (output_scale * self.q_sqrtm_lower).T,
             )
         ).T
         l_ext = p[:, None] * l_ext_p
 
-        shape = output_begin.target_shape
+        shape = ssv.target_shape
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.DenseSSV(rv, cache=None, target_shape=shape)
+        ssv = _vars.DenseSSV(rv, target_shape=shape)
+        return ssv, None
 
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         m_ext_p, m0_p, p, p_inv = output_begin.cache

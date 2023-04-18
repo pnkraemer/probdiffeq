@@ -80,6 +80,7 @@ class _IsoIBM(_extra.Extrapolation):
         rv = _vars.IsoNormalHiddenState(m0, c0)
         return _vars.IsoSSV(rv, cache=None)
 
+    # Unnecessary?
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 

@@ -47,7 +47,7 @@ class DenseSSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale)
-        return DenseSSV(rv, cache=self.cache, target_shape=self.target_shape)
+        return DenseSSV(rv, target_shape=self.target_shape)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:
