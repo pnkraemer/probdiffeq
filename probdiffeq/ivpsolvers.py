@@ -16,9 +16,6 @@ class _State(NamedTuple):
     # Same as in solution.Solution()
     strategy: Any
 
-    # Not contained in _State but in Solution: output_scale, marginals.
-
-    # Different to solution.Solution():
     error_estimate: Any
     output_scale_calibrated: Any
     output_scale_prior: Any
@@ -362,8 +359,7 @@ class MLESolver(Solver):
             num_steps=state.num_steps,
         )
 
-    @staticmethod
-    def _rescale_covs(state, /, *, output_scale):
+    def _rescale_covs(self, state, /, *, output_scale):
         # todo: these calls to *.scale_covariance are a bit cumbersome,
         #  because we need to add this
         #  method to all sorts of classes.
@@ -387,5 +383,6 @@ class MLESolver(Solver):
             output_scale_calibrated=output_scale,
             output_scale_prior=None,  # irrelevant, will be removed in next step
             error_estimate=None,  # irrelevant, will be removed in next step.
+            num_steps=state.num_steps,
         )
         return state_rescaled

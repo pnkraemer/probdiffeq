@@ -22,13 +22,13 @@ class Posterior(abc.ABC, Generic[R]):
         self.rv = rv
 
     def tree_flatten(self):
-        children = self.rv
+        children = (self.rv,)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        rv = children
+        (rv,) = children
         return cls(rv)
 
     @abc.abstractmethod
