@@ -50,12 +50,12 @@ class FilterDist(_strategy.Posterior[S]):
         raise NotImplementedError
 
     def marginals_at_terminal_values(self):
-        marginals = self.rv
+        marginals = self.rand
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
     def marginals(self):
-        marginals = self.rv
+        marginals = self.rand
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
@@ -72,7 +72,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return u, marginals, sol
 
     def init(self, t, solution) -> _FiState:
-        ssv, extra = self.extrapolation.filter_init(solution.rv)
+        ssv, extra = self.extrapolation.filter_init(solution.rand)
         ssv, corr = self.correction.init(ssv)
         return _FiState(t=t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
 

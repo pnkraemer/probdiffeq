@@ -18,18 +18,18 @@ R = TypeVar("R")
 
 
 class Posterior(abc.ABC, Generic[R]):
-    def __init__(self, rv: R, /):
-        self.rv = rv
+    def __init__(self, rand: R, /):
+        self.rand = rand
 
     def tree_flatten(self):
-        children = (self.rv,)
+        children = (self.rand,)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (rv,) = children
-        return cls(rv)
+        (rand,) = children
+        return cls(rand)
 
     @abc.abstractmethod
     def sample(self, key, *, shape):

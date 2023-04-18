@@ -160,5 +160,5 @@ def solve_fixed_grid(
     _, (result, _) = _control_flow.scan_with_init(
         f=body_fn, init=(state, t0), xs=grid[1:]
     )
-    _ts, *sol = solver.extract(result)
+    _t, *sol = solver.extract(result)
     return sol

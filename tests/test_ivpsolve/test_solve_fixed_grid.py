@@ -10,6 +10,8 @@ from probdiffeq import ivpsolve, ivpsolvers, test_util
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
 from probdiffeq.statespace.dense import corr as dense_corr
+from probdiffeq.statespace.iso import corr as iso_corr
+from probdiffeq.statespace.scalar import corr as scalar_corr
 from probdiffeq.strategies import filters, smoothers
 
 
@@ -154,25 +156,28 @@ def _skip_autodiff_test(solver):
     _SLR1 = dense_corr._DenseStatisticalFirstOrder
     _SLR0 = dense_corr._DenseStatisticalZerothOrder
     _TS1 = dense_corr._DenseTaylorFirstOrder
+    _DenseTS0 = dense_corr._DenseTaylorZerothOrder
+    _IsoTS0 = iso_corr._IsoTaylorZerothOrder
+    _ScalarTS0 = scalar_corr._TaylorZerothOrder
     is_smoother = lambda x: isinstance(x, smoothers.Smoother)  # noqa: E731
     is_fp_smoother = lambda x: isinstance(x, smoothers.FixedPointSmoother)  # noqa: E731
     is_slr1 = lambda x: isinstance(x, _SLR1)  # noqa: E731
     is_slr0 = lambda x: isinstance(x, _SLR0)  # noqa: E731
     is_ts1 = lambda x: isinstance(x, _TS1)  # noqa: E731
+    is_ts0 = lambda x: isinstance(x, (_DenseTS0, _IsoTS0, _ScalarTS0))  # noqa: E731
 
     strategy = solver.strategy
     correction = solver.strategy.correction
 
     if is_slr1(correction):
         return True
-    if is_slr0(correction) and is_smoother(strategy):
-        return True
-    if is_slr0(correction) and is_fp_smoother(strategy):
-        return True
-    if is_ts1(correction) and is_smoother(strategy):
-        return True
-    if is_ts1(correction) and is_fp_smoother(strategy):
-        return True
+    if is_smoother(strategy) or is_fp_smoother(strategy):
+        if is_slr0(correction):
+            return True
+        if is_ts1(correction):
+            return True
+        if is_ts0(correction):
+            return True
 
     # All good now, no skipping.
     return False

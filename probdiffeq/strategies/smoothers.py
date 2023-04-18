@@ -15,10 +15,10 @@ class SmootherSol(_strategy.Posterior[MarkovSequence]):
     """Smmoothing solution."""
 
     def sample(self, key, *, shape):
-        return self.rv.sample(key, shape=shape)
+        return self.rand.sample(key, shape=shape)
 
     def marginals_at_terminal_values(self):
-        marginals = self.rv.init
+        marginals = self.rand.init
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
@@ -28,10 +28,10 @@ class SmootherSol(_strategy.Posterior[MarkovSequence]):
         return u, marginals
 
     def _extract_marginals(self, /):
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.rv.init)
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.rand.init)
 
         # todo: this construction should not happen here...
-        markov = MarkovSequence(init=init, backward_model=self.rv.backward_model)
+        markov = MarkovSequence(init=init, backward_model=self.rand.backward_model)
         return markov.marginalise_backwards()
 
 
@@ -83,7 +83,7 @@ class _SmootherCommon(_strategy.Strategy):
         raise NotImplementedError
 
     def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.smoother_init(posterior.rv)
+        ssv, extra = self.extrapolation.smoother_init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
         return _SmState(
             t=t,
@@ -215,7 +215,7 @@ class Smoother(_SmootherCommon):
             output_scale=output_scale,
         )
         t, posterior = self.extract(acc)
-        marginals = posterior.rv.backward_model.marginalise(posterior.rv.init)
+        marginals = posterior.rand.backward_model.marginalise(posterior.rand.init)
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
