@@ -18,7 +18,7 @@ R = TypeVar("R")
 
 
 class Posterior(abc.ABC, Generic[R]):
-    def __init__(self, rv: S, /):
+    def __init__(self, rv: R, /):
         self.rv = rv
 
     def tree_flatten(self):
@@ -55,7 +55,7 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init(self, t, u, marginals, solution: P, /) -> S:
+    def init(self, t, solution: P, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod

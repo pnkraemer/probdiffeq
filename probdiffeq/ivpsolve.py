@@ -66,7 +66,7 @@ def simulate_terminal_values(
         dt0=dt0,
         while_loop_fn=while_loop_fn_temporal,
     )
-    u, marginals = posterior.marginals_terminal_value()
+    u, marginals = posterior.marginals_at_terminal_values()
     return solution.Solution(
         t=t,
         u=u,

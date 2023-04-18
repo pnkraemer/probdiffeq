@@ -1,7 +1,7 @@
 """''Global'' estimation: smoothing."""
 
 import abc
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, NamedTuple, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -9,32 +9,29 @@ import jax.numpy as jnp
 from probdiffeq._collections import InterpRes, MarkovSequence
 from probdiffeq.strategies import _strategy
 
-S = TypeVar("S")
-"""A type-variable to alias appropriate state-space variable types."""
-
 
 @jax.tree_util.register_pytree_node_class
-class SmootherSol(_strategy.Posterior[S]):
+class SmootherSol(_strategy.Posterior[MarkovSequence]):
     """Smmoothing solution."""
 
     def sample(self, key, *, shape):
         return self.rv.sample(key, shape=shape)
 
-    def marginals_terminal_value(self):
+    def marginals_at_terminal_values(self):
         marginals = self.rv.init
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
     def marginals(self):
-        marginals = self._extract_marginals(self.rv)
+        marginals = self._extract_marginals()
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
-    def _extract_marginals(self, posterior: MarkovSequence, /):
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.init)
+    def _extract_marginals(self, /):
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.rv.init)
 
-        # todo: this should not happen here...
-        markov = MarkovSequence(init=init, backward_model=posterior.backward_model)
+        # todo: this construction should not happen here...
+        markov = MarkovSequence(init=init, backward_model=self.rv.backward_model)
         return markov.marginalise_backwards()
 
 
@@ -85,7 +82,7 @@ class _SmootherCommon(_strategy.Strategy):
     ):
         raise NotImplementedError
 
-    def init(self, t, _u, _marginals, posterior, /) -> _SmState:
+    def init(self, t, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.smoother_init(posterior.rv)
         ssv, corr = self.correction.init(ssv)
         return _SmState(
@@ -116,7 +113,7 @@ class _SmootherCommon(_strategy.Strategy):
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def extract(self, state: _SmState, /):
+    def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
         mseq = self.extrapolation.smoother_extract(ssv, state.extra)
         sol = SmootherSol(mseq)  # type: ignore
@@ -213,12 +210,13 @@ class Smoother(_SmootherCommon):
     ):
         acc, _sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(t1, None, None, posterior),
-            s0=self.init(t0, None, None, posterior_previous),
+            s1=self.init(t1, posterior),
+            s0=self.init(t0, posterior_previous),
             output_scale=output_scale,
         )
-        marginals = acc.extra.marginalise(marginals)
-        u = acc.ssv.extract_qoi_from_sample(marginals.mean)
+        t, posterior = self.extract(acc)
+        marginals = posterior.rv.backward_model.marginalise(posterior.rv.init)
+        u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
 

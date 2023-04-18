@@ -49,7 +49,7 @@ class FilterDist(_strategy.Posterior[S]):
     def sample(self, key, *, shape):
         raise NotImplementedError
 
-    def marginals_terminal_value(self):
+    def marginals_at_terminal_values(self):
         marginals = self.rv
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
@@ -71,7 +71,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def init(self, t, _u, _marginals, solution) -> _FiState:
+    def init(self, t, solution) -> _FiState:
         ssv, extra = self.extrapolation.filter_init(solution.rv)
         ssv, corr = self.correction.init(ssv)
         return _FiState(t=t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
@@ -123,12 +123,12 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, jax.Array]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(t1, None, None, posterior),
-            s0=self.init(t0, None, None, posterior_previous),
+            s1=self.init(t1, posterior),
+            s0=self.init(t0, posterior_previous),
             output_scale=output_scale,
         )
-        _, u, marginals, _ = self.extract(sol)
-        return u, marginals
+        t, posterior = self.extract(sol)
+        return posterior.marginals()
 
     def begin(self, state: _FiState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.filter_begin(state.ssv, state.extra, dt=dt)

@@ -79,7 +79,7 @@ class Solver(abc.ABC):
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        strategy_state = self.strategy.init(t, None, None, posterior)
+        strategy_state = self.strategy.init(t, posterior)
         return _State(
             error_estimate=error_estimate,
             strategy=strategy_state,
