@@ -93,8 +93,8 @@ class Smoother(_strategy.Strategy):
         Subsequent IVP solver steps continue from the value at 't1'.
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        e_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
-        e_1 = self._interpolate_from_to_fn(s0=e_t, output_scale=output_scale, t=s1.t)
+        e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
+        e_1 = self._extrapolate(s0=e_t, output_scale=output_scale, t=s1.t)
 
         # Marginalise from t1 to t to obtain the interpolated solution.
         bw_t1_to_t, bw_t_to_t0 = e_1.extra, e_t.extra
@@ -162,7 +162,7 @@ class Smoother(_strategy.Strategy):
 
     # Auxiliary routines that are the same among all subclasses
 
-    def _interpolate_from_to_fn(self, *, s0, output_scale, t):
+    def _extrapolate(self, *, s0, output_scale, t):
         dt = t - s0.t
         ssv, extra = self.extrapolation.smoother_begin(s0.ssv, s0.extra, dt=dt)
         ssv, extra = self.extrapolation.smoother_complete(
@@ -292,8 +292,8 @@ class FixedPointSmoother(_strategy.Strategy):
         # 'e_t': interpolated result at time 't'.
         # 'e_1': extrapolated result at time 't1'.
         # todo: rename this to "extrapolate from to fn", no interpolation happens here.
-        e_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
-        e_1 = self._interpolate_from_to_fn(s0=e_t, output_scale=output_scale, t=s1.t)
+        e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
+        e_1 = self._extrapolate(s0=e_t, output_scale=output_scale, t=s1.t)
 
         # Read backward models and condense qoi-to-t
         bw_t1_to_t, bw_t_to_t0, bw_t0_to_qoi = e_1.extra, e_t.extra, s0.extra
@@ -332,7 +332,7 @@ class FixedPointSmoother(_strategy.Strategy):
 
     # Auxiliary routines that are the same among all subclasses
 
-    def _interpolate_from_to_fn(self, *, s0, output_scale, t):
+    def _extrapolate(self, *, s0, output_scale, t):
         dt = t - s0.t
         ssv, extra = self.extrapolation.fixpt_begin(s0.ssv, s0.extra, dt=dt)
         ssv, extra = self.extrapolation.fixpt_complete(
