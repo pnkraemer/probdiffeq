@@ -79,13 +79,19 @@ class Smoother(_strategy.Strategy):
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
-        # A smoother interpolates by reverting the Markov kernels between s0.t and t
-        # which gives an extrapolation and a backward transition;
-        # and by reverting the Markov kernels between t and s1.t
-        # which gives another extrapolation and a backward transition.
-        # The latter extrapolation is discarded in favour of s1.marginals_filtered,
-        # but the backward transition is kept.
+        """Interpolate.
 
+        A smoother interpolates by_
+        * Extrapolating from t0 to t, which gives the "filtering" marginal
+          and the backward transition from t to t0.
+        * Extrapolating from t to t1, which gives another "filtering" marginal
+          and the backward transition from t1 to t.
+        * Applying the t1-to-t backward transition to compute the interpolation result.
+          This intermediate result is informed about its "right-hand side" datum.
+
+        Subsequent interpolations continue from the value at 't'.
+        Subsequent IVP solver steps continue from the value at 't1'.
+        """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
         s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
         state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
@@ -105,13 +111,7 @@ class Smoother(_strategy.Strategy):
 
         # The state at t1 gets a new backward model; it must remember how to
         # get back to t, not to t0.
-        s_1 = _SmState(
-            t=s1.t,
-            u=s1.u,
-            ssv=s1.ssv,
-            corr=s1.corr,
-            extra=backward_model1,
-        )
+        s_1 = _SmState(t=s1.t, u=s1.u, ssv=s1.ssv, corr=s1.corr, extra=backward_model1)
         return InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
     def offgrid_marginals(
@@ -273,13 +273,43 @@ class FixedPointSmoother(_strategy.Strategy):
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
-        # A fixed-point smoother interpolates almost like a smoother.
-        # The key difference is that when interpolating from s0.t to t,
-        # the backward models in s0.t and the incoming model are condensed into one.
-        # The reasoning is that the previous model "knows how to get to the
-        # quantity of interest", and this is what we are interested in.
-        # The rest remains the same as for the smoother.
+        """Interpolate.
 
+        A fixed-point smoother interpolates by_
+
+        * Extrapolating from t0 to t, which gives the "filtering" marginal
+          and the backward transition from t to t0.
+        * Extrapolating from t to t1, which gives another "filtering" marginal
+          and the backward transition from t1 to t.
+        * Applying the t1-to-t backward transition to compute the interpolation result.
+          This intermediate result is informed about its "right-hand side" datum.
+
+        The difference to smoother-interpolation is quite subtle:
+
+        * The backward transition of the value at 't' is merged with that at 't0'.
+          The reason is that the backward transition at 't0' knows
+          "how to get to the quantity of interest",
+          and this is precisely what we want to interpolate.
+        * Subsequent interpolations do not continue from the value at 't', but
+          from a very similar value where the backward transition
+          is replaced with an identity. The reason is that the interpolated solution
+          becomes the new quantity of interest, and subsequent interpolations
+          need to learn how to get here.
+        * Subsequent solver steps do not continue from the value at 't1',
+          but the value at 't1' where the backward model is merged with
+          the 't1-to-t' backward model. The reason is similar to the above:
+          future steps need to know "how to get back to the quantity of interest",
+          which is the interpolated solution.
+
+        These distinctions are precisely why we need three fields
+        in every interpolation result:
+        the solution,
+        the continue-interpolation-from-here,
+        and the continue-stepping-from-here.
+        All three are different for fixed point smoothers.
+        (Really, I try removing one of them monthly and
+        then don't understand why tests fail.)
+        """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
         s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
         state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
@@ -291,24 +321,14 @@ class FixedPointSmoother(_strategy.Strategy):
         mseq_at_t = MarkovSequence(init=rv_at_t, backward_model=bw_model_qoi_to_t)
         ssv, extra = self.extrapolation.fixpt_init(mseq_at_t)
 
-        state_at_t = _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            corr=jax.tree_util.tree_map(jnp.empty_like, s1.corr),
-            extra=extra,
-        )
+        corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
+        u = ssv.extract_qoi()
+        state_at_t = _SmState(t=t, u=u, ssv=ssv, corr=corr_like, extra=extra)
         prev_at_t = self._duplicate_with_unit_backward_model(s_t)
 
         # The state at t1 gets a new backward model; it must remember how to
         # get back to t, not to t0.
-        s_1 = _SmState(
-            t=s1.t,
-            u=s1.u,
-            ssv=s1.ssv,
-            corr=s1.corr,
-            extra=bw_model_t_to_t1,
-        )
+        s_1 = _SmState(t=s1.t, u=s1.u, ssv=s1.ssv, corr=s1.corr, extra=bw_model_t_to_t1)
         return InterpRes(accepted=s_1, solution=state_at_t, previous=prev_at_t)
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:

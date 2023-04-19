@@ -22,11 +22,13 @@ def strategy_pair_fixedpoint_smoother():
     return filters.Filter(*impl), smoothers.FixedPointSmoother(*impl)
 
 
+# Shorthand for the test parametrization below:
+_CLIPPED_CONTROLS = [controls.IntegralClipped(), controls.ProportionalIntegralClipped()]
+
+
 @testing.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-@testing.parametrize(
-    "ctrl", [controls.IntegralClipped(), controls.ProportionalIntegralClipped()]
-)
+@testing.parametrize("ctrl", _CLIPPED_CONTROLS)
 def test_equality_clipped_control(ode_problem, fil, smo, ctrl):
     """Assert equality for when a clipped controller is used."""
     atol, rtol = 1e-2, 1e-1
@@ -117,7 +119,7 @@ def test_inequality_nonclipped_control(ode_problem, fil, smo, ctrl):
     smoother_scale = smoother_solution.output_scale
     assert _tree_all_allclose(filter_scale, smoother_scale)
 
-    # Not-equal:
+    # Not-equal: (-> assert 'NOT')
     assert not _tree_all_allclose(filter_solution.u, smoother_solution.u)
     filter_marginals = filter_solution.marginals
     smoother_marginals = smoother_solution.marginals
