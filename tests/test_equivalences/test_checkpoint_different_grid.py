@@ -54,11 +54,11 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
             control=controls.Integral(),
             **kwargs
         )
-        fixedpoint_smo_sol = fp_smo_sol[
-            1:-1
-        ]  # reference is defined only on the interior
 
-        print(fp_smo_sol.u)
+        # reference is defined only on the interior
+        fixedpoint_smo_sol = fp_smo_sol[1:-1]
+
+        print(fixedpoint_smo_sol.u)
         print(u)
     # Compare all attributes for equality,
     # except for the covariance matrix square roots

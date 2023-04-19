@@ -86,19 +86,36 @@ class Smoother(_strategy.Strategy):
         # The latter extrapolation is discarded in favour of s1.marginals_filtered,
         # but the backward transition is kept.
 
+        # todo: this extrapolation is incorrect! It extrapolates a bit like a filter,
+        #  which is not a good idea. Why are we not marginalising backwards anywhere?
+
         # Extrapolate from t0 to t, and from t to t1
         s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
         state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
         backward_model1 = state1.extra
 
-        s_1 = _SmState(
+        # Backward-marginalise from t1 to t so we obtain the solution at t
+        rv_at_t = backward_model1.marginalise(s1.ssv.hidden_state)
+        posterior_at_t = MarkovSequence(init=rv_at_t, backward_model=s_t.extra)
+        ssv_at_t, extra_at_t = self.extrapolation.smoother_init(posterior_at_t)
+        state_t = _SmState(
+            t=t,
+            u=ssv_at_t.extract_qoi(),
+            ssv=ssv_at_t,
+            extra=extra_at_t,
+            corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
+        )
+
+        # Update the State at t1 with the backward model between t and t1
+        # instead of the backward model between t0 and t1
+        state_1 = _SmState(
             t=s1.t,
             u=s1.u,
             ssv=s1.ssv,
             corr=s1.corr,
             extra=backward_model1,
         )
-        return InterpRes(accepted=s_1, solution=s_t)
+        return InterpRes(accepted=state_1, solution=state_t)
 
     def offgrid_marginals(
         self,
@@ -220,10 +237,10 @@ class FixedPointSmoother(_strategy.Strategy):
         )
 
     def complete(self, state, /, *, output_scale, vector_field, parameters):
+        bw_model, *_ = state.extra
         ssv, extra = self.extrapolation.fixpt_complete(
             state.ssv, state.extra, output_scale=output_scale
         )
-        bw_model, *_ = state.extra
         extra = bw_model.merge_with_incoming_conditional(extra)
         ssv, corr = self.correction.complete(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
@@ -250,12 +267,47 @@ class FixedPointSmoother(_strategy.Strategy):
         # The reasoning is that the previous model "knows how to get to the
         # quantity of interest", and this is what we are interested in.
         # The rest remains the same as for the smoother.
-
+        #
         # From s0.t to t
-        solution = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
-        s_1 = self._interpolate_from_to_fn(
-            s0=solution, output_scale=output_scale, t=s1.t
+        s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
+        backward_model1 = s_t.extra
+
+        #
+        # # Extrapolate from t0 to t, and from t to t1
+        # s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
+        # state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
+        # backward_model1 = state1.extra
+
+        # Backward-marginalise from t1 to t so we obtain the solution at t
+        rv_at_t = backward_model1.marginalise(s1.ssv.hidden_state)
+        posterior_at_t = MarkovSequence(init=rv_at_t, backward_model=s_t.extra)
+        ssv_at_t, extra_at_t = self.extrapolation.fixpt_init(posterior_at_t)
+        state_t = _SmState(
+            t=t,
+            u=ssv_at_t.extract_qoi(),
+            ssv=ssv_at_t,
+            extra=extra_at_t,
+            corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
         )
+
+        # Update the State at t1 with the backward model between t and t1
+        # instead of the backward model between t0 and t1
+        state_1 = _SmState(
+            t=s1.t,
+            u=s1.u,
+            ssv=s1.ssv,
+            corr=s1.corr,
+            extra=backward_model1,
+        )
+        return InterpRes(accepted=state_1, solution=state_t)
+
+        # # Reset sol to unit identity before proceeding
+        # s_t = self._duplicate_with_unit_backward_model(solution)
+        #
+        # s_1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
+        #
+        # todo: this extrapolation is incorrect! It extrapolates a bit like a filter,
+        #  which is not a good idea. Why are we not marginalising backwards anywhere?
 
         accepted = _SmState(
             t=s1.t,
@@ -290,14 +342,13 @@ class FixedPointSmoother(_strategy.Strategy):
             corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
         )
 
-    #
-    # # todo: should this be a classmethod of MarkovSequence?
-    # def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
-    #     extra = self.extrapolation.fixpt_init_conditional(rv_proto=state.extra.noise)
-    #     return _SmState(
-    #         t=state.t,
-    #         u=state.u,
-    #         extra=extra,  # new!
-    #         corr=state.corr,
-    #         ssv=state.ssv,
-    #     )
+    # todo: should this be a classmethod of MarkovSequence?
+    def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
+        extra = self.extrapolation.fixpt_init_conditional(rv_proto=state.extra.noise)
+        return _SmState(
+            t=state.t,
+            u=state.u,
+            extra=extra,  # new!
+            corr=state.corr,
+            ssv=state.ssv,
+        )

@@ -191,7 +191,6 @@ class AdaptiveIVPSolver(Generic[T]):
             lambda s: s,
             state,
         )
-        print(f"Am at {state.accepted.t, state.solution.t}")
 
         # todo: which output scale does this interpolation use?
         #  the MLE solver should use the prior one, but it looks like
@@ -204,6 +203,8 @@ class AdaptiveIVPSolver(Generic[T]):
             lambda s: self._accepted_as_solution(state=s),
             state,
         )
+        print(f"Accepted: {state.accepted.t}, solution: {state.solution.t}")
+        print("solution.u =", state.solution.u)
         return state
 
     def _rejection_loop(self, *, vector_field, state0, t1, parameters):
@@ -288,6 +289,7 @@ class AdaptiveIVPSolver(Generic[T]):
         accepted, solution = self.solver.interpolate(
             s0=state.solution, s1=state.accepted, t=t
         )
+        print(state.accepted.strategy.extra)
         return _AdaptiveState(
             error_norm_proposed=_inf_like(state.error_norm_proposed),
             proposed=_inf_like(state.proposed),
