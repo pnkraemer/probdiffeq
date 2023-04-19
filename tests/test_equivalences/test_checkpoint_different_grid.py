@@ -69,6 +69,9 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     assert jnp.allclose(cov(l0), cov(l1))
 
 
+# todo: are those used?
+
+
 def _tree_all_allclose(tree1, tree2, **kwargs):
     trees_is_allclose = _tree_allclose(tree1, tree2, **kwargs)
     return jax.tree_util.tree_all(trees_is_allclose)
