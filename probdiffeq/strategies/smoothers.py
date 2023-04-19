@@ -263,19 +263,6 @@ class FixedPointSmoother(_strategy.Strategy):
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
-    def offgrid_marginals(
-        self,
-        *,
-        t,
-        marginals,
-        posterior,
-        posterior_previous: SmootherSol,
-        t0,
-        t1,
-        output_scale,
-    ):
-        raise NotImplementedError
-
     def init(self, t, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.smoother_init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
