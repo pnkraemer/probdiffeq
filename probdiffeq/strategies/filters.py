@@ -71,7 +71,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def init(self, t, solution) -> _FiState:
+    def init(self, t, solution, /) -> _FiState:
         ssv, extra = self.extrapolation.filter_init(solution.rand)
         ssv, corr = self.correction.init(ssv)
         return _FiState(t=t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)

@@ -31,7 +31,6 @@ class Posterior(abc.ABC, Generic[R]):
         (rand,) = children
         return cls(rand)
 
-    @abc.abstractmethod
     def sample(self, key, *, shape):
         raise NotImplementedError
 
@@ -50,27 +49,21 @@ class Strategy(abc.ABC, Generic[S, P]):
         arg2 = self.correction
         return f"{name}({arg1}, {arg2})"
 
-    @abc.abstractmethod
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> P:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def init(self, t, solution: P, /) -> S:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def extract(self, state: S, /) -> P:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def case_right_corner(self, t, *, s0: S, s1: S, output_scale) -> InterpRes[S]:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def case_interpolate(self, t, *, s0: S, s1: S, output_scale) -> InterpRes[S]:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def offgrid_marginals(
         self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
     ):
@@ -97,10 +90,8 @@ class Strategy(abc.ABC, Generic[S, P]):
         init_fn = self.extrapolation.extract_output_scale
         return init_fn(*args, **kwargs)
 
-    @abc.abstractmethod
     def begin(self, state: S, /, *, dt, parameters, vector_field):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def complete(self, state, /, *, parameters, vector_field, output_scale):
         raise NotImplementedError
