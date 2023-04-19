@@ -50,10 +50,6 @@ class Solver(abc.ABC):
     def extract(self, state: _State, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def extract_at_terminal_values(self, state: _State, /):
-        raise NotImplementedError
-
     def solution_from_tcoeffs(
         self, taylor_coefficients, /, t, output_scale, num_steps=1.0
     ):
@@ -188,10 +184,6 @@ class CalibrationFreeSolver(Solver):
         t, posterior = self.strategy.extract(state.strategy)
         return t, posterior, state.output_scale_prior, state.num_steps
 
-    def extract_at_terminal_values(self, state: _State, /):
-        #  todo: remove this function soon (once MLESolver has the same redundancy)
-        return self.extract(state)
-
 
 @jax.tree_util.register_pytree_node_class
 class DynamicSolver(Solver):
@@ -227,10 +219,6 @@ class DynamicSolver(Solver):
     def extract(self, state: _State, /):
         t, posterior = self.strategy.extract(state.strategy)
         return t, posterior, state.output_scale_calibrated, state.num_steps
-
-    def extract_at_terminal_values(self, state: _State, /):
-        #  todo: remove this function soon (once MLESolver has the same redundancy)
-        return self.extract(state)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -287,25 +275,17 @@ class MLESolver(Solver):
         return sum_updated / jnp.sqrt(n + 1)
 
     def extract(self, state: _State, /):
-        # 'state' is batched. Thus, output scale is an array instead of a scalar.
-
-        # Important: Rescale before extracting! Otherwise backward samples are wrong.
-
-        # promote calibrated scale to the correct batch-shape
-        s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
-        state = self._rescale_covs(state, output_scale=s)
-
-        t, posterior = self.strategy.extract(state.strategy)
-        return t, posterior, state.output_scale_calibrated, state.num_steps
-
-    def extract_at_terminal_values(self, state: _State, /):
         # 'state' is not batched. Thus, output scale is a scalar.
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
 
+        # Read output-scale
         output_scale = self.strategy.extract_output_scale(state.output_scale_calibrated)
+
+        # Promote calibrated output scale to the correct batch-shape
         s = output_scale * jnp.ones_like(state.output_scale_prior)
         state = self._rescale_covs(state, output_scale=s)
 
+        # Extract and return results
         t, posterior = self.strategy.extract(state.strategy)
         return t, posterior, state.output_scale_calibrated, state.num_steps
 
