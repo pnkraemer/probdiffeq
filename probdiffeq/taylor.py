@@ -184,7 +184,7 @@ def _runge_kutta_starter_fn(
 
     # Initialise
     rv0 = extrapolation.standard_normal(ode_shape=initial_values[0].shape)
-    cond0 = extrapolation.init_conditional(rv_proto=rv0)
+    cond0 = extrapolation.smoother_init_conditional(rv_proto=rv0)
     sol0 = _collections.MarkovSequence(init=rv0, backward_model=cond0)
 
     # Estimate

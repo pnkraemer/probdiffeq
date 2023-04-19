@@ -54,7 +54,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         rv = _vars.IsoNormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        cond = self.init_conditional(rv_proto=rv)
+        cond = self.smoother_init_conditional(rv_proto=rv)
         return _collections.MarkovSequence(init=rv, backward_model=cond)
 
     def filter_init(self, rv, /):
@@ -167,7 +167,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return _vars.IsoSSV(extrapolated), bw_model
 
     # todo: should this be a classmethod in _conds.IsoConditional?
-    def init_conditional(self, rv_proto):
+    def smoother_init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return _conds.IsoConditionalHiddenState(op, noise=noi)

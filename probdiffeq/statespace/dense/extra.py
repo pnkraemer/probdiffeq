@@ -110,7 +110,7 @@ class _DenseIBM(_extra.Extrapolation):
             cov_sqrtm_lower=c_sqrtm0_corrected,
             target_shape=self.target_shape,
         )
-        conds = self.init_conditional(rv_proto=rv)
+        conds = self.smoother_init_conditional(rv_proto=rv)
         return _collections.MarkovSequence(init=rv, backward_model=conds)
 
     def filter_init(self, sol, /):
@@ -225,7 +225,7 @@ class _DenseIBM(_extra.Extrapolation):
         ext = _vars.DenseSSV(rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    def init_conditional(self, rv_proto):
+    def smoother_init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return _conds.DenseConditional(op, noise=noi, target_shape=self.target_shape)

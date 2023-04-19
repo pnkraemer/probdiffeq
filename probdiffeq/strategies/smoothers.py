@@ -137,7 +137,7 @@ class _SmootherCommon(_strategy.Strategy):
 
     # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
-        extra = self.extrapolation.init_conditional(rv_proto=state.extra.noise)
+        extra = self.extrapolation.smoother_init_conditional(rv_proto=state.extra.noise)
         return _SmState(
             t=state.t,
             u=state.u,
