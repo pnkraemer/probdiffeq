@@ -58,14 +58,25 @@ class _BlockDiag(_extra.Extrapolation):
         fn = jax.vmap(type(self.extra).smoother_begin, in_axes=(0, 0, 0, None))
         return fn(self.extra, ssv, extra, dt)
 
+    def fixpt_begin(self, ssv, extra, /, dt):
+        fn = jax.vmap(type(self.extra).fixpt_begin, in_axes=(0, 0, 0, None))
+        return fn(self.extra, ssv, extra, dt)
+
     def smoother_complete(self, ssv, extra, /, output_scale):
         fn = jax.vmap(type(self.extra).smoother_complete)
         return fn(self.extra, ssv, extra, output_scale)
 
+    def fixpt_complete(self, ssv, extra, /, output_scale):
+        fn = jax.vmap(type(self.extra).fixpt_complete)
+        return fn(self.extra, ssv, extra, output_scale)
+
     def smoother_init_conditional(self, rv_proto):
-        return jax.vmap(type(self.extra).smoother_init_conditional)(
-            self.extra, rv_proto
-        )
+        init_fn = jax.vmap(type(self.extra).smoother_init_conditional)
+        return init_fn(self.extra, rv_proto)
+
+    def fixpt_init_conditional(self, rv_proto):
+        init_fn = jax.vmap(type(self.extra).fixpt_init_conditional)
+        return init_fn(self.extra, rv_proto)
 
     def filter_solution_from_tcoeffs(self, taylor_coefficients, /):
         solution_fn = jax.vmap(type(self.extra).filter_solution_from_tcoeffs)
@@ -75,12 +86,20 @@ class _BlockDiag(_extra.Extrapolation):
         solution_fn = jax.vmap(type(self.extra).smoother_solution_from_tcoeffs)
         return solution_fn(self.extra, taylor_coefficients)
 
+    def fixpt_solution_from_tcoeffs(self, taylor_coefficients, /):
+        solution_fn = jax.vmap(type(self.extra).fixpt_solution_from_tcoeffs)
+        return solution_fn(self.extra, taylor_coefficients)
+
     def filter_init(self, sol, /):
         solution_fn = jax.vmap(type(self.extra).filter_init)
         return solution_fn(self.extra, sol)
 
     def smoother_init(self, sol, /):
         solution_fn = jax.vmap(type(self.extra).smoother_init)
+        return solution_fn(self.extra, sol)
+
+    def fixpt_init(self, sol, /):
+        solution_fn = jax.vmap(type(self.extra).fixpt_init)
         return solution_fn(self.extra, sol)
 
     def filter_extract(self, ssv, extra, /):
@@ -97,6 +116,14 @@ class _BlockDiag(_extra.Extrapolation):
             return jax.vmap(self.smoother_extract)(ssv, extra)
 
         solution_fn = jax.vmap(type(self.extra).smoother_extract)
+        return solution_fn(self.extra, ssv, extra)
+
+    def fixpt_extract(self, ssv, extra, /):
+        # If called in save-at mode, batch again.
+        if ssv.hidden_state.mean.ndim > 2:
+            return jax.vmap(self.fixpt_extract)(ssv, extra)
+
+        solution_fn = jax.vmap(type(self.extra).fixpt_extract)
         return solution_fn(self.extra, ssv, extra)
 
     # todo: move to correction?
