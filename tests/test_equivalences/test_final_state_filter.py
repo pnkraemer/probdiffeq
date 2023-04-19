@@ -27,7 +27,7 @@ def strategy_pair_fixedpoint_smoother():
 @testing.parametrize(
     "ctrl", [controls.IntegralClipped(), controls.ProportionalIntegralClipped()]
 )
-def test_final_state_equal_to_filter_clipped_control(ode_problem, fil, smo, ctrl):
+def test_equality_clipped_control(ode_problem, fil, smo, ctrl):
     """Assert equality for when a clipped controller is used."""
     atol, rtol = 1e-2, 1e-1
     filter_solution = ivpsolve.simulate_terminal_values(
@@ -76,9 +76,7 @@ def test_final_state_equal_to_filter_clipped_control(ode_problem, fil, smo, ctrl
 @testing.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize("ctrl", [controls.Integral(), controls.ProportionalIntegral()])
-def test_final_state_not_equal_to_filter_nonclipped_control(
-    ode_problem, fil, smo, ctrl
-):
+def test_inequality_nonclipped_control(ode_problem, fil, smo, ctrl):
     """Assert inequality for when a non-clipped controller is used.
 
     Why inequality? Because non-clipped control requires interpolation around 't1',
