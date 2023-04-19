@@ -85,7 +85,7 @@ class _IBM(_extra.Extrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.SSV(extrapolated), (m_ext_p, m0_p, p, p_inv, l0)
+        return _vars.SSV(extrapolated), (p, p_inv, l0)
 
     def smoother_begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -103,7 +103,7 @@ class _IBM(_extra.Extrapolation):
         )
 
     def filter_complete(self, ssv, extra, /, output_scale):
-        _, _, p, p_inv, l0 = extra  # todo: remove those unneeded caches
+        p, p_inv, l0 = extra  # todo: remove those unneeded caches
         m_ext = ssv.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
