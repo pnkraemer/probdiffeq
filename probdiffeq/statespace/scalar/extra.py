@@ -103,7 +103,7 @@ class _IBM(_extra.Extrapolation):
         )
 
     def filter_complete(self, ssv, extra, /, output_scale):
-        p, p_inv, l0 = extra  # todo: remove those unneeded caches
+        p, p_inv, l0 = extra
         m_ext = ssv.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
