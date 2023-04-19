@@ -69,5 +69,5 @@ class Extrapolation(Generic[S, C]):
     def init_error_estimate(self) -> jax.Array:
         raise NotImplementedError
 
-    def init_conditional(self, ssv_proto):
+    def smoother_init_conditional(self, ssv_proto):
         raise NotImplementedError

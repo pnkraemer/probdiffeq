@@ -57,7 +57,7 @@ class _IBM(_extra.Extrapolation):
         rv = _vars.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        cond = self.init_conditional(rv_proto=rv)
+        cond = self.smoother_init_conditional(rv_proto=rv)
         return _collections.MarkovSequence(init=rv, backward_model=cond)
 
     def filter_init(self, sol, /):
@@ -143,7 +143,7 @@ class _IBM(_extra.Extrapolation):
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.SSV(extrapolated), bw_model
 
-    def init_conditional(self, rv_proto):
+    def smoother_init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return _conds.ConditionalHiddenState(op, noise=noi)

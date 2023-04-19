@@ -62,8 +62,10 @@ class _BlockDiag(_extra.Extrapolation):
         fn = jax.vmap(type(self.extra).smoother_complete)
         return fn(self.extra, ssv, extra, output_scale)
 
-    def init_conditional(self, rv_proto):
-        return jax.vmap(type(self.extra).init_conditional)(self.extra, rv_proto)
+    def smoother_init_conditional(self, rv_proto):
+        return jax.vmap(type(self.extra).smoother_init_conditional)(
+            self.extra, rv_proto
+        )
 
     def filter_solution_from_tcoeffs(self, taylor_coefficients, /):
         solution_fn = jax.vmap(type(self.extra).filter_solution_from_tcoeffs)
