@@ -86,11 +86,25 @@ class Smoother(_strategy.Strategy):
         # The latter extrapolation is discarded in favour of s1.marginals_filtered,
         # but the backward transition is kept.
 
-        # Extrapolate from t0 to t, and from t to t1
+        # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
         s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
         state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
         backward_model1 = state1.extra
 
+        # Marginalise from t1 to t to obtain the interpolated solution.
+        rv_at_t = backward_model1.marginalise(s1.ssv.hidden_state)
+        mseq_at_t = MarkovSequence(init=rv_at_t, backward_model=s_t.extra)
+        ssv, extra = self.extrapolation.smoother_init(mseq_at_t)
+        state_at_t = _SmState(
+            t=t,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            corr=jax.tree_util.tree_map(jnp.empty_like, s1.corr),
+            extra=extra,
+        )
+
+        # The state at t1 gets a new backward model; it must remember how to
+        # get back to t, not to t0.
         s_1 = _SmState(
             t=s1.t,
             u=s1.u,
@@ -98,7 +112,7 @@ class Smoother(_strategy.Strategy):
             corr=s1.corr,
             extra=backward_model1,
         )
-        return InterpRes(accepted=s_1, solution=s_t, previous=s_t)
+        return InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
     def offgrid_marginals(
         self,
@@ -266,33 +280,36 @@ class FixedPointSmoother(_strategy.Strategy):
         # quantity of interest", and this is what we are interested in.
         # The rest remains the same as for the smoother.
 
-        # From s0.t to t
-        s_t = self._interpolate_from_to_fn(
-            s0=s0,
-            output_scale=output_scale,
+        # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
+        s_t = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
+        state1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
+        bw_model_qoi_to_t = s0.extra.merge_with_incoming_conditional(s_t.extra)
+        bw_model_t_to_t1 = state1.extra
+
+        # Marginalise from t1 to t to obtain the interpolated solution.
+        rv_at_t = bw_model_t_to_t1.marginalise(s1.ssv.hidden_state)
+        mseq_at_t = MarkovSequence(init=rv_at_t, backward_model=bw_model_qoi_to_t)
+        ssv, extra = self.extrapolation.fixpt_init(mseq_at_t)
+
+        state_at_t = _SmState(
             t=t,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            corr=jax.tree_util.tree_map(jnp.empty_like, s1.corr),
+            extra=extra,
         )
-        extra = s0.extra.merge_with_incoming_conditional(s_t.extra)
-        solution = _SmState(
-            t=s_t.t,
-            u=s_t.u,
-            ssv=s_t.ssv,
-            extra=extra,  # new
-            corr=s_t.corr,
-        )
+        prev_at_t = self._duplicate_with_unit_backward_model(s_t)
 
-        previous = self._duplicate_with_unit_backward_model(solution)
-
-        s_1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
-        accepted = _SmState(
+        # The state at t1 gets a new backward model; it must remember how to
+        # get back to t, not to t0.
+        s_1 = _SmState(
             t=s1.t,
             u=s1.u,
             ssv=s1.ssv,
             corr=s1.corr,
-            extra=s_1.extra,  # new!
+            extra=bw_model_t_to_t1,
         )
-
-        return InterpRes(accepted=accepted, solution=solution, previous=previous)
+        return InterpRes(accepted=s_1, solution=state_at_t, previous=prev_at_t)
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
