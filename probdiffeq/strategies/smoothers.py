@@ -188,6 +188,37 @@ class FixedPointSmoother(_strategy.Strategy):
 
     """
 
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
+        seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
+        sol = SmootherSol(seq)
+        marginals = seq.init
+        u = taylor_coefficients[0]
+        return u, marginals, sol
+
+    def init(self, t, posterior, /) -> _SmState:
+        ssv, extra = self.extrapolation.smoother_init(posterior.rand)
+        ssv, corr = self.correction.init(ssv)
+        return _SmState(
+            t=t,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            extra=extra,
+            corr=corr,
+        )
+
+    def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
+        ssv, extra = self.extrapolation.smoother_begin(state.ssv, state.extra, dt=dt)
+        ssv, corr = self.correction.begin(
+            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
+        )
+        return _SmState(
+            t=state.t + dt,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            extra=extra,
+            corr=corr,
+        )
+
     def complete(self, state, /, *, output_scale, vector_field, parameters):
         ssv, extra = self.extrapolation.smoother_complete(
             state.ssv, state.extra, output_scale=output_scale
@@ -262,37 +293,6 @@ class FixedPointSmoother(_strategy.Strategy):
         )
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
-
-    def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.smoother_init(posterior.rand)
-        ssv, corr = self.correction.init(ssv)
-        return _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
-
-    def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.smoother_begin(state.ssv, state.extra, dt=dt)
-        ssv, corr = self.correction.begin(
-            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
-        )
-        return _SmState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
-
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
-        sol = SmootherSol(seq)
-        marginals = seq.init
-        u = taylor_coefficients[0]
-        return u, marginals, sol
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
