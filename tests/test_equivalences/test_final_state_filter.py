@@ -4,7 +4,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import controls, ivpsolve, ivpsolvers
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
@@ -24,8 +24,11 @@ def strategy_pair_fixedpoint_smoother():
 
 @testing.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-def test_final_state_equal_to_filter(ode_problem, fil, smo):
-    """Filters and smoothers should compute the same terminal values."""
+@testing.parametrize(
+    "ctrl", [controls.IntegralClipped(), controls.ProportionalIntegralClipped()]
+)
+def test_final_state_equal_to_filter_clipped_control(ode_problem, fil, smo, ctrl):
+    """Assert equality for when a clipped controller is used."""
     atol, rtol = 1e-2, 1e-1
     filter_solution = ivpsolve.simulate_terminal_values(
         ode_problem.vector_field,
@@ -36,6 +39,7 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
         solver=ivpsolvers.DynamicSolver(strategy=fil),
         atol=atol,
         rtol=rtol,
+        control=ctrl,
     )
     smoother_solution = ivpsolve.simulate_terminal_values(
         ode_problem.vector_field,
@@ -46,6 +50,7 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
         solver=ivpsolvers.DynamicSolver(strategy=smo),
         atol=atol,
         rtol=rtol,
+        control=ctrl,
     )
 
     @jax.vmap
@@ -54,17 +59,75 @@ def test_final_state_equal_to_filter(ode_problem, fil, smo):
 
     assert _tree_all_allclose(filter_solution.t, smoother_solution.t)
     assert _tree_all_allclose(filter_solution.u, smoother_solution.u)
-    assert _tree_all_allclose(
-        filter_solution.marginals.mean,
-        smoother_solution.marginals.mean,
+
+    filter_scale = filter_solution.output_scale
+    smoother_scale = smoother_solution.output_scale
+    assert _tree_all_allclose(filter_scale, smoother_scale)
+
+    filter_marginals = filter_solution.marginals
+    smoother_marginals = smoother_solution.marginals
+    assert _tree_all_allclose(filter_marginals.mean, smoother_marginals.mean)
+
+    filter_cov_sqrtm = filter_marginals.cov_sqrtm_lower
+    smoother_cov_sqrtm = smoother_marginals.cov_sqrtm_lower
+    assert _tree_all_allclose(cov(filter_cov_sqrtm), cov(smoother_cov_sqrtm))
+
+
+@testing.parametrize_with_cases("fil, smo", cases=".", prefix="strategy_pair_")
+@testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
+@testing.parametrize("ctrl", [controls.Integral(), controls.ProportionalIntegral()])
+def test_final_state_not_equal_to_filter_nonclipped_control(
+    ode_problem, fil, smo, ctrl
+):
+    """Assert inequality for when a non-clipped controller is used.
+
+    Why inequality? Because non-clipped control requires interpolation around 't1',
+    and filters and smoothers interpolate differently.
+    """
+    atol, rtol = 1e-2, 1e-1
+    filter_solution = ivpsolve.simulate_terminal_values(
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
+        solver=ivpsolvers.DynamicSolver(strategy=fil),
+        atol=atol,
+        rtol=rtol,
+        control=ctrl,
     )
-    assert _tree_all_allclose(
-        cov(filter_solution.marginals.cov_sqrtm_lower),
-        cov(smoother_solution.marginals.cov_sqrtm_lower),
+    smoother_solution = ivpsolve.simulate_terminal_values(
+        ode_problem.vector_field,
+        ode_problem.initial_values,
+        t0=ode_problem.t0,
+        t1=ode_problem.t1,
+        parameters=ode_problem.args,
+        solver=ivpsolvers.DynamicSolver(strategy=smo),
+        atol=atol,
+        rtol=rtol,
+        control=ctrl,
     )
-    assert _tree_all_allclose(
-        filter_solution.output_scale, smoother_solution.output_scale
-    )
+
+    @jax.vmap
+    def cov(x):
+        return x @ x.T
+
+    # Equal:
+    assert _tree_all_allclose(filter_solution.t, smoother_solution.t)
+
+    filter_scale = filter_solution.output_scale
+    smoother_scale = smoother_solution.output_scale
+    assert _tree_all_allclose(filter_scale, smoother_scale)
+
+    # Not-equal:
+    assert not _tree_all_allclose(filter_solution.u, smoother_solution.u)
+    filter_marginals = filter_solution.marginals
+    smoother_marginals = smoother_solution.marginals
+    assert not _tree_all_allclose(filter_marginals.mean, smoother_marginals.mean)
+
+    filter_cov_sqrtm = filter_marginals.cov_sqrtm_lower
+    smoother_cov_sqrtm = smoother_marginals.cov_sqrtm_lower
+    assert not _tree_all_allclose(cov(filter_cov_sqrtm), cov(smoother_cov_sqrtm))
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):
