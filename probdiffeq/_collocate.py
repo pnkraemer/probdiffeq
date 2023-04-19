@@ -64,7 +64,7 @@ def simulate_terminal_values(
         parameters=parameters,
         while_loop_fn=while_loop_fn,
     )
-    (sol_solver, _sol_control) = adaptive_solver.extract_at_terminal_values(solution)
+    (sol_solver, _sol_control) = adaptive_solver.extract(solution)
     return sol_solver
 
 
