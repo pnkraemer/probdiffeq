@@ -66,7 +66,6 @@ class Solver(abc.ABC):
         u, marginals, posterior = self.strategy.solution_from_tcoeffs(
             taylor_coefficients
         )
-        # todo: remove!?
         output_scale = self.strategy.promote_output_scale(output_scale)
         return solution.Solution(
             t=t,
@@ -302,7 +301,9 @@ class MLESolver(Solver):
     def extract_at_terminal_values(self, state: _State, /):
         # 'state' is not batched. Thus, output scale is a scalar.
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
-        s = state.output_scale_calibrated
+
+        output_scale = self.strategy.extract_output_scale(state.output_scale_calibrated)
+        s = output_scale * jnp.ones_like(state.output_scale_prior)
         state = self._rescale_covs(state, output_scale=s)
 
         t, posterior = self.strategy.extract(state.strategy)

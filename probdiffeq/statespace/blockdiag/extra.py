@@ -108,6 +108,10 @@ class _BlockDiag(_extra.Extrapolation):
         fn_vmap = jax.vmap(type(self.extra).promote_output_scale)
         return fn_vmap(self.extra, output_scale)
 
+    def extract_output_scale(self, output_scale):
+        fn_vmap = jax.vmap(type(self.extra).extract_output_scale)
+        return fn_vmap(self.extra, output_scale)
+
     def complete_with_reversal(self, output_begin, /, s0, output_scale):
         fn = jax.vmap(type(self.extra).complete_with_reversal)
         return fn(self.extra, output_begin, s0, output_scale)

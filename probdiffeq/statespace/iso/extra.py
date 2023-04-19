@@ -88,6 +88,11 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def promote_output_scale(self, output_scale):
         return output_scale
 
+    def extract_output_scale(self, output_scale):
+        if output_scale.ndim > 0:
+            return output_scale[-1]
+        return output_scale
+
     def filter_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
