@@ -103,7 +103,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
         ssv = _vars.IsoSSV(ext)
-        cache = (m_ext_p, m0_p, p, p_inv, l0)
+        cache = (p, p_inv, l0)
         return ssv, cache
 
     def smoother_begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
@@ -125,7 +125,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         )
 
     def filter_complete(self, st, ex, /, output_scale):
-        _, _, p, p_inv, l0 = ex
+        p, p_inv, l0 = ex
         m_ext = st.hidden_state.mean
 
         l0_p = p_inv[:, None] * l0

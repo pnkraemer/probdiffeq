@@ -146,7 +146,7 @@ class _DenseIBM(_extra.Extrapolation):
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
-        cache = (m_ext_p, m0_p, p, p_inv, l0)
+        cache = (p, p_inv, l0)
         ssv = _vars.DenseSSV(ext, target_shape=shape)
         return ssv, cache
 
@@ -176,7 +176,7 @@ class _DenseIBM(_extra.Extrapolation):
         return p, p_inv
 
     def filter_complete(self, ssv, extra, /, output_scale):
-        _, _, p, p_inv, l0 = extra
+        p, p_inv, l0 = extra
         m_ext = ssv.hidden_state.mean
         l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
             R_stack=(
