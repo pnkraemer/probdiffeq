@@ -62,13 +62,6 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, solv
     # which are equal modulo orthogonal transformation
     # (they are equal in square, though).
     # The backward models are not expected to be equal.
-    print(fixedpoint_smo_sol.marginals.mean)
-    print()
-    print()
-    print(dense.mean)
-    print()
-    print()
-    print(fixedpoint_smo_sol.posterior.rand.init.mean - dense.mean)
     assert jnp.allclose(fixedpoint_smo_sol.t, ts[1:-1])
     assert jnp.allclose(fixedpoint_smo_sol.u, u)
     assert jnp.allclose(fixedpoint_smo_sol.marginals.mean, dense.mean)
