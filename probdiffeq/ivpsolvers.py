@@ -1,6 +1,5 @@
 """Calibrated IVP solvers."""
 
-import abc
 from typing import Any, NamedTuple
 
 import jax
@@ -31,7 +30,7 @@ class _State(NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class Solver(abc.ABC):
+class Solver:
     """Interface for initial value problem solvers."""
 
     def __init__(self, strategy):
@@ -42,11 +41,9 @@ class Solver(abc.ABC):
 
     #  methods
 
-    @abc.abstractmethod
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def extract(self, state: _State, /):
         raise NotImplementedError
 
