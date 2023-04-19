@@ -1,6 +1,5 @@
 """''Global'' estimation: smoothing."""
 
-import abc
 from typing import Any, NamedTuple, Tuple
 
 import jax
@@ -54,34 +53,6 @@ class _SmState(NamedTuple):
 
 
 class _SmootherCommon(_strategy.Strategy):
-    # Inherited abstract methods
-
-    @abc.abstractmethod
-    def case_interpolate(
-        self, t, *, s0: _SmState, s1: _SmState, output_scale
-    ) -> InterpRes[_SmState]:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def case_right_corner(
-        self, t, *, s0: _SmState, s1: _SmState, output_scale
-    ) -> InterpRes[_SmState]:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def offgrid_marginals(
-        self,
-        *,
-        t,
-        marginals,
-        posterior: SmootherSol,
-        posterior_previous: SmootherSol,
-        t0,
-        t1,
-        output_scale,
-    ):
-        raise NotImplementedError
-
     def init(self, t, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.smoother_init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
