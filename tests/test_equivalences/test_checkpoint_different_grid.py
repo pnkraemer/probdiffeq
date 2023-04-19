@@ -19,10 +19,18 @@ def smoother_pair_smoother_and_fixedpoint():
     return smoothers.Smoother(*impl), smoothers.FixedPointSmoother(*impl)
 
 
+_ALL_IVPSOLVERS = [
+    ivpsolvers.DynamicSolver,
+    ivpsolvers.MLESolver,
+    ivpsolvers.CalibrationFreeSolver,
+]
+
+
 @testing.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
-@testing.parametrize("k", [1, 3])  # k * N // 2 off-grid points
+@testing.parametrize("k", [1, 3], ids=["1xPts", "3xPts"])  # k * N // 2 off-grid points
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
+@testing.parametrize("solver", _ALL_IVPSOLVERS)
+def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, solver, k):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \
      the results should be identical."""
@@ -36,16 +44,16 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
         *args,
         t0=ode_problem.t0,
         t1=ode_problem.t1,
-        solver=ivpsolvers.DynamicSolver(strategy=smo),
+        solver=solver(strategy=smo),
         **kwargs
     )
     ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=k * len(smo_sol.t) // 2)
     u, dense = solution.offgrid_marginals_searchsorted(
-        ts=ts[1:-1], solution=smo_sol, solver=ivpsolvers.DynamicSolver(strategy=smo)
+        ts=ts[1:-1], solution=smo_sol, solver=solver(strategy=smo)
     )
 
     fp_smo_sol = ivpsolve.solve_and_save_at(
-        *args, save_at=ts, solver=ivpsolvers.DynamicSolver(strategy=fp_smo), **kwargs
+        *args, save_at=ts, solver=solver(strategy=fp_smo), **kwargs
     )
     fixedpoint_smo_sol = fp_smo_sol[1:-1]  # reference is defined only on the interior
 
@@ -54,6 +62,13 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     # which are equal modulo orthogonal transformation
     # (they are equal in square, though).
     # The backward models are not expected to be equal.
+    print(fixedpoint_smo_sol.marginals.mean)
+    print()
+    print()
+    print(dense.mean)
+    print()
+    print()
+    print(fixedpoint_smo_sol.posterior.rand.init.mean - dense.mean)
     assert jnp.allclose(fixedpoint_smo_sol.t, ts[1:-1])
     assert jnp.allclose(fixedpoint_smo_sol.u, u)
     assert jnp.allclose(fixedpoint_smo_sol.marginals.mean, dense.mean)
