@@ -302,11 +302,6 @@ class AdaptiveIVPSolver(Generic[T]):
         control_extract = self.control.extract_dt_from_state(state.control)
         return solver_extract, control_extract
 
-    def extract_at_terminal_values(self, state: _AdaptiveState, /):
-        solver_extract = self.solver.extract_at_terminal_values(state.solution)
-        control_extract = self.control.extract_dt_from_state(state.control)
-        return solver_extract, control_extract
-
 
 def _inf_like(tree):
     return jax.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)

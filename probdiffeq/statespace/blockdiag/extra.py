@@ -107,3 +107,8 @@ class _BlockDiag(_extra.Extrapolation):
         output_scale = output_scale * jnp.ones(self.ode_shape)
         fn_vmap = jax.vmap(type(self.extra).promote_output_scale)
         return fn_vmap(self.extra, output_scale)
+
+    def extract_output_scale(self, output_scale):
+        if output_scale.ndim > 1:
+            return output_scale[-1, :]
+        return output_scale

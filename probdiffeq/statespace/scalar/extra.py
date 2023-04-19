@@ -160,3 +160,8 @@ class _IBM(_extra.Extrapolation):
 
     def promote_output_scale(self, output_scale):
         return output_scale
+
+    def extract_output_scale(self, output_scale):
+        if output_scale.ndim > 0:
+            return output_scale[-1]
+        return output_scale

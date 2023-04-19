@@ -243,5 +243,14 @@ class _DenseIBM(_extra.Extrapolation):
             target_shape=rv_proto.target_shape,
         )
 
+    # todo: the below two are a bit of an init/extract pair.
+    #  It seems like this should happen in a "calibration" algorithm, right?
+    #  Probably on ivpsolver-level. But the difficulty will be that
+    #  implementing these two functions will require the shape of the state-space.
     def promote_output_scale(self, output_scale):
+        return output_scale
+
+    def extract_output_scale(self, output_scale):
+        if output_scale.ndim > 0:
+            return output_scale[-1]
         return output_scale
