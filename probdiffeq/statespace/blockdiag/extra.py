@@ -112,7 +112,3 @@ class _BlockDiag(_extra.Extrapolation):
         if output_scale.ndim > 1:
             return output_scale[-1, :]
         return output_scale
-
-    def complete_with_reversal(self, output_begin, /, s0, output_scale):
-        fn = jax.vmap(type(self.extra).complete_with_reversal)
-        return fn(self.extra, output_begin, s0, output_scale)
