@@ -116,7 +116,7 @@ def fixture_solution_save_at(setup):
         strategy_factory=setup.strategy_fn,
         impl_factory=setup.impl_fn,
         ode_shape=ode_shape,
-        num_derivatives=2,
+        num_derivatives=4,
     )
 
     t0, t1 = setup.ivp.t0, setup.ivp.t1
