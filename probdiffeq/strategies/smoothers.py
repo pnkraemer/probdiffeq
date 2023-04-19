@@ -140,9 +140,7 @@ class Smoother(_SmootherCommon):
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
-        # todo: is this duplication unnecessary?
-        accepted = self._duplicate_with_unit_backward_model(s1)
-        return InterpRes(accepted=accepted, solution=s1, previous=s1)
+        return InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
