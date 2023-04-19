@@ -92,7 +92,7 @@ class IsoNormalHiddenState(_collections.Normal):
         return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
     def extract_qoi_from_sample(self, u, /):
-        return u[0, :]
+        return u[..., 0, :]
 
 
 @jax.tree_util.register_pytree_node_class

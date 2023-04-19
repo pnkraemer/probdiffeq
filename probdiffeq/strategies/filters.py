@@ -49,8 +49,15 @@ class FilterDist(_strategy.Posterior[S]):
     def sample(self, key, *, shape):
         raise NotImplementedError
 
+    def marginals_at_terminal_values(self):
+        marginals = self.rand
+        u = marginals.extract_qoi_from_sample(marginals.mean)
+        return u, marginals
 
-_SolType = Tuple[float, jax.Array, jax.Array, FilterDist]
+    def marginals(self):
+        marginals = self.rand
+        u = marginals.extract_qoi_from_sample(marginals.mean)
+        return u, marginals
 
 
 @jax.tree_util.register_pytree_node_class
@@ -64,29 +71,18 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def init(self, t, u, _marginals, solution) -> _FiState:
-        ssv, extra = self.extrapolation.filter_init(solution.rv)
+    def init(self, t, solution) -> _FiState:
+        ssv, extra = self.extrapolation.filter_init(solution.rand)
         ssv, corr = self.correction.init(ssv)
-        return _FiState(
-            t=t,
-            u=u,
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
+        return _FiState(t=t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
 
-    def extract(self, posterior: _FiState, /) -> _SolType:
+    def extract(self, posterior: _FiState, /):
         t = posterior.t
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
         rv = self.extrapolation.filter_extract(ssv, posterior.extra)
 
         solution = FilterDist(rv)  # type: ignore
-        marginals = rv
-        u = posterior.u
-        return t, u, marginals, solution
-
-    def extract_at_terminal_values(self, posterior: _FiState, /) -> _SolType:
-        return self.extract(posterior)
+        return t, solution
 
     def case_right_corner(
         self, t, *, s0: _FiState, s1: _FiState, output_scale
@@ -127,12 +123,12 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     ) -> Tuple[jax.Array, jax.Array]:
         _acc, sol, _prev = self.case_interpolate(
             t=t,
-            s1=self.init(t1, None, None, posterior),
-            s0=self.init(t0, None, None, posterior_previous),
+            s1=self.init(t1, posterior),
+            s0=self.init(t0, posterior_previous),
             output_scale=output_scale,
         )
-        _, u, marginals, _ = self.extract(sol)
-        return u, marginals
+        t, posterior = self.extract(sol)
+        return posterior.marginals()
 
     def begin(self, state: _FiState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.filter_begin(state.ssv, state.extra, dt=dt)
@@ -140,25 +136,14 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv, state.corr, vector_field=vector_field, t=state.t + dt, p=parameters
         )
         return _FiState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            corr=corr,
-            extra=extra,
+            t=state.t + dt, u=ssv.extract_qoi(), ssv=ssv, corr=corr, extra=extra
         )
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
         ssv, extra = self.extrapolation.filter_complete(
             state.ssv, state.extra, output_scale=output_scale
         )
-
         ssv, corr = self.correction.complete(
             ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
-        return _FiState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
+        return _FiState(t=state.t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)

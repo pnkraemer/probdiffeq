@@ -13,7 +13,6 @@ from probdiffeq._collections import InterpRes  # simplify type signatures
 class _State(NamedTuple):
     """Solver state."""
 
-    # Same as in solution.Solution()
     strategy: Any
 
     error_estimate: Any
@@ -48,11 +47,11 @@ class Solver(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /):
         raise NotImplementedError
 
     def solution_from_tcoeffs(
@@ -78,15 +77,15 @@ class Solver(abc.ABC):
             num_steps=num_steps,
         )
 
-    def init(self, sol, /) -> _State:
+    def init(self, t, posterior, /, output_scale, num_steps) -> _State:
         error_estimate = self.strategy.init_error_estimate()
-        strategy_state = self.strategy.init(sol.t, sol.u, sol.marginals, sol.posterior)
+        strategy_state = self.strategy.init(t, posterior)
         return _State(
             error_estimate=error_estimate,
             strategy=strategy_state,
-            output_scale_prior=sol.output_scale,
-            output_scale_calibrated=sol.output_scale,
-            num_steps=sol.num_steps,
+            output_scale_prior=output_scale,
+            output_scale_calibrated=output_scale,
+            num_steps=num_steps,
         )
 
     def interpolate(self, *, s0: _State, s1: _State, t):
@@ -186,32 +185,13 @@ class CalibrationFreeSolver(Solver):
             num_steps=state.num_steps + 1,
         )
 
-    def extract(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract(state.strategy)
-        return solution.Solution(
-            t=t,
-            u=u,  # new!
-            marginals=marginals,  # new!
-            posterior=posterior,
-            # _prior and _calibrated are identical.
-            #  but we use _prior because we might remove the _calibrated
-            #  value in the future.
-            output_scale=state.output_scale_prior,
-            num_steps=state.num_steps,
-        )
+    def extract(self, state: _State, /):
+        t, posterior = self.strategy.extract(state.strategy)
+        return t, posterior, state.output_scale_prior, state.num_steps
 
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
-            state.strategy
-        )
-        return solution.Solution(
-            t=t,
-            u=u,  # new!
-            marginals=marginals,  # new!
-            posterior=posterior,
-            output_scale=state.output_scale_prior,
-            num_steps=state.num_steps,
-        )
+    def extract_at_terminal_values(self, state: _State, /):
+        #  todo: remove this function soon (once MLESolver has the same redundancy)
+        return self.extract(state)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -245,29 +225,13 @@ class DynamicSolver(Solver):
             num_steps=state.num_steps + 1,
         )
 
-    def extract(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract(state.strategy)
-        return solution.Solution(
-            t=t,
-            u=u,  # new!
-            marginals=marginals,  # new!
-            posterior=posterior,
-            output_scale=state.output_scale_calibrated,
-            num_steps=state.num_steps,
-        )
+    def extract(self, state: _State, /):
+        t, posterior = self.strategy.extract(state.strategy)
+        return t, posterior, state.output_scale_calibrated, state.num_steps
 
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
-        t, u, marginals, posterior = self.strategy.extract_at_terminal_values(
-            state.strategy
-        )
-        return solution.Solution(
-            t=t,
-            u=u,  # new!
-            marginals=marginals,  # new!
-            posterior=posterior,
-            output_scale=state.output_scale_calibrated,
-            num_steps=state.num_steps,
-        )
+    def extract_at_terminal_values(self, state: _State, /):
+        #  todo: remove this function soon (once MLESolver has the same redundancy)
+        return self.extract(state)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -323,7 +287,7 @@ class MLESolver(Solver):
         sum_updated = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
         return sum_updated / jnp.sqrt(n + 1)
 
-    def extract(self, state: _State, /) -> solution.Solution:
+    def extract(self, state: _State, /):
         # 'state' is batched. Thus, output scale is an array instead of a scalar.
 
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
@@ -332,32 +296,17 @@ class MLESolver(Solver):
         s = state.output_scale_calibrated[-1] * jnp.ones_like(state.output_scale_prior)
         state = self._rescale_covs(state, output_scale=s)
 
-        t, u, marginals, posterior = self.strategy.extract(state.strategy)
-        return solution.Solution(
-            t=t,
-            u=state.u,
-            marginals=marginals,
-            posterior=posterior,
-            output_scale=state.output_scale_calibrated,
-            num_steps=state.num_steps,
-        )
+        t, posterior = self.strategy.extract(state.strategy)
+        return t, posterior, state.output_scale_calibrated, state.num_steps
 
-    def extract_at_terminal_values(self, state: _State, /) -> solution.Solution:
+    def extract_at_terminal_values(self, state: _State, /):
         # 'state' is not batched. Thus, output scale is a scalar.
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
         s = state.output_scale_calibrated
         state = self._rescale_covs(state, output_scale=s)
 
-        _sol = self.strategy.extract_at_terminal_values(state.strategy)
-        t, u, marginals, posterior = _sol
-        return solution.Solution(
-            t=t,
-            u=state.u,
-            marginals=marginals,
-            posterior=posterior,
-            output_scale=state.output_scale_calibrated,
-            num_steps=state.num_steps,
-        )
+        t, posterior = self.strategy.extract(state.strategy)
+        return t, posterior, state.output_scale_calibrated, state.num_steps
 
     def _rescale_covs(self, state, /, *, output_scale):
         # todo: these calls to *.scale_covariance are a bit cumbersome,

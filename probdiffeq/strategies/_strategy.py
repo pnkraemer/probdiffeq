@@ -18,18 +18,18 @@ R = TypeVar("R")
 
 
 class Posterior(abc.ABC, Generic[R]):
-    def __init__(self, rv: S, /):
-        self.rv = rv
+    def __init__(self, rand: R, /):
+        self.rand = rand
 
     def tree_flatten(self):
-        children = (self.rv,)
+        children = (self.rand,)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (rv,) = children
-        return cls(rv)
+        (rand,) = children
+        return cls(rand)
 
     @abc.abstractmethod
     def sample(self, key, *, shape):
@@ -55,15 +55,11 @@ class Strategy(abc.ABC, Generic[S, P]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init(self, t, u, marginals, solution: P, /) -> S:
+    def init(self, t, solution: P, /) -> S:
         raise NotImplementedError
 
     @abc.abstractmethod
     def extract(self, state: S, /) -> P:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_at_terminal_values(self, state: S, /) -> P:
         raise NotImplementedError
 
     @abc.abstractmethod
