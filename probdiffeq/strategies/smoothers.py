@@ -188,8 +188,39 @@ class FixedPointSmoother(_strategy.Strategy):
 
     """
 
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
+        seq = self.extrapolation.fixpt_solution_from_tcoeffs(taylor_coefficients)
+        sol = SmootherSol(seq)
+        marginals = seq.init
+        u = taylor_coefficients[0]
+        return u, marginals, sol
+
+    def init(self, t, posterior, /) -> _SmState:
+        ssv, extra = self.extrapolation.fixpt_init(posterior.rand)
+        ssv, corr = self.correction.init(ssv)
+        return _SmState(
+            t=t,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            extra=extra,
+            corr=corr,
+        )
+
+    def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
+        ssv, extra = self.extrapolation.fixpt_begin(state.ssv, state.extra, dt=dt)
+        ssv, corr = self.correction.begin(
+            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
+        )
+        return _SmState(
+            t=state.t + dt,
+            u=ssv.extract_qoi(),
+            ssv=ssv,
+            extra=extra,
+            corr=corr,
+        )
+
     def complete(self, state, /, *, output_scale, vector_field, parameters):
-        ssv, extra = self.extrapolation.smoother_complete(
+        ssv, extra = self.extrapolation.fixpt_complete(
             state.ssv, state.extra, output_scale=output_scale
         )
         bw_model, *_ = state.extra
@@ -263,40 +294,9 @@ class FixedPointSmoother(_strategy.Strategy):
 
         return InterpRes(accepted=accepted, solution=solution, previous=previous)
 
-    def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.smoother_init(posterior.rand)
-        ssv, corr = self.correction.init(ssv)
-        return _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
-
-    def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.smoother_begin(state.ssv, state.extra, dt=dt)
-        ssv, corr = self.correction.begin(
-            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
-        )
-        return _SmState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
-
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
-        sol = SmootherSol(seq)
-        marginals = seq.init
-        u = taylor_coefficients[0]
-        return u, marginals, sol
-
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
-        mseq = self.extrapolation.smoother_extract(ssv, state.extra)
+        mseq = self.extrapolation.fixpt_extract(ssv, state.extra)
         sol = SmootherSol(mseq)  # type: ignore
         return state.t, sol
 
@@ -304,8 +304,8 @@ class FixedPointSmoother(_strategy.Strategy):
 
     def _interpolate_from_to_fn(self, *, s0, output_scale, t):
         dt = t - s0.t
-        ssv, extra = self.extrapolation.smoother_begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.smoother_complete(
+        ssv, extra = self.extrapolation.fixpt_begin(s0.ssv, s0.extra, dt=dt)
+        ssv, extra = self.extrapolation.fixpt_complete(
             ssv, extra, output_scale=output_scale
         )
         return _SmState(
@@ -318,7 +318,7 @@ class FixedPointSmoother(_strategy.Strategy):
 
     # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
-        extra = self.extrapolation.smoother_init_conditional(rv_proto=state.extra.noise)
+        extra = self.extrapolation.fixpt_init_conditional(rv_proto=state.extra.noise)
         return _SmState(
             t=state.t,
             u=state.u,
