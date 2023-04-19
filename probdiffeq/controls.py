@@ -1,6 +1,5 @@
 """Step-size control algorithms."""
 
-import abc
 import dataclasses
 from typing import Generic, NamedTuple, TypeVar
 
@@ -11,27 +10,23 @@ S = TypeVar("S")
 """Controller state."""
 
 
-class Control(abc.ABC, Generic[S]):
+class Control(Generic[S]):
     """Interface for control-algorithms."""
 
-    @abc.abstractmethod
     def init_state_from_dt(self, dt0: float) -> S:
         """Initialise the controller state."""
         raise NotImplementedError
 
-    @abc.abstractmethod
     def clip(self, t: float, t1: float, state: S) -> S:
         """(Optionally) clip the current step to not exceed t1."""
         raise NotImplementedError
 
-    @abc.abstractmethod
     def apply(
         self, error_normalised: float, error_contraction_rate: float, state: S
     ) -> S:
         r"""Propose a time-step $\Delta t$."""
         raise NotImplementedError
 
-    @abc.abstractmethod
     def extract_dt_from_state(self, state: S) -> jax.Array:
         """Extract the time-step from the controller state."""
         raise NotImplementedError
@@ -71,7 +66,6 @@ class _ProportionalIntegralCommon(Control[_PIState]):
     def init_state_from_dt(self, dt0):
         return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
 
-    @abc.abstractmethod
     def clip(self, t, t1, state: _PIState) -> _PIState:
         raise NotImplementedError
 
@@ -151,7 +145,6 @@ class _IntegralCommon(Control[_IState]):
     def init_state_from_dt(self, dt0) -> _IState:
         return _IState(dt0)
 
-    @abc.abstractmethod
     def clip(self, t, t1, state: _IState) -> _IState:
         raise NotImplementedError
 
