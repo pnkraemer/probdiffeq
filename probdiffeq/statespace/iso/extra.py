@@ -81,9 +81,8 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
 
     def fixpt_init(self, sol, /):
-        # todo: reset backward model
         ssv = _vars.IsoSSV(sol.init)
-        cache = sol.backward_model
+        cache = self.fixpt_init_conditional(rv_proto=sol.backward_model.noise)
         return ssv, cache
 
     def fixpt_extract(self, ssv, ex, /):
@@ -227,7 +226,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return _conds.IsoConditionalHiddenState(op, noise=noi)
 
     def fixpt_init_conditional(self, rv_proto):
-        op = self._init_backward_transition()
+        op = jnp.eye(*self.a.shape)
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return _conds.IsoConditionalHiddenState(op, noise=noi)
 

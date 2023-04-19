@@ -130,7 +130,7 @@ def solve_and_save_at(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    t, posterior, output_scale, num_steps = _collocate.solve_and_save_at(
+    t, posterior, *_, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         t=sol.t,
         posterior=sol.posterior,
@@ -196,7 +196,7 @@ def solve_with_python_while_loop(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
+    t, posterior, *_, output_scale, num_steps = _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
         t=sol.t,
         posterior=sol.posterior,

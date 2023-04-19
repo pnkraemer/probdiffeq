@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import controls, ivpsolve, ivpsolvers, solution
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
@@ -29,26 +29,37 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, k):
     # smo_sol.t is an adaptive grid
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
+    import jax
 
-    args = (ode_problem.vector_field, ode_problem.initial_values)
-    kwargs = {"parameters": ode_problem.args, "atol": 1e-1, "rtol": 1e-1}
-    smo_sol = ivpsolve.solve_with_python_while_loop(
-        *args,
-        t0=ode_problem.t0,
-        t1=ode_problem.t1,
-        solver=ivpsolvers.DynamicSolver(strategy=smo),
-        **kwargs
-    )
-    ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=k * len(smo_sol.t) // 2)
-    u, dense = solution.offgrid_marginals_searchsorted(
-        ts=ts[1:-1], solution=smo_sol, solver=ivpsolvers.DynamicSolver(strategy=smo)
-    )
+    with jax.disable_jit():
+        args = (ode_problem.vector_field, ode_problem.initial_values)
+        kwargs = {"parameters": ode_problem.args, "atol": 1e-1, "rtol": 1e-1}
+        smo_sol = ivpsolve.solve_with_python_while_loop(
+            *args,
+            t0=ode_problem.t0,
+            t1=ode_problem.t1,
+            solver=ivpsolvers.DynamicSolver(strategy=smo),
+            control=controls.Integral(),
+            **kwargs
+        )
+        ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=k * len(smo_sol.t) // 2)
+        u, dense = solution.offgrid_marginals_searchsorted(
+            ts=ts[1:-1], solution=smo_sol, solver=ivpsolvers.DynamicSolver(strategy=smo)
+        )
 
-    fp_smo_sol = ivpsolve.solve_and_save_at(
-        *args, save_at=ts, solver=ivpsolvers.DynamicSolver(strategy=fp_smo), **kwargs
-    )
-    fixedpoint_smo_sol = fp_smo_sol[1:-1]  # reference is defined only on the interior
+        fp_smo_sol = ivpsolve.solve_and_save_at(
+            *args,
+            save_at=ts,
+            solver=ivpsolvers.DynamicSolver(strategy=fp_smo),
+            control=controls.Integral(),
+            **kwargs
+        )
+        fixedpoint_smo_sol = fp_smo_sol[
+            1:-1
+        ]  # reference is defined only on the interior
 
+        print(fp_smo_sol.u)
+        print(u)
     # Compare all attributes for equality,
     # except for the covariance matrix square roots
     # which are equal modulo orthogonal transformation

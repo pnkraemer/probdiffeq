@@ -29,14 +29,12 @@ class _AdaptiveState(Generic[S, C]):
         proposed: S,
         accepted: S,
         solution: S,
-        previous: S,
     ):
         self.error_norm_proposed = error_norm_proposed
         self.control = control
         self.proposed = proposed
         self.accepted = accepted
         self.solution = solution
-        self.previous = previous
 
     def __repr__(self):
         return (
@@ -46,7 +44,6 @@ class _AdaptiveState(Generic[S, C]):
             f"\n\tproposed={self.proposed},"
             f"\n\taccepted={self.accepted},"
             f"\n\tsolution={self.solution},"
-            f"\n\tprevious={self.previous},"
             "\n)"
         )
 
@@ -57,7 +54,6 @@ class _AdaptiveState(Generic[S, C]):
             self.proposed,
             self.accepted,
             self.solution,
-            self.previous,
         )
         aux = ()
         return children, aux
@@ -70,7 +66,6 @@ class _AdaptiveState(Generic[S, C]):
             proposed,
             accepted,
             solution,
-            previous,
         ) = children
         return cls(
             error_norm_proposed=error_norm_proposed,
@@ -78,7 +73,6 @@ class _AdaptiveState(Generic[S, C]):
             proposed=proposed,
             accepted=accepted,
             solution=solution,
-            previous=previous,
         )
 
 
@@ -159,32 +153,32 @@ class AdaptiveIVPSolver(Generic[T]):
         return self.solver.strategy.extrapolation.num_derivatives + 1
 
     @jax.jit
-    def init(self, t, posterior, output_scale, num_steps, dt0):
+    def init(self, sol, control_sol):
         """Initialise the IVP solver state."""
+        (t, posterior, t_accepted, posterior_accepted, output_scale, num_steps) = sol
         # Initialise the components
         state_solver = self.solver.init(t, posterior, output_scale, num_steps)
-        state_control = self.control.init_state_from_dt(dt0)
+        state_solver_accepted = self.solver.init(
+            t_accepted, posterior_accepted, output_scale, num_steps
+        )
+        state_solver_proposed = _inf_like(state_solver)
+        state_control = self.control.init_state_from_dt(*control_sol)
 
         # Initialise (prototypes for) proposed values
-        error_norm_proposed = self._normalise_error(
-            error_estimate=state_solver.error_estimate,
-            u=state_solver.u,
-            atol=self.atol,
-            rtol=self.rtol,
-            norm_ord=self.norm_ord,
-        )
+        error_norm_proposed = _inf_like(jnp.zeros((), dtype=float))
+        print(f"Initialising at {t}")
         return _AdaptiveState(
             error_norm_proposed=error_norm_proposed,
+            accepted=state_solver_accepted,
+            proposed=state_solver_proposed,
             solution=state_solver,
-            proposed=state_solver,
-            accepted=state_solver,
-            previous=state_solver,
             control=state_control,
         )
 
     @jax.jit
     def step(self, state, vector_field, t1, parameters):
         """Perform a full step (including acceptance/rejection)."""
+        print("Entering step")
         enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
         state = jax.lax.cond(
             enter_rejection_loop,
@@ -197,6 +191,7 @@ class AdaptiveIVPSolver(Generic[T]):
             lambda s: s,
             state,
         )
+        print(f"Am at {state.accepted.t, state.solution.t}")
 
         # todo: which output scale does this interpolation use?
         #  the MLE solver should use the prior one, but it looks like
@@ -206,12 +201,14 @@ class AdaptiveIVPSolver(Generic[T]):
         state = jax.lax.cond(
             state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
-            lambda s: s,
+            lambda s: self._accepted_as_solution(state=s),
             state,
         )
         return state
 
     def _rejection_loop(self, *, vector_field, state0, t1, parameters):
+        print(f"Entering rejection loop from {state0.accepted.t} to maximally {t1}")
+
         def cond_fn(x):
             proceed_iteration, _ = x
             return proceed_iteration
@@ -230,13 +227,12 @@ class AdaptiveIVPSolver(Generic[T]):
         def init(s):
             return True, s
 
-        _, state_new = self.while_loop_fn(cond_fn, body_fn, init(state0))
+        _proceed, state_new = self.while_loop_fn(cond_fn, body_fn, init(state0))
         return _AdaptiveState(
             error_norm_proposed=_inf_like(state_new.error_norm_proposed),
             proposed=_inf_like(state_new.proposed),  # meaningless?
             accepted=state_new.proposed,  # holla! New! :)
-            solution=state_new.proposed,  # Overwritten by interpolate() if necessary
-            previous=state0.accepted,  # holla! New! :)
+            solution=state0.accepted,  # Not yet by interpolate() if necessary
             control=state_new.control,
         )
 
@@ -253,7 +249,7 @@ class AdaptiveIVPSolver(Generic[T]):
         posterior = self.solver.step(
             state=state.accepted,
             vector_field=vector_field,
-            dt=self.control.extract_dt_from_state(state_control),
+            dt=state_control.dt_proposed,
             parameters=parameters,
         )
         # Normalise the error and propose a new step.
@@ -264,17 +260,18 @@ class AdaptiveIVPSolver(Generic[T]):
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
+        # print(f"Error norm previous {state_control.error_norm_previously_accepted} and now {error_normalised}")
         state_control = self.control.apply(
             state=state_control,
             error_normalised=error_normalised,
             error_contraction_rate=self.error_contraction_rate,
         )
+        print("Proposed control:", state_control)
         return _AdaptiveState(
             error_norm_proposed=error_normalised,  # new
             proposed=posterior,  # new
             solution=state.solution,  # too early to accept :)
             accepted=state.accepted,  # too early to accept :)
-            previous=state.previous,  # too early to accept :)
             control=state_control,  # new
         )
 
@@ -285,23 +282,46 @@ class AdaptiveIVPSolver(Generic[T]):
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
     def _interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
-        accepted, solution, previous = self.solver.interpolate(
-            s0=state.previous, s1=state.accepted, t=t
+        print(
+            f"Interpolating from {state.solution.t} to {t} to {state.accepted.t} or stepped right to solution!"
+        )
+        accepted, solution = self.solver.interpolate(
+            s0=state.solution, s1=state.accepted, t=t
         )
         return _AdaptiveState(
-            error_norm_proposed=state.error_norm_proposed,
+            error_norm_proposed=_inf_like(state.error_norm_proposed),
             proposed=_inf_like(state.proposed),
             accepted=accepted,  # holla! New! :)
             solution=solution,  # holla! New! :)
-            previous=previous,  # holla! New! :)
+            control=state.control,
+        )
+
+    def _accepted_as_solution(self, state):
+        return _AdaptiveState(
+            error_norm_proposed=_inf_like(state.error_norm_proposed),
+            proposed=_inf_like(state.proposed),
+            accepted=state.accepted,
+            solution=state.accepted,  # holla! New! :)
             control=state.control,
         )
 
     def extract(self, state: _AdaptiveState, /):
-        solver_extract = self.solver.extract(state.solution)
+        print(f"Extracting at {state.solution.t}")
+        print()
+        (t, posterior, output_scale, num_steps) = self.solver.extract(state.solution)
+        (t_accepted, posterior_accepted, *_) = self.solver.extract(state.accepted)
         control_extract = self.control.extract_dt_from_state(state.control)
-        return solver_extract, control_extract
+        solution = (
+            t,
+            posterior,
+            t_accepted,
+            posterior_accepted,
+            output_scale,
+            num_steps,
+        )
+        return solution, control_extract
 
 
+# todo: rename to "meaningless_like" or whatever
 def _inf_like(tree):
     return jax.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)

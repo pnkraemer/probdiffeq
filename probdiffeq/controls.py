@@ -63,8 +63,11 @@ class _ProportionalIntegralCommon(Control[_PIState]):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
-    def init_state_from_dt(self, dt0):
-        return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
+    def init_state_from_dt(self, dt0, error_norm_previously_accepted=1.0):
+        return _PIState(
+            dt_proposed=dt0,
+            error_norm_previously_accepted=error_norm_previously_accepted,
+        )
 
     def clip(self, t, t1, state: _PIState) -> _PIState:
         raise NotImplementedError
@@ -96,7 +99,7 @@ class _ProportionalIntegralCommon(Control[_PIState]):
         return state
 
     def extract_dt_from_state(self, state: _PIState) -> jax.Array:
-        return state.dt_proposed
+        return state.dt_proposed, state.error_norm_previously_accepted
 
 
 @jax.tree_util.register_pytree_node_class
@@ -162,7 +165,7 @@ class _IntegralCommon(Control[_IState]):
         return _IState(dt)
 
     def extract_dt_from_state(self, state: _IState) -> jax.Array:
-        return state.dt_proposed
+        return (state.dt_proposed,)
 
 
 @jax.tree_util.register_pytree_node_class

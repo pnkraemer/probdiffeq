@@ -95,7 +95,7 @@ class Solver:
         return jax.lax.switch(apply_branch, branches, t, s0, s1)
 
     def _case_interpolate(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
-        acc_p, sol_p, prev_p = self.strategy.case_interpolate(
+        acc_p, sol_p = self.strategy.case_interpolate(
             t,
             s0=s0.strategy,
             s1=s1.strategy,
@@ -104,22 +104,20 @@ class Solver:
             #  (Dynamic solvers overwrite the prior output scale at every step anyway).
             output_scale=s1.output_scale_prior,
         )
-        prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
-        return InterpRes(accepted=acc, solution=sol, previous=prev)
+        return InterpRes(accepted=acc, solution=sol)
 
     def _case_right_corner(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
-        acc_p, sol_p, prev_p = self.strategy.case_right_corner(
+        acc_p, sol_p = self.strategy.case_right_corner(
             t,
             s0=s0.strategy,
             s1=s1.strategy,
             output_scale=s1.output_scale_prior,
         )
-        prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
-        return InterpRes(accepted=acc, solution=sol, previous=prev)
+        return InterpRes(accepted=acc, solution=sol)
 
     def _interp_make_state(self, state_strategy, *, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()

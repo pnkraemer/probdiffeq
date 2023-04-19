@@ -29,19 +29,6 @@ class InterpRes(Generic[T]):
     At time `t`. This is the interpolation result.
     """
 
-    previous: T
-    """The new `previous_solution` field.
-
-    At time `t`. Use this as the right-most reference state
-    in future interpolations, or continue time-stepping from here.
-
-    The difference between `solution` and `previous` emerges in save_at* modes.
-    One belongs to the just-concluded time interval, and the other belongs to
-    the to-be-started time interval.
-    Concretely, this means that one has a unit backward model and the other
-    remembers how to step back to the previous state.
-    """
-
     # make it look like a namedtuple.
     #  we cannot use normal named tuples because we want to use a type-variable
     #  and namedtuples don't support that.
@@ -51,13 +38,13 @@ class InterpRes(Generic[T]):
 
     def tree_flatten(self):
         aux = ()
-        children = self.previous, self.solution, self.accepted
+        children = self.solution, self.accepted
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        prev, sol, acc = children
-        return cls(previous=prev, solution=sol, accepted=acc)
+        sol, acc = children
+        return cls(solution=sol, accepted=acc)
 
 
 S = TypeVar("S")

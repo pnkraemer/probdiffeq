@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import controls, ivpsolve, ivpsolvers
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
@@ -40,25 +40,35 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \
      the results should be identical."""
-    smo_sol = ivpsolve.solve_with_python_while_loop(
-        ode_problem.vector_field,
-        ode_problem.initial_values,
-        t0=ode_problem.t0,
-        t1=ode_problem.t1,
-        parameters=ode_problem.args,
-        solver=ivpsolvers.DynamicSolver(strategy=smo),
-        atol=1e-2 * tol,
-        rtol=tol,
-    )
+    import jax
 
-    fp_smo_sol = ivpsolve.solve_and_save_at(
-        ode_problem.vector_field,
-        ode_problem.initial_values,
-        save_at=smo_sol.t,
-        parameters=ode_problem.args,
-        solver=ivpsolvers.DynamicSolver(strategy=fp_smo),
-        atol=1e-2 * tol,
-        rtol=tol,
+    with jax.disable_jit():
+        smo_sol = ivpsolve.solve_with_python_while_loop(
+            ode_problem.vector_field,
+            ode_problem.initial_values,
+            t0=ode_problem.t0,
+            t1=ode_problem.t1,
+            parameters=ode_problem.args,
+            solver=ivpsolvers.DynamicSolver(strategy=smo),
+            atol=1e-2 * tol,
+            rtol=tol,
+            control=controls.Integral(),
+        )
+        print("Now it counts")
+        fp_smo_sol = ivpsolve.solve_and_save_at(
+            ode_problem.vector_field,
+            ode_problem.initial_values,
+            save_at=smo_sol.t,
+            parameters=ode_problem.args,
+            solver=ivpsolvers.DynamicSolver(strategy=fp_smo),
+            atol=1e-2 * tol,
+            rtol=tol,
+            control=controls.Integral(),
+        )
+
+    print(
+        fp_smo_sol.posterior.rand.backward_model.transition
+        - smo_sol.posterior.rand.backward_model.transition
     )
 
     tols = {"atol": 1e-2, "rtol": 1e-2}

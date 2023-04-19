@@ -19,26 +19,27 @@ def solve_and_save_at(
     parameters,
     while_loop_fn,
 ):
+    print(save_at)
+
     def advance_to_next_checkpoint(s, t_next):
-        s_next = _advance_ivp_solution_adaptively(
-            state0=s,
+        state = adaptive_solver.init(*s)
+        state_new = _advance_ivp_solution_adaptively(
+            state0=state,
             t1=t_next,
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
             while_loop_fn=while_loop_fn,
         )
+        s_next = adaptive_solver.extract(state_new)
         return s_next, s_next
 
-    state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-
-    _, solution = _control_flow.scan_with_init(
+    _, (sol_solver, _sol_control) = _control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
-        init=state0,
+        init=((t, posterior, t, posterior, output_scale, num_steps), (dt0,)),
         xs=save_at[1:],
         reverse=False,
     )
-    sol_solver, _sol_control = adaptive_solver.extract(solution)
     return sol_solver
 
 
@@ -112,7 +113,9 @@ def solve_with_python_while_loop(
     dt0,
     parameters,
 ):
-    state = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
+    state = adaptive_solver.init(
+        (t, posterior, t, posterior, output_scale, num_steps), (dt0,)
+    )
     generator = _solution_generator(
         vector_field,
         state=state,
@@ -120,8 +123,7 @@ def solve_with_python_while_loop(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    forward_solution = _control_flow.tree_stack(list(generator))
-    sol_solver, _sol_control = adaptive_solver.extract(forward_solution)
+    sol_solver, _sol_control = _control_flow.tree_stack(list(generator))
     return sol_solver
 
 
@@ -129,15 +131,15 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
     """Generate a probabilistic IVP solution iteratively."""
     # todo: adaptive_solver.solution_time(s) < t1?
     while state.solution.t < t1:
-        yield state
+        print(state.solution.t)
+        yield adaptive_solver.extract(state)
         state = adaptive_solver.step(
             state=state,
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
         )
-
-    yield state
+    yield adaptive_solver.extract(state)
 
 
 def solve_fixed_grid(

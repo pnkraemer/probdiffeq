@@ -74,7 +74,7 @@ class Smoother(_strategy.Strategy):
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> InterpRes[_SmState]:
-        return InterpRes(accepted=s1, solution=s1, previous=s1)
+        return InterpRes(accepted=s1, solution=s1)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
@@ -98,7 +98,7 @@ class Smoother(_strategy.Strategy):
             corr=s1.corr,
             extra=backward_model1,
         )
-        return InterpRes(accepted=s_1, solution=s_t, previous=s_t)
+        return InterpRes(accepted=s_1, solution=s_t)
 
     def offgrid_marginals(
         self,
@@ -111,7 +111,7 @@ class Smoother(_strategy.Strategy):
         t1,
         output_scale,
     ):
-        acc, _sol, _prev = self.case_interpolate(
+        acc, _sol = self.case_interpolate(
             t=t,
             s1=self.init(t1, posterior),
             s0=self.init(t0, posterior_previous),
@@ -238,23 +238,8 @@ class FixedPointSmoother(_strategy.Strategy):
 
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
-    ):  # s1.t == t
-        # can we guarantee that the backward model in s1 is the
-        # correct backward model to get from s0 to s1?
-        backward_model1 = s0.extra.merge_with_incoming_conditional(s1.extra)
-
-        solution = _SmState(
-            t=t,
-            u=s1.u,
-            ssv=s1.ssv,
-            corr=s1.corr,
-            extra=backward_model1,
-        )
-
-        accepted = self._duplicate_with_unit_backward_model(solution)
-        previous = accepted
-
-        return InterpRes(accepted=accepted, solution=solution, previous=previous)
+    ) -> InterpRes[_SmState]:
+        return InterpRes(s1, s1)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
@@ -267,23 +252,11 @@ class FixedPointSmoother(_strategy.Strategy):
         # The rest remains the same as for the smoother.
 
         # From s0.t to t
-        s_t = self._interpolate_from_to_fn(
-            s0=s0,
-            output_scale=output_scale,
-            t=t,
-        )
-        extra = s0.extra.merge_with_incoming_conditional(s_t.extra)
-        solution = _SmState(
-            t=s_t.t,
-            u=s_t.u,
-            ssv=s_t.ssv,
-            extra=extra,  # new
-            corr=s_t.corr,
+        solution = self._interpolate_from_to_fn(s0=s0, output_scale=output_scale, t=t)
+        s_1 = self._interpolate_from_to_fn(
+            s0=solution, output_scale=output_scale, t=s1.t
         )
 
-        previous = self._duplicate_with_unit_backward_model(solution)
-
-        s_1 = self._interpolate_from_to_fn(s0=s_t, output_scale=output_scale, t=s1.t)
         accepted = _SmState(
             t=s1.t,
             u=s1.u,
@@ -292,7 +265,7 @@ class FixedPointSmoother(_strategy.Strategy):
             extra=s_1.extra,  # new!
         )
 
-        return InterpRes(accepted=accepted, solution=solution, previous=previous)
+        return InterpRes(accepted=accepted, solution=solution)
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
@@ -308,6 +281,7 @@ class FixedPointSmoother(_strategy.Strategy):
         ssv, extra = self.extrapolation.fixpt_complete(
             ssv, extra, output_scale=output_scale
         )
+        extra = s0.extra.merge_with_incoming_conditional(extra)
         return _SmState(
             t=t,
             u=ssv.extract_qoi(),
@@ -316,13 +290,14 @@ class FixedPointSmoother(_strategy.Strategy):
             corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
         )
 
-    # todo: should this be a classmethod of MarkovSequence?
-    def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
-        extra = self.extrapolation.fixpt_init_conditional(rv_proto=state.extra.noise)
-        return _SmState(
-            t=state.t,
-            u=state.u,
-            extra=extra,  # new!
-            corr=state.corr,
-            ssv=state.ssv,
-        )
+    #
+    # # todo: should this be a classmethod of MarkovSequence?
+    # def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
+    #     extra = self.extrapolation.fixpt_init_conditional(rv_proto=state.extra.noise)
+    #     return _SmState(
+    #         t=state.t,
+    #         u=state.u,
+    #         extra=extra,  # new!
+    #         corr=state.corr,
+    #         ssv=state.ssv,
+    #     )
