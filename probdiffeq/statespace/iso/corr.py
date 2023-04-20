@@ -59,7 +59,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
         corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        ssv = _vars.IsoSSV(corrected)
+        ssv = _vars.IsoSSV(m_cor[0, :], corrected)
         return ssv, observed
 
     def extract(self, x, c, /):

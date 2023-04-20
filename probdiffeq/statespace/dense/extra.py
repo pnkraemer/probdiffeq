@@ -114,8 +114,9 @@ class _DenseIBM(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def filter_init(self, sol, /):
-        ssv = _vars.DenseSSV(sol, target_shape=self.target_shape)
+    def filter_init(self, sol: _vars.DenseNormal, /):
+        u = sol.mean.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, sol, target_shape=self.target_shape)
         extra = None
         return ssv, extra
 
@@ -123,13 +124,15 @@ class _DenseIBM(_extra.Extrapolation):
         return ssv.hidden_state
 
     def smoother_init(self, sol: _collections.MarkovSequence, /):
-        ssv = _vars.DenseSSV(sol.init, target_shape=self.target_shape)
+        u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = sol.backward_model
         return ssv, extra
 
     def fixpt_init(self, sol: _collections.MarkovSequence, /):
         # todo: reset init
-        ssv = _vars.DenseSSV(sol.init, target_shape=self.target_shape)
+        u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = sol.backward_model
         return ssv, extra
 
@@ -159,7 +162,8 @@ class _DenseIBM(_extra.Extrapolation):
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (p, p_inv, l0)
-        ssv = _vars.DenseSSV(ext, target_shape=shape)
+        u = m_ext.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
 
     def smoother_begin(self, ssv, extra, /, dt):
@@ -175,7 +179,8 @@ class _DenseIBM(_extra.Extrapolation):
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
-        ssv = _vars.DenseSSV(ext, target_shape=shape)
+        u = m_ext.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
 
     def fixpt_begin(self, ssv, extra, /, dt):
@@ -191,7 +196,8 @@ class _DenseIBM(_extra.Extrapolation):
         shape = (self.num_derivatives + 1, d)
         ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
-        ssv = _vars.DenseSSV(ext, target_shape=shape)
+        u = m_ext.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
 
     def _assemble_preconditioner(self, dt):
@@ -206,17 +212,15 @@ class _DenseIBM(_extra.Extrapolation):
     def filter_complete(self, ssv, extra, /, output_scale):
         p, p_inv, l0 = extra
         m_ext = ssv.hidden_state.mean
-        l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
-            R_stack=(
-                (self.a @ (p_inv[:, None] * l0)).T,
-                (output_scale * self.q_sqrtm_lower).T,
-            )
-        ).T
+        l0_p = p_inv[:, None] * l0
+        r_stack = ((self.a @ l0_p).T, (output_scale * self.q_sqrtm_lower).T)
+        l_ext_p = _sqrt_util.sum_of_sqrtm_factors(R_stack=r_stack).T
         l_ext = p[:, None] * l_ext_p
 
         shape = ssv.target_shape
         rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
-        ssv = _vars.DenseSSV(rv, target_shape=shape)
+        u = m_ext.reshape(self.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, rv, target_shape=shape)
         return ssv, None
 
     def smoother_complete(self, ssv, extra, /, output_scale):
@@ -250,7 +254,8 @@ class _DenseIBM(_extra.Extrapolation):
         rv = _vars.DenseNormal(
             mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
         )
-        ext = _vars.DenseSSV(rv, target_shape=self.target_shape)
+        u = m_ext.reshape(self.target_shape, order="F")[0, :]
+        ext = _vars.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
     def fixpt_complete(self, ssv, extra, /, output_scale):
@@ -284,7 +289,8 @@ class _DenseIBM(_extra.Extrapolation):
         rv = _vars.DenseNormal(
             mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
         )
-        ext = _vars.DenseSSV(rv, target_shape=self.target_shape)
+        u = m_ext.reshape(self.target_shape, order="F")[0, :]
+        ext = _vars.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
     # todo: remove smoother_init_conditional?

@@ -61,7 +61,7 @@ class _TaylorZerothOrder(_corr.Correction):
         observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
 
         rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        corrected = _vars.SSV(rv_cor)
+        corrected = _vars.SSV(m_cor[0], rv_cor)
         return corrected, observed
 
     def extract(self, ssv, corr):
@@ -216,5 +216,5 @@ class StatisticalFirstOrder(_corr.Correction):
         # Catch up the backward noise and return result
         m_bw = rv.mean - gain * m_marg
         rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        cor = _vars.SSV(rv_cor)
+        cor = _vars.SSV(m_bw[0], rv_cor)
         return cor, obs

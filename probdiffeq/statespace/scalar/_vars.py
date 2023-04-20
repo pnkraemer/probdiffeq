@@ -97,7 +97,7 @@ class SSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return SSV(rv)
+        return SSV(self.u, rv)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:

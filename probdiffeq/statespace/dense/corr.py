@@ -128,7 +128,8 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         cor = _vars.DenseNormal(
             mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=ssv.target_shape
         )
-        ssv = _vars.DenseSSV(cor, target_shape=ssv.target_shape)
+        u = m_cor.reshape(ssv.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, cor, target_shape=ssv.target_shape)
         return ssv, observed
 
     def extract(self, ssv, corr, /):
@@ -212,7 +213,8 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         rv = _vars.DenseNormal(
             mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=ssv.target_shape
         )
-        ssv = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
+        u = m_cor.reshape(ssv.target_shape, order="F")[0, :]
+        ssv = _vars.DenseSSV(u, rv, target_shape=ssv.target_shape)
         return ssv, observed
 
     def extract(self, ssv, _corr, /):
@@ -330,7 +332,8 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         # Compute the corrected mean and gather the correction
         m_bw = ssv.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T, target_shape=ssv.target_shape)
-        corrected = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
+        u = m_bw.reshape(ssv.target_shape, order="F")[0, :]
+        corrected = _vars.DenseSSV(u, rv, target_shape=ssv.target_shape)
         return corrected, marginals
 
     def extract(self, ssv, corr, /):
@@ -439,7 +442,8 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         # Compute the corrected mean and gather the correction
         m_bw = ssv.hidden_state.mean - gain @ m_marg
         rv = _vars.DenseNormal(m_bw, r_bw.T, target_shape=ssv.target_shape)
-        corrected = _vars.DenseSSV(rv, target_shape=ssv.target_shape)
+        u = m_bw.reshape(ssv.target_shape, order="F")[0, :]
+        corrected = _vars.DenseSSV(u, rv, target_shape=ssv.target_shape)
 
         # Return the results
         return corrected, marginals

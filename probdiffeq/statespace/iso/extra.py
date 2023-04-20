@@ -64,16 +64,16 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         m0_corrected = jnp.stack(taylor_coefficients)
         return m0_corrected, c_sqrtm0_corrected
 
-    def filter_init(self, rv, /):
-        ssv = _vars.IsoSSV(rv)
+    def filter_init(self, rv: _vars.IsoNormalHiddenState, /):
+        ssv = _vars.IsoSSV(rv.mean[0, :], rv)
         cache = None
         return ssv, cache
 
     def filter_extract(self, ssv, ex, /):
         return ssv.hidden_state
 
-    def smoother_init(self, sol, /):
-        ssv = _vars.IsoSSV(sol.init)
+    def smoother_init(self, sol: _collections.MarkovSequence, /):
+        ssv = _vars.IsoSSV(sol.init.mean[0, :], sol.init)
         cache = sol.backward_model
         return ssv, cache
 
@@ -82,7 +82,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
     def fixpt_init(self, sol, /):
         # todo: reset backward model
-        ssv = _vars.IsoSSV(sol.init)
+        ssv = _vars.IsoSSV(sol.init.mean[0, :], sol.init)
         cache = sol.backward_model
         return ssv, cache
 
@@ -118,7 +118,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         l0 = s0.hidden_state.cov_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(ext)
+        ssv = _vars.IsoSSV(m_ext[0, :], ext)
         cache = (p, p_inv, l0)
         return ssv, cache
 
@@ -131,7 +131,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         l0 = s0.hidden_state.cov_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(ext)
+        ssv = _vars.IsoSSV(m_ext[0, :], ext)
         cache = (ex0, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
@@ -144,7 +144,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         l0 = s0.hidden_state.cov_sqrtm_lower
 
         ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(ext)
+        ssv = _vars.IsoSSV(m_ext[0, :], ext)
         cache = (ex0, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
@@ -166,7 +166,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         ).T
         l_ext = p[:, None] * l_ext_p
         rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        ssv = _vars.IsoSSV(rv)
+        ssv = _vars.IsoSSV(m_ext[0, :], rv)
         return ssv, None
 
     def smoother_complete(self, ssv, extra, /, output_scale):
@@ -193,7 +193,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoSSV(extrapolated), bw_model
+        return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
     def fixpt_complete(self, ssv, extra, /, output_scale):
         _, m_ext_p, m0_p, p, p_inv, l0 = extra
@@ -219,7 +219,7 @@ class _IsoIBM(_extra.Extrapolation[_vars.IsoSSV, Any]):
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoSSV(extrapolated), bw_model
+        return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
     def smoother_init_conditional(self, rv_proto):
         op = self._init_backward_transition()
