@@ -39,7 +39,7 @@ def test_dataclass_tree():
 
 def test_dataclass_nested():
     """Tree-flattening and unflattening for nested data classes must be as expected."""
-    tree2 = MyPyTree(1, MyPyTree(2, 3))
+    tree2 = MyPyTree(1, MyPyTree(a=2, b=3))
     children, aux = jax.tree_util.tree_flatten(tree2)
     tree = jax.tree_util.tree_unflatten(aux, children)
     assert tree.a == 1
