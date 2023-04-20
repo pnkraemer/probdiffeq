@@ -36,20 +36,20 @@ class SmootherSol(_strategy.Posterior[MarkovSequence]):
 
 class _SmState(NamedTuple):
     t: Any
-    u: Any
     ssv: Any
     extra: Any
 
     corr: Any
 
+    @property
+    def u(self):
+        return self.ssv.u
+
     def scale_covariance(self, output_scale):
-        return _SmState(
-            t=self.t,
-            u=self.u,
-            extra=self.extra.scale_covariance(output_scale),
-            ssv=self.ssv.scale_covariance(output_scale),
-            corr=self.corr.scale_covariance(output_scale),
-        )
+        extra = self.extra.scale_covariance(output_scale)
+        ssv = self.ssv.scale_covariance(output_scale)
+        corr = self.corr.scale_covariance(output_scale)
+        return _SmState(t=self.t, extra=extra, ssv=ssv, corr=corr)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -63,13 +63,7 @@ class Smoother(_strategy.Strategy):
         ssv, corr = self.correction.complete(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        return _SmState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            corr=corr,
-            extra=extra,
-            ssv=ssv,
-        )
+        return _SmState(t=state.t, corr=corr, extra=extra, ssv=ssv)
 
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
@@ -101,14 +95,13 @@ class Smoother(_strategy.Strategy):
         rv_at_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
         mseq_t = MarkovSequence(init=rv_at_t, backward_model=bw_t_to_t0)
         ssv, _ = self.extrapolation.smoother_init(mseq_t)
-        u = ssv.extract_qoi()
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
-        state_at_t = _SmState(t=t, u=u, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
+        state_at_t = _SmState(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
 
         # The state at t1 gets a new backward model; it must remember how to
         # get back to t, not to t0.
         # The other two are the extrapolated solution
-        s_1 = _SmState(t=s1.t, u=s1.u, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
+        s_1 = _SmState(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
         return InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
     def offgrid_marginals(
@@ -136,16 +129,14 @@ class Smoother(_strategy.Strategy):
     def init(self, t, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.smoother_init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
-        u = ssv.extract_qoi()
-        return _SmState(t=t, u=u, ssv=ssv, extra=extra, corr=corr)
+        return _SmState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.smoother_begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        u = ssv.extract_qoi()
-        return _SmState(t=state.t + dt, u=u, ssv=ssv, extra=extra, corr=corr)
+        return _SmState(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
@@ -168,13 +159,8 @@ class Smoother(_strategy.Strategy):
         ssv, extra = self.extrapolation.smoother_complete(
             ssv, extra, output_scale=output_scale
         )
-        return _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
-        )
+        corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
+        return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -199,26 +185,14 @@ class FixedPointSmoother(_strategy.Strategy):
     def init(self, t, posterior, /) -> _SmState:
         ssv, extra = self.extrapolation.fixpt_init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
-        return _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
+        return _SmState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.fixpt_begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        return _SmState(
-            t=state.t + dt,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=corr,
-        )
+        return _SmState(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
 
     def complete(self, state, /, *, output_scale, vector_field, parameters):
         ssv, extra = self.extrapolation.fixpt_complete(
@@ -229,19 +203,13 @@ class FixedPointSmoother(_strategy.Strategy):
         ssv, corr = self.correction.complete(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        return _SmState(
-            t=state.t,
-            u=ssv.extract_qoi(),
-            corr=corr,
-            extra=extra,
-            ssv=ssv,
-        )
+        return _SmState(t=state.t, corr=corr, extra=extra, ssv=ssv)
 
     def case_right_corner(self, t, *, s0: _SmState, s1: _SmState, output_scale):
         # See case_interpolate() for detailed explanation of why this works.
 
         bw_t_to_qoi = s0.extra.merge_with_incoming_conditional(s1.extra)
-        solution = _SmState(t=t, u=s1.u, ssv=s1.ssv, corr=s1.corr, extra=bw_t_to_qoi)
+        solution = _SmState(t=t, ssv=s1.ssv, corr=s1.corr, extra=bw_t_to_qoi)
 
         accepted = self._duplicate_with_unit_backward_model(solution)
         previous = self._duplicate_with_unit_backward_model(solution)
@@ -307,8 +275,7 @@ class FixedPointSmoother(_strategy.Strategy):
         mseq_t = MarkovSequence(init=rv_t, backward_model=bw_t_to_qoi)
         ssv_t, _ = self.extrapolation.fixpt_init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
-        u_t = ssv_t.extract_qoi()
-        sol_t = _SmState(t=t, u=u_t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
+        sol_t = _SmState(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
 
         # Now, the remaining two solutions:
 
@@ -319,7 +286,7 @@ class FixedPointSmoother(_strategy.Strategy):
         prev_t = self._duplicate_with_unit_backward_model(e_t)
 
         # Future IVP solver stepping continues from here:
-        acc_t1 = _SmState(t=s1.t, u=s1.u, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
+        acc_t1 = _SmState(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
 
         # Bundle up the results and return
         return InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
@@ -338,21 +305,12 @@ class FixedPointSmoother(_strategy.Strategy):
         ssv, extra = self.extrapolation.fixpt_complete(
             ssv, extra, output_scale=output_scale
         )
-        return _SmState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=jax.tree_util.tree_map(jnp.empty_like, s0.corr),
-        )
+        corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
+        return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
     # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
-        extra = self.extrapolation.fixpt_init_conditional(rv_proto=state.extra.noise)
-        return _SmState(
-            t=state.t,
-            u=state.u,
-            extra=extra,  # new!
-            corr=state.corr,
-            ssv=state.ssv,
+        extra_new = self.extrapolation.fixpt_init_conditional(
+            rv_proto=state.extra.noise
         )
+        return _SmState(t=state.t, extra=extra_new, corr=state.corr, ssv=state.ssv)

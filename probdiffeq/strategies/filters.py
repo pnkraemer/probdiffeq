@@ -26,16 +26,16 @@ class _FiState(NamedTuple):
 
     # Todo: move those to `ssv`
     t: Any
-    u: Any
+
+    @property
+    def u(self):
+        return self.ssv.u
 
     def scale_covariance(self, s, /):
-        return _FiState(
-            t=self.t,
-            u=self.u,
-            extra=None,
-            ssv=self.ssv.scale_covariance(s),
-            corr=self.corr.scale_covariance(s),
-        )
+        ssv = self.ssv.scale_covariance(s)
+        corr = self.corr.scale_covariance(s)
+        # 'extra' is always None when filtering
+        return _FiState(t=self.t, extra=None, ssv=ssv, corr=corr)
 
 
 S = TypeVar("S")
@@ -74,7 +74,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     def init(self, t, solution, /) -> _FiState:
         ssv, extra = self.extrapolation.filter_init(solution.rand)
         ssv, corr = self.correction.init(ssv)
-        return _FiState(t=t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
+        return _FiState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def extract(self, posterior: _FiState, /):
         t = posterior.t
@@ -101,13 +101,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv, extra, output_scale=output_scale
         )
 
-        extrapolated = _FiState(
-            t=t,
-            u=ssv.extract_qoi(),
-            ssv=ssv,
-            extra=extra,
-            corr=jax.tree_util.tree_map(jnp.zeros_like, s0.corr),
-        )
+        corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
+        extrapolated = _FiState(t=t, ssv=ssv, extra=extra, corr=corr_like)
         return InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
 
     def offgrid_marginals(
@@ -135,9 +130,7 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t + dt, p=parameters
         )
-        return _FiState(
-            t=state.t + dt, u=ssv.extract_qoi(), ssv=ssv, corr=corr, extra=extra
-        )
+        return _FiState(t=state.t + dt, ssv=ssv, corr=corr, extra=extra)
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
         ssv, extra = self.extrapolation.filter_complete(
@@ -146,4 +139,4 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         ssv, corr = self.correction.complete(
             ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
-        return _FiState(t=state.t, u=ssv.extract_qoi(), ssv=ssv, extra=extra, corr=corr)
+        return _FiState(t=state.t, ssv=ssv, extra=extra, corr=corr)
