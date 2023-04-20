@@ -19,9 +19,6 @@ class NormalQOI(_collections.Normal):
     def condition_on_qoi_observation(self, u, /, observation_std):
         raise NotImplementedError
 
-    def extract_qoi(self):
-        raise NotImplementedError
-
     def extract_qoi_from_sample(self, u, /):
         raise NotImplementedError
 
@@ -61,9 +58,6 @@ class NormalQOI(_collections.Normal):
 class SSV(_collections.SSV):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
-    def extract_qoi(self):
-        return self.hidden_state.mean[..., 0]
-
     def observe_qoi(self, observation_std):
         # what is this for? batched calls? If so, that seems wrong.
         #  the scalar state should not worry about the context it is called in.
@@ -97,7 +91,7 @@ class SSV(_collections.SSV):
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return SSV(rv)
+        return SSV(self.u, rv)
 
     def marginal_nth_derivative(self, n):
         if self.hidden_state.mean.ndim > 1:

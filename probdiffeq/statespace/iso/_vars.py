@@ -29,15 +29,12 @@ class IsoSSV(_collections.SSV):
         cond = _conds.IsoConditionalQOI(gain, noise=cor)
         return obs, cond
 
-    def extract_qoi(self) -> jax.Array:
-        return self.hidden_state.mean[..., 0, :]
-
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
         return u[..., 0, :]
 
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return IsoSSV(rv)
+        return IsoSSV(self.u, rv)
 
     def marginal_nth_derivative(self, n):
         # if the variable has batch-axes, vmap the result

@@ -225,7 +225,8 @@ def _rk_filter_step(carry, y, extrapolation, dt):
 
     rv = cond_cor(y)
     # hack! This should rather be handled by some correction scheme.
-    corr = type(ssv)(rv)
+    u_like = jnp.empty_like(ssv.u)
+    corr = type(ssv)(u_like, rv)
 
     # Return correction and backward-model
     return (corr, extra), None

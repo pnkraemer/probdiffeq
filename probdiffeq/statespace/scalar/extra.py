@@ -62,17 +62,17 @@ class _IBM(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def filter_init(self, sol, /):
-        return _vars.SSV(sol), None
+    def filter_init(self, sol: _vars.NormalHiddenState, /):
+        return _vars.SSV(sol.mean[0], sol), None
 
     def smoother_init(self, sol: _collections.MarkovSequence, /):
-        ssv = _vars.SSV(sol.init)
+        ssv = _vars.SSV(sol.init.mean[0], sol.init)
         extra = sol.backward_model
         return ssv, extra
 
     def fixpt_init(self, sol: _collections.MarkovSequence, /):
         # todo: reset backward model
-        ssv = _vars.SSV(sol.init)
+        ssv = _vars.SSV(sol.init.mean[0], sol.init)
         extra = sol.backward_model
         return ssv, extra
 
@@ -96,7 +96,7 @@ class _IBM(_extra.Extrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.SSV(extrapolated), (p, p_inv, l0)
+        return _vars.SSV(m_ext[0], extrapolated), (p, p_inv, l0)
 
     def smoother_begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -106,7 +106,9 @@ class _IBM(_extra.Extrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.SSV(extrapolated), (extra, m_ext_p, m0_p, p, p_inv, l0)
+        ssv = _vars.SSV(m_ext[0], extrapolated)
+        cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
+        return ssv, cache
 
     def fixpt_begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -116,7 +118,9 @@ class _IBM(_extra.Extrapolation):
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.SSV(extrapolated), (extra, m_ext_p, m0_p, p, p_inv, l0)
+        ssv = _vars.SSV(m_ext[0], extrapolated)
+        cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
+        return ssv, cache
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -135,7 +139,7 @@ class _IBM(_extra.Extrapolation):
         l_ext = p[:, None] * l_ext_p
 
         rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ssv = _vars.SSV(rv)
+        ssv = _vars.SSV(m_ext[0], rv)
         return ssv, None
 
     def smoother_complete(self, ssv, extra, /, output_scale):
@@ -162,7 +166,8 @@ class _IBM(_extra.Extrapolation):
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.SSV(extrapolated), bw_model
+        ssv = _vars.SSV(m_ext[0], extrapolated)
+        return ssv, bw_model
 
     def fixpt_complete(self, ssv, extra, /, output_scale):
         _, m_ext_p, m0_p, p, p_inv, l0 = extra
@@ -188,7 +193,8 @@ class _IBM(_extra.Extrapolation):
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.SSV(extrapolated), bw_model
+        ssv = _vars.SSV(m_ext[0], extrapolated)
+        return ssv, bw_model
 
     def smoother_init_conditional(self, rv_proto):
         op = self._init_backward_transition()

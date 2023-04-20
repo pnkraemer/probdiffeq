@@ -69,24 +69,26 @@ class SSV(abc.ABC):
     and the quantity of interest is (x, x', y, y') -> x+y
     """
 
-    def __init__(self, hidden_state, /, *, target_shape=None):
+    def __init__(self, u, hidden_state, /, *, target_shape=None):
+        self.u = u
         self.hidden_state = hidden_state
         self.target_shape = target_shape
 
     def tree_flatten(self):
-        children = (self.hidden_state,)
+        children = (self.hidden_state, self.u)
         aux = (self.target_shape,)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        (hidden_state,) = children
+        (hidden_state, u) = children
         (target_shape,) = aux
-        return cls(hidden_state, target_shape=target_shape)
+        return cls(u, hidden_state, target_shape=target_shape)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
+            f"{self.u},"
             f"{self.hidden_state},"
             f"target_shape={self.target_shape}"
             f")"
@@ -94,10 +96,6 @@ class SSV(abc.ABC):
 
     @abc.abstractmethod
     def observe_qoi(self, observation_std):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract_qoi(self):
         raise NotImplementedError
 
     @abc.abstractmethod
