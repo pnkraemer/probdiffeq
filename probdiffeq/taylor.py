@@ -183,8 +183,8 @@ def _runge_kutta_starter_fn(
     extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
 
     # Initialise
-    rv0 = extrapolation.standard_normal(ode_shape=initial_values[0].shape)
-    cond0 = extrapolation.smoother_init_conditional(rv_proto=rv0)
+    rv0 = extrapolation.smoother.standard_normal(ode_shape=initial_values[0].shape)
+    cond0 = extrapolation.smoother.init_conditional(rv_proto=rv0)
     sol0 = _collections.MarkovSequence(init=rv0, backward_model=cond0)
 
     # Estimate
@@ -201,7 +201,7 @@ def _runge_kutta_starter_improve(extrapolation, solution, ys, dt):
     Fit a Gauss-Markov process to observations of the ODE solution.
     """
     # Initialise backward-transitions
-    ssv0, extra0 = extrapolation.smoother_init(solution)
+    ssv0, extra0 = extrapolation.smoother.init(solution)
 
     # Scan
     fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
@@ -216,8 +216,8 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     (ssv, extra_old) = carry
 
     # Extrapolate (with fixed-point-style merging)
-    ssv, extra = extrapolation.smoother_begin(ssv, extra_old, dt=dt)
-    ssv, extra_new = extrapolation.smoother_complete(ssv, extra, output_scale=1.0)
+    ssv, extra = extrapolation.smoother.begin(ssv, extra_old, dt=dt)
+    ssv, extra_new = extrapolation.smoother.complete(ssv, extra, output_scale=1.0)
     extra = extra_old.merge_with_incoming_conditional(extra_new)  # sqrt-fp-smoother!
 
     # Correct

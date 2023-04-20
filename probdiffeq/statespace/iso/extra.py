@@ -103,7 +103,7 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
     @property
     def num_derivatives(self):
-        return self.filter.a.shape[0] - 1
+        return self.a.shape[0] - 1
 
     # Actual content:
 
@@ -199,7 +199,7 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
     @property
     def num_derivatives(self):
-        return self.filter.a.shape[0] - 1
+        return self.a.shape[0] - 1
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
