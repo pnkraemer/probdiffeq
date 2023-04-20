@@ -3,11 +3,10 @@ import dataclasses
 
 import jax
 
-dataclass = dataclasses.dataclass
 
-
+# Might have to combine with typing_extensions.dataclass_transform()
 def dataclass_pytree_node(clz, /):
-    return _register_pytree_node_dataclass(dataclass(frozen=True)(clz))
+    return _register_pytree_node_dataclass(dataclasses.dataclass(frozen=True)(clz))
 
 
 # Very similar to https://github.com/google/jax/issues/2371
