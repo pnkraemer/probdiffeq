@@ -14,23 +14,20 @@ def ibm_iso(num_derivatives):
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
     _tmp = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
     scales, powers = _tmp
-    kwargs = dict(
-        a=a,
-        q_sqrtm_lower=q_sqrtm,
-        preconditioner_scales=scales,
-        preconditioner_powers=powers,
-    )
-    return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, **kwargs)
+    dynamic = (a, q_sqrtm, scales, powers)
+    static = {}
+    return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
 
-@jax.tree_util.register_pytree_node_class
 class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
     @property
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
+    # Content:
+
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, q_like=self.q_sqrtm_lower)
         rv = _vars.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         return rv
 
@@ -39,7 +36,7 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         cache = None
         return ssv, cache
 
-    def begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
+    def begin(self, s0: _vars.IsoSSV, _extra, /, dt) -> Tuple[_vars.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -51,12 +48,6 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         ssv = _vars.IsoSSV(m_ext[0, :], ext)
         cache = (p, p_inv, l0)
         return ssv, cache
-
-    def _assemble_preconditioner(self, dt):
-        # todo: 'partial' scales and powers into the preconditioner?
-        return _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
 
     def complete(self, st, ex, /, output_scale):
         p, p_inv, l0 = ex
@@ -74,10 +65,15 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         ssv = _vars.IsoSSV(m_ext[0, :], rv)
         return ssv, None
 
-    def extract(self, ssv, ex, /):
+    def extract(self, ssv, _extra, /):
         return ssv.hidden_state
 
     # Some helpers:
+
+    def _assemble_preconditioner(self, dt):
+        # todo: 'partial' scales and powers into the preconditioner?
+        k = {"scales": self.preconditioner_scales, "powers": self.preconditioner_powers}
+        return _ibm_util.preconditioner_diagonal(dt=dt, **k)
 
     def standard_normal(self, ode_shape):
         # Used for Runge-Kutta initialisation.
@@ -100,7 +96,6 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return output_scale
 
 
-@jax.tree_util.register_pytree_node_class
 class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
@@ -109,6 +104,8 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
     @property
     def num_derivatives(self):
         return self.filter.a.shape[0] - 1
+
+    # Actual content:
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
@@ -137,11 +134,6 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         cache = (ex0, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
-    def _assemble_preconditioner(self, dt):
-        return _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
-
     def complete(self, ssv, extra, /, output_scale):
         _, m_ext_p, m0_p, p, p_inv, l0 = extra
         m_ext = ssv.hidden_state.mean
@@ -168,6 +160,13 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
+    # Some helpers:
+
+    def _assemble_preconditioner(self, dt):
+        return _ibm_util.preconditioner_diagonal(
+            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
+        )
+
     def standard_normal(self, ode_shape):
         # Used for Runge-Kutta initialisation.
         assert len(ode_shape) == 1
@@ -176,7 +175,6 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         c0 = jnp.eye(self.num_derivatives + 1)
         return _vars.IsoNormalHiddenState(m0, c0)
 
-    # Unnecessary?
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
 
@@ -194,7 +192,6 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return _conds.IsoConditionalHiddenState(op, noise=noi)
 
 
-@jax.tree_util.register_pytree_node_class
 class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"

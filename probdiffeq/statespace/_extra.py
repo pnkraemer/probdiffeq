@@ -15,22 +15,23 @@ C = TypeVar("C")
 
 @jax.tree_util.register_pytree_node_class
 class ExtrapolationBundle:
-    def __init__(self, filter, smoother, fixedpoint, **kwargs):
+    def __init__(self, filter, smoother, fixedpoint, *dynamic, **static):
         self._filter = filter
         self._smoother = smoother
         self._fixedpoint = fixedpoint
-        self.kwargs = kwargs
+        self._dynamic = dynamic
+        self._static = static
 
     def tree_flatten(self):
-        children = (self.kwargs,)
-        aux = self._filter, self._smoother, self._fixedpoint
+        children = (self._dynamic,)
+        aux = self._filter, self._smoother, self._fixedpoint, self._static
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        filter, smoother, fixedpoint = aux
-        (kwargs,) = children
-        return cls(filter, smoother, fixedpoint, **kwargs)
+        filter, smoother, fixedpoint, static = aux
+        (dynamic,) = children
+        return cls(filter, smoother, fixedpoint, *dynamic, **static)
 
     @property
     def num_derivatives(self):
@@ -38,15 +39,15 @@ class ExtrapolationBundle:
 
     @property
     def filter(self):
-        return self._filter(**self.kwargs)
+        return self._filter(*self._dynamic, **self._static)
 
     @property
     def smoother(self):
-        return self._smoother(**self.kwargs)
+        return self._smoother(*self._dynamic, **self._static)
 
     @property
     def fixedpoint(self):
-        return self._fixedpoint(**self.kwargs)
+        return self._fixedpoint(*self._dynamic, **self._static)
 
 
 class Extrapolation(Generic[S, C]):
@@ -58,26 +59,6 @@ class Extrapolation(Generic[S, C]):
 
         self.preconditioner_scales = preconditioner_scales
         self.preconditioner_powers = preconditioner_powers
-
-    def tree_flatten(self):
-        children = (
-            self.a,
-            self.q_sqrtm_lower,
-            self.preconditioner_scales,
-            self.preconditioner_powers,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        a, q_sqrtm_lower, scales, powers = children
-        return cls(
-            a=a,
-            q_sqrtm_lower=q_sqrtm_lower,
-            preconditioner_scales=scales,
-            preconditioner_powers=powers,
-        )
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"
