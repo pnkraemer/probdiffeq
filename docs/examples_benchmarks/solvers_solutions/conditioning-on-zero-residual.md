@@ -97,17 +97,17 @@ taylor_coefficients = jnp.reshape(
 prior_u = []
 prior_du = []
 rv = extrapolation_model.filter_solution_from_tcoeffs(taylor_coefficients)
-ssv, extra = extrapolation_model.filter_init(rv)
+ssv, extra = extrapolation_model.filter.init(rv)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
     prior_u.append(rv.marginal_nth_derivative(0).mean)
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 
     dt = t_new - t_old
-    ssv, extra = extrapolation_model.filter_begin(ssv, extra, dt)
-    ssv, extra = extrapolation_model.filter_complete(
+    ssv, extra = extrapolation_model.filter.begin(ssv, extra, dt)
+    ssv, extra = extrapolation_model.filter.complete(
         ssv, extra, output_scale=sol.output_scale.mean()
     )
-    rv = extrapolation_model.filter_extract(ssv, extra)
+    rv = extrapolation_model.filter.extract(ssv, extra)
 
 
 prior_u.append(rv.marginal_nth_derivative(0).mean)
