@@ -1,6 +1,5 @@
 """Extrapolations."""
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import _collections, _sqrt_util
@@ -271,7 +270,6 @@ class _IBMSm(_extra.Extrapolation):
         return output_scale
 
 
-@jax.tree_util.register_pytree_node_class
 class _IBMFp(_extra.Extrapolation):
     def __init__(self, *args, num_derivatives, ode_shape):
         super().__init__(*args)
