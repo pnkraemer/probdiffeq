@@ -18,61 +18,16 @@ R = TypeVar("R")
  generic initial value problem solutions."""
 
 
-@jax.tree_util.register_pytree_node_class
+@containers.dataclass_pytree_node
 class Solution(Generic[R]):
     """Estimated initial value problem solution."""
 
-    def __init__(
-        self,
-        t,
-        u,
-        output_scale,
-        marginals: R,
-        posterior,
-        num_steps,
-    ):
-        self.t = t
-        self.u = u
-        self.output_scale = output_scale
-        self.marginals = marginals
-        self.posterior = posterior
-        self.num_steps = num_steps
-
-    def __repr__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"t={self.t},"
-            f"u={self.u},"
-            f"output_scale={self.output_scale},"
-            f"marginals={self.marginals},"
-            f"posterior={self.posterior},"
-            f"num_steps={self.num_steps},"
-            ")"
-        )
-
-    def tree_flatten(self):
-        children = (
-            self.t,
-            self.u,
-            self.marginals,
-            self.posterior,
-            self.output_scale,
-            self.num_steps,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        t, u, marginals, posterior, output_scale, n = children
-        return cls(
-            t=t,
-            u=u,
-            marginals=marginals,
-            posterior=posterior,
-            output_scale=output_scale,
-            num_steps=n,
-        )
+    t: float
+    u: Any
+    output_scale: Any
+    marginals: Any
+    posterior: Any
+    num_steps: Any
 
     def __len__(self):
         if jnp.ndim(self.t) < 1:
