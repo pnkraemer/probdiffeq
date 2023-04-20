@@ -1,11 +1,12 @@
 """''Global'' estimation: smoothing."""
 
-from typing import Any, NamedTuple, Tuple
+from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq._collections import InterpRes, MarkovSequence
+from probdiffeq.backend import containers
 from probdiffeq.strategies import _strategy
 
 
@@ -34,7 +35,8 @@ class SmootherSol(_strategy.Posterior[MarkovSequence]):
         return markov.marginalise_backwards()
 
 
-class _SmState(NamedTuple):
+@containers.dataclass_pytree_node
+class _SmState:
     t: Any
     ssv: Any
     extra: Any

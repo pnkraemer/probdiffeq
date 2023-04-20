@@ -1,23 +1,18 @@
 """Forward-only estimation: filtering."""
-from typing import Any, NamedTuple, Tuple, TypeVar
+from typing import Any, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq._collections import InterpRes
+from probdiffeq.backend import containers
 from probdiffeq.strategies import _strategy
 
-
-# this class is NOT redundant.
-# next, add "t" into this solution (and into MarkovSequence)
-# this will simplify a million functions in this code base
-# and is the next step en route to x=extract(init(x)) for solvers, strategies, etc.
-# more specifically, init(tcoeffs) becomes
-# init_posterior_from_tcoeffs(t, tcoeffs)
-#  which allows the solver (!) to satisfy x = extract(init(x)). Then,
-#  the strategy can be made to obey this pattern next.
 # todo: if we happen to keep this class, make it generic.
-class _FiState(NamedTuple):
+
+
+@containers.dataclass_pytree_node
+class _FiState:
     """Filtering state."""
 
     ssv: Any
