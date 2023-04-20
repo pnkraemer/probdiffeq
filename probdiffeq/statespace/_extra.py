@@ -13,6 +13,42 @@ C = TypeVar("C")
 """A type-variable to alias extrapolation-caches."""
 
 
+@jax.tree_util.register_pytree_node_class
+class ExtrapolationBundle:
+    def __init__(self, filter, smoother, fixedpoint, **kwargs):
+        self._filter = filter
+        self._smoother = smoother
+        self._fixedpoint = fixedpoint
+        self.kwargs = kwargs
+
+    def tree_flatten(self):
+        children = (self.kwargs,)
+        aux = self._filter, self._smoother, self._fixedpoint
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        filter, smoother, fixedpoint = aux
+        (kwargs,) = children
+        return cls(filter, smoother, fixedpoint, **kwargs)
+
+    @property
+    def num_derivatives(self):
+        return self.filter.num_derivatives
+
+    @property
+    def filter(self):
+        return self._filter(**self.kwargs)
+
+    @property
+    def smoother(self):
+        return self._smoother(**self.kwargs)
+
+    @property
+    def fixedpoint(self):
+        return self._fixedpoint(**self.kwargs)
+
+
 class Extrapolation(Generic[S, C]):
     """Extrapolation model interface."""
 

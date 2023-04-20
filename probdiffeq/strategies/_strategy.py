@@ -79,17 +79,6 @@ class Strategy(abc.ABC, Generic[S, P]):
         (extra, correct) = children
         return cls(extra, correct)
 
-    def init_error_estimate(self):
-        return self.extrapolation.init_error_estimate()
-
-    def promote_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.promote_output_scale
-        return init_fn(*args, **kwargs)
-
-    def extract_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.extract_output_scale
-        return init_fn(*args, **kwargs)
-
     def begin(self, state: S, /, *, dt, parameters, vector_field):
         raise NotImplementedError
 
