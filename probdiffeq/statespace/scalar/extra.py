@@ -1,5 +1,5 @@
 """Implementations for scalar initial value problems."""
-
+import jax
 import jax.numpy as jnp
 
 from probdiffeq import _collections, _sqrt_util
@@ -299,3 +299,31 @@ class _IBMFp(_extra.Extrapolation):
         if output_scale.ndim > 0:
             return output_scale[-1]
         return output_scale
+
+
+# Register scalar extrapolations as pytrees because we want to vmap them
+# for block-diagonal models.
+# todo: this feels very temporary...
+
+
+def _flatten(fi):
+    child = fi.a, fi.q_sqrtm_lower, fi.preconditioner_scales, fi.preconditioner_powers
+    aux = ()
+    return child, aux
+
+
+def _fi_unflatten(_aux, children):
+    return _IBMFi(*children)
+
+
+def _sm_unflatten(_aux, children):
+    return _IBMSm(*children)
+
+
+def _fp_unflatten(_aux, children):
+    return _IBMFp(*children)
+
+
+jax.tree_util.register_pytree_node(_IBMFi, _flatten, _fi_unflatten)
+jax.tree_util.register_pytree_node(_IBMSm, _flatten, _sm_unflatten)
+jax.tree_util.register_pytree_node(_IBMFp, _flatten, _fp_unflatten)
