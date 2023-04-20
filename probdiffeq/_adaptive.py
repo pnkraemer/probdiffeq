@@ -1,89 +1,29 @@
 """Adaptive solvers for initial value problems (IVPs)."""
-from typing import Generic, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls, ivpsolvers
 
-S = TypeVar("S")
-"""A type-variable for generic IVP solver states."""
 
-C = TypeVar("C", bound=controls.Control)
-"""A type-variable for generic controller states."""
-
-T = TypeVar("T", bound=ivpsolvers.Solver)
-"""A type-variable for (non-adaptive) IVP solvers."""
-
-
-# basically a namedtuple, but NamedTuples cannot be generic,
-#  which is why we implement this functionality manually.
-@jax.tree_util.register_pytree_node_class
-class _AdaptiveState(Generic[S, C]):
-    """Adaptive IVP solver state."""
-
-    def __init__(
-        self,
-        error_norm_proposed,
-        control: C,
-        proposed: S,
-        accepted: S,
-        solution: S,
-        previous: S,
-    ):
-        self.error_norm_proposed = error_norm_proposed
-        self.control = control
-        self.proposed = proposed
-        self.accepted = accepted
-        self.solution = solution
-        self.previous = previous
-
-    def __repr__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"\n\terror_norm_proposed={self.error_norm_proposed},"
-            f"\n\tcontrol={self.control},"
-            f"\n\tproposed={self.proposed},"
-            f"\n\taccepted={self.accepted},"
-            f"\n\tsolution={self.solution},"
-            f"\n\tprevious={self.previous},"
-            "\n)"
-        )
-
-    def tree_flatten(self):
-        children = (
-            self.error_norm_proposed,
-            self.control,
-            self.proposed,
-            self.accepted,
-            self.solution,
-            self.previous,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (
-            error_norm_proposed,
-            control,
-            proposed,
-            accepted,
-            solution,
-            previous,
-        ) = children
-        return cls(
-            error_norm_proposed=error_norm_proposed,
-            control=control,
-            proposed=proposed,
-            accepted=accepted,
-            solution=solution,
-            previous=previous,
-        )
+# we could make this generic, but any path there would involve
+# custom pytree-registration, which needs a lot of code for such a simple object.
+class _AdaptiveState(NamedTuple):
+    error_norm_proposed: float
+    control: Any
+    proposed: Any
+    accepted: Any
+    solution: Any
+    previous: Any
 
 
 def _reference_state_fn_max_abs(sol, sol_previous):
     return jnp.maximum(jnp.abs(sol), jnp.abs(sol_previous))
+
+
+T = TypeVar("T", bound=ivpsolvers.Solver)
+"""A type-variable for (non-adaptive) IVP solvers."""
 
 
 @jax.tree_util.register_pytree_node_class
