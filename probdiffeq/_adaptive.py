@@ -1,92 +1,36 @@
 """Adaptive solvers for initial value problems (IVPs)."""
-from typing import Generic, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls, ivpsolvers
 
-S = TypeVar("S")
-"""A type-variable for generic IVP solver states."""
 
-C = TypeVar("C", bound=controls.Control)
-"""A type-variable for generic controller states."""
-
-T = TypeVar("T", bound=ivpsolvers.Solver)
-"""A type-variable for (non-adaptive) IVP solvers."""
-
-
-# basically a namedtuple, but NamedTuples cannot be generic,
-#  which is why we implement this functionality manually.
-@jax.tree_util.register_pytree_node_class
-class _AdaptiveState(Generic[S, C]):
-    """Adaptive IVP solver state."""
-
-    def __init__(
-        self,
-        error_norm_proposed,
-        control: C,
-        proposed: S,
-        accepted: S,
-        solution: S,
-        previous: S,
-    ):
-        self.error_norm_proposed = error_norm_proposed
-        self.control = control
-        self.proposed = proposed
-        self.accepted = accepted
-        self.solution = solution
-        self.previous = previous
-
-    def __repr__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"\n\terror_norm_proposed={self.error_norm_proposed},"
-            f"\n\tcontrol={self.control},"
-            f"\n\tproposed={self.proposed},"
-            f"\n\taccepted={self.accepted},"
-            f"\n\tsolution={self.solution},"
-            f"\n\tprevious={self.previous},"
-            "\n)"
-        )
-
-    def tree_flatten(self):
-        children = (
-            self.error_norm_proposed,
-            self.control,
-            self.proposed,
-            self.accepted,
-            self.solution,
-            self.previous,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (
-            error_norm_proposed,
-            control,
-            proposed,
-            accepted,
-            solution,
-            previous,
-        ) = children
-        return cls(
-            error_norm_proposed=error_norm_proposed,
-            control=control,
-            proposed=proposed,
-            accepted=accepted,
-            solution=solution,
-            previous=previous,
-        )
+# we could make this generic, but any path there would involve
+# custom pytree-registration, which needs a lot of code for such a simple object.
+class _AdaptiveState(NamedTuple):
+    error_norm_proposed: float
+    control: Any
+    proposed: Any
+    accepted: Any
+    solution: Any
+    previous: Any
 
 
 def _reference_state_fn_max_abs(sol, sol_previous):
     return jnp.maximum(jnp.abs(sol), jnp.abs(sol_previous))
 
 
-@jax.tree_util.register_pytree_node_class
+T = TypeVar("T", bound=ivpsolvers.Solver)
+"""A type-variable for (non-adaptive) IVP solvers."""
+
+
+# todo: this is the only object in this module
+#  (and I cannot imagine another one coming in the near future)
+#  so why do we need a class in the first place?
+
+
 class AdaptiveIVPSolver(Generic[T]):
     """Adaptive IVP solvers."""
 
@@ -125,38 +69,6 @@ class AdaptiveIVPSolver(Generic[T]):
             f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
-
-    def tree_flatten(self):
-        children = (
-            self.solver,
-            self.atol,
-            self.rtol,
-            self.control,
-            self.numerical_zero,
-        )
-        aux = self.norm_ord, self.reference_state_fn, self.while_loop_fn
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, children):
-        solver, atol, rtol, control, numerical_zero = children
-        norm_ord, reference_state_fn, while_loop_fn = aux
-        return cls(
-            solver=solver,
-            while_loop_fn=while_loop_fn,
-            atol=atol,
-            rtol=rtol,
-            control=control,
-            numerical_zero=numerical_zero,
-            norm_ord=norm_ord,
-            reference_state_fn=reference_state_fn,
-        )
-
-    @property
-    def error_contraction_rate(self):
-        """Error order."""
-        # call self.solver.num_derivatives() ?
-        return self.solver.strategy.extrapolation.num_derivatives + 1
 
     @jax.jit
     def init(self, t, posterior, output_scale, num_steps, dt0):
@@ -198,11 +110,6 @@ class AdaptiveIVPSolver(Generic[T]):
             state,
         )
 
-        # todo: which output scale does this interpolation use?
-        #  the MLE solver should use the prior one, but it looks like
-        #  we are using the calibrated scale.
-        #  to test this, assert that MLESolver and calibrated_solver(mle) are IDENTICAL.
-        #  they will not be if the configuration is such that interpolation matters.
         state = jax.lax.cond(
             state.accepted.t + self.numerical_zero >= t1,
             lambda s: self._interpolate(state=s, t=t1),
@@ -264,10 +171,11 @@ class AdaptiveIVPSolver(Generic[T]):
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
+        error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
         state_control = self.control.apply(
             state=state_control,
             error_normalised=error_normalised,
-            error_contraction_rate=self.error_contraction_rate,
+            error_contraction_rate=error_contraction_rate,
         )
         return _AdaptiveState(
             error_norm_proposed=error_normalised,  # new
@@ -301,6 +209,43 @@ class AdaptiveIVPSolver(Generic[T]):
         solver_extract = self.solver.extract(state.solution)
         control_extract = self.control.extract_dt_from_state(state.control)
         return solver_extract, control_extract
+
+
+# Register outside of class to declutter the AdaptiveIVPSolver source code a bit
+
+
+def _asolver_flatten(asolver: AdaptiveIVPSolver):
+    children = (
+        asolver.solver,
+        asolver.atol,
+        asolver.rtol,
+        asolver.control,
+        asolver.numerical_zero,
+    )
+    aux = asolver.norm_ord, asolver.reference_state_fn, asolver.while_loop_fn
+    return children, aux
+
+
+def _asolver_unflatten(aux, children):
+    solver, atol, rtol, control, numerical_zero = children
+    norm_ord, reference_state_fn, while_loop_fn = aux
+    return AdaptiveIVPSolver(
+        solver=solver,
+        while_loop_fn=while_loop_fn,
+        atol=atol,
+        rtol=rtol,
+        control=control,
+        numerical_zero=numerical_zero,
+        norm_ord=norm_ord,
+        reference_state_fn=reference_state_fn,
+    )
+
+
+jax.tree_util.register_pytree_node(
+    nodetype=AdaptiveIVPSolver,
+    flatten_func=_asolver_flatten,
+    unflatten_func=_asolver_unflatten,
+)
 
 
 def _inf_like(tree):
