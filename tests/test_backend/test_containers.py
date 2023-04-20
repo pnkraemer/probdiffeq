@@ -1,5 +1,7 @@
 """Tests for specific containers."""
 
+import dataclasses
+
 import jax.numpy as jnp
 import jax.tree_util
 
@@ -7,7 +9,7 @@ from probdiffeq.backend import containers
 
 
 def test_dataclass_tree():
-    @containers.dataclass
+    @dataclasses.dataclass
     class MyClass:
         a: float
         b: float

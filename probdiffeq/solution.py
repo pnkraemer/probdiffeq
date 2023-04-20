@@ -5,11 +5,12 @@ or to evaluate marginal likelihoods of observations of the solutions.
 """
 
 import functools
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import containers
 from probdiffeq.strategies import smoothers
 
 R = TypeVar("R")
@@ -233,7 +234,10 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
 
 # todo: this smells a lot like a `statespace.SSV` object.
 #  But merging those two data structures might be in the far future.
-class _KalFiltState(NamedTuple):
+
+
+@containers.dataclass_pytree_node
+class _KalFiltState:
     rv: Any
     num_data_points: int
     log_marginal_likelihood: float
@@ -269,7 +273,7 @@ def _init_fn(rv, obs_std, data, strategy):
     obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
     cor = cond_cor(data)
     lml_new = jnp.sum(obs.logpdf(data))
-    return _KalFiltState(cor, 1.0, lml_new)
+    return _KalFiltState(cor, 1.0, log_marginal_likelihood=lml_new)
 
 
 def _filter_step(carry, x, *, strategy):
@@ -292,5 +296,5 @@ def _filter_step(carry, x, *, strategy):
     lml_updated = (num_data * lml_prev + lml_new) / (num_data + 1)
 
     # Return values
-    x = _KalFiltState(cor, num_data + 1, lml_updated)
+    x = _KalFiltState(cor, num_data + 1, log_marginal_likelihood=lml_updated)
     return x, x
