@@ -19,9 +19,6 @@ class NormalQOI(_collections.Normal):
     def condition_on_qoi_observation(self, u, /, observation_std):
         raise NotImplementedError
 
-    def extract_qoi(self):
-        raise NotImplementedError
-
     def extract_qoi_from_sample(self, u, /):
         raise NotImplementedError
 
@@ -60,9 +57,6 @@ class NormalQOI(_collections.Normal):
 @jax.tree_util.register_pytree_node_class
 class SSV(_collections.SSV):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
-
-    def extract_qoi(self):
-        return self.hidden_state.mean[..., 0]
 
     def observe_qoi(self, observation_std):
         # what is this for? batched calls? If so, that seems wrong.

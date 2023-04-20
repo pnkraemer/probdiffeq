@@ -99,10 +99,6 @@ class SSV(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract_qoi(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def extract_qoi_from_sample(self, u, /):
         raise NotImplementedError
 

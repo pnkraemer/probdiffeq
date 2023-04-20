@@ -33,13 +33,6 @@ class DenseSSV(_collections.SSV):
         cor = _conds.DenseConditional(gain, noise=noise, target_shape=self.target_shape)
         return obs, cor
 
-    def extract_qoi(self):
-        if self.hidden_state.mean.ndim == 1:
-            return self._select_derivative(self.hidden_state.mean, i=0)
-
-        select_fn = jax.vmap(self._select_derivative, in_axes=(0, None))
-        return select_fn(self.hidden_state.mean, 0)
-
     def extract_qoi_from_sample(self, u, /):
         if u.ndim == 1:
             return u.reshape(self.target_shape, order="F")[0, ...]

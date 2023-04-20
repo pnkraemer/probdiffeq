@@ -29,9 +29,6 @@ class IsoSSV(_collections.SSV):
         cond = _conds.IsoConditionalQOI(gain, noise=cor)
         return obs, cond
 
-    def extract_qoi(self) -> jax.Array:
-        return self.hidden_state.mean[..., 0, :]
-
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
         return u[..., 0, :]
 
