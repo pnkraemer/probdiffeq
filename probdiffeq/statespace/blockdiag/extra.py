@@ -23,8 +23,6 @@ def ibm_blockdiag(ode_shape, num_derivatives):
         **static,
     )
 
-    return _BlockDiag(ibm_stack)
-
 
 def _tree_stack_duplicates(tree, n):
     return jax.tree_util.tree_map(lambda s: jnp.concatenate([s[None, ...]] * n), tree)
