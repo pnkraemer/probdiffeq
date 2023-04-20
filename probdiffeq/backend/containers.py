@@ -1,21 +1,14 @@
 """Container types."""
-import dataclasses
 
-import jax
+import jax_dataclasses
 
-
-# Might have to combine with typing_extensions.dataclass_transform()
-def dataclass_pytree_node(clz, /):
-    return _register_pytree_node_dataclass(dataclasses.dataclass(frozen=True)(clz))
-
-
-# Very similar to https://github.com/google/jax/issues/2371
-def _register_pytree_node_dataclass(clz, /):
-    def flatten(obj, /):
-        return jax.tree_util.tree_flatten(dataclasses.asdict(obj))
-
-    def unflatten(aux, children):
-        return clz(**aux.unflatten(children))
-
-    jax.tree_util.register_pytree_node(clz, flatten, unflatten)
-    return clz
+# jax_dataclasses is one of few dataclass implementations that can handle
+# nested dataclasses properly.
+# We need A LOT OF nested dataclasses.
+#
+# What about the others?
+# chex.dataclasses requires keyword-only initialisation
+# tjax requires a very recent JAX version (which appears unnecessary for using it here)
+# flax.struct.dataclass works, and jax_dataclasses.pytree_dataclass works.
+# I prefer the jax_dataclasses dependency because it is a much smaller dependency.#
+dataclass_pytree_node = jax_dataclasses.pytree_dataclass
