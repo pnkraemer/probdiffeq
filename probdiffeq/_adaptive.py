@@ -70,12 +70,6 @@ class AdaptiveIVPSolver(Generic[T]):
             "\n)"
         )
 
-    @property
-    def error_contraction_rate(self):
-        """Error order."""
-        # call self.solver.num_derivatives() ?
-        return self.solver.strategy.extrapolation.num_derivatives + 1
-
     @jax.jit
     def init(self, t, posterior, output_scale, num_steps, dt0):
         """Initialise the IVP solver state."""
@@ -177,10 +171,11 @@ class AdaptiveIVPSolver(Generic[T]):
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
+        error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
         state_control = self.control.apply(
             state=state_control,
             error_normalised=error_normalised,
-            error_contraction_rate=self.error_contraction_rate,
+            error_contraction_rate=error_contraction_rate,
         )
         return _AdaptiveState(
             error_norm_proposed=error_normalised,  # new
