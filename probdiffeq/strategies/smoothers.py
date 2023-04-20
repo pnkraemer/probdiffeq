@@ -57,7 +57,7 @@ class Smoother(_strategy.Strategy):
     """Smoother."""
 
     def complete(self, state, /, *, output_scale, vector_field, parameters):
-        ssv, extra = self.extrapolation.smoother_complete(
+        ssv, extra = self.extrapolation.smoother.complete(
             state.ssv, state.extra, output_scale=output_scale
         )
         ssv, corr = self.correction.complete(
@@ -94,7 +94,7 @@ class Smoother(_strategy.Strategy):
         bw_t1_to_t, bw_t_to_t0 = e_1.extra, e_t.extra
         rv_at_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
         mseq_t = MarkovSequence(init=rv_at_t, backward_model=bw_t_to_t0)
-        ssv, _ = self.extrapolation.smoother_init(mseq_t)
+        ssv, _ = self.extrapolation.smoother.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         state_at_t = _SmState(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
 
@@ -127,19 +127,19 @@ class Smoother(_strategy.Strategy):
         return u, marginals
 
     def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.smoother_init(posterior.rand)
+        ssv, extra = self.extrapolation.smoother.init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.smoother_begin(state.ssv, state.extra, dt=dt)
+        ssv, extra = self.extrapolation.smoother.begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
         return _SmState(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
-        seq = self.extrapolation.smoother_solution_from_tcoeffs(taylor_coefficients)
+        seq = self.extrapolation.smoother.solution_from_tcoeffs(taylor_coefficients)
         sol = SmootherSol(seq)
         marginals = seq.init
         u = taylor_coefficients[0]
@@ -147,20 +147,29 @@ class Smoother(_strategy.Strategy):
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
-        mseq = self.extrapolation.smoother_extract(ssv, state.extra)
+        mseq = self.extrapolation.smoother.extract(ssv, state.extra)
         sol = SmootherSol(mseq)  # type: ignore
         return state.t, sol
 
-    # Auxiliary routines that are the same among all subclasses
-
     def _extrapolate(self, *, s0, output_scale, t):
         dt = t - s0.t
-        ssv, extra = self.extrapolation.smoother_begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.smoother_complete(
+        ssv, extra = self.extrapolation.smoother.begin(s0.ssv, s0.extra, dt=dt)
+        ssv, extra = self.extrapolation.smoother.complete(
             ssv, extra, output_scale=output_scale
         )
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
+
+    def init_error_estimate(self):
+        return self.extrapolation.smoother.init_error_estimate()
+
+    def promote_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.smoother.promote_output_scale
+        return init_fn(*args, **kwargs)
+
+    def extract_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.smoother.extract_output_scale
+        return init_fn(*args, **kwargs)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -176,26 +185,26 @@ class FixedPointSmoother(_strategy.Strategy):
     """
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
-        seq = self.extrapolation.fixpt_solution_from_tcoeffs(taylor_coefficients)
+        seq = self.extrapolation.fixedpoint.solution_from_tcoeffs(taylor_coefficients)
         sol = SmootherSol(seq)
         marginals = seq.init
         u = taylor_coefficients[0]
         return u, marginals, sol
 
     def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.fixpt_init(posterior.rand)
+        ssv, extra = self.extrapolation.fixedpoint.init(posterior.rand)
         ssv, corr = self.correction.init(ssv)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def begin(self, state: _SmState, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.fixpt_begin(state.ssv, state.extra, dt=dt)
+        ssv, extra = self.extrapolation.fixedpoint.begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
         return _SmState(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
 
     def complete(self, state, /, *, output_scale, vector_field, parameters):
-        ssv, extra = self.extrapolation.fixpt_complete(
+        ssv, extra = self.extrapolation.fixedpoint.complete(
             state.ssv, state.extra, output_scale=output_scale
         )
         bw_model, *_ = state.extra
@@ -273,7 +282,7 @@ class FixedPointSmoother(_strategy.Strategy):
         # (Which is different for the non-fixed-point smoother)
         rv_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
         mseq_t = MarkovSequence(init=rv_t, backward_model=bw_t_to_qoi)
-        ssv_t, _ = self.extrapolation.fixpt_init(mseq_t)
+        ssv_t, _ = self.extrapolation.fixedpoint.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         sol_t = _SmState(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
 
@@ -293,7 +302,7 @@ class FixedPointSmoother(_strategy.Strategy):
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
-        mseq = self.extrapolation.fixpt_extract(ssv, state.extra)
+        mseq = self.extrapolation.fixedpoint.extract(ssv, state.extra)
         sol = SmootherSol(mseq)  # type: ignore
         return state.t, sol
 
@@ -301,8 +310,8 @@ class FixedPointSmoother(_strategy.Strategy):
 
     def _extrapolate(self, *, s0, output_scale, t):
         dt = t - s0.t
-        ssv, extra = self.extrapolation.fixpt_begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.fixpt_complete(
+        ssv, extra = self.extrapolation.fixedpoint.begin(s0.ssv, s0.extra, dt=dt)
+        ssv, extra = self.extrapolation.fixedpoint.complete(
             ssv, extra, output_scale=output_scale
         )
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
@@ -310,7 +319,18 @@ class FixedPointSmoother(_strategy.Strategy):
 
     # todo: should this be a classmethod of MarkovSequence?
     def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
-        extra_new = self.extrapolation.fixpt_init_conditional(
+        extra_new = self.extrapolation.fixedpoint.init_conditional(
             rv_proto=state.extra.noise
         )
         return _SmState(t=state.t, extra=extra_new, corr=state.corr, ssv=state.ssv)
+
+    def init_error_estimate(self):
+        return self.extrapolation.fixedpoint.init_error_estimate()
+
+    def promote_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.fixedpoint.promote_output_scale
+        return init_fn(*args, **kwargs)
+
+    def extract_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.fixedpoint.extract_output_scale
+        return init_fn(*args, **kwargs)

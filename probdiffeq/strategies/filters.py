@@ -65,21 +65,21 @@ class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
-        sol = self.extrapolation.filter_solution_from_tcoeffs(taylor_coefficients)
+        sol = self.extrapolation.filter.solution_from_tcoeffs(taylor_coefficients)
         sol = FilterDist(sol)
         marginals = sol
         u = taylor_coefficients[0]
         return u, marginals, sol
 
     def init(self, t, solution, /) -> _FiState:
-        ssv, extra = self.extrapolation.filter_init(solution.rand)
+        ssv, extra = self.extrapolation.filter.init(solution.rand)
         ssv, corr = self.correction.init(ssv)
         return _FiState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def extract(self, posterior: _FiState, /):
         t = posterior.t
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
-        rv = self.extrapolation.filter_extract(ssv, posterior.extra)
+        rv = self.extrapolation.filter.extract(ssv, posterior.extra)
 
         solution = FilterDist(rv)  # type: ignore
         return t, solution
@@ -96,8 +96,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         # to the in-between variable. That's it.
         dt = t - s0.t
 
-        ssv, extra = self.extrapolation.filter_begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.filter_complete(
+        ssv, extra = self.extrapolation.filter.begin(s0.ssv, s0.extra, dt=dt)
+        ssv, extra = self.extrapolation.filter.complete(
             ssv, extra, output_scale=output_scale
         )
 
@@ -126,17 +126,28 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return posterior.marginals()
 
     def begin(self, state: _FiState, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.filter_begin(state.ssv, state.extra, dt=dt)
+        ssv, extra = self.extrapolation.filter.begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t + dt, p=parameters
         )
         return _FiState(t=state.t + dt, ssv=ssv, corr=corr, extra=extra)
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
-        ssv, extra = self.extrapolation.filter_complete(
+        ssv, extra = self.extrapolation.filter.complete(
             state.ssv, state.extra, output_scale=output_scale
         )
         ssv, corr = self.correction.complete(
             ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
         return _FiState(t=state.t, ssv=ssv, extra=extra, corr=corr)
+
+    def init_error_estimate(self):
+        return self.extrapolation.filter.init_error_estimate()
+
+    def promote_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.filter.promote_output_scale
+        return init_fn(*args, **kwargs)
+
+    def extract_output_scale(self, *args, **kwargs):
+        init_fn = self.extrapolation.filter.extract_output_scale
+        return init_fn(*args, **kwargs)

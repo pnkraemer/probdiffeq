@@ -233,7 +233,7 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
         )
 
     def init_fn(rv, obs_std, data):
-        ssv, _ = strategy.extrapolation.filter_init(rv)
+        ssv, _ = strategy.extrapolation.filter.init(rv)
         obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
         cor = cond_cor(data)
         nmll_new = jnp.sum(obs.logpdf(data))
@@ -248,7 +248,7 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
         rv_ext = bw_model.marginalise(rv)
 
         # Correct (with an alias for long function names)
-        ssv, _ = strategy.extrapolation.filter_init(rv_ext)
+        ssv, _ = strategy.extrapolation.filter.init(rv_ext)
         obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
         cor = cond_cor(data)
 
