@@ -4,6 +4,7 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
+import functools
 from typing import Any, Generic, NamedTuple, TypeVar
 
 import jax
@@ -182,12 +183,6 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, st
     return jnp.sum(obs.logpdf(u))
 
 
-class _NMLLState(NamedTuple):
-    rv: Any
-    num_data: int
-    nmll: float
-
-
 def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     """Compute the log-marginal-likelihood of \
      observations of the IVP solution.
@@ -232,55 +227,70 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    def init_fn(rv, obs_std, data):
-        ssv, _ = strategy.extrapolation.filter.init(rv)
-        obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
-        cor = cond_cor(data)
-        nmll_new = jnp.sum(obs.logpdf(data))
-        return _NMLLState(cor, 1.0, nmll_new)
+    result = _kalman_filter(u, posterior.rand, observation_std, strategy=strategy)
+    return result
 
-    def filter_step(carry, x):
-        # Read
-        rv, num_data, nmll_prev = carry.rv, carry.num_data, carry.nmll
-        bw_model, obs_std, data = x
 
-        # Extrapolate
-        rv_ext = bw_model.marginalise(rv)
+# todo: this smells a lot like a `statespace.SSV` object.
+#  But merging those two data structures might be in the far future.
+class _KalFiltState(NamedTuple):
+    rv: Any
+    num_data_points: int
+    log_marginal_likelihood: float
 
-        # Correct (with an alias for long function names)
-        ssv, _ = strategy.extrapolation.filter.init(rv_ext)
-        obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
-        cor = cond_cor(data)
 
-        # Compute marginal log likelihood (with an alias for long function names)
-        nmll_new = jnp.sum(obs.logpdf(data))
-        nmll_updated = (num_data * nmll_prev + nmll_new) / (num_data + 1)
-
-        # Return values
-        x = _NMLLState(cor, num_data + 1, nmll_updated)
-        return x, x
-
-    # todo: this should return a Filtering posterior or a smoothing posterior
-    #  which could then be plotted. Right?
-    #  (We might also want some dense-output/checkpoint kind of thing here)
-    # todo: we should reuse the extrapolation model statespace.
-    #  But this only works if the ODE posterior uses the preconditioner (I think).
-    # todo: we should allow proper noise, and proper information functions.
-    #  But it is not clear which data structure that should be.
-    #
-
+# todo: this should return a Filtering posterior or a smoothing posterior
+#  which could then be plotted. Right?
+#  (We might also want some dense-output/checkpoint kind of thing here)
+# todo: we should reuse the extrapolation model statespace.
+#  But this only works if the ODE posterior uses the preconditioner (I think).
+# todo: we should allow proper noise, and proper information functions.
+#  But it is not clear which data structure that should be.
+def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(
-        lambda x: x[1:, ...], posterior.rand.backward_model
-    )
+    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.backward_model)
 
     # Incorporate final data point
-    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], posterior.rand.init)
-    init = init_fn(rv_terminal, observation_std[-1], u[-1])
-    (_, _, nmll), _ = jax.lax.scan(
-        f=filter_step,
+    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
+    init = _init_fn(rv_terminal, standard_deviations[-1], u[-1], strategy)
+
+    # Scan over the remaining data points
+    lml_state, _ = jax.lax.scan(
+        f=functools.partial(_filter_step, strategy=strategy),
         init=init,
-        xs=(bw_models, observation_std[:-1], u[:-1]),
-        reverse=True,
+        xs=(bw_models, standard_deviations[:-1], u[:-1]),
+        reverse=reverse,
     )
-    return nmll
+    return lml_state.log_marginal_likelihood
+
+
+def _init_fn(rv, obs_std, data, strategy):
+    ssv, _ = strategy.extrapolation.filter.init(rv)
+    obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
+    cor = cond_cor(data)
+    lml_new = jnp.sum(obs.logpdf(data))
+    return _KalFiltState(cor, 1.0, lml_new)
+
+
+def _filter_step(carry, x, *, strategy):
+    # Read
+    rv = carry.rv
+    num_data = carry.num_data_points
+    lml_prev = carry.log_marginal_likelihood
+    bw_model, obs_std, data = x
+
+    # Extrapolate
+    rv_ext = bw_model.marginalise(rv)
+
+    # Correct (with an alias for long function names)
+    ssv, _ = strategy.extrapolation.filter.init(rv_ext)
+    obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
+    cor = cond_cor(data)
+
+    # Compute marginal log likelihood (with an alias for long function names)
+    lml_new = jnp.sum(obs.logpdf(data))
+    lml_updated = (num_data * lml_prev + lml_new) / (num_data + 1)
+
+    # Return values
+    x = _KalFiltState(cor, num_data + 1, lml_updated)
+    return x, x
