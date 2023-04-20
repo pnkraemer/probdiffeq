@@ -23,14 +23,7 @@ class ExtrapolationBundle:
         self._static = static
 
     def __repr__(self):
-        name = self.__class__.__name__
-        return (
-            f"{name}("
-            f"{self.filter}, "
-            f"{self.smoother}, "
-            f"{self.fixedpoint}, "
-            f"{self._dynamic})"
-        )
+        return repr(self.filter)
 
     def tree_flatten(self):
         children = (self._dynamic,)

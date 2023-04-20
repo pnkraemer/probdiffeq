@@ -24,6 +24,10 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
+    def __repr__(self):
+        args2 = f"num_derivatives={self.num_derivatives}"
+        return f"<Isotropic IBM with {args2}>"
+
     # Content:
 
     def solution_from_tcoeffs(self, tcoeffs, /):
