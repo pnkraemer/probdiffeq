@@ -1,5 +1,3 @@
 """Container types."""
 
-import typing
-
-NamedTuple = typing.NamedTuple
+from typing import NamedTuple  # noqa: F401

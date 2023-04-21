@@ -1,10 +1,12 @@
 """Step-size control algorithms."""
 
 import dataclasses
-from typing import Generic, NamedTuple, TypeVar
+from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
+
+from probdiffeq.backend import containers
 
 S = TypeVar("S")
 """Controller state."""
@@ -32,7 +34,7 @@ class Control(Generic[S]):
         raise NotImplementedError
 
 
-class _PIState(NamedTuple):
+class _PIState(containers.NamedTuple):
     """Proportional-integral controller state."""
 
     dt_proposed: jax.Array
@@ -122,7 +124,7 @@ class ProportionalIntegralClipped(_ProportionalIntegralCommon):
         return _PIState(dt_clipped, state.error_norm_previously_accepted)
 
 
-class _IState(NamedTuple):
+class _IState(containers.NamedTuple):
     dt_proposed: jax.Array
 
 

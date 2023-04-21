@@ -1,15 +1,16 @@
 """Adaptive solvers for initial value problems (IVPs)."""
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls, ivpsolvers
+from probdiffeq.backend import containers
 
 
 # we could make this generic, but any path there would involve
 # custom pytree-registration, which needs a lot of code for such a simple object.
-class _AdaptiveState(NamedTuple):
+class _AdaptiveState(containers.NamedTuple):
     error_norm_proposed: float
     control: Any
     proposed: Any

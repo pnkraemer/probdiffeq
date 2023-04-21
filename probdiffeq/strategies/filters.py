@@ -1,14 +1,15 @@
 """Forward-only estimation: filtering."""
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
+from probdiffeq.backend import containers
 from probdiffeq.strategies import _strategy
 
 
-class _FiState(NamedTuple):
+class _FiState(containers.NamedTuple):
     """Filtering state."""
 
     ssv: Any

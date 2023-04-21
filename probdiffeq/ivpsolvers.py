@@ -1,14 +1,15 @@
 """Calibrated IVP solvers."""
 
-from typing import Any, NamedTuple
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp, _sqrt_util, solution
+from probdiffeq.backend import containers
 
 
-class _State(NamedTuple):
+class _State(containers.NamedTuple):
     """Solver state."""
 
     strategy: Any

@@ -1,13 +1,15 @@
 """Cubature rules."""
 
-from typing import Any, Callable, NamedTuple
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
+from probdiffeq.backend import containers
 
-class PositiveCubatureRule(NamedTuple):
+
+class PositiveCubatureRule(containers.NamedTuple):
     """Cubature rule with positive weights."""
 
     points: jax.Array

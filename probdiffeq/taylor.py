@@ -1,7 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 import functools
-from typing import Any, Callable, NamedTuple, Tuple
+from typing import Any, Callable, Tuple
 
 import jax
 import jax.experimental.jet
@@ -9,6 +9,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 from probdiffeq import _markov
+from probdiffeq.backend import containers
 from probdiffeq.statespace import recipes
 
 
@@ -194,7 +195,7 @@ def _runge_kutta_starter_fn(
     return taylor_coefficients
 
 
-class _FpState(NamedTuple):
+class _FpState(containers.NamedTuple):
     ssv: Any
     extra: Any
 
