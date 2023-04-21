@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 
-from probdiffeq import _collections, _sqrt_util
+from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.dense import _vars
 
@@ -148,7 +148,7 @@ class _IBMSm(_extra.Extrapolation):
             target_shape=self.target_shape,
         )
         conds = self.init_conditional(rv_proto=rv)
-        return _collections.MarkovSequence(init=rv, backward_model=conds)
+        return _markov.MarkovSequence(init=rv, backward_model=conds)
 
     def _stack_tcoeffs(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
@@ -163,16 +163,16 @@ class _IBMSm(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def init(self, sol: _collections.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSequence, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = _vars.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = sol.backward_model
         return ssv, extra
 
-    def extract(self, ssv, extra, /) -> _collections.MarkovSequence:
+    def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
         rv = ssv.hidden_state
         cond = extra
-        return _collections.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -295,7 +295,7 @@ class _IBMFp(_extra.Extrapolation):
             target_shape=self.target_shape,
         )
         conds = self.init_conditional(rv_proto=rv)
-        return _collections.MarkovSequence(init=rv, backward_model=conds)
+        return _markov.MarkovSequence(init=rv, backward_model=conds)
 
     def _stack_tcoeffs(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
@@ -310,17 +310,17 @@ class _IBMFp(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def init(self, sol: _collections.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSequence, /):
         # todo: reset init
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = _vars.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = sol.backward_model
         return ssv, extra
 
-    def extract(self, ssv, extra, /) -> _collections.MarkovSequence:
+    def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
         rv = ssv.hidden_state
         cond = extra
-        return _collections.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init_error_estimate(self):
         return jnp.zeros(self.ode_shape)  # the initialisation is error-free

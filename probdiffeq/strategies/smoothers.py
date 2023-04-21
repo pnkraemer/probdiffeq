@@ -5,12 +5,12 @@ from typing import Any, NamedTuple, Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq._collections import InterpRes, MarkovSequence
+from probdiffeq import _interp, _markov
 from probdiffeq.strategies import _strategy
 
 
 @jax.tree_util.register_pytree_node_class
-class SmootherSol(_strategy.Posterior[MarkovSequence]):
+class SmootherSol(_strategy.Posterior[_markov.MarkovSequence]):
     """Smmoothing solution."""
 
     def sample(self, key, *, shape):
@@ -30,7 +30,9 @@ class SmootherSol(_strategy.Posterior[MarkovSequence]):
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.rand.init)
 
         # todo: this construction should not happen here...
-        markov = MarkovSequence(init=init, backward_model=self.rand.backward_model)
+        markov = _markov.MarkovSequence(
+            init=init, backward_model=self.rand.backward_model
+        )
         return markov.marginalise_backwards()
 
 
@@ -67,12 +69,12 @@ class Smoother(_strategy.Strategy):
 
     def case_right_corner(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
-    ) -> InterpRes[_SmState]:
-        return InterpRes(accepted=s1, solution=s1, previous=s1)
+    ) -> _interp.InterpRes[_SmState]:
+        return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
-    ) -> InterpRes[_SmState]:
+    ) -> _interp.InterpRes[_SmState]:
         """Interpolate.
 
         A smoother interpolates by_
@@ -93,7 +95,7 @@ class Smoother(_strategy.Strategy):
         # Marginalise from t1 to t to obtain the interpolated solution.
         bw_t1_to_t, bw_t_to_t0 = e_1.extra, e_t.extra
         rv_at_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
-        mseq_t = MarkovSequence(init=rv_at_t, backward_model=bw_t_to_t0)
+        mseq_t = _markov.MarkovSequence(init=rv_at_t, backward_model=bw_t_to_t0)
         ssv, _ = self.extrapolation.smoother.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         state_at_t = _SmState(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
@@ -102,7 +104,7 @@ class Smoother(_strategy.Strategy):
         # get back to t, not to t0.
         # The other two are the extrapolated solution
         s_1 = _SmState(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
-        return InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
+        return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
     def offgrid_marginals(
         self,
@@ -222,11 +224,13 @@ class FixedPointSmoother(_strategy.Strategy):
 
         accepted = self._duplicate_with_unit_backward_model(solution)
         previous = self._duplicate_with_unit_backward_model(solution)
-        return InterpRes(accepted=accepted, solution=solution, previous=previous)
+        return _interp.InterpRes(
+            accepted=accepted, solution=solution, previous=previous
+        )
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
-    ) -> InterpRes[_SmState]:
+    ) -> _interp.InterpRes[_SmState]:
         """Interpolate.
 
         A fixed-point smoother interpolates by_
@@ -281,7 +285,7 @@ class FixedPointSmoother(_strategy.Strategy):
         # Note how we use the bw_to_to_qoi backward model!
         # (Which is different for the non-fixed-point smoother)
         rv_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
-        mseq_t = MarkovSequence(init=rv_t, backward_model=bw_t_to_qoi)
+        mseq_t = _markov.MarkovSequence(init=rv_t, backward_model=bw_t_to_qoi)
         ssv_t, _ = self.extrapolation.fixedpoint.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         sol_t = _SmState(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
@@ -298,7 +302,7 @@ class FixedPointSmoother(_strategy.Strategy):
         acc_t1 = _SmState(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
 
         # Bundle up the results and return
-        return InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
+        return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
 
     def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
         ssv = self.correction.extract(state.ssv, state.corr)
@@ -317,7 +321,7 @@ class FixedPointSmoother(_strategy.Strategy):
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
-    # todo: should this be a classmethod of MarkovSequence?
+    # todo: should this be a classmethod of _markov.MarkovSequence?
     def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
         extra_new = self.extrapolation.fixedpoint.init_conditional(
             rv_proto=state.extra.noise

@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _collections, _sqrt_util
+from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.scalar import _vars
 
@@ -103,7 +103,7 @@ class _IBMSm(_extra.Extrapolation):
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
         cond = self.init_conditional(rv_proto=rv)
-        return _collections.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def _stack_tcoeffs(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
@@ -115,13 +115,13 @@ class _IBMSm(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def init(self, sol: _collections.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSequence, /):
         ssv = _vars.SSV(sol.init.mean[0], sol.init)
         extra = sol.backward_model
         return ssv, extra
 
     def extract(self, ssv, extra, /):
-        return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
+        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
 
     def init_error_estimate(self):
         return jnp.zeros(())
@@ -209,7 +209,7 @@ class _IBMFp(_extra.Extrapolation):
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
         cond = self.init_conditional(rv_proto=rv)
-        return _collections.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def _stack_tcoeffs(self, taylor_coefficients):
         if len(taylor_coefficients) != self.num_derivatives + 1:
@@ -221,14 +221,14 @@ class _IBMFp(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def init(self, sol: _collections.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSequence, /):
         # todo: reset backward model
         ssv = _vars.SSV(sol.init.mean[0], sol.init)
         extra = sol.backward_model
         return ssv, extra
 
     def extract(self, ssv, extra, /):
-        return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
+        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
 
     def init_error_estimate(self):
         return jnp.zeros(())

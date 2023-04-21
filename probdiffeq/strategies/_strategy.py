@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 
 import jax
 
-from probdiffeq._collections import InterpRes
+from probdiffeq import _interp
 
 S = TypeVar("S")
 """A type-variable to indicate strategy-state types."""
@@ -57,10 +57,14 @@ class Strategy(Generic[S, P]):
     def extract(self, state: S, /) -> P:
         raise NotImplementedError
 
-    def case_right_corner(self, t, *, s0: S, s1: S, output_scale) -> InterpRes[S]:
+    def case_right_corner(
+        self, t, *, s0: S, s1: S, output_scale
+    ) -> _interp.InterpRes[S]:
         raise NotImplementedError
 
-    def case_interpolate(self, t, *, s0: S, s1: S, output_scale) -> InterpRes[S]:
+    def case_interpolate(
+        self, t, *, s0: S, s1: S, output_scale
+    ) -> _interp.InterpRes[S]:
         raise NotImplementedError
 
     def offgrid_marginals(
