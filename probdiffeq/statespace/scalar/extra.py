@@ -46,9 +46,6 @@ class _IBMFi(_extra.Extrapolation):
     def extract(self, ssv, extra, /):
         return ssv.hidden_state
 
-    def init_error_estimate(self):
-        return jnp.zeros(())
-
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
@@ -122,9 +119,6 @@ class _IBMSm(_extra.Extrapolation):
 
     def extract(self, ssv, extra, /):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
-
-    def init_error_estimate(self):
-        return jnp.zeros(())
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -229,9 +223,6 @@ class _IBMFp(_extra.Extrapolation):
 
     def extract(self, ssv, extra, /):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
-
-    def init_error_estimate(self):
-        return jnp.zeros(())
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)

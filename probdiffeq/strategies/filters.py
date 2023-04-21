@@ -143,9 +143,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
         return _FiState(t=state.t, ssv=ssv, extra=extra, corr=corr)
 
-    def init_error_estimate(self):
-        return self.extrapolation.filter.init_error_estimate()
-
     def promote_output_scale(self, *args, **kwargs):
         init_fn = self.extrapolation.filter.promote_output_scale
         return init_fn(*args, **kwargs)
