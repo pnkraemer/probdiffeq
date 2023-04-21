@@ -100,7 +100,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         fx = self.linearise_fn(fn=f_wrapped, m=m0)
 
         b = m1 - fx
-        l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        l_obs_raw = _sqrt_util.triu_via_qr(cov_sqrtm_lower.T).T
         observed = variables.DenseNormal(b, l_obs_raw, target_shape=None)
 
         mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
@@ -184,7 +184,7 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         cov_sqrtm_lower = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
 
         # Gather the observed variable
-        l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower.T).T
+        l_obs_raw = _sqrt_util.triu_via_qr(cov_sqrtm_lower.T).T
         observed = variables.DenseNormal(b, l_obs_raw, target_shape=None)
 
         # Extract the output scale and the error estimate
@@ -279,7 +279,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         # Compute the linearisation point
         m_0 = self.e0(ssv.hidden_state.mean)
         r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
-        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.triu_via_qr(r_0)
         lin_pt = variables.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # todo: higher-order ODEs
@@ -316,7 +316,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         r_1 = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower).T
 
         # Extract the linearisation point
-        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.triu_via_qr(r_0)
         lin_pt = variables.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # Apply statistical linear regression to the ODE vector field
@@ -388,7 +388,7 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         # Compute the linearisation point
         m_0 = self.e0(ssv.hidden_state.mean)
         r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
-        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.triu_via_qr(r_0)
         lin_pt = variables.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # todo: higher-order ODEs
@@ -425,7 +425,7 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         r_1 = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower).T
 
         # Extract the linearisation point
-        r_0_square = _sqrt_util.sqrtm_to_upper_triangular(R=r_0)
+        r_0_square = _sqrt_util.triu_via_qr(r_0)
         lin_pt = variables.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # Apply statistical linear regression to the ODE vector field

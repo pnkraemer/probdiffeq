@@ -164,9 +164,7 @@ class SSV(variables.SSV):
 
         mean = self.hidden_state.mean[n]
         cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
-        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
-            R=cov_sqrtm_lower_nonsquare[:, None]
-        ).T
+        cov_sqrtm_lower = _sqrt_util.triu_via_qr(cov_sqrtm_lower_nonsquare[:, None]).T
         return NormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
 
 
@@ -201,9 +199,7 @@ class NormalHiddenState(variables.Normal):
 
         mean = self.mean[n]
         cov_sqrtm_lower_nonsquare = self.cov_sqrtm_lower[n, :]
-        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
-            R=cov_sqrtm_lower_nonsquare[:, None]
-        ).T
+        cov_sqrtm_lower = _sqrt_util.triu_via_qr(cov_sqrtm_lower_nonsquare[:, None]).T
         return NormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
 
     def extract_qoi_from_sample(self, u, /):

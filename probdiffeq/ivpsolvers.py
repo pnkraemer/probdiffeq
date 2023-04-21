@@ -269,7 +269,7 @@ class MLESolver(Solver):
             return fn_vmap(diffsqrtm, obs)
 
         x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
-        sum_updated = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
+        sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(n) * diffsqrtm, x)
         return sum_updated / jnp.sqrt(n + 1)
 
     def extract(self, state: _State, /):

@@ -101,7 +101,7 @@ class IsoSSV(variables.SSV):
         mean = self.hidden_state.mean[n, :]
         cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
         R = cov_sqrtm_lower_nonsquare[:, None]
-        cov_sqrtm_lower_square = _sqrt_util.sqrtm_to_upper_triangular(R=R)
+        cov_sqrtm_lower_square = _sqrt_util.triu_via_qr(R)
         cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
         return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
@@ -135,7 +135,7 @@ class IsoNormalHiddenState(variables.Normal):
         mean = self.mean[n, :]
         cov_sqrtm_lower_nonsquare = self.cov_sqrtm_lower[n, :]
         R = cov_sqrtm_lower_nonsquare[:, None]
-        cov_sqrtm_lower_square = _sqrt_util.sqrtm_to_upper_triangular(R=R)
+        cov_sqrtm_lower_square = _sqrt_util.triu_via_qr(R)
         cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
         return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 

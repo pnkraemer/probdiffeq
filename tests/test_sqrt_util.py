@@ -55,12 +55,12 @@ def _some_array(shape):
     return jnp.arange(1.0, 1.0 + prod(shape)).reshape(shape)
 
 
-def test_sqrt_sum_square():
+def test_sqrt_sum_square_scalar():
     a = 3.0
     b = 4.0
     c = 5.0
     expected = jnp.sqrt(a**2 + b**2 + c**2)
-    received = _sqrt_util.sqrt_sum_square(a, b, c)
+    received = _sqrt_util.sqrt_sum_square_scalar(a, b, c)
     assert jnp.allclose(expected, received)
 
 
@@ -69,4 +69,4 @@ def test_sqrt_sum_square_error():
     b = 4.0 * jnp.eye(2)
     c = 5.0 * jnp.eye(2)
     with testing.raises(ValueError, match="scalar"):
-        _ = _sqrt_util.sqrt_sum_square(a, b, c)
+        _ = _sqrt_util.sqrt_sum_square_scalar(a, b, c)
