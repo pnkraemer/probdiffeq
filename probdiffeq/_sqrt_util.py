@@ -36,7 +36,7 @@ def revert_conditional_noisefree(*, R_X_F, R_X):
         )
         raise ValueError(msg)
 
-    r_marg = sqrtm_to_upper_triangular(R=R_X_F)
+    r_marg = triu_via_qr(R_X_F)
     crosscov = R_X.T @ R_X_F
     gain = jax.scipy.linalg.cho_solve((r_marg.T, True), crosscov.T).T
     r_cor = R_X - R_X_F @ gain.T
@@ -45,7 +45,7 @@ def revert_conditional_noisefree(*, R_X_F, R_X):
     #  I don't like the double-QR decomposition --
     #  it feels that we don't save any computation here...
     if r_cor.shape[0] != r_cor.shape[1]:
-        r_cor = sqrtm_to_upper_triangular(R=r_cor)
+        r_cor = triu_via_qr(r_cor)
     return r_marg, (r_cor, gain)
 
 
@@ -67,12 +67,6 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
 
     _The present function provides the machinery to change the covariance
     parametrisation from $p(Y \mid X) p(X)$ to $p(X \mid Y) p(Y)$._
-
-    !!! note "Application"
-
-        This function is crucial to compute the backward transitions
-        in Kalman-smoothing-like applications.
-
 
     The signature of this function is now
 
@@ -102,8 +96,7 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
             [R_X_F, R_X],
         ]
     )
-    # todo: point to sqrtm_to_upper_triangular()
-    R = jnp.linalg.qr(R, mode="r")
+    R = triu_via_qr(R)
 
     # ~R_{Y}
     d_out = R_YX.shape[1]
@@ -123,30 +116,32 @@ def revert_conditional(*, R_X_F, R_X, R_YX):
 def sum_of_sqrtm_factors(*, R_stack: Tuple):
     r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
     R = jnp.concatenate(R_stack)
-    uppertri = sqrtm_to_upper_triangular(R=R)
+    uppertri = triu_via_qr(R)
     if jnp.ndim(R_stack[0]) == 0:
         return jnp.reshape(uppertri, ())
     return uppertri
 
 
-def sqrt_sum_square(*args):  # logsumexp but for squares
+# logsumexp but for squares
+def sqrt_sum_square_scalar(*args):
+    """Compute sqrt(a**2 + b**2) without squaring a or b."""
     args_are_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) == 0, args)
     if not jax.tree_util.tree_all(args_are_scalar):
         args_shapes = jax.tree_util.tree_map(jnp.shape, args)
-        msg1 = "'sqrt_sum_square' expects scalar arguments. "
+        msg1 = "'sqrt_sum_square_scalar' expects scalar arguments. "
         msg2 = f"PyTree with shapes {args_shapes} received."
         raise ValueError(msg1 + msg2)
 
     stack = jnp.stack(args)
-    sqrt_mat = sqrtm_to_upper_triangular(R=stack[:, None])
+    sqrt_mat = triu_via_qr(stack[:, None])
     sqrt_mat_abs = jnp.abs(sqrt_mat)  # convention
     return jnp.reshape(sqrt_mat_abs, ())
 
 
-def sqrtm_to_upper_triangular(*, R):
-    """Transform a right matrix square root to a Cholesky factor."""
+def triu_via_qr(R, /):
+    """Upper-triangularise a matrix using a QR-decomposition."""
     # todo: enforce positive diagonals?
     #  (or expose this option; some equivalence tests might fail
     #   if we always use a positive diagonal.)
-    upper_sqrtm = jnp.linalg.qr(R, mode="r")
-    return upper_sqrtm
+    triu = jnp.linalg.qr(R, mode="r")
+    return triu

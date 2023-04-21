@@ -69,11 +69,11 @@ class Solver:
         )
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _State:
-        state_strategy = self.strategy.init(t, posterior)
-        error_estimate = jnp.empty_like(state_strategy.u)
+        error_estimate = self.strategy.init_error_estimate()
+        strategy_state = self.strategy.init(t, posterior)
         return _State(
             error_estimate=error_estimate,
-            strategy=state_strategy,
+            strategy=strategy_state,
             output_scale_prior=output_scale,
             output_scale_calibrated=output_scale,
             num_steps=num_steps,
@@ -269,7 +269,7 @@ class MLESolver(Solver):
             return fn_vmap(diffsqrtm, obs)
 
         x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
-        sum_updated = _sqrt_util.sqrt_sum_square(jnp.sqrt(n) * diffsqrtm, x)
+        sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(n) * diffsqrtm, x)
         return sum_updated / jnp.sqrt(n + 1)
 
     def extract(self, state: _State, /):

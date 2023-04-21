@@ -29,9 +29,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         bias = m1 - vector_field(*m0, t=t, p=p)
         cov_sqrtm_lower = x.hidden_state.cov_sqrtm_lower[self.ode_order, ...]
 
-        l_obs_nonscalar = _sqrt_util.sqrtm_to_upper_triangular(
-            R=cov_sqrtm_lower[:, None]
-        )
+        l_obs_nonscalar = _sqrt_util.triu_via_qr(cov_sqrtm_lower[:, None])
         l_obs = jnp.reshape(l_obs_nonscalar, ())
         obs = variables.IsoNormalQOI(bias, l_obs)
 
@@ -50,7 +48,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         l_ext = x.hidden_state.cov_sqrtm_lower
         l_obs = l_ext[self.ode_order, ...]
 
-        l_obs_nonscalar = _sqrt_util.sqrtm_to_upper_triangular(R=l_obs[:, None])
+        l_obs_nonscalar = _sqrt_util.triu_via_qr(l_obs[:, None])
         l_obs_scalar = jnp.reshape(l_obs_nonscalar, ())
 
         observed = variables.IsoNormalQOI(mean=bias, cov_sqrtm_lower=l_obs_scalar)

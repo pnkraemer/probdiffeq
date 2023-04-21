@@ -127,9 +127,7 @@ class DenseSSV(variables.SSV):
         cov_sqrtm_lower_nonsquare = self._select_derivative_vect(
             self.hidden_state.cov_sqrtm_lower, n
         )
-        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
-            R=cov_sqrtm_lower_nonsquare.T
-        ).T
+        cov_sqrtm_lower = _sqrt_util.triu_via_qr(cov_sqrtm_lower_nonsquare.T).T
         return DenseNormal(mean, cov_sqrtm_lower, target_shape=None)
 
     def _select_derivative_vect(self, x, i):
@@ -233,9 +231,7 @@ class DenseNormal(variables.Normal):
         cov_sqrtm_lower_nonsquare = self._select_derivative_vect(
             self.cov_sqrtm_lower, n
         )
-        cov_sqrtm_lower = _sqrt_util.sqrtm_to_upper_triangular(
-            R=cov_sqrtm_lower_nonsquare.T
-        ).T
+        cov_sqrtm_lower = _sqrt_util.triu_via_qr(cov_sqrtm_lower_nonsquare.T).T
         return DenseNormal(mean, cov_sqrtm_lower, target_shape=None)
 
     def _select_derivative_vect(self, x, i):

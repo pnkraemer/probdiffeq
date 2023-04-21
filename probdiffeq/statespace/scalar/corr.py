@@ -37,7 +37,7 @@ class _TaylorZerothOrder(_corr.Correction):
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
         cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, :]
-        l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
+        l_obs_raw = _sqrt_util.triu_via_qr(cov_sqrtm_lower[:, None])
         l_obs = jnp.reshape(l_obs_raw, ())
         observed = variables.NormalQOI(b, l_obs)
         cache = (b,)
@@ -154,7 +154,7 @@ class StatisticalFirstOrder(_corr.Correction):
     def transform_sigma_points(self, rv: variables.NormalHiddenState):
         # Extract square-root of covariance (-> std-dev.)
         L0_nonsq = rv.cov_sqrtm_lower[0, :]
-        r_marg1_x_mat = _sqrt_util.sqrtm_to_upper_triangular(R=L0_nonsq[:, None])
+        r_marg1_x_mat = _sqrt_util.triu_via_qr(L0_nonsq[:, None])
         r_marg1_x = jnp.reshape(r_marg1_x_mat, ())
 
         # Multiply and shift the unit-points
