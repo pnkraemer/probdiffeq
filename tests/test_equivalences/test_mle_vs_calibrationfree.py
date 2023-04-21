@@ -52,8 +52,8 @@ def test_mle_vs_calibrationfree(ode_problem, strategy_fn):
 
     # If we are smoothing, we also compare the backward models.
     if isinstance(strategy, smoothers.FixedPointSmoother):
-        rand_mle = solution_mle.posterior.rand
-        rand_free = solution_free.posterior.rand
+        rand_mle = solution_mle.posterior
+        rand_free = solution_free.posterior
         assert _tree_all_allclose(rand_mle.init, rand_free.init)
 
         bw_mle = rand_mle.backward_model

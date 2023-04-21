@@ -85,12 +85,19 @@ class MarkovSequence(Generic[S]):
             out = conditional.marginalise(rv)
             return out, out
 
-        # Initial condition does not matter
+        # Initial backward model leads into the void
+        # todo: this is only true for the version we use.
         conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.backward_model)
+
+        # If we hold many 'init's, choose the terminal one.
+        if self.backward_model.noise.mean.shape == self.init.mean.shape:
+            init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.init)
+        else:
+            init = self.init
 
         # Scan and return
         reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
-        _, rvs = reverse_scan(f=body_fun, init=self.init, xs=conds)
+        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
         return rvs
 
     @property

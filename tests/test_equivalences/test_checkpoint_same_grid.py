@@ -66,8 +66,8 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     assert jnp.allclose(fp_smo_sol.u, smo_sol.u, **tols)
     assert jnp.allclose(fp_smo_sol.marginals.mean, smo_sol.marginals.mean, **tols)
     assert jnp.allclose(
-        fp_smo_sol.posterior.rand.backward_model.noise.mean,
-        smo_sol.posterior.rand.backward_model.noise.mean,
+        fp_smo_sol.posterior.backward_model.noise.mean,
+        smo_sol.posterior.backward_model.noise.mean,
         **tols
     )
     assert jnp.allclose(fp_smo_sol.output_scale, smo_sol.output_scale, **tols)
@@ -81,6 +81,6 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, tol)
     l1 = smo_sol.marginals.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1), **tols)
 
-    l0 = fp_smo_sol.posterior.rand.backward_model.noise.cov_sqrtm_lower
-    l1 = smo_sol.posterior.rand.backward_model.noise.cov_sqrtm_lower
+    l0 = fp_smo_sol.posterior.backward_model.noise.cov_sqrtm_lower
+    l1 = smo_sol.posterior.backward_model.noise.cov_sqrtm_lower
     assert jnp.allclose(cov(l0), cov(l1), **tols)
