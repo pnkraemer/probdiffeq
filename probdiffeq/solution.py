@@ -236,8 +236,7 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
 #  But merging those two data structures might be in the far future.
 
 
-@containers.dataclass_pytree_node
-class _KalFiltState:
+class _KalFiltState(containers.NamedTuple):
     rv: Any
     num_data_points: int
     log_marginal_likelihood: float
