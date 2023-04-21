@@ -5,8 +5,7 @@ from typing import Any, NamedTuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util, solution
-from probdiffeq._collections import InterpRes  # simplify type signatures
+from probdiffeq import _interp, _sqrt_util, solution
 
 
 class _State(NamedTuple):
@@ -94,7 +93,7 @@ class Solver:
         apply_branch = jnp.reshape(apply_branch_as_array, ())
         return jax.lax.switch(apply_branch, branches, t, s0, s1)
 
-    def _case_interpolate(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
+    def _case_interpolate(self, t, s0: _State, s1: _State) -> _interp.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
             t,
             s0=s0.strategy,
@@ -107,9 +106,11 @@ class Solver:
         prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
-        return InterpRes(accepted=acc, solution=sol, previous=prev)
+        return _interp.InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def _case_right_corner(self, t, s0: _State, s1: _State) -> InterpRes[_State]:
+    def _case_right_corner(
+        self, t, s0: _State, s1: _State
+    ) -> _interp.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
             t,
             s0=s0.strategy,
@@ -119,7 +120,7 @@ class Solver:
         prev = self._interp_make_state(prev_p, reference=s0)
         sol = self._interp_make_state(sol_p, reference=s1)
         acc = self._interp_make_state(acc_p, reference=s1)
-        return InterpRes(accepted=acc, solution=sol, previous=prev)
+        return _interp.InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def _interp_make_state(self, state_strategy, *, reference: _State) -> _State:
         error_estimate = self.strategy.init_error_estimate()

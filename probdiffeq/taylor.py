@@ -8,7 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq import _collections
+from probdiffeq import _markov
 from probdiffeq.statespace import recipes
 
 
@@ -184,7 +184,7 @@ def _runge_kutta_starter_fn(
     extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
     rv0 = extrapolation.smoother.standard_normal(ode_shape=initial_values[0].shape)
     cond0 = extrapolation.smoother.init_conditional(rv_proto=rv0)
-    sol0 = _collections.MarkovSequence(init=rv0, backward_model=cond0)
+    sol0 = _markov.MarkovSequence(init=rv0, backward_model=cond0)
 
     # Estimate
     u0_full = _fixed_point_smoother(extrapolation, sol0, ys=ys, dts=jnp.diff(ts))

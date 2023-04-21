@@ -5,7 +5,7 @@ from typing import Any, Tuple
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _collections, _sqrt_util
+from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.iso import _conds, _vars
 
@@ -115,15 +115,15 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = _vars.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = self.init_conditional(rv_proto=rv)
-        return _collections.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSequence(init=rv, backward_model=cond)
 
-    def init(self, sol: _collections.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSequence, /):
         ssv = _vars.IsoSSV(sol.init.mean[0, :], sol.init)
         cache = sol.backward_model
         return ssv, cache
 
     def extract(self, ssv, ex, /):
-        return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
+        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
 
     def begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
@@ -209,7 +209,7 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = _vars.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = self.init_conditional(rv_proto=rv)
-        return _collections.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol, /):
         # todo: reset backward model
@@ -218,7 +218,7 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return ssv, cache
 
     def extract(self, ssv, ex, /):
-        return _collections.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
+        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
 
     def standard_normal(self, ode_shape):
         # Used for Runge-Kutta initialisation.
