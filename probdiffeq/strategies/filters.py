@@ -39,7 +39,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         sol = self.extrapolation.filter.solution_from_tcoeffs(taylor_coefficients)
-        # sol = FilterDist(sol)
         marginals = sol
         u = taylor_coefficients[0]
         return u, marginals, sol
@@ -53,8 +52,6 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         t = posterior.t
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
         solution = self.extrapolation.filter.extract(ssv, posterior.extra)
-
-        # solution = FilterDist(rv)  # type: ignore
         return t, solution
 
     def case_right_corner(
