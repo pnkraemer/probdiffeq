@@ -1,4 +1,4 @@
-"""Various utility types."""
+"""Markov sequences and Markov processes."""
 
 import functools
 from typing import Generic, TypeVar

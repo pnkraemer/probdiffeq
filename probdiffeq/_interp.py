@@ -1,4 +1,4 @@
-"""Various utility types."""
+"""Interpolation utilities."""
 
 import dataclasses
 from typing import Generic, Iterator, TypeVar
