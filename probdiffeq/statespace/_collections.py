@@ -1,10 +1,9 @@
 """Various interfaces."""
 
-import abc
 from typing import Tuple
 
 
-class Normal(abc.ABC):
+class Normal:
     """Normal-distributed random variables.
 
     Means, covariances, log-probability-density functions, sampling, and so on.
@@ -29,19 +28,15 @@ class Normal(abc.ABC):
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
-    @abc.abstractmethod
     def logpdf(self, u, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def transform_unit_sample(self, x, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def scale_covariance(self, output_scale):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def mahalanobis_norm(self, u, /):
         raise NotImplementedError
 
@@ -49,16 +44,14 @@ class Normal(abc.ABC):
     def sample_shape(self) -> Tuple[int]:
         return self.mean.shape
 
-    @abc.abstractmethod
     def extract_qoi_from_sample(self, u, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def marginal_nth_derivative(self, n):
         raise NotImplementedError
 
 
-class SSV(abc.ABC):
+class SSV:
     """State-space variables.
 
     Hidden states, and knowledge about extracting a quantity of interest.
@@ -94,20 +87,17 @@ class SSV(abc.ABC):
             f")"
         )
 
-    @abc.abstractmethod
     def observe_qoi(self, observation_std):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def extract_qoi_from_sample(self, u, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def scale_covariance(self, output_scale):
         raise NotImplementedError
 
 
-class Conditional(abc.ABC):
+class Conditional:
     """Conditional distribution interface.
 
     Used as a backward model for backward-Gauss--Markov process representations.
@@ -131,7 +121,6 @@ class Conditional(abc.ABC):
         transition, noise = children
         return cls(transition=transition, noise=noise)
 
-    @abc.abstractmethod
     def __call__(self, x, /):
         raise NotImplementedError
 
