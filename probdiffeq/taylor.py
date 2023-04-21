@@ -1,7 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 import functools
-from typing import Callable, Tuple
+from typing import Any, Callable, NamedTuple, Tuple
 
 import jax
 import jax.experimental.jet
@@ -180,40 +180,58 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
-
     # Initialise
+    extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
     rv0 = extrapolation.smoother.standard_normal(ode_shape=initial_values[0].shape)
     cond0 = extrapolation.smoother.init_conditional(rv_proto=rv0)
     sol0 = _collections.MarkovSequence(init=rv0, backward_model=cond0)
 
     # Estimate
-    u0_full = _runge_kutta_starter_improve(extrapolation, sol0, ys=ys, dt=dt0)
+    u0_full = _fixed_point_smoother(extrapolation, sol0, ys=ys, dts=jnp.diff(ts))
 
     # Turn the mean into a tuple of arrays and return
     taylor_coefficients = tuple(u0_full.mean)
     return taylor_coefficients
 
 
-def _runge_kutta_starter_improve(extrapolation, solution, ys, dt):
-    """Improve the current estimate of a Runge-Kutta starter.
+class _FpState(NamedTuple):
+    ssv: Any
+    extra: Any
 
-    Fit a Gauss-Markov process to observations of the ODE solution.
-    """
+
+def _fixed_point_smoother(extrapolation, solution, ys, dts):
+    """Fit a Gauss-Markov process to observations of the ODE solution."""
     # Initialise backward-transitions
-    ssv0, extra0 = extrapolation.smoother.init(solution)
+    state = _fixedpoint_init(solution, ys[0], extrapolation=extrapolation)
 
     # Scan
-    fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
-    (ssv_fi, extra_fi), _ = jax.lax.scan(fn, init=(ssv0, extra0), xs=ys, reverse=False)
+    fn = functools.partial(_fixedpoint_step, extrapolation=extrapolation)
+    state, _ = jax.lax.scan(fn, init=state, xs=(ys[1:], dts), reverse=False)
 
     # Backward-marginalise to get the initial value
-    return extra_fi.marginalise(ssv_fi.hidden_state)
+    return state.extra.marginalise(state.ssv.hidden_state)
 
 
-def _rk_filter_step(carry, y, extrapolation, dt):
+def _fixedpoint_init(solution, y, *, extrapolation) -> _FpState:
+    # State-space variables
+    ssv, extra = extrapolation.smoother.init(solution)
+
+    # Initial data point
+    _, cond_cor = ssv.observe_qoi(observation_std=0.0)
+
+    rv = cond_cor(y)
+    # hack! This should rather be handled by some correction scheme.
+    u_like = jnp.empty_like(ssv.u)
+    corr = type(ssv)(u_like, rv)
+
+    # Return correction and backward-model
+    return _FpState(corr, extra)
+
+
+def _fixedpoint_step(carry: _FpState, x, *, extrapolation) -> Tuple[_FpState, None]:
     # Read
-    (ssv, extra_old) = carry
+    (ssv, extra_old) = carry.ssv, carry.extra
+    y, dt = x
 
     # Extrapolate (with fixed-point-style merging)
     ssv, extra = extrapolation.smoother.begin(ssv, extra_old, dt=dt)
@@ -229,7 +247,7 @@ def _rk_filter_step(carry, y, extrapolation, dt):
     corr = type(ssv)(u_like, rv)
 
     # Return correction and backward-model
-    return (corr, extra), None
+    return _FpState(corr, extra), None
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
