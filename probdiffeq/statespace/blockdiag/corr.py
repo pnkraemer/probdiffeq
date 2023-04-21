@@ -5,8 +5,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.statespace import _corr, cubature
-from probdiffeq.statespace.scalar import _vars as scalar_vars
 from probdiffeq.statespace.scalar import corr as scalar_corr
+from probdiffeq.statespace.scalar import variables as scalar_variables
 
 _SLR1CacheType = Tuple[Callable]
 """Type-variable for the correction-cache."""
@@ -159,7 +159,7 @@ class _BlockDiag(_corr.Correction):
         marginalise_fn = jax.vmap(type(self.corr).marginalise_observation)
         cache, obs_unbatch = marginalise_fn(self.corr, fx, m1, ssv.hidden_state)
 
-        mahalanobis_fn = scalar_vars.NormalQOI.mahalanobis_norm
+        mahalanobis_fn = scalar_variables.NormalQOI.mahalanobis_norm
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
         output_scale = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
         error_estimate = obs_unbatch.cov_sqrtm_lower

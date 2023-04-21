@@ -4,9 +4,9 @@ from typing import Generic, Tuple, TypeVar
 
 import jax
 
-from probdiffeq.statespace import _vars
+from probdiffeq.statespace import variables
 
-S = TypeVar("S", bound=_vars.SSV)
+S = TypeVar("S", bound=variables.SSV)
 """A type-variable to alias appropriate state-space variable types."""
 
 C = TypeVar("C")

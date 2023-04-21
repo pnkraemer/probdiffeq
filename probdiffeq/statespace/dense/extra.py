@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
-from probdiffeq.statespace.dense import _vars
+from probdiffeq.statespace.dense import variables
 
 
 def ibm_dense(ode_shape, num_derivatives):
@@ -39,7 +39,7 @@ class _IBMFi(_extra.Extrapolation):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        return _vars.DenseNormal(
+        return variables.DenseNormal(
             mean=m0_corrected,
             cov_sqrtm_lower=c_sqrtm0_corrected,
             target_shape=self.target_shape,
@@ -58,9 +58,9 @@ class _IBMFi(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def init(self, sol: _vars.DenseNormal, /):
+    def init(self, sol: variables.DenseNormal, /):
         u = sol.mean.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, sol, target_shape=self.target_shape)
+        ssv = variables.DenseSSV(u, sol, target_shape=self.target_shape)
         extra = None
         return ssv, extra
 
@@ -78,10 +78,10 @@ class _IBMFi(_extra.Extrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
+        ext = variables.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (p, p_inv, l0)
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, ext, target_shape=shape)
+        ssv = variables.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
 
     def _assemble_preconditioner(self, dt):
@@ -102,9 +102,11 @@ class _IBMFi(_extra.Extrapolation):
         l_ext = p[:, None] * l_ext_p
 
         shape = ssv.target_shape
-        rv = _vars.DenseNormal(mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape)
+        rv = variables.DenseNormal(
+            mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=shape
+        )
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, rv, target_shape=shape)
+        ssv = variables.DenseSSV(u, rv, target_shape=shape)
         return ssv, None
 
     # todo: the below two are a bit of an init/extract pair.
@@ -139,7 +141,7 @@ class _IBMSm(_extra.Extrapolation):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        rv = _vars.DenseNormal(
+        rv = variables.DenseNormal(
             mean=m0_corrected,
             cov_sqrtm_lower=c_sqrtm0_corrected,
             target_shape=self.target_shape,
@@ -162,7 +164,7 @@ class _IBMSm(_extra.Extrapolation):
 
     def init(self, sol: _markov.MarkovSequence, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, sol.init, target_shape=self.target_shape)
+        ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = sol.backward_model
         return ssv, extra
 
@@ -182,10 +184,10 @@ class _IBMSm(_extra.Extrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
+        ext = variables.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, ext, target_shape=shape)
+        ssv = variables.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
 
     def _assemble_preconditioner(self, dt):
@@ -219,24 +221,24 @@ class _IBMSm(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.DenseNormal(
+        backward_noise = variables.DenseNormal(
             mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=self.target_shape
         )
-        bw_model = _vars.DenseConditional(
+        bw_model = variables.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
-        rv = _vars.DenseNormal(
+        rv = variables.DenseNormal(
             mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
         )
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
-        ext = _vars.DenseSSV(u, rv, target_shape=self.target_shape)
+        ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
     # todo: remove smoother_init_conditional?
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _vars.DenseConditional(op, noise=noi, target_shape=self.target_shape)
+        return variables.DenseConditional(op, noise=noi, target_shape=self.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape
@@ -245,7 +247,7 @@ class _IBMSm(_extra.Extrapolation):
 
     @staticmethod
     def _init_backward_noise(rv_proto):
-        return _vars.DenseNormal(
+        return variables.DenseNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
             target_shape=rv_proto.target_shape,
@@ -283,7 +285,7 @@ class _IBMFp(_extra.Extrapolation):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        rv = _vars.DenseNormal(
+        rv = variables.DenseNormal(
             mean=m0_corrected,
             cov_sqrtm_lower=c_sqrtm0_corrected,
             target_shape=self.target_shape,
@@ -307,7 +309,7 @@ class _IBMFp(_extra.Extrapolation):
     def init(self, sol: _markov.MarkovSequence, /):
         # todo: reset init
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, sol.init, target_shape=self.target_shape)
+        ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = sol.backward_model
         return ssv, extra
 
@@ -327,10 +329,10 @@ class _IBMFp(_extra.Extrapolation):
 
         (d,) = self.ode_shape
         shape = (self.num_derivatives + 1, d)
-        ext = _vars.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
+        ext = variables.DenseNormal(m_ext, q_sqrtm, target_shape=shape)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
-        ssv = _vars.DenseSSV(u, ext, target_shape=shape)
+        ssv = variables.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
 
     def _assemble_preconditioner(self, dt):
@@ -364,23 +366,23 @@ class _IBMFp(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.DenseNormal(
+        backward_noise = variables.DenseNormal(
             mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=self.target_shape
         )
-        bw_model = _vars.DenseConditional(
+        bw_model = variables.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
-        rv = _vars.DenseNormal(
+        rv = variables.DenseNormal(
             mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
         )
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
-        ext = _vars.DenseSSV(u, rv, target_shape=self.target_shape)
+        ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _vars.DenseConditional(op, noise=noi, target_shape=self.target_shape)
+        return variables.DenseConditional(op, noise=noi, target_shape=self.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape
@@ -389,7 +391,7 @@ class _IBMFp(_extra.Extrapolation):
 
     @staticmethod
     def _init_backward_noise(rv_proto):
-        return _vars.DenseNormal(
+        return variables.DenseNormal(
             mean=jnp.zeros_like(rv_proto.mean),
             cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
             target_shape=rv_proto.target_shape,

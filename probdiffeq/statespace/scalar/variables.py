@@ -1,14 +1,14 @@
-"""Implementations for scalar initial value problems."""
+"""Variables."""
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _vars
+from probdiffeq.statespace import variables
 
 
 @jax.tree_util.register_pytree_node_class
-class ConditionalHiddenState(_vars.Conditional):
+class ConditionalHiddenState(variables.Conditional):
     def __call__(self, x, /):
         if self.transition.ndim > 2:
             return jax.vmap(ConditionalHiddenState.__call__)(self, x)
@@ -58,7 +58,7 @@ class ConditionalHiddenState(_vars.Conditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class ConditionalQOI(_vars.Conditional):
+class ConditionalQOI(variables.Conditional):
     def __call__(self, x, /):
         if self.transition.ndim > 1:
             return jax.vmap(ConditionalQOI.__call__)(self, x)
@@ -67,7 +67,7 @@ class ConditionalQOI(_vars.Conditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class NormalQOI(_vars.Normal):
+class NormalQOI(variables.Normal):
     # Normal RV. Shapes (), (). No QOI.
 
     def transform_unit_sample(self, base, /):
@@ -113,7 +113,7 @@ class NormalQOI(_vars.Normal):
 
 
 @jax.tree_util.register_pytree_node_class
-class SSV(_vars.SSV):
+class SSV(variables.SSV):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
     def observe_qoi(self, observation_std):
@@ -171,7 +171,7 @@ class SSV(_vars.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class NormalHiddenState(_vars.Normal):
+class NormalHiddenState(variables.Normal):
     def logpdf(self, u, /):
         raise NotImplementedError
 

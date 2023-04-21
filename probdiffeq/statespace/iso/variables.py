@@ -4,11 +4,11 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _vars
+from probdiffeq.statespace import variables
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditionalHiddenState(_vars.Conditional):
+class IsoConditionalHiddenState(variables.Conditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
@@ -51,7 +51,7 @@ class IsoConditionalHiddenState(_vars.Conditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoConditionalQOI(_vars.Conditional):
+class IsoConditionalQOI(variables.Conditional):
     # Conditional between hidden state and QOI
     def __call__(self, x, /):
         mv = self.transition[:, None] * x[None, :]
@@ -60,7 +60,7 @@ class IsoConditionalQOI(_vars.Conditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoSSV(_vars.SSV):
+class IsoSSV(variables.SSV):
     def observe_qoi(self, observation_std):
         hc = self.hidden_state.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.hidden_state.mean[0, ...]
@@ -107,7 +107,7 @@ class IsoSSV(_vars.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormalHiddenState(_vars.Normal):
+class IsoNormalHiddenState(variables.Normal):
     def logpdf(self, u, /) -> jax.Array:
         raise NotImplementedError
 
@@ -144,7 +144,7 @@ class IsoNormalHiddenState(_vars.Normal):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormalQOI(_vars.Normal):
+class IsoNormalQOI(variables.Normal):
     def logpdf(self, u, /) -> jax.Array:
         x1 = self.mahalanobis_norm_squared(u)
         x2 = u.size * 2.0 * jnp.log(jnp.abs(self.cov_sqrtm_lower))
