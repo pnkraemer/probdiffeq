@@ -38,7 +38,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         mahalanobis_norm = obs.mahalanobis_norm(jnp.zeros_like(m1))
         output_scale = mahalanobis_norm / jnp.sqrt(bias.size)
 
-        error_estimate_unscaled = obs.marginal_std()
+        error_estimate_unscaled = obs.marginal_std() * jnp.ones_like(bias)
         error_estimate = error_estimate_unscaled * output_scale
         cache = (error_estimate, output_scale, (bias,))
         return x, cache

@@ -87,10 +87,6 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         c0 = jnp.eye(self.num_derivatives + 1)
         return _vars.IsoNormalHiddenState(m0, c0)
 
-    # Unnecessary?
-    def init_error_estimate(self):
-        return jnp.zeros(())  # the initialisation is error-free
-
     def promote_output_scale(self, output_scale):
         return output_scale
 
@@ -179,9 +175,6 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         c0 = jnp.eye(self.num_derivatives + 1)
         return _vars.IsoNormalHiddenState(m0, c0)
 
-    def init_error_estimate(self):
-        return jnp.zeros(())  # the initialisation is error-free
-
     def promote_output_scale(self, output_scale):
         return output_scale
 
@@ -227,10 +220,6 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
         return _vars.IsoNormalHiddenState(m0, c0)
-
-    # Unnecessary?
-    def init_error_estimate(self):
-        return jnp.zeros(())  # the initialisation is error-free
 
     def promote_output_scale(self, output_scale):
         return output_scale

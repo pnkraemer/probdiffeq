@@ -82,10 +82,6 @@ class _BlockDiag(_extra.Extrapolation):
         return solution_fn(self.extra, ssv, extra)
 
     # todo: move to correction?
-    def init_error_estimate(self):
-        return jax.vmap(type(self.extra).init_error_estimate)(self.extra)
-
-    # todo: move to correction?
     def promote_output_scale(self, output_scale):
         # broadcast to shape (d,)
         output_scale = output_scale * jnp.ones(self.ode_shape)

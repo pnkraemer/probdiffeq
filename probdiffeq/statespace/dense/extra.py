@@ -67,9 +67,6 @@ class _IBMFi(_extra.Extrapolation):
     def extract(self, ssv, _extra, /):
         return ssv.hidden_state
 
-    def init_error_estimate(self):
-        return jnp.zeros(self.ode_shape)  # the initialisation is error-free
-
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
@@ -235,9 +232,6 @@ class _IBMSm(_extra.Extrapolation):
         ext = _vars.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    def init_error_estimate(self):
-        return jnp.zeros(self.ode_shape)  # the initialisation is error-free
-
     # todo: remove smoother_init_conditional?
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
@@ -321,9 +315,6 @@ class _IBMFp(_extra.Extrapolation):
         rv = ssv.hidden_state
         cond = extra
         return _markov.MarkovSequence(init=rv, backward_model=cond)
-
-    def init_error_estimate(self):
-        return jnp.zeros(self.ode_shape)  # the initialisation is error-free
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self._assemble_preconditioner(dt=dt)

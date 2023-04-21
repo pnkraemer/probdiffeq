@@ -162,9 +162,6 @@ class Smoother(_strategy.Strategy):
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
-    def init_error_estimate(self):
-        return self.extrapolation.smoother.init_error_estimate()
-
     def promote_output_scale(self, *args, **kwargs):
         init_fn = self.extrapolation.smoother.promote_output_scale
         return init_fn(*args, **kwargs)
@@ -327,9 +324,6 @@ class FixedPointSmoother(_strategy.Strategy):
             rv_proto=state.extra.noise
         )
         return _SmState(t=state.t, extra=extra_new, corr=state.corr, ssv=state.ssv)
-
-    def init_error_estimate(self):
-        return self.extrapolation.fixedpoint.init_error_estimate()
 
     def promote_output_scale(self, *args, **kwargs):
         init_fn = self.extrapolation.fixedpoint.promote_output_scale
