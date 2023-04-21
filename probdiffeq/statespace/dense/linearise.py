@@ -42,9 +42,8 @@ def slr1(*, fn, x, cubature_rule):
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
     mean_cond = fx_mean - linop_cond @ x.mean
-    return linop_cond, variables.DenseNormal(
-        mean_cond, cov_sqrtm_cond.T, target_shape=None
-    )
+    rv_cond = variables.DenseNormal(mean_cond, cov_sqrtm_cond.T, target_shape=None)
+    return linop_cond, rv_cond
 
 
 def slr0(*, fn, x, cubature_rule):
