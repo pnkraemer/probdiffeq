@@ -6,18 +6,88 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections
-from probdiffeq.statespace.dense import _conds
+from probdiffeq.statespace import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseSSV(_collections.SSV):
+class DenseConditional(_vars.Conditional):
+    """Conditional distribution with dense covariance structure."""
+
+    def __init__(self, *args, target_shape, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.target_shape = target_shape
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args1 = f"transition={self.transition}, noise={self.noise}"
+        args2 = f"target_shape={self.target_shape}"
+        return f"{name}({args1}, {args2})"
+
+    def tree_flatten(self):
+        children = self.transition, self.noise
+        aux = (self.target_shape,)
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, children):
+        transition, noise = children
+        (target_shape,) = aux
+        return cls(transition=transition, noise=noise, target_shape=target_shape)
+
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        return DenseNormal(
+            m, self.noise.cov_sqrtm_lower, target_shape=self.target_shape
+        )
+
+    def scale_covariance(self, output_scale):
+        noise = self.noise.scale_covariance(output_scale=output_scale)
+        shape = self.target_shape
+        return DenseConditional(self.transition, noise=noise, target_shape=shape)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
+        ).T
+
+        noise = DenseNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=self.target_shape)
+        return DenseConditional(g, noise=noise, target_shape=self.target_shape)
+
+    def marginalise(self, rv, /):
+        # Pull into preconditioned space
+        m0_p = rv.mean
+        l0_p = rv.cov_sqrtm_lower
+
+        # Apply transition
+        m_new_p = self.transition @ m0_p + self.noise.mean
+        l_new_p = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((self.transition @ l0_p).T, self.noise.cov_sqrtm_lower.T)
+        ).T
+
+        # Push back into non-preconditioned space
+        m_new = m_new_p
+        l_new = l_new_p
+
+        marg = DenseNormal(m_new, l_new, target_shape=self.target_shape)
+        return marg
+
+
+@jax.tree_util.register_pytree_node_class
+class DenseSSV(_vars.SSV):
     """State-space variable with dense covariance structure."""
 
     def __repr__(self):
         return f"{self.__class__.__name__}(hidden_state={self.hidden_state})"
 
-    # todo: move to _conds.DenseConditional(H=E0, noise=noise).observe()
+    # todo: move to DenseConditional(H=E0, noise=noise).observe()
     def observe_qoi(self, observation_std):
         hc = self._select_derivative_vect(self.hidden_state.cov_sqrtm_lower, 0)
         m_obs = self._select_derivative(self.hidden_state.mean, 0)
@@ -30,7 +100,7 @@ class DenseSSV(_collections.SSV):
         obs = DenseNormal(m_obs, r_obs.T, target_shape=None)
 
         noise = DenseNormal(m_cor, r_cor.T, target_shape=self.target_shape)
-        cor = _conds.DenseConditional(gain, noise=noise, target_shape=self.target_shape)
+        cor = DenseConditional(gain, noise=noise, target_shape=self.target_shape)
         return obs, cor
 
     def extract_qoi_from_sample(self, u, /):
@@ -73,7 +143,7 @@ class DenseSSV(_collections.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseNormal(_collections.Normal):
+class DenseNormal(_vars.Normal):
     """Random variables with a normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.

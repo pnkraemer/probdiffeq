@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
-from probdiffeq.statespace.dense import _conds, _vars
+from probdiffeq.statespace.dense import _vars
 
 
 def ibm_dense(ode_shape, num_derivatives):
@@ -225,7 +225,7 @@ class _IBMSm(_extra.Extrapolation):
         backward_noise = _vars.DenseNormal(
             mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=self.target_shape
         )
-        bw_model = _conds.DenseConditional(
+        bw_model = _vars.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
         rv = _vars.DenseNormal(
@@ -242,7 +242,7 @@ class _IBMSm(_extra.Extrapolation):
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _conds.DenseConditional(op, noise=noi, target_shape=self.target_shape)
+        return _vars.DenseConditional(op, noise=noi, target_shape=self.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape
@@ -376,7 +376,7 @@ class _IBMFp(_extra.Extrapolation):
         backward_noise = _vars.DenseNormal(
             mean=m_bw, cov_sqrtm_lower=l_bw, target_shape=self.target_shape
         )
-        bw_model = _conds.DenseConditional(
+        bw_model = _vars.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
         rv = _vars.DenseNormal(
@@ -389,7 +389,7 @@ class _IBMFp(_extra.Extrapolation):
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _conds.DenseConditional(op, noise=noi, target_shape=self.target_shape)
+        return _vars.DenseConditional(op, noise=noi, target_shape=self.target_shape)
 
     def _init_backward_transition(self):
         (d,) = self.ode_shape

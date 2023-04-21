@@ -4,12 +4,63 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections
-from probdiffeq.statespace.iso import _conds
+from probdiffeq.statespace import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoSSV(_collections.SSV):
+class IsoConditionalHiddenState(_vars.Conditional):
+    # Conditional between two hidden states and QOI
+    def __call__(self, x, /):
+        m = self.transition @ x + self.noise.mean
+        return IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        A = self.transition
+        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
+        ).T
+
+        noise = IsoNormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
+        bw_model = IsoConditionalHiddenState(g, noise=noise)
+        return bw_model
+
+    def marginalise(self, rv, /):
+        """Marginalise the output of a linear model."""
+        # Read
+        m0 = rv.mean
+        l0 = rv.cov_sqrtm_lower
+
+        # Apply transition
+        m_new = self.transition @ m0 + self.noise.mean
+        l_new = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
+        ).T
+
+        return IsoNormalHiddenState(mean=m_new, cov_sqrtm_lower=l_new)
+
+    def scale_covariance(self, output_scale):
+        noise = self.noise.scale_covariance(output_scale=output_scale)
+        return IsoConditionalHiddenState(transition=self.transition, noise=noise)
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoConditionalQOI(_vars.Conditional):
+    # Conditional between hidden state and QOI
+    def __call__(self, x, /):
+        mv = self.transition[:, None] * x[None, :]
+        m = mv + self.noise.mean
+        return IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
+
+
+@jax.tree_util.register_pytree_node_class
+class IsoSSV(_vars.SSV):
     def observe_qoi(self, observation_std):
         hc = self.hidden_state.cov_sqrtm_lower[0, ...].reshape((1, -1))
         m_obs = self.hidden_state.mean[0, ...]
@@ -26,7 +77,7 @@ class IsoSSV(_collections.SSV):
         m_cor = self.hidden_state.mean - gain[:, None] * m_obs[None, :]
         obs = IsoNormalQOI(m_obs, r_obs.T)
         cor = IsoNormalHiddenState(m_cor, r_cor.T)
-        cond = _conds.IsoConditionalQOI(gain, noise=cor)
+        cond = IsoConditionalQOI(gain, noise=cor)
         return obs, cond
 
     def extract_qoi_from_sample(self, u, /) -> jax.Array:
@@ -56,7 +107,7 @@ class IsoSSV(_collections.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormalHiddenState(_collections.Normal):
+class IsoNormalHiddenState(_vars.Normal):
     def logpdf(self, u, /) -> jax.Array:
         raise NotImplementedError
 
@@ -93,7 +144,7 @@ class IsoNormalHiddenState(_collections.Normal):
 
 
 @jax.tree_util.register_pytree_node_class
-class IsoNormalQOI(_collections.Normal):
+class IsoNormalQOI(_vars.Normal):
     def logpdf(self, u, /) -> jax.Array:
         x1 = self.mahalanobis_norm_squared(u)
         x2 = u.size * 2.0 * jnp.log(jnp.abs(self.cov_sqrtm_lower))

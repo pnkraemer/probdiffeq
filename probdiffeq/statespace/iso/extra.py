@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
-from probdiffeq.statespace.iso import _conds, _vars
+from probdiffeq.statespace.iso import _vars
 
 
 def ibm_iso(num_derivatives):
@@ -160,7 +160,7 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
+        bw_model = _vars.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
@@ -193,7 +193,7 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
         noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
-        return _conds.IsoConditionalHiddenState(op, noise=noi)
+        return _vars.IsoConditionalHiddenState(op, noise=noi)
 
 
 class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
@@ -280,14 +280,14 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _conds.IsoConditionalHiddenState(g_bw, noise=backward_noise)
+        bw_model = _vars.IsoConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
     def init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
         noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
-        return _conds.IsoConditionalHiddenState(op, noise=noi)
+        return _vars.IsoConditionalHiddenState(op, noise=noi)
 
 
 def _stack_tcoeffs(taylor_coefficients, q_like):
