@@ -1,6 +1,5 @@
 """Interface for estimation strategies."""
 
-import abc
 from typing import Generic, TypeVar
 
 import jax
@@ -17,7 +16,7 @@ R = TypeVar("R")
 """A type-variable to indicate random-variable types."""
 
 
-class Posterior(abc.ABC, Generic[R]):
+class Posterior(Generic[R]):
     def __init__(self, rand: R, /):
         self.rand = rand
 
@@ -36,7 +35,7 @@ class Posterior(abc.ABC, Generic[R]):
 
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(abc.ABC, Generic[S, P]):
+class Strategy(Generic[S, P]):
     """Inference strategy interface."""
 
     def __init__(self, extrapolation, correction):
