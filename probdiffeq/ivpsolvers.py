@@ -69,11 +69,11 @@ class Solver:
         )
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _State:
-        error_estimate = self.strategy.init_error_estimate()
-        strategy_state = self.strategy.init(t, posterior)
+        state_strategy = self.strategy.init(t, posterior)
+        error_estimate = jnp.empty_like(state_strategy.u)
         return _State(
             error_estimate=error_estimate,
-            strategy=strategy_state,
+            strategy=state_strategy,
             output_scale_prior=output_scale,
             output_scale_calibrated=output_scale,
             num_steps=num_steps,
