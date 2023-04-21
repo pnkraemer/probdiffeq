@@ -1,7 +1,8 @@
 """State-space model recipes."""
 
-from typing import Any, NamedTuple
+from typing import Any
 
+from probdiffeq.backend import containers
 from probdiffeq.statespace import cubature
 from probdiffeq.statespace.blockdiag import corr as blockdiag_corr
 from probdiffeq.statespace.blockdiag import extra as blockdiag_extra
@@ -13,7 +14,7 @@ from probdiffeq.statespace.scalar import corr as scalar_corr
 from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
-class _Impl(NamedTuple):
+class _Impl(containers.NamedTuple):
     """State-space model implementation.
 
     Contains an extrapolation style and a correction style.

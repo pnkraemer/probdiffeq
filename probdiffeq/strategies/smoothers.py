@@ -1,15 +1,16 @@
 """''Global'' estimation: smoothing."""
 
-from typing import Any, NamedTuple, Tuple
+from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp, _markov
+from probdiffeq.backend import containers
 from probdiffeq.strategies import _strategy
 
 
-class _SmState(NamedTuple):
+class _SmState(containers.NamedTuple):
     t: Any
     ssv: Any
     extra: Any
