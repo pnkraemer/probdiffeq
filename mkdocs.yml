@@ -102,19 +102,23 @@ nav:
       - statespace:
           - recipes: api_docs/statespace/recipes.md
           - cubature: api_docs/statespace/cubature.md
+          - variables: api_docs/statespace/variables.md
           - dense:
               - extra: api_docs/statespace/dense/extra.md
               - linearise: api_docs/statespace/dense/linearise.md
               - corr: api_docs/statespace/dense/corr.md
+              - variables: api_docs/statespace/dense/variables.md
           - iso:
               - extra: api_docs/statespace/iso/extra.md
               - corr: api_docs/statespace/iso/corr.md
+              - variables: api_docs/statespace/iso/variables.md
           - blockdiag:
               - extra: api_docs/statespace/blockdiag/extra.md
               - corr: api_docs/statespace/blockdiag/corr.md
           - scalar:
               - extra: api_docs/statespace/scalar/extra.md
               - corr: api_docs/statespace/scalar/corr.md
+              - variables: api_docs/statespace/scalar/variables.md
       - solution: api_docs/solution.md
       - taylor: api_docs/taylor.md
       - controls: api_docs/controls.md

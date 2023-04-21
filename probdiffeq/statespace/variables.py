@@ -1,4 +1,4 @@
-"""Various interfaces."""
+"""Variables."""
 
 from typing import Tuple
 

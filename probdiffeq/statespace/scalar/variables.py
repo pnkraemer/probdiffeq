@@ -1,4 +1,4 @@
-"""Implementations for scalar initial value problems."""
+"""Variables."""
 
 import jax
 import jax.numpy as jnp
