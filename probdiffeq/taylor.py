@@ -1,7 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 import functools
-from typing import Callable, Tuple
+from typing import Any, Callable, NamedTuple, Tuple
 
 import jax
 import jax.experimental.jet
@@ -194,25 +194,25 @@ def _runge_kutta_starter_fn(
     return taylor_coefficients
 
 
-def _fixed_point_smoother(extrapolation, solution, ys, dts):
-    """Improve the current estimate of a Runge-Kutta starter.
+class _FpState(NamedTuple):
+    ssv: Any
+    extra: Any
 
-    Fit a Gauss-Markov process to observations of the ODE solution.
-    """
+
+def _fixed_point_smoother(extrapolation, solution, ys, dts):
+    """Fit a Gauss-Markov process to observations of the ODE solution."""
     # Initialise backward-transitions
-    ssv0, extra0 = _fixedpoint_init(solution, ys[0], extrapolation=extrapolation)
+    state = _fixedpoint_init(solution, ys[0], extrapolation=extrapolation)
 
     # Scan
     fn = functools.partial(_fixedpoint_step, extrapolation=extrapolation)
-    (ssv_fi, extra_fi), _ = jax.lax.scan(
-        fn, init=(ssv0, extra0), xs=(ys[1:], dts), reverse=False
-    )
+    state, _ = jax.lax.scan(fn, init=state, xs=(ys[1:], dts), reverse=False)
 
     # Backward-marginalise to get the initial value
-    return extra_fi.marginalise(ssv_fi.hidden_state)
+    return state.extra.marginalise(state.ssv.hidden_state)
 
 
-def _fixedpoint_init(solution, y, *, extrapolation):
+def _fixedpoint_init(solution, y, *, extrapolation) -> _FpState:
     # State-space variables
     ssv, extra = extrapolation.smoother.init(solution)
 
@@ -225,12 +225,12 @@ def _fixedpoint_init(solution, y, *, extrapolation):
     corr = type(ssv)(u_like, rv)
 
     # Return correction and backward-model
-    return (corr, extra)
+    return _FpState(corr, extra)
 
 
-def _fixedpoint_step(carry, x, *, extrapolation):
+def _fixedpoint_step(carry: _FpState, x, *, extrapolation) -> Tuple[_FpState, None]:
     # Read
-    (ssv, extra_old) = carry
+    (ssv, extra_old) = carry.ssv, carry.extra
     y, dt = x
 
     # Extrapolate (with fixed-point-style merging)
@@ -247,7 +247,7 @@ def _fixedpoint_step(carry, x, *, extrapolation):
     corr = type(ssv)(u_like, rv)
 
     # Return correction and backward-model
-    return (corr, extra), None
+    return _FpState(corr, extra), None
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
