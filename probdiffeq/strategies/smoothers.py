@@ -9,33 +9,6 @@ from probdiffeq import _interp, _markov
 from probdiffeq.strategies import _strategy
 
 
-@jax.tree_util.register_pytree_node_class
-class SmootherSol(_strategy.Posterior[_markov.MarkovSequence]):
-    """Smmoothing solution."""
-
-    def sample(self, key, *, shape):
-        return self.rand.sample(key, shape=shape)
-
-    def marginals_at_terminal_values(self):
-        marginals = self.rand.init
-        u = marginals.extract_qoi_from_sample(marginals.mean)
-        return u, marginals
-
-    def marginals(self):
-        marginals = self._extract_marginals()
-        u = marginals.extract_qoi_from_sample(marginals.mean)
-        return u, marginals
-
-    def _extract_marginals(self, /):
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.rand.init)
-
-        # todo: this construction should not happen here...
-        markov = _markov.MarkovSequence(
-            init=init, backward_model=self.rand.backward_model
-        )
-        return markov.marginalise_backwards()
-
-
 class _SmState(NamedTuple):
     t: Any
     ssv: Any
@@ -111,8 +84,8 @@ class Smoother(_strategy.Strategy):
         *,
         t,
         marginals,
-        posterior: SmootherSol,
-        posterior_previous: SmootherSol,
+        posterior: _markov.MarkovSequence,
+        posterior_previous: _markov.MarkovSequence,
         t0,
         t1,
         output_scale,
@@ -124,12 +97,12 @@ class Smoother(_strategy.Strategy):
             output_scale=output_scale,
         )
         t, posterior = self.extract(acc)
-        marginals = posterior.rand.backward_model.marginalise(marginals)
+        marginals = posterior.backward_model.marginalise(marginals)
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
     def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.smoother.init(posterior.rand)
+        ssv, extra = self.extrapolation.smoother.init(posterior)
         ssv, corr = self.correction.init(ssv)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr)
 
@@ -141,16 +114,14 @@ class Smoother(_strategy.Strategy):
         return _SmState(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
-        seq = self.extrapolation.smoother.solution_from_tcoeffs(taylor_coefficients)
-        sol = SmootherSol(seq)
-        marginals = seq.init
+        sol = self.extrapolation.smoother.solution_from_tcoeffs(taylor_coefficients)
+        marginals = sol.init
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
+    def extract(self, state: _SmState, /) -> Tuple[float, _markov.MarkovSequence]:
         ssv = self.correction.extract(state.ssv, state.corr)
-        mseq = self.extrapolation.smoother.extract(ssv, state.extra)
-        sol = SmootherSol(mseq)  # type: ignore
+        sol = self.extrapolation.smoother.extract(ssv, state.extra)
         return state.t, sol
 
     def _extrapolate(self, *, s0, output_scale, t):
@@ -185,13 +156,12 @@ class FixedPointSmoother(_strategy.Strategy):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         seq = self.extrapolation.fixedpoint.solution_from_tcoeffs(taylor_coefficients)
-        sol = SmootherSol(seq)
         marginals = seq.init
         u = taylor_coefficients[0]
-        return u, marginals, sol
+        return u, marginals, seq
 
     def init(self, t, posterior, /) -> _SmState:
-        ssv, extra = self.extrapolation.fixedpoint.init(posterior.rand)
+        ssv, extra = self.extrapolation.fixedpoint.init(posterior)
         ssv, corr = self.correction.init(ssv)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr)
 
@@ -301,10 +271,9 @@ class FixedPointSmoother(_strategy.Strategy):
         # Bundle up the results and return
         return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
 
-    def extract(self, state: _SmState, /) -> Tuple[float, SmootherSol]:
+    def extract(self, state: _SmState, /) -> Tuple[float, _markov.MarkovSequence]:
         ssv = self.correction.extract(state.ssv, state.corr)
-        mseq = self.extrapolation.fixedpoint.extract(ssv, state.extra)
-        sol = SmootherSol(mseq)  # type: ignore
+        sol = self.extrapolation.fixedpoint.extract(ssv, state.extra)
         return state.t, sol
 
     # Auxiliary routines that are the same among all subclasses

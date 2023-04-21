@@ -6,7 +6,7 @@ import warnings
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _adaptive, _collocate, solution, taylor
+from probdiffeq import _adaptive, _collocate, _markov, solution, taylor
 from probdiffeq.strategies import smoothers
 
 # The high-level checkpoint-style routines
@@ -66,7 +66,13 @@ def simulate_terminal_values(
         dt0=dt0,
         while_loop_fn=while_loop_fn_temporal,
     )
-    u, marginals = posterior.marginals_at_terminal_values()
+
+    # I think the user expects marginals, so we compute them here
+    if isinstance(posterior, _markov.MarkovSequence):
+        marginals = posterior.init
+    else:
+        marginals = posterior
+    u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
         t=t,
         u=u,
@@ -142,7 +148,12 @@ def solve_and_save_at(
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
     )
-    u, marginals = posterior.marginals()
+    # I think the user expects marginals, so we compute them here
+    if isinstance(posterior, _markov.MarkovSequence):
+        marginals = posterior.marginalise_backwards()
+    else:
+        marginals = posterior
+    u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
         t=t,
         u=u,
@@ -207,7 +218,12 @@ def solve_with_python_while_loop(
         dt0=dt0,
         parameters=parameters,
     )
-    u, marginals = posterior.marginals()
+    # I think the user expects marginals, so we compute them here
+    if isinstance(posterior, _markov.MarkovSequence):
+        marginals = posterior.marginalise_backwards()
+    else:
+        marginals = posterior
+    u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
         t=t,
         u=u,
@@ -250,7 +266,12 @@ def solve_fixed_grid(
         solver=solver,
         parameters=parameters,
     )
-    u, marginals = posterior.marginals()
+    # I think the user expects marginals, so we compute them here
+    if isinstance(posterior, _markov.MarkovSequence):
+        marginals = posterior.marginalise_backwards()
+    else:
+        marginals = posterior
+    u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
         t=grid,
         u=u,

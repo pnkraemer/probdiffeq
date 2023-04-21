@@ -10,8 +10,8 @@ from typing import Any, Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _markov
 from probdiffeq.backend import containers
-from probdiffeq.strategies import smoothers
 
 R = TypeVar("R")
 """Type-variable for random variables used in \
@@ -209,11 +209,6 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for log-posterior
 
-    if not isinstance(posterior, smoothers.SmootherSol):
-        msg1 = "Time-series marginal likelihoods "
-        msg2 = "cannot be computed with a filtering solution."
-        raise TypeError(msg1 + msg2)
-
     if jnp.shape(observation_std) != (jnp.shape(u)[0],):
         raise ValueError(
             f"Observation-noise shape {jnp.shape(observation_std)} does not match "
@@ -228,7 +223,12 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    result = _kalman_filter(u, posterior.rand, observation_std, strategy=strategy)
+    if not isinstance(posterior, _markov.MarkovSequence):
+        msg1 = "Time-series marginal likelihoods "
+        msg2 = "cannot be computed with a filtering solution."
+        raise TypeError(msg1 + msg2)
+
+    result = _kalman_filter(u, posterior, observation_std, strategy=strategy)
     return result
 
 

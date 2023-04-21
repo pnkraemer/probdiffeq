@@ -12,27 +12,6 @@ S = TypeVar("S")
 P = TypeVar("P")
 """A type-variable to indicate strategy-solution ("posterior") types."""
 
-R = TypeVar("R")
-"""A type-variable to indicate random-variable types."""
-
-
-class Posterior(Generic[R]):
-    def __init__(self, rand: R, /):
-        self.rand = rand
-
-    def tree_flatten(self):
-        children = (self.rand,)
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        (rand,) = children
-        return cls(rand)
-
-    def sample(self, key, *, shape):
-        raise NotImplementedError
-
 
 @jax.tree_util.register_pytree_node_class
 class Strategy(Generic[S, P]):

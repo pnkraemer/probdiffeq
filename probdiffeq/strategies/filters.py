@@ -1,5 +1,5 @@
 """Forward-only estimation: filtering."""
-from typing import Any, NamedTuple, Tuple, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -8,15 +8,6 @@ from probdiffeq import _interp
 from probdiffeq.strategies import _strategy
 
 
-# this class is NOT redundant.
-# next, add "t" into this solution (and into MarkovSequence)
-# this will simplify a million functions in this code base
-# and is the next step en route to x=extract(init(x)) for solvers, strategies, etc.
-# more specifically, init(tcoeffs) becomes
-# init_posterior_from_tcoeffs(t, tcoeffs)
-#  which allows the solver (!) to satisfy x = extract(init(x)). Then,
-#  the strategy can be made to obey this pattern next.
-# todo: if we happen to keep this class, make it generic.
 class _FiState(NamedTuple):
     """Filtering state."""
 
@@ -24,7 +15,7 @@ class _FiState(NamedTuple):
     extra: Any
     corr: Any
 
-    # Todo: move those to `ssv`
+    # Todo: move those to `ssv`?
     t: Any
 
     @property
@@ -43,45 +34,27 @@ S = TypeVar("S")
 
 
 @jax.tree_util.register_pytree_node_class
-class FilterDist(_strategy.Posterior[S]):
-    """Filtering solution."""
-
-    def sample(self, key, *, shape):
-        raise NotImplementedError
-
-    def marginals_at_terminal_values(self):
-        marginals = self.rand
-        u = marginals.extract_qoi_from_sample(marginals.mean)
-        return u, marginals
-
-    def marginals(self):
-        marginals = self.rand
-        u = marginals.extract_qoi_from_sample(marginals.mean)
-        return u, marginals
-
-
-@jax.tree_util.register_pytree_node_class
 class Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         sol = self.extrapolation.filter.solution_from_tcoeffs(taylor_coefficients)
-        sol = FilterDist(sol)
+        # sol = FilterDist(sol)
         marginals = sol
         u = taylor_coefficients[0]
         return u, marginals, sol
 
     def init(self, t, solution, /) -> _FiState:
-        ssv, extra = self.extrapolation.filter.init(solution.rand)
+        ssv, extra = self.extrapolation.filter.init(solution)
         ssv, corr = self.correction.init(ssv)
         return _FiState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def extract(self, posterior: _FiState, /):
         t = posterior.t
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
-        rv = self.extrapolation.filter.extract(ssv, posterior.extra)
+        solution = self.extrapolation.filter.extract(ssv, posterior.extra)
 
-        solution = FilterDist(rv)  # type: ignore
+        # solution = FilterDist(rv)  # type: ignore
         return t, solution
 
     def case_right_corner(
@@ -108,16 +81,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         )
 
     def offgrid_marginals(
-        self,
-        *,
-        t,
-        marginals,
-        posterior,
-        posterior_previous,
-        t0,
-        t1,
-        output_scale,
-    ) -> Tuple[jax.Array, jax.Array]:
+        self, *, t, marginals, posterior, posterior_previous, t0, t1, output_scale
+    ):
         _acc, sol, _prev = self.case_interpolate(
             t=t,
             s1=self.init(t1, posterior),
@@ -125,7 +90,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             output_scale=output_scale,
         )
         t, posterior = self.extract(sol)
-        return posterior.marginals()
+        u = posterior.extract_qoi_from_sample(posterior.mean)
+        return u, posterior
 
     def begin(self, state: _FiState, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.filter.begin(state.ssv, state.extra, dt=dt)

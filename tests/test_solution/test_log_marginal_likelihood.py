@@ -21,9 +21,10 @@ from probdiffeq.strategies import filters, smoothers
     ],
     ids=["IsoTS0", "BlockDiagTS0", "DenseTS0"],
 )
-def fixture_solution_save_at(ode_problem, impl_fn):
+@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+def fixture_solution_save_at(ode_problem, impl_fn, strategy_fn):
     solver = test_util.generate_solver(
-        strategy_factory=smoothers.FixedPointSmoother,
+        strategy_factory=strategy_fn,
         impl_factory=impl_fn,
         ode_shape=ode_problem.initial_values[0].shape,
         num_derivatives=2,
@@ -46,7 +47,9 @@ def test_log_marginal_likelihood(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
-
+    if isinstance(solver.strategy, filters.Filter):
+        reason = "No time-series log marginal likelihoods for Filters."
+        testing.skip(reason)
     mll = solution.log_marginal_likelihood(
         observation_std=jnp.ones((k,)),
         u=data,
