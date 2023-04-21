@@ -180,40 +180,58 @@ def _runge_kutta_starter_fn(
 
     # Run fixed-point smoother
 
-    extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
-
     # Initialise
+    extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
     rv0 = extrapolation.smoother.standard_normal(ode_shape=initial_values[0].shape)
     cond0 = extrapolation.smoother.init_conditional(rv_proto=rv0)
     sol0 = _collections.MarkovSequence(init=rv0, backward_model=cond0)
 
     # Estimate
-    u0_full = _runge_kutta_starter_improve(extrapolation, sol0, ys=ys, dt=dt0)
+    u0_full = _fixed_point_smoother(extrapolation, sol0, ys=ys, dts=jnp.diff(ts))
 
     # Turn the mean into a tuple of arrays and return
     taylor_coefficients = tuple(u0_full.mean)
     return taylor_coefficients
 
 
-def _runge_kutta_starter_improve(extrapolation, solution, ys, dt):
+def _fixed_point_smoother(extrapolation, solution, ys, dts):
     """Improve the current estimate of a Runge-Kutta starter.
 
     Fit a Gauss-Markov process to observations of the ODE solution.
     """
     # Initialise backward-transitions
-    ssv0, extra0 = extrapolation.smoother.init(solution)
+    ssv0, extra0 = _fixedpoint_init(solution, ys[0], extrapolation=extrapolation)
 
     # Scan
-    fn = functools.partial(_rk_filter_step, extrapolation=extrapolation, dt=dt)
-    (ssv_fi, extra_fi), _ = jax.lax.scan(fn, init=(ssv0, extra0), xs=ys, reverse=False)
+    fn = functools.partial(_fixedpoint_step, extrapolation=extrapolation)
+    (ssv_fi, extra_fi), _ = jax.lax.scan(
+        fn, init=(ssv0, extra0), xs=(ys[1:], dts), reverse=False
+    )
 
     # Backward-marginalise to get the initial value
     return extra_fi.marginalise(ssv_fi.hidden_state)
 
 
-def _rk_filter_step(carry, y, extrapolation, dt):
+def _fixedpoint_init(solution, y, *, extrapolation):
+    # State-space variables
+    ssv, extra = extrapolation.smoother.init(solution)
+
+    # Initial data point
+    _, cond_cor = ssv.observe_qoi(observation_std=0.0)
+
+    rv = cond_cor(y)
+    # hack! This should rather be handled by some correction scheme.
+    u_like = jnp.empty_like(ssv.u)
+    corr = type(ssv)(u_like, rv)
+
+    # Return correction and backward-model
+    return (corr, extra)
+
+
+def _fixedpoint_step(carry, x, *, extrapolation):
     # Read
     (ssv, extra_old) = carry
+    y, dt = x
 
     # Extrapolate (with fixed-point-style merging)
     ssv, extra = extrapolation.smoother.begin(ssv, extra_old, dt=dt)
