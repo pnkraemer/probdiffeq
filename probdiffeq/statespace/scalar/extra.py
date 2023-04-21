@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
-from probdiffeq.statespace.scalar import _vars
+from probdiffeq.statespace.scalar import variables
 
 
 def ibm_scalar(num_derivatives):
@@ -26,7 +26,7 @@ class _IBMFi(_extra.Extrapolation):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        return _vars.NormalHiddenState(
+        return variables.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
 
@@ -40,8 +40,8 @@ class _IBMFi(_extra.Extrapolation):
         c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
         return m0_corrected, c_sqrtm0_corrected
 
-    def init(self, sol: _vars.NormalHiddenState, /):
-        return _vars.SSV(sol.mean[0], sol), None
+    def init(self, sol: variables.NormalHiddenState, /):
+        return variables.SSV(sol.mean[0], sol), None
 
     def extract(self, ssv, extra, /):
         return ssv.hidden_state
@@ -56,8 +56,8 @@ class _IBMFi(_extra.Extrapolation):
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        return _vars.SSV(m_ext[0], extrapolated), (p, p_inv, l0)
+        extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
+        return variables.SSV(m_ext[0], extrapolated), (p, p_inv, l0)
 
     def _assemble_preconditioner(self, dt):
         return _ibm_util.preconditioner_diagonal(
@@ -75,8 +75,8 @@ class _IBMFi(_extra.Extrapolation):
         ).T
         l_ext = p[:, None] * l_ext_p
 
-        rv = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ssv = _vars.SSV(m_ext[0], rv)
+        rv = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        ssv = variables.SSV(m_ext[0], rv)
         return ssv, None
 
     def promote_output_scale(self, output_scale):
@@ -99,7 +99,7 @@ class _IBMSm(_extra.Extrapolation):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        rv = _vars.NormalHiddenState(
+        rv = variables.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
         cond = self.init_conditional(rv_proto=rv)
@@ -116,7 +116,7 @@ class _IBMSm(_extra.Extrapolation):
         return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
-        ssv = _vars.SSV(sol.init.mean[0], sol.init)
+        ssv = variables.SSV(sol.init.mean[0], sol.init)
         extra = sol.backward_model
         return ssv, extra
 
@@ -133,8 +133,8 @@ class _IBMSm(_extra.Extrapolation):
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.SSV(m_ext[0], extrapolated)
+        extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
+        ssv = variables.SSV(m_ext[0], extrapolated)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
@@ -164,16 +164,16 @@ class _IBMSm(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.ConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ssv = _vars.SSV(m_ext[0], extrapolated)
+        backward_noise = variables.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = variables.ConditionalHiddenState(g_bw, noise=backward_noise)
+        extrapolated = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
 
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _vars.ConditionalHiddenState(op, noise=noi)
+        return variables.ConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         k = self.num_derivatives + 1
@@ -183,7 +183,7 @@ class _IBMSm(_extra.Extrapolation):
     def _init_backward_noise(rv_proto):
         mean = jnp.zeros_like(rv_proto.mean)
         cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
-        return _vars.NormalHiddenState(mean, cov_sqrtm_lower)
+        return variables.NormalHiddenState(mean, cov_sqrtm_lower)
 
     def promote_output_scale(self, output_scale):
         return output_scale
@@ -205,7 +205,7 @@ class _IBMFp(_extra.Extrapolation):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        rv = _vars.NormalHiddenState(
+        rv = variables.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
         cond = self.init_conditional(rv_proto=rv)
@@ -223,7 +223,7 @@ class _IBMFp(_extra.Extrapolation):
 
     def init(self, sol: _markov.MarkovSequence, /):
         # todo: reset backward model
-        ssv = _vars.SSV(sol.init.mean[0], sol.init)
+        ssv = variables.SSV(sol.init.mean[0], sol.init)
         extra = sol.backward_model
         return ssv, extra
 
@@ -240,8 +240,8 @@ class _IBMFp(_extra.Extrapolation):
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        extrapolated = _vars.NormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.SSV(m_ext[0], extrapolated)
+        extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
+        ssv = variables.SSV(m_ext[0], extrapolated)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
@@ -271,16 +271,16 @@ class _IBMFp(_extra.Extrapolation):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.ConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ssv = _vars.SSV(m_ext[0], extrapolated)
+        backward_noise = variables.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = variables.ConditionalHiddenState(g_bw, noise=backward_noise)
+        extrapolated = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
 
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _vars.ConditionalHiddenState(op, noise=noi)
+        return variables.ConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         k = self.num_derivatives + 1
@@ -290,7 +290,7 @@ class _IBMFp(_extra.Extrapolation):
     def _init_backward_noise(rv_proto):
         mean = jnp.zeros_like(rv_proto.mean)
         cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
-        return _vars.NormalHiddenState(mean, cov_sqrtm_lower)
+        return variables.NormalHiddenState(mean, cov_sqrtm_lower)
 
     def promote_output_scale(self, output_scale):
         return output_scale

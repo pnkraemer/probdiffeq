@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace import _corr
-from probdiffeq.statespace.iso import _vars
+from probdiffeq.statespace.iso import variables
 
 
 def taylor_order_zero(*args, **kwargs):
@@ -20,10 +20,10 @@ class _IsoTaylorZerothOrder(_corr.Correction):
     def init(self, x, /):
         bias_like = jnp.empty_like(x.hidden_state.mean[0, :])
         chol_like = jnp.empty(())
-        obs_like = _vars.IsoNormalQOI(bias_like, chol_like)
+        obs_like = variables.IsoNormalQOI(bias_like, chol_like)
         return x, obs_like
 
-    def begin(self, x: _vars.IsoSSV, c, /, vector_field, t, p):
+    def begin(self, x: variables.IsoSSV, c, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -33,7 +33,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
             R=cov_sqrtm_lower[:, None]
         )
         l_obs = jnp.reshape(l_obs_nonscalar, ())
-        obs = _vars.IsoNormalQOI(bias, l_obs)
+        obs = variables.IsoNormalQOI(bias, l_obs)
 
         mahalanobis_norm = obs.mahalanobis_norm(jnp.zeros_like(m1))
         output_scale = mahalanobis_norm / jnp.sqrt(bias.size)
@@ -43,7 +43,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         cache = (error_estimate, output_scale, (bias,))
         return x, cache
 
-    def complete(self, x: _vars.IsoSSV, co, /, vector_field, t, p):
+    def complete(self, x: variables.IsoSSV, co, /, vector_field, t, p):
         *_, (bias,) = co
 
         m_ext = x.hidden_state.mean
@@ -53,13 +53,13 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         l_obs_nonscalar = _sqrt_util.sqrtm_to_upper_triangular(R=l_obs[:, None])
         l_obs_scalar = jnp.reshape(l_obs_nonscalar, ())
 
-        observed = _vars.IsoNormalQOI(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+        observed = variables.IsoNormalQOI(mean=bias, cov_sqrtm_lower=l_obs_scalar)
 
         g = (l_ext @ l_obs.T) / l_obs_scalar  # shape (n,)
         m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
         l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
-        corrected = _vars.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        ssv = _vars.IsoSSV(m_cor[0, :], corrected)
+        corrected = variables.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
+        ssv = variables.IsoSSV(m_cor[0, :], corrected)
         return ssv, observed
 
     def extract(self, x, c, /):

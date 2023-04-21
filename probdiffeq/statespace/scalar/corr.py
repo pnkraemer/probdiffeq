@@ -6,7 +6,7 @@ from jax.typing import ArrayLike
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace import _corr
-from probdiffeq.statespace.scalar import _vars
+from probdiffeq.statespace.scalar import variables
 
 
 def taylor_order_zero(*args, **kwargs):
@@ -21,10 +21,10 @@ class _TaylorZerothOrder(_corr.Correction):
     def init(self, ssv, /):
         m_like = jnp.zeros(())
         chol_like = jnp.zeros(())
-        obs_like = _vars.NormalQOI(m_like, chol_like)
+        obs_like = variables.NormalQOI(m_like, chol_like)
         return ssv, obs_like
 
-    def begin(self, ssv: _vars.SSV, corr, /, vector_field, t, p):
+    def begin(self, ssv: variables.SSV, corr, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(ssv.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, ssv.hidden_state)
@@ -39,7 +39,7 @@ class _TaylorZerothOrder(_corr.Correction):
         cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, :]
         l_obs_raw = _sqrt_util.sqrtm_to_upper_triangular(R=cov_sqrtm_lower[:, None])
         l_obs = jnp.reshape(l_obs_raw, ())
-        observed = _vars.NormalQOI(b, l_obs)
+        observed = variables.NormalQOI(b, l_obs)
         cache = (b,)
         return cache, observed
 
@@ -47,7 +47,7 @@ class _TaylorZerothOrder(_corr.Correction):
         m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
         return m0, m1
 
-    def complete(self, ssv: _vars.SSV, corr, /, vector_field, t, p):
+    def complete(self, ssv: variables.SSV, corr, /, vector_field, t, p):
         *_, (b,) = corr
         m_ext, l_ext = (ssv.hidden_state.mean, ssv.hidden_state.cov_sqrtm_lower)
 
@@ -58,10 +58,10 @@ class _TaylorZerothOrder(_corr.Correction):
         r_obs = jnp.reshape(r_obs_mat, ())
         gain = jnp.reshape(gain_mat, (-1,))
         m_cor = m_ext - gain * b
-        observed = _vars.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
+        observed = variables.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
 
-        rv_cor = _vars.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        corrected = _vars.SSV(m_cor[0], rv_cor)
+        rv_cor = variables.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
+        corrected = variables.SSV(m_cor[0], rv_cor)
         return corrected, observed
 
     def extract(self, ssv, corr):
@@ -95,7 +95,7 @@ class StatisticalFirstOrder(_corr.Correction):
     def init(self, ssv, /):
         m_like = jnp.zeros(())
         chol_like = jnp.zeros(())
-        obs_like = _vars.NormalQOI(m_like, chol_like)
+        obs_like = variables.NormalQOI(m_like, chol_like)
         return ssv, obs_like
 
     def extract(self, ssv, corr):
@@ -108,7 +108,7 @@ class StatisticalFirstOrder(_corr.Correction):
         self,
         fx_mean: ArrayLike,
         fx_centered_normed: ArrayLike,
-        extrapolated: _vars.NormalHiddenState,
+        extrapolated: variables.NormalHiddenState,
     ):
         fx_mean = jnp.asarray(fx_mean)
         fx_centered_normed = jnp.asarray(fx_centered_normed)
@@ -127,7 +127,7 @@ class StatisticalFirstOrder(_corr.Correction):
         std_marg = jnp.reshape(std_marg_mat, ())
 
         # Extract error estimate and output scale from marginals
-        marginals = _vars.NormalQOI(m_marg, std_marg)
+        marginals = variables.NormalQOI(m_marg, std_marg)
         mahalanobis_norm = marginals.mahalanobis_norm(jnp.zeros(()))
         output_scale = mahalanobis_norm / jnp.sqrt(m_marg.size)
 
@@ -151,7 +151,7 @@ class StatisticalFirstOrder(_corr.Correction):
             fx_centered_normed, fx_mean, pts_centered_normed, rv
         )
 
-    def transform_sigma_points(self, rv: _vars.NormalHiddenState):
+    def transform_sigma_points(self, rv: variables.NormalHiddenState):
         # Extract square-root of covariance (-> std-dev.)
         L0_nonsq = rv.cov_sqrtm_lower[0, :]
         r_marg1_x_mat = _sqrt_util.sqrtm_to_upper_triangular(R=L0_nonsq[:, None])
@@ -191,7 +191,7 @@ class StatisticalFirstOrder(_corr.Correction):
 
         # Catch up the transition-mean and return the result
         m_noi = fx_mean - linop * rv.mean[0]
-        return linop, _vars.NormalQOI(m_noi, std_noi)
+        return linop, variables.NormalQOI(m_noi, std_noi)
 
     def complete_post_linearize(self, linop, rv, noise):
         # Compute the cubature-correction
@@ -211,10 +211,10 @@ class StatisticalFirstOrder(_corr.Correction):
         # Catch up the marginals
         x0, x1 = rv.mean[0], rv.mean[1]
         m_marg = x1 - (linop * x0 + noise.mean)
-        obs = _vars.NormalQOI(m_marg, std_marg)
+        obs = variables.NormalQOI(m_marg, std_marg)
 
         # Catch up the backward noise and return result
         m_bw = rv.mean - gain * m_marg
-        rv_cor = _vars.NormalHiddenState(m_bw, r_bw.T)
-        cor = _vars.SSV(m_bw[0], rv_cor)
+        rv_cor = variables.NormalHiddenState(m_bw, r_bw.T)
+        cor = variables.SSV(m_bw[0], rv_cor)
         return cor, obs

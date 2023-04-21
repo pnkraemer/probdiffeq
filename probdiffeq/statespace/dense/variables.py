@@ -6,11 +6,11 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _vars
+from probdiffeq.statespace import variables
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseConditional(_vars.Conditional):
+class DenseConditional(variables.Conditional):
     """Conditional distribution with dense covariance structure."""
 
     def __init__(self, *args, target_shape, **kwargs):
@@ -81,7 +81,7 @@ class DenseConditional(_vars.Conditional):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseSSV(_vars.SSV):
+class DenseSSV(variables.SSV):
     """State-space variable with dense covariance structure."""
 
     def __repr__(self):
@@ -143,7 +143,7 @@ class DenseSSV(_vars.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class DenseNormal(_vars.Normal):
+class DenseNormal(variables.Normal):
     """Random variables with a normal distribution.
 
     You can think of this as a traditional multivariate normal distribution.

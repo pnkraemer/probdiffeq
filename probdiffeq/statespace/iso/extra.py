@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
-from probdiffeq.statespace.iso import _vars
+from probdiffeq.statespace.iso import variables
 
 
 def ibm_iso(num_derivatives):
@@ -19,7 +19,7 @@ def ibm_iso(num_derivatives):
     return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
 
-class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
+class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
     @property
     def num_derivatives(self):
         return self.a.shape[0] - 1
@@ -32,15 +32,17 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
     def solution_from_tcoeffs(self, tcoeffs, /):
         m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, q_like=self.q_sqrtm_lower)
-        rv = _vars.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
+        rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         return rv
 
-    def init(self, rv: _vars.IsoNormalHiddenState, /):
-        ssv = _vars.IsoSSV(rv.mean[0, :], rv)
+    def init(self, rv: variables.IsoNormalHiddenState, /):
+        ssv = variables.IsoSSV(rv.mean[0, :], rv)
         cache = None
         return ssv, cache
 
-    def begin(self, s0: _vars.IsoSSV, _extra, /, dt) -> Tuple[_vars.IsoSSV, Any]:
+    def begin(
+        self, s0: variables.IsoSSV, _extra, /, dt
+    ) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -48,8 +50,8 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         l0 = s0.hidden_state.cov_sqrtm_lower
 
-        ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(m_ext[0, :], ext)
+        ext = variables.IsoNormalHiddenState(m_ext, q_sqrtm)
+        ssv = variables.IsoSSV(m_ext[0, :], ext)
         cache = (p, p_inv, l0)
         return ssv, cache
 
@@ -65,8 +67,8 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
             )
         ).T
         l_ext = p[:, None] * l_ext_p
-        rv = _vars.IsoNormalHiddenState(m_ext, l_ext)
-        ssv = _vars.IsoSSV(m_ext[0, :], rv)
+        rv = variables.IsoNormalHiddenState(m_ext, l_ext)
+        ssv = variables.IsoSSV(m_ext[0, :], rv)
         return ssv, None
 
     def extract(self, ssv, _extra, /):
@@ -85,7 +87,7 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoNormalHiddenState(m0, c0)
+        return variables.IsoNormalHiddenState(m0, c0)
 
     # Unnecessary?
     def init_error_estimate(self):
@@ -100,7 +102,7 @@ class _IBMFi(_extra.Extrapolation[_vars.IsoSSV, Any]):
         return output_scale
 
 
-class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
+class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
@@ -113,19 +115,19 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
-        rv = _vars.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
+        rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = self.init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol: _markov.MarkovSequence, /):
-        ssv = _vars.IsoSSV(sol.init.mean[0, :], sol.init)
+        ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
         cache = sol.backward_model
         return ssv, cache
 
     def extract(self, ssv, ex, /):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
 
-    def begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
+    def begin(self, s0: variables.IsoSSV, ex0, /, dt) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -133,8 +135,8 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         l0 = s0.hidden_state.cov_sqrtm_lower
 
-        ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(m_ext[0, :], ext)
+        ext = variables.IsoNormalHiddenState(m_ext, q_sqrtm)
+        ssv = variables.IsoSSV(m_ext[0, :], ext)
         cache = (ex0, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
@@ -159,10 +161,10 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.IsoConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
+        backward_noise = variables.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = variables.IsoConditionalHiddenState(g_bw, noise=backward_noise)
+        extrapolated = variables.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
     # Some helpers:
 
@@ -177,7 +179,7 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoNormalHiddenState(m0, c0)
+        return variables.IsoNormalHiddenState(m0, c0)
 
     def init_error_estimate(self):
         return jnp.zeros(())  # the initialisation is error-free
@@ -193,10 +195,10 @@ class _IBMSm(_extra.Extrapolation[_vars.IsoSSV, Any]):
     def init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
         noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
-        return _vars.IsoConditionalHiddenState(op, noise=noi)
+        return variables.IsoConditionalHiddenState(op, noise=noi)
 
 
-class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
+class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
@@ -207,13 +209,13 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
-        rv = _vars.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
+        rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = self.init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol, /):
         # todo: reset backward model
-        ssv = _vars.IsoSSV(sol.init.mean[0, :], sol.init)
+        ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
         cache = sol.backward_model
         return ssv, cache
 
@@ -226,7 +228,7 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         (d,) = ode_shape
         m0 = jnp.zeros((self.num_derivatives + 1, d))
         c0 = jnp.eye(self.num_derivatives + 1)
-        return _vars.IsoNormalHiddenState(m0, c0)
+        return variables.IsoNormalHiddenState(m0, c0)
 
     # Unnecessary?
     def init_error_estimate(self):
@@ -240,7 +242,7 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
             return output_scale[-1]
         return output_scale
 
-    def begin(self, s0: _vars.IsoSSV, ex0, /, dt) -> Tuple[_vars.IsoSSV, Any]:
+    def begin(self, s0: variables.IsoSSV, ex0, /, dt) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)
         m0_p = p_inv[:, None] * s0.hidden_state.mean
         m_ext_p = self.a @ m0_p
@@ -248,8 +250,8 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         l0 = s0.hidden_state.cov_sqrtm_lower
 
-        ext = _vars.IsoNormalHiddenState(m_ext, q_sqrtm)
-        ssv = _vars.IsoSSV(m_ext[0, :], ext)
+        ext = variables.IsoNormalHiddenState(m_ext, q_sqrtm)
+        ssv = variables.IsoSSV(m_ext[0, :], ext)
         cache = (ex0, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
 
@@ -279,15 +281,15 @@ class _IBMFp(_extra.Extrapolation[_vars.IsoSSV, Any]):
         l_bw = p[:, None] * l_bw_p
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
-        backward_noise = _vars.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _vars.IsoConditionalHiddenState(g_bw, noise=backward_noise)
-        extrapolated = _vars.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        return _vars.IsoSSV(m_ext[0, :], extrapolated), bw_model
+        backward_noise = variables.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
+        bw_model = variables.IsoConditionalHiddenState(g_bw, noise=backward_noise)
+        extrapolated = variables.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
     def init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
         noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
-        return _vars.IsoConditionalHiddenState(op, noise=noi)
+        return variables.IsoConditionalHiddenState(op, noise=noi)
 
 
 def _stack_tcoeffs(taylor_coefficients, q_like):

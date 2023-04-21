@@ -4,7 +4,7 @@
 import jax
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace.dense import _vars
+from probdiffeq.statespace.dense import variables
 
 # todo:
 #  statistical linear regression (zeroth order)
@@ -42,7 +42,9 @@ def slr1(*, fn, x, cubature_rule):
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
     mean_cond = fx_mean - linop_cond @ x.mean
-    return linop_cond, _vars.DenseNormal(mean_cond, cov_sqrtm_cond.T, target_shape=None)
+    return linop_cond, variables.DenseNormal(
+        mean_cond, cov_sqrtm_cond.T, target_shape=None
+    )
 
 
 def slr0(*, fn, x, cubature_rule):
@@ -64,4 +66,4 @@ def slr0(*, fn, x, cubature_rule):
     fx_mean = cubature_rule.weights_sqrtm**2 @ fx
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-    return _vars.DenseNormal(fx_mean, fx_centered_normed.T, target_shape=None)
+    return variables.DenseNormal(fx_mean, fx_centered_normed.T, target_shape=None)
