@@ -4,12 +4,70 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _collections
-from probdiffeq.statespace.scalar import _conds
+from probdiffeq.statespace import _vars
 
 
 @jax.tree_util.register_pytree_node_class
-class NormalQOI(_collections.Normal):
+class ConditionalHiddenState(_vars.Conditional):
+    def __call__(self, x, /):
+        if self.transition.ndim > 2:
+            return jax.vmap(ConditionalHiddenState.__call__)(self, x)
+
+        m = self.transition @ x + self.noise.mean
+        rv = NormalHiddenState(m, self.noise.cov_sqrtm_lower)
+        return SSV(rv, cache=None)
+
+    def scale_covariance(self, output_scale):
+        noise = self.noise.scale_covariance(output_scale=output_scale)
+        return ConditionalHiddenState(transition=self.transition, noise=noise)
+
+    def merge_with_incoming_conditional(self, incoming, /):
+        if self.transition.ndim > 2:
+            fn = ConditionalHiddenState.merge_with_incoming_conditional
+            return jax.vmap(fn)(self, incoming)
+
+        A = self.transition
+        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
+
+        C = incoming.transition
+        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+        g = A @ C
+        xi = A @ d + b
+        Xi = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
+        ).T
+
+        noise = NormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
+        return ConditionalHiddenState(g, noise=noise)
+
+    def marginalise(self, rv, /):
+        # Todo: this auto-batch is a bit hacky,
+        #  but single-handedly replaces the entire BatchConditional class
+        if rv.mean.ndim > 1:
+            return jax.vmap(ConditionalHiddenState.marginalise)(self, rv)
+
+        m0, l0 = rv.mean, rv.cov_sqrtm_lower
+
+        m_new = self.transition @ m0 + self.noise.mean
+        l_new = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((self.transition @ l0).T, self.noise.cov_sqrtm_lower.T)
+        ).T
+
+        return NormalHiddenState(m_new, l_new)
+
+
+@jax.tree_util.register_pytree_node_class
+class ConditionalQOI(_vars.Conditional):
+    def __call__(self, x, /):
+        if self.transition.ndim > 1:
+            return jax.vmap(ConditionalQOI.__call__)(self, x)
+        m = self.transition * x + self.noise.mean
+        return NormalHiddenState(m, self.noise.cov_sqrtm_lower)
+
+
+@jax.tree_util.register_pytree_node_class
+class NormalQOI(_vars.Normal):
     # Normal RV. Shapes (), (). No QOI.
 
     def transform_unit_sample(self, base, /):
@@ -55,7 +113,7 @@ class NormalQOI(_collections.Normal):
 
 
 @jax.tree_util.register_pytree_node_class
-class SSV(_collections.SSV):
+class SSV(_vars.SSV):
     # Normal RV. Shapes (n,), (n,n); zeroth state is the QOI.
 
     def observe_qoi(self, observation_std):
@@ -82,7 +140,7 @@ class SSV(_collections.SSV):
 
         obs = NormalQOI(m_obs, r_obs.T)
         cor = NormalHiddenState(m_cor, r_cor.T)
-        return obs, _conds.ConditionalQOI(gain, cor)
+        return obs, ConditionalQOI(gain, cor)
 
     def extract_qoi_from_sample(self, u, /):
         if u.ndim == 1:
@@ -113,7 +171,7 @@ class SSV(_collections.SSV):
 
 
 @jax.tree_util.register_pytree_node_class
-class NormalHiddenState(_collections.Normal):
+class NormalHiddenState(_vars.Normal):
     def logpdf(self, u, /):
         raise NotImplementedError
 

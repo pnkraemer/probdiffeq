@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _collections, _sqrt_util
 from probdiffeq.statespace import _extra, _ibm_util
-from probdiffeq.statespace.scalar import _conds, _vars
+from probdiffeq.statespace.scalar import _vars
 
 
 def ibm_scalar(num_derivatives):
@@ -165,7 +165,7 @@ class _IBMSm(_extra.Extrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
+        bw_model = _vars.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = _vars.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
@@ -173,7 +173,7 @@ class _IBMSm(_extra.Extrapolation):
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _conds.ConditionalHiddenState(op, noise=noi)
+        return _vars.ConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         k = self.num_derivatives + 1
@@ -272,7 +272,7 @@ class _IBMFp(_extra.Extrapolation):
         g_bw = p[:, None] * g_bw_p * p_inv[None, :]
 
         backward_noise = _vars.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
-        bw_model = _conds.ConditionalHiddenState(g_bw, noise=backward_noise)
+        bw_model = _vars.ConditionalHiddenState(g_bw, noise=backward_noise)
         extrapolated = _vars.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = _vars.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
@@ -280,7 +280,7 @@ class _IBMFp(_extra.Extrapolation):
     def init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
-        return _conds.ConditionalHiddenState(op, noise=noi)
+        return _vars.ConditionalHiddenState(op, noise=noi)
 
     def _init_backward_transition(self):
         k = self.num_derivatives + 1
