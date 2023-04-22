@@ -3,8 +3,38 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
+from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import variables
+
+
+def unit_markov_sequence(**kwargs) -> _markov.MarkovSequence:
+    rv0 = standard_normal(**kwargs)
+    cond0 = identity_conditional(**kwargs)
+    return _markov.MarkovSequence(init=rv0, backward_model=cond0)
+
+
+# todo: once the fixedpoint smoother resets the backward model at initialisation,
+#  all init_conditional() functions can be removed and the relevant code snippets
+#  point to this function.
+def identity_conditional(*, num_derivatives, ode_shape) -> "IsoConditionalHiddenState":
+    assert len(ode_shape) == 1
+    (d,) = ode_shape
+
+    op = jnp.eye(num_derivatives + 1)
+
+    m0 = jnp.zeros((num_derivatives + 1, d))
+    c0 = jnp.zeros((num_derivatives + 1, num_derivatives + 1))
+    noise = IsoNormalHiddenState(m0, c0)
+    return IsoConditionalHiddenState(op, noise=noise)
+
+
+def standard_normal(*, num_derivatives, ode_shape) -> "IsoNormalHiddenState":
+    assert len(ode_shape) == 1
+    (d,) = ode_shape
+
+    m0 = jnp.zeros((num_derivatives + 1, d))
+    c0 = jnp.eye(num_derivatives + 1)
+    return IsoNormalHiddenState(m0, c0)
 
 
 @jax.tree_util.register_pytree_node_class

@@ -8,9 +8,8 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq import _markov
 from probdiffeq.backend import containers
-from probdiffeq.statespace import recipes
+from probdiffeq.statespace.iso import extra, variables
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -182,13 +181,12 @@ def _runge_kutta_starter_fn(
     # Run fixed-point smoother
 
     # Initialise
-    extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
-    rv0 = extrapolation.smoother.standard_normal(ode_shape=initial_values[0].shape)
-    cond0 = extrapolation.smoother.init_conditional(rv_proto=rv0)
-    sol0 = _markov.MarkovSequence(init=rv0, backward_model=cond0)
+    ode_shape = initial_values[0].shape
+    extrapolation = extra.ibm_iso(num_derivatives=num)
+    solution = variables.unit_markov_sequence(num_derivatives=num, ode_shape=ode_shape)
 
     # Estimate
-    u0_full = _fixed_point_smoother(extrapolation, sol0, ys=ys, dts=jnp.diff(ts))
+    u0_full = _fixed_point_smoother(extrapolation, solution, ys=ys, dts=jnp.diff(ts))
 
     # Turn the mean into a tuple of arrays and return
     taylor_coefficients = tuple(u0_full.mean)
