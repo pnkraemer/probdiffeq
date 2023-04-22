@@ -207,9 +207,8 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol, /):
-        # todo: reset backward model
         ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
-        cache = sol.backward_model
+        cache = self.init_conditional(rv_proto=sol.init)
         return ssv, cache
 
     def extract(self, ssv, ex, /):
