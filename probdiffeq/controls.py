@@ -15,7 +15,7 @@ S = TypeVar("S")
 class Control(Generic[S]):
     """Interface for control-algorithms."""
 
-    def init_state_from_dt(self, dt0: float) -> S:
+    def init(self, dt0: float) -> S:
         """Initialise the controller state."""
         raise NotImplementedError
 
@@ -29,7 +29,7 @@ class Control(Generic[S]):
         r"""Propose a time-step $\Delta t$."""
         raise NotImplementedError
 
-    def extract_dt_from_state(self, state: S) -> jax.Array:
+    def extract(self, state: S) -> jax.Array:
         """Extract the time-step from the controller state."""
         raise NotImplementedError
 
@@ -65,7 +65,7 @@ class _ProportionalIntegralCommon(Control[_PIState]):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
-    def init_state_from_dt(self, dt0):
+    def init(self, dt0):
         return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
 
     def clip(self, t, t1, state: _PIState) -> _PIState:
@@ -97,7 +97,7 @@ class _ProportionalIntegralCommon(Control[_PIState]):
         )
         return state
 
-    def extract_dt_from_state(self, state: _PIState) -> jax.Array:
+    def extract(self, state: _PIState) -> jax.Array:
         return state.dt_proposed
 
 
@@ -144,7 +144,7 @@ class _IntegralCommon(Control[_IState]):
     def tree_unflatten(cls, _aux, children):
         return cls(*children)
 
-    def init_state_from_dt(self, dt0) -> _IState:
+    def init(self, dt0) -> _IState:
         return _IState(dt0)
 
     def clip(self, t, t1, state: _IState) -> _IState:
@@ -163,7 +163,7 @@ class _IntegralCommon(Control[_IState]):
         dt = scale_factor * state.dt_proposed
         return _IState(dt)
 
-    def extract_dt_from_state(self, state: _IState) -> jax.Array:
+    def extract(self, state: _IState) -> jax.Array:
         return state.dt_proposed
 
 
