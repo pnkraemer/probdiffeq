@@ -3,12 +3,29 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
+from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import variables
 
 
+def unit_markov_sequence(**kwargs):
+    rv0 = standard_normal(**kwargs)
+    cond0 = identity_conditional(**kwargs)
+    return _markov.MarkovSequence(init=rv0, backward_model=cond0)
+
+
+def identity_conditional(*, num_derivatives, ode_shape):
+    assert len(ode_shape) == 1
+    (d,) = ode_shape
+
+    op = jnp.eye(num_derivatives + 1)
+
+    m0 = jnp.zeros((num_derivatives + 1, d))
+    c0 = jnp.zeros((num_derivatives + 1, num_derivatives + 1))
+    noise = IsoNormalHiddenState(m0, c0)
+    return IsoConditionalHiddenState(op, noise=noise)
+
+
 def standard_normal(*, num_derivatives, ode_shape):
-    # Used for Runge-Kutta initialisation.
     assert len(ode_shape) == 1
     (d,) = ode_shape
 
