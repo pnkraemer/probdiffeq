@@ -255,45 +255,61 @@ def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
 
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
-    init = _init_fn(rv_terminal, standard_deviations[-1], u[-1], strategy)
+    init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
 
     # Scan over the remaining data points
     lml_state, _ = jax.lax.scan(
         f=functools.partial(_filter_step, strategy=strategy),
         init=init,
-        xs=(bw_models, standard_deviations[:-1], u[:-1]),
+        xs=(bw_models, (standard_deviations[:-1], u[:-1])),
         reverse=reverse,
     )
     return lml_state.log_marginal_likelihood
 
 
-def _init_fn(rv, obs_std, data, strategy):
+def _init_fn(rv, problem, *, strategy):
+    obs_std, data = problem
+
     ssv, _ = strategy.extrapolation.filter.init(rv)
     obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
+
     cor = cond_cor(data)
     lml_new = jnp.sum(obs.logpdf(data))
     return _KalFiltState(cor, 1.0, log_marginal_likelihood=lml_new)
 
 
-def _filter_step(carry, x, *, strategy):
-    # Read
-    rv = carry.rv
-    num_data = carry.num_data_points
-    lml_prev = carry.log_marginal_likelihood
-    bw_model, obs_std, data = x
+def _filter_step(state, problem, *, strategy):
+    bw_model, (obs_std, data) = problem
 
-    # Extrapolate
-    rv_ext = bw_model.marginalise(rv)
+    state = _predict(state, problem=bw_model)
+    updates = _update(state, problem=(obs_std, data), strategy=strategy)
+    state = _apply_updates(state, updates=updates)
+    return state, state
 
-    # Correct (with an alias for long function names)
-    ssv, _ = strategy.extrapolation.filter.init(rv_ext)
-    obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
-    cor = cond_cor(data)
 
-    # Compute marginal log likelihood (with an alias for long function names)
-    lml_new = jnp.sum(obs.logpdf(data))
+def _predict(state, *, problem):
+    """Extrapolate according to the given transition."""
+    rv = problem.marginalise(state.rv)
+    return _KalFiltState(rv, state.num_data_points, state.log_marginal_likelihood)
+
+
+def _update(state, problem, *, strategy):
+    """Observe the QOI and compute the 'local' log-marginal likelihood."""
+    obs_std, data = problem
+
+    ssv, _ = strategy.extrapolation.filter.init(state.rv)
+    observed, conditional = ssv.observe_qoi(observation_std=obs_std)
+
+    corrected = conditional(data)
+    lml = jnp.sum(observed.logpdf(data))
+    return corrected, lml
+
+
+def _apply_updates(state, /, *, updates):
+    """Update the 'global' log-marginal-likelihood and return a new state."""
+    corrected, lml_new = updates
+    num_data = state.num_data_points
+    lml_prev = state.log_marginal_likelihood
+
     lml_updated = (num_data * lml_prev + lml_new) / (num_data + 1)
-
-    # Return values
-    x = _KalFiltState(cor, num_data + 1, log_marginal_likelihood=lml_updated)
-    return x, x
+    return _KalFiltState(corrected, num_data + 1, log_marginal_likelihood=lml_updated)
