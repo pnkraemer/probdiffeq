@@ -288,11 +288,13 @@ def _filter_step(state, problem, *, strategy):
 
 
 def _predict(state, *, problem):
+    """Extrapolate according to the given transition."""
     rv = problem.marginalise(state.rv)
     return _KalFiltState(rv, state.num_data_points, state.log_marginal_likelihood)
 
 
 def _update(state, problem, *, strategy):
+    """Observe the QOI and compute the 'local' log-marginal likelihood."""
     obs_std, data = problem
 
     ssv, _ = strategy.extrapolation.filter.init(state.rv)
@@ -304,6 +306,7 @@ def _update(state, problem, *, strategy):
 
 
 def _apply_updates(state, /, *, updates):
+    """Update the 'global' log-marginal-likelihood and return a new state."""
     corrected, lml_new = updates
     num_data = state.num_data_points
     lml_prev = state.log_marginal_likelihood
