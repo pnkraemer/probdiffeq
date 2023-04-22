@@ -44,7 +44,6 @@ class _PIState(containers.NamedTuple):
 class _ProportionalIntegralCommon(Control[_PIState]):
     def __init__(
         self,
-        *,
         safety: float = 0.95,
         factor_min: float = 0.2,
         factor_max: float = 10.0,
@@ -118,7 +117,7 @@ class _IState(containers.NamedTuple):
 
 class _IntegralCommon(Control[_IState]):
     def __init__(
-        self, *, safety: float = 0.95, factor_min: float = 0.2, factor_max: float = 10.0
+        self, safety: float = 0.95, factor_min: float = 0.2, factor_max: float = 10.0
     ):
         self.safety = safety
         self.factor_min = factor_min
