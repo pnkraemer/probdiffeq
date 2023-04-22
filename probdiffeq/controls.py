@@ -111,11 +111,7 @@ class ProportionalIntegralClipped(_ProportionalIntegralCommon):
         return _PIState(dt_clipped, state.error_norm_previously_accepted)
 
 
-class _IState(containers.NamedTuple):
-    dt_proposed: jax.Array
-
-
-class _IntegralCommon(Control[_IState]):
+class _IntegralCommon(Control[float]):
     def __init__(
         self, safety: float = 0.95, factor_min: float = 0.2, factor_max: float = 10.0
     ):
@@ -123,34 +119,29 @@ class _IntegralCommon(Control[_IState]):
         self.factor_min = factor_min
         self.factor_max = factor_max
 
-    def init(self, dt0) -> _IState:
-        return _IState(dt0)
+    def init(self, dt0) -> float:
+        return dt0
 
-    def clip(self, state: _IState, /, t, t1) -> _IState:
+    def clip(self, dt: float, /, t, t1) -> float:
         raise NotImplementedError
 
-    def apply(
-        self, state: _IState, /, error_normalised, error_contraction_rate
-    ) -> _IState:
-        scale_factor_unclipped = self.safety * (
-            error_normalised ** (-1.0 / error_contraction_rate)
-        )
+    def apply(self, dt, /, error_normalised, error_contraction_rate) -> float:
+        error_power = error_normalised ** (-1.0 / error_contraction_rate)
+        scale_factor_unclipped = self.safety * error_power
 
-        scale_factor = jnp.maximum(
-            self.factor_min, jnp.minimum(scale_factor_unclipped, self.factor_max)
-        )
-        dt = scale_factor * state.dt_proposed
-        return _IState(dt)
+        scale_factor_clipped_min = jnp.minimum(scale_factor_unclipped, self.factor_max)
+        scale_factor = jnp.maximum(self.factor_min, scale_factor_clipped_min)
+        return scale_factor * dt
 
-    def extract(self, state: _IState, /) -> float:
-        return state.dt_proposed
+    def extract(self, dt: float, /) -> float:
+        return dt
 
 
 class Integral(_IntegralCommon):
     r"""Integral (I) controller."""
 
-    def clip(self, state: _IState, /, t: float, t1: float) -> _IState:
-        return state
+    def clip(self, dt: float, /, t, t1) -> float:
+        return dt
 
 
 class IntegralClipped(_IntegralCommon):
@@ -159,9 +150,9 @@ class IntegralClipped(_IntegralCommon):
     Time-steps are always clipped to $\min(\Delta t, t_1-t)$.
     """
 
-    def clip(self, state: _IState, /, t: float, t1: float) -> _IState:
-        dt_clipped = jnp.minimum(state.dt_proposed, t1 - t)
-        return _IState(dt_clipped)
+    def clip(self, dt: float, /, t, t1) -> float:
+        dt_clipped = jnp.minimum(dt, t1 - t)
+        return dt_clipped
 
 
 # Register the controllers as PyTrees
