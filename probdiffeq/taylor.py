@@ -183,10 +183,10 @@ def _runge_kutta_starter_fn(
     # Initialise
     ode_shape = initial_values[0].shape
     extrapolation = extra.ibm_iso(num_derivatives=num)
-    sol0 = variables.unit_markov_sequence(num_derivatives=num, ode_shape=ode_shape)
+    solution = variables.unit_markov_sequence(num_derivatives=num, ode_shape=ode_shape)
 
     # Estimate
-    u0_full = _fixed_point_smoother(extrapolation, sol0, ys=ys, dts=jnp.diff(ts))
+    u0_full = _fixed_point_smoother(extrapolation, solution, ys=ys, dts=jnp.diff(ts))
 
     # Turn the mean into a tuple of arrays and return
     taylor_coefficients = tuple(u0_full.mean)

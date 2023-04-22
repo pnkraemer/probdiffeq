@@ -7,13 +7,16 @@ from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import variables
 
 
-def unit_markov_sequence(**kwargs):
+def unit_markov_sequence(**kwargs) -> _markov.MarkovSequence:
     rv0 = standard_normal(**kwargs)
     cond0 = identity_conditional(**kwargs)
     return _markov.MarkovSequence(init=rv0, backward_model=cond0)
 
 
-def identity_conditional(*, num_derivatives, ode_shape):
+# todo: once the fixedpoint smoother resets the backward model at initialisation,
+#  all init_conditional() functions can be removed and the relevant code snippets
+#  point to this function.
+def identity_conditional(*, num_derivatives, ode_shape) -> "IsoConditionalHiddenState":
     assert len(ode_shape) == 1
     (d,) = ode_shape
 
@@ -25,7 +28,7 @@ def identity_conditional(*, num_derivatives, ode_shape):
     return IsoConditionalHiddenState(op, noise=noise)
 
 
-def standard_normal(*, num_derivatives, ode_shape):
+def standard_normal(*, num_derivatives, ode_shape) -> "IsoNormalHiddenState":
     assert len(ode_shape) == 1
     (d,) = ode_shape
 
