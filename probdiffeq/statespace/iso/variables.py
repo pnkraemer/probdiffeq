@@ -7,6 +7,16 @@ from probdiffeq import _sqrt_util
 from probdiffeq.statespace import variables
 
 
+def standard_normal(*, num_derivatives, ode_shape):
+    # Used for Runge-Kutta initialisation.
+    assert len(ode_shape) == 1
+    (d,) = ode_shape
+
+    m0 = jnp.zeros((num_derivatives + 1, d))
+    c0 = jnp.eye(num_derivatives + 1)
+    return IsoNormalHiddenState(m0, c0)
+
+
 @jax.tree_util.register_pytree_node_class
 class IsoConditionalHiddenState(variables.Conditional):
     # Conditional between two hidden states and QOI

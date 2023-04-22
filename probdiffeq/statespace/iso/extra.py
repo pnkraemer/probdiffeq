@@ -81,14 +81,6 @@ class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
         k = {"scales": self.preconditioner_scales, "powers": self.preconditioner_powers}
         return _ibm_util.preconditioner_diagonal(dt=dt, **k)
 
-    def standard_normal(self, ode_shape):
-        # Used for Runge-Kutta initialisation.
-        assert len(ode_shape) == 1
-        (d,) = ode_shape
-        m0 = jnp.zeros((self.num_derivatives + 1, d))
-        c0 = jnp.eye(self.num_derivatives + 1)
-        return variables.IsoNormalHiddenState(m0, c0)
-
     def promote_output_scale(self, output_scale):
         return output_scale
 

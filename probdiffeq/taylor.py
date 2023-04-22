@@ -11,6 +11,7 @@ import jax.numpy as jnp
 from probdiffeq import _markov
 from probdiffeq.backend import containers
 from probdiffeq.statespace import recipes
+from probdiffeq.statespace.iso import variables
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -182,8 +183,9 @@ def _runge_kutta_starter_fn(
     # Run fixed-point smoother
 
     # Initialise
+    ode_shape = initial_values[0].shape
     extrapolation, _corr = recipes.ts0_iso(num_derivatives=num)
-    rv0 = extrapolation.smoother.standard_normal(ode_shape=initial_values[0].shape)
+    rv0 = variables.standard_normal(num_derivatives=num, ode_shape=ode_shape)
     cond0 = extrapolation.smoother.init_conditional(rv_proto=rv0)
     sol0 = _markov.MarkovSequence(init=rv0, backward_model=cond0)
 
