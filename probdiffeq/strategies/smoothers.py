@@ -190,8 +190,8 @@ class FixedPointSmoother(_strategy.Strategy):
         bw_t_to_qoi = s0.extra.merge_with_incoming_conditional(s1.extra)
         solution = _SmState(t=t, ssv=s1.ssv, corr=s1.corr, extra=bw_t_to_qoi)
 
-        accepted = self._duplicate_with_unit_backward_model(solution)
-        previous = self._duplicate_with_unit_backward_model(solution)
+        accepted = self._reset_fixedpoint(solution)
+        previous = self._reset_fixedpoint(solution)
         return _interp.InterpRes(
             accepted=accepted, solution=solution, previous=previous
         )
@@ -242,7 +242,7 @@ class FixedPointSmoother(_strategy.Strategy):
         # 'e_1': extrapolated result at time 't1'.
         # todo: rename this to "extrapolate from to fn", no interpolation happens here.
         e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
-        prev_t = self._duplicate_with_unit_backward_model(e_t)
+        prev_t = self._reset_fixedpoint(e_t)
         e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
 
         # Read backward models and condense qoi-to-t
@@ -282,7 +282,7 @@ class FixedPointSmoother(_strategy.Strategy):
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
     # todo: should this be a classmethod of _markov.MarkovSequence?
-    def _duplicate_with_unit_backward_model(self, state: _SmState, /) -> _SmState:
+    def _reset_fixedpoint(self, state: _SmState, /) -> _SmState:
         extra_new = self.extrapolation.fixedpoint.init_conditional(
             rv_proto=state.extra.noise
         )
