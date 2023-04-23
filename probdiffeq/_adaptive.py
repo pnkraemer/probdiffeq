@@ -76,7 +76,7 @@ class AdaptiveIVPSolver(Generic[T]):
         """Initialise the IVP solver state."""
         # Initialise the components
         state_solver = self.solver.init(t, posterior, output_scale, num_steps)
-        state_control = self.control.init_state_from_dt(dt0)
+        state_control = self.control.init(dt0)
 
         # Initialise (prototypes for) proposed values
         error_norm_proposed = self._normalise_error(
@@ -153,38 +153,36 @@ class AdaptiveIVPSolver(Generic[T]):
         propose a future time-step based on tolerances and error estimates."""
         # Some controllers like to clip the terminal value instead of interpolating.
         # This must happen _before_ the step.
-        state_control = self.control.clip(
-            t=state.accepted.t, state=state.control, t1=t1
-        )
+        state_control = self.control.clip(state.control, t=state.accepted.t, t1=t1)
 
         # Perform the actual step.
-        posterior = self.solver.step(
+        state_proposed = self.solver.step(
             state=state.accepted,
             vector_field=vector_field,
-            dt=self.control.extract_dt_from_state(state_control),
+            dt=self.control.extract(state_control),
             parameters=parameters,
         )
         # Normalise the error and propose a new step.
         error_normalised = self._normalise_error(
-            error_estimate=posterior.error_estimate,
-            u=self.reference_state_fn(posterior.u, state.accepted.u),
+            error_estimate=state_proposed.error_estimate,
+            u=self.reference_state_fn(state_proposed.u, state.accepted.u),
             atol=self.atol,
             rtol=self.rtol,
             norm_ord=self.norm_ord,
         )
         error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
         state_control = self.control.apply(
-            state=state_control,
+            state_control,
             error_normalised=error_normalised,
             error_contraction_rate=error_contraction_rate,
         )
         return _AdaptiveState(
             error_norm_proposed=error_normalised,  # new
-            proposed=posterior,  # new
-            solution=state.solution,  # too early to accept :)
-            accepted=state.accepted,  # too early to accept :)
-            previous=state.previous,  # too early to accept :)
+            proposed=state_proposed,  # new
             control=state_control,  # new
+            solution=state.solution,  # too early to accept
+            accepted=state.accepted,  # too early to accept
+            previous=state.previous,  # too early to accept
         )
 
     @staticmethod
@@ -208,7 +206,7 @@ class AdaptiveIVPSolver(Generic[T]):
 
     def extract(self, state: _AdaptiveState, /):
         solver_extract = self.solver.extract(state.solution)
-        control_extract = self.control.extract_dt_from_state(state.control)
+        control_extract = self.control.extract(state.control)
         return solver_extract, control_extract
 
 
