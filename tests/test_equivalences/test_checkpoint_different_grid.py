@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, solution, test_util
+from probdiffeq import ivpsolve, solution, test_util
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
@@ -73,15 +73,9 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, impl_fn, k):
     assert jnp.allclose(fixedpoint_smo_sol.marginals.mean, dense.mean)
 
     # covariances are equal, but cov_sqrtm_lower might not be
-
-    @jax.vmap
-    @jax.vmap
-    def cov(x):
-        return x @ x.T
-
-    l0 = fixedpoint_smo_sol.marginals.cov_sqrtm_lower
-    l1 = dense.cov_sqrtm_lower
-    assert jnp.allclose(cov(l0), cov(l1))
+    c0 = fixedpoint_smo_sol.marginals.cov_dense()
+    c1 = dense.cov_dense()
+    assert jnp.allclose(c0, c1)
 
 
 def _tree_all_allclose(tree1, tree2, **kwargs):

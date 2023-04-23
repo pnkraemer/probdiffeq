@@ -345,7 +345,7 @@ class _IBMFp(_extra.Extrapolation):
         return p, p_inv
 
     def complete(self, ssv, extra, /, output_scale):
-        _, m_ext_p, m0_p, p, p_inv, l0 = extra
+        bw0, m_ext_p, m0_p, p, p_inv, l0 = extra
         # todo: move this to cache? it may be modified by correction models
         m_ext = ssv.hidden_state.mean
 
@@ -372,6 +372,7 @@ class _IBMFp(_extra.Extrapolation):
         bw_model = variables.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
+        bw_model = bw0.merge_with_incoming_conditional(bw_model)
         rv = variables.DenseNormal(
             mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
         )

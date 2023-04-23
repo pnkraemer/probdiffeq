@@ -206,3 +206,9 @@ class NormalHiddenState(variables.Normal):
         if u.ndim == 1:
             return u[0]
         return jax.vmap(self.extract_qoi_from_sample)(u)
+
+    def cov_dense(self):
+        if self.cov_sqrtm_lower.ndim > 2:
+            return jax.vmap(NormalHiddenState.cov_dense)(self)
+
+        return self.cov_sqrtm_lower @ self.cov_sqrtm_lower.T

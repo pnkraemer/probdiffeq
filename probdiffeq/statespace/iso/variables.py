@@ -172,6 +172,11 @@ class IsoNormalHiddenState(variables.Normal):
     def extract_qoi_from_sample(self, u, /):
         return u[..., 0, :]
 
+    def cov_dense(self):
+        if self.cov_sqrtm_lower.ndim > 2:
+            return jax.vmap(IsoNormalHiddenState.cov_dense)(self)
+        return self.cov_sqrtm_lower @ self.cov_sqrtm_lower.T
+
 
 @jax.tree_util.register_pytree_node_class
 class IsoNormalQOI(variables.Normal):
