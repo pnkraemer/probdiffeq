@@ -233,7 +233,7 @@ class _IBMFp(_extra.Extrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
         ssv = variables.SSV(m_ext[0], extrapolated)
-        cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
+        cache = (m_ext_p, m0_p, p, p_inv, l0, extra)
         return ssv, cache
 
     def _assemble_preconditioner(self, dt):
@@ -242,7 +242,7 @@ class _IBMFp(_extra.Extrapolation):
         )
 
     def complete(self, ssv, extra, /, output_scale):
-        _, m_ext_p, m0_p, p, p_inv, l0 = extra
+        m_ext_p, m0_p, p, p_inv, l0, bw0 = extra
         m_ext = ssv.hidden_state.mean
 
         l0_p = p_inv[:, None] * l0
@@ -264,6 +264,8 @@ class _IBMFp(_extra.Extrapolation):
 
         backward_noise = variables.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = variables.ConditionalHiddenState(g_bw, noise=backward_noise)
+        bw_model = bw0.merge_with_incoming_conditional(bw_model)
+
         extrapolated = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model

@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import ivpsolve, ivpsolvers, solution, test_util
 from probdiffeq.backend import testing
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
@@ -13,24 +13,21 @@ from probdiffeq.strategies import smoothers
 #  this redundancy should be eliminated
 
 
-@testing.case
-def smoother_pair_smoother_and_fixedpoint():
-    impl = recipes.ts0_iso()
-    return smoothers.Smoother(*impl), smoothers.FixedPointSmoother(*impl)
-
-
-_ALL_IVPSOLVERS = [
-    ivpsolvers.DynamicSolver,
-    ivpsolvers.MLESolver,
-    ivpsolvers.CalibrationFreeSolver,
-]
-
-
-@testing.parametrize_with_cases("smo, fp_smo", cases=".", prefix="smoother_pair_")
 @testing.parametrize("k", [1, 3], ids=["1xPts", "3xPts"])  # k * N // 2 off-grid points
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-@testing.parametrize("solver", _ALL_IVPSOLVERS)
-def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, solver, k):
+@testing.parametrize(
+    "impl_fn",
+    # one for each SSM factorisation
+    [
+        lambda num_derivatives, **kwargs: recipes.ts0_iso(
+            num_derivatives=num_derivatives
+        ),
+        recipes.ts0_blockdiag,
+        recipes.ts0_dense,
+    ],
+    ids=["IsoTS0", "BlockDiagTS0", "DenseTS0"],
+)
+def test_smoothing_checkpoint_equals_solver_state(ode_problem, impl_fn, k):
     """In solve_and_save_at(), if the checkpoint-grid equals the solution-grid\
      of a previous call to solve_with_python_while_loop(), \
      the results should be identical."""
@@ -38,22 +35,31 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, solv
     # here, create an even grid which shares one point with the adaptive one.
     # This one point will be used for error-estimation.
 
+    solver_smo = test_util.generate_solver(
+        strategy_factory=smoothers.Smoother,
+        impl_factory=impl_fn,
+        ode_shape=ode_problem.initial_values[0].shape,
+        num_derivatives=2,
+    )
+    solver_fp_smo = test_util.generate_solver(
+        strategy_factory=smoothers.FixedPointSmoother,
+        impl_factory=impl_fn,
+        ode_shape=ode_problem.initial_values[0].shape,
+        num_derivatives=2,
+    )
+
     args = (ode_problem.vector_field, ode_problem.initial_values)
     kwargs = {"parameters": ode_problem.args, "atol": 1e-1, "rtol": 1e-1}
     smo_sol = ivpsolve.solve_with_python_while_loop(
-        *args,
-        t0=ode_problem.t0,
-        t1=ode_problem.t1,
-        solver=solver(strategy=smo),
-        **kwargs
+        *args, t0=ode_problem.t0, t1=ode_problem.t1, solver=solver_smo, **kwargs
     )
     ts = jnp.linspace(ode_problem.t0, ode_problem.t1, num=k * len(smo_sol.t) // 2)
     u, dense = solution.offgrid_marginals_searchsorted(
-        ts=ts[1:-1], solution=smo_sol, solver=solver(strategy=smo)
+        ts=ts[1:-1], solution=smo_sol, solver=solver_smo
     )
 
     fp_smo_sol = ivpsolve.solve_and_save_at(
-        *args, save_at=ts, solver=solver(strategy=fp_smo), **kwargs
+        *args, save_at=ts, solver=solver_fp_smo, **kwargs
     )
     fixedpoint_smo_sol = fp_smo_sol[1:-1]  # reference is defined only on the interior
 
@@ -68,6 +74,7 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, smo, fp_smo, solv
 
     # covariances are equal, but cov_sqrtm_lower might not be
 
+    @jax.vmap
     @jax.vmap
     def cov(x):
         return x @ x.T
