@@ -242,7 +242,8 @@ class FixedPointSmoother(_strategy.Strategy):
         # 'e_1': extrapolated result at time 't1'.
         # todo: rename this to "extrapolate from to fn", no interpolation happens here.
         e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
-        e_1 = self._extrapolate(s0=e_t, output_scale=output_scale, t=s1.t)
+        prev_t = self._duplicate_with_unit_backward_model(e_t)
+        e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
 
         # Read backward models and condense qoi-to-t
         bw_t1_to_t, bw_t_to_t0, bw_t0_to_qoi = e_1.extra, e_t.extra, s0.extra
@@ -257,14 +258,6 @@ class FixedPointSmoother(_strategy.Strategy):
         ssv_t, _ = self.extrapolation.fixedpoint.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         sol_t = _SmState(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
-
-        # Now, the remaining two solutions:
-
-        # Future interpolation steps continue from here:
-        # Careful: we don't duplicate sol_t, but e_t.
-        # The former would imply some double-counting of data and lead to wrong results.
-        # In other words: always extrapolate from "filtering" posteriors.
-        prev_t = self._duplicate_with_unit_backward_model(e_t)
 
         # Future IVP solver stepping continues from here:
         acc_t1 = _SmState(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
