@@ -281,7 +281,7 @@ class FixedPointSmoother(_strategy.Strategy):
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
-    # todo: should this be a classmethod of _markov.MarkovSequence?
+    # todo: move this to (a new) self.extrapolation.fixedpoint.reset()
     def _reset_fixedpoint(self, state: _SmState, /) -> _SmState:
         extra_new = self.extrapolation.fixedpoint.init_conditional(
             rv_proto=state.extra.noise
