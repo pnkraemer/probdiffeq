@@ -19,6 +19,9 @@ class Control(Generic[S]):
         """Initialise the controller state."""
         raise NotImplementedError
 
+    # todo: should this decision happen outside of the controller?
+    #  It is kind of orthogonal, and inflates the controller-inheritance structure
+    #  to a certain amount.
     def clip(self, state: S, /, t: float, t1: float) -> S:
         """(Optionally) clip the current step to not exceed t1."""
         raise NotImplementedError
@@ -72,9 +75,8 @@ class _ProportionalIntegralCommon(Control[_PIState]):
         a2 = (state.error_norm_previously_accepted / error_normalised) ** n2
         scale_factor_unclipped = self.safety * a1 * a2
 
-        scale_factor = jnp.maximum(
-            self.factor_min, jnp.minimum(scale_factor_unclipped, self.factor_max)
-        )
+        scale_factor_clipped_min = jnp.minimum(scale_factor_unclipped, self.factor_max)
+        scale_factor = jnp.maximum(self.factor_min, scale_factor_clipped_min)
         error_norm_previously_accepted = jnp.where(
             error_normalised <= 1.0,
             error_normalised,
@@ -182,11 +184,9 @@ def _unflatten(_aux, children, *, clz):
 
 
 for x in [ProportionalIntegral, ProportionalIntegralClipped]:
-    jax.tree_util.register_pytree_node(
-        x, _pi_flatten, functools.partial(_unflatten, clz=x)
-    )
+    pi_unflatten = functools.partial(_unflatten, clz=x)
+    jax.tree_util.register_pytree_node(x, _pi_flatten, pi_unflatten)
 
 for y in [Integral, IntegralClipped]:
-    jax.tree_util.register_pytree_node(
-        y, _i_flatten, functools.partial(_unflatten, clz=y)
-    )
+    i_unflatten = functools.partial(_unflatten, clz=y)
+    jax.tree_util.register_pytree_node(y, _i_flatten, i_unflatten)
