@@ -216,9 +216,8 @@ class _IBMFp(_extra.Extrapolation):
         return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
-        # todo: reset backward model
         ssv = variables.SSV(sol.init.mean[0], sol.init)
-        extra = sol.backward_model
+        extra = self.init_conditional(rv_proto=sol.init)
         return ssv, extra
 
     def extract(self, ssv, extra, /):

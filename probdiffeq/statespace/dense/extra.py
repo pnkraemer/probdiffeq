@@ -307,10 +307,9 @@ class _IBMFp(_extra.Extrapolation):
         return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
-        # todo: reset init
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
-        extra = sol.backward_model
+        extra = self.init_conditional(rv_proto=sol.init)
         return ssv, extra
 
     def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
