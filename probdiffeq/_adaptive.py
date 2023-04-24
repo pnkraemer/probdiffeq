@@ -27,9 +27,11 @@ T = TypeVar("T", bound=ivpsolvers.Solver)
 """A type-variable for (non-adaptive) IVP solvers."""
 
 
-# todo: this is the only object in this module
-#  (and I cannot imagine another one coming in the near future)
-#  so why do we need a class in the first place?
+# todo: should there be two (!) instances here?
+#  one that handles the rejection loop (with corresponding init, step, extract)
+#  and one that handles the step-interpolation-etc. version?
+#  Something feels like the interpolation should only operate on solution instances,
+#  not on state instances.
 
 
 class AdaptiveIVPSolver(Generic[T]):

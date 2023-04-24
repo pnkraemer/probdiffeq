@@ -7,6 +7,25 @@ from probdiffeq import _sqrt_util
 from probdiffeq.statespace import variables
 
 
+def merge_conditionals(previous, incoming, /):
+    if previous.transition.ndim > 2:
+        return jax.vmap(merge_conditionals)(previous, incoming)
+
+    A = previous.transition
+    (b, B_sqrtm_lower) = previous.noise.mean, previous.noise.cov_sqrtm_lower
+
+    C = incoming.transition
+    (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+    g = A @ C
+    xi = A @ d + b
+    R_stack = ((A @ D_sqrtm).T, B_sqrtm_lower.T)
+    Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+    noise = NormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
+    return ConditionalHiddenState(g, noise=noise)
+
+
 @jax.tree_util.register_pytree_node_class
 class ConditionalHiddenState(variables.Conditional):
     def __call__(self, x, /):
@@ -20,26 +39,6 @@ class ConditionalHiddenState(variables.Conditional):
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)
         return ConditionalHiddenState(transition=self.transition, noise=noise)
-
-    def merge_with_incoming_conditional(self, incoming, /):
-        if self.transition.ndim > 2:
-            fn = ConditionalHiddenState.merge_with_incoming_conditional
-            return jax.vmap(fn)(self, incoming)
-
-        A = self.transition
-        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
-
-        C = incoming.transition
-        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = A @ d + b
-        Xi = _sqrt_util.sum_of_sqrtm_factors(
-            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
-        ).T
-
-        noise = NormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
-        return ConditionalHiddenState(g, noise=noise)
 
     def marginalise(self, rv, /):
         # Todo: this auto-batch is a bit hacky,

@@ -263,7 +263,7 @@ class _IBMFp(_extra.Extrapolation):
 
         backward_noise = variables.NormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = variables.ConditionalHiddenState(g_bw, noise=backward_noise)
-        bw_model = bw0.merge_with_incoming_conditional(bw_model)
+        bw_model = variables.merge_conditionals(bw0, bw_model)
 
         extrapolated = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = variables.SSV(m_ext[0], extrapolated)
