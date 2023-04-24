@@ -185,21 +185,18 @@ class FixedPointSmoother(_strategy.Strategy):
     def case_right_corner(self, t, *, s0: _SmState, s1: _SmState, output_scale):
         # See case_interpolate() for detailed explanation of why this works.
 
-        bw_t_to_qoi = s0.extra.merge_with_incoming_conditional(s1.extra)
-        solution = _SmState(t=t, ssv=s1.ssv, corr=s1.corr, extra=bw_t_to_qoi)
-
-        accepted = self._reset_fixedpoint(solution)
-        previous = self._reset_fixedpoint(solution)
-        return _interp.InterpRes(
-            accepted=accepted, solution=solution, previous=previous
-        )
+        # Todo: this prepares _future_ steps, so shouldn't it happen
+        #  at initialisation instead of at completion?
+        accepted = self._reset_fixedpoint(s1)
+        previous = self._reset_fixedpoint(s1)
+        return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
     ) -> _interp.InterpRes[_SmState]:
         """Interpolate.
 
-        A fixed-point smoother interpolates by_
+        A fixed-point smoother interpolates by
 
         * Extrapolating from t0 to t, which gives the "filtering" marginal
           and the backward transition from t to t0.
@@ -238,7 +235,6 @@ class FixedPointSmoother(_strategy.Strategy):
         # No backward model condensing yet.
         # 'e_t': interpolated result at time 't'.
         # 'e_1': extrapolated result at time 't1'.
-        # todo: rename this to "extrapolate from to fn", no interpolation happens here.
         e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
         prev_t = self._reset_fixedpoint(e_t)
         e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
