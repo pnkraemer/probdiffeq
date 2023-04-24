@@ -79,13 +79,7 @@ class AdaptiveIVPSolver(Generic[T]):
         state_control = self.control.init(dt0)
 
         # Initialise (prototypes for) proposed values
-        error_norm_proposed = self._normalise_error(
-            error_estimate=state_solver.error_estimate,
-            u=state_solver.u,
-            atol=self.atol,
-            rtol=self.rtol,
-            norm_ord=self.norm_ord,
-        )
+        error_norm_proposed = _inf_like(0.0)
         return _AdaptiveState(
             error_norm_proposed=error_norm_proposed,
             solution=state_solver,
