@@ -177,8 +177,6 @@ class FixedPointSmoother(_strategy.Strategy):
         ssv, extra = self.extrapolation.fixedpoint.complete(
             state.ssv, state.extra, output_scale=output_scale
         )
-        bw_model, *_ = state.extra
-        extra = bw_model.merge_with_incoming_conditional(extra)
         ssv, corr = self.correction.complete(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
@@ -248,14 +246,11 @@ class FixedPointSmoother(_strategy.Strategy):
         prev_t = self._reset_fixedpoint(e_t)
         e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
 
-        # Read backward models and condense qoi-to-t
-        bw_t1_to_t, bw_t_to_t0, bw_t0_to_qoi = e_1.extra, e_t.extra, s0.extra
-        bw_t_to_qoi = bw_t0_to_qoi.merge_with_incoming_conditional(bw_t_to_t0)
-
         # Marginalise from t1 to t:
         # turn an extrapolation- ("e_t") into an interpolation-result ("i_t")
         # Note how we use the bw_to_to_qoi backward model!
         # (Which is different for the non-fixed-point smoother)
+        bw_t1_to_t, bw_t_to_qoi = e_1.extra, e_t.extra
         rv_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
         mseq_t = _markov.MarkovSequence(init=rv_t, backward_model=bw_t_to_qoi)
         ssv_t, _ = self.extrapolation.fixedpoint.init(mseq_t)
@@ -281,6 +276,7 @@ class FixedPointSmoother(_strategy.Strategy):
         ssv, extra = self.extrapolation.fixedpoint.complete(
             ssv, extra, output_scale=output_scale
         )
+
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
