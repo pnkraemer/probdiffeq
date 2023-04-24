@@ -127,8 +127,5 @@ class Conditional:
     def scale_covariance(self, output_scale):
         raise NotImplementedError
 
-    def merge_with_incoming_conditional(self, incoming, /):
-        raise NotImplementedError
-
     def marginalise(self, rv, /):
         raise NotImplementedError

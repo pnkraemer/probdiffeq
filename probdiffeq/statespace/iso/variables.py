@@ -37,29 +37,29 @@ def standard_normal(*, num_derivatives, ode_shape) -> "IsoNormalHiddenState":
     return IsoNormalHiddenState(m0, c0)
 
 
+def merge_conditionals(previous, incoming, /):
+    A = previous.transition
+    (b, B_sqrtm_lower) = previous.noise.mean, previous.noise.cov_sqrtm_lower
+
+    C = incoming.transition
+    (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+    g = A @ C
+    xi = A @ d + b
+    R_stack = ((A @ D_sqrtm).T, B_sqrtm_lower.T)
+    Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+    noise = IsoNormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
+    bw_model = IsoConditionalHiddenState(g, noise=noise)
+    return bw_model
+
+
 @jax.tree_util.register_pytree_node_class
 class IsoConditionalHiddenState(variables.Conditional):
     # Conditional between two hidden states and QOI
     def __call__(self, x, /):
         m = self.transition @ x + self.noise.mean
         return IsoNormalHiddenState(m, self.noise.cov_sqrtm_lower)
-
-    def merge_with_incoming_conditional(self, incoming, /):
-        A = self.transition
-        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
-
-        C = incoming.transition
-        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = A @ d + b
-        Xi = _sqrt_util.sum_of_sqrtm_factors(
-            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
-        ).T
-
-        noise = IsoNormalHiddenState(mean=xi, cov_sqrtm_lower=Xi)
-        bw_model = IsoConditionalHiddenState(g, noise=noise)
-        return bw_model
 
     def marginalise(self, rv, /):
         """Marginalise the output of a linear model."""

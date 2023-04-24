@@ -9,6 +9,22 @@ from probdiffeq import _sqrt_util
 from probdiffeq.statespace import variables
 
 
+def merge_conditionals(prev: "DenseConditional", incoming: "DenseConditional", /):
+    A = prev.transition
+    (b, B_sqrtm_lower) = prev.noise.mean, prev.noise.cov_sqrtm_lower
+
+    C = incoming.transition
+    (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
+
+    g = A @ C
+    xi = A @ d + b
+    R_stack = ((A @ D_sqrtm).T, B_sqrtm_lower.T)
+    Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+    noise = DenseNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=prev.target_shape)
+    return DenseConditional(g, noise=noise, target_shape=prev.target_shape)
+
+
 @jax.tree_util.register_pytree_node_class
 class DenseConditional(variables.Conditional):
     """Conditional distribution with dense covariance structure."""
@@ -44,22 +60,6 @@ class DenseConditional(variables.Conditional):
         noise = self.noise.scale_covariance(output_scale=output_scale)
         shape = self.target_shape
         return DenseConditional(self.transition, noise=noise, target_shape=shape)
-
-    def merge_with_incoming_conditional(self, incoming, /):
-        A = self.transition
-        (b, B_sqrtm_lower) = self.noise.mean, self.noise.cov_sqrtm_lower
-
-        C = incoming.transition
-        (d, D_sqrtm) = (incoming.noise.mean, incoming.noise.cov_sqrtm_lower)
-
-        g = A @ C
-        xi = A @ d + b
-        Xi = _sqrt_util.sum_of_sqrtm_factors(
-            R_stack=((A @ D_sqrtm).T, B_sqrtm_lower.T)
-        ).T
-
-        noise = DenseNormal(mean=xi, cov_sqrtm_lower=Xi, target_shape=self.target_shape)
-        return DenseConditional(g, noise=noise, target_shape=self.target_shape)
 
     def marginalise(self, rv, /):
         # Pull into preconditioned space

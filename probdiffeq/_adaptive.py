@@ -39,6 +39,13 @@ T = TypeVar("T", bound=ivpsolvers.Solver)
 """A type-variable for (non-adaptive) IVP solvers."""
 
 
+# todo: should there be two (!) instances here?
+#  one that handles the rejection loop (with corresponding init, step, extract)
+#  and one that handles the step-interpolation-etc. version?
+#  Something feels like the interpolation should only operate on solution instances,
+#  not on state instances.
+
+
 class AdaptiveIVPSolver(Generic[T]):
     """Adaptive IVP solvers."""
 
