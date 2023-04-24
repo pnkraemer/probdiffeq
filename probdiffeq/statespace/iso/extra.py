@@ -248,7 +248,7 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
         # Merge backward-models
         backward_noise = variables.IsoNormalHiddenState(mean=m_bw, cov_sqrtm_lower=l_bw)
         bw_model = variables.IsoConditionalHiddenState(g_bw, noise=backward_noise)
-        bw_model = ex0.merge_with_incoming_conditional(bw_model)
+        bw_model = variables.merge_conditionals(ex0, bw_model)
 
         extrapolated = variables.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model

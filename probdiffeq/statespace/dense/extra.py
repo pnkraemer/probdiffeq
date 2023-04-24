@@ -371,7 +371,7 @@ class _IBMFp(_extra.Extrapolation):
         bw_model = variables.DenseConditional(
             g_bw, noise=backward_noise, target_shape=self.target_shape
         )
-        bw_model = bw0.merge_with_incoming_conditional(bw_model)
+        bw_model = variables.merge_conditionals(bw0, bw_model)
         rv = variables.DenseNormal(
             mean=m_ext, cov_sqrtm_lower=l_ext, target_shape=self.target_shape
         )
