@@ -66,25 +66,23 @@ class Extrapolation(Generic[S, C]):
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
-    def promote_output_scale(self, output_scale) -> float:
+    def promote_output_scale(self, output_scale):
+        raise NotImplementedError
+
+    def extract_output_scale(self, output_scale):
         raise NotImplementedError
 
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
-    def filter_begin(self, ssv: S, extra: C, /, dt) -> Tuple[S, C]:
+    def begin(self, ssv: S, extra: C, /, dt) -> Tuple[S, C]:
         raise NotImplementedError
 
-    def smoother_begin(self, ssv: S, extra: C, /, dt) -> Tuple[S, C]:
+    def complete(self, ssv: S, extra: C, /, output_scale) -> Tuple[S, C]:
         raise NotImplementedError
 
-    def filter_complete(self, ssv: S, extra: C, /, output_scale) -> Tuple[S, C]:
+    def init(self, sol, /):
         raise NotImplementedError
 
-    def smoother_complete(self, ssv: S, extra: C, /, output_scale) -> Tuple[S, C]:
-        raise NotImplementedError
-
-    # todo: bundle in an init() method:
-
-    def smoother_init_conditional(self, ssv_proto):
+    def extract(self, ssv, extra, /):
         raise NotImplementedError
