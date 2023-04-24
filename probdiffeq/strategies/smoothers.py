@@ -185,17 +185,11 @@ class FixedPointSmoother(_strategy.Strategy):
     def case_right_corner(self, t, *, s0: _SmState, s1: _SmState, output_scale):
         # See case_interpolate() for detailed explanation of why this works.
 
-        # todo: should reset_fixedpoint see both s1 and s0, and return
-        #  the merged & the reset' versions?
-        # todo: is this merging even necessary?
-        bw_t_to_qoi = s0.extra.merge_with_incoming_conditional(s1.extra)
-        solution = _SmState(t=t, ssv=s1.ssv, corr=s1.corr, extra=bw_t_to_qoi)
-
-        accepted = self._reset_fixedpoint(solution)
-        previous = self._reset_fixedpoint(solution)
-        return _interp.InterpRes(
-            accepted=accepted, solution=solution, previous=previous
-        )
+        # Todo: this prepares _future_ steps, so shouldn't it happen
+        #  at initialisation instead of at completion?
+        accepted = self._reset_fixedpoint(s1)
+        previous = self._reset_fixedpoint(s1)
+        return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
 
     def case_interpolate(
         self, t, *, s0: _SmState, s1: _SmState, output_scale
