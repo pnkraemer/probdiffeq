@@ -8,8 +8,6 @@ from probdiffeq import controls, ivpsolvers
 from probdiffeq.backend import containers
 
 
-# we could make this generic, but any path there would involve
-# custom pytree-registration, which needs a lot of code for such a simple object.
 # todo: should this move to _collocate?
 class _AdaptiveState(containers.NamedTuple):
     """State for adaptive IVP solvers."""
@@ -39,11 +37,6 @@ def _reference_state_fn_max_abs(sol, sol_previous):
 
 T = TypeVar("T", bound=ivpsolvers.Solver)
 """A type-variable for (non-adaptive) IVP solvers."""
-
-
-# todo: this is the only object in this module
-#  (and I cannot imagine another one coming in the near future)
-#  so why do we need a class in the first place?
 
 
 class AdaptiveIVPSolver(Generic[T]):
@@ -123,8 +116,8 @@ class AdaptiveIVPSolver(Generic[T]):
         return state
 
     def _rejection_loop(self, *, vector_field, state0, t1, parameters):
-        # todo: this is sufficiently complex that it should probably be extracted
-        #  from here...
+        # todo: this function is sufficiently complex that it should probably
+        #   be extracted from here...
 
         def cond_fn(s):
             return s.error_norm_proposed > 1.0
