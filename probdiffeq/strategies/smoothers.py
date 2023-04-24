@@ -235,7 +235,6 @@ class FixedPointSmoother(_strategy.Strategy):
         # No backward model condensing yet.
         # 'e_t': interpolated result at time 't'.
         # 'e_1': extrapolated result at time 't1'.
-        # todo: rename this to "extrapolate from to fn", no interpolation happens here.
         e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
         prev_t = self._reset_fixedpoint(e_t)
         e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
