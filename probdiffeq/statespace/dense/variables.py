@@ -245,3 +245,8 @@ class DenseNormal(variables.Normal):
     def _select_derivative(self, x, i):
         x_reshaped = jnp.reshape(x, self.target_shape, order="F")
         return x_reshaped[i, ...]
+
+    def cov_dense(self):
+        if self.cov_sqrtm_lower.ndim > 2:
+            return jax.vmap(DenseNormal.cov_dense)(self)
+        return self.cov_sqrtm_lower @ self.cov_sqrtm_lower.T

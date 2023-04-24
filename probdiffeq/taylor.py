@@ -213,7 +213,7 @@ def _fixed_point_smoother(extrapolation, solution, ys, dts):
 
 def _fixedpoint_init(solution, y, *, extrapolation) -> _FpState:
     # State-space variables
-    ssv, extra = extrapolation.smoother.init(solution)
+    ssv, extra = extrapolation.fixedpoint.init(solution)
 
     # Initial data point
     _, cond_cor = ssv.observe_qoi(observation_std=0.0)
@@ -233,9 +233,8 @@ def _fixedpoint_step(carry: _FpState, x, *, extrapolation) -> Tuple[_FpState, No
     y, dt = x
 
     # Extrapolate (with fixed-point-style merging)
-    ssv, extra = extrapolation.smoother.begin(ssv, extra_old, dt=dt)
-    ssv, extra_new = extrapolation.smoother.complete(ssv, extra, output_scale=1.0)
-    extra = extra_old.merge_with_incoming_conditional(extra_new)  # sqrt-fp-smoother!
+    ssv, extra = extrapolation.fixedpoint.begin(ssv, extra_old, dt=dt)
+    ssv, extra = extrapolation.fixedpoint.complete(ssv, extra, output_scale=1.0)
 
     # Correct
     _, cond_cor = ssv.observe_qoi(observation_std=0.0)
