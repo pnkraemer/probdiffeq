@@ -69,9 +69,9 @@ class _BlockDiag(_extra.Extrapolation):
         fn = jax.vmap(type(self.extra).complete)
         return fn(self.extra, ssv, extra, output_scale)
 
-    def init_conditional(self, rv_proto):
-        init_fn = jax.vmap(type(self.extra).init_conditional)
-        return init_fn(self.extra, rv_proto)
+    def reset(self, ssv, extra, /):
+        init_fn = jax.vmap(type(self.extra).reset)
+        return init_fn(self.extra, ssv, extra)
 
     def extract(self, ssv, extra, /):
         # If called in save-at mode, batch again.

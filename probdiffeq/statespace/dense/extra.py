@@ -146,7 +146,7 @@ class _IBMSm(_extra.Extrapolation):
             cov_sqrtm_lower=c_sqrtm0_corrected,
             target_shape=self.target_shape,
         )
-        conds = self.init_conditional(rv_proto=rv)
+        conds = self._init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=conds)
 
     def _stack_tcoeffs(self, taylor_coefficients):
@@ -234,8 +234,7 @@ class _IBMSm(_extra.Extrapolation):
         ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    # todo: remove smoother_init_conditional?
-    def init_conditional(self, rv_proto):
+    def _init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return variables.DenseConditional(op, noise=noi, target_shape=self.target_shape)
@@ -290,7 +289,7 @@ class _IBMFp(_extra.Extrapolation):
             cov_sqrtm_lower=c_sqrtm0_corrected,
             target_shape=self.target_shape,
         )
-        conds = self.init_conditional(rv_proto=rv)
+        conds = self._init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=conds)
 
     def _stack_tcoeffs(self, taylor_coefficients):
@@ -309,7 +308,7 @@ class _IBMFp(_extra.Extrapolation):
     def init(self, sol: _markov.MarkovSequence, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
-        extra = self.init_conditional(rv_proto=sol.init)
+        extra = self._init_conditional(rv_proto=sol.init)
         return ssv, extra
 
     def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
@@ -379,7 +378,7 @@ class _IBMFp(_extra.Extrapolation):
         ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    def init_conditional(self, rv_proto):
+    def _init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return variables.DenseConditional(op, noise=noi, target_shape=self.target_shape)
@@ -408,3 +407,6 @@ class _IBMFp(_extra.Extrapolation):
         if output_scale.ndim > 0:
             return output_scale[-1]
         return output_scale
+
+    def reset(self, ssv, extra, /):
+        return ssv, self._init_conditional(extra.noise)
