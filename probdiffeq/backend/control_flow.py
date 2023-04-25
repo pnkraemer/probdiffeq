@@ -1,4 +1,4 @@
-"""Custom control flow. Extends the functionality of jax.lax."""
+"""Custom control flow."""
 
 import jax
 import jax.numpy as jnp

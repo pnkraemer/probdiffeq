@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 from tqdm.auto import tqdm
 
-from probdiffeq import _control_flow
+from probdiffeq.backend import control_flow
 
 
 class MethodConfig:
@@ -148,14 +148,13 @@ def _evaluate_method(*, method_config, problem_config):
         else:
             fn = jax.jit(fn)
 
-    return _control_flow.tree_stack(
-        [
-            _evaluate_method_and_tolerance(
-                error_fn=error_fn, fn=fn, rtol=rtol, atol=atol, repeat=repeat
-            )
-            for atol, rtol in zip(tqdm(atols, leave=False), rtols)
-        ]
-    )
+    results = [
+        _evaluate_method_and_tolerance(
+            error_fn=error_fn, fn=fn, rtol=rtol, atol=atol, repeat=repeat
+        )
+        for atol, rtol in zip(tqdm(atols, leave=False), rtols)
+    ]
+    return control_flow.tree_stack(results)
 
 
 def _evaluate_method_and_tolerance(*, error_fn, fn, atol, rtol, repeat):
