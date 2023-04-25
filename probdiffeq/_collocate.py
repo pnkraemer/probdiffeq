@@ -3,7 +3,7 @@
 Sequentially (and often, adaptively) constrain a random process to an ODE.
 """
 
-from probdiffeq import _control_flow
+from probdiffeq.backend import control_flow
 
 
 def solve_and_save_at(
@@ -32,7 +32,7 @@ def solve_and_save_at(
 
     state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
 
-    _, solution = _control_flow.scan_with_init(
+    _, solution = control_flow.scan_with_init(
         f=advance_to_next_checkpoint,
         init=state0,
         xs=save_at[1:],
@@ -120,7 +120,7 @@ def solve_with_python_while_loop(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    forward_solution = _control_flow.tree_stack(list(generator))
+    forward_solution = control_flow.tree_stack(list(generator))
     sol_solver, _sol_control = adaptive_solver.extract(forward_solution)
     return sol_solver
 
@@ -157,7 +157,7 @@ def solve_fixed_grid(
         )
         return (s_new, t_new), (s_new, t_new)
 
-    _, (result, _) = _control_flow.scan_with_init(
+    _, (result, _) = control_flow.scan_with_init(
         f=body_fn, init=(state, t0), xs=grid[1:]
     )
     _t, *sol = solver.extract(result)

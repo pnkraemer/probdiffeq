@@ -6,7 +6,7 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _control_flow
+from probdiffeq.backend import control_flow
 
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
@@ -96,7 +96,7 @@ class MarkovSequence(Generic[S]):
             init = self.init
 
         # Scan and return
-        reverse_scan = functools.partial(_control_flow.scan_with_init, reverse=True)
+        reverse_scan = functools.partial(control_flow.scan_with_init, reverse=True)
         _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
         return rvs
 
