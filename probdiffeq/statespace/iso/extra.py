@@ -104,7 +104,7 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
-        cond = self.init_conditional(rv_proto=rv)
+        cond = self._init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol: _markov.MarkovSequence, /):
@@ -169,7 +169,7 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
             return output_scale[-1]
         return output_scale
 
-    def init_conditional(self, rv_proto):
+    def _init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
         noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
         return variables.IsoConditionalHiddenState(op, noise=noi)
@@ -187,12 +187,12 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
-        cond = self.init_conditional(rv_proto=rv)
+        cond = self._init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol, /):
         ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
-        cache = self.init_conditional(rv_proto=sol.init)
+        cache = self._init_conditional(rv_proto=sol.init)
         return ssv, cache
 
     def extract(self, ssv, ex, /):
@@ -253,10 +253,13 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
         extrapolated = variables.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
-    def init_conditional(self, rv_proto):
+    def _init_conditional(self, rv_proto):
         op = jnp.eye(*self.a.shape)
         noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
         return variables.IsoConditionalHiddenState(op, noise=noi)
+
+    def reset(self, ssv, extra):
+        return ssv, self._init_conditional(extra.noise)
 
 
 def _stack_tcoeffs(taylor_coefficients, q_like):

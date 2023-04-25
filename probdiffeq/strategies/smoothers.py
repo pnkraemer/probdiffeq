@@ -187,8 +187,9 @@ class FixedPointSmoother(_strategy.Strategy):
 
         # Todo: this prepares _future_ steps, so shouldn't it happen
         #  at initialisation instead of at completion?
-        accepted = self._reset_fixedpoint(s1)
-        previous = self._reset_fixedpoint(s1)
+        ssv, extra = self.extrapolation.fixedpoint.reset(s1.ssv, s1.extra)
+        accepted = _SmState(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
+        previous = _SmState(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
         return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
 
     def case_interpolate(
@@ -236,7 +237,10 @@ class FixedPointSmoother(_strategy.Strategy):
         # 'e_t': interpolated result at time 't'.
         # 'e_1': extrapolated result at time 't1'.
         e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
-        prev_t = self._reset_fixedpoint(e_t)
+
+        ssv, extra = self.extrapolation.fixedpoint.reset(e_t.ssv, e_t.extra)
+        prev_t = _SmState(t=e_t.t, ssv=ssv, extra=extra, corr=e_t.corr)
+
         e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
 
         # Marginalise from t1 to t:
@@ -272,13 +276,6 @@ class FixedPointSmoother(_strategy.Strategy):
 
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
-
-    # todo: move this to (a new) self.extrapolation.fixedpoint.reset()
-    def _reset_fixedpoint(self, state: _SmState, /) -> _SmState:
-        extra_new = self.extrapolation.fixedpoint.init_conditional(
-            rv_proto=state.extra.noise
-        )
-        return _SmState(t=state.t, extra=extra_new, corr=state.corr, ssv=state.ssv)
 
     def promote_output_scale(self, *args, **kwargs):
         init_fn = self.extrapolation.fixedpoint.promote_output_scale

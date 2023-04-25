@@ -99,7 +99,7 @@ class _IBMSm(_extra.Extrapolation):
         rv = variables.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        cond = self.init_conditional(rv_proto=rv)
+        cond = self._init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def _stack_tcoeffs(self, taylor_coefficients):
@@ -164,7 +164,7 @@ class _IBMSm(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
 
-    def init_conditional(self, rv_proto):
+    def _init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return variables.ConditionalHiddenState(op, noise=noi)
@@ -202,7 +202,7 @@ class _IBMFp(_extra.Extrapolation):
         rv = variables.NormalHiddenState(
             mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
         )
-        cond = self.init_conditional(rv_proto=rv)
+        cond = self._init_conditional(rv_proto=rv)
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def _stack_tcoeffs(self, taylor_coefficients):
@@ -217,7 +217,7 @@ class _IBMFp(_extra.Extrapolation):
 
     def init(self, sol: _markov.MarkovSequence, /):
         ssv = variables.SSV(sol.init.mean[0], sol.init)
-        extra = self.init_conditional(rv_proto=sol.init)
+        extra = self._init_conditional(rv_proto=sol.init)
         return ssv, extra
 
     def extract(self, ssv, extra, /):
@@ -269,7 +269,7 @@ class _IBMFp(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
 
-    def init_conditional(self, rv_proto):
+    def _init_conditional(self, rv_proto):
         op = self._init_backward_transition()
         noi = self._init_backward_noise(rv_proto=rv_proto)
         return variables.ConditionalHiddenState(op, noise=noi)
@@ -291,6 +291,9 @@ class _IBMFp(_extra.Extrapolation):
         if output_scale.ndim > 0:
             return output_scale[-1]
         return output_scale
+
+    def reset(self, ssv, extra, /):
+        return ssv, self._init_conditional(extra.noise)
 
 
 # Register scalar extrapolations as pytrees because we want to vmap them

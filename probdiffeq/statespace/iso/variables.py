@@ -14,7 +14,7 @@ def unit_markov_sequence(**kwargs) -> _markov.MarkovSequence:
 
 
 # todo: once the fixedpoint smoother resets the backward model at initialisation,
-#  all init_conditional() functions can be removed and the relevant code snippets
+#  all _init_conditional() functions can be removed and the relevant code snippets
 #  point to this function.
 def identity_conditional(*, num_derivatives, ode_shape) -> "IsoConditionalHiddenState":
     assert len(ode_shape) == 1
