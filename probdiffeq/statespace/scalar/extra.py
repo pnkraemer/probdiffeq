@@ -9,8 +9,8 @@ from probdiffeq.statespace.scalar import variables
 
 def ibm_scalar(num_derivatives):
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-    scales, powers = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-    dynamic = (a, q_sqrtm, scales, powers)
+    precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    dynamic = (a, q_sqrtm, precon)
     static = {}
     return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
@@ -47,7 +47,7 @@ class _IBMFi(_extra.Extrapolation):
         return ssv.hidden_state
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self._assemble_preconditioner(dt=dt)
+        p, p_inv = self.preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
         l0 = ssv.hidden_state.cov_sqrtm_lower
         m_ext_p = self.a @ m0_p
@@ -55,11 +55,6 @@ class _IBMFi(_extra.Extrapolation):
         q_sqrtm = p[:, None] * self.q_sqrtm_lower
         extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
         return variables.SSV(m_ext[0], extrapolated), (p, p_inv, l0)
-
-    def _assemble_preconditioner(self, dt):
-        return _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
 
     def complete(self, ssv, extra, /, output_scale):
         p, p_inv, l0 = extra
@@ -121,7 +116,7 @@ class _IBMSm(_extra.Extrapolation):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self._assemble_preconditioner(dt=dt)
+        p, p_inv = self.preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
         l0 = ssv.hidden_state.cov_sqrtm_lower
         m_ext_p = self.a @ m0_p
@@ -131,11 +126,6 @@ class _IBMSm(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], extrapolated)
         cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
         return ssv, cache
-
-    def _assemble_preconditioner(self, dt):
-        return _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
 
     def complete(self, ssv, extra, /, output_scale):
         _, m_ext_p, m0_p, p, p_inv, l0 = extra
@@ -224,7 +214,7 @@ class _IBMFp(_extra.Extrapolation):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self._assemble_preconditioner(dt=dt)
+        p, p_inv = self.preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
         l0 = ssv.hidden_state.cov_sqrtm_lower
         m_ext_p = self.a @ m0_p
@@ -234,11 +224,6 @@ class _IBMFp(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], extrapolated)
         cache = (m_ext_p, m0_p, p, p_inv, l0, extra)
         return ssv, cache
-
-    def _assemble_preconditioner(self, dt):
-        return _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
 
     def complete(self, ssv, extra, /, output_scale):
         m_ext_p, m0_p, p, p_inv, l0, bw0 = extra
@@ -302,7 +287,7 @@ class _IBMFp(_extra.Extrapolation):
 
 
 def _flatten(fi):
-    child = fi.a, fi.q_sqrtm_lower, fi.preconditioner_scales, fi.preconditioner_powers
+    child = fi.a, fi.q_sqrtm_lower, fi.preconditioner
     aux = ()
     return child, aux
 

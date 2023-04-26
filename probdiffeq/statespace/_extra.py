@@ -56,12 +56,10 @@ class ExtrapolationBundle:
 class Extrapolation(Generic[S, C]):
     """Extrapolation model interface."""
 
-    def __init__(self, a, q_sqrtm_lower, preconditioner_scales, preconditioner_powers):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
-
-        self.preconditioner_scales = preconditioner_scales
-        self.preconditioner_powers = preconditioner_powers
+        self.preconditioner = preconditioner
 
     def __repr__(self):
         return f"{self.__class__.__name__}()"

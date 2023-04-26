@@ -13,7 +13,7 @@ def system_matrices_1d(*, num_derivatives):
     return A_1d, jnp.linalg.cholesky(Q_1d)
 
 
-def preconditioner_diagonal(*, dt, scales, powers):
+def preconditioner_diagonal(dt, *, scales, powers):
     """Construct the diagonal IBM preconditioner."""
     dt_abs = jnp.abs(dt)
     scaling_vector = jnp.power(dt_abs, powers) / scales
@@ -25,7 +25,7 @@ def preconditioner_prepare(*, num_derivatives):
     powers = jnp.arange(num_derivatives, -1.0, -1.0)
     scales = _factorial(powers)
     powers = powers + 0.5
-    return scales, powers
+    return jax.tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
 
 
 def _hilbert(a):
