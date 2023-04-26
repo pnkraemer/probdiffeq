@@ -25,6 +25,15 @@ def merge_conditionals(prev: "DenseConditional", incoming: "DenseConditional", /
     return DenseConditional(g, noise=noise, target_shape=prev.target_shape)
 
 
+def identity_conditional(n, d):
+    op = jnp.eye(n * d)
+
+    m0 = jnp.zeros((n * d,))
+    cholesky0 = jnp.zeros((n * d, n * d))
+    noise = DenseNormal(m0, cholesky0, target_shape=(n, d))
+    return DenseConditional(op, noise, target_shape=(n, d))
+
+
 @jax.tree_util.register_pytree_node_class
 class DenseConditional(variables.Conditional):
     """Conditional distribution with dense covariance structure."""

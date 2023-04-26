@@ -37,26 +37,11 @@ class _IBMFi(_extra.Extrapolation):
         args3 = f"ode_shape={self.ode_shape}"
         return f"<Dense IBM with {args2}, {args3}>"
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, target_shape=self.target_shape)
         return variables.DenseNormal(
-            mean=m0_corrected,
-            cov_sqrtm_lower=c_sqrtm0_corrected,
-            target_shape=self.target_shape,
+            mean=m0, cov_sqrtm_lower=c_sqrtm0, target_shape=self.target_shape
         )
-
-    def _stack_tcoeffs(self, taylor_coefficients):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-        if taylor_coefficients[0].shape != self.ode_shape:
-            msg = "The solver's ODE dimension does not match the initial condition."
-            raise ValueError(msg)
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: variables.DenseNormal, /):
         u = sol.mean.reshape(self.target_shape, order="F")[0, :]
@@ -139,28 +124,13 @@ class _IBMSm(_extra.Extrapolation):
         args3 = f"ode_shape={self.ode_shape}"
         return f"<Dense IBM with {args2}, {args3}>"
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, target_shape=self.target_shape)
         rv = variables.DenseNormal(
-            mean=m0_corrected,
-            cov_sqrtm_lower=c_sqrtm0_corrected,
-            target_shape=self.target_shape,
+            mean=m0, cov_sqrtm_lower=c_sqrtm0, target_shape=self.target_shape
         )
-        conds = self._init_conditional(rv_proto=rv)
+        conds = variables.identity_conditional(*self.target_shape)
         return _markov.MarkovSequence(init=rv, backward_model=conds)
-
-    def _stack_tcoeffs(self, taylor_coefficients):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-        if taylor_coefficients[0].shape != self.ode_shape:
-            msg = "The solver's ODE dimension does not match the initial condition."
-            raise ValueError(msg)
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
@@ -234,24 +204,6 @@ class _IBMSm(_extra.Extrapolation):
         ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    def _init_conditional(self, rv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
-        return variables.DenseConditional(op, noise=noi, target_shape=self.target_shape)
-
-    def _init_backward_transition(self):
-        (d,) = self.ode_shape
-        k = (self.num_derivatives + 1) * d
-        return jnp.eye(k)
-
-    @staticmethod
-    def _init_backward_noise(rv_proto):
-        return variables.DenseNormal(
-            mean=jnp.zeros_like(rv_proto.mean),
-            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-            target_shape=rv_proto.target_shape,
-        )
-
     # todo: the below two are a bit of an init/extract pair.
     #  It seems like this should happen in a "calibration" algorithm, right?
     #  Probably on ivpsolver-level. But the difficulty will be that
@@ -282,33 +234,18 @@ class _IBMFp(_extra.Extrapolation):
         args3 = f"ode_shape={self.ode_shape}"
         return f"<Dense IBM with {args2}, {args3}>"
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, target_shape=self.target_shape)
         rv = variables.DenseNormal(
-            mean=m0_corrected,
-            cov_sqrtm_lower=c_sqrtm0_corrected,
-            target_shape=self.target_shape,
+            mean=m0, cov_sqrtm_lower=c_sqrtm0, target_shape=self.target_shape
         )
-        conds = self._init_conditional(rv_proto=rv)
+        conds = variables.identity_conditional(*self.target_shape)
         return _markov.MarkovSequence(init=rv, backward_model=conds)
-
-    def _stack_tcoeffs(self, taylor_coefficients):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-        if taylor_coefficients[0].shape != self.ode_shape:
-            msg = "The solver's ODE dimension does not match the initial condition."
-            raise ValueError(msg)
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
-        extra = self._init_conditional(rv_proto=sol.init)
+        extra = variables.identity_conditional(*self.target_shape)
         return ssv, extra
 
     def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
@@ -378,24 +315,6 @@ class _IBMFp(_extra.Extrapolation):
         ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
 
-    def _init_conditional(self, rv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
-        return variables.DenseConditional(op, noise=noi, target_shape=self.target_shape)
-
-    def _init_backward_transition(self):
-        (d,) = self.ode_shape
-        k = (self.num_derivatives + 1) * d
-        return jnp.eye(k)
-
-    @staticmethod
-    def _init_backward_noise(rv_proto):
-        return variables.DenseNormal(
-            mean=jnp.zeros_like(rv_proto.mean),
-            cov_sqrtm_lower=jnp.zeros_like(rv_proto.cov_sqrtm_lower),
-            target_shape=rv_proto.target_shape,
-        )
-
     # todo: the below two are a bit of an init/extract pair.
     #  It seems like this should happen in a "calibration" algorithm, right?
     #  Probably on ivpsolver-level. But the difficulty will be that
@@ -408,5 +327,25 @@ class _IBMFp(_extra.Extrapolation):
             return output_scale[-1]
         return output_scale
 
-    def reset(self, ssv, extra, /):
-        return ssv, self._init_conditional(extra.noise)
+    def reset(self, ssv, _extra, /):
+        return ssv, variables.identity_conditional(*self.target_shape)
+
+
+def _stack_tcoeffs(tcoeffs, /, *, target_shape):
+    if len(tcoeffs) != target_shape[0]:
+        msg1 = "The number of Taylor coefficients does not match "
+        msg2 = "the number of derivatives in the implementation."
+        raise ValueError(msg1 + msg2)
+
+    if tcoeffs[0].shape != target_shape[1:]:
+        msg = "The solver's ODE dimension does not match the initial condition."
+        raise ValueError(msg)
+
+    m0_matrix = jnp.stack(tcoeffs)
+    m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
+
+    assert len(target_shape) == 2
+    n, d = target_shape
+    c_sqrtm0_corrected = jnp.zeros((n * d, n * d))
+
+    return m0_corrected, c_sqrtm0_corrected
