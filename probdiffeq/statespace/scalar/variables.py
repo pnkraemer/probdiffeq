@@ -26,6 +26,15 @@ def merge_conditionals(previous, incoming, /):
     return ConditionalHiddenState(g, noise=noise)
 
 
+def identity_conditional(ndim) -> "ConditionalHiddenState":
+    transition = jnp.eye(ndim)
+
+    mean = jnp.zeros((ndim,))
+    cov_sqrtm = jnp.zeros((ndim, ndim))
+    noise = NormalHiddenState(mean, cov_sqrtm)
+    return ConditionalHiddenState(transition, noise)
+
+
 @jax.tree_util.register_pytree_node_class
 class ConditionalHiddenState(variables.Conditional):
     def __call__(self, x, /):
