@@ -14,7 +14,6 @@ def ibm_blockdiag(ode_shape, num_derivatives):
     ibm_stack = _tree_stack_duplicates(ibm, n=n)
     fi, sm, fp = ibm_stack._filter, ibm_stack._smoother, ibm_stack._fixedpoint
     dynamic, static = ibm_stack._dynamic, ibm_stack._static
-
     return _extra.ExtrapolationBundle(
         _blockdiag(fi),
         _blockdiag(sm),
@@ -35,7 +34,6 @@ def _blockdiag(ex: _extra.Extrapolation):
     return custom_constructor
 
 
-# @jax.tree_util.register_pytree_node_class
 class _BlockDiag(_extra.Extrapolation):
     def __init__(self, extra, /):
         self.extra = extra
