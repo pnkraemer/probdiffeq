@@ -6,6 +6,7 @@ from probdiffeq.backend import containers
 from probdiffeq.statespace import cubature
 from probdiffeq.statespace.blockdiag import corr as blockdiag_corr
 from probdiffeq.statespace.blockdiag import extra as blockdiag_extra
+from probdiffeq.statespace.dense import calib as dense_calib
 from probdiffeq.statespace.dense import corr as dense_corr
 from probdiffeq.statespace.dense import extra as dense_extra
 from probdiffeq.statespace.iso import corr as iso_corr
@@ -13,22 +14,31 @@ from probdiffeq.statespace.iso import extra as iso_extra
 from probdiffeq.statespace.scalar import corr as scalar_corr
 from probdiffeq.statespace.scalar import extra as scalar_extra
 
+# todo: make strategies into factory function.
+#  This allows moving the calibration up to solver-level!
+
 
 class _Impl(containers.NamedTuple):
     """State-space model implementation.
 
-    Contains an extrapolation style and a correction style.
+    Contains an extra style and a corr style.
     """
 
-    extrapolation: Any
-    correction: Any
+    extra: Any
+    """Extrapolation method."""
+
+    corr: Any
+    """Correction method."""
+
+    calib: Any
+    """Calibration method."""
 
 
 def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
-    correction = iso_corr.taylor_order_zero(ode_order=ode_order)
-    extrapolation = iso_extra.ibm_iso(num_derivatives=num_derivatives)
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    corr = iso_corr.taylor_order_zero(ode_order=ode_order)
+    extra = iso_extra.ibm_iso(num_derivatives=num_derivatives)
+    return _Impl(corr=corr, extra=extra)
 
 
 def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -42,37 +52,35 @@ def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
         and without any deprecation policy.
 
     """
-    correction = blockdiag_corr.statistical_order_one(
+    corr = blockdiag_corr.statistical_order_one(
         ode_shape=ode_shape, ode_order=ode_order
     )
-    extrapolation = blockdiag_extra.ibm_blockdiag(
+    extra = blockdiag_extra.ibm_blockdiag(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    return _Impl(corr=corr, extra=extra)
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
-    extrapolation = blockdiag_extra.ibm_blockdiag(
+    corr = blockdiag_corr.taylor_order_zero(ode_order=ode_order)
+    extra = blockdiag_extra.ibm_blockdiag(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    return _Impl(corr=corr, extra=extra)
 
 
 def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = dense_corr.taylor_order_one(ode_shape=ode_shape, ode_order=ode_order)
-    extrapolation = dense_extra.ibm_dense(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    corr = dense_corr.taylor_order_one(ode_shape=ode_shape, ode_order=ode_order)
+    extra = dense_extra.ibm_dense(ode_shape=ode_shape, num_derivatives=num_derivatives)
+    calib = dense_calib.output_scale_scalar()
+    return _Impl(corr=corr, extra=extra, calib=calib)
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = dense_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
-    extrapolation = dense_extra.ibm_dense(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    corr = dense_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
+    extra = dense_extra.ibm_dense(ode_shape=ode_shape, num_derivatives=num_derivatives)
+    calib = dense_calib.output_scale_scalar()
+    return _Impl(corr=corr, extra=extra, calib=calib)
 
 
 def slr1_dense(
@@ -82,13 +90,12 @@ def slr1_dense(
     ode_order=1,
     num_derivatives=4,
 ) -> _Impl:
-    correction = dense_corr.statistical_order_one(
+    corr = dense_corr.statistical_order_one(
         ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
     )
-    extrapolation = dense_extra.ibm_dense(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    extra = dense_extra.ibm_dense(ode_shape=ode_shape, num_derivatives=num_derivatives)
+    calib = dense_calib.output_scale_scalar()
+    return _Impl(corr=corr, extra=extra, calib=calib)
 
 
 def slr0_dense(
@@ -108,16 +115,15 @@ def slr0_dense(
         and without any deprecation policy.
 
     """
-    correction = dense_corr.statistical_order_zero(
+    corr = dense_corr.statistical_order_zero(
         ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
     )
-    extrapolation = dense_extra.ibm_dense(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    extra = dense_extra.ibm_dense(ode_shape=ode_shape, num_derivatives=num_derivatives)
+    calib = dense_calib.output_scale_scalar()
+    return _Impl(corr=corr, extra=extra, calib=calib)
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
-    extrapolation = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
-    return _Impl(correction=correction, extrapolation=extrapolation)
+    corr = scalar_corr.taylor_order_zero(ode_order=ode_order)
+    extra = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
+    return _Impl(corr=corr, extra=extra)

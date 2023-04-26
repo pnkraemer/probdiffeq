@@ -66,12 +66,6 @@ class Extrapolation(Generic[S, C]):
     def __repr__(self):
         return f"{self.__class__.__name__}()"
 
-    def promote_output_scale(self, output_scale):
-        raise NotImplementedError
-
-    def extract_output_scale(self, output_scale):
-        raise NotImplementedError
-
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 

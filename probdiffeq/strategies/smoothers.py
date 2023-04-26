@@ -134,14 +134,6 @@ class Smoother(_strategy.Strategy):
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
-    def promote_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.smoother.promote_output_scale
-        return init_fn(*args, **kwargs)
-
-    def extract_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.smoother.extract_output_scale
-        return init_fn(*args, **kwargs)
-
 
 @jax.tree_util.register_pytree_node_class
 class FixedPointSmoother(_strategy.Strategy):
@@ -276,11 +268,3 @@ class FixedPointSmoother(_strategy.Strategy):
 
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         return _SmState(t=t, ssv=ssv, extra=extra, corr=corr_like)
-
-    def promote_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.fixedpoint.promote_output_scale
-        return init_fn(*args, **kwargs)
-
-    def extract_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.fixedpoint.extract_output_scale
-        return init_fn(*args, **kwargs)
