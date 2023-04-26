@@ -13,10 +13,7 @@ def unit_markov_sequence(**kwargs) -> _markov.MarkovSequence:
     return _markov.MarkovSequence(init=rv0, backward_model=cond0)
 
 
-# todo: once the fixedpoint smoother resets the backward model at initialisation,
-#  all _init_conditional() functions can be removed and the relevant code snippets
-#  point to this function.
-def identity_conditional(*, num_derivatives, ode_shape) -> "IsoConditionalHiddenState":
+def identity_conditional(num_derivatives, ode_shape) -> "IsoConditionalHiddenState":
     assert len(ode_shape) == 1
     (d,) = ode_shape
 

@@ -2,7 +2,6 @@
 
 from typing import Any, Tuple
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
@@ -104,7 +103,7 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
-        cond = self._init_conditional(rv_proto=rv)
+        cond = variables.identity_conditional(self.num_derivatives, m0.shape[1:])
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol: _markov.MarkovSequence, /):
@@ -169,11 +168,6 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
             return output_scale[-1]
         return output_scale
 
-    def _init_conditional(self, rv_proto):
-        op = jnp.eye(*self.a.shape)
-        noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
-        return variables.IsoConditionalHiddenState(op, noise=noi)
-
 
 class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
@@ -187,13 +181,14 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
-        cond = self._init_conditional(rv_proto=rv)
+        cond = variables.identity_conditional(self.num_derivatives, m0.shape[1:])
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def init(self, sol, /):
         ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
-        cache = self._init_conditional(rv_proto=sol.init)
-        return ssv, cache
+        ode_shape = sol.init.mean.shape[1:]
+        cond = variables.identity_conditional(self.num_derivatives, ode_shape)
+        return ssv, cond
 
     def extract(self, ssv, ex, /):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
@@ -253,13 +248,10 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
         extrapolated = variables.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
-    def _init_conditional(self, rv_proto):
-        op = jnp.eye(*self.a.shape)
-        noi = jax.tree_util.tree_map(jnp.zeros_like, rv_proto)
-        return variables.IsoConditionalHiddenState(op, noise=noi)
-
-    def reset(self, ssv, extra):
-        return ssv, self._init_conditional(extra.noise)
+    def reset(self, ssv, _extra):
+        ode_shape = ssv.hidden_state.mean.shape[1:]
+        cond = variables.identity_conditional(self.num_derivatives, ode_shape)
+        return ssv, cond
 
 
 def _stack_tcoeffs(taylor_coefficients, q_like):
