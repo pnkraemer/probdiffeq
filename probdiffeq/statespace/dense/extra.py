@@ -1,5 +1,6 @@
 """Extrapolations."""
 
+import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
@@ -10,13 +11,20 @@ from probdiffeq.statespace.dense import variables
 def ibm_dense(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (d,) = ode_shape
+
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    precon_1d = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+
+    @jax.tree_util.Partial
+    def preconditioner(*args, **kwargs):
+        p1, p2 = precon_1d(*args, **kwargs)
+        p1 = jnp.tile(p1, d)
+        p2 = jnp.tile(p2, d)
+        return p1, p2
+
     eye_d = jnp.eye(d)
-
-    scales, powers = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-
-    dynamic = (jnp.kron(eye_d, a), jnp.kron(eye_d, q_sqrtm), scales, powers)
-    static = dict(num_derivatives=num_derivatives, ode_shape=ode_shape)
+    dynamic = (jnp.kron(eye_d, a), jnp.kron(eye_d, q_sqrtm), preconditioner)
+    static = {"num_derivatives": num_derivatives, "ode_shape": ode_shape}
     return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
 
@@ -53,7 +61,7 @@ class _IBMFi(_extra.Extrapolation):
         return ssv.hidden_state
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self._assemble_preconditioner(dt=dt)
+        p, p_inv = self.preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
@@ -68,15 +76,6 @@ class _IBMFi(_extra.Extrapolation):
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
-
-    def _assemble_preconditioner(self, dt):
-        p, p_inv = _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
-        (d,) = self.ode_shape
-        p = jnp.tile(p, d)
-        p_inv = jnp.tile(p_inv, d)
-        return p, p_inv
 
     def complete(self, ssv, extra, /, output_scale):
         p, p_inv, l0 = extra
@@ -144,7 +143,7 @@ class _IBMSm(_extra.Extrapolation):
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self._assemble_preconditioner(dt=dt)
+        p, p_inv = self.preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
@@ -159,15 +158,6 @@ class _IBMSm(_extra.Extrapolation):
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
-
-    def _assemble_preconditioner(self, dt):
-        p, p_inv = _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
-        (d,) = self.ode_shape
-        p = jnp.tile(p, d)
-        p_inv = jnp.tile(p_inv, d)
-        return p, p_inv
 
     def complete(self, ssv, extra, /, output_scale):
         _, m_ext_p, m0_p, p, p_inv, l0 = extra
@@ -254,7 +244,7 @@ class _IBMFp(_extra.Extrapolation):
         return _markov.MarkovSequence(init=rv, backward_model=cond)
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self._assemble_preconditioner(dt=dt)
+        p, p_inv = self.preconditioner(dt=dt)
         m0_p = p_inv * ssv.hidden_state.mean
         m_ext_p = self.a @ m0_p
         m_ext = p * m_ext_p
@@ -269,15 +259,6 @@ class _IBMFp(_extra.Extrapolation):
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, ext, target_shape=shape)
         return ssv, cache
-
-    def _assemble_preconditioner(self, dt):
-        p, p_inv = _ibm_util.preconditioner_diagonal(
-            dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
-        )
-        (d,) = self.ode_shape
-        p = jnp.tile(p, d)
-        p_inv = jnp.tile(p_inv, d)
-        return p, p_inv
 
     def complete(self, ssv, extra, /, output_scale):
         bw0, m_ext_p, m0_p, p, p_inv, l0 = extra
