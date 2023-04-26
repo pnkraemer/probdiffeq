@@ -24,21 +24,9 @@ class _IBMFi(_extra.Extrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        return variables.NormalHiddenState(
-            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
-        )
-
-    def _stack_tcoeffs(self, taylor_coefficients):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return m0_corrected, c_sqrtm0_corrected
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
+        return variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
 
     def init(self, sol: variables.NormalHiddenState, /):
         return variables.SSV(sol.mean[0], sol), None
@@ -89,23 +77,11 @@ class _IBMSm(_extra.Extrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        rv = variables.NormalHiddenState(
-            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
-        )
-        cond = self._init_conditional(rv_proto=rv)
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
+        rv = variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
+        cond = variables.identity_conditional(ndim=len(tcoeffs))
         return _markov.MarkovSequence(init=rv, backward_model=cond)
-
-    def _stack_tcoeffs(self, taylor_coefficients):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
         ssv = variables.SSV(sol.init.mean[0], sol.init)
@@ -154,21 +130,6 @@ class _IBMSm(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
 
-    def _init_conditional(self, rv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
-        return variables.ConditionalHiddenState(op, noise=noi)
-
-    def _init_backward_transition(self):
-        k = self.num_derivatives + 1
-        return jnp.eye(k)
-
-    @staticmethod
-    def _init_backward_noise(rv_proto):
-        mean = jnp.zeros_like(rv_proto.mean)
-        cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
-        return variables.NormalHiddenState(mean, cov_sqrtm_lower)
-
     def promote_output_scale(self, output_scale):
         return output_scale
 
@@ -187,27 +148,15 @@ class _IBMFp(_extra.Extrapolation):
     def num_derivatives(self):
         return self.a.shape[0] - 1
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        m0_corrected, c_sqrtm0_corrected = self._stack_tcoeffs(taylor_coefficients)
-        rv = variables.NormalHiddenState(
-            mean=m0_corrected, cov_sqrtm_lower=c_sqrtm0_corrected
-        )
-        cond = self._init_conditional(rv_proto=rv)
+    def solution_from_tcoeffs(self, tcoeffs, /):
+        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
+        rv = variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
+        cond = variables.identity_conditional(ndim=len(tcoeffs))
         return _markov.MarkovSequence(init=rv, backward_model=cond)
-
-    def _stack_tcoeffs(self, taylor_coefficients):
-        if len(taylor_coefficients) != self.num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-        m0_matrix = jnp.stack(taylor_coefficients)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = jnp.zeros_like(self.q_sqrtm_lower)
-        return m0_corrected, c_sqrtm0_corrected
 
     def init(self, sol: _markov.MarkovSequence, /):
         ssv = variables.SSV(sol.init.mean[0], sol.init)
-        extra = self._init_conditional(rv_proto=sol.init)
+        extra = variables.identity_conditional(ndim=sol.init.mean.shape[0])
         return ssv, extra
 
     def extract(self, ssv, extra, /):
@@ -254,21 +203,6 @@ class _IBMFp(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
 
-    def _init_conditional(self, rv_proto):
-        op = self._init_backward_transition()
-        noi = self._init_backward_noise(rv_proto=rv_proto)
-        return variables.ConditionalHiddenState(op, noise=noi)
-
-    def _init_backward_transition(self):
-        k = self.num_derivatives + 1
-        return jnp.eye(k)
-
-    @staticmethod
-    def _init_backward_noise(rv_proto):
-        mean = jnp.zeros_like(rv_proto.mean)
-        cov_sqrtm_lower = jnp.zeros_like(rv_proto.cov_sqrtm_lower)
-        return variables.NormalHiddenState(mean, cov_sqrtm_lower)
-
     def promote_output_scale(self, output_scale):
         return output_scale
 
@@ -277,8 +211,20 @@ class _IBMFp(_extra.Extrapolation):
             return output_scale[-1]
         return output_scale
 
-    def reset(self, ssv, extra, /):
-        return ssv, self._init_conditional(extra.noise)
+    def reset(self, ssv, _extra, /):
+        cond = variables.identity_conditional(ndim=ssv.hidden_state.mean.shape[0])
+        return ssv, cond
+
+
+def _stack_tcoeffs(tcoeffs, /, *, num_derivatives):
+    if len(tcoeffs) != num_derivatives + 1:
+        msg1 = "The number of Taylor coefficients does not match "
+        msg2 = "the number of derivatives in the implementation."
+        raise ValueError(msg1 + msg2)
+    m0_matrix = jnp.stack(tcoeffs)
+    m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
+    c_sqrtm0_corrected = jnp.zeros((num_derivatives + 1, num_derivatives + 1))
+    return m0_corrected, c_sqrtm0_corrected
 
 
 # Register scalar extrapolations as pytrees because we want to vmap them
