@@ -9,11 +9,6 @@ import jax.numpy as jnp
 from probdiffeq import _adaptive, _collocate, _markov, solution, taylor
 from probdiffeq.strategies import smoothers
 
-# The high-level checkpoint-style routines
-
-# todo: call the argument "p" instead of "parameters"
-#  to match the signature of the vector field?
-
 
 def simulate_terminal_values(
     vector_field,

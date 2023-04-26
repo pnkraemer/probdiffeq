@@ -26,8 +26,6 @@ class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
 
-    # Content:
-
     def solution_from_tcoeffs(self, tcoeffs, /):
         m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
@@ -81,8 +79,6 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     @property
     def num_derivatives(self):
         return self.a.shape[0] - 1
-
-    # Actual content:
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)

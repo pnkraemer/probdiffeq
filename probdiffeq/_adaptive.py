@@ -130,7 +130,6 @@ class AdaptiveIVPSolver(Generic[T]):
             return s.error_norm_proposed > 1.0
 
         def body_fn(s):
-            # _, s = x
             s = self._attempt_step(
                 state=s,
                 vector_field=vector_field,

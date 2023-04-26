@@ -24,7 +24,7 @@ from probdiffeq.statespace.scalar import extra as scalar_extra
 class _Impl(containers.NamedTuple):
     """State-space model implementation.
 
-    Contains an extra style and a corr style.
+    Contains an extrapolation, correction, and calibration style.
     """
 
     extra: Any

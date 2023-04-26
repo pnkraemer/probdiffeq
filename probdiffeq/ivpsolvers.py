@@ -39,8 +39,6 @@ class Solver:
     def __repr__(self):
         return f"{self.__class__.__name__}({self.strategy})"
 
-    #  methods
-
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         raise NotImplementedError
 
