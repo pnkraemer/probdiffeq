@@ -26,8 +26,8 @@ class Strategy(Generic[S, P]):
         name = self.__class__.__name__
         arg1 = self.extrapolation
         arg2 = self.correction
-        arg3 = self.calibration
-        return f"{name}({arg1}, {arg2}, {arg3})"
+        # no calibration in __repr__ because it will leave again soon.
+        return f"{name}({arg1}, {arg2})"
 
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> P:
         raise NotImplementedError
