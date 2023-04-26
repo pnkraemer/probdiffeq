@@ -80,14 +80,6 @@ class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
         k = {"scales": self.preconditioner_scales, "powers": self.preconditioner_powers}
         return _ibm_util.preconditioner_diagonal(dt=dt, **k)
 
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
-
 
 class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
@@ -160,14 +152,6 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
             dt=dt, scales=self.preconditioner_scales, powers=self.preconditioner_powers
         )
 
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
-
 
 class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
@@ -192,14 +176,6 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
 
     def extract(self, ssv, ex, /):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
-
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
 
     def begin(self, s0: variables.IsoSSV, ex0, /, dt) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self._assemble_preconditioner(dt=dt)

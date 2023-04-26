@@ -64,14 +64,6 @@ class _IBMFi(_extra.Extrapolation):
         ssv = variables.SSV(m_ext[0], rv)
         return ssv, None
 
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
-
 
 class _IBMSm(_extra.Extrapolation):
     def __repr__(self):
@@ -139,14 +131,6 @@ class _IBMSm(_extra.Extrapolation):
         extrapolated = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
-
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
 
 
 class _IBMFp(_extra.Extrapolation):
@@ -217,14 +201,6 @@ class _IBMFp(_extra.Extrapolation):
         extrapolated = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = variables.SSV(m_ext[0], extrapolated)
         return ssv, bw_model
-
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
 
     def reset(self, ssv, _extra, /):
         cond = variables.identity_conditional(ndim=ssv.hidden_state.mean.shape[0])
