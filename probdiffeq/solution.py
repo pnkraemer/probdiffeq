@@ -270,7 +270,8 @@ def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
 def _init_fn(rv, problem, *, strategy):
     obs_std, data = problem
 
-    ssv, _ = strategy.extrapolation.filter.init(rv)
+    rv_as_mseq = _markov.MarkovSequence(init=rv, backward_model=None)
+    ssv, _ = strategy.extrapolation.init(rv_as_mseq)
     obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
 
     cor = cond_cor(data)
@@ -297,7 +298,8 @@ def _update(state, problem, *, strategy):
     """Observe the QOI and compute the 'local' log-marginal likelihood."""
     obs_std, data = problem
 
-    ssv, _ = strategy.extrapolation.filter.init(state.rv)
+    rv_as_mseq = _markov.MarkovSequence(init=state.rv, backward_model=None)
+    ssv, _ = strategy.extrapolation.init(rv_as_mseq)
     observed, conditional = ssv.observe_qoi(observation_std=obs_std)
 
     corrected = conditional(data)
