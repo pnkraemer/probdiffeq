@@ -37,19 +37,19 @@ example:
 	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
 
 run-benchmarks:
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
 	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
 	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
 	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/pleiades/external.ipynb
 	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
 	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/hires/external.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
 
 clean:
 	pre-commit clean
