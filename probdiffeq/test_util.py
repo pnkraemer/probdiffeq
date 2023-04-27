@@ -39,6 +39,6 @@ def generate_solver(
     >>> print(generate_solver(strategy_factory=strat_fcty, impl_factory=impl_fcty, ode_shape=(1,)))  # noqa: E501
     MLESolver(_Smoother(<Dense IBM with num_derivatives=4, ode_shape=(1,)>, <TS1 with ode_order=1>))
     """
-    impl = impl_factory(**impl_factory_kwargs)
-    strat = strategy_factory(*impl)
-    return solver_factory(strat)
+    implementation = impl_factory(**impl_factory_kwargs)
+    strategy = strategy_factory(*implementation)
+    return solver_factory(*strategy)

@@ -53,7 +53,7 @@ def vector_field(y, *, t, p):
 
 # Make a solver
 impl = recipes.slr1_dense(ode_shape=(1,), num_derivatives=1)
-solver = ivpsolvers.MLESolver(smoothers.smoother(*impl))
+solver = ivpsolvers.MLESolver(*smoothers.smoother(*impl))
 ```
 
 ```python
@@ -95,7 +95,7 @@ taylor_coefficients = jnp.reshape(
 
 prior_u = []
 prior_du = []
-model = filters.filter(*impl)
+model, _ = filters.filter(*impl)
 rv = model.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 ssv, extra = model.extrapolation.init(rv)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):

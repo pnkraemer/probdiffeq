@@ -17,10 +17,9 @@ P = TypeVar("P")
 class Strategy(Generic[S, P]):
     """Inference strategy interface."""
 
-    def __init__(self, extrapolation, correction, calibration):
+    def __init__(self, extrapolation, correction):
         self.extrapolation = extrapolation
         self.correction = correction
-        self.calibration = calibration
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -55,7 +54,7 @@ class Strategy(Generic[S, P]):
 
     def tree_flatten(self):
         # todo: they should all be 'aux'?
-        children = (self.correction, self.calibration)
+        children = (self.correction,)
         aux = (self.extrapolation,)
         return children, aux
 
@@ -68,10 +67,3 @@ class Strategy(Generic[S, P]):
 
     def complete(self, state, /, *, parameters, vector_field, output_scale):
         raise NotImplementedError
-
-    # todo: move these calls up to solver-level.
-    def promote_output_scale(self, *args, **kwargs):
-        return self.calibration.init(*args, **kwargs)
-
-    def extract_output_scale(self, *args, **kwargs):
-        return self.calibration.extract(*args, **kwargs)

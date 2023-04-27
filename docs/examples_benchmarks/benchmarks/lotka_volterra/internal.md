@@ -112,7 +112,7 @@ def impl_to_method_config(impl, *, label):
 
 
 def strategy_to_method_config(strategy, *, label):
-    solver = ivpsolvers.MLESolver(strategy)
+    solver = ivpsolvers.MLESolver(*strategy)
     return workprecision.MethodConfig(method=solver_to_method(solver), label=label)
 
 
