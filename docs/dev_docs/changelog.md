@@ -60,6 +60,7 @@ Notable breaking changes:
 * `log_marginal_likelihood*` functions now operator on posterior and strategy, instead of the solution/solver. The solution and solver carry a lot of information that is unnecessary for log-marginal-likelihood computation.
   To update, replace `log_marginal_likelihood*(..., solution=sol)`
   with `log_marginal_likelihood*(..., posterior=sol.posterior, strategy=solver.strategy)`
+* Implementation recipes now return a tuple of length three instead of a tuple of length two.
 
 Notable enhancements:
 

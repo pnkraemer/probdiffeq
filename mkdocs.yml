@@ -122,17 +122,21 @@ nav:
               - linearise: api_docs/statespace/dense/linearise.md
               - corr: api_docs/statespace/dense/corr.md
               - variables: api_docs/statespace/dense/variables.md
+              - calib: api_docs/statespace/dense/calib.md
           - iso:
               - extra: api_docs/statespace/iso/extra.md
               - corr: api_docs/statespace/iso/corr.md
               - variables: api_docs/statespace/iso/variables.md
+              - calib: api_docs/statespace/iso/calib.md
           - blockdiag:
               - extra: api_docs/statespace/blockdiag/extra.md
               - corr: api_docs/statespace/blockdiag/corr.md
+              - calib: api_docs/statespace/blockdiag/calib.md
           - scalar:
               - extra: api_docs/statespace/scalar/extra.md
               - corr: api_docs/statespace/scalar/corr.md
               - variables: api_docs/statespace/scalar/variables.md
+              - calib: api_docs/statespace/scalar/calib.md
       - solution: api_docs/solution.md
       - taylor: api_docs/taylor.md
       - controls: api_docs/controls.md

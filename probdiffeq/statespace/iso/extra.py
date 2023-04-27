@@ -26,8 +26,6 @@ class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
 
-    # Content:
-
     def solution_from_tcoeffs(self, tcoeffs, /):
         m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
@@ -72,16 +70,6 @@ class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
     def extract(self, ssv, _extra, /):
         return ssv.hidden_state
 
-    # Some helpers:
-
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
-
 
 class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
@@ -91,8 +79,6 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
     @property
     def num_derivatives(self):
         return self.a.shape[0] - 1
-
-    # Actual content:
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
@@ -147,16 +133,6 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
         extrapolated = variables.IsoNormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
-    # Some helpers:
-
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
-
 
 class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
     def __repr__(self):
@@ -181,14 +157,6 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
 
     def extract(self, ssv, ex, /):
         return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
-
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
 
     def begin(self, s0: variables.IsoSSV, ex0, /, dt) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self.preconditioner(dt=dt)

@@ -17,14 +17,16 @@ P = TypeVar("P")
 class Strategy(Generic[S, P]):
     """Inference strategy interface."""
 
-    def __init__(self, extrapolation, correction):
+    def __init__(self, extrapolation, correction, calibration):
         self.extrapolation = extrapolation
         self.correction = correction
+        self.calibration = calibration
 
     def __repr__(self):
         name = self.__class__.__name__
         arg1 = self.extrapolation
         arg2 = self.correction
+        # no calibration in __repr__ because it will leave again soon.
         return f"{name}({arg1}, {arg2})"
 
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> P:
@@ -52,17 +54,23 @@ class Strategy(Generic[S, P]):
         raise NotImplementedError
 
     def tree_flatten(self):
-        children = (self.extrapolation, self.correction)
+        children = (self.extrapolation, self.correction, self.calibration)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (extra, correct) = children
-        return cls(extra, correct)
+        return cls(*children)
 
     def begin(self, state: S, /, *, dt, parameters, vector_field):
         raise NotImplementedError
 
     def complete(self, state, /, *, parameters, vector_field, output_scale):
         raise NotImplementedError
+
+    # todo: move these calls up to solver-level.
+    def promote_output_scale(self, *args, **kwargs):
+        return self.calibration.init(*args, **kwargs)
+
+    def extract_output_scale(self, *args, **kwargs):
+        return self.calibration.extract(*args, **kwargs)

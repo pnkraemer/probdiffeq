@@ -106,11 +106,3 @@ class Filter(_strategy.Strategy[_FiState, Any]):
             ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
         return _FiState(t=state.t, ssv=ssv, extra=extra, corr=corr)
-
-    def promote_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.filter.promote_output_scale
-        return init_fn(*args, **kwargs)
-
-    def extract_output_scale(self, *args, **kwargs):
-        init_fn = self.extrapolation.filter.extract_output_scale
-        return init_fn(*args, **kwargs)

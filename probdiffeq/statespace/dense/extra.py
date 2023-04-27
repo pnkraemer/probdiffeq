@@ -93,18 +93,6 @@ class _IBMFi(_extra.Extrapolation):
         ssv = variables.DenseSSV(u, rv, target_shape=shape)
         return ssv, None
 
-    # todo: the below two are a bit of an init/extract pair.
-    #  It seems like this should happen in a "calibration" algorithm, right?
-    #  Probably on ivpsolver-level. But the difficulty will be that
-    #  implementing these two functions will require the shape of the state-space.
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
-
 
 class _IBMSm(_extra.Extrapolation):
     def __init__(self, *args, num_derivatives, ode_shape):
@@ -193,18 +181,6 @@ class _IBMSm(_extra.Extrapolation):
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
         ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
-
-    # todo: the below two are a bit of an init/extract pair.
-    #  It seems like this should happen in a "calibration" algorithm, right?
-    #  Probably on ivpsolver-level. But the difficulty will be that
-    #  implementing these two functions will require the shape of the state-space.
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
 
 
 class _IBMFp(_extra.Extrapolation):
@@ -295,18 +271,6 @@ class _IBMFp(_extra.Extrapolation):
         u = m_ext.reshape(self.target_shape, order="F")[0, :]
         ext = variables.DenseSSV(u, rv, target_shape=self.target_shape)
         return ext, bw_model
-
-    # todo: the below two are a bit of an init/extract pair.
-    #  It seems like this should happen in a "calibration" algorithm, right?
-    #  Probably on ivpsolver-level. But the difficulty will be that
-    #  implementing these two functions will require the shape of the state-space.
-    def promote_output_scale(self, output_scale):
-        return output_scale
-
-    def extract_output_scale(self, output_scale):
-        if output_scale.ndim > 0:
-            return output_scale[-1]
-        return output_scale
 
     def reset(self, ssv, _extra, /):
         return ssv, variables.identity_conditional(*self.target_shape)
