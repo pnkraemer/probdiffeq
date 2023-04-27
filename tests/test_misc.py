@@ -2,8 +2,8 @@
 
 Place all tests that have no better place here.
 """
-from probdiffeq import test_util
 from probdiffeq.backend import testing
+from probdiffeq.statespace.iso import extra
 
 
 @testing.parametrize("incr", [1, -1])
@@ -16,10 +16,8 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     passed to *IBM.init_state_space_var() does not match the `num_derivatives`
     attribute of the extrapolation model.
     """
-    solver = test_util.generate_solver(num_derivatives=n)
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
-
-    extra = solver.strategy.extrapolation
-    for impl in [extra.filter, extra.smoother, extra.fixedpoint]:
+    ibm = extra.ibm_iso(num_derivatives=n)
+    for impl in [ibm.filter, ibm.smoother, ibm.fixedpoint]:
         with testing.raises(ValueError):
             _ = impl.solution_from_tcoeffs(tcoeffs_wrong_length)

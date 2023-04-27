@@ -9,6 +9,12 @@ from probdiffeq.backend import containers
 from probdiffeq.strategies import _strategy
 
 
+def filter(*impl):
+    """Create a filter strategy."""
+    extra, corr, calib = impl
+    return _Filter(extra.filter, corr, calib)
+
+
 class _FiState(containers.NamedTuple):
     """Filtering state."""
 
@@ -35,24 +41,24 @@ S = TypeVar("S")
 
 
 @jax.tree_util.register_pytree_node_class
-class Filter(_strategy.Strategy[_FiState, Any]):
+class _Filter(_strategy.Strategy[_FiState, Any]):
     """Filter strategy."""
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
-        sol = self.extrapolation.filter.solution_from_tcoeffs(taylor_coefficients)
+        sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
         marginals = sol
         u = taylor_coefficients[0]
         return u, marginals, sol
 
     def init(self, t, solution, /) -> _FiState:
-        ssv, extra = self.extrapolation.filter.init(solution)
+        ssv, extra = self.extrapolation.init(solution)
         ssv, corr = self.correction.init(ssv)
         return _FiState(t=t, ssv=ssv, extra=extra, corr=corr)
 
     def extract(self, posterior: _FiState, /):
         t = posterior.t
         ssv = self.correction.extract(posterior.ssv, posterior.corr)
-        solution = self.extrapolation.filter.extract(ssv, posterior.extra)
+        solution = self.extrapolation.extract(ssv, posterior.extra)
         return t, solution
 
     def case_right_corner(
@@ -67,10 +73,8 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         # to the in-between variable. That's it.
         dt = t - s0.t
 
-        ssv, extra = self.extrapolation.filter.begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.filter.complete(
-            ssv, extra, output_scale=output_scale
-        )
+        ssv, extra = self.extrapolation.begin(s0.ssv, s0.extra, dt=dt)
+        ssv, extra = self.extrapolation.complete(ssv, extra, output_scale=output_scale)
 
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
         extrapolated = _FiState(t=t, ssv=ssv, extra=extra, corr=corr_like)
@@ -92,14 +96,14 @@ class Filter(_strategy.Strategy[_FiState, Any]):
         return u, posterior
 
     def begin(self, state: _FiState, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.filter.begin(state.ssv, state.extra, dt=dt)
+        ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t + dt, p=parameters
         )
         return _FiState(t=state.t + dt, ssv=ssv, corr=corr, extra=extra)
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
-        ssv, extra = self.extrapolation.filter.complete(
+        ssv, extra = self.extrapolation.complete(
             state.ssv, state.extra, output_scale=output_scale
         )
         ssv, corr = self.correction.complete(

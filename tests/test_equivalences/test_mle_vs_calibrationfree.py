@@ -10,7 +10,7 @@ from probdiffeq.strategies import filters, smoothers
 
 
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
-@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother_fixedpoint])
 def test_mle_vs_calibrationfree(ode_problem, strategy_fn):
     """Assert equivalence between MLESolver and CalibrationFreeSolver.
 
@@ -51,7 +51,7 @@ def test_mle_vs_calibrationfree(ode_problem, strategy_fn):
     assert _tree_all_allclose(solution_mle.num_steps, solution_free.num_steps)
 
     # If we are smoothing, we also compare the backward models.
-    if isinstance(strategy, smoothers.FixedPointSmoother):
+    if isinstance(strategy, smoothers._FixedPointSmoother):  # noqa: E731
         rand_mle = solution_mle.posterior
         rand_free = solution_free.posterior
         assert _tree_all_allclose(rand_mle.init, rand_free.init)

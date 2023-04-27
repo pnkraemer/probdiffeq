@@ -104,7 +104,7 @@ def solve_and_save_at(
     """
     _assert_tuple(initial_values)
 
-    if isinstance(solver.strategy, smoothers.Smoother):
+    if isinstance(solver.strategy, smoothers._Smoother):
         msg1 = "A conventional smoother cannot be used. "
         msg2 = "Did you mean ``smoothers.FixedPointSmoother()``?"
         warnings.warn(msg1 + msg2)

@@ -42,14 +42,14 @@ def fixture_solution_native_python_while_loop(ode_problem, strategy_fn, impl_fn)
     return sol, solver
 
 
-@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.filter], scope="function")
 def test_solution_is_iterable(solution_native_python_while_loop):
     sol, _ = solution_native_python_while_loop
     assert isinstance(sol[0], type(sol))
     assert len(sol) == len(sol.t)
 
 
-@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.filter], scope="function")
 def test_getitem_raises_error_for_nonbatched_solutions(
     solution_native_python_while_loop,
 ):
@@ -61,7 +61,7 @@ def test_getitem_raises_error_for_nonbatched_solutions(
         _ = sol[0, 0]
 
 
-@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.filter], scope="function")
 def test_loop_over_solution_is_possible(solution_native_python_while_loop):
     solution_full, _ = solution_native_python_while_loop
 
@@ -73,7 +73,7 @@ def test_loop_over_solution_is_possible(solution_native_python_while_loop):
     assert i == len(solution_full) - 1
 
 
-@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.filter], scope="function")
 def test_marginal_nth_derivative_of_solution(solution_native_python_while_loop):
     """Assert that each $n$th derivative matches the quantity of interest's shape."""
     sol, _ = solution_native_python_while_loop
@@ -88,7 +88,7 @@ def test_marginal_nth_derivative_of_solution(solution_native_python_while_loop):
         sol.marginals.marginal_nth_derivative(100)
 
 
-@testing.parametrize("strategy_fn", [filters.Filter], scope="function")
+@testing.parametrize("strategy_fn", [filters.filter], scope="function")
 def test_offgrid_marginals_filter(solution_native_python_while_loop):
     """Assert that the offgrid-marginals are close to the boundary values."""
     sol, solver = solution_native_python_while_loop
@@ -102,7 +102,7 @@ def test_offgrid_marginals_filter(solution_native_python_while_loop):
     assert not jnp.allclose(u[0], sol.u[1], atol=1e-3, rtol=1e-3)
 
 
-@testing.parametrize("strategy_fn", [smoothers.Smoother], scope="function")
+@testing.parametrize("strategy_fn", [smoothers.smoother], scope="function")
 def test_offgrid_marginals_smoother(solution_native_python_while_loop):
     sol, solver = solution_native_python_while_loop
     t0, t1 = sol.t[0], sol.t[-1]
@@ -118,7 +118,7 @@ def test_offgrid_marginals_smoother(solution_native_python_while_loop):
 @testing.fixture(scope="function", name="solution_save_at")
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 def fixture_solution_save_at(ode_problem):
-    solver = test_util.generate_solver(strategy_factory=smoothers.FixedPointSmoother)
+    solver = test_util.generate_solver(strategy_factory=smoothers.smoother_fixedpoint)
 
     save_at = jnp.linspace(ode_problem.t0, ode_problem.t1, endpoint=True, num=4)
     sol = ivpsolve.solve_and_save_at(

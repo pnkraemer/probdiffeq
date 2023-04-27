@@ -27,7 +27,7 @@ class _SimulateTerminalValuesConfig(NamedTuple):
     output_scale: Any
 
 
-_ALL_STRATEGY_FNS = [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
+_ALL_STRATEGY_FNS = [filters.filter, smoothers.smoother, smoothers.smoother_fixedpoint]
 
 
 @testing.case(tags=["jvp"])
@@ -110,7 +110,7 @@ def case_setup_all_loops(ivp, loop_fn, solver_config):
         ivp=ivp,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.ts0_blockdiag,
-        strategy_fn=filters.Filter,
+        strategy_fn=filters.filter,
         solver_config=solver_config,
         loop_fn=loop_fn,
         control=controls.ProportionalIntegral(),
@@ -149,7 +149,7 @@ def case_setup_all_controls(ivp, control, solver_config):
         ivp=ivp,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.ts0_blockdiag,
-        strategy_fn=filters.Filter,
+        strategy_fn=filters.filter,
         solver_config=solver_config,
         loop_fn=jax.lax.while_loop,
         control=control,
@@ -220,7 +220,7 @@ def test_jvp(ivp, solver_config):
     ode_shape = ivp.initial_values[0].shape
     solver = test_util.generate_solver(
         solver_factory=ivpsolvers.CalibrationFreeSolver,
-        strategy_factory=filters.Filter,
+        strategy_factory=filters.filter,
         impl_factory=recipes.ts0_blockdiag,
         ode_shape=ode_shape,
         num_derivatives=1,

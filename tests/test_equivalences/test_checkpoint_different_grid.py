@@ -36,13 +36,13 @@ def test_smoothing_checkpoint_equals_solver_state(ode_problem, impl_fn, k):
     # This one point will be used for error-estimation.
 
     solver_smo = test_util.generate_solver(
-        strategy_factory=smoothers.Smoother,
+        strategy_factory=smoothers.smoother,
         impl_factory=impl_fn,
         ode_shape=ode_problem.initial_values[0].shape,
         num_derivatives=2,
     )
     solver_fp_smo = test_util.generate_solver(
-        strategy_factory=smoothers.FixedPointSmoother,
+        strategy_factory=smoothers.smoother_fixedpoint,
         impl_factory=impl_fn,
         ode_shape=ode_problem.initial_values[0].shape,
         num_derivatives=2,

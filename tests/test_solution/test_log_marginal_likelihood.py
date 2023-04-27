@@ -21,7 +21,7 @@ from probdiffeq.strategies import filters, smoothers
     ],
     ids=["IsoTS0", "BlockDiagTS0", "DenseTS0"],
 )
-@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother_fixedpoint])
 def fixture_solution_save_at(ode_problem, impl_fn, strategy_fn):
     solver = test_util.generate_solver(
         strategy_factory=strategy_fn,
@@ -47,7 +47,7 @@ def test_log_marginal_likelihood(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
-    if isinstance(solver.strategy, filters.Filter):
+    if isinstance(solver.strategy, filters._Filter):  # noqa: E731
         reason = "No time-series log marginal likelihoods for Filters."
         testing.skip(reason)
     mll = solution.log_marginal_likelihood(
@@ -141,7 +141,7 @@ def test_log_marginal_likelihood_terminal_values_error_for_wrong_shapes(
 
 
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag="nd")
-@testing.parametrize("strategy_fn", [filters.Filter, smoothers.Smoother])
+@testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother])
 def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
     """Issue #477."""
     recipe = recipes.ts0_iso(num_derivatives=4)
@@ -168,7 +168,7 @@ def test_filter_ts0_iso_terminal_value_nll(ode_problem, strategy_fn):
 def test_nmll_raises_error_for_filter(ode_problem):
     """Non-terminal value calls are not possible for filters."""
     recipe = recipes.ts0_iso(num_derivatives=4)
-    strategy = filters.Filter(*recipe)
+    strategy = filters.filter(*recipe)
     solver = ivpsolvers.CalibrationFreeSolver(strategy)
     grid = jnp.linspace(ode_problem.t0, ode_problem.t1)
 

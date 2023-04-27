@@ -13,13 +13,13 @@ from probdiffeq.strategies import filters, smoothers
 @testing.case
 def strategy_pair_smoother():
     impl = recipes.ts0_iso()
-    return filters.Filter(*impl), smoothers.Smoother(*impl)
+    return filters.filter(*impl), smoothers.smoother(*impl)
 
 
 @testing.case
 def strategy_pair_fixedpoint_smoother():
     impl = recipes.ts0_iso()
-    return filters.Filter(*impl), smoothers.FixedPointSmoother(*impl)
+    return filters.filter(*impl), smoothers.smoother_fixedpoint(*impl)
 
 
 # Shorthand for the test parametrization below:
