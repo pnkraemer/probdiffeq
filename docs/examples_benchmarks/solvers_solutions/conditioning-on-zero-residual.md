@@ -28,7 +28,7 @@ from jax.config import config
 from probdiffeq import controls, ivpsolve, ivpsolvers, solution
 from probdiffeq.doc_util import notebook
 from probdiffeq.statespace import recipes
-from probdiffeq.strategies import smoothers
+from probdiffeq.strategies import filters, smoothers
 ```
 
 ```python
@@ -86,7 +86,6 @@ posterior_du = marginals.marginal_nth_derivative(1).mean
 ```python
 # Extrapolate the prior on the dense grid
 
-extrapolation_model = solver.strategy.extrapolation
 taylor_coefficients = jnp.reshape(
     sol.marginals.mean[0, ...],
     sol.marginals.target_shape,
@@ -96,18 +95,19 @@ taylor_coefficients = jnp.reshape(
 
 prior_u = []
 prior_du = []
-rv = extrapolation_model.filter.solution_from_tcoeffs(taylor_coefficients)
-ssv, extra = extrapolation_model.filter.init(rv)
+model = filters.filter(*impl)
+rv = model.extrapolation.solution_from_tcoeffs(taylor_coefficients)
+ssv, extra = model.extrapolation.init(rv)
 for t_old, t_new in zip(mesh[:-1], mesh[1:]):
     prior_u.append(rv.marginal_nth_derivative(0).mean)
     prior_du.append(rv.marginal_nth_derivative(1).mean)
 
     dt = t_new - t_old
-    ssv, extra = extrapolation_model.filter.begin(ssv, extra, dt)
-    ssv, extra = extrapolation_model.filter.complete(
+    ssv, extra = model.extrapolation.begin(ssv, extra, dt)
+    ssv, extra = model.extrapolation.complete(
         ssv, extra, output_scale=sol.output_scale.mean()
     )
-    rv = extrapolation_model.filter.extract(ssv, extra)
+    rv = model.extrapolation.extract(ssv, extra)
 
 
 prior_u.append(rv.marginal_nth_derivative(0).mean)
