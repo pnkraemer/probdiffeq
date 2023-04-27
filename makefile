@@ -2,31 +2,17 @@
 .PHONY: format lint test doc example run-benchmarks clean
 
 format:
-	isort .
-	black .
-	yamlfix .
-	eof .
-	nbqa black docs/quickstart/
-	nbqa black docs/examples_benchmarks/solvers_solutions/
-	nbqa black docs/examples_benchmarks/parameter_estimation/
-	nbqa black docs/examples_benchmarks/benchmarks/lotka_volterra/
-	nbqa black docs/examples_benchmarks/benchmarks/pleiades/
-	nbqa black docs/examples_benchmarks/benchmarks/stiff_van_der_pol/
-	nbqa black docs/examples_benchmarks/benchmarks/hires/
-	nbqa isort docs/quickstart/
-	nbqa isort docs/examples_benchmarks/solvers_solutions/
-	nbqa isort docs/examples_benchmarks/parameter_estimation/
-	nbqa isort docs/examples_benchmarks/benchmarks/lotka_volterra/
-	nbqa isort docs/examples_benchmarks/benchmarks/pleiades/
-	nbqa isort docs/examples_benchmarks/benchmarks/stiff_van_der_pol/
-	nbqa isort docs/examples_benchmarks/benchmarks/hires/
-	jupytext --sync docs/quickstart/*
-	jupytext --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --sync docs/examples_benchmarks/parameter_estimation/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/hires/*
+	isort --quiet .
+	black --quiet .
+	nbqa black --quiet docs/quickstart/ docs/examples_benchmarks/
+	nbqa isort --quiet docs/quickstart/ docs/examples_benchmarks/
+	jupytext --quiet --sync docs/quickstart/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
 
 lint:
 	pre-commit run --all-files
@@ -36,34 +22,34 @@ test:
 	python -m doctest probdiffeq/*.py
 
 example:
-	jupytext --sync docs/quickstart/*.ipynb
-	jupytext --execute docs/quickstart/*.ipynb
-	jupytext --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --execute docs/examples_benchmarks/solvers_solutions/*
-	jupytext --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --sync docs/examples_benchmarks/parameter_estimation/*
-	jupytext --execute docs/examples_benchmarks/parameter_estimation/*
-	jupytext --sync docs/examples_benchmarks/parameter_estimation/*
+	jupytext --quiet --sync docs/quickstart/*.ipynb
+	jupytext --quiet --execute docs/quickstart/*.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*
+	jupytext --quiet --execute docs/examples_benchmarks/solvers_solutions/*
+	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*
+	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
+	jupytext --quiet --execute docs/examples_benchmarks/parameter_estimation/*
+	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
 	# No --execute for advanced examples and benchmarks (takes too long)
-	jupytext --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/hires/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
 
 run-benchmarks:
-	jupytext --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/hires/*
-	jupytext --execute docs/examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
-	jupytext --execute docs/examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
-	jupytext --execute docs/examples_benchmarks/benchmarks/pleiades/external.ipynb
-	jupytext --execute docs/examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
-	jupytext --execute docs/examples_benchmarks/benchmarks/hires/external.ipynb
-	jupytext --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --sync docs/examples_benchmarks/benchmarks/hires/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
+	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
+	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
+	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/pleiades/external.ipynb
+	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
+	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/hires/external.ipynb
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
+	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
 
 clean:
 	pre-commit clean
