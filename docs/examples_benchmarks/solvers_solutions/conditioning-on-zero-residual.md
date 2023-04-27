@@ -53,7 +53,7 @@ def vector_field(y, *, t, p):
 
 # Make a solver
 impl = recipes.slr1_dense(ode_shape=(1,), num_derivatives=1)
-solver = ivpsolvers.MLESolver(smoothers.Smoother(*impl))
+solver = ivpsolvers.MLESolver(smoothers.smoother(*impl))
 ```
 
 ```python

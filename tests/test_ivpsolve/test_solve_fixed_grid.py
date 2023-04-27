@@ -24,7 +24,7 @@ class _SolveFixedGridConfig(NamedTuple):
     output_scale: Any
 
 
-_ALL_STRATEGY_FNS = [filters.Filter, smoothers.Smoother, smoothers.FixedPointSmoother]
+_ALL_STRATEGY_FNS = [filters.filter, smoothers.smoother, smoothers.smoother_fixedpoint]
 
 
 @testing.case
@@ -159,8 +159,8 @@ def _skip_autodiff_test(solver):
     _DenseTS0 = dense_corr._DenseTaylorZerothOrder
     _IsoTS0 = iso_corr._IsoTaylorZerothOrder
     _ScalarTS0 = scalar_corr._TaylorZerothOrder
-    is_smoother = lambda x: isinstance(x, smoothers.Smoother)  # noqa: E731
-    is_fp_smoother = lambda x: isinstance(x, smoothers.FixedPointSmoother)  # noqa: E731
+    is_smoother = lambda x: isinstance(x, smoothers._Smoother)  # noqa: E731
+    is_fixedpoint = lambda x: isinstance(x, smoothers._FixedPointSmoother)  # noqa: E731
     is_slr1 = lambda x: isinstance(x, _SLR1)  # noqa: E731
     is_slr0 = lambda x: isinstance(x, _SLR0)  # noqa: E731
     is_ts1 = lambda x: isinstance(x, _TS1)  # noqa: E731
@@ -171,7 +171,7 @@ def _skip_autodiff_test(solver):
 
     if is_slr1(correction):
         return True
-    if is_smoother(strategy) or is_fp_smoother(strategy):
+    if is_smoother(strategy) or is_fixedpoint(strategy):
         if is_slr0(correction):
             return True
         if is_ts1(correction):

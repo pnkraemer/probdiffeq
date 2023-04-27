@@ -61,6 +61,14 @@ Notable breaking changes:
   To update, replace `log_marginal_likelihood*(..., solution=sol)`
   with `log_marginal_likelihood*(..., posterior=sol.posterior, strategy=solver.strategy)`
 * Implementation recipes now return a tuple of length three instead of a tuple of length two.
+* Strategies are factories instead of classes now.
+  The API remains the same. 
+  To update, replace `filters.Filter(*impl)` with `filters.filter(*impl)`, 
+  `smoothers.Smoother(*impl)` with `smoothers.smoother(*impl)`,
+  `smoothers.FixedPointSmoother(*impl)` with `smoothers.smoother_fixedpoint(*impl)`.
+  The reason for this change are internal code-simplifications: implementing the strategies as a class is an implementation detail that may change soon. 
+  A factory will remain.
+
 
 Notable enhancements:
 

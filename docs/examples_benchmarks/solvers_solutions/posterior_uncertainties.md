@@ -54,7 +54,7 @@ def vf(*ys, t, p):
 ## Filter
 
 ```python
-ts0 = ivpsolvers.MLESolver(filters.Filter(*recipes.ts0_iso()))
+ts0 = ivpsolvers.MLESolver(filters.filter(*recipes.ts0_iso()))
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
@@ -112,7 +112,7 @@ plt.show()
 ## Smoother
 
 ```python
-ts0 = ivpsolvers.MLESolver(smoothers.FixedPointSmoother(*recipes.ts0_iso()))
+ts0 = ivpsolvers.MLESolver(smoothers.smoother_fixedpoint(*recipes.ts0_iso()))
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 

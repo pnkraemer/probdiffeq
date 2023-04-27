@@ -24,7 +24,7 @@ t0, t1 = 0.0, 1.0
 #     Smoother: Compute a global estimate of the solution
 #     MLESolver: Calibrate unknown parameters with (quasi-)maximum-likelihood estimation
 implementation = recipes.ts1_dense(ode_shape=(1,))
-strategy = smoothers.Smoother(*implementation)
+strategy = smoothers.smoother(*implementation)
 solver = ivpsolvers.MLESolver(strategy)
 
 

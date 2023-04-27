@@ -54,13 +54,14 @@ class Strategy(Generic[S, P]):
         raise NotImplementedError
 
     def tree_flatten(self):
-        children = (self.extrapolation, self.correction, self.calibration)
-        aux = ()
+        # todo: they should all be 'aux'?
+        children = (self.correction, self.calibration)
+        aux = (self.extrapolation,)
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, _aux, children):
-        return cls(*children)
+    def tree_unflatten(cls, aux, children):
+        return cls(*aux, *children)
 
     def begin(self, state: S, /, *, dt, parameters, vector_field):
         raise NotImplementedError

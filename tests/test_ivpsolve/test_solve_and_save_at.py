@@ -26,7 +26,7 @@ class _SolveAndSaveAtConfig(NamedTuple):
 @testing.case
 @testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize_with_cases("impl_fn", cases="..statespace_cases", has_tag=["nd"])
-@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother_fixedpoint])
 def case_setup_all_strategy_statespace_combinations_nd(
     ivp, impl_fn, strategy_fn, solver_config
 ):
@@ -46,7 +46,7 @@ def case_setup_all_strategy_statespace_combinations_nd(
 @testing.parametrize_with_cases(
     "impl_fn", cases="..statespace_cases", has_tag=["scalar"]
 )
-@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother_fixedpoint])
 def case_setup_all_stratgy_statespace_combinations_scalar(
     ivp, impl_fn, strategy_fn, solver_config
 ):
@@ -64,7 +64,7 @@ def case_setup_all_stratgy_statespace_combinations_scalar(
 @testing.case
 @testing.parametrize_with_cases("ivp", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize_with_cases("solver_fn", cases="..ivpsolver_cases")
-@testing.parametrize("strategy_fn", [filters.Filter, smoothers.FixedPointSmoother])
+@testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother_fixedpoint])
 def case_setup_all_solvers_strategies(ivp, solver_fn, strategy_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ivp=ivp,
@@ -100,7 +100,7 @@ def case_setup_all_loops(ivp, loop_fn, solver_config):
         ivp=ivp,
         solver_fn=ivpsolvers.MLESolver,
         impl_fn=recipes.ts0_blockdiag,
-        strategy_fn=filters.Filter,
+        strategy_fn=filters.filter,
         solver_config=solver_config,
         loop_fn=loop_fn,
         output_scale=1.0,
@@ -162,7 +162,7 @@ def test_solution_correct(solution_save_at, solver_config):
 def test_smoother_warning(ivp):
     """A non-fixed-point smoother is not usable in save-at-simulation."""
     ts = jnp.linspace(ivp.t0, ivp.t1, num=3)
-    solver = test_util.generate_solver(strategy_factory=smoothers.Smoother)
+    solver = test_util.generate_solver(strategy_factory=smoothers.smoother)
 
     # todo: does this compute the full solve? We only want to catch a warning!
     with testing.warns():

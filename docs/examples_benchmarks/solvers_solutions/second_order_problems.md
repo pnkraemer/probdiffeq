@@ -48,7 +48,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ts0_1 = ivpsolvers.MLESolver(filters.Filter(*recipes.ts0_iso()))
+ts0_1 = ivpsolvers.MLESolver(filters.filter(*recipes.ts0_iso()))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -86,7 +86,7 @@ def vf_2(y, dy, t, p):
 
 # One derivative more than above because we don't transform to first order
 implementation = recipes.ts0_iso(ode_order=2, num_derivatives=5)
-ts0_2 = ivpsolvers.MLESolver(filters.Filter(*implementation))
+ts0_2 = ivpsolvers.MLESolver(filters.filter(*implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 

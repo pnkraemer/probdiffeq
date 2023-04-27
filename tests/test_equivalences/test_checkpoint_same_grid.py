@@ -15,7 +15,7 @@ from probdiffeq.strategies import smoothers
 @testing.case
 def smoother_pair_smoother_and_fixedpoint():
     impl = recipes.ts0_iso()
-    return smoothers.Smoother(*impl), smoothers.FixedPointSmoother(*impl)
+    return smoothers.smoother(*impl), smoothers.smoother_fixedpoint(*impl)
 
 
 @testing.case
@@ -24,7 +24,7 @@ def smoother_pair_two_smoothers():
     # then the checkpoint-simulator replicates _exactly_ what the non-checkpoint-
     # smoother does. So the tests must also pass in this setup.
     impl = recipes.ts0_iso()
-    return smoothers.Smoother(*impl), smoothers.Smoother(*impl)
+    return smoothers.smoother(*impl), smoothers.smoother(*impl)
 
 
 # Why a filter-warning?
