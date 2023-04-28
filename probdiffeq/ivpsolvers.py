@@ -58,8 +58,6 @@ class Solver:
         u, marginals, posterior = self.strategy.solution_from_tcoeffs(
             taylor_coefficients
         )
-        # todo: move to init(self,...)
-        output_scale = self.calibration.init(output_scale)
         return solution.Solution(
             t=t,
             posterior=posterior,
@@ -72,6 +70,7 @@ class Solver:
     def init(self, t, posterior, /, output_scale, num_steps) -> _State:
         state_strategy = self.strategy.init(t, posterior)
         error_estimate = jnp.empty_like(state_strategy.u)
+        output_scale = self.calibration.init(output_scale)
         return _State(
             error_estimate=error_estimate,
             strategy=state_strategy,
@@ -180,7 +179,8 @@ class CalibrationFreeSolver(Solver):
 
     def extract(self, state: _State, /):
         t, posterior = self.strategy.extract(state.strategy)
-        return t, posterior, state.output_scale_prior, state.num_steps
+        output_scale = self.calibration.extract(state.output_scale_prior)
+        return t, posterior, output_scale, state.num_steps
 
 
 @jax.tree_util.register_pytree_node_class
@@ -216,7 +216,8 @@ class DynamicSolver(Solver):
 
     def extract(self, state: _State, /):
         t, posterior = self.strategy.extract(state.strategy)
-        return t, posterior, state.output_scale_calibrated, state.num_steps
+        output_scale = self.calibration.extract(state.output_scale_calibrated)
+        return t, posterior, output_scale, state.num_steps
 
 
 @jax.tree_util.register_pytree_node_class
@@ -277,7 +278,6 @@ class MLESolver(Solver):
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
 
         # Read output-scale
-        # todo: call this in all extract() methods.
         output_scale = self.calibration.extract(state.output_scale_calibrated)
 
         # Promote calibrated output scale to the correct batch-shape
