@@ -1,5 +1,6 @@
 """Calibration."""
 import jax
+import jax.numpy as jnp
 
 from probdiffeq.statespace import _calib
 
@@ -27,7 +28,7 @@ def _output_scale_mle():
     @jax.tree_util.Partial
     def extract(s):
         if s.ndim > 0:
-            return s[-1]
+            return s[-1] * jnp.ones_like(s)
         return s
 
     return _calib.Calib(init=init, update=update, extract=extract)
@@ -46,8 +47,6 @@ def _output_scale_dynamic():
 
     @jax.tree_util.Partial
     def extract(s):
-        if s.ndim > 0:
-            return s[-1]
         return s
 
     return _calib.Calib(init=init, update=update, extract=extract)
@@ -66,8 +65,6 @@ def _output_scale_free():
 
     @jax.tree_util.Partial
     def extract(s):
-        if s.ndim > 0:
-            return s[-1]
         return s
 
     return _calib.Calib(init=init, update=update, extract=extract)

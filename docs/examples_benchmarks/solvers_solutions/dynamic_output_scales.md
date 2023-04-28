@@ -154,4 +154,4 @@ ax[1][1].set_xlabel("Time t")
 plt.show()
 ```
 
-The solver_dynamic follows the exponential growth by rescaling the output-scale appropriately; the solver_mle is hopelessly lost.
+The dynamic solver follows the exponential growth by rescaling the output-scale appropriately; the MLE solveris hopelessly lost.
