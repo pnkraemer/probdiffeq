@@ -39,7 +39,7 @@ def case_setup_all_strategy_statespace_combinations_nd(
 ):
     return _SimulateTerminalValuesConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=impl_fn,
         strategy_fn=strategy_fn,
         solver_config=solver_config,
@@ -58,7 +58,7 @@ def case_setup_all_strategy_statespace_combinations_scalar(
 ):
     return _SimulateTerminalValuesConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=impl_fn,
         strategy_fn=strategy_fn,
         solver_config=solver_config,
@@ -108,7 +108,7 @@ def case_loop_eqx():
 def case_setup_all_loops(ivp, loop_fn, solver_config):
     return _SimulateTerminalValuesConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=recipes.ts0_blockdiag,
         strategy_fn=filters.filter,
         solver_config=solver_config,
@@ -147,7 +147,7 @@ def case_control_i_clipped():
 def case_setup_all_controls(ivp, control, solver_config):
     return _SimulateTerminalValuesConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=recipes.ts0_blockdiag,
         strategy_fn=filters.filter,
         solver_config=solver_config,
@@ -219,7 +219,7 @@ def test_terminal_values_correct(solution_terminal_values, solver_config):
 def test_jvp(ivp, solver_config):
     ode_shape = ivp.initial_values[0].shape
     solver = test_util.generate_solver(
-        solver_factory=ivpsolvers.CalibrationFreeSolver,
+        solver_factory=ivpsolvers.solver_calibrationfree,
         strategy_factory=filters.filter,
         impl_factory=recipes.ts0_blockdiag,
         ode_shape=ode_shape,

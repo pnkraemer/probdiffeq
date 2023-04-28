@@ -9,6 +9,21 @@ from probdiffeq import _interp, _sqrt_util, solution
 from probdiffeq.backend import containers
 
 
+def solver_mle(strategy, calibration):
+    """Create a solver that calibrates the output scale via maximum-likelihood."""
+    return _MLESolver(strategy, calibration)
+
+
+def solver_dynamic(strategy, calibration):
+    """Create a solver that calibrates the output scale dynamically."""
+    return _DynamicSolver(strategy, calibration)
+
+
+def solver_calibrationfree(strategy, calibration):
+    """Create a solver that does not calibrate the output scale automatically."""
+    return _CalibrationFreeSolver(strategy, calibration)
+
+
 class _State(containers.NamedTuple):
     """Solver state."""
 
@@ -144,7 +159,7 @@ class Solver:
 
 
 @jax.tree_util.register_pytree_node_class
-class CalibrationFreeSolver(Solver):
+class _CalibrationFreeSolver(Solver):
     """Initial value problem solver.
 
     No automatic output-scale calibration.
@@ -184,7 +199,7 @@ class CalibrationFreeSolver(Solver):
 
 
 @jax.tree_util.register_pytree_node_class
-class DynamicSolver(Solver):
+class _DynamicSolver(Solver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
@@ -220,7 +235,7 @@ class DynamicSolver(Solver):
 
 
 @jax.tree_util.register_pytree_node_class
-class MLESolver(Solver):
+class _MLESolver(Solver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
 
@@ -262,7 +277,7 @@ class MLESolver(Solver):
         if jnp.ndim(diffsqrtm) > 0:
 
             def fn_partial(d, o):
-                fn = MLESolver._update_output_scale
+                fn = _MLESolver._update_output_scale
                 return fn(diffsqrtm=d, n=n, obs=o)
 
             fn_vmap = jax.vmap(fn_partial)

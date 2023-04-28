@@ -22,10 +22,11 @@ t0, t1 = 0.0, 1.0
 # Make a solver:
 #     DenseTS1: dense covariance structure with first-order Taylor linearisation
 #     Smoother: Compute a global estimate of the solution
-#     MLESolver: Calibrate unknown parameters with (quasi-)maximum-likelihood estimation
+#     solver_mle:
+#       Calibrate unknown parameters with (quasi-)maximum-likelihood estimation
 implementation = recipes.ts1_dense(ode_shape=(1,))
 strategy = smoothers.smoother(*implementation)
-solver = ivpsolvers.MLESolver(*strategy)
+solver = ivpsolvers.solver_mle(*strategy)
 
 
 # Solve

@@ -12,7 +12,7 @@ from probdiffeq.strategies import filters, smoothers
 @testing.parametrize_with_cases("ode_problem", cases="..problem_cases", has_tag=["nd"])
 @testing.parametrize("strategy_fn", [filters.filter, smoothers.smoother_fixedpoint])
 def test_mle_vs_calibrationfree(ode_problem, strategy_fn):
-    """Assert equivalence between MLESolver and CalibrationFreeSolver.
+    """Assert equivalence between solver_mle and solver_calibrationfree.
 
     The MLE-solution must be identical to the calibration-free solution
     provided the latter is started with the MLE of the former.
@@ -22,8 +22,8 @@ def test_mle_vs_calibrationfree(ode_problem, strategy_fn):
     impl = recipes.ts0_iso()
     strategy = strategy_fn(*impl)
 
-    mlesolver = ivpsolvers.MLESolver(*strategy)
-    freesolver = ivpsolvers.CalibrationFreeSolver(*strategy)
+    mlesolver = ivpsolvers.solver_mle(*strategy)
+    freesolver = ivpsolvers.solver_calibrationfree(*strategy)
 
     args = (ode_problem.vector_field, ode_problem.initial_values)
     ts = jnp.linspace(

@@ -4,16 +4,16 @@ from probdiffeq import ivpsolvers
 from probdiffeq.backend import testing
 
 
-@testing.case(id="MLESolver")
+@testing.case(id="solver_mle")
 def case_mle():
-    return ivpsolvers.MLESolver
+    return ivpsolvers.solver_mle
 
 
-@testing.case(id="DynamicSolver")
+@testing.case(id="solver_dynamic")
 def case_dynamic():
-    return ivpsolvers.DynamicSolver
+    return ivpsolvers.solver_dynamic
 
 
-@testing.case(id="CalibrationFreeSolver")
+@testing.case(id="solver_calibrationfree")
 def case_calibration_free():
-    return ivpsolvers.CalibrationFreeSolver
+    return ivpsolvers.solver_calibrationfree
