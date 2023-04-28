@@ -11,17 +11,17 @@ from probdiffeq.backend import containers
 
 def solver_mle(strategy, calibration):
     """Create a solver that calibrates the output scale via maximum-likelihood."""
-    return _MLESolver(strategy, calibration)
+    return _MLESolver(strategy, calibration.mle)
 
 
 def solver_dynamic(strategy, calibration):
     """Create a solver that calibrates the output scale dynamically."""
-    return _DynamicSolver(strategy, calibration)
+    return _DynamicSolver(strategy, calibration.dynamic)
 
 
 def solver_calibrationfree(strategy, calibration):
     """Create a solver that does not calibrate the output scale automatically."""
-    return _CalibrationFreeSolver(strategy, calibration)
+    return _CalibrationFreeSolver(strategy, calibration.free)
 
 
 class _State(containers.NamedTuple):
