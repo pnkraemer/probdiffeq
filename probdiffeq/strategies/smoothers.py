@@ -13,13 +13,13 @@ from probdiffeq.strategies import _strategy
 def smoother(*impl):
     """Create a smoother strategy."""
     extra, corr, calib = impl
-    return _Smoother(extra.smoother, corr, calib)
+    return _Smoother(extra.smoother, corr), calib
 
 
 def smoother_fixedpoint(*impl):
     """Create a fixedpoint-smoother strategy."""
     extra, corr, calib = impl
-    return _FixedPointSmoother(extra.fixedpoint, corr, calib)
+    return _FixedPointSmoother(extra.fixedpoint, corr), calib
 
 
 class _SmState(containers.NamedTuple):

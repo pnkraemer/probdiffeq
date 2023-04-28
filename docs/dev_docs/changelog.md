@@ -68,6 +68,9 @@ Notable breaking changes:
   `smoothers.FixedPointSmoother(*impl)` with `smoothers.smoother_fixedpoint(*impl)`.
   The reason for this change are internal code-simplifications: implementing the strategies as a class is an implementation detail that may change soon. 
   A factory will remain.
+* IVP solvers now take two arguments (strategy and calibration) instead of one (strategy).
+  To update (and from now on in general), initialise IVP solvers as `solver(*strategy(*recipe))`.
+  The reason for this change is to declutter strategy implementations.
 
 
 Notable enhancements:

@@ -60,8 +60,8 @@ num_derivatives = 1
 implementation = recipes.ts1_dense(ode_shape=(1,), num_derivatives=num_derivatives)
 strategy = filters.filter(*implementation)
 
-dynamic = ivpsolvers.DynamicSolver(strategy)
-mle = ivpsolvers.MLESolver(strategy)
+dynamic = ivpsolvers.DynamicSolver(*strategy)
+mle = ivpsolvers.MLESolver(*strategy)
 ```
 
 ```python

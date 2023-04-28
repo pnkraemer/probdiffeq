@@ -12,7 +12,7 @@ from probdiffeq.strategies import _strategy
 def filter(*impl):
     """Create a filter strategy."""
     extra, corr, calib = impl
-    return _Filter(extra.filter, corr, calib)
+    return _Filter(extra.filter, corr), calib
 
 
 class _FiState(containers.NamedTuple):

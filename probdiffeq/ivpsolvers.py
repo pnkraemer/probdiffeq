@@ -33,8 +33,9 @@ class _State(containers.NamedTuple):
 class Solver:
     """Interface for initial value problem solvers."""
 
-    def __init__(self, strategy):
+    def __init__(self, strategy, calibration, /):
         self.strategy = strategy
+        self.calibration = calibration
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.strategy})"
@@ -57,7 +58,8 @@ class Solver:
         u, marginals, posterior = self.strategy.solution_from_tcoeffs(
             taylor_coefficients
         )
-        output_scale = self.strategy.promote_output_scale(output_scale)
+        # todo: move to init(self,...)
+        output_scale = self.calibration.init(output_scale)
         return solution.Solution(
             t=t,
             posterior=posterior,
@@ -132,14 +134,13 @@ class Solver:
         )
 
     def tree_flatten(self):
-        children = (self.strategy,)
+        children = (self.strategy, self.calibration)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        (strategy,) = children
-        return cls(strategy=strategy)
+        return cls(*children)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -276,10 +277,13 @@ class MLESolver(Solver):
         # Important: Rescale before extracting! Otherwise backward samples are wrong.
 
         # Read output-scale
-        output_scale = self.strategy.extract_output_scale(state.output_scale_calibrated)
+        # todo: call this in all extract() methods.
+        output_scale = self.calibration.extract(state.output_scale_calibrated)
 
         # Promote calibrated output scale to the correct batch-shape
         s = output_scale * jnp.ones_like(state.output_scale_prior)
+
+        # todo: rescale outside of extract().
         state = self._rescale_covs(state, output_scale=s)
 
         # Extract and return results
