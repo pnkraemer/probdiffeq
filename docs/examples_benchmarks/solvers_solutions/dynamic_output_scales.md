@@ -15,10 +15,10 @@ jupyter:
 
 # Dynamic and non-dynamic solvers
 
-You can choose between a `ivpsolvers.CalibrationFreeSolver()` (which does not calibrate the output-scale), a `ivpsolvers.MLESolver()` (which calibrates a global output scale via quasi-maximum-likelihood-estimation), and a `ivpsolvers.DynamicSolver()`, which calibrates a time-varying, piecewise constant output-scale via "local' quasi-maximum-likelihood estimation, similar to how ODE solver estimate local errors.
+You can choose between a `ivpsolvers.solver_calibrationfree()` (which does not calibrate the output-scale), a `ivpsolvers.solver_mle()` (which calibrates a global output scale via quasi-maximum-likelihood-estimation), and a `ivpsolvers.solver_dynamic()`, which calibrates a time-varying, piecewise constant output-scale via "local' quasi-maximum-likelihood estimation, similar to how ODE solver estimate local errors.
 
 But are these good for?
-In short: choose a `DynamicSolver` if your ODE output-scale varies quite strongly, and choose an `MLESolver` otherwise.
+In short: choose a `solver_dynamic` if your ODE output-scale varies quite strongly, and choose an `solver_mle` otherwise.
 
 For example, consider the numerical solution of a linear ODE with fixed steps:
 
@@ -60,8 +60,8 @@ num_derivatives = 1
 implementation = recipes.ts1_dense(ode_shape=(1,), num_derivatives=num_derivatives)
 strategy = filters.filter(*implementation)
 
-dynamic = ivpsolvers.DynamicSolver(*strategy)
-mle = ivpsolvers.MLESolver(*strategy)
+dynamic = ivpsolvers.solver_dynamic(*strategy)
+mle = ivpsolvers.solver_mle(*strategy)
 ```
 
 ```python
@@ -97,8 +97,8 @@ ax[0][1].plot(
 ax[0][0].legend()
 ax[0][1].legend()
 
-ax[0][0].set_title(f"DynamicSolver(nu={num_derivatives})")
-ax[0][1].set_title(f"MLESolver(nu={num_derivatives})")
+ax[0][0].set_title(f"solver_dynamic(nu={num_derivatives})")
+ax[0][1].set_title(f"solver_mle(nu={num_derivatives})")
 ax[0][0].set_ylabel("Solution")
 ax[1][0].set_ylabel("Output-scale")
 ax[1][0].set_xlabel("Time t")
@@ -109,7 +109,7 @@ plt.show()
 The dynamic solver adapts the output-scale so that both the solution and the output-scale grow exponentially.
 The ODE-solution fits the truth well.
 
-The MLESolver does not have this tool, and the ODE solution is not able to follow the exponential: it drifts back to the origin. (This is expected, we are basically trying to fit an exponential with a piecewise polynomial.)
+The solver_mle does not have this tool, and the ODE solution is not able to follow the exponential: it drifts back to the origin. (This is expected, we are basically trying to fit an exponential with a piecewise polynomial.)
 
 The whole issue gets more pronounced if we increase the time-span. (Careful! We plot in log-scale now.)
 
@@ -145,8 +145,8 @@ ax[0][1].semilogy(
 ax[0][0].legend()
 ax[0][1].legend()
 
-ax[0][0].set_title(f"DynamicSolver(nu={num_derivatives})")
-ax[0][1].set_title(f"MLESolver(nu={num_derivatives})")
+ax[0][0].set_title(f"solver_dynamic(nu={num_derivatives})")
+ax[0][1].set_title(f"solver_mle(nu={num_derivatives})")
 ax[0][0].set_ylabel("Solution (log-scale)")
 ax[1][0].set_ylabel("Output-scale (log-scale)")
 ax[1][0].set_xlabel("Time t")
@@ -154,4 +154,4 @@ ax[1][1].set_xlabel("Time t")
 plt.show()
 ```
 
-The DynamicSolver follows the exponential growth by rescaling the output-scale appropriately; the MLESolver is hopelessly lost.
+The solver_dynamic follows the exponential growth by rescaling the output-scale appropriately; the solver_mle is hopelessly lost.

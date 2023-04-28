@@ -36,7 +36,7 @@ def case_setup_all_strategy_statespace_combinations_nd(
 ):
     return _SolveFixedGridConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=impl_fn,
         strategy_fn=strategy_fn,
         solver_config=solver_config,
@@ -53,7 +53,7 @@ def case_setup_all_strategy_statespace_combinations_scalar(
 ):
     return _SolveFixedGridConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=impl_fn,
         strategy_fn=strategy_fn,
         solver_config=solver_config,

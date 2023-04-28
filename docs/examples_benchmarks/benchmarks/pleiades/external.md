@@ -186,7 +186,7 @@ def impl_to_method_config(impl, *, key, label):
 
 
 def strategy_to_method_config(strategy, *, key, label):
-    solver = ivpsolvers.DynamicSolver(*strategy)
+    solver = ivpsolvers.solver_dynamic(*strategy)
     return workprecision.MethodConfig(
         method={"solver": solver},
         label="ProbDiffEq: " + label,

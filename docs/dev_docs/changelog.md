@@ -71,6 +71,12 @@ Notable breaking changes:
 * IVP solvers now take two arguments (strategy and calibration) instead of one (strategy).
   To update (and from now on in general), initialise IVP solvers as `solver(*strategy(*recipe))`.
   The reason for this change is to declutter strategy implementations.
+* Just like the strategies: IVP solvers are now factory functions. The rest of the API remains.
+  To update, replace `MLESolver(*args) -> solver_mle(*args)`,
+  `DynamicSolver(*args) -> solver_dynamic(*args)`, and
+  `CalibrationFreeSolver(*args) -> solver_calibrationfree(*args)`.
+  The reasons for this change are -- as before -- internal code simplifications that become 
+  possible as soon as we do not promise an object-oriented implementation.
 
 
 Notable enhancements:

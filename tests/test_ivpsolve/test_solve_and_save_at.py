@@ -32,7 +32,7 @@ def case_setup_all_strategy_statespace_combinations_nd(
 ):
     return _SolveAndSaveAtConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=impl_fn,
         strategy_fn=strategy_fn,
         solver_config=solver_config,
@@ -52,7 +52,7 @@ def case_setup_all_stratgy_statespace_combinations_scalar(
 ):
     return _SolveAndSaveAtConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=impl_fn,
         strategy_fn=strategy_fn,
         solver_config=solver_config,
@@ -98,7 +98,7 @@ def case_loop_eqx():
 def case_setup_all_loops(ivp, loop_fn, solver_config):
     return _SolveAndSaveAtConfig(
         ivp=ivp,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         impl_fn=recipes.ts0_blockdiag,
         strategy_fn=filters.filter,
         solver_config=solver_config,

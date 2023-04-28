@@ -26,7 +26,7 @@ def case_setup_all_nd_configs(ode_problem, impl_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,
         impl_fn=impl_fn,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         strat_fn=filters.filter,
         solver_config=solver_config,
         output_scale=1.0,
@@ -44,7 +44,7 @@ def case_setup_all_scalar_configs(ode_problem, impl_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,
         impl_fn=impl_fn,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         strat_fn=filters.filter,
         solver_config=solver_config,
         output_scale=1.0,
@@ -58,7 +58,7 @@ def case_setup_all_strategies(ode_problem, strat_fn, solver_config):
     return _SolveWithPythonWhileLoopConfig(
         ode_problem=ode_problem,
         impl_fn=recipes.ts0_blockdiag,
-        solver_fn=ivpsolvers.MLESolver,
+        solver_fn=ivpsolvers.solver_mle,
         strat_fn=strat_fn,
         solver_config=solver_config,
         output_scale=1.0,

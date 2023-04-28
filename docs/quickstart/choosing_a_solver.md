@@ -18,8 +18,8 @@ Good solvers are problem-dependent. Nevertheless, some guidelines exist:
   a smoother strategy for `solve_with_native_python_loop()`, 
   and a `FixedPointSmoother` strategy for `solve_and_save_at()`. 
   Counterexamples do exist, but are for experienced users.
-* Use `DynamicSolver()` if you expect that the output scale of your IVP solution varies greatly. 
-  Otherwise, choose an `MLESolver()`. Try a `CalibrationFreeSolver()` for parameter-estimation problems.
+* Use `solver_dynamic()` if you expect that the output scale of your IVP solution varies greatly. 
+  Otherwise, choose an `solver_mle()`. Try a `solver_calibrationfree()` for parameter-estimation problems.
 * If you are solving a scalar differential equation (e.g. the initial values have `shape=()`), choose `Scalar*()` solvers,
   e.g. `ScalarTS0()`. These methods are designed for this simple use-case and independent of any multi-dimensional state-space model concerns.
   If you wish to use the other solvers, transform the problem into one of `shape=(1,)`.

@@ -149,9 +149,9 @@ def impl_to_method_config(impl, *, key, label):
 
 
 def strategy_to_method_config(strategy, *, key, label):
-    # Use a DynamicSolver because vdP has such aggressively
+    # Use a solver_dynamic because vdP has such aggressively
     # different output scales
-    solver = ivpsolvers.DynamicSolver(*strategy)
+    solver = ivpsolvers.solver_dynamic(*strategy)
 
     # Use a clipped control because |f(u0)|=0 which is why
     # the initial step-size suggestion becomes a little bit fragile.
