@@ -11,7 +11,7 @@ from probdiffeq.statespace.scalar import extra
 
 def test_ibm_discretised(num_derivatives=1, reverse=False):
     """Solve a second-order, scalar, linear, separable BVP."""
-    output_scale = 1.0
+    output_scale = 10.0
     t0, t1 = 0.0, 3.4123412
     grid = jnp.linspace(t0, t1, endpoint=True, num=20)
 
@@ -68,17 +68,28 @@ def _assert_brownian_motion_std(
     assert jnp.allclose(received, expected)
 
 
-def test_bridge():
+def test_bridge(num_derivatives=4, reverse=True):
     vf, (g0, g1), (t0, t1), params = diffeqzoo.bvps.pendulum()
 
-    def vf_partial(u, /):
-        return vf(u, *params)
+    g0 = lambda x: x - 1.0
+    output_scale = 10.0
+    grid = jnp.linspace(t0, t1, endpoint=True, num=100)
 
-    grid = jnp.linspace(t0, t1, num=10)
-    solution = bvpsolve.solve_fixed_grid(vf_partial, bcond=(g0, g1), grid=grid)
+    prior = bvpsolve.ibm_prior_discretised(
+        grid, num_derivatives=num_derivatives, output_scale=output_scale
+    )
+    prior_bridge = bvpsolve.bridge(
+        (g0, g1), prior, num_derivatives=num_derivatives, reverse=reverse
+    )
 
-    init, (process_noise, transitions) = solution
-    print(init)
-    print(process_noise)
-    print(transitions)
+    (init, transitions, precons) = prior_bridge
+    means, stds = _marginal_moments(init, precons, transitions, reverse=not reverse)
+
+    fig, axes = plt.subplots(ncols=num_derivatives + 1, sharey=True, sharex=True)
+
+    for m, s, ax in zip(means.T, stds.T, axes):
+        ax.plot(grid[1:], m)
+        ax.fill_between(grid[1:], m - s, m + s, alpha=0.2)
+
+    plt.show()
     assert False

@@ -32,11 +32,13 @@ def ibm_prior_discretised(grid, *, num_derivatives, output_scale):
     return _MarkovProc(init, transition, precon)
 
 
-def bridge(bcond, prior, *, num_derivatives):
+def bridge(bcond, prior, *, num_derivatives, reverse):
     """Bridge a discrete prior according to separable boundary conditions."""
     _shape = (num_derivatives + 1,)
     correction_bcond = _correction_model_bcond(bcond, state_shape=_shape)
-    init, transitions, precon = _constrain_boundary(prior, correction_bcond)
+    init, transitions, precon = _constrain_boundary(
+        prior, correction_bcond, reverse=reverse
+    )
     return _MarkovProc(init, transitions, precon)
 
 
@@ -50,15 +52,19 @@ def _correction_model_bcond(bcond, *, state_shape):
     return A_left, A_right
 
 
-def _constrain_boundary(prior, correction):
+def _constrain_boundary(prior, correction, *, reverse):
     """Constrain a discrete prior to satisfy boundary conditions.
 
     This algorithm runs a reverse-time Kalman filter.
     """
     init, transitions, precons = prior
-    H_left, H_right = correction
 
-    # Initialise on the right end (we filter in reverse)
+    if reverse:
+        H_left, H_right = correction
+    else:
+        H_right, H_left = correction
+
+    # Initialise (we usually filter in reverse)
     _, (rv_corrected, _) = corr.correct_affine_qoi(init, H_right)
 
     # Run the reverse-time Kalman filter
@@ -69,9 +75,11 @@ def _constrain_boundary(prior, correction):
         )
 
     extrapolation = transitions, precons
-    rv_init, transitions = jax.lax.scan(step, rv_corrected, extrapolation, reverse=True)
+    rv_init, transitions = jax.lax.scan(
+        step, rv_corrected, extrapolation, reverse=reverse
+    )
 
-    # Constrain on the left end
+    # Constrain on the remaining end
     _, (rv_corrected, _) = corr.correct_affine_qoi(rv_init, H_left)
 
     # Return solution
