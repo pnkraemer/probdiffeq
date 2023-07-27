@@ -18,14 +18,14 @@ def solve(vf, bcond, grid, *, num_derivatives=2, output_scale=1.0):
         bcond,
         prior,
         num_derivatives=num_derivatives,
-        reverse=False,
+        reverse=True,
     )
     return constrain_with_ode(
         vf,
         grid,
         prior_bridge,
         num_derivatives=num_derivatives,
-        reverse=True,
+        reverse=False,
     )
 
 
@@ -75,7 +75,7 @@ def _constrain_boundary(prior, correction, *, reverse):
         H_right, H_left = correction
 
     # Initialise (we usually filter in reverse)
-    _, (rv_corrected, _) = corr.correct_affine_qoi(init, H_right)
+    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(init, H_right)
 
     # Run the reverse-time Kalman filter
     def step(rv_carry, transition):
@@ -90,7 +90,7 @@ def _constrain_boundary(prior, correction, *, reverse):
     )
 
     # Constrain on the remaining end
-    _, (rv_corrected, _) = corr.correct_affine_qoi(rv_init, H_left)
+    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(rv_init, H_left)
 
     # Return solution
     return rv_corrected, transitions, precons

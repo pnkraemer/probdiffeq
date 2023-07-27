@@ -13,7 +13,7 @@ def taylor_order_zero(*args, **kwargs):
     return _TaylorZerothOrder(*args, **kwargs)
 
 
-def correct_affine_qoi(rv, correction_affine):
+def correct_affine_qoi_noisy(rv, correction_affine, *, nugget=1e-6):
     """Correct on zero-data."""
     # Read inputs
     jacfun, (bias,) = correction_affine
@@ -27,8 +27,10 @@ def correct_affine_qoi(rv, correction_affine):
     cov_sqrtm_obs_upper, (
         cov_sqrtm_cor_upper,
         gain,
-    ) = _sqrt_util.revert_conditional_noisefree(
-        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T, R_X=cov_sqrtm_prior.T
+    ) = _sqrt_util.revert_conditional(
+        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T,
+        R_X=cov_sqrtm_prior.T,
+        R_YX=jnp.ones((1, 1)) * nugget,
     )
     cov_sqrtm_obs = cov_sqrtm_obs_upper.T
     cov_sqrtm_cor = cov_sqrtm_cor_upper.T

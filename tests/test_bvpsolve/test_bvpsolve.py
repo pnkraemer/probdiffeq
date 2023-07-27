@@ -103,7 +103,7 @@ def test_bridge(num_derivatives=4):
 
 def test_solve(num_derivatives=2):
     def vf(u):
-        return u
+        return 1e2 * u
 
     def g0(x):
         return x - 1.0
@@ -118,9 +118,7 @@ def test_solve(num_derivatives=2):
     solution = bvpsolve.solve(vf, (g0, g1), grid=grid)
 
     (init, transitions, precons) = solution
-    print(init)
-    print(transitions)
-    means, stds = _marginal_moments(init, precons, transitions, reverse=False)
+    means, stds = _marginal_moments(init, precons, transitions, reverse=True)
 
     fig, axes = plt.subplots(ncols=num_derivatives + 1, sharey=True, sharex=True)
 
