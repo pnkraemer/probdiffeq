@@ -15,19 +15,25 @@ def ibm_scalar(num_derivatives):
     return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
 
-def ibm_discretise(mesh, /, *, num_derivatives):
+def ibm_discretise(dt, /, num_derivatives, output_scale):
     """Compute the discrete transition densities for the IBM on a pre-specified grid."""
-    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    a, q_sqrtm = _ibm_util.system_matrices_1d(
+        num_derivatives=num_derivatives, output_scale=output_scale
+    )
     q0 = jnp.zeros((num_derivatives + 1,))
     transitions = (variables.NormalHiddenState(q0, q_sqrtm), a)
 
     precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-    p, p_inv = jax.vmap(precon_fun)(jnp.diff(mesh))
+    p, p_inv = precon_fun(dt)
 
     return transitions, (p, p_inv)
 
 
-def extrapolate_with_reversal(rv, transition, precon, *, output_scale):
+def extrapolate_with_reversal_precon(rv, transition, precon, *, output_scale):
+    """Extrapolate and compute smoothing gains in a preconditioned model.
+
+    Careful: the smoothing gains are preconditioned.
+    """
     # Read quantities
     noise, a = transition
     q0, q_sqrtm = noise.mean, noise.cov_sqrtm_lower
@@ -51,19 +57,44 @@ def extrapolate_with_reversal(rv, transition, precon, *, output_scale):
     # Catch up with the mean
     m_rev_p = m0_p - gain_p @ m_ext_p
 
-    # Unapply preconditioner
+    # Unapply preconditioner for the state variable
+    # (the system matrices remain preconditioned)
     m_ext = p * m_ext_p
     l_ext = p[:, None] * l_ext_p
-    m_rev = p * m_rev_p
-    l_rev = p[:, None] * l_rev_p
-    gain = p[:, None] * gain_p * p_inv[None, :]
 
     # Gather variables
     marginal = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-    reversal = variables.NormalHiddenState(mean=m_rev, cov_sqrtm_lower=l_rev)
+    reversal_p = variables.NormalHiddenState(mean=m_rev_p, cov_sqrtm_lower=l_rev_p)
 
     # Return values
-    return marginal, (reversal, gain)
+    return marginal, (reversal_p, gain_p)
+
+
+def extrapolate_precon(rv, transition, precon):
+    # Read quantities
+    noise, a = transition
+    q0, q_sqrtm = noise.mean, noise.cov_sqrtm_lower
+    p, p_inv = precon
+    m0, l0 = rv.mean, rv.cov_sqrtm_lower
+
+    # Apply preconditioner
+    m0_p = p_inv * m0
+    l0_p = p_inv[:, None] * l0
+
+    # Extrapolate with reversal
+    m_ext_p = a @ m0_p + q0
+    r_ext_p = _sqrt_util.sum_of_sqrtm_factors(R_stack=((a @ l0_p).T, q_sqrtm.T))
+    l_ext_p = r_ext_p.T
+
+    # Unapply preconditioner for the state variable
+    m_ext = p * m_ext_p
+    l_ext = p[:, None] * l_ext_p
+
+    # Gather variables
+    marginal = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+
+    # Return values
+    return marginal
 
 
 class _IBMFi(_extra.Extrapolation):
