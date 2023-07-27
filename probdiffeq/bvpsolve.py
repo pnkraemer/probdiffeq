@@ -10,13 +10,23 @@ from probdiffeq.statespace.scalar import corr, extra, linearise, variables
 _MarkovProc = namedtuple("_MarkovProc", ("init", "transition", "precon"))
 
 
-def solve_fixed_grid(vf, bcond, grid, *, num_derivatives=2):
-    prior = ibm_discretised(grid, num_derivatives=num_derivatives)
-    prior_bridge = bridge(bcond, prior, num_derivatives=num_derivatives)
-    posterior = constrain_with_ode(
-        vf, grid, prior_bridge, num_derivatives=num_derivatives
+def solve(vf, bcond, grid, *, num_derivatives=2, output_scale=1.0):
+    prior = ibm_prior_discretised(
+        grid, num_derivatives=num_derivatives, output_scale=output_scale
     )
-    return posterior
+    prior_bridge = bridge(
+        bcond,
+        prior,
+        num_derivatives=num_derivatives,
+        reverse=False,
+    )
+    return constrain_with_ode(
+        vf,
+        grid,
+        prior_bridge,
+        num_derivatives=num_derivatives,
+        reverse=True,
+    )
 
 
 def ibm_prior_discretised(grid, *, num_derivatives, output_scale):
@@ -86,20 +96,21 @@ def _constrain_boundary(prior, correction, *, reverse):
     return rv_corrected, transitions, precons
 
 
-def constrain_with_ode(vf, grid, prior, *, num_derivatives):
+def constrain_with_ode(vf, grid, prior, *, num_derivatives, reverse):
     # Linearise ODE
     state_shape = (num_derivatives + 1,)
     correction_model = _correction_model_ode(vf, grid, state_shape=state_shape)
 
     # Constrain the states and return the result
-    return _kalmanfilter(correction_model, prior)
+    rv, transitions, precons = _kalmanfilter(correction_model, prior, reverse=reverse)
+    return _MarkovProc(rv, transitions, precons)
 
 
 def _correction_model_ode(vf, mesh, *, state_shape):
     """Linearise the ODE vector field as a function of the state"""
 
     def residual(x):
-        return x[1] - vf(x[0])
+        return x[2] - vf(x[0])
 
     @jax.vmap
     def lin(m):
@@ -109,7 +120,7 @@ def _correction_model_ode(vf, mesh, *, state_shape):
     return lin(unimportant_values)
 
 
-def _kalmanfilter(correction, prior):
+def _kalmanfilter(correction, prior, *, reverse):
     jac, (bias,) = correction
     init, transitions, precons = prior
 
@@ -130,6 +141,7 @@ def _kalmanfilter(correction, prior):
         return rv, (rv_rev, gain)
 
     extrapolation = (transitions, precons)
-    return jax.lax.scan(
-        step, rv_corrected, (correction_remaining, extrapolation), reverse=True
+    rv, transitions = jax.lax.scan(
+        step, rv_corrected, (correction_remaining, extrapolation), reverse=reverse
     )
+    return rv, transitions, precons
