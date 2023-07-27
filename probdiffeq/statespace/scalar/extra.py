@@ -15,6 +15,16 @@ def ibm_scalar(num_derivatives):
     return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
 
+def ibm_discretise(mesh, /, *, num_derivatives):
+    """Compute the discrete transition densities for the IBM on a pre-specified grid."""
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+
+    precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    p, p_inv = jax.vmap(precon_fun)(jnp.diff(mesh))
+
+    return (a, q_sqrtm), (p, p_inv)
+
+
 class _IBMFi(_extra.Extrapolation):
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"

@@ -13,6 +13,32 @@ def taylor_order_zero(*args, **kwargs):
     return _TaylorZerothOrder(*args, **kwargs)
 
 
+def correct_affine_qoi(rv, correction_affine):
+    """Correct on zero-data."""
+    # Read inputs
+    jacfun, (bias,) = correction_affine
+    mean_prior, cov_sqrtm_prior = rv.mean, rv.cov_sqrtm_lower
+
+    # Apply observation model to covariance
+    jacfun_vect = jax.vmap(jacfun, in_axes=1)
+    cov_sqrtm_obs_nonsquare = jacfun_vect(cov_sqrtm_prior)
+
+    # Revert the conditional covariances
+    cov_sqrtm_obs, (cov_sqrtm_cor, gain) = _sqrt_util.revert_conditional_noisefree(
+        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T, R_X=cov_sqrtm_prior.T
+    )
+    gain = gain[:, 0]
+
+    # Gather the observed variable
+    mean_obs = jacfun(rv.mean) + bias
+    observed = variables.NormalQOI(mean=mean_obs, cov_sqrtm_lower=cov_sqrtm_obs)
+
+    # Gather the corrected variable
+    mean_cor = mean_prior - gain * mean_obs
+    corrected = variables.NormalQOI(mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor)
+    return observed, (corrected, gain)
+
+
 @jax.tree_util.register_pytree_node_class
 class _TaylorZerothOrder(_corr.Correction):
     def __repr__(self):

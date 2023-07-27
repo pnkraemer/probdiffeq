@@ -12,7 +12,8 @@ def test_bvpsolve():
     vf, (g0, g1), (t0, t1), params = diffeqzoo.bvps.pendulum()
 
     grid = jnp.linspace(t0, t1, num=10)
-    solution = bvpsolve.solve_fixed_grid(vf, (g0, g1), grid)
+    solution = bvpsolve.solve_fixed_grid(vf, bcond=(g0, g1), grid=grid)
+
     print(solution)
 
     assert False
