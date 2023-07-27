@@ -24,10 +24,15 @@ def correct_affine_qoi(rv, correction_affine):
     cov_sqrtm_obs_nonsquare = jacfun_vect(cov_sqrtm_prior)
 
     # Revert the conditional covariances
-    cov_sqrtm_obs, (cov_sqrtm_cor, gain) = _sqrt_util.revert_conditional_noisefree(
+    cov_sqrtm_obs_upper, (
+        cov_sqrtm_cor_upper,
+        gain,
+    ) = _sqrt_util.revert_conditional_noisefree(
         R_X_F=cov_sqrtm_obs_nonsquare[None, :].T, R_X=cov_sqrtm_prior.T
     )
-    gain = gain[:, 0]
+    cov_sqrtm_obs = cov_sqrtm_obs_upper.T
+    cov_sqrtm_cor = cov_sqrtm_cor_upper.T
+    gain = gain[:, 0]  # "squeeze"; output shape is (), not (1,)
 
     # Gather the observed variable
     mean_obs = jacfun(rv.mean) + bias
@@ -35,7 +40,9 @@ def correct_affine_qoi(rv, correction_affine):
 
     # Gather the corrected variable
     mean_cor = mean_prior - gain * mean_obs
-    corrected = variables.NormalQOI(mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor)
+    corrected = variables.NormalHiddenState(
+        mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor
+    )
     return observed, (corrected, gain)
 
 

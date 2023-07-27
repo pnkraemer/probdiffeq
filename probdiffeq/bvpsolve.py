@@ -41,9 +41,15 @@ def _kalmanfilter_bcond(init, extrapolation, correction):
     H_left, H_right = correction
 
     # Initialise on the right end (we filter in reverse)
-    rv = corr.correct_affine_qoi(init, H_right)
+    _, (rv_corrected, _) = corr.correct_affine_qoi(init, H_right)
 
-    pass
+    def step(rv_carry, precon_current):
+        return extra.extrapolate_with_reversal(
+            rv_carry, transition=(a, q_sqrtm), precon=precon_current, output_scale=1.0
+        )
+
+    rv_init, transitions = jax.lax.scan(step, rv_corrected, (p, p_inv), reverse=True)
+    return rv_init, transitions
 
 
 def _correction_model_ode(vf, mesh):
