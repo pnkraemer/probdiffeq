@@ -1,4 +1,12 @@
-"""BVP solver."""
+"""BVP solving functionality.
+
+!!! warning "Warning: highly EXPERIMENTAL!"
+    This module is highly experimental.
+    There is no guarantee that it works correctly.
+    It might be deleted tomorrow
+    and without any deprecation policy.
+
+"""
 
 import jax
 
@@ -18,18 +26,23 @@ from probdiffeq.statespace.scalar import corr, extra
 
 
 def solve_separable_affine_2nd(
-    ode, bcond, prior: _markov.MarkovSeqPreconFwd, *, bcond_nugget=1e-6
+    ode, bconds, prior: _markov.MarkovSeqPreconFwd, *, bcond_nugget=1e-6
 ) -> _markov.MarkovSeqPreconFwd:
-    """Solve an affine, 2nd-order BVP with separable, affine boundary conditions."""
-    prior_bridge = constrain_bcond_affine_separable(bcond, prior, nugget=bcond_nugget)
-    return constrain_ode_affine_2nd(ode, prior_bridge)
+    """Solve an affine, 2nd-order BVP with separable, affine boundary conditions.
+
+    Currently restricted to scalar problems.
+    """
+    prior_bridge = _constrain_bconds_affine_separable(
+        bconds, prior, nugget=bcond_nugget
+    )
+    return _constrain_ode_affine_2nd(ode, prior_bridge)
 
 
-def constrain_bcond_affine_separable(
-    bcond, prior: _markov.MarkovSeqPreconFwd, *, nugget
+def _constrain_bconds_affine_separable(
+    bconds, prior: _markov.MarkovSeqPreconFwd, *, nugget
 ) -> _markov.MarkovSeqPreconRev:
     """Constrain a discrete prior to satisfy boundary conditions."""
-    bcond_first, bcond_second = bcond
+    bcond_first, bcond_second = bconds
 
     # First boundary condition
     _, (init, _) = corr.correct_affine_qoi_noisy(prior.init, bcond_first, stdev=nugget)
@@ -51,7 +64,7 @@ def constrain_bcond_affine_separable(
     )
 
 
-def constrain_ode_affine_2nd(
+def _constrain_ode_affine_2nd(
     vf, prior: _markov.MarkovSeqPreconRev
 ) -> _markov.MarkovSeqPreconFwd:
     As, bs = vf
