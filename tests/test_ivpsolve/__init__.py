@@ -1,1 +1,1 @@
-"""Tests for IVP solver routines."""
+"""Tests for IVP solver functionalities."""
