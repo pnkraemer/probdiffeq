@@ -13,17 +13,6 @@ import jax
 from probdiffeq import _markov
 from probdiffeq.statespace.scalar import corr, extra
 
-# Open questions:
-#
-#     - solve the bcond-nugget problem: it should not be necessary
-#     - how do we generalise to multidimensional problems?
-#     - how do we generalise to nonlinear problems?
-#     - how do we generalise to non-separable BCs?
-#     - how would mesh refinement work?
-#     - how would parameter estimation work?
-#     - which of the new functions in the statespace are actually required?
-#     - do we always use preconditioning for everything?
-
 
 def solve_separable_affine_2nd(
     ode, bconds, prior: _markov.MarkovSeqPreconFwd, *, bcond_nugget=1e-6

@@ -13,16 +13,9 @@ S = TypeVar("S")
 
 R = TypeVar("R", bound=bool)
 """A (Boolean-bound) type-variable indicating the direction of the Markov sequence."""
-#
-#
-# # todo: merge this with _markov.MarkovSequence.
-# #  The difference is that the one in _markov.py does not know "reverse" and "precon".
-# #  But this should be a separate PR?
-# class _MarkovSeq(NamedTuple):
-#     init: Any
-#     conditional: Tuple[Tuple[Any], Any]
-#     precon: Tuple[Any, Any]
-#     reverse: bool
+
+
+# todo: Unify the MarkovSeq* implementations (Naming, use of preconditioner, fwd/rev)
 
 
 @jax.tree_util.register_pytree_node_class
