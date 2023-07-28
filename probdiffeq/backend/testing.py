@@ -23,8 +23,9 @@ skip = pytest.skip
 xfail = pytest.xfail
 
 
-def fixture(name=None, scope="function"):
-    # todo: if we default to scope="module", the tests will be massively faster
+def fixture(name=None, scope="module"):
+    # We have a different default! Usually, the scope is set to "function".
+    # We benefit so much from "module" that we choose this instead.
     return pytest_cases.fixture(name=name, scope=scope)
 
 
