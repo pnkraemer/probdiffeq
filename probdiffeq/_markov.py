@@ -25,15 +25,6 @@ class MarkovSeqPreconFwd(Generic[S]):
         self.conditional = conditional
         self.preconditioner = preconditioner
 
-    @property
-    def state_shape(self):
-        return self.init.mean.shape
-
-    @property
-    def sequence_shape(self):
-        num_states = self.conditional.transition.shape[0] + 1
-        return (num_states,) + self.state_shape
-
     def __repr__(self):
         name = self.__class__.__name__
         args1 = f"init={self.init}, backward_model={self.backward_model}"
@@ -59,15 +50,6 @@ class MarkovSeqPreconRev(Generic[S]):
         self.init = init
         self.conditional = conditional
         self.preconditioner = preconditioner
-
-    @property
-    def state_shape(self):
-        return self.init.mean.shape
-
-    @property
-    def sequence_shape(self):
-        num_states = self.conditional.transition.shape[0] + 1
-        return (num_states,) + self.state_shape
 
     def __repr__(self):
         name = self.__class__.__name__

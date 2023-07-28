@@ -18,7 +18,7 @@ def test_solve_separable_affine_2nd(num_derivatives=4):
     ode = (jnp.ones_like(grid) / eps, jnp.zeros_like(grid))
 
     # Solve the BVP
-    solution = bvpsolve.solve_separable_affine_2nd(ode, bcond=(g0, g1), prior=prior)
+    solution = bvpsolve.solve_separable_affine_2nd(ode, bconds=(g0, g1), prior=prior)
 
     def true_sol(t):
         a = jnp.exp(-t / jnp.sqrt(eps))
