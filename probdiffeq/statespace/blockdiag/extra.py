@@ -10,7 +10,7 @@ from probdiffeq.statespace.scalar import extra as scalar_extra
 def ibm_blockdiag(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (n,) = ode_shape
-    ibm = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
+    ibm = scalar_extra.extrapolation_bundle_ibm(num_derivatives=num_derivatives)
     ibm_stack = _tree_stack_duplicates(ibm, n=n)
     fi, sm, fp = ibm_stack._filter, ibm_stack._smoother, ibm_stack._fixedpoint
     dynamic, static = ibm_stack._dynamic, ibm_stack._static
