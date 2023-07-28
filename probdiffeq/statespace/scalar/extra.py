@@ -10,7 +10,7 @@ from probdiffeq.statespace.scalar import variables
 
 
 def ibm_discretise_fwd(
-    dts, /, *, num_derivatives, output_scale
+    dts, /, *, num_derivatives, output_scale=1.0
 ) -> _markov.MarkovSeqPreconFwd:
     """Construct the discrete transition densities of an IBM prior.
 

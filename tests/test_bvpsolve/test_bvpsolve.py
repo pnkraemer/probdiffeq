@@ -90,17 +90,13 @@ def test_bridge(num_derivatives=4):
 def test_solve(num_derivatives=4):
     eps = 1e-2
 
-    def vf(u):
-        return u / eps
+    grid = jnp.linspace(0.0, 1.0, endpoint=True, num=20)
+    prior = extra.ibm_discretise_fwd(jnp.diff(grid), num_derivatives=num_derivatives)
 
-    def g0(x):
-        return x - 1.0
-
-    def g1(x):
-        return x
-
-    t0 = 0.0
-    t1 = 1.0
+    g0, g1 = (1.0, -1.0), (1.0, 0.0)
+    vf = (jnp.ones_like(grid) / eps, jnp.zeros_like(grid))
+    solution = bvpsolve.solve(vf, (g0, g1), prior=prior)
+    means, stds = _marginal_moments(solution)
 
     def true_sol(t):
         a = jnp.exp(-t / jnp.sqrt(eps))
@@ -108,11 +104,7 @@ def test_solve(num_derivatives=4):
         c = jnp.exp(-2.0 / jnp.sqrt(eps))
         return (a - b) / (1 - c)
 
-    grid = jnp.linspace(t0, t1, endpoint=True, num=20)
-    solution = bvpsolve.solve(vf, (g0, g1), grid=grid, num_derivatives=num_derivatives)
-    means, stds = _marginal_moments(solution)
-
-    print(means[:, 0] - true_sol(grid[1:]))
+    print(means[:, 0], true_sol(grid[1:]))
     assert jnp.allclose(means[:, 0], true_sol(grid[1:]), atol=1e-3)
 
 

@@ -13,15 +13,13 @@ def taylor_order_zero(*args, **kwargs):
     return _TaylorZerothOrder(*args, **kwargs)
 
 
-def correct_affine_qoi_noisy(rv, correction_affine, *, nugget=1e-6):
-    """Correct on zero-data."""
+def correct_affine_qoi_noisy(rv, affine, nugget=1e-6):
     # Read inputs
-    jacfun, (bias,) = correction_affine
-    mean_prior, cov_sqrtm_prior = rv.mean, rv.cov_sqrtm_lower
+    A, b = affine
 
     # Apply observation model to covariance
-    jacfun_vect = jax.vmap(jacfun, in_axes=1)
-    cov_sqrtm_obs_nonsquare = jacfun_vect(cov_sqrtm_prior)
+    cov_sqrtm = rv.cov_sqrtm_lower
+    cov_sqrtm_obs_nonsquare = jnp.dot(A, cov_sqrtm[0, ...])
 
     # Revert the conditional covariances
     cov_sqrtm_obs_upper, (
@@ -29,7 +27,7 @@ def correct_affine_qoi_noisy(rv, correction_affine, *, nugget=1e-6):
         gain,
     ) = _sqrt_util.revert_conditional(
         R_X_F=cov_sqrtm_obs_nonsquare[None, :].T,
-        R_X=cov_sqrtm_prior.T,
+        R_X=rv.cov_sqrtm_lower.T,
         R_YX=jnp.ones((1, 1)) * nugget,
     )
     cov_sqrtm_obs = cov_sqrtm_obs_upper.T
@@ -37,43 +35,42 @@ def correct_affine_qoi_noisy(rv, correction_affine, *, nugget=1e-6):
     gain = gain[:, 0]  # "squeeze"; output shape is (), not (1,)
 
     # Gather the observed variable
-    mean_obs = jacfun(rv.mean) + bias
+    mean_obs = jnp.dot(A, rv.mean[0, ...]) + b
     observed = variables.NormalQOI(mean=mean_obs, cov_sqrtm_lower=cov_sqrtm_obs)
 
     # Gather the corrected variable
-    mean_cor = mean_prior - gain * mean_obs
+    mean_cor = rv.mean - gain * mean_obs
     corrected = variables.NormalHiddenState(
         mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor
     )
     return observed, (corrected, gain)
 
 
-def correct_affine_qoi_matrix(rv, correction_affine):
-    """Correct on zero-data."""
+def correct_affine_ode_2nd(rv, affine):
     # Read inputs
-    jac, (bias,) = correction_affine
-    mean_prior, cov_sqrtm_prior = rv.mean, rv.cov_sqrtm_lower
+    A, b = affine
 
     # Apply observation model to covariance
-    cov_sqrtm_obs_nonsquare = jac @ cov_sqrtm_prior
+    cov_sqrtm = rv.cov_sqrtm_lower
+    cov_sqrtm_obs_nonsquare = cov_sqrtm[2, ...] - jnp.dot(A, cov_sqrtm[0, ...])
 
     # Revert the conditional covariances
     cov_sqrtm_obs_upper, (
         cov_sqrtm_cor_upper,
         gain,
     ) = _sqrt_util.revert_conditional_noisefree(
-        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T, R_X=cov_sqrtm_prior.T
+        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T, R_X=rv.cov_sqrtm_lower.T
     )
     cov_sqrtm_obs = cov_sqrtm_obs_upper.T
     cov_sqrtm_cor = cov_sqrtm_cor_upper.T
     gain = gain[:, 0]  # "squeeze"; output shape is (), not (1,)
 
     # Gather the observed variable
-    mean_obs = jac @ rv.mean + bias
+    mean_obs = rv.mean[2, ...] - jnp.dot(A, rv.mean[0, ...]) - b
     observed = variables.NormalQOI(mean=mean_obs, cov_sqrtm_lower=cov_sqrtm_obs)
 
     # Gather the corrected variable
-    mean_cor = mean_prior - gain * mean_obs
+    mean_cor = rv.mean - gain * mean_obs
     corrected = variables.NormalHiddenState(
         mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor
     )
