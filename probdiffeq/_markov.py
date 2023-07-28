@@ -27,21 +27,19 @@ class MarkovSeqPreconFwd(Generic[S]):
 
     def __repr__(self):
         name = self.__class__.__name__
-        args1 = f"init={self.init}, backward_model={self.backward_model}"
+        args1 = f"init={self.init}, conditional={self.conditional}"
         args2 = f"preconditioner={self.preconditioner}"
         return f"{name}({args1}, {args2})"
 
     def tree_flatten(self):
-        children = (self.init, self.backward_model, self.preconditioner)
+        children = (self.init, self.conditional, self.preconditioner)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        init, backward_model, preconditioner = children
-        return cls(
-            init=init, backward_model=backward_model, preconditioner=preconditioner
-        )
+        init, conditional, preconditioner = children
+        return cls(init=init, conditional=conditional, preconditioner=preconditioner)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -53,44 +51,42 @@ class MarkovSeqPreconRev(Generic[S]):
 
     def __repr__(self):
         name = self.__class__.__name__
-        args1 = f"init={self.init}, backward_model={self.backward_model}"
+        args1 = f"init={self.init}, conditional={self.conditional}"
         args2 = f"preconditioner={self.preconditioner}"
         return f"{name}({args1}, {args2})"
 
     def tree_flatten(self):
-        children = (self.init, self.backward_model, self.preconditioner)
+        children = (self.init, self.conditional, self.preconditioner)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        init, backward_model, preconditioner = children
-        return cls(
-            init=init, backward_model=backward_model, preconditioner=preconditioner
-        )
+        init, conditional, preconditioner = children
+        return cls(init=init, conditional=conditional, preconditioner=preconditioner)
 
 
 @jax.tree_util.register_pytree_node_class
-class MarkovSequence(Generic[S]):
+class MarkovSeqRev(Generic[S]):
     """Markov sequence. A discretised Markov process."""
 
-    def __init__(self, *, init: S, backward_model):
+    def __init__(self, *, init: S, conditional):
         self.init = init
-        self.backward_model = backward_model
+        self.conditional = conditional
 
     def __repr__(self):
         name = self.__class__.__name__
-        return f"{name}(init={self.init}, backward_model={self.backward_model})"
+        return f"{name}(init={self.init}, conditional={self.conditional})"
 
     def tree_flatten(self):
-        children = (self.init, self.backward_model)
+        children = (self.init, self.conditional)
         aux = ()
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        init, backward_model = children
-        return cls(init=init, backward_model=backward_model)
+        init, conditional = children
+        return cls(init=init, conditional=conditional)
 
     def sample(self, key, *, shape):
         # A smoother samples on the grid by sampling i.i.d values
@@ -125,7 +121,7 @@ class MarkovSequence(Generic[S]):
         init_val = (init_qoi, init_sample)
 
         # Remove the initial backward-model
-        conds = jax.tree_util.tree_map(lambda s: s[1:, ...], self.backward_model)
+        conds = jax.tree_util.tree_map(lambda s: s[1:, ...], self.conditional)
 
         # Loop over backward models and the remaining base samples
         xs = (conds, base_sample[:-1])
@@ -143,10 +139,10 @@ class MarkovSequence(Generic[S]):
 
         # Initial backward model leads into the void
         # todo: this is only true for the version we use.
-        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.backward_model)
+        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.conditional)
 
         # If we hold many 'init's, choose the terminal one.
-        if self.backward_model.noise.mean.shape == self.init.mean.shape:
+        if self.conditional.noise.mean.shape == self.init.mean.shape:
             init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.init)
         else:
             init = self.init
@@ -158,4 +154,4 @@ class MarkovSequence(Generic[S]):
 
     @property
     def sample_shape(self):
-        return self.backward_model.noise.sample_shape
+        return self.conditional.noise.sample_shape

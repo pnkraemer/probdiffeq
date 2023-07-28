@@ -63,7 +63,7 @@ def simulate_terminal_values(
     )
 
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSequence):
+    if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.init
     else:
         marginals = posterior
@@ -144,7 +144,7 @@ def solve_and_save_at(
         while_loop_fn=while_loop_fn_temporal,
     )
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSequence):
+    if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
     else:
         marginals = posterior
@@ -214,7 +214,7 @@ def solve_with_python_while_loop(
         parameters=parameters,
     )
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSequence):
+    if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
     else:
         marginals = posterior
@@ -262,7 +262,7 @@ def solve_fixed_grid(
         parameters=parameters,
     )
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSequence):
+    if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
     else:
         marginals = posterior
