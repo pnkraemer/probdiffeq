@@ -32,24 +32,6 @@ def test_ibm_discretised(num_derivatives=1, reverse=False):
     )
 
 
-def _marginal_moments(init, precons, transitions, *, reverse):
-    def step(carry, input):
-        trans, prec = input
-        rv = extra.extrapolate_precon(carry, trans, prec)
-        return rv, rv
-
-    _, rvs = jax.lax.scan(step, init=init, xs=(transitions, precons), reverse=reverse)
-    means, cov_sqrtms = rvs.mean, rvs.cov_sqrtm_lower
-
-    @jax.vmap
-    def cov(x):
-        return x @ x.T
-
-    covs = cov(cov_sqrtms)
-    stds = jnp.sqrt(jax.vmap(jnp.diagonal)(covs))
-    return means, stds
-
-
 def _assert_zero_mean(means):
     assert jnp.allclose(means, 0.0)
 
@@ -105,7 +87,7 @@ def test_bridge(num_derivatives=4):
     assert False
 
 
-def test_solve(num_derivatives=2):
+def test_solve(num_derivatives=4):
     eps = 1e-2
 
     def vf(u):
@@ -127,23 +109,32 @@ def test_solve(num_derivatives=2):
         return (a - b) / (1 - c)
 
     grid = jnp.linspace(t0, t1, endpoint=True, num=20)
-    solution = bvpsolve.solve(vf, (g0, g1), grid=grid)
-
-    (init, transitions, precons, reverse) = solution
-    means, stds = _marginal_moments(init, precons, transitions, reverse=reverse)
+    solution = bvpsolve.solve(vf, (g0, g1), grid=grid, num_derivatives=num_derivatives)
+    means, stds = _marginal_moments(solution)
 
     print(means[:, 0] - true_sol(grid[1:]))
     assert jnp.allclose(means[:, 0], true_sol(grid[1:]), atol=1e-3)
-    #
-    # fig, axes = plt.subplots(ncols=num_derivatives + 1, sharey=True, sharex=True)
-    #
-    # for m, s, ax in zip(means.T, stds.T, axes):
-    #     ax.plot(grid[:-1], m, label="approx")
-    #     ax.fill_between(grid[:-1], m - s, m + s, alpha=0.2)
-    #     ax.set_ylim((-1.0, 2.0))
-    #
-    #
-    # axes[0].plot(grid[:-1], true_sol(grid[:-1]), label="truth")
-    # axes[0].legend()
-    # plt.show()
-    # assert False
+
+
+def _marginal_moments(precon_mseq):
+    def step(carry, input):
+        trans, prec = input
+        rv = extra.extrapolate_precon(carry, trans, prec)
+        return rv, rv
+
+    assert precon_mseq.reverse is False
+    _, rvs = jax.lax.scan(
+        step,
+        init=precon_mseq.init,
+        xs=(precon_mseq.transition, precon_mseq.preconditioner),
+        reverse=precon_mseq.reverse,
+    )
+    means, cov_sqrtms = rvs.mean, rvs.cov_sqrtm_lower
+
+    @jax.vmap
+    def cov(x):
+        return x @ x.T
+
+    covs = cov(cov_sqrtms)
+    stds = jnp.sqrt(jax.vmap(jnp.diagonal)(covs))
+    return means, stds

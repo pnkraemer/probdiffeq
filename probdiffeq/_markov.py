@@ -11,7 +11,50 @@ from probdiffeq.backend import control_flow
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
 
-# todo: markov sequences should not necessarily be backwards
+R = TypeVar("R", bound=bool)
+"""A (Boolean-bound) type-variable indicating the direction of the Markov sequence."""
+#
+#
+# # todo: merge this with _markov.MarkovSequence.
+# #  The difference is that the one in _markov.py does not know "reverse" and "precon".
+# #  But this should be a separate PR?
+# class _MarkovSeq(NamedTuple):
+#     init: Any
+#     transition: Tuple[Tuple[Any], Any]
+#     precon: Tuple[Any, Any]
+#     reverse: bool
+
+
+@jax.tree_util.register_pytree_node_class
+class PreconMarkovSeq(Generic[S, R]):
+    """Markov sequence. A discretised Markov process."""
+
+    def __init__(self, *, init: S, transition, preconditioner, reverse: R):
+        self.init = init
+        self.transition = transition
+        self.preconditioner = preconditioner
+        self.reverse = reverse
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args1 = f"init={self.init}, backward_model={self.backward_model}"
+        args2 = f"preconditioner={self.preconditioner}, reverse={self.reverse}"
+        return f"{name}({args1}, {args2})"
+
+    def tree_flatten(self):
+        children = (self.init, self.backward_model, self.preconditioner, self.reverse)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        init, backward_model, preconditioner, reverse = children
+        return cls(
+            init=init,
+            backward_model=backward_model,
+            preconditioner=preconditioner,
+            reverse=reverse,
+        )
 
 
 @jax.tree_util.register_pytree_node_class

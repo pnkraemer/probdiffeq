@@ -1,25 +1,17 @@
 """BVP solver."""
 
 import functools
-from typing import Any, NamedTuple, Tuple
 
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _markov
 from probdiffeq.statespace.scalar import corr, extra, linearise, variables
 
 
-# todo: merge this with _markov.MarkovSequence.
-#  The difference is that the one in _markov.py does not know "reverse" and "precon".
-#  But this should be a separate PR?
-class _MarkovSeq(NamedTuple):
-    init: Any
-    transition: Tuple[Tuple[Any], Any]
-    precon: Tuple[Any, Any]
-    reverse: bool
-
-
-def solve(vf, bcond, grid, *, num_derivatives=4, output_scale=1.0):
+def solve(
+    vf, bcond, grid, *, num_derivatives=4, output_scale=1.0
+) -> _markov.PreconMarkovSeq:
     """Solve a BVP.
 
     Improvements:
@@ -43,7 +35,9 @@ def solve(vf, bcond, grid, *, num_derivatives=4, output_scale=1.0):
     return constrain_with_ode(vf, grid, prior_bridge, num_derivatives=num_derivatives)
 
 
-def ibm_prior_discretised(grid, *, num_derivatives, output_scale):
+def ibm_prior_discretised(
+    grid, *, num_derivatives, output_scale
+) -> _markov.PreconMarkovSeq:
     """Construct the discrete transition densities of an IBM prior."""
     init = variables.standard_normal(num_derivatives + 1, output_scale=output_scale)
 
@@ -54,10 +48,14 @@ def ibm_prior_discretised(grid, *, num_derivatives, output_scale):
     )
     transition, precon = jax.vmap(transitions)(jnp.diff(grid))
 
-    return _MarkovSeq(init=init, transition=transition, precon=precon, reverse=False)
+    return _markov.PreconMarkovSeq(
+        init=init, transition=transition, preconditioner=precon, reverse=False
+    )
 
 
-def bridge(bcond, prior, *, num_derivatives):
+def bridge(
+    bcond, prior: _markov.PreconMarkovSeq, *, num_derivatives
+) -> _markov.PreconMarkovSeq:
     """Bridge a discrete prior according to separable boundary conditions."""
     _shape = (num_derivatives + 1,)
     correction_bcond = _correction_model_bcond(bcond, state_shape=_shape)
@@ -74,20 +72,22 @@ def _correction_model_bcond(bcond, *, state_shape):
     return A_left, A_right
 
 
-def _constrain_boundary(prior, correction):
+def _constrain_boundary(
+    prior: _markov.PreconMarkovSeq, correction
+) -> _markov.PreconMarkovSeq:
     """Constrain a discrete prior to satisfy boundary conditions.
 
     This algorithm runs a reverse-time Kalman filter.
     """
-    init, transitions, precons, reverse = prior
+    # init, transitions, precons, reverse = prior
 
-    if reverse:
+    if prior.reverse:
         H_second, H_first = correction
     else:
         H_first, H_second = correction
 
     # Initialise (we usually filter in reverse)
-    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(init, H_first)
+    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(prior.init, H_first)
 
     # Run the reverse-time Kalman filter
     def step(rv_carry, transition):
@@ -96,21 +96,28 @@ def _constrain_boundary(prior, correction):
             rv_carry, transition=system, precon=precon, output_scale=1.0
         )
 
-    extrapolation = transitions, precons
     rv_init, transitions = jax.lax.scan(
-        step, rv_corrected, extrapolation, reverse=reverse
+        step,
+        init=rv_corrected,
+        xs=(prior.transition, prior.preconditioner),
+        reverse=prior.reverse,
     )
 
     # Constrain on the remaining end
     _, (rv_corr, _) = corr.correct_affine_qoi_noisy(rv_init, H_second)
 
     # Return solution
-    return _MarkovSeq(
-        init=rv_corr, transition=transitions, precon=precons, reverse=not reverse
+    return _markov.PreconMarkovSeq(
+        init=rv_corr,
+        transition=transitions,
+        preconditioner=prior.preconditioner,
+        reverse=not prior.reverse,
     )
 
 
-def constrain_with_ode(vf, grid, prior, *, num_derivatives):
+def constrain_with_ode(
+    vf, grid, prior: _markov.PreconMarkovSeq, *, num_derivatives
+) -> _markov.PreconMarkovSeq:
     # Linearise ODE
     state_shape = (num_derivatives + 1,)
     correction_model = _correction_model_ode(vf, grid, state_shape=state_shape)
@@ -133,13 +140,16 @@ def _correction_model_ode(vf, mesh, *, state_shape):
     return lin(unimportant_values)
 
 
-def _kalmanfilter(correction, prior):
+def _kalmanfilter(
+    correction, prior: _markov.PreconMarkovSeq
+) -> _markov.PreconMarkovSeq:
     jac, (bias,) = correction
-    init, transitions, precons, reverse = prior
 
-    # Initialise on the left end
-    assert reverse is True
-    _, (rv_corrected, _) = corr.correct_affine_qoi_matrix(init, (jac[-1], (bias[-1],)))
+    # Initialise on the right end and run backwards
+    assert prior.reverse is True
+    _, (rv_corrected, _) = corr.correct_affine_qoi_matrix(
+        prior.init, (jac[-1], (bias[-1],))
+    )
     correction_remaining = jax.tree_util.tree_map(lambda x: x[:-1], correction)
 
     # Run the extrapolate-correct Kalman filter
@@ -154,8 +164,16 @@ def _kalmanfilter(correction, prior):
         _, (rv, _) = corr.correct_affine_qoi_matrix(rv_ext, (jac, (bias,)))
         return rv, (rv_rev, gain)
 
-    extrapolation = (transitions, precons)
+    extrapolation = (prior.transition, prior.preconditioner)
     rv, transitions = jax.lax.scan(
-        step, rv_corrected, (correction_remaining, extrapolation), reverse=reverse
+        step,
+        init=rv_corrected,
+        xs=(correction_remaining, extrapolation),
+        reverse=prior.reverse,
     )
-    return _MarkovSeq(rv, transitions, precons, reverse=not reverse)
+    return _markov.PreconMarkovSeq(
+        init=rv,
+        transition=transitions,
+        preconditioner=prior.preconditioner,
+        reverse=not prior.reverse,
+    )
