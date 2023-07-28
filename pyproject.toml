@@ -16,3 +16,21 @@ write_to_template = """
 # don't change, don't track in version control
 version = \"{version}\"
 """
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["dist", "build", "dev", "typings"]
+addopts = ["--cov=probdiffeq", "--cov-report=html"]
+
+[tool.coverage.run]
+source = ["probdiffeq/*"]
+omit = ["probdiffeq/doc_util/*"]
+
+[tool.coverage.report]
+exclude_also = [
+    "def __repr__",
+    "raise NotImplementedError",
+    "def tree_flatten",
+    "def tree_unflatten",
+    ]
