@@ -87,16 +87,16 @@ def test_bridge(num_derivatives=4):
     assert False
 
 
-def test_solve(num_derivatives=4):
-    eps = 1e-2
-
+def test_solve_separable_affine_2nd(num_derivatives=4):
+    # Set up a prior
     grid = jnp.linspace(0.0, 1.0, endpoint=True, num=20)
     prior = extra.ibm_discretise_fwd(jnp.diff(grid), num_derivatives=num_derivatives)
 
+    # Set up a problem
+    eps = 1e-2
     g0, g1 = (1.0, -1.0), (1.0, 0.0)
-    vf = (jnp.ones_like(grid) / eps, jnp.zeros_like(grid))
-    solution = bvpsolve.solve(vf, (g0, g1), prior=prior)
-    means, stds = _marginal_moments(solution)
+    ode = (jnp.ones_like(grid) / eps, jnp.zeros_like(grid))
+    solution = bvpsolve.solve_separable_affine_2nd(ode, bcond=(g0, g1), prior=prior)
 
     def true_sol(t):
         a = jnp.exp(-t / jnp.sqrt(eps))
@@ -104,7 +104,7 @@ def test_solve(num_derivatives=4):
         c = jnp.exp(-2.0 / jnp.sqrt(eps))
         return (a - b) / (1 - c)
 
-    print(means[:, 0], true_sol(grid[1:]))
+    means, stds = _marginal_moments(solution)
     assert jnp.allclose(means[:, 0], true_sol(grid[1:]), atol=1e-3)
 
 

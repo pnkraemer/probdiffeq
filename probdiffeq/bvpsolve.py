@@ -5,35 +5,36 @@ import jax
 from probdiffeq import _markov
 from probdiffeq.statespace.scalar import corr, extra
 
+# Open questions:
+#
+#     - solve the bcond-nugget problem: it should not be necessary
+#     - how do we generalise to multidimensional problems?
+#     - how do we generalise to nonlinear problems?
+#     - how do we generalise to non-separable BCs?
+#     - how would mesh refinement work?
+#     - how would parameter estimation work?
+#     - which of the new functions in the statespace are actually required?
+#     - do we always use preconditioning for everything?
 
-def solve(vf, bcond, prior: _markov.MarkovSeqPreconFwd) -> _markov.MarkovSeqPreconFwd:
-    """Solve a BVP.
 
-    Improvements:
-
-    - solve the bridge-nugget problem: it should not be necessary
-    - how do we generalise to multidimensional problems?
-    - how do we generalise to nonlinear problems?
-    - how do we generalise to non-separable BCs?
-    - how would mesh refinement work?
-    - how would parameter estimation work?
-    - which of the new functions in the statespace are actually required?
-    - do we always use preconditioning for everything?
-    """
-    prior_bridge = constrain_bcond_affine_separable(bcond, prior)
-    return constrain_ode_affine_2nd(vf, prior_bridge)
+def solve_separable_affine_2nd(
+    ode, bcond, prior: _markov.MarkovSeqPreconFwd, *, bcond_nugget=1e-6
+) -> _markov.MarkovSeqPreconFwd:
+    """Solve an affine, 2nd-order BVP with separable, affine boundary conditions."""
+    prior_bridge = constrain_bcond_affine_separable(bcond, prior, nugget=bcond_nugget)
+    return constrain_ode_affine_2nd(ode, prior_bridge)
 
 
 def constrain_bcond_affine_separable(
-    bcond, prior: _markov.MarkovSeqPreconFwd
+    bcond, prior: _markov.MarkovSeqPreconFwd, *, nugget
 ) -> _markov.MarkovSeqPreconRev:
     """Constrain a discrete prior to satisfy boundary conditions."""
     bcond_first, bcond_second = bcond
 
     # First boundary condition
-    _, (init, _) = corr.correct_affine_qoi_noisy(prior.init, affine=bcond_first)
+    _, (init, _) = corr.correct_affine_qoi_noisy(prior.init, bcond_first, stdev=nugget)
 
-    # Extrapolate
+    # Loop over time
     final, conditionals = jax.lax.scan(
         lambda a, b: extra.extrapolate_precon_with_reversal(a, *b),
         init=init,
@@ -42,11 +43,11 @@ def constrain_bcond_affine_separable(
     )
 
     # Second boundary condition
-    _, (final_bcond, _) = corr.correct_affine_qoi_noisy(final, affine=bcond_second)
+    _, (final, _) = corr.correct_affine_qoi_noisy(final, bcond_second, stdev=nugget)
 
-    # Return reversed Markov sequence
+    # Return reverse-Markov sequence
     return _markov.MarkovSeqPreconRev(
-        init=final_bcond, conditional=conditionals, preconditioner=prior.preconditioner
+        init=final, conditional=conditionals, preconditioner=prior.preconditioner
     )
 
 
@@ -55,11 +56,11 @@ def constrain_ode_affine_2nd(
 ) -> _markov.MarkovSeqPreconFwd:
     As, bs = vf
 
-    # Initialise on the right end
+    # First ODE constraint
     _, (final, _) = corr.correct_affine_ode_2nd(prior.init, affine=(As[-1], bs[-1]))
-    correction_remaining = (As[:-1], bs[:-1])
 
-    # Run the extrapolate-correct Kalman filter
+    # Run the extrapolate-correct loop (which includes the final ODE constraint)
+
     def step(rv_carry, ssm):
         observation_model, (transition, precon) = ssm
         rv_ext, reversal = extra.extrapolate_precon_with_reversal(
@@ -70,6 +71,7 @@ def constrain_ode_affine_2nd(
         )
         return rv_corrected, reversal
 
+    correction_remaining = (As[:-1], bs[:-1])
     extrapolation = (prior.conditional, prior.preconditioner)
     rv, transitions = jax.lax.scan(
         step, init=final, xs=(correction_remaining, extrapolation), reverse=True
