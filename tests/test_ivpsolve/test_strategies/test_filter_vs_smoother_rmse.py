@@ -6,7 +6,26 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
+from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
+
+
+@testing.case()
+def case_isotropic_factorisation():
+    def iso_factory(ode_shape, num_derivatives):
+        return recipes.ts0_iso(num_derivatives=num_derivatives)
+
+    return iso_factory
+
+
+@testing.case()  # this implies success of the scalar solver
+def case_blockdiag_factorisation():
+    return recipes.ts0_blockdiag
+
+
+@testing.case()
+def case_dense_factorisation():
+    return recipes.ts0_dense
 
 
 @testing.fixture(name="problem")
@@ -22,26 +41,35 @@ def fixture_problem():
 
 
 @testing.fixture(name="solver_setup")
-def fixture_solver_setup(problem):
+@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
+def fixture_solver_setup(problem, impl_factory):
     vf, u0, (t0, t1), f_args = problem
 
     grid = jnp.linspace(t0, t1, endpoint=True, num=10)
     problem_args = (vf, (u0,))
     problem_kwargs = {"grid": grid, "parameters": f_args}
-    return problem_args, problem_kwargs
+
+    def impl_factory_wrapped():
+        return impl_factory(ode_shape=jnp.shape(u0), num_derivatives=4)
+
+    return problem_args, problem_kwargs, impl_factory_wrapped
 
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
-    args, kwargs = solver_setup
-    solver = test_util.generate_solver(strategy_factory=filters.filter)
+    args, kwargs, impl_factory = solver_setup
+    solver = test_util.generate_solver(
+        strategy_factory=filters.filter, impl_factory=impl_factory
+    )
     return ivpsolve.solve_fixed_grid(*args, solver=solver, **kwargs)
 
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
-    args, kwargs = solver_setup
-    solver = test_util.generate_solver(strategy_factory=smoothers.smoother)
+    args, kwargs, impl_factory = solver_setup
+    solver = test_util.generate_solver(
+        strategy_factory=smoothers.smoother, impl_factory=impl_factory
+    )
     return ivpsolve.solve_fixed_grid(*args, solver=solver, **kwargs)
 
 
@@ -87,6 +115,7 @@ def test_compare_filter_smoother_rmse(
     # at least 10 percent difference to increase significance
     assert 1.1 * smoother_rmse < filter_rmse
 
+    # The error should be small, otherwise the test makes little sense
     assert filter_rmse < 0.01
 
 

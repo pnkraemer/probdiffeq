@@ -39,8 +39,9 @@ def _tree_allclose(tree1, tree2, **kwargs):
 def marginals_allclose(m1, m2, /):
     mean_allclose = jnp.allclose(m1.mean, m2.mean)
 
-    @jax.vmap
     def square(x):
+        if jnp.ndim(x) > 2:
+            return jax.vmap(square)(x)
         return x @ x.T
 
     cov_allclose = jnp.allclose(square(m1.cov_sqrtm_lower), square(m2.cov_sqrtm_lower))
