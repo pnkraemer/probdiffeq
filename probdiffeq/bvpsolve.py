@@ -11,8 +11,6 @@ def solve(vf, bcond, prior: _markov.MarkovSeqPreconFwd) -> _markov.MarkovSeqPrec
 
     Improvements:
 
-    - This function solves linear problems. Make it expect linear problems
-    - the discretised IBM prior should not be in here, but in the statespace module
     - solve the bridge-nugget problem: it should not be necessary
     - how do we generalise to multidimensional problems?
     - how do we generalise to nonlinear problems?
@@ -21,13 +19,12 @@ def solve(vf, bcond, prior: _markov.MarkovSeqPreconFwd) -> _markov.MarkovSeqPrec
     - how would parameter estimation work?
     - which of the new functions in the statespace are actually required?
     - do we always use preconditioning for everything?
-    - what is a clean solution for the reverse=True/False choices?
     """
-    prior_bridge = constrain_bcond(bcond, prior)
-    return constrain_ode(vf, prior_bridge)
+    prior_bridge = constrain_bcond_affine_separable(bcond, prior)
+    return constrain_ode_affine_2nd(vf, prior_bridge)
 
 
-def constrain_bcond(
+def constrain_bcond_affine_separable(
     bcond, prior: _markov.MarkovSeqPreconFwd
 ) -> _markov.MarkovSeqPreconRev:
     """Constrain a discrete prior to satisfy boundary conditions."""
@@ -53,7 +50,9 @@ def constrain_bcond(
     )
 
 
-def constrain_ode(vf, prior: _markov.MarkovSeqPreconRev) -> _markov.MarkovSeqPreconFwd:
+def constrain_ode_affine_2nd(
+    vf, prior: _markov.MarkovSeqPreconRev
+) -> _markov.MarkovSeqPreconFwd:
     As, bs = vf
 
     # Initialise on the right end
