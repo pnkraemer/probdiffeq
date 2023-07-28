@@ -125,7 +125,7 @@ def _marginal_moments(precon_mseq):
     _, rvs = jax.lax.scan(
         step,
         init=precon_mseq.init,
-        xs=(precon_mseq.transition, precon_mseq.preconditioner),
+        xs=(precon_mseq.conditional, precon_mseq.preconditioner),
         reverse=False,
     )
     means, cov_sqrtms = rvs.mean, rvs.cov_sqrtm_lower

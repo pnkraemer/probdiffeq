@@ -1,4 +1,6 @@
-"""Implementations for scalar initial value problems."""
+"""Extrapolation behaviour for scalar state-space models."""
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -7,21 +9,31 @@ from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.scalar import variables
 
 
-def ibm_scalar(num_derivatives):
-    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
-    precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-    dynamic = (a, q_sqrtm, precon)
-    static = {}
-    return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
+def ibm_discretise_fwd(
+    dts, /, *, num_derivatives, output_scale
+) -> _markov.MarkovSeqPreconFwd:
+    """Construct the discrete transition densities of an IBM prior.
+
+    Initialises with a scaled standard normal distribution.
+    """
+    init = variables.standard_normal(num_derivatives + 1, output_scale=output_scale)
+
+    transitions_vmap = jax.vmap(ibm_transitions_precon, in_axes=(0, None, None))
+    cond, precon = transitions_vmap(dts, num_derivatives, output_scale)
+
+    return _markov.MarkovSeqPreconFwd(
+        init=init, conditional=cond, preconditioner=precon
+    )
 
 
-def ibm_discretise(dt, /, num_derivatives, output_scale):
+def ibm_transitions_precon(dt, /, num_derivatives, output_scale):
     """Compute the discrete transition densities for the IBM on a pre-specified grid."""
     a, q_sqrtm = _ibm_util.system_matrices_1d(
         num_derivatives=num_derivatives, output_scale=output_scale
     )
     q0 = jnp.zeros((num_derivatives + 1,))
-    transitions = (variables.NormalHiddenState(q0, q_sqrtm), a)
+    noise = variables.NormalHiddenState(q0, q_sqrtm)
+    transitions = variables.ConditionalHiddenState(transition=a, noise=noise)
 
     precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
     p, p_inv = precon_fun(dt)
@@ -29,15 +41,19 @@ def ibm_discretise(dt, /, num_derivatives, output_scale):
     return transitions, (p, p_inv)
 
 
-def extrapolate_with_reversal_precon(rv, transition, precon, *, output_scale):
+def extrapolate_precon_with_reversal(
+    rv: variables.NormalHiddenState,
+    conditional: variables.ConditionalHiddenState,
+    preconditioner: Tuple[jax.Array, jax.Array],
+):
     """Extrapolate and compute smoothing gains in a preconditioned model.
 
-    Careful: the smoothing gains are preconditioned.
+    Careful: the reverse-conditional is preconditioned.
     """
     # Read quantities
-    noise, a = transition
-    q0, q_sqrtm = noise.mean, noise.cov_sqrtm_lower
-    p, p_inv = precon
+    a = conditional.transition
+    q0, q_sqrtm = conditional.noise.mean, conditional.noise.cov_sqrtm_lower
+    p, p_inv = preconditioner
     m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
     # Apply preconditioner
@@ -49,7 +65,7 @@ def extrapolate_with_reversal_precon(rv, transition, precon, *, output_scale):
     r_ext_p, (r_rev_p, gain_p) = _sqrt_util.revert_conditional(
         R_X_F=(a @ l0_p).T,
         R_X=l0_p.T,
-        R_YX=(output_scale * q_sqrtm).T,
+        R_YX=q_sqrtm.T,
     )
     l_ext_p = r_ext_p.T
     l_rev_p = r_rev_p.T
@@ -62,19 +78,22 @@ def extrapolate_with_reversal_precon(rv, transition, precon, *, output_scale):
     m_ext = p * m_ext_p
     l_ext = p[:, None] * l_ext_p
 
-    # Gather variables
+    # Gather and return variables
     marginal = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
     reversal_p = variables.NormalHiddenState(mean=m_rev_p, cov_sqrtm_lower=l_rev_p)
+    conditional = variables.ConditionalHiddenState(transition=gain_p, noise=reversal_p)
+    return marginal, conditional
 
-    # Return values
-    return marginal, (reversal_p, gain_p)
 
-
-def extrapolate_precon(rv, transition, precon):
+def extrapolate_precon(
+    rv: variables.NormalHiddenState,
+    conditional: variables.ConditionalHiddenState,
+    preconditioner: Tuple[jax.Array, jax.Array],
+):
     # Read quantities
-    noise, a = transition
-    q0, q_sqrtm = noise.mean, noise.cov_sqrtm_lower
-    p, p_inv = precon
+    a = conditional.transition
+    q0, q_sqrtm = conditional.noise.mean, conditional.noise.cov_sqrtm_lower
+    p, p_inv = preconditioner
     m0, l0 = rv.mean, rv.cov_sqrtm_lower
 
     # Apply preconditioner
@@ -90,11 +109,17 @@ def extrapolate_precon(rv, transition, precon):
     m_ext = p * m_ext_p
     l_ext = p[:, None] * l_ext_p
 
-    # Gather variables
+    # Gather and return variables
     marginal = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-
-    # Return values
     return marginal
+
+
+def extrapolation_bundle_ibm(num_derivatives):
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    dynamic = (a, q_sqrtm, precon)
+    static = {}
+    return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
 
 
 class _IBMFi(_extra.Extrapolation):

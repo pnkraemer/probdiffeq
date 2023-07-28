@@ -20,16 +20,16 @@ R = TypeVar("R", bound=bool)
 # #  But this should be a separate PR?
 # class _MarkovSeq(NamedTuple):
 #     init: Any
-#     transition: Tuple[Tuple[Any], Any]
+#     conditional: Tuple[Tuple[Any], Any]
 #     precon: Tuple[Any, Any]
 #     reverse: bool
 
 
 @jax.tree_util.register_pytree_node_class
 class MarkovSeqPreconFwd(Generic[S]):
-    def __init__(self, *, init: S, transition, preconditioner):
+    def __init__(self, *, init: S, conditional, preconditioner):
         self.init = init
-        self.transition = transition
+        self.conditional = conditional
         self.preconditioner = preconditioner
 
     def __repr__(self):
@@ -53,9 +53,9 @@ class MarkovSeqPreconFwd(Generic[S]):
 
 @jax.tree_util.register_pytree_node_class
 class MarkovSeqPreconRev(Generic[S]):
-    def __init__(self, *, init: S, transition, preconditioner):
+    def __init__(self, *, init: S, conditional, preconditioner):
         self.init = init
-        self.transition = transition
+        self.conditional = conditional
         self.preconditioner = preconditioner
 
     def __repr__(self):
