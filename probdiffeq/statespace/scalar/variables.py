@@ -48,8 +48,7 @@ class ConditionalHiddenState(variables.Conditional):
             return jax.vmap(ConditionalHiddenState.__call__)(self, x)
 
         m = self.transition @ x + self.noise.mean
-        rv = NormalHiddenState(m, self.noise.cov_sqrtm_lower)
-        return SSV(rv, cache=None)
+        return NormalHiddenState(m, self.noise.cov_sqrtm_lower)
 
     def scale_covariance(self, output_scale):
         noise = self.noise.scale_covariance(output_scale=output_scale)

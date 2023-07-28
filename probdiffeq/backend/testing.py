@@ -15,13 +15,17 @@ import pytest_cases
 
 case = pytest_cases.case
 filterwarnings = pytest.mark.filterwarnings
-fixture = pytest_cases.fixture
 parametrize = pytest.mark.parametrize
 parametrize_with_cases = pytest_cases.parametrize_with_cases
 raises = pytest.raises
 warns = pytest.warns
 skip = pytest.skip
 xfail = pytest.xfail
+
+
+def fixture(name=None, scope="function"):
+    # todo: if we default to scope="module", the tests will be massively faster
+    return pytest_cases.fixture(name=name, scope=scope)
 
 
 def tree_all_allclose(tree1, tree2, **kwargs):
