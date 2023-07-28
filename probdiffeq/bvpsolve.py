@@ -10,7 +10,23 @@ from probdiffeq.statespace.scalar import corr, extra, linearise, variables
 _MarkovProc = namedtuple("_MarkovProc", ("init", "transition", "precon"))
 
 
-def solve(vf, bcond, grid, *, num_derivatives=2, output_scale=1.0):
+def solve(vf, bcond, grid, *, num_derivatives=4, output_scale=1.0):
+    """Solve a BVP.
+
+    Improvements:
+
+    - This function solves linear problems. Make it expect linear problems
+    - the discretised IBM prior should not be in here, but in the statespace module
+    - solve the bridge-nugget problem: it should not be necessary
+    - how do we generalise to multidimensional problems?
+    - how do we generalise to nonlinear problems?
+    - how do we generalise to non-separable BCs?
+    - how would mesh refinement work?
+    - how would parameter estimation work?
+    - which of the new functions in the statespace are actually required?
+    - do we always use preconditioning for everything?
+    - what is a clean solution for the reverse=True/False choices?
+    """
     prior = ibm_prior_discretised(
         grid, num_derivatives=num_derivatives, output_scale=output_scale
     )
@@ -107,7 +123,7 @@ def constrain_with_ode(vf, grid, prior, *, num_derivatives, reverse):
 
 
 def _correction_model_ode(vf, mesh, *, state_shape):
-    """Linearise the ODE vector field as a function of the state"""
+    """Linearise the ODE vector field as a function of the state."""
 
     def residual(x):
         return x[2] - vf(x[0])

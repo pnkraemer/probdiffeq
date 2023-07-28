@@ -1,6 +1,5 @@
 """Tests for BVP solver."""
 
-import diffeqzoo.bvps
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -72,8 +71,13 @@ def test_bridge(num_derivatives=4):
     # Choose t0 > t1 to reverse-pass initially
     t0 = -3.0
     t1 = 3.0
-    g0 = lambda x: x - 2.0
-    g1 = lambda x: x + 400.0
+
+    def g0(x):
+        return x - 2.0
+
+    def g1(x):
+        return x + 400.0
+
     output_scale = 10.0
     grid = jnp.linspace(t0, t1, endpoint=True, num=100)
 
@@ -102,8 +106,10 @@ def test_bridge(num_derivatives=4):
 
 
 def test_solve(num_derivatives=2):
+    eps = 1e-2
+
     def vf(u):
-        return 1e2 * u
+        return u / eps
 
     def g0(x):
         return x - 1.0
@@ -114,17 +120,30 @@ def test_solve(num_derivatives=2):
     t0 = 0.0
     t1 = 1.0
 
-    grid = jnp.linspace(t0, t1, endpoint=True, num=100)
+    def true_sol(t):
+        a = jnp.exp(-t / jnp.sqrt(eps))
+        b = jnp.exp((t - 2.0) / jnp.sqrt(eps))
+        c = jnp.exp(-2.0 / jnp.sqrt(eps))
+        return (a - b) / (1 - c)
+
+    grid = jnp.linspace(t0, t1, endpoint=True, num=20)
     solution = bvpsolve.solve(vf, (g0, g1), grid=grid)
 
     (init, transitions, precons) = solution
     means, stds = _marginal_moments(init, precons, transitions, reverse=True)
 
-    fig, axes = plt.subplots(ncols=num_derivatives + 1, sharey=True, sharex=True)
-
-    for m, s, ax in zip(means.T, stds.T, axes):
-        ax.plot(grid[1:], m)
-        ax.fill_between(grid[1:], m - s, m + s, alpha=0.2)
-        ax.set_ylim((-1.0, 2.0))
-    plt.show()
-    assert False
+    print(means[:, 0] - true_sol(grid[:-1]))
+    assert jnp.allclose(means[:, 0], true_sol(grid[:-1]), atol=1e-3)
+    #
+    # fig, axes = plt.subplots(ncols=num_derivatives + 1, sharey=True, sharex=True)
+    #
+    # for m, s, ax in zip(means.T, stds.T, axes):
+    #     ax.plot(grid[:-1], m, label="approx")
+    #     ax.fill_between(grid[:-1], m - s, m + s, alpha=0.2)
+    #     ax.set_ylim((-1.0, 2.0))
+    #
+    #
+    # axes[0].plot(grid[:-1], true_sol(grid[:-1]), label="truth")
+    # axes[0].legend()
+    # plt.show()
+    # assert False
