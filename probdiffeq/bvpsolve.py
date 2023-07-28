@@ -29,14 +29,16 @@ def solve(
     - what is a clean solution for the reverse=True/False choices?
     """
     prior = ibm_prior_discretised(
-        grid, num_derivatives=num_derivatives, output_scale=output_scale
+        increments=jnp.diff(grid),
+        num_derivatives=num_derivatives,
+        output_scale=output_scale,
     )
     prior_bridge = bridge(bcond, prior, num_derivatives=num_derivatives)
     return constrain_with_ode(vf, grid, prior_bridge, num_derivatives=num_derivatives)
 
 
 def ibm_prior_discretised(
-    grid, *, num_derivatives, output_scale
+    increments, *, num_derivatives, output_scale
 ) -> _markov.MarkovSeqPreconFwd:
     """Construct the discrete transition densities of an IBM prior."""
     init = variables.standard_normal(num_derivatives + 1, output_scale=output_scale)
@@ -46,7 +48,7 @@ def ibm_prior_discretised(
         num_derivatives=num_derivatives,
         output_scale=output_scale,
     )
-    transition, precon = jax.vmap(transitions)(jnp.diff(grid))
+    transition, precon = jax.vmap(transitions)(increments)
 
     return _markov.MarkovSeqPreconFwd(
         init=init, transition=transition, preconditioner=precon
