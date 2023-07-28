@@ -155,30 +155,9 @@ class SSV(variables.SSV):
         cor = NormalHiddenState(m_cor, r_cor.T)
         return obs, ConditionalQOI(gain, cor)
 
-    def extract_qoi_from_sample(self, u, /):
-        if u.ndim == 1:
-            return u[0]
-        return jax.vmap(self.extract_qoi_from_sample)(u)
-
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
         return SSV(self.u, rv)
-
-    def marginal_nth_derivative(self, n):
-        if self.hidden_state.mean.ndim > 1:
-            # if the variable has batch-axes, vmap the result
-            fn = SSV.marginal_nth_derivative
-            vect_fn = jax.vmap(fn, in_axes=(0, None))
-            return vect_fn(self, n)
-
-        if n >= self.hidden_state.mean.shape[0]:
-            msg = f"The {n}th derivative not available in the state-space variable."
-            raise ValueError(msg)
-
-        mean = self.hidden_state.mean[n]
-        cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
-        cov_sqrtm_lower = _sqrt_util.triu_via_qr(cov_sqrtm_lower_nonsquare[:, None]).T
-        return NormalQOI(mean=mean, cov_sqrtm_lower=jnp.reshape(cov_sqrtm_lower, ()))
 
 
 @jax.tree_util.register_pytree_node_class
