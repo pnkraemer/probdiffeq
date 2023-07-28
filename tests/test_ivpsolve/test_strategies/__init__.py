@@ -1,8 +1,8 @@
 """Tests for the strategy choices.
 
-
 To ensure that all strategies work correctly, we do the following:
 
+* All variations should yield the same terminal value
 * the RMSE of the smoother should be (slightly) lower than the RMSE of the filter
 using the same configuration (e.g. fixed grid solutions).
 Both should yield a reasonable approximation of the ODE solution.
@@ -20,5 +20,3 @@ Each test runs two simulations.
 We solve 16 differential equations here.
 
 """
-
-# raise RuntimeError("When returning, either start writing those tests above or check the accuracy of the module docstrings in the test_taylor/ and the test_solution_routines/ directories (ie the most recent ones). This might be a slightly easier entrance.")

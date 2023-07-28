@@ -1,3 +1,4 @@
+"""The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 import diffeqzoo.ivps
 import diffrax
 import jax
