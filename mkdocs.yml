@@ -77,7 +77,7 @@ plugins:
         - examples_benchmarks/benchmarks/pleiades/external.md
         - examples_benchmarks/benchmarks/stiff_van_der_pol/external.md
         - examples_benchmarks/benchmarks/hires/external.md
-  - mknotebooks
+  - mkdocs-jupyter
 nav:
   - Getting started:
       - Getting started: index.md
