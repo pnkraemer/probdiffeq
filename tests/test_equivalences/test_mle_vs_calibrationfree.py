@@ -56,8 +56,8 @@ def test_mle_vs_calibrationfree(ode_problem, strategy_fn):
         rand_free = solution_free.posterior
         assert _tree_all_allclose(rand_mle.init, rand_free.init)
 
-        bw_mle = rand_mle.backward_model
-        bw_free = rand_free.backward_model
+        bw_mle = rand_mle.conditional
+        bw_free = rand_free.conditional
         assert _tree_all_allclose(bw_mle.transition, bw_free.transition)
         assert _tree_all_allclose(bw_mle.noise.mean, bw_free.noise.mean)
 

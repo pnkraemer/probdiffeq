@@ -84,15 +84,15 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = variables.identity_conditional(self.num_derivatives, m0.shape[1:])
-        return _markov.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
-    def init(self, sol: _markov.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSeqRev, /):
         ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
-        cache = sol.backward_model
+        cache = sol.conditional
         return ssv, cache
 
     def extract(self, ssv, ex, /):
-        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
+        return _markov.MarkovSeqRev(init=ssv.hidden_state, conditional=ex)
 
     def begin(self, s0: variables.IsoSSV, ex0, /, dt) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self.preconditioner(dt=dt)
@@ -147,7 +147,7 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
         m0, c_sqrtm0 = _stack_tcoeffs(taylor_coefficients, q_like=self.q_sqrtm_lower)
         rv = variables.IsoNormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = variables.identity_conditional(self.num_derivatives, m0.shape[1:])
-        return _markov.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def init(self, sol, /):
         ssv = variables.IsoSSV(sol.init.mean[0, :], sol.init)
@@ -156,7 +156,7 @@ class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
         return ssv, cond
 
     def extract(self, ssv, ex, /):
-        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=ex)
+        return _markov.MarkovSeqRev(init=ssv.hidden_state, conditional=ex)
 
     def begin(self, s0: variables.IsoSSV, ex0, /, dt) -> Tuple[variables.IsoSSV, Any]:
         p, p_inv = self.preconditioner(dt=dt)

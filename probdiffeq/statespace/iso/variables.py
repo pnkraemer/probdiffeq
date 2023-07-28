@@ -7,10 +7,10 @@ from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import variables
 
 
-def unit_markov_sequence(**kwargs) -> _markov.MarkovSequence:
+def unit_markov_sequence(**kwargs) -> _markov.MarkovSeqRev:
     rv0 = standard_normal(**kwargs)
     cond0 = identity_conditional(**kwargs)
-    return _markov.MarkovSequence(init=rv0, backward_model=cond0)
+    return _markov.MarkovSeqRev(init=rv0, conditional=cond0)
 
 
 def identity_conditional(num_derivatives, ode_shape) -> "IsoConditionalHiddenState":

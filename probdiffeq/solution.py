@@ -223,7 +223,7 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    if not isinstance(posterior, _markov.MarkovSequence):
+    if not isinstance(posterior, _markov.MarkovSeqRev):
         msg1 = "Time-series marginal likelihoods "
         msg2 = "cannot be computed with a filtering solution."
         raise TypeError(msg1 + msg2)
@@ -251,7 +251,7 @@ class _KalFiltState(containers.NamedTuple):
 #  But it is not clear which data structure that should be.
 def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.backward_model)
+    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.conditional)
 
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
@@ -270,7 +270,7 @@ def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
 def _init_fn(rv, problem, *, strategy):
     obs_std, data = problem
 
-    rv_as_mseq = _markov.MarkovSequence(init=rv, backward_model=None)
+    rv_as_mseq = _markov.MarkovSeqRev(init=rv, conditional=None)
     ssv, _ = strategy.extrapolation.init(rv_as_mseq)
     obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
 
@@ -298,7 +298,7 @@ def _update(state, problem, *, strategy):
     """Observe the QOI and compute the 'local' log-marginal likelihood."""
     obs_std, data = problem
 
-    rv_as_mseq = _markov.MarkovSequence(init=state.rv, backward_model=None)
+    rv_as_mseq = _markov.MarkovSeqRev(init=state.rv, conditional=None)
     ssv, _ = strategy.extrapolation.init(rv_as_mseq)
     observed, conditional = ssv.observe_qoi(observation_std=obs_std)
 

@@ -81,7 +81,7 @@ class _Smoother(_strategy.Strategy):
         # Marginalise from t1 to t to obtain the interpolated solution.
         bw_t1_to_t, bw_t_to_t0 = e_1.extra, e_t.extra
         rv_at_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
-        mseq_t = _markov.MarkovSequence(init=rv_at_t, backward_model=bw_t_to_t0)
+        mseq_t = _markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)
         ssv, _ = self.extrapolation.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         state_at_t = _SmState(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
@@ -97,8 +97,8 @@ class _Smoother(_strategy.Strategy):
         *,
         t,
         marginals,
-        posterior: _markov.MarkovSequence,
-        posterior_previous: _markov.MarkovSequence,
+        posterior: _markov.MarkovSeqRev,
+        posterior_previous: _markov.MarkovSeqRev,
         t0,
         t1,
         output_scale,
@@ -110,7 +110,7 @@ class _Smoother(_strategy.Strategy):
             output_scale=output_scale,
         )
         t, posterior = self.extract(acc)
-        marginals = posterior.backward_model.marginalise(marginals)
+        marginals = posterior.conditional.marginalise(marginals)
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
@@ -132,7 +132,7 @@ class _Smoother(_strategy.Strategy):
         u = taylor_coefficients[0]
         return u, marginals, sol
 
-    def extract(self, state: _SmState, /) -> Tuple[float, _markov.MarkovSequence]:
+    def extract(self, state: _SmState, /) -> Tuple[float, _markov.MarkovSeqRev]:
         ssv = self.correction.extract(state.ssv, state.corr)
         sol = self.extrapolation.extract(ssv, state.extra)
         return state.t, sol
@@ -251,7 +251,7 @@ class _FixedPointSmoother(_strategy.Strategy):
         # (Which is different for the non-fixed-point smoother)
         bw_t1_to_t, bw_t_to_qoi = e_1.extra, e_t.extra
         rv_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
-        mseq_t = _markov.MarkovSequence(init=rv_t, backward_model=bw_t_to_qoi)
+        mseq_t = _markov.MarkovSeqRev(init=rv_t, conditional=bw_t_to_qoi)
         ssv_t, _ = self.extrapolation.init(mseq_t)
         corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
         sol_t = _SmState(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
@@ -262,7 +262,7 @@ class _FixedPointSmoother(_strategy.Strategy):
         # Bundle up the results and return
         return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
 
-    def extract(self, state: _SmState, /) -> Tuple[float, _markov.MarkovSequence]:
+    def extract(self, state: _SmState, /) -> Tuple[float, _markov.MarkovSeqRev]:
         ssv = self.correction.extract(state.ssv, state.corr)
         sol = self.extrapolation.extract(ssv, state.extra)
         return state.t, sol

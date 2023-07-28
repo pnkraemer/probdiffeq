@@ -180,15 +180,15 @@ class _IBMSm(_extra.Extrapolation):
         m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
         rv = variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = variables.identity_conditional(ndim=len(tcoeffs))
-        return _markov.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
-    def init(self, sol: _markov.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSeqRev, /):
         ssv = variables.SSV(sol.init.mean[0], sol.init)
-        extra = sol.backward_model
+        extra = sol.conditional
         return ssv, extra
 
     def extract(self, ssv, extra, /):
-        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
+        return _markov.MarkovSeqRev(init=ssv.hidden_state, conditional=extra)
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self.preconditioner(dt=dt)
@@ -243,15 +243,15 @@ class _IBMFp(_extra.Extrapolation):
         m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
         rv = variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
         cond = variables.identity_conditional(ndim=len(tcoeffs))
-        return _markov.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
-    def init(self, sol: _markov.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSeqRev, /):
         ssv = variables.SSV(sol.init.mean[0], sol.init)
         extra = variables.identity_conditional(ndim=sol.init.mean.shape[0])
         return ssv, extra
 
     def extract(self, ssv, extra, /):
-        return _markov.MarkovSequence(init=ssv.hidden_state, backward_model=extra)
+        return _markov.MarkovSeqRev(init=ssv.hidden_state, conditional=extra)
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self.preconditioner(dt=dt)

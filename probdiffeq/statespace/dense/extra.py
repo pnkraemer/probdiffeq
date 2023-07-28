@@ -117,18 +117,18 @@ class _IBMSm(_extra.Extrapolation):
             mean=m0, cov_sqrtm_lower=c_sqrtm0, target_shape=self.target_shape
         )
         conds = variables.identity_conditional(*self.target_shape)
-        return _markov.MarkovSequence(init=rv, backward_model=conds)
+        return _markov.MarkovSeqRev(init=rv, conditional=conds)
 
-    def init(self, sol: _markov.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSeqRev, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
-        extra = sol.backward_model
+        extra = sol.conditional
         return ssv, extra
 
-    def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
+    def extract(self, ssv, extra, /) -> _markov.MarkovSeqRev:
         rv = ssv.hidden_state
         cond = extra
-        return _markov.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self.preconditioner(dt=dt)
@@ -206,18 +206,18 @@ class _IBMFp(_extra.Extrapolation):
             mean=m0, cov_sqrtm_lower=c_sqrtm0, target_shape=self.target_shape
         )
         conds = variables.identity_conditional(*self.target_shape)
-        return _markov.MarkovSequence(init=rv, backward_model=conds)
+        return _markov.MarkovSeqRev(init=rv, conditional=conds)
 
-    def init(self, sol: _markov.MarkovSequence, /):
+    def init(self, sol: _markov.MarkovSeqRev, /):
         u = sol.init.mean.reshape(self.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, sol.init, target_shape=self.target_shape)
         extra = variables.identity_conditional(*self.target_shape)
         return ssv, extra
 
-    def extract(self, ssv, extra, /) -> _markov.MarkovSequence:
+    def extract(self, ssv, extra, /) -> _markov.MarkovSeqRev:
         rv = ssv.hidden_state
         cond = extra
-        return _markov.MarkovSequence(init=rv, backward_model=cond)
+        return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def begin(self, ssv, extra, /, dt):
         p, p_inv = self.preconditioner(dt=dt)
