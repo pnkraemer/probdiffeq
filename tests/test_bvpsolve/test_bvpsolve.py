@@ -129,11 +129,11 @@ def test_solve(num_derivatives=2):
     grid = jnp.linspace(t0, t1, endpoint=True, num=20)
     solution = bvpsolve.solve(vf, (g0, g1), grid=grid)
 
-    (init, transitions, precons) = solution
-    means, stds = _marginal_moments(init, precons, transitions, reverse=True)
+    (init, transitions, precons, reverse) = solution
+    means, stds = _marginal_moments(init, precons, transitions, reverse=reverse)
 
-    print(means[:, 0] - true_sol(grid[:-1]))
-    assert jnp.allclose(means[:, 0], true_sol(grid[:-1]), atol=1e-3)
+    print(means[:, 0] - true_sol(grid[1:]))
+    assert jnp.allclose(means[:, 0], true_sol(grid[1:]), atol=1e-3)
     #
     # fig, axes = plt.subplots(ncols=num_derivatives + 1, sharey=True, sharex=True)
     #

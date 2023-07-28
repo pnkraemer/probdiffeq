@@ -1,13 +1,22 @@
 """BVP solver."""
 
-from collections import namedtuple
+import functools
+from typing import Any, NamedTuple, Tuple
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq.statespace.scalar import corr, extra, linearise, variables
 
-_MarkovProc = namedtuple("_MarkovProc", ("init", "transition", "precon"))
+
+# todo: merge this with _markov.MarkovSequence.
+#  The difference is that the one in _markov.py does not know "reverse" and "precon".
+#  But this should be a separate PR?
+class _MarkovSeq(NamedTuple):
+    init: Any
+    transition: Tuple[Tuple[Any], Any]
+    precon: Tuple[Any, Any]
+    reverse: bool
 
 
 def solve(vf, bcond, grid, *, num_derivatives=4, output_scale=1.0):
@@ -30,42 +39,29 @@ def solve(vf, bcond, grid, *, num_derivatives=4, output_scale=1.0):
     prior = ibm_prior_discretised(
         grid, num_derivatives=num_derivatives, output_scale=output_scale
     )
-    prior_bridge = bridge(
-        bcond,
-        prior,
-        num_derivatives=num_derivatives,
-        reverse=True,
-    )
-    return constrain_with_ode(
-        vf,
-        grid,
-        prior_bridge,
-        num_derivatives=num_derivatives,
-        reverse=False,
-    )
+    prior_bridge = bridge(bcond, prior, num_derivatives=num_derivatives)
+    return constrain_with_ode(vf, grid, prior_bridge, num_derivatives=num_derivatives)
 
 
 def ibm_prior_discretised(grid, *, num_derivatives, output_scale):
     """Construct the discrete transition densities of an IBM prior."""
     init = variables.standard_normal(num_derivatives + 1, output_scale=output_scale)
 
-    def transitions(dt):
-        return extra.ibm_discretise(
-            dt, num_derivatives=num_derivatives, output_scale=output_scale
-        )
-
+    transitions = functools.partial(
+        extra.ibm_discretise,
+        num_derivatives=num_derivatives,
+        output_scale=output_scale,
+    )
     transition, precon = jax.vmap(transitions)(jnp.diff(grid))
-    return _MarkovProc(init, transition, precon)
+
+    return _MarkovSeq(init=init, transition=transition, precon=precon, reverse=False)
 
 
-def bridge(bcond, prior, *, num_derivatives, reverse):
+def bridge(bcond, prior, *, num_derivatives):
     """Bridge a discrete prior according to separable boundary conditions."""
     _shape = (num_derivatives + 1,)
     correction_bcond = _correction_model_bcond(bcond, state_shape=_shape)
-    init, transitions, precon = _constrain_boundary(
-        prior, correction_bcond, reverse=reverse
-    )
-    return _MarkovProc(init, transitions, precon)
+    return _constrain_boundary(prior, correction_bcond)
 
 
 def _correction_model_bcond(bcond, *, state_shape):
@@ -78,20 +74,20 @@ def _correction_model_bcond(bcond, *, state_shape):
     return A_left, A_right
 
 
-def _constrain_boundary(prior, correction, *, reverse):
+def _constrain_boundary(prior, correction):
     """Constrain a discrete prior to satisfy boundary conditions.
 
     This algorithm runs a reverse-time Kalman filter.
     """
-    init, transitions, precons = prior
+    init, transitions, precons, reverse = prior
 
     if reverse:
-        H_left, H_right = correction
+        H_second, H_first = correction
     else:
-        H_right, H_left = correction
+        H_first, H_second = correction
 
     # Initialise (we usually filter in reverse)
-    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(init, H_right)
+    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(init, H_first)
 
     # Run the reverse-time Kalman filter
     def step(rv_carry, transition):
@@ -106,20 +102,21 @@ def _constrain_boundary(prior, correction, *, reverse):
     )
 
     # Constrain on the remaining end
-    _, (rv_corrected, _) = corr.correct_affine_qoi_noisy(rv_init, H_left)
+    _, (rv_corr, _) = corr.correct_affine_qoi_noisy(rv_init, H_second)
 
     # Return solution
-    return rv_corrected, transitions, precons
+    return _MarkovSeq(
+        init=rv_corr, transition=transitions, precon=precons, reverse=not reverse
+    )
 
 
-def constrain_with_ode(vf, grid, prior, *, num_derivatives, reverse):
+def constrain_with_ode(vf, grid, prior, *, num_derivatives):
     # Linearise ODE
     state_shape = (num_derivatives + 1,)
     correction_model = _correction_model_ode(vf, grid, state_shape=state_shape)
 
     # Constrain the states and return the result
-    rv, transitions, precons = _kalmanfilter(correction_model, prior, reverse=reverse)
-    return _MarkovProc(rv, transitions, precons)
+    return _kalmanfilter(correction_model, prior)
 
 
 def _correction_model_ode(vf, mesh, *, state_shape):
@@ -136,13 +133,14 @@ def _correction_model_ode(vf, mesh, *, state_shape):
     return lin(unimportant_values)
 
 
-def _kalmanfilter(correction, prior, *, reverse):
+def _kalmanfilter(correction, prior):
     jac, (bias,) = correction
-    init, transitions, precons = prior
+    init, transitions, precons, reverse = prior
 
     # Initialise on the left end
-    _, (rv_corrected, _) = corr.correct_affine_qoi_matrix(init, (jac[0], (bias[0],)))
-    correction_remaining = jax.tree_util.tree_map(lambda x: x[1:], correction)
+    assert reverse is True
+    _, (rv_corrected, _) = corr.correct_affine_qoi_matrix(init, (jac[-1], (bias[-1],)))
+    correction_remaining = jax.tree_util.tree_map(lambda x: x[:-1], correction)
 
     # Run the extrapolate-correct Kalman filter
     def step(rv_carry, ssm):
@@ -160,4 +158,4 @@ def _kalmanfilter(correction, prior, *, reverse):
     rv, transitions = jax.lax.scan(
         step, rv_corrected, (correction_remaining, extrapolation), reverse=reverse
     )
-    return rv, transitions, precons
+    return _MarkovSeq(rv, transitions, precons, reverse=not reverse)
