@@ -127,6 +127,6 @@ def slr0_dense(
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
     corr = scalar_corr.taylor_order_zero(ode_order=ode_order)
-    extra = scalar_extra.ibm_scalar(num_derivatives=num_derivatives)
+    extra = scalar_extra.extrapolation_bundle_ibm(num_derivatives=num_derivatives)
     calib = scalar_calib.output_scale()
     return _Impl(corr=corr, extra=extra, calib=calib)

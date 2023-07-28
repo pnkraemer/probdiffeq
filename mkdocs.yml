@@ -140,6 +140,7 @@ nav:
       - solution: api_docs/solution.md
       - taylor: api_docs/taylor.md
       - controls: api_docs/controls.md
+      - bvpsolve (experimental): api_docs/bvpsolve.md
   - Developer Documentation:
       - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md

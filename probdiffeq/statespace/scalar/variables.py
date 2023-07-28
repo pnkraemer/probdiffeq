@@ -35,6 +35,12 @@ def identity_conditional(ndim) -> "ConditionalHiddenState":
     return ConditionalHiddenState(transition, noise)
 
 
+def standard_normal(ndim, *, output_scale=1.0):
+    mean = jnp.zeros((ndim,))
+    cov_sqrtm = jnp.eye(ndim) * output_scale
+    return NormalHiddenState(mean, cov_sqrtm)
+
+
 @jax.tree_util.register_pytree_node_class
 class ConditionalHiddenState(variables.Conditional):
     def __call__(self, x, /):

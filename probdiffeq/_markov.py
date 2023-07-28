@@ -11,7 +11,63 @@ from probdiffeq.backend import control_flow
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
 
-# todo: markov sequences should not necessarily be backwards
+R = TypeVar("R", bound=bool)
+"""A (Boolean-bound) type-variable indicating the direction of the Markov sequence."""
+
+
+# todo: Unify the MarkovSeq* implementations (Naming, use of preconditioner, fwd/rev)
+
+
+@jax.tree_util.register_pytree_node_class
+class MarkovSeqPreconFwd(Generic[S]):
+    def __init__(self, *, init: S, conditional, preconditioner):
+        self.init = init
+        self.conditional = conditional
+        self.preconditioner = preconditioner
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args1 = f"init={self.init}, backward_model={self.backward_model}"
+        args2 = f"preconditioner={self.preconditioner}"
+        return f"{name}({args1}, {args2})"
+
+    def tree_flatten(self):
+        children = (self.init, self.backward_model, self.preconditioner)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        init, backward_model, preconditioner = children
+        return cls(
+            init=init, backward_model=backward_model, preconditioner=preconditioner
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+class MarkovSeqPreconRev(Generic[S]):
+    def __init__(self, *, init: S, conditional, preconditioner):
+        self.init = init
+        self.conditional = conditional
+        self.preconditioner = preconditioner
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args1 = f"init={self.init}, backward_model={self.backward_model}"
+        args2 = f"preconditioner={self.preconditioner}"
+        return f"{name}({args1}, {args2})"
+
+    def tree_flatten(self):
+        children = (self.init, self.backward_model, self.preconditioner)
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        init, backward_model, preconditioner = children
+        return cls(
+            init=init, backward_model=backward_model, preconditioner=preconditioner
+        )
 
 
 @jax.tree_util.register_pytree_node_class
