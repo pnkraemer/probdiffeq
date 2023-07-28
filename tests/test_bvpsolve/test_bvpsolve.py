@@ -122,12 +122,11 @@ def _marginal_moments(precon_mseq):
         rv = extra.extrapolate_precon(carry, trans, prec)
         return rv, rv
 
-    assert precon_mseq.reverse is False
     _, rvs = jax.lax.scan(
         step,
         init=precon_mseq.init,
         xs=(precon_mseq.transition, precon_mseq.preconditioner),
-        reverse=precon_mseq.reverse,
+        reverse=False,
     )
     means, cov_sqrtms = rvs.mean, rvs.cov_sqrtm_lower
 
