@@ -23,14 +23,23 @@ testpaths = ["tests"]
 norecursedirs = ["dist", "build", "dev", "typings"]
 addopts = ["--cov=probdiffeq", "--cov-report=html"]
 
+
+# This is how we measure coverage; it is purely an internal/local thing for now.
+# That means that we don't display test coverage, but use it to guide refactoring
+# the tests.
+
 [tool.coverage.run]
 source = ["probdiffeq/*"]
 omit = ["probdiffeq/doc_util/*"]
 
 [tool.coverage.report]
 exclude_also = [
+    # Debugging-only code should not be measured
     "def __repr__",
+    # Interfaces should not be measured
     "raise NotImplementedError",
+    # Tree flattening/unflattening is not always called but important
+    # once functions are jitted by the user
     "def tree_flatten",
     "def tree_unflatten",
     ]
