@@ -77,7 +77,7 @@ Notable breaking changes:
   `CalibrationFreeSolver(*args) -> solver_calibrationfree(*args)`.
   The reasons for this change are -- as before -- internal code simplifications that become 
   possible as soon as we do not promise an object-oriented implementation.
-
+* The support for Python 3.8 has been dropped. Why? Because JAX' support for python 3.8 has been dropped.
 
 Notable enhancements:
 
@@ -86,6 +86,7 @@ Notable enhancements:
 * The public API has been defined (see the developer docs). Notably, this document describes changes in which modules necessitate an entry in this changelog.
 * `dt0` can now be provided to the solution routines. To do so, call `simulate_terminal_values(..., dt0=1.)` replacing `1.` with appropriate values.
   This change is completely backwards-compatible. The argument `dt0` is entirely optional, and its default value is set to the same as before.
+* An (experimental) draft for BVP solvers has been created.
 
 
 Notable bug fixes:
