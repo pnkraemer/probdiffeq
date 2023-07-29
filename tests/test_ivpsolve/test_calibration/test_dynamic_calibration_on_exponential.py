@@ -1,4 +1,9 @@
-"""Assert that solve_with_python_loop is accurate."""
+"""Assert that the dynamic solver can successfully solve a linear function.
+
+Specifically, we solve a linear function with exponentially increasing output-scale.
+This is difficult for the MLE- and calibration-free solver,
+but not for the dynamic solver.
+"""
 import jax
 import jax.numpy as jnp
 
@@ -38,9 +43,8 @@ def fixture_problem():
 
 @testing.fixture(name="dynamic_solution_approximation_error")
 @testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def fixture_dynamic_solution_approximation_error(problem, impl_factory):
+def fixture_approximation_error_low(problem, impl_factory):
     vf, u0, (t0, t1), f_args, solution = problem
-
     problem_args = (vf, (u0,))
 
     solver = test_util.generate_solver(
@@ -55,7 +59,7 @@ def fixture_dynamic_solution_approximation_error(problem, impl_factory):
     grid = jnp.linspace(t0, t1, num=20)
     solver_kwargs = {"grid": grid, "parameters": f_args, "solver": solver}
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
-    print(approximation.u[-1], solution(t1))
+
     return _rmse(approximation.u[-1], solution(t1))
 
 
