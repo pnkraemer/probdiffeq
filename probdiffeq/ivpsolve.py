@@ -148,7 +148,8 @@ def solve_and_save_at(
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
-        marginals = control_flow.tree_append(marginals, posterior.init)
+        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+        marginals = control_flow.tree_append(marginals, marginal_t1)
     else:
         posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
@@ -225,7 +226,8 @@ def solve_with_python_while_loop(
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
-        marginals = control_flow.tree_append(marginals, posterior.init)
+        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+        marginals = control_flow.tree_append(marginals, marginal_t1)
     else:
         posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
@@ -280,7 +282,8 @@ def solve_fixed_grid(
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
-        marginals = control_flow.tree_append(marginals, posterior.init)
+        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+        marginals = control_flow.tree_append(marginals, marginal_t1)
     else:
         posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior

@@ -1,12 +1,9 @@
 """Markov sequences and Markov processes."""
 
-import functools
 from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
-
-from probdiffeq.backend import control_flow
 
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
@@ -148,8 +145,7 @@ class MarkovSeqRev(Generic[S]):
             init = self.init
 
         # Scan and return
-        reverse_scan = functools.partial(control_flow.scan_with_init, reverse=True)
-        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
+        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=conds, reverse=True)
         return rvs
 
     @property

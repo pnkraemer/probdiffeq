@@ -4,9 +4,16 @@ import jax
 import jax.numpy as jnp
 
 
-def tree_prepend(tree_of_arrays, tree_of_stacked_arrays):
-    broadcast = jax.tree_util.tree_map(lambda x: x[None, ...], tree_of_arrays)
-    return tree_concatenate([broadcast, tree_of_stacked_arrays])
+def tree_prepend(y, X, /):
+    """PyTree-equivalent of y[None, ...].append(X)."""
+    Y = jax.tree_util.tree_map(lambda s: s[None, ...], y)
+    return tree_concatenate([Y, X])
+
+
+def tree_append(X, y, /):
+    """PyTree-equivalent of X.append(y[None, ...])."""
+    Y = jax.tree_util.tree_map(lambda s: s[None, ...], y)
+    return tree_concatenate([X, Y])
 
 
 def tree_concatenate(list_of_trees):
