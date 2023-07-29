@@ -107,30 +107,9 @@ class IsoSSV(variables.SSV):
         cond = IsoConditionalQOI(gain, noise=cor)
         return obs, cond
 
-    def extract_qoi_from_sample(self, u, /) -> jax.Array:
-        return u[..., 0, :]
-
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale=output_scale)
         return IsoSSV(self.u, rv)
-
-    def marginal_nth_derivative(self, n):
-        # if the variable has batch-axes, vmap the result
-        if self.hidden_state.mean.ndim > 2:
-            fn = IsoSSV.marginal_nth_derivative
-            vect_fn = jax.vmap(fn, in_axes=(0, None))
-            return vect_fn(self, n)
-
-        if n >= self.hidden_state.mean.shape[0]:
-            msg = f"The {n}th derivative is not available in the state-variable."
-            raise ValueError(msg)
-
-        mean = self.hidden_state.mean[n, :]
-        cov_sqrtm_lower_nonsquare = self.hidden_state.cov_sqrtm_lower[n, :]
-        R = cov_sqrtm_lower_nonsquare[:, None]
-        cov_sqrtm_lower_square = _sqrt_util.triu_via_qr(R)
-        cov_sqrtm_lower = jnp.reshape(cov_sqrtm_lower_square, ())
-        return IsoNormalQOI(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
 
 @jax.tree_util.register_pytree_node_class

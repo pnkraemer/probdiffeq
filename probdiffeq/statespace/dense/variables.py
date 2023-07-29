@@ -112,32 +112,9 @@ class DenseSSV(variables.SSV):
         cor = DenseConditional(gain, noise=noise, target_shape=self.target_shape)
         return obs, cor
 
-    def extract_qoi_from_sample(self, u, /):
-        if u.ndim == 1:
-            return u.reshape(self.target_shape, order="F")[0, ...]
-        return jax.vmap(self.extract_qoi_from_sample)(u)
-
     def scale_covariance(self, output_scale):
         rv = self.hidden_state.scale_covariance(output_scale)
         return DenseSSV(self.u, rv, target_shape=self.target_shape)
-
-    def marginal_nth_derivative(self, n):
-        if self.hidden_state.mean.ndim > 1:
-            # if the variable has batch-axes, vmap the result
-            fn = DenseSSV.marginal_nth_derivative
-            vect_fn = jax.vmap(fn, in_axes=(0, None))
-            return vect_fn(self, n)
-
-        if n >= self.target_shape[0]:
-            msg = f"The {n}th derivative not available in the state-space variable."
-            raise ValueError(msg)
-
-        mean = self._select_derivative(self.hidden_state.mean, n)
-        cov_sqrtm_lower_nonsquare = self._select_derivative_vect(
-            self.hidden_state.cov_sqrtm_lower, n
-        )
-        cov_sqrtm_lower = _sqrt_util.triu_via_qr(cov_sqrtm_lower_nonsquare.T).T
-        return DenseNormal(mean, cov_sqrtm_lower, target_shape=None)
 
     def _select_derivative_vect(self, x, i):
         fn = functools.partial(self._select_derivative, i=i)
