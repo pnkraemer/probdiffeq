@@ -1,4 +1,4 @@
-"""Save reference solutions. Accelerate testing."""
+"""Precompute and save reference solutions. Accelerate testing."""
 import diffeqzoo.ivps
 import jax.numpy as jnp
 from diffeqzoo import backend
@@ -7,7 +7,11 @@ from jax.config import config
 from probdiffeq import taylor
 
 
-def three_body_first(num_derivatives_max=6):
+def set_environment():
+    """Set the environment (e.g., 64-bit precision).
+
+    The setup used to precompute references should match that of the other tests.
+    """
     # Test on CPU.
     config.update("jax_platform_name", "cpu")
 
@@ -18,6 +22,8 @@ def three_body_first(num_derivatives_max=6):
     # IVPs in JAX
     backend.select("jax")
 
+
+def three_body_first(num_derivatives_max=6):
     f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
 
     def vf(u, *, t, p):  # pylint: disable=unused-argument
@@ -48,6 +54,9 @@ def van_der_pol_second(num_derivatives_max=6):
 
 
 if __name__ == "__main__":
+    # 64-bit precision and the like
+    set_environment()
+
     solution1 = three_body_first()
     jnp.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
 
