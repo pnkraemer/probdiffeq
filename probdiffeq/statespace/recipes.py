@@ -53,7 +53,6 @@ def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
         This feature is highly experimental.
         There is no guarantee that it works correctly.
         It might be deleted tomorrow
-
         and without any deprecation policy.
 
     """
