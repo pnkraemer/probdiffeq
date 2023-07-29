@@ -1,4 +1,4 @@
-"""Tests for marginal log likelihoods."""
+"""Tests for log-marginal-likelihood functionality."""
 import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
@@ -65,7 +65,7 @@ def fixture_solution_save_at(problem, impl_fn):
     return sol, solver
 
 
-def test_is_a_scalar_and_not_nan_or_inf(solution_save_at):
+def test_output_is_a_scalar_and_not_nan_and_not_inf(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
@@ -80,7 +80,11 @@ def test_is_a_scalar_and_not_nan_or_inf(solution_save_at):
     assert not jnp.isinf(lml)
 
 
-def test_raises_error_for_wrong_std_shape_1(solution_save_at):
+def test_that_function_raises_error_for_wrong_std_shape_too_many(solution_save_at):
+    """Test that the log-marginal-likelihood function complains about the wrong shape.
+
+    Specifically, about receiving more standard-deviations than data-points.
+    """
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
@@ -94,7 +98,11 @@ def test_raises_error_for_wrong_std_shape_1(solution_save_at):
         )
 
 
-def test_raises_error_for_wrong_std_shape_2(solution_save_at):
+def test_that_function_raises_error_for_wrong_std_shape_wrong_ndim(solution_save_at):
+    """Test that the log-marginal-likelihood function complains about the wrong shape.
+
+    Specifically, about receiving non-scalar standard-deviations.
+    """
     sol, solver = solution_save_at
     data = sol.u + 0.005
     k = sol.u.shape[0]
@@ -109,6 +117,11 @@ def test_raises_error_for_wrong_std_shape_2(solution_save_at):
 
 
 def test_raises_error_for_terminal_values(solution_save_at):
+    """Test that the log-marginal-likelihood function complains when called incorrectly.
+
+    Specifically, raise an error when calling log_marginal_likelihood even though
+    log_marginal_likelihood_terminal_values was meant.
+    """
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
