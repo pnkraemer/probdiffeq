@@ -10,15 +10,14 @@ theme:
     - search.suggest
     - search.highlight
   palette:
-
     # Palette toggle for light mode
-    - scheme: default
+    - scheme: probdiffeq-light
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
 
     # Palette toggle for dark mode
-    - scheme: slate
+    - scheme: probdiffeq-dark
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -34,7 +33,7 @@ repo_url: https://github.com/pnkraemer/probdiffeq
 repo_name: pnkraemer/probdiffeq
 
 # Credit for a good amount of this setup: https://github.com/patrick-kidger/diffrax
-extra_css: [_static/custom.css]
+extra_css: [stylesheets/extra.css]
 markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
@@ -54,7 +53,6 @@ extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 plugins:
-  - search
   - mkdocstrings:
       handlers:
         python:
