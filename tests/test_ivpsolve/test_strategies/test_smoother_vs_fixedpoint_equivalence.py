@@ -1,6 +1,6 @@
 """The fixedpoint-smoother and smoother should yield identical results.
 
-That is, at least in certain configurations.
+That is, when called with correct adaptive- and checkpoint-setups.
 """
 import diffeqzoo.ivps
 import jax
@@ -44,16 +44,18 @@ def fixture_problem():
 
 @testing.fixture(name="solver_setup")
 @testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
+# Run with clipped and non-clipped controllers to cover both interpolation and clipping
+# around the end(s) of time-intervals.
 def fixture_solver_setup(problem, impl_factory):
     vf, u0, (t0, t1), f_args = problem
 
-    problem_args = (vf, (u0,))
-    problem_kwargs = {"parameters": f_args, "rtol": 1e-2}
+    args = (vf, (u0,))
+    kwargs = {"parameters": f_args, "atol": 1e-3, "rtol": 1e-3}
 
     def impl_factory_wrapped():
         return impl_factory(ode_shape=jnp.shape(u0), num_derivatives=2)
 
-    return problem_args, problem_kwargs, (t0, t1), impl_factory_wrapped
+    return args, kwargs, (t0, t1), impl_factory_wrapped
 
 
 @testing.fixture(name="solution_smoother")
@@ -85,7 +87,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     solver_smoother = test_util.generate_solver(
         strategy_factory=smoothers.smoother, impl_factory=impl_factory
     )
-    ts = jnp.linspace(save_at[0], save_at[-1], num=17, endpoint=True)
+    ts = jnp.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
     u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
     )

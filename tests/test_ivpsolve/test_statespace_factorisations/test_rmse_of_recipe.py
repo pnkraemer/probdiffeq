@@ -1,4 +1,4 @@
-"""Assert that solve_with_python_loop is accurate."""
+"""Assert that every recipe yields a decent ODE approximation."""
 import diffeqzoo.ivps
 import diffrax
 import jax

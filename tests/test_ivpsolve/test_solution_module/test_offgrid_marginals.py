@@ -40,8 +40,8 @@ def case_dense_factorisation():
 
 
 @testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def test_offgrid_marginals_filter(problem, impl_factory):
-    """Assert that the offgrid-marginals are close to the boundary values."""
+def test_filter_marginals_close_only_to_left_boundary(problem, impl_factory):
+    """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, u0, (t0, t1), f_args = problem
     solver = test_util.generate_solver(
         num_derivatives=1,
@@ -69,8 +69,8 @@ def test_offgrid_marginals_filter(problem, impl_factory):
 
 
 @testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def test_offgrid_marginals_smoother(problem, impl_factory):
-    """Assert that the offgrid-marginals are close to the boundary values."""
+def test_smoother_marginals_close_to_both_boundaries(problem, impl_factory):
+    """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, u0, (t0, t1), f_args = problem
     solver = test_util.generate_solver(
         num_derivatives=1,

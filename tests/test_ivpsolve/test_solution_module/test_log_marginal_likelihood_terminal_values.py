@@ -41,7 +41,7 @@ def case_impl_dense_factorisation():
 
 @testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_impl")
 @testing.case()
-def case_solution_vary_the_statespace(problem, impl_factory):
+def case_sol_vary_the_statespace(problem, impl_factory):
     vf, u0, (t0, t1), params = problem
     recipe = impl_factory(num_derivatives=4, ode_shape=jnp.shape(u0))
     strategy, calibration = filters.filter(*recipe)
@@ -52,11 +52,12 @@ def case_solution_vary_the_statespace(problem, impl_factory):
     return sol, strategy
 
 
-@testing.parametrize(
-    "strategy_fun", [filters.filter, smoothers.smoother_fixedpoint, smoothers.smoother]
-)
+_STRATEGY_FUNS = [filters.filter, smoothers.smoother_fixedpoint, smoothers.smoother]
+
+
+@testing.parametrize("strategy_fun", _STRATEGY_FUNS)
 @testing.case()
-def case_solution_vary_the_strategy(problem, strategy_fun):
+def case_sol_vary_the_strategy(problem, strategy_fun):
     vf, u0, (t0, t1), params = problem
     recipe = recipes.ts0_iso(num_derivatives=4)
     strategy, calibration = strategy_fun(*recipe)
@@ -67,9 +68,7 @@ def case_solution_vary_the_strategy(problem, strategy_fun):
     return sol, strategy
 
 
-@testing.parametrize_with_cases(
-    "solution_and_strategy", cases=".", prefix="case_solution_"
-)
+@testing.parametrize_with_cases("solution_and_strategy", cases=".", prefix="case_sol_")
 def test_output_is_scalar_and_not_inf_and_not_nan(solution_and_strategy):
     """Test that terminal-value log-marginal-likelihood calls work with all strategies.
 
@@ -89,9 +88,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution_and_strategy):
     assert not jnp.isinf(mll)
 
 
-@testing.parametrize_with_cases(
-    "solution_and_strategy", cases=".", prefix="case_solution_"
-)
+@testing.parametrize_with_cases("solution_and_strategy", cases=".", prefix="case_sol_")
 def test_terminal_values_error_for_wrong_shapes(solution_and_strategy):
     sol, strategy = solution_and_strategy
     data = sol.u + 0.005
