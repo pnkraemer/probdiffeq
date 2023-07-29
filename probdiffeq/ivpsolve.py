@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _adaptive, _collocate, _markov, solution, taylor
+from probdiffeq.backend import control_flow
 from probdiffeq.strategies import smoothers
 
 
@@ -122,7 +123,7 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
-    sol = solver.solution_from_tcoeffs(
+    initial_solution = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -131,26 +132,30 @@ def solve_and_save_at(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    t, posterior, output_scale, num_steps = _collocate.solve_and_save_at(
+    posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        t=sol.t,
-        posterior=sol.posterior,
-        output_scale=sol.output_scale,
-        num_steps=sol.num_steps,
+        t=initial_solution.t,
+        posterior=initial_solution.posterior,
+        output_scale=initial_solution.output_scale,
+        num_steps=initial_solution.num_steps,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
     )
+
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
+        marginals = control_flow.tree_append(marginals, posterior.init)
     else:
+        posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
+
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
-        t=t,
+        t=save_at,
         u=u,
         marginals=marginals,
         posterior=posterior,
@@ -193,7 +198,7 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    sol = solver.solution_from_tcoeffs(
+    initial_solution = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -204,20 +209,27 @@ def solve_with_python_while_loop(
 
     t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        t=sol.t,
-        posterior=sol.posterior,
-        output_scale=sol.output_scale,
-        num_steps=sol.num_steps,
+        t=initial_solution.t,
+        posterior=initial_solution.posterior,
+        output_scale=initial_solution.output_scale,
+        num_steps=initial_solution.num_steps,
         t1=t1,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
     )
+    # I think the user expects the initial time-point to be part of the grid
+    # (Even though t0 is not computed by this function)
+    t = jnp.concatenate((jnp.atleast_1d(t0), t))
+
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
+        marginals = control_flow.tree_append(marginals, posterior.init)
     else:
+        posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
+
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
         t=t,
@@ -241,6 +253,7 @@ def solve_fixed_grid(
     """Solve an initial value problem on a fixed, pre-determined grid."""
     _assert_tuple(initial_values)
 
+    # Initialise the Taylor series
     num_derivatives = solver.strategy.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
         vector_field=jax.tree_util.Partial(vector_field),
@@ -249,23 +262,29 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    sol = solver.solution_from_tcoeffs(
+    initial_solution = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
+
+    # Compute the solution
     posterior, output_scale, num_steps = _collocate.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        posterior=sol.posterior,
-        output_scale=sol.output_scale,
-        num_steps=sol.num_steps,
+        posterior=initial_solution.posterior,
+        output_scale=initial_solution.output_scale,
+        num_steps=initial_solution.num_steps,
         grid=grid,
         solver=solver,
         parameters=parameters,
     )
+
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.marginalise_backwards()
+        marginals = control_flow.tree_append(marginals, posterior.init)
     else:
+        posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
+
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
         t=grid,

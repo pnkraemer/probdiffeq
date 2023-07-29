@@ -3,9 +3,12 @@
 Sequentially (and often, adaptively) constrain a random process to an ODE.
 """
 
+import jax
+
 from probdiffeq.backend import control_flow
 
 
+# filter or fixedpoint
 def solve_and_save_at(
     vector_field,
     *,
@@ -19,7 +22,7 @@ def solve_and_save_at(
     parameters,
     while_loop_fn,
 ):
-    def advance_to_next_checkpoint(s, t_next):
+    def advance(s, t_next):
         s_next = _advance_ivp_solution_adaptively(
             state0=s,
             t1=t_next,
@@ -32,16 +35,12 @@ def solve_and_save_at(
 
     state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
 
-    _, solution = control_flow.scan_with_init(
-        f=advance_to_next_checkpoint,
-        init=state0,
-        xs=save_at[1:],
-        reverse=False,
-    )
-    sol_solver, _sol_control = adaptive_solver.extract(solution)
-    return sol_solver
+    _, sol = jax.lax.scan(f=advance, init=state0, xs=save_at[1:], reverse=False)
+    (_t, posterior, output_scale, num_steps), _sol_ctrl = adaptive_solver.extract(sol)
+    return posterior, output_scale, num_steps
 
 
+# filter or fixedpoint
 def simulate_terminal_values(
     vector_field,
     *,
@@ -100,6 +99,7 @@ def _advance_ivp_solution_adaptively(
     return sol
 
 
+# filter, smoother, or fixedpoint (but fixedpoint would be really dumb)
 def solve_with_python_while_loop(
     vector_field,
     *,
@@ -129,22 +129,20 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
     """Generate a probabilistic IVP solution iteratively."""
     # todo: adaptive_solver.solution_time(s) < t1?
     while state.solution.t < t1:
-        yield state
         state = adaptive_solver.step(
             state=state,
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
         )
-
-    yield state
+        yield state
 
 
 def solve_fixed_grid(
     vector_field, *, posterior, output_scale, num_steps, grid, solver, parameters
 ):
     t0 = grid[0]
-    state = solver.init(t0, posterior, output_scale, num_steps)
+    state0 = solver.init(t0, posterior, output_scale, num_steps)
 
     def body_fn(carry, t_new):
         s, t_old = carry
@@ -155,10 +153,9 @@ def solve_fixed_grid(
             dt=dt,
             parameters=parameters,
         )
-        return (s_new, t_new), (s_new, t_new)
+        return (s_new, t_new), s_new
 
-    _, (result, _) = control_flow.scan_with_init(
-        f=body_fn, init=(state, t0), xs=grid[1:]
-    )
-    _t, *sol = solver.extract(result)
-    return sol
+    _, result_state = jax.lax.scan(f=body_fn, init=(state0, t0), xs=grid[1:])
+
+    _t, posterior, output_scale, num_steps = solver.extract(result_state)
+    return posterior, output_scale, num_steps

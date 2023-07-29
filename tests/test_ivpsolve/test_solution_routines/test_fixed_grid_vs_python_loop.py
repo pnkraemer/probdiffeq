@@ -37,5 +37,4 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     solution_fixed = ivpsolve.solve_fixed_grid(
         *problem_args, grid=grid_adaptive, parameters=f_args, solver=solver
     )
-
     assert testing.tree_all_allclose(solution_adaptive, solution_fixed)

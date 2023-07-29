@@ -8,6 +8,7 @@ from probdiffeq.backend import testing
 
 
 def test_save_at_result_matches_interpolated_adaptive_result():
+    """Test that the save_at result matches the interpolation (using a filter)."""
     # Make a problem
     f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
     t1 = 2.0  # Short time-intervals are sufficient for this test.
@@ -21,11 +22,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Generate a solver
     solver = test_util.generate_solver(num_derivatives=2)
-    adaptive_kwargs = {
-        "solver": solver,
-        "atol": 1e-2,
-        "rtol": 1e-2,
-    }
+    adaptive_kwargs = {"solver": solver, "atol": 1e-2, "rtol": 1e-2}
 
     # Compute an adaptive solution and interpolate
     ts = jnp.linspace(t0, t1, num=15, endpoint=True)
