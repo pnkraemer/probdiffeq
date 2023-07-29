@@ -10,15 +10,14 @@ theme:
     - search.suggest
     - search.highlight
   palette:
-
     # Palette toggle for light mode
-    - scheme: default
+    - scheme: probdiffeq-light
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
 
     # Palette toggle for dark mode
-    - scheme: slate
+    - scheme: probdiffeq-dark
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -54,7 +53,6 @@ extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 plugins:
-  - search
   - mkdocstrings:
       handlers:
         python:
