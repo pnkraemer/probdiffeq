@@ -164,6 +164,8 @@ class _CalibrationFreeSolver(Solver):
     No automatic output-scale calibration.
     """
 
+    requires_rescaling = False
+
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         state_strategy = self.strategy.begin(
             state.strategy,
@@ -202,6 +204,8 @@ class _CalibrationFreeSolver(Solver):
 class _DynamicSolver(Solver):
     """Initial value problem solver with dynamic calibration of the output scale."""
 
+    requires_rescaling = False
+
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         state_strategy = self.strategy.begin(
             state.strategy,
@@ -239,6 +243,8 @@ class _DynamicSolver(Solver):
 class _MLESolver(Solver):
     """Initial value problem solver with (quasi-)maximum-likelihood \
      calibration of the output-scale."""
+
+    requires_rescaling = True
 
     def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
         state_strategy = self.strategy.begin(
@@ -290,42 +296,11 @@ class _MLESolver(Solver):
 
     def extract(self, state: _State, /):
         # 'state' is not batched. Thus, output scale is a scalar.
-        # Important: Rescale before extracting! Otherwise backward samples are wrong.
+        # Important: Rescale before extracting! Otherwise, backward samples are wrong.
 
         # Read output-scale
         output_scale = self.calibration.extract(state.output_scale_calibrated)
 
-        # todo: rescale outside of extract()?
-        state = self._rescale_covs(state, output_scale=output_scale)
-
         # Extract and return results
         t, posterior = self.strategy.extract(state.strategy)
         return t, posterior, output_scale, state.num_steps
-
-    def _rescale_covs(self, state, /, *, output_scale):
-        # todo: these calls to *.scale_covariance are a bit cumbersome,
-        #  because we need to add this
-        #  method to all sorts of classes.
-        #  Instead, we could move the collections.Normal
-        #  to the top-level and implement this via tree_map:
-        #  def scale_cov(tree):
-        #      def is_leaf(x):
-        #          return isinstance(x, Normal)
-        #      def fn(x: Normal):
-        #          return x.scale_covariance(output_scale)
-        #      return tree_map(fn, tree, is_leaf=is_leaf)
-        #  marginals = scale_cov(marginals_unscaled)
-        #  posterior = scale_cov(state.strategy)
-        #  Which would avoid having to do this over and over again
-        #  in intermediate objects
-        #  (Conditionals, Posteriors, StateSpaceVars, ...)
-
-        state_strategy = state.strategy.scale_covariance(output_scale)
-        state_rescaled = _State(
-            strategy=state_strategy,
-            output_scale_calibrated=output_scale,
-            output_scale_prior=None,  # irrelevant, will be removed in next step
-            error_estimate=None,  # irrelevant, will be removed in next step.
-            num_steps=state.num_steps,
-        )
-        return state_rescaled

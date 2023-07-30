@@ -69,6 +69,9 @@ def simulate_terminal_values(
     output_scale = jax.tree_util.tree_map(squeeze_fun, output_scale)
     num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
 
+    if solver.requires_rescaling:
+        posterior = posterior.scale_covariance(output_scale)
+
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.init
@@ -151,6 +154,9 @@ def solve_and_save_at(
         while_loop_fn=while_loop_fn_temporal,
     )
 
+    if solver.requires_rescaling:
+        posterior = posterior.scale_covariance(output_scale)
+
     # I think the user expects marginals, so we compute them here
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=solution_t0.posterior)
     marginals, posterior = _tmp
@@ -224,6 +230,9 @@ def solve_with_python_while_loop(
     # (Even though t0 is not computed by this function)
     t = jnp.concatenate((jnp.atleast_1d(t0), t))
 
+    if solver.requires_rescaling:
+        posterior = posterior.scale_covariance(output_scale)
+
     # I think the user expects marginals, so we compute them here
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=solution_t0.posterior)
     marginals, posterior = _tmp
@@ -274,6 +283,9 @@ def solve_fixed_grid(
         solver=solver,
         parameters=parameters,
     )
+
+    if solver.requires_rescaling:
+        posterior = posterior.scale_covariance(output_scale)
 
     # I think the user expects marginals, so we compute them here
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=solution_t0.posterior)

@@ -29,12 +29,6 @@ class _FiState(containers.NamedTuple):
     def u(self):
         return self.ssv.u
 
-    def scale_covariance(self, s, /):
-        ssv = self.ssv.scale_covariance(s)
-        corr = self.corr.scale_covariance(s)
-        # 'extra' is always None when filtering
-        return _FiState(t=self.t, extra=None, ssv=ssv, corr=corr)
-
 
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""

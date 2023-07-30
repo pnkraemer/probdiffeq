@@ -155,10 +155,6 @@ class SSV(variables.SSV):
         cor = NormalHiddenState(m_cor, r_cor.T)
         return obs, ConditionalQOI(gain, cor)
 
-    def scale_covariance(self, output_scale):
-        rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return SSV(self.u, rv)
-
 
 @jax.tree_util.register_pytree_node_class
 class NormalHiddenState(variables.Normal):
