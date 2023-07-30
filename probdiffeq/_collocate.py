@@ -8,7 +8,6 @@ import jax
 from probdiffeq.backend import tree_array_util
 
 
-# filter or fixedpoint
 def solve_and_save_at(
     vector_field,
     *,
@@ -40,7 +39,6 @@ def solve_and_save_at(
     return posterior, output_scale, num_steps
 
 
-# filter or fixedpoint
 def simulate_terminal_values(
     vector_field,
     *,
@@ -99,7 +97,6 @@ def _advance_ivp_solution_adaptively(
     return sol
 
 
-# filter, smoother, or fixedpoint (but fixedpoint would be really dumb)
 def solve_with_python_while_loop(
     vector_field,
     *,
