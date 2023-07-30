@@ -123,7 +123,7 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
-    initial_solution = solver.solution_from_tcoeffs(
+    solution_t0 = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -134,10 +134,10 @@ def solve_and_save_at(
 
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        t=initial_solution.t,
-        posterior=initial_solution.posterior,
-        output_scale=initial_solution.output_scale,
-        num_steps=initial_solution.num_steps,
+        t=solution_t0.t,
+        posterior=solution_t0.posterior,
+        output_scale=solution_t0.output_scale,
+        num_steps=solution_t0.num_steps,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -153,11 +153,11 @@ def solve_and_save_at(
 
         # We need to include the initial filtering solution (as an init)
         # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
-        init_t0 = initial_solution.posterior.init
+        init_t0 = solution_t0.posterior.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
         posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
-        posterior = tree_array_util.tree_prepend(initial_solution.posterior, posterior)
+        posterior = tree_array_util.tree_prepend(solution_t0.posterior, posterior)
         marginals = posterior
 
     u = marginals.extract_qoi_from_sample(marginals.mean)
@@ -205,7 +205,7 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    initial_solution = solver.solution_from_tcoeffs(
+    solution_t0 = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -216,10 +216,10 @@ def solve_with_python_while_loop(
 
     t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        t=initial_solution.t,
-        posterior=initial_solution.posterior,
-        output_scale=initial_solution.output_scale,
-        num_steps=initial_solution.num_steps,
+        t=solution_t0.t,
+        posterior=solution_t0.posterior,
+        output_scale=solution_t0.output_scale,
+        num_steps=solution_t0.num_steps,
         t1=t1,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -237,11 +237,11 @@ def solve_with_python_while_loop(
 
         # We need to include the initial filtering solution (as an init)
         # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
-        init_t0 = initial_solution.posterior.init
+        init_t0 = solution_t0.posterior.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
         posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
-        posterior = tree_array_util.tree_prepend(initial_solution.posterior, posterior)
+        posterior = tree_array_util.tree_prepend(solution_t0.posterior, posterior)
         marginals = posterior
 
     u = marginals.extract_qoi_from_sample(marginals.mean)
@@ -276,16 +276,16 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    initial_solution = solver.solution_from_tcoeffs(
+    solution_t0 = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
 
     # Compute the solution
     posterior, output_scale, num_steps = _collocate.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        posterior=initial_solution.posterior,
-        output_scale=initial_solution.output_scale,
-        num_steps=initial_solution.num_steps,
+        posterior=solution_t0.posterior,
+        output_scale=solution_t0.output_scale,
+        num_steps=solution_t0.num_steps,
         grid=grid,
         solver=solver,
         parameters=parameters,
@@ -299,11 +299,11 @@ def solve_fixed_grid(
 
         # We need to include the initial filtering solution (as an init)
         # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
-        init_t0 = initial_solution.posterior.init
+        init_t0 = solution_t0.posterior.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
         posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
-        posterior = tree_array_util.tree_prepend(initial_solution.posterior, posterior)
+        posterior = tree_array_util.tree_prepend(solution_t0.posterior, posterior)
         marginals = posterior
 
     u = marginals.extract_qoi_from_sample(marginals.mean)

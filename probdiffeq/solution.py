@@ -80,8 +80,13 @@ class Solution(Generic[R]):
         return self.t.shape[0]
 
     def __getitem__(self, item):
-        # todo: make message meaningful
-        raise NotImplementedError
+        msg = (
+            "Solution.__getitem__ has been removed. "
+            "If you need it in the context of log-likelihood estimation, "
+            "consider using a solver that returns the solution "
+            "at the appropriate grid (e.g. solve_and_save_at) instead."
+        )
+        raise NotImplementedError(msg)
 
 
 # todo: the functions in here should only depend on posteriors / strategies!
@@ -251,10 +256,6 @@ class _KalFiltState(containers.NamedTuple):
 # todo: we should allow proper noise, and proper information functions.
 #  But it is not clear which data structure that should be.
 def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
-    # the 0th backward model contains meaningless values
-    # bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.conditional)
-    bw_models = mseq.conditional
-
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
     init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
@@ -263,7 +264,7 @@ def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     lml_state, _ = jax.lax.scan(
         f=functools.partial(_filter_step, strategy=strategy),
         init=init,
-        xs=(bw_models, (standard_deviations[:-1], u[:-1])),
+        xs=(mseq.conditional, (standard_deviations[:-1], u[:-1])),
         reverse=reverse,
     )
     return lml_state.log_marginal_likelihood

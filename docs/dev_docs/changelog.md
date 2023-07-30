@@ -78,6 +78,11 @@ Notable breaking changes:
   The reasons for this change are -- as before -- internal code simplifications that become 
   possible as soon as we do not promise an object-oriented implementation.
 * The support for Python 3.8 has been dropped. Why? Because JAX' support for python 3.8 has been dropped.
+* `Solution.__getitem__` has been removed. 
+  It has always been slightly mathematically incorrect, which now leads to issues 
+  with correct interpolation behaviour. To update your code, 
+  use solve_and_save_at or simulate_terminal_values instead. 
+
 
 Notable enhancements:
 

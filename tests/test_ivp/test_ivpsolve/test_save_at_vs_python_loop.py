@@ -44,6 +44,5 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     )
 
     # Assert similarity
-    print(u_interp, u_save_at)
     assert jnp.allclose(u_interp, u_save_at)
     assert testing.marginals_allclose(marginals_interp, marginals_save_at)
