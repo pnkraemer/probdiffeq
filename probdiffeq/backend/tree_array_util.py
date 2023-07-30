@@ -1,4 +1,4 @@
-"""Custom control flow."""
+"""Pytree-array utility functions (e.g. tree_concatenate)."""
 
 import jax
 import jax.numpy as jnp
