@@ -18,8 +18,8 @@ lint:
 	pre-commit run --all-files
 
 test:
-	pytest -n auto -v -s  # parallelise, verbose output, show all 'stdout's
 	python -m doctest probdiffeq/*.py
+	pytest -n auto -v # parallelise, verbose output
 
 example:
 	jupytext --quiet --sync docs/quickstart/*.ipynb
