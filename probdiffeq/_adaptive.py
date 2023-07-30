@@ -99,30 +99,7 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
     @jax.jit
-    def step(self, state, vector_field, t1, parameters):
-        """Perform a full step (including acceptance/rejection)."""
-        enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
-        state = jax.lax.cond(
-            enter_rejection_loop,
-            lambda s: self._rejection_loop(
-                state0=s,
-                vector_field=vector_field,
-                t1=t1,
-                parameters=parameters,
-            ),
-            lambda s: s,
-            state,
-        )
-
-        state = jax.lax.cond(
-            state.accepted.t + self.numerical_zero >= t1,
-            lambda s: self._interpolate(state=s, t=t1),
-            lambda s: s,
-            state,
-        )
-        return state
-
-    def _rejection_loop(self, *, vector_field, state0, t1, parameters):
+    def rejection_loop(self, *, vector_field, state0, t1, parameters):
         # todo: this function is sufficiently complex that it should probably
         #   be extracted from here...
 
@@ -201,7 +178,8 @@ class AdaptiveIVPSolver(Generic[T]):
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
-    def _interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
+    # todo: move to _collocate.py
+    def interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
         accepted, solution, previous = self.solver.interpolate(
             s0=state.previous, s1=state.accepted, t=t
         )

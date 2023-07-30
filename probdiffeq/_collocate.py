@@ -51,23 +51,29 @@ def _advance_ivp_solution_adaptively(
 
     def cond_fun(s):
         # todo: adaptive_solver.solution_time(s) < t1?
-        return s.solution.t < t1
+        return s.accepted.t < t1
 
     def body_fun(s):
-        state = adaptive_solver.step(
-            state=s,
+        return adaptive_solver.rejection_loop(
+            state0=s,
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
         )
-        return state
 
-    sol = while_loop_fn(
+    state1 = while_loop_fn(
         cond_fun=cond_fun,
         body_fun=body_fun,
         init_val=state0,
     )
-    return sol
+    # todo: remove state.solution for good (not needed anymore)
+    # todo: rethink case_interpolate implementation
+    return jax.lax.cond(
+        state1.accepted.t >= t1,
+        lambda s: adaptive_solver.interpolate(state=s, t=t1),
+        lambda s: s,
+        state1,
+    )
 
 
 def solve_with_python_while_loop(
@@ -98,14 +104,19 @@ def solve_with_python_while_loop(
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
     # todo: adaptive_solver.solution_time(s) < t1?
-    while state.solution.t < t1:
-        state = adaptive_solver.step(
-            state=state,
+    while state.accepted.t < t1:
+        state = adaptive_solver.rejection_loop(
+            state0=state,
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
         )
-        yield state
+        # todo: rethink implementation of case_right_corner
+        if state.accepted.t >= t1:
+            # todo: move interpolate from adaptive solver to here
+            yield adaptive_solver.interpolate(state=state, t=t1)
+        else:
+            yield state
 
 
 def solve_fixed_grid(
