@@ -119,6 +119,8 @@ class MarkovSeqRev(Generic[S]):
 
         # Remove the initial backward-model
         conds = jax.tree_util.tree_map(lambda s: s[1:, ...], self.conditional)
+        # warnings.warn("No more ignoring initial conditionals please!!!")
+        conds = self.conditional
 
         # Loop over backward models and the remaining base samples
         xs = (conds, base_sample[:-1])
@@ -136,7 +138,9 @@ class MarkovSeqRev(Generic[S]):
 
         # Initial backward model leads into the void
         # todo: this is only true for the version we use.
-        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.conditional)
+        # conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.conditional)
+        # warnings.warn("No more ignoring initial conditionals please!!!")
+        conds = self.conditional
 
         # If we hold many 'init's, choose the terminal one.
         if self.conditional.noise.mean.shape == self.init.mean.shape:
@@ -150,4 +154,6 @@ class MarkovSeqRev(Generic[S]):
 
     @property
     def sample_shape(self):
-        return self.conditional.noise.sample_shape
+        # The number of samples is one larger than the number of conditionals
+        n, *shape_single_sample = self.conditional.noise.sample_shape
+        return (n + 1,) + tuple(shape_single_sample)

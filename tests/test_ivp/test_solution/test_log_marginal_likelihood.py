@@ -125,11 +125,12 @@ def test_raises_error_for_terminal_values(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
 
+    posterior_t1 = jax.tree_util.tree_map(lambda s: s[-1], sol)
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
             observation_std=jnp.ones_like(data[-1]),
             u=data[-1],
-            posterior=sol[-1].posterior,
+            posterior=posterior_t1,
             strategy=solver.strategy,
         )
 

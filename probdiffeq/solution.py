@@ -80,25 +80,8 @@ class Solution(Generic[R]):
         return self.t.shape[0]
 
     def __getitem__(self, item):
-        if jnp.ndim(self.t) < 1:
-            raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
-        if isinstance(item, tuple) and len(item) > jnp.ndim(self.t):
-            # s[2, 3] forbidden
-            raise ValueError(f"Inapplicable shape: {item, jnp.shape(self.t)}")
-        return Solution(
-            t=self.t[item],
-            u=self.u[item],
-            output_scale=self.output_scale[item],
-            # todo: make iterable?
-            marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
-            # todo: make iterable?
-            posterior=jax.tree_util.tree_map(lambda x: x[item], self.posterior),
-            num_steps=self.num_steps[item],
-        )
-
-    def __iter__(self):
-        for i in range(self.t.shape[0]):
-            yield self[i]
+        # todo: make message meaningful
+        raise NotImplementedError
 
 
 # todo: the functions in here should only depend on posteriors / strategies!
@@ -118,27 +101,59 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
         with the interval boundaries.
         At the moment, we do not check this.
     """
-    # todo: support "method" argument to be passed to searchsorted.
+    offgrid_marginals_vmap = jax.vmap(_offgrid_marginals, in_axes=(0, None, None))
+    return offgrid_marginals_vmap(ts, solution, solver)
+    # print(jax.tree_util.tree_map(jnp.shape, solution))
+    #
+    # # todo: support "method" argument to be passed to searchsorted.
+    # # side="left" and side="right" are equivalent
+    # # because we _assume_ that the point sets are disjoint.
+    # indices = jnp.searchsorted(solution.t, ts)
+    #
+    # # Solution slicing to the rescue
+    # solution_left = solution[indices - 1]
+    # solution_right = solution[indices]
+    #
+    # # Vmap to the rescue :) It does not like kw-only arguments, though.
+    # @jax.vmap
+    # def marginals_vmap(sprev, t, s):
+    #     return _offgrid_marginals(
+    #         t=t, solution=s, solution_previous=sprev, solver=solver
+    #     )
+    #
+    # return marginals_vmap(solution_left, ts, solution_right)
 
+
+def _offgrid_marginals(t, solution, solver):
     # side="left" and side="right" are equivalent
     # because we _assume_ that the point sets are disjoint.
-    indices = jnp.searchsorted(solution.t, ts)
+    index = jnp.searchsorted(solution.t, t)
 
-    # Solution slicing to the rescue
-    solution_left = solution[indices - 1]
-    solution_right = solution[indices]
+    def _extract_previous(tree):
+        return jax.tree_util.tree_map(lambda s: s[index - 1, ...], tree)
 
-    # Vmap to the rescue :) It does not like kw-only arguments, though.
-    @jax.vmap
-    def marginals_vmap(sprev, t, s):
-        return _offgrid_marginals(
-            t=t, solution=s, solution_previous=sprev, solver=solver
-        )
+    def _extract(tree):
+        return jax.tree_util.tree_map(lambda s: s[index, ...], tree)
 
-    return marginals_vmap(solution_left, ts, solution_right)
+    marginals = _extract_previous(solution.marginals)
+    posterior = _extract(solution.posterior)
+    posterior_previous = _extract_previous(solution.posterior)
+    t0 = _extract_previous(solution.t)
+    t1 = _extract(solution.t)
+    output_scale = _extract(solution.output_scale)
+
+    return solver.strategy.offgrid_marginals(
+        marginals=marginals,
+        posterior=posterior,
+        posterior_previous=posterior_previous,
+        t=t,
+        t0=t0,
+        t1=t1,
+        output_scale=output_scale,
+    )
 
 
-def _offgrid_marginals(*, solution, t, solution_previous, solver):
+def _offgrid_marginals2(*, solution, t, solution_previous, solver):
     return solver.strategy.offgrid_marginals(
         marginals=solution.marginals,
         posterior=solution.posterior,
@@ -251,7 +266,8 @@ class _KalFiltState(containers.NamedTuple):
 #  But it is not clear which data structure that should be.
 def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.conditional)
+    # bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.conditional)
+    bw_models = mseq.conditional
 
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)

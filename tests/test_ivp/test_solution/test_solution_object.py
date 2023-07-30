@@ -58,32 +58,6 @@ def fixture_approximate_solution(problem, impl_factory):
     return sol, solver
 
 
-def test_solution_is_iterable(approximate_solution):
-    sol, _ = approximate_solution
-    assert isinstance(sol[0], type(sol))
-    assert len(sol) == len(sol.t)
-
-
-def test_getitem_raises_error_for_nonbatched_solutions(approximate_solution):
-    """__getitem__ only works for batched solutions."""
-    sol, _ = approximate_solution
-    with testing.raises(ValueError):
-        _ = sol[0][0]
-    with testing.raises(ValueError):
-        _ = sol[0, 0]
-
-
-def test_loop_over_solution_is_possible(approximate_solution):
-    solution_full, _ = approximate_solution
-
-    i = 0
-    for i, sol in zip(range(2 * len(solution_full)), solution_full):
-        assert isinstance(sol, type(solution_full))
-
-    assert i > 0
-    assert i == len(solution_full) - 1
-
-
 def test_marginal_nth_derivative_of_solution(approximate_solution):
     """Assert that each $n$th derivative matches the quantity of interest's shape."""
     sol, _ = approximate_solution

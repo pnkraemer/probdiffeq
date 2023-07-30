@@ -37,8 +37,13 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     solution_save_at = ivpsolve.solve_and_save_at(
         *problem_args, **problem_kwargs, save_at=ts, **adaptive_kwargs
     )
-    solution_save_at = solution_save_at[1:-1]
+
+    u_save_at = solution_save_at.u[1:-1]
+    marginals_save_at = jax.tree_util.tree_map(
+        lambda s: s[1:-1], solution_save_at.marginals
+    )
 
     # Assert similarity
-    assert jnp.allclose(u_interp, solution_save_at.u)
-    assert testing.marginals_allclose(marginals_interp, solution_save_at.marginals)
+    print(u_interp, u_save_at)
+    assert jnp.allclose(u_interp, u_save_at)
+    assert testing.marginals_allclose(marginals_interp, marginals_save_at)
