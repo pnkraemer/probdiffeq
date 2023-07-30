@@ -33,36 +33,9 @@ def solve_and_save_at(
         return s_next, s_next
 
     state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-
-    _, sol = jax.lax.scan(f=advance, init=state0, xs=save_at[1:], reverse=False)
+    _, sol = jax.lax.scan(f=advance, init=state0, xs=save_at, reverse=False)
     (_t, posterior, output_scale, num_steps), _sol_ctrl = adaptive_solver.extract(sol)
     return posterior, output_scale, num_steps
-
-
-def simulate_terminal_values(
-    vector_field,
-    *,
-    t,
-    posterior,
-    output_scale,
-    num_steps,
-    t1,
-    adaptive_solver,
-    parameters,
-    dt0,
-    while_loop_fn,
-):
-    state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-    solution = _advance_ivp_solution_adaptively(
-        state0=state0,
-        t1=t1,
-        vector_field=vector_field,
-        adaptive_solver=adaptive_solver,
-        parameters=parameters,
-        while_loop_fn=while_loop_fn,
-    )
-    (sol_solver, _sol_control) = adaptive_solver.extract(solution)
-    return sol_solver
 
 
 def _advance_ivp_solution_adaptively(
