@@ -103,25 +103,6 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
     """
     offgrid_marginals_vmap = jax.vmap(_offgrid_marginals, in_axes=(0, None, None))
     return offgrid_marginals_vmap(ts, solution, solver)
-    # print(jax.tree_util.tree_map(jnp.shape, solution))
-    #
-    # # todo: support "method" argument to be passed to searchsorted.
-    # # side="left" and side="right" are equivalent
-    # # because we _assume_ that the point sets are disjoint.
-    # indices = jnp.searchsorted(solution.t, ts)
-    #
-    # # Solution slicing to the rescue
-    # solution_left = solution[indices - 1]
-    # solution_right = solution[indices]
-    #
-    # # Vmap to the rescue :) It does not like kw-only arguments, though.
-    # @jax.vmap
-    # def marginals_vmap(sprev, t, s):
-    #     return _offgrid_marginals(
-    #         t=t, solution=s, solution_previous=sprev, solver=solver
-    #     )
-    #
-    # return marginals_vmap(solution_left, ts, solution_right)
 
 
 def _offgrid_marginals(t, solution, solver):
@@ -135,9 +116,14 @@ def _offgrid_marginals(t, solution, solver):
     def _extract(tree):
         return jax.tree_util.tree_map(lambda s: s[index, ...], tree)
 
-    marginals = _extract_previous(solution.marginals)
+    marginals = _extract(solution.marginals)
+
+    # In the smoothing context:
+    # Extract the correct posterior.init (aka the filtering solutions)
+    # The conditionals are incorrect, but we don't really care about this.
     posterior = _extract(solution.posterior)
     posterior_previous = _extract_previous(solution.posterior)
+
     t0 = _extract_previous(solution.t)
     t1 = _extract(solution.t)
     output_scale = _extract(solution.output_scale)

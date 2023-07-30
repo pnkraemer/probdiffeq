@@ -109,6 +109,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
         lambda s: s[1:-1], solution_fixedpoint.marginals
     )
 
+    print(u_fixedpoint)
+    print(u_interp)
+
     # Compare QOI and marginals
     assert testing.tree_all_allclose(u_fixedpoint, u_interp)
     assert testing.marginals_allclose(marginals_fixedpoint, marginals_interp)

@@ -150,6 +150,12 @@ def solve_and_save_at(
         marginals = posterior.marginalise_backwards()
         marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = control_flow.tree_append(marginals, marginal_t1)
+
+        # We need to include the initial filtering solution (as an init)
+        # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
+        init_t0 = initial_solution.posterior.init
+        init = control_flow.tree_prepend(init_t0, posterior.init)
+        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
         posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
@@ -228,6 +234,12 @@ def solve_with_python_while_loop(
         marginals = posterior.marginalise_backwards()
         marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = control_flow.tree_append(marginals, marginal_t1)
+
+        # We need to include the initial filtering solution (as an init)
+        # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
+        init_t0 = initial_solution.posterior.init
+        init = control_flow.tree_prepend(init_t0, posterior.init)
+        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
         posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
@@ -284,6 +296,12 @@ def solve_fixed_grid(
         marginals = posterior.marginalise_backwards()
         marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = control_flow.tree_append(marginals, marginal_t1)
+
+        # We need to include the initial filtering solution (as an init)
+        # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
+        init_t0 = initial_solution.posterior.init
+        init = control_flow.tree_prepend(init_t0, posterior.init)
+        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
         posterior = control_flow.tree_prepend(initial_solution.posterior, posterior)
         marginals = posterior
