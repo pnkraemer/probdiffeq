@@ -33,12 +33,6 @@ class _SmState(containers.NamedTuple):
     def u(self):
         return self.ssv.u
 
-    def scale_covariance(self, output_scale):
-        extra = self.extra.scale_covariance(output_scale)
-        ssv = self.ssv.scale_covariance(output_scale)
-        corr = self.corr.scale_covariance(output_scale)
-        return _SmState(t=self.t, extra=extra, ssv=ssv, corr=corr)
-
 
 @jax.tree_util.register_pytree_node_class
 class _Smoother(_strategy.Strategy):

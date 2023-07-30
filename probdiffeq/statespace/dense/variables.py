@@ -112,10 +112,6 @@ class DenseSSV(variables.SSV):
         cor = DenseConditional(gain, noise=noise, target_shape=self.target_shape)
         return obs, cor
 
-    def scale_covariance(self, output_scale):
-        rv = self.hidden_state.scale_covariance(output_scale)
-        return DenseSSV(self.u, rv, target_shape=self.target_shape)
-
     def _select_derivative_vect(self, x, i):
         fn = functools.partial(self._select_derivative, i=i)
         select = jax.vmap(fn, in_axes=1, out_axes=1)
