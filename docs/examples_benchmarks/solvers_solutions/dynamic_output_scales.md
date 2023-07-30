@@ -83,9 +83,9 @@ Plot the solution.
 fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8, 5))
 
 ax[0][0].plot(ts, solution_dynamic.u, label="Approximation", marker="None")
-ax[1][0].plot(ts, solution_dynamic.output_scale, marker="None")
+ax[1][0].plot(ts[1:], solution_dynamic.output_scale, marker="None")
 ax[0][1].plot(ts, solution_mle.u, label="Approximation", marker="None")
-ax[1][1].plot(ts, solution_mle.output_scale, marker="None")
+ax[1][1].plot(ts[1:], solution_mle.output_scale, marker="None")
 
 ax[0][0].plot(
     ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
@@ -131,9 +131,9 @@ solution_mle = ivpsolve.solve_fixed_grid(
 fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8, 5))
 
 ax[0][0].semilogy(ts, solution_dynamic.u, label="Approximation", marker="None")
-ax[1][0].semilogy(ts, solution_dynamic.output_scale, marker="None")
+ax[1][0].semilogy(ts[1:], solution_dynamic.output_scale, marker="None")
 ax[0][1].semilogy(ts, solution_mle.u, label="Approximation", marker="None")
-ax[1][1].semilogy(ts, solution_mle.output_scale, marker="None")
+ax[1][1].semilogy(ts[1:], solution_mle.output_scale, marker="None")
 
 ax[0][0].semilogy(
     ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"

@@ -68,13 +68,6 @@ sol = ivpsolve.solve_with_python_while_loop(
 )
 ```
 
-We can access elements of the solution.
-
-```python
-print(len(sol))
-print(sol[-1])
-```
-
 We can plot an estimate of the solution.
 
 ```python
