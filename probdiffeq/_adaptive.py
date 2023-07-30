@@ -56,7 +56,6 @@ class AdaptiveIVPSolver(Generic[T]):
         rtol=1e-2,
         control=None,
         norm_ord=None,
-        numerical_zero=1e-10,
         while_loop_fn=jax.lax.while_loop,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
@@ -69,7 +68,6 @@ class AdaptiveIVPSolver(Generic[T]):
         self.rtol = rtol
         self.control = control
         self.norm_ord = norm_ord
-        self.numerical_zero = numerical_zero
         self.reference_state_fn = reference_state_fn
 
     def __repr__(self):
@@ -80,7 +78,6 @@ class AdaptiveIVPSolver(Generic[T]):
             f"\n\trtol={self.rtol},"
             f"\n\tcontrol={self.control},"
             f"\n\tnorm_order={self.norm_ord},"
-            f"\n\tnumerical_zero={self.numerical_zero},"
             f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
@@ -200,19 +197,13 @@ class AdaptiveIVPSolver(Generic[T]):
 
 
 def _asolver_flatten(asolver: AdaptiveIVPSolver):
-    children = (
-        asolver.solver,
-        asolver.atol,
-        asolver.rtol,
-        asolver.control,
-        asolver.numerical_zero,
-    )
+    children = (asolver.solver, asolver.atol, asolver.rtol, asolver.control)
     aux = asolver.norm_ord, asolver.reference_state_fn, asolver.while_loop_fn
     return children, aux
 
 
 def _asolver_unflatten(aux, children):
-    solver, atol, rtol, control, numerical_zero = children
+    solver, atol, rtol, control = children
     norm_ord, reference_state_fn, while_loop_fn = aux
     return AdaptiveIVPSolver(
         solver=solver,
@@ -220,7 +211,6 @@ def _asolver_unflatten(aux, children):
         atol=atol,
         rtol=rtol,
         control=control,
-        numerical_zero=numerical_zero,
         norm_ord=norm_ord,
         reference_state_fn=reference_state_fn,
     )
