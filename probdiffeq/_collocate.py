@@ -5,7 +5,7 @@ Sequentially (and often, adaptively) constrain a random process to an ODE.
 
 import jax
 
-from probdiffeq.backend import control_flow
+from probdiffeq.backend import tree_array_util
 
 
 # filter or fixedpoint
@@ -120,7 +120,7 @@ def solve_with_python_while_loop(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    forward_solution = control_flow.tree_stack(list(generator))
+    forward_solution = tree_array_util.tree_stack(list(generator))
     sol_solver, _sol_control = adaptive_solver.extract(forward_solution)
     return sol_solver
 

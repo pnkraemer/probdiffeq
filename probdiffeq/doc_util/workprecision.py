@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 from tqdm.auto import tqdm
 
-from probdiffeq.backend import control_flow
+from probdiffeq.backend import tree_array_util
 
 
 class MethodConfig:
@@ -154,7 +154,7 @@ def _evaluate_method(*, method_config, problem_config):
         )
         for atol, rtol in zip(tqdm(atols, leave=False), rtols)
     ]
-    return control_flow.tree_stack(results)
+    return tree_array_util.tree_stack(results)
 
 
 def _evaluate_method_and_tolerance(*, error_fn, fn, atol, rtol, repeat):
