@@ -30,12 +30,13 @@ def solve_and_save_at(
             parameters=parameters,
             while_loop_fn=while_loop_fn,
         )
-        return s_next, s_next
+        sol_strategy, _sol_ctrl = adaptive_solver.extract(s_next)
+        (_t, *sol) = sol_strategy
+        return s_next, sol
 
     state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-    _, sol = jax.lax.scan(f=advance, init=state0, xs=save_at, reverse=False)
-    (_t, posterior, output_scale, num_steps), _sol_ctrl = adaptive_solver.extract(sol)
-    return posterior, output_scale, num_steps
+    _, solution = jax.lax.scan(f=advance, init=state0, xs=save_at, reverse=False)
+    return solution
 
 
 def _advance_ivp_solution_adaptively(
@@ -96,9 +97,7 @@ def solve_with_python_while_loop(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    forward_solution = tree_array_util.tree_stack(list(generator))
-    sol_solver, _sol_control = adaptive_solver.extract(forward_solution)
-    return sol_solver
+    return tree_array_util.tree_stack(list(generator))
 
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
@@ -114,9 +113,12 @@ def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters)
         # todo: rethink implementation of case_right_corner
         if state.accepted.t >= t1:
             # todo: move interpolate from adaptive solver to here
-            yield adaptive_solver.interpolate(state=state, t=t1)
+            state = adaptive_solver.interpolate(state=state, t=t1)
+            sol_solver, _sol_control = adaptive_solver.extract(state)
+            yield sol_solver
         else:
-            yield state
+            sol_solver, _sol_control = adaptive_solver.extract(state)
+            yield sol_solver
 
 
 def solve_fixed_grid(
