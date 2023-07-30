@@ -146,3 +146,8 @@ class MarkovSeqRev(Generic[S]):
         # The number of samples is one larger than the number of conditionals
         n, *shape_single_sample = self.conditional.noise.sample_shape
         return (n + 1,) + tuple(shape_single_sample)
+
+    def scale_covariance(self, output_scale):
+        init = self.init.scale_covariance(output_scale)
+        conditional = self.conditional.scale_covariance(output_scale)
+        return MarkovSeqRev(init=init, conditional=conditional)

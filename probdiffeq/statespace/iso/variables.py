@@ -107,10 +107,6 @@ class IsoSSV(variables.SSV):
         cond = IsoConditionalQOI(gain, noise=cor)
         return obs, cond
 
-    def scale_covariance(self, output_scale):
-        rv = self.hidden_state.scale_covariance(output_scale=output_scale)
-        return IsoSSV(self.u, rv)
-
 
 @jax.tree_util.register_pytree_node_class
 class IsoNormalHiddenState(variables.Normal):
