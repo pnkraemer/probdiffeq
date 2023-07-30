@@ -23,7 +23,7 @@ def fixture_problem():
 def fixture_approximate_solution(problem):
     vf, u0, (t0, t1), f_args = problem
     solver = test_util.generate_solver(num_derivatives=1)
-    sol = ivpsolve.solve_with_python_while_loop(
+    return ivpsolve.solve_with_python_while_loop(
         vf,
         (u0,),
         t0=t0,
@@ -33,10 +33,37 @@ def fixture_approximate_solution(problem):
         atol=1e-2,
         rtol=1e-2,
     )
-    return sol, solver
 
 
-def test_getitem_vmap_result_possible(problem):
+def test_getitem_possible_for_terminal_values(approximate_solution):
+    solution_t1 = approximate_solution[-1]
+    assert isinstance(solution_t1, type(approximate_solution))
+
+
+@testing.parametrize("item", [-2, 0, slice(1, -1, 1)])
+def test_getitem_impossible_for_nonterminal_values(approximate_solution, item):
+    with testing.raises(ValueError, match="non-terminal"):
+        _ = approximate_solution[item]
+
+
+@testing.parametrize("item", [-1, -2, 0, slice(1, -1, 1)])
+def test_getitem_impossible_at_single_time_for_any_item(approximate_solution, item):
+    # Allowed slicing:
+    # solution_t1 is not batched now, so further slicing should be impossible
+    solution_t1 = approximate_solution[-1]
+
+    with testing.raises(ValueError, match="not batched"):
+        _ = solution_t1[item]
+
+
+def test_iter_impossible(approximate_solution):
+    with testing.raises(ValueError, match="not batched"):
+        for _ in approximate_solution:
+            pass
+
+
+@testing.fixture(name="approximate_solution_vmap")
+def fixture_approximate_solution_vmap(problem):
     vf, u0, (t0, t1), f_args = problem
     solver = test_util.generate_solver(num_derivatives=1)
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
@@ -53,47 +80,33 @@ def test_getitem_vmap_result_possible(problem):
             rtol=1e-2,
         )
 
-    solution_vmapped = solve(jnp.stack((u0, u0 + 0.1, u0 + 0.2)))
-
-    assert isinstance(solution_vmapped[0], type(solution_vmapped))
-    assert isinstance(solution_vmapped[1], type(solution_vmapped))
-    assert isinstance(solution_vmapped[2], type(solution_vmapped))
+    return solve(jnp.stack((u0, u0 + 0.1, u0 + 0.2)))
 
 
-def test_getitem_terminal_values_possible(approximate_solution):
-    solution, _ = approximate_solution
-    solution_t1 = solution[-1]
-    assert isinstance(solution_t1, type(solution))
+def test_vmap_getitem_possible(approximate_solution_vmap):
+    solution_type = type(approximate_solution_vmap)
+    for idx in (0, 1, 2):
+        approximate_solution = approximate_solution_vmap[idx]
+        assert isinstance(approximate_solution, solution_type)
+        assert jnp.allclose(approximate_solution.t, approximate_solution_vmap.t[idx])
+        assert jnp.allclose(approximate_solution.u, approximate_solution_vmap.u[idx])
 
 
-@testing.parametrize("item", [-2, 0, slice(1, -1, 1)])
-def test_getitem_non_batched_solution_impossible(approximate_solution, item):
-    solution, _ = approximate_solution
-    # Allowed slicing:
-    # solution_t1 is not batched now, so further slicing should be impossible
-    solution_t1 = solution[-1]
-
-    with testing.raises(ValueError, match="not batched"):
-        _ = solution_t1[item]
-
-
-@testing.parametrize("item", [-2, 0, slice(1, -1, 1)])
-def test_getitem_nonterminal_values_impossible(approximate_solution, item):
-    solution, _ = approximate_solution
-
-    with testing.raises(ValueError, match="non-terminal"):
-        _ = solution[item]
+def test_vmap_iter_possible(approximate_solution_vmap):
+    solution_type = type(approximate_solution_vmap)
+    for idx, approximate_solution in enumerate(approximate_solution_vmap):
+        assert isinstance(approximate_solution, solution_type)
+        assert jnp.allclose(approximate_solution.t, approximate_solution_vmap.t[idx])
+        assert jnp.allclose(approximate_solution.u, approximate_solution_vmap.u[idx])
 
 
 def test_marginal_nth_derivative_of_solution(approximate_solution):
     """Assert that each $n$th derivative matches the quantity of interest's shape."""
-    sol, _ = approximate_solution
-
     # Assert that the marginals have the same shape as the qoi.
     for i in (0, 1):
-        derivatives = sol.marginals.marginal_nth_derivative(i)
-        assert derivatives.mean.shape == sol.u.shape
+        derivatives = approximate_solution.marginals.marginal_nth_derivative(i)
+        assert derivatives.mean.shape == approximate_solution.u.shape
 
     # if the requested derivative is not in the state-space model, raise a ValueError
     with testing.raises(ValueError):
-        sol.marginals.marginal_nth_derivative(100)
+        approximate_solution.marginals.marginal_nth_derivative(100)
