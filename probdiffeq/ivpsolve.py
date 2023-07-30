@@ -1,6 +1,6 @@
 """Routines for estimating solutions of initial value problems."""
 
-
+import functools
 import warnings
 
 import jax
@@ -41,7 +41,7 @@ def simulate_terminal_values(
         t=t0,
         parameters=parameters,
     )
-    sol = solver.solution_from_tcoeffs(
+    solution_t0 = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -50,18 +50,24 @@ def simulate_terminal_values(
         nugget = propose_dt0_nugget
         dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
-    t, posterior, output_scale, num_steps = _collocate.simulate_terminal_values(
+    save_at = jnp.asarray([t1])
+    posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        t=sol.t,
-        posterior=sol.posterior,
-        output_scale=sol.output_scale,
-        num_steps=sol.num_steps,
-        t1=t1,
+        t=solution_t0.t,
+        posterior=solution_t0.posterior,
+        output_scale=solution_t0.output_scale,
+        num_steps=solution_t0.num_steps,
+        save_at=save_at,
         adaptive_solver=adaptive_solver,
-        parameters=parameters,
         dt0=dt0,
+        parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
     )
+    # "squeeze"-type functionality (there is only a single state!)
+    squeeze_fun = functools.partial(jnp.squeeze, axis=0)
+    posterior = jax.tree_util.tree_map(squeeze_fun, posterior)
+    output_scale = jax.tree_util.tree_map(squeeze_fun, output_scale)
+    num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
 
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
@@ -70,7 +76,7 @@ def simulate_terminal_values(
         marginals = posterior
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
-        t=t,
+        t=t1,
         u=u,
         marginals=marginals,
         posterior=posterior,
@@ -138,7 +144,7 @@ def solve_and_save_at(
         posterior=solution_t0.posterior,
         output_scale=solution_t0.output_scale,
         num_steps=solution_t0.num_steps,
-        save_at=save_at,
+        save_at=save_at[1:],
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
