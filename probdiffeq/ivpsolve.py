@@ -152,19 +152,8 @@ def solve_and_save_at(
     )
 
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSeqRev):
-        marginals = posterior.marginalise_backwards()
-        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
-        # We need to include the initial filtering solution (as an init)
-        # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
-        init_t0 = solution_t0.posterior.init
-        init = tree_array_util.tree_prepend(init_t0, posterior.init)
-        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
-    else:
-        posterior = tree_array_util.tree_prepend(solution_t0.posterior, posterior)
-        marginals = posterior
+    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=solution_t0.posterior)
+    marginals, posterior = _tmp
 
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
@@ -236,19 +225,8 @@ def solve_with_python_while_loop(
     t = jnp.concatenate((jnp.atleast_1d(t0), t))
 
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSeqRev):
-        marginals = posterior.marginalise_backwards()
-        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
-        # We need to include the initial filtering solution (as an init)
-        # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
-        init_t0 = solution_t0.posterior.init
-        init = tree_array_util.tree_prepend(init_t0, posterior.init)
-        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
-    else:
-        posterior = tree_array_util.tree_prepend(solution_t0.posterior, posterior)
-        marginals = posterior
+    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=solution_t0.posterior)
+    marginals, posterior = _tmp
 
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
@@ -298,19 +276,8 @@ def solve_fixed_grid(
     )
 
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSeqRev):
-        marginals = posterior.marginalise_backwards()
-        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
-        # We need to include the initial filtering solution (as an init)
-        # Otherwise, information is lost and we cannot, e.g., interpolate corrrectly.
-        init_t0 = solution_t0.posterior.init
-        init = tree_array_util.tree_prepend(init_t0, posterior.init)
-        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
-    else:
-        posterior = tree_array_util.tree_prepend(solution_t0.posterior, posterior)
-        marginals = posterior
+    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=solution_t0.posterior)
+    marginals, posterior = _tmp
 
     u = marginals.extract_qoi_from_sample(marginals.mean)
     return solution.Solution(
@@ -321,6 +288,23 @@ def solve_fixed_grid(
         output_scale=output_scale,
         num_steps=num_steps,
     )
+
+
+def _userfriendly_output(*, posterior, posterior_t0):
+    if isinstance(posterior, _markov.MarkovSeqRev):
+        marginals = posterior.marginalise_backwards()
+        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+        marginals = tree_array_util.tree_append(marginals, marginal_t1)
+
+        # We need to include the initial filtering solution (as an init)
+        # Otherwise, information is lost, and we cannot, e.g., interpolate correctly.
+        init_t0 = posterior_t0.init
+        init = tree_array_util.tree_prepend(init_t0, posterior.init)
+        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
+    else:
+        posterior = tree_array_util.tree_prepend(posterior_t0, posterior)
+        marginals = posterior
+    return marginals, posterior
 
 
 def propose_dt0(
