@@ -80,13 +80,14 @@ class Solution(Generic[R]):
         return self.t.shape[0]
 
     def __getitem__(self, item):
-        msg = (
-            "Solution.__getitem__ has been removed. "
-            "If you need it in the context of log-likelihood estimation, "
-            "consider using a solver that returns the solution "
-            "at the appropriate grid (e.g. solve_and_save_at) instead."
-        )
-        raise NotImplementedError(msg)
+        if jnp.ndim(self.t) < 1:
+            raise ValueError("Solution object not batched :(")
+
+        if item != -1:
+            msg = "Access to non-terminal states is not available."
+            raise ValueError(msg)
+
+        return jax.tree_util.tree_map(lambda s: s[-1, ...], self)
 
 
 # todo: the functions in here should only depend on posteriors / strategies!
