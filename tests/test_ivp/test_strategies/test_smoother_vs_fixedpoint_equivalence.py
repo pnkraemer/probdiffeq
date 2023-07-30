@@ -84,6 +84,8 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
 def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_smoother):
     args, kwargs, _, impl_factory = solver_setup
     save_at = solution_smoother.t
+
+    # Re-generate the smoothing solver and compute the offgrid-marginals
     solver_smoother = test_util.generate_solver(
         strategy_factory=smoothers.smoother, impl_factory=impl_factory
     )
@@ -92,13 +94,21 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
         ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
     )
 
+    # Generate a fixedpoint solver and solve (saving at the interpolation points)
     solver_fixedpoint = test_util.generate_solver(
         strategy_factory=smoothers.smoother_fixedpoint, impl_factory=impl_factory
     )
     solution_fixedpoint = ivpsolve.solve_and_save_at(
         *args, save_at=ts, solver=solver_fixedpoint, **kwargs
     )
-    solution_fixedpoint = solution_fixedpoint[1:-1]
 
-    assert testing.tree_all_allclose(solution_fixedpoint.u, u_interp)
-    assert testing.marginals_allclose(marginals_interp, solution_fixedpoint.marginals)
+    # Extract the interior points of the save_at solution
+    # (because only there is the interpolated solution defined)
+    u_fixedpoint = solution_fixedpoint.u[1:-1]
+    marginals_fixedpoint = jax.tree_util.tree_map(
+        lambda s: s[1:-1], solution_fixedpoint.marginals
+    )
+
+    # Compare QOI and marginals
+    assert testing.tree_all_allclose(u_fixedpoint, u_interp)
+    assert testing.marginals_allclose(marginals_fixedpoint, marginals_interp)

@@ -78,6 +78,8 @@ Notable breaking changes:
   The reasons for this change are -- as before -- internal code simplifications that become 
   possible as soon as we do not promise an object-oriented implementation.
 * The support for Python 3.8 has been dropped. Why? Because JAX' support for python 3.8 has been dropped.
+* `Solution.__getitem__(self, item)` is now only allowed if either `item = -1` or if the solution is the result of a vmap-type operation.
+  Every other implementation has always been mathematically incorrect.
 
 Notable enhancements:
 

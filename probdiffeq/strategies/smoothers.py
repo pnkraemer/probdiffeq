@@ -79,6 +79,9 @@ class _Smoother(_strategy.Strategy):
         e_1 = self._extrapolate(s0=e_t, output_scale=output_scale, t=s1.t)
 
         # Marginalise from t1 to t to obtain the interpolated solution.
+        # (This function assumes we are in the forward-pass, which is why we interpolate
+        # back from the "filtering" state. In the context of offgrid_marginals,
+        # the backward-interpolation step is repeated from the smoothing marginals)
         bw_t1_to_t, bw_t_to_t0 = e_1.extra, e_t.extra
         rv_at_t = bw_t1_to_t.marginalise(s1.ssv.hidden_state)
         mseq_t = _markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)

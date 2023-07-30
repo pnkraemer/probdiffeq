@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0.dev2
+      jupytext_version: 1.14.7
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -66,13 +66,6 @@ sol = ivpsolve.solve_with_python_while_loop(
     atol=1e-1,
     rtol=1e-1,
 )
-```
-
-We can access elements of the solution.
-
-```python
-print(len(sol))
-print(sol[-1])
 ```
 
 We can plot an estimate of the solution.

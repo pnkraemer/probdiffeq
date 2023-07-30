@@ -81,22 +81,18 @@ class Solution(Generic[R]):
 
     def __getitem__(self, item):
         if jnp.ndim(self.t) < 1:
-            raise ValueError(f"Solution object not batched :(, {jnp.ndim(self.t)}")
-        if isinstance(item, tuple) and len(item) > jnp.ndim(self.t):
-            # s[2, 3] forbidden
-            raise ValueError(f"Inapplicable shape: {item, jnp.shape(self.t)}")
-        return Solution(
-            t=self.t[item],
-            u=self.u[item],
-            output_scale=self.output_scale[item],
-            # todo: make iterable?
-            marginals=jax.tree_util.tree_map(lambda x: x[item], self.marginals),
-            # todo: make iterable?
-            posterior=jax.tree_util.tree_map(lambda x: x[item], self.posterior),
-            num_steps=self.num_steps[item],
-        )
+            raise ValueError("Solution object not batched :(")
+
+        if jnp.ndim(self.t) == 1 and item != -1:
+            msg = "Access to non-terminal states is not available."
+            raise ValueError(msg)
+
+        return jax.tree_util.tree_map(lambda s: s[item, ...], self)
 
     def __iter__(self):
+        if jnp.ndim(self.t) <= 1:
+            raise ValueError("Solution object not batched :(")
+
         for i in range(self.t.shape[0]):
             yield self[i]
 
@@ -118,27 +114,45 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
         with the interval boundaries.
         At the moment, we do not check this.
     """
-    # todo: support "method" argument to be passed to searchsorted.
+    offgrid_marginals_vmap = jax.vmap(_offgrid_marginals, in_axes=(0, None, None))
+    return offgrid_marginals_vmap(ts, solution, solver)
 
+
+def _offgrid_marginals(t, solution, solver):
     # side="left" and side="right" are equivalent
     # because we _assume_ that the point sets are disjoint.
-    indices = jnp.searchsorted(solution.t, ts)
+    index = jnp.searchsorted(solution.t, t)
 
-    # Solution slicing to the rescue
-    solution_left = solution[indices - 1]
-    solution_right = solution[indices]
+    def _extract_previous(tree):
+        return jax.tree_util.tree_map(lambda s: s[index - 1, ...], tree)
 
-    # Vmap to the rescue :) It does not like kw-only arguments, though.
-    @jax.vmap
-    def marginals_vmap(sprev, t, s):
-        return _offgrid_marginals(
-            t=t, solution=s, solution_previous=sprev, solver=solver
-        )
+    def _extract(tree):
+        return jax.tree_util.tree_map(lambda s: s[index, ...], tree)
 
-    return marginals_vmap(solution_left, ts, solution_right)
+    marginals = _extract(solution.marginals)
+
+    # In the smoothing context:
+    # Extract the correct posterior.init (aka the filtering solutions)
+    # The conditionals are incorrect, but we don't really care about this.
+    posterior = _extract(solution.posterior)
+    posterior_previous = _extract_previous(solution.posterior)
+
+    t0 = _extract_previous(solution.t)
+    t1 = _extract(solution.t)
+    output_scale = _extract(solution.output_scale)
+
+    return solver.strategy.offgrid_marginals(
+        marginals=marginals,
+        posterior=posterior,
+        posterior_previous=posterior_previous,
+        t=t,
+        t0=t0,
+        t1=t1,
+        output_scale=output_scale,
+    )
 
 
-def _offgrid_marginals(*, solution, t, solution_previous, solver):
+def _offgrid_marginals2(*, solution, t, solution_previous, solver):
     return solver.strategy.offgrid_marginals(
         marginals=solution.marginals,
         posterior=solution.posterior,
@@ -250,9 +264,6 @@ class _KalFiltState(containers.NamedTuple):
 # todo: we should allow proper noise, and proper information functions.
 #  But it is not clear which data structure that should be.
 def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
-    # the 0th backward model contains meaningless values
-    bw_models = jax.tree_util.tree_map(lambda x: x[1:, ...], mseq.conditional)
-
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
     init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
@@ -261,7 +272,7 @@ def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     lml_state, _ = jax.lax.scan(
         f=functools.partial(_filter_step, strategy=strategy),
         init=init,
-        xs=(bw_models, (standard_deviations[:-1], u[:-1])),
+        xs=(mseq.conditional, (standard_deviations[:-1], u[:-1])),
         reverse=reverse,
     )
     return lml_state.log_marginal_likelihood

@@ -8,6 +8,7 @@ from probdiffeq.backend import testing
 
 
 def test_save_at_result_matches_interpolated_adaptive_result():
+    """Test that the save_at result matches the interpolation (using a filter)."""
     # Make a problem
     f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
     t1 = 2.0  # Short time-intervals are sufficient for this test.
@@ -21,11 +22,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Generate a solver
     solver = test_util.generate_solver(num_derivatives=2)
-    adaptive_kwargs = {
-        "solver": solver,
-        "atol": 1e-2,
-        "rtol": 1e-2,
-    }
+    adaptive_kwargs = {"solver": solver, "atol": 1e-2, "rtol": 1e-2}
 
     # Compute an adaptive solution and interpolate
     ts = jnp.linspace(t0, t1, num=15, endpoint=True)
@@ -40,8 +37,12 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     solution_save_at = ivpsolve.solve_and_save_at(
         *problem_args, **problem_kwargs, save_at=ts, **adaptive_kwargs
     )
-    solution_save_at = solution_save_at[1:-1]
+
+    u_save_at = solution_save_at.u[1:-1]
+    marginals_save_at = jax.tree_util.tree_map(
+        lambda s: s[1:-1], solution_save_at.marginals
+    )
 
     # Assert similarity
-    assert jnp.allclose(u_interp, solution_save_at.u)
-    assert testing.marginals_allclose(marginals_interp, solution_save_at.marginals)
+    assert jnp.allclose(u_interp, u_save_at)
+    assert testing.marginals_allclose(marginals_interp, marginals_save_at)

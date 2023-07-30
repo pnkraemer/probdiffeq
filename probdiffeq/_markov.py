@@ -1,12 +1,9 @@
 """Markov sequences and Markov processes."""
 
-import functools
 from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
-
-from probdiffeq.backend import control_flow
 
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
@@ -120,11 +117,8 @@ class MarkovSeqRev(Generic[S]):
         init_qoi = init.extract_qoi_from_sample(init_sample)
         init_val = (init_qoi, init_sample)
 
-        # Remove the initial backward-model
-        conds = jax.tree_util.tree_map(lambda s: s[1:, ...], self.conditional)
-
         # Loop over backward models and the remaining base samples
-        xs = (conds, base_sample[:-1])
+        xs = (self.conditional, base_sample[:-1])
         _, (qois, samples) = jax.lax.scan(
             f=body_fun, init=init_val, xs=xs, reverse=True
         )
@@ -137,10 +131,6 @@ class MarkovSeqRev(Generic[S]):
             out = conditional.marginalise(rv)
             return out, out
 
-        # Initial backward model leads into the void
-        # todo: this is only true for the version we use.
-        conds = jax.tree_util.tree_map(lambda x: x[1:, ...], self.conditional)
-
         # If we hold many 'init's, choose the terminal one.
         if self.conditional.noise.mean.shape == self.init.mean.shape:
             init = jax.tree_util.tree_map(lambda x: x[-1, ...], self.init)
@@ -148,10 +138,11 @@ class MarkovSeqRev(Generic[S]):
             init = self.init
 
         # Scan and return
-        reverse_scan = functools.partial(control_flow.scan_with_init, reverse=True)
-        _, rvs = reverse_scan(f=body_fun, init=init, xs=conds)
+        _, rvs = jax.lax.scan(f=body_fun, init=init, xs=self.conditional, reverse=True)
         return rvs
 
     @property
     def sample_shape(self):
-        return self.conditional.noise.sample_shape
+        # The number of samples is one larger than the number of conditionals
+        n, *shape_single_sample = self.conditional.noise.sample_shape
+        return (n + 1,) + tuple(shape_single_sample)
