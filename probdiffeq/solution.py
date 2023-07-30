@@ -83,11 +83,12 @@ class Solution(Generic[R]):
         if jnp.ndim(self.t) < 1:
             raise ValueError("Solution object not batched :(")
 
-        if item != -1:
-            msg = "Access to non-terminal states is not available."
-            raise ValueError(msg)
+        if jnp.ndim(self.t) == 1:
+            if item != -1:
+                msg = "Access to non-terminal states is not available."
+                raise ValueError(msg)
 
-        return jax.tree_util.tree_map(lambda s: s[-1, ...], self)
+        return jax.tree_util.tree_map(lambda s: s[item, ...], self)
 
 
 # todo: the functions in here should only depend on posteriors / strategies!

@@ -1,11 +1,10 @@
-"""Tests for IVP solvers."""
+"""Tests for interaction with the solution object."""
 import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
-from probdiffeq.statespace import recipes
 
 
 @testing.fixture(name="problem")
@@ -20,31 +19,10 @@ def fixture_problem():
     return vf, u0, (t0, t1), f_args
 
 
-@testing.case()
-def case_isotropic_factorisation():
-    def iso_factory(ode_shape, num_derivatives):
-        return recipes.ts0_iso(num_derivatives=num_derivatives)
-
-    return iso_factory
-
-
-@testing.case()  # this implies success of the scalar solver
-def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag
-
-
-@testing.case()
-def case_dense_factorisation():
-    return recipes.ts0_dense
-
-
 @testing.fixture(name="approximate_solution")
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def fixture_approximate_solution(problem, impl_factory):
+def fixture_approximate_solution(problem):
     vf, u0, (t0, t1), f_args = problem
-    solver = test_util.generate_solver(
-        num_derivatives=1, impl_factory=impl_factory, ode_shape=jnp.shape(u0)
-    )
+    solver = test_util.generate_solver(num_derivatives=1)
     sol = ivpsolve.solve_with_python_while_loop(
         vf,
         (u0,),
@@ -56,6 +34,30 @@ def fixture_approximate_solution(problem, impl_factory):
         rtol=1e-2,
     )
     return sol, solver
+
+
+def test_getitem_vmap_result_possible(problem):
+    vf, u0, (t0, t1), f_args = problem
+    solver = test_util.generate_solver(num_derivatives=1)
+    save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
+
+    @jax.vmap
+    def solve(init):
+        return ivpsolve.solve_and_save_at(
+            vf,
+            (init,),
+            save_at=save_at,
+            parameters=f_args,
+            solver=solver,
+            atol=1e-2,
+            rtol=1e-2,
+        )
+
+    solution_vmapped = solve(jnp.stack((u0, u0 + 0.1, u0 + 0.2)))
+
+    assert isinstance(solution_vmapped[0], type(solution_vmapped))
+    assert isinstance(solution_vmapped[1], type(solution_vmapped))
+    assert isinstance(solution_vmapped[2], type(solution_vmapped))
 
 
 def test_getitem_terminal_values_possible(approximate_solution):
