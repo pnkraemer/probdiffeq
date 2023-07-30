@@ -295,9 +295,6 @@ class _MLESolver(Solver):
         return sum_updated / jnp.sqrt(n + 1)
 
     def extract(self, state: _State, /):
-        # 'state' is not batched. Thus, output scale is a scalar.
-        # Important: Rescale before extracting! Otherwise, backward samples are wrong.
-
         # Read output-scale
         output_scale = self.calibration.extract(state.output_scale_calibrated)
 
