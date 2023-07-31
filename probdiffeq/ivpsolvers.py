@@ -94,21 +94,7 @@ class Solver:
             num_steps=num_steps,
         )
 
-    def interpolate(self, *, s0: _State, s1: _State, t):
-        # Cases to switch between
-        branches = [self._case_right_corner, self._case_interpolate]
-
-        # Which case applies
-        is_right_corner = (s1.t - t) ** 2 <= 1e-10  # todo: magic constant?
-        is_in_between = jnp.logical_not(is_right_corner)
-        index_as_array = jnp.asarray([is_right_corner, is_in_between])
-
-        # Select branch and return result
-        apply_branch_as_array, *_ = jnp.where(index_as_array, size=1)
-        apply_branch = jnp.reshape(apply_branch_as_array, ())
-        return jax.lax.switch(apply_branch, branches, t, s0, s1)
-
-    def _case_interpolate(self, t, s0: _State, s1: _State) -> _interp.InterpRes[_State]:
+    def interpolate_fun(self, t, s0: _State, s1: _State) -> _interp.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
             t,
             s0=s0.strategy,
@@ -123,9 +109,7 @@ class Solver:
         acc = self._interp_make_state(acc_p, reference=s1)
         return _interp.InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def _case_right_corner(
-        self, t, s0: _State, s1: _State
-    ) -> _interp.InterpRes[_State]:
+    def right_corner_fun(self, t, s0: _State, s1: _State) -> _interp.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(
             t,
             s0=s0.strategy,
