@@ -20,15 +20,13 @@ def solve_and_save_at(
     dt0,
     parameters,
     while_loop_fn,
+    interpolate_fn,
 ):
-    def advance(s, t_next):
-        acc, prev, ctrl = s
+    def advance(acc_prev_ctrl, t_next):
         # Advance until accepted.t >= t_next.
         # Note: This could already be the case and we may not loop (just interpolate)
         accepted, previous, control = _advance_ivp_solution_adaptively(
-            acc,
-            prev,
-            ctrl,
+            *acc_prev_ctrl,
             t1=t_next,
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
@@ -37,8 +35,8 @@ def solve_and_save_at(
         )
 
         # As long as case_right_corner is part of interpolation, we always "interpolate"
-        accepted, solution, previous = adaptive_solver.interpolate(
-            accepted=accepted, previous=previous, t=t_next
+        accepted, solution, previous = interpolate_fn(
+            s1=accepted, s0=previous, t=t_next
         )
 
         # Extract the solution
@@ -52,9 +50,8 @@ def solve_and_save_at(
         num_steps=num_steps,
         dt0=dt0,
     )
-    _, solution = jax.lax.scan(
-        f=advance, init=(acc, acc, ctrl), xs=save_at, reverse=False
-    )
+    init = (acc, acc, ctrl)
+    _, solution = jax.lax.scan(f=advance, init=init, xs=save_at, reverse=False)
     return solution
 
 
@@ -105,6 +102,7 @@ def _solution_generator(
     t1,
     adaptive_solver,
     parameters,
+    interpolate_fn,
 ):
     """Generate a probabilistic IVP solution iteratively."""
     accepted, control = adaptive_solver.init(
@@ -123,9 +121,7 @@ def _solution_generator(
     # todo: rethink implementation of case_right_corner
     # todo: move interpolate from adaptive solver to here
     # todo: what happens if while-loop is never entered?
-    accepted, solution, previous = adaptive_solver.interpolate(
-        accepted=accepted, previous=previous, t=t1
-    )
+    accepted, solution, previous = interpolate_fn(s1=accepted, s0=previous, t=t1)
 
     sol_solver, _sol_control = adaptive_solver.extract(solution, control)
     yield sol_solver

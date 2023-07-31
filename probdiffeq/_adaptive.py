@@ -7,14 +7,6 @@ import jax.numpy as jnp
 from probdiffeq import controls, ivpsolvers
 from probdiffeq.backend import containers
 
-#
-# # todo: should this move to _collocate?
-# class _AdaptiveState(containers.NamedTuple):
-#     """State for adaptive IVP solvers."""
-#
-#     control: Any
-#     accepted: Any
-
 
 class _RejectionState(containers.NamedTuple):
     """State for rejection loops.
@@ -83,7 +75,6 @@ class AdaptiveIVPSolver(Generic[T]):
     @jax.jit
     def init(self, t, posterior, output_scale, num_steps, dt0):
         """Initialise the IVP solver state."""
-        # Initialise the components
         state_solver = self.solver.init(t, posterior, output_scale, num_steps)
         state_control = self.control.init(dt0)
         return state_solver, state_control
@@ -156,10 +147,6 @@ class AdaptiveIVPSolver(Generic[T]):
         error_relative = error_estimate / (atol + rtol * jnp.abs(u))
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
-
-    # todo: move to _collocate.py
-    def interpolate(self, *, accepted, previous, t):
-        return self.solver.interpolate(s0=previous, s1=accepted, t=t)
 
     def extract(self, accepted, control, /):
         solver_extract = self.solver.extract(accepted)
