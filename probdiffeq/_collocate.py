@@ -30,12 +30,13 @@ def solve_and_save_at(
             parameters=parameters,
             while_loop_fn=while_loop_fn,
         )
-        return s_next, s_next
+        sol_strategy, _sol_ctrl = adaptive_solver.extract(s_next)
+        (_t, *sol) = sol_strategy
+        return s_next, sol
 
     state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-    _, sol = jax.lax.scan(f=advance, init=state0, xs=save_at, reverse=False)
-    (_t, posterior, output_scale, num_steps), _sol_ctrl = adaptive_solver.extract(sol)
-    return posterior, output_scale, num_steps
+    _, solution = jax.lax.scan(f=advance, init=state0, xs=save_at, reverse=False)
+    return solution
 
 
 def _advance_ivp_solution_adaptively(
@@ -51,23 +52,29 @@ def _advance_ivp_solution_adaptively(
 
     def cond_fun(s):
         # todo: adaptive_solver.solution_time(s) < t1?
-        return s.solution.t < t1
+        return s.accepted.t < t1
 
     def body_fun(s):
-        state = adaptive_solver.step(
-            state=s,
+        return adaptive_solver.rejection_loop(
+            state0=s,
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
         )
-        return state
 
-    sol = while_loop_fn(
+    state1 = while_loop_fn(
         cond_fun=cond_fun,
         body_fun=body_fun,
         init_val=state0,
     )
-    return sol
+    # todo: remove state.solution for good (not needed anymore)
+    # todo: rethink case_interpolate implementation
+    return jax.lax.cond(
+        state1.accepted.t >= t1,
+        lambda s: adaptive_solver.interpolate(state=s, t=t1),
+        lambda s: s,
+        state1,
+    )
 
 
 def solve_with_python_while_loop(
@@ -90,22 +97,28 @@ def solve_with_python_while_loop(
         adaptive_solver=adaptive_solver,
         parameters=parameters,
     )
-    forward_solution = tree_array_util.tree_stack(list(generator))
-    sol_solver, _sol_control = adaptive_solver.extract(forward_solution)
-    return sol_solver
+    return tree_array_util.tree_stack(list(generator))
 
 
 def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
     # todo: adaptive_solver.solution_time(s) < t1?
-    while state.solution.t < t1:
-        state = adaptive_solver.step(
-            state=state,
+    while state.accepted.t < t1:
+        state = adaptive_solver.rejection_loop(
+            state0=state,
             vector_field=vector_field,
             t1=t1,
             parameters=parameters,
         )
-        yield state
+        # todo: rethink implementation of case_right_corner
+        if state.accepted.t >= t1:
+            # todo: move interpolate from adaptive solver to here
+            state = adaptive_solver.interpolate(state=state, t=t1)
+            sol_solver, _sol_control = adaptive_solver.extract(state)
+            yield sol_solver
+        else:
+            sol_solver, _sol_control = adaptive_solver.extract(state)
+            yield sol_solver
 
 
 def solve_fixed_grid(

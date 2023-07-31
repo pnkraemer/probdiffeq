@@ -70,6 +70,8 @@ def simulate_terminal_values(
     num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
 
     if solver.requires_rescaling:
+        if output_scale.ndim > 0:
+            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
         posterior = posterior.scale_covariance(output_scale)
 
     # I think the user expects marginals, so we compute them here
@@ -155,6 +157,8 @@ def solve_and_save_at(
     )
 
     if solver.requires_rescaling:
+        if output_scale.ndim > 0:
+            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
         posterior = posterior.scale_covariance(output_scale)
 
     # I think the user expects marginals, so we compute them here
@@ -231,6 +235,8 @@ def solve_with_python_while_loop(
     t = jnp.concatenate((jnp.atleast_1d(t0), t))
 
     if solver.requires_rescaling:
+        if output_scale.ndim > 0:
+            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
         posterior = posterior.scale_covariance(output_scale)
 
     # I think the user expects marginals, so we compute them here
@@ -285,6 +291,8 @@ def solve_fixed_grid(
     )
 
     if solver.requires_rescaling:
+        if output_scale.ndim > 0:
+            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
         posterior = posterior.scale_covariance(output_scale)
 
     # I think the user expects marginals, so we compute them here

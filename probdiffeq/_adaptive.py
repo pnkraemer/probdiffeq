@@ -56,7 +56,6 @@ class AdaptiveIVPSolver(Generic[T]):
         rtol=1e-2,
         control=None,
         norm_ord=None,
-        numerical_zero=1e-10,
         while_loop_fn=jax.lax.while_loop,
         reference_state_fn=_reference_state_fn_max_abs,
     ):
@@ -69,7 +68,6 @@ class AdaptiveIVPSolver(Generic[T]):
         self.rtol = rtol
         self.control = control
         self.norm_ord = norm_ord
-        self.numerical_zero = numerical_zero
         self.reference_state_fn = reference_state_fn
 
     def __repr__(self):
@@ -80,7 +78,6 @@ class AdaptiveIVPSolver(Generic[T]):
             f"\n\trtol={self.rtol},"
             f"\n\tcontrol={self.control},"
             f"\n\tnorm_order={self.norm_ord},"
-            f"\n\tnumerical_zero={self.numerical_zero},"
             f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
@@ -99,30 +96,7 @@ class AdaptiveIVPSolver(Generic[T]):
         )
 
     @jax.jit
-    def step(self, state, vector_field, t1, parameters):
-        """Perform a full step (including acceptance/rejection)."""
-        enter_rejection_loop = state.accepted.t + self.numerical_zero < t1
-        state = jax.lax.cond(
-            enter_rejection_loop,
-            lambda s: self._rejection_loop(
-                state0=s,
-                vector_field=vector_field,
-                t1=t1,
-                parameters=parameters,
-            ),
-            lambda s: s,
-            state,
-        )
-
-        state = jax.lax.cond(
-            state.accepted.t + self.numerical_zero >= t1,
-            lambda s: self._interpolate(state=s, t=t1),
-            lambda s: s,
-            state,
-        )
-        return state
-
-    def _rejection_loop(self, *, vector_field, state0, t1, parameters):
+    def rejection_loop(self, *, vector_field, state0, t1, parameters):
         # todo: this function is sufficiently complex that it should probably
         #   be extracted from here...
 
@@ -201,7 +175,8 @@ class AdaptiveIVPSolver(Generic[T]):
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
-    def _interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
+    # todo: move to _collocate.py
+    def interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
         accepted, solution, previous = self.solver.interpolate(
             s0=state.previous, s1=state.accepted, t=t
         )
@@ -222,19 +197,13 @@ class AdaptiveIVPSolver(Generic[T]):
 
 
 def _asolver_flatten(asolver: AdaptiveIVPSolver):
-    children = (
-        asolver.solver,
-        asolver.atol,
-        asolver.rtol,
-        asolver.control,
-        asolver.numerical_zero,
-    )
+    children = (asolver.solver, asolver.atol, asolver.rtol, asolver.control)
     aux = asolver.norm_ord, asolver.reference_state_fn, asolver.while_loop_fn
     return children, aux
 
 
 def _asolver_unflatten(aux, children):
-    solver, atol, rtol, control, numerical_zero = children
+    solver, atol, rtol, control = children
     norm_ord, reference_state_fn, while_loop_fn = aux
     return AdaptiveIVPSolver(
         solver=solver,
@@ -242,7 +211,6 @@ def _asolver_unflatten(aux, children):
         atol=atol,
         rtol=rtol,
         control=control,
-        numerical_zero=numerical_zero,
         norm_ord=norm_ord,
         reference_state_fn=reference_state_fn,
     )
