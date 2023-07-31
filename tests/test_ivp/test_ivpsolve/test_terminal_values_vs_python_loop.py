@@ -34,7 +34,8 @@ def fixture_solution_with_python_while_loop(problem_args_kwargs, solver_kwargs):
 @testing.fixture(name="simulation_terminal_values")
 def fixture_simulation_terminal_values(problem_args_kwargs, solver_kwargs):
     args, kwargs = problem_args_kwargs
-    return ivpsolve.simulate_terminal_values(*args, **kwargs, **solver_kwargs)
+    with jax.disable_jit():
+        return ivpsolve.simulate_terminal_values(*args, **kwargs, **solver_kwargs)
 
 
 def test_terminal_values_identical(solution_python_loop, simulation_terminal_values):
