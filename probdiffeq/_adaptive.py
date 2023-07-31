@@ -8,16 +8,6 @@ from probdiffeq import controls, ivpsolvers
 from probdiffeq.backend import containers
 
 
-# todo: should this move to _collocate?
-class _AdaptiveState(containers.NamedTuple):
-    """State for adaptive IVP solvers."""
-
-    control: Any
-    accepted: Any
-    solution: Any
-    previous: Any
-
-
 class _RejectionState(containers.NamedTuple):
     """State for rejection loops.
 
@@ -85,53 +75,36 @@ class AdaptiveIVPSolver(Generic[T]):
     @jax.jit
     def init(self, t, posterior, output_scale, num_steps, dt0):
         """Initialise the IVP solver state."""
-        # Initialise the components
         state_solver = self.solver.init(t, posterior, output_scale, num_steps)
         state_control = self.control.init(dt0)
-        return _AdaptiveState(
-            solution=state_solver,
-            accepted=state_solver,
-            previous=state_solver,
-            control=state_control,
-        )
+        return state_solver, state_control
 
     @jax.jit
-    def rejection_loop(self, *, vector_field, state0, t1, parameters):
-        # todo: this function is sufficiently complex that it should probably
-        #   be extracted from here...
-
+    def rejection_loop(self, state0, control0, *, vector_field, t1, parameters):
         def cond_fn(s):
             return s.error_norm_proposed > 1.0
 
         def body_fn(s):
-            s = self._attempt_step(
+            return self._attempt_step(
                 state=s,
                 vector_field=vector_field,
                 t1=t1,
                 parameters=parameters,
             )
-            return s
 
-        def init(s):
+        def init(s0, c0):
             larger_than_1 = 1.1
-            st = _RejectionState(
+            return _RejectionState(
                 error_norm_proposed=larger_than_1,
-                control=s.control,
-                proposed=_inf_like(s.solution),
-                step_from=s.accepted,
+                control=c0,
+                proposed=_inf_like(s0),
+                step_from=s0,
             )
-            return st
 
         def extract(s):
-            # 'solution' is overwritten by interpolate() if necessary
-            return _AdaptiveState(
-                accepted=s.proposed,
-                solution=s.proposed,
-                previous=s.step_from,
-                control=s.control,
-            )
+            return s.proposed, s.control
 
-        state_new = self.while_loop_fn(cond_fn, body_fn, init(state0))
+        state_new = self.while_loop_fn(cond_fn, body_fn, init(state0, control0))
         return extract(state_new)
 
     def _attempt_step(self, *, state: _RejectionState, vector_field, t1, parameters):
@@ -175,21 +148,9 @@ class AdaptiveIVPSolver(Generic[T]):
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
 
-    # todo: move to _collocate.py
-    def interpolate(self, *, state: _AdaptiveState, t) -> _AdaptiveState:
-        accepted, solution, previous = self.solver.interpolate(
-            s0=state.previous, s1=state.accepted, t=t
-        )
-        return _AdaptiveState(
-            accepted=accepted,  # holla! New! :)
-            solution=solution,  # holla! New! :)
-            previous=previous,  # holla! New! :)
-            control=state.control,
-        )
-
-    def extract(self, state: _AdaptiveState, /):
-        solver_extract = self.solver.extract(state.solution)
-        control_extract = self.control.extract(state.control)
+    def extract(self, accepted, control, /):
+        solver_extract = self.solver.extract(accepted)
+        control_extract = self.control.extract(control)
         return solver_extract, control_extract
 
 

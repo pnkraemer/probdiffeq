@@ -20,30 +20,55 @@ def solve_and_save_at(
     dt0,
     parameters,
     while_loop_fn,
+    interpolate,
 ):
-    def advance(s, t_next):
-        s_next = _advance_ivp_solution_adaptively(
-            state0=s,
+    interpolate_fun, right_corner_fun = interpolate
+
+    def advance(acc_prev_ctrl, t_next):
+        # Advance until accepted.t >= t_next.
+        # Note: This could already be the case and we may not loop (just interpolate)
+        accepted, previous, control = _advance_ivp_solution_adaptively(
+            *acc_prev_ctrl,
             t1=t_next,
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
             while_loop_fn=while_loop_fn,
         )
-        sol_strategy, _sol_ctrl = adaptive_solver.extract(s_next)
-        (_t, *sol) = sol_strategy
-        return s_next, sol
 
-    state0 = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-    _, solution = jax.lax.scan(f=advance, init=state0, xs=save_at, reverse=False)
+        # Either interpolate (t > t_next) or "finalise" (t == t_next)
+        accepted, solution, previous = jax.lax.cond(
+            accepted.t > t_next,
+            interpolate_fun,
+            right_corner_fun,
+            t_next,
+            previous,
+            accepted,
+        )
+
+        # Extract the solution
+        (_t, *sol_solver), _sol_ctrl = adaptive_solver.extract(solution, control)
+        return (accepted, previous, control), sol_solver
+
+    acc, ctrl = adaptive_solver.init(
+        t=t,
+        posterior=posterior,
+        output_scale=output_scale,
+        num_steps=num_steps,
+        dt0=dt0,
+    )
+    init = (acc, acc, ctrl)
+    _, solution = jax.lax.scan(f=advance, init=init, xs=save_at, reverse=False)
     return solution
 
 
 def _advance_ivp_solution_adaptively(
+    acc0,
+    prev0,
+    ctrl0,
     *,
     vector_field,
     t1,
-    state0,
     adaptive_solver,
     parameters,
     while_loop_fn,
@@ -51,74 +76,66 @@ def _advance_ivp_solution_adaptively(
     """Advance an IVP solution to the next state."""
 
     def cond_fun(s):
-        # todo: adaptive_solver.solution_time(s) < t1?
-        return s.accepted.t < t1
+        acc, _, ctrl = s
+        return acc.t < t1
 
     def body_fun(s):
-        return adaptive_solver.rejection_loop(
-            state0=s,
-            vector_field=vector_field,
-            t1=t1,
-            parameters=parameters,
+        s0, _, c0 = s
+        s1, c1 = adaptive_solver.rejection_loop(
+            s0, c0, vector_field=vector_field, t1=t1, parameters=parameters
         )
+        return s1, s0, c1
 
-    state1 = while_loop_fn(
+    return while_loop_fn(
         cond_fun=cond_fun,
         body_fun=body_fun,
-        init_val=state0,
-    )
-    # todo: remove state.solution for good (not needed anymore)
-    # todo: rethink case_interpolate implementation
-    return jax.lax.cond(
-        state1.accepted.t >= t1,
-        lambda s: adaptive_solver.interpolate(state=s, t=t1),
-        lambda s: s,
-        state1,
+        init_val=(acc0, prev0, ctrl0),
     )
 
 
-def solve_with_python_while_loop(
+def solve_with_python_while_loop(*args, **kwargs):
+    generator = _solution_generator(*args, **kwargs)
+    return tree_array_util.tree_stack(list(generator))
+
+
+def _solution_generator(
     vector_field,
     *,
     t,
     posterior,
     output_scale,
     num_steps,
+    dt0,
     t1,
     adaptive_solver,
-    dt0,
     parameters,
+    interpolate,
 ):
-    state = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-    generator = _solution_generator(
-        vector_field,
-        state=state,
-        t1=t1,
-        adaptive_solver=adaptive_solver,
-        parameters=parameters,
-    )
-    return tree_array_util.tree_stack(list(generator))
-
-
-def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
-    # todo: adaptive_solver.solution_time(s) < t1?
-    while state.accepted.t < t1:
-        state = adaptive_solver.rejection_loop(
-            state0=state,
-            vector_field=vector_field,
-            t1=t1,
-            parameters=parameters,
+    interpolate_fun, right_corner_fun = interpolate
+
+    accepted, control = adaptive_solver.init(
+        t, posterior, output_scale, num_steps, dt0=dt0
+    )
+    while accepted.t < t1:
+        previous = accepted
+        accepted, control = adaptive_solver.rejection_loop(
+            accepted, control, vector_field=vector_field, t1=t1, parameters=parameters
         )
-        # todo: rethink implementation of case_right_corner
-        if state.accepted.t >= t1:
-            # todo: move interpolate from adaptive solver to here
-            state = adaptive_solver.interpolate(state=state, t=t1)
-            sol_solver, _sol_control = adaptive_solver.extract(state)
+
+        if accepted.t < t1:
+            sol_solver, _sol_control = adaptive_solver.extract(accepted, control)
             yield sol_solver
-        else:
-            sol_solver, _sol_control = adaptive_solver.extract(state)
-            yield sol_solver
+
+    # Either interpolate (t > t_next) or "finalise" (t == t_next)
+    if accepted.t > t1:
+        accepted, solution, previous = interpolate_fun(s1=accepted, s0=previous, t=t1)
+    else:
+        assert accepted.t == t1
+        accepted, solution, previous = right_corner_fun(s1=accepted, s0=previous, t=t1)
+
+    sol_solver, _sol_control = adaptive_solver.extract(solution, control)
+    yield sol_solver
 
 
 def solve_fixed_grid(
