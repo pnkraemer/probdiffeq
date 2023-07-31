@@ -77,32 +77,25 @@ def _advance_ivp_solution_adaptively(
     )
 
 
-def solve_with_python_while_loop(
+def solve_with_python_while_loop(*args, **kwargs):
+    generator = _solution_generator(*args, **kwargs)
+    return tree_array_util.tree_stack(list(generator))
+
+
+def _solution_generator(
     vector_field,
     *,
     t,
     posterior,
     output_scale,
     num_steps,
+    dt0,
     t1,
     adaptive_solver,
-    dt0,
     parameters,
 ):
-    state = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
-    generator = _solution_generator(
-        vector_field,
-        state=state,
-        t1=t1,
-        adaptive_solver=adaptive_solver,
-        parameters=parameters,
-    )
-    return tree_array_util.tree_stack(list(generator))
-
-
-def _solution_generator(vector_field, *, state, t1, adaptive_solver, parameters):
     """Generate a probabilistic IVP solution iteratively."""
-    # todo: adaptive_solver.solution_time(s) < t1?
+    state = adaptive_solver.init(t, posterior, output_scale, num_steps, dt0=dt0)
     while state.accepted.t < t1:
         state = adaptive_solver.rejection_loop(
             state0=state,
