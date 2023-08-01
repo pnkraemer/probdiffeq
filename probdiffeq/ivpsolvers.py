@@ -55,24 +55,14 @@ class Solver:
     def __repr__(self):
         return f"{self.__class__.__name__}({self.strategy})"
 
-    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        raise NotImplementedError
-
-    def extract(self, state: _State, /):
-        raise NotImplementedError
-
-    def solution_from_tcoeffs(
-        self, taylor_coefficients, /, t, output_scale, num_steps=1.0
-    ):
+    def solution_from_tcoeffs(self, tcoeffs, /, t, output_scale, num_steps=1.0):
         """Construct an initial `Solution` object.
 
         An (even if empty) solution object is needed to initialise the solver.
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
-        u, marginals, posterior = self.strategy.solution_from_tcoeffs(
-            taylor_coefficients
-        )
+        u, marginals, posterior = self.strategy.solution_from_tcoeffs(tcoeffs)
         return solution.Solution(
             t=t,
             posterior=posterior,
@@ -93,6 +83,14 @@ class Solver:
             output_scale_calibrated=output_scale,
             num_steps=num_steps,
         )
+
+    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
+        raise NotImplementedError
+
+    def extract(self, state: _State, /):
+        t, posterior = self.strategy.extract(state.strategy)
+        output_scale = self.calibration.extract(state.output_scale_prior)
+        return t, posterior, output_scale, state.num_steps
 
     def interpolate_fun(self, t, s0: _State, s1: _State) -> _interp.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
@@ -178,11 +176,6 @@ class _CalibrationFreeSolver(Solver):
             num_steps=state.num_steps + 1,
         )
 
-    def extract(self, state: _State, /):
-        t, posterior = self.strategy.extract(state.strategy)
-        output_scale = self.calibration.extract(state.output_scale_prior)
-        return t, posterior, output_scale, state.num_steps
-
 
 @jax.tree_util.register_pytree_node_class
 class _DynamicSolver(Solver):
@@ -216,11 +209,6 @@ class _DynamicSolver(Solver):
             output_scale_prior=output_scale,
             num_steps=state.num_steps + 1,
         )
-
-    def extract(self, state: _State, /):
-        t, posterior = self.strategy.extract(state.strategy)
-        output_scale = self.calibration.extract(state.output_scale_calibrated)
-        return t, posterior, output_scale, state.num_steps
 
 
 @jax.tree_util.register_pytree_node_class
@@ -277,11 +265,3 @@ class _MLESolver(Solver):
         x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
         sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(n) * diffsqrtm, x)
         return sum_updated / jnp.sqrt(n + 1)
-
-    def extract(self, state: _State, /):
-        # Read output-scale
-        output_scale = self.calibration.extract(state.output_scale_calibrated)
-
-        # Extract and return results
-        t, posterior = self.strategy.extract(state.strategy)
-        return t, posterior, output_scale, state.num_steps
