@@ -182,7 +182,9 @@ def _runge_kutta_starter_fn(
 
     # Initialise
     ode_shape = initial_values[0].shape
-    extrapolation = extra.ibm_iso(num_derivatives=num)
+    factory, params = extra.ibm_iso_factory(num_derivatives=num)
+    extrapolation = factory.fixedpoint(*params)
+
     solution = variables.unit_markov_sequence(num_derivatives=num, ode_shape=ode_shape)
 
     # Estimate
@@ -213,7 +215,7 @@ def _fixed_point_smoother(extrapolation, solution, ys, dts):
 
 def _fixedpoint_init(solution, y, *, extrapolation) -> _FpState:
     # State-space variables
-    ssv, extra = extrapolation.fixedpoint.init(solution)
+    ssv, extra = extrapolation.init(solution)
 
     # Initial data point
     _, cond_cor = ssv.observe_qoi(observation_std=0.0)
@@ -233,8 +235,8 @@ def _fixedpoint_step(carry: _FpState, x, *, extrapolation) -> Tuple[_FpState, No
     y, dt = x
 
     # Extrapolate (with fixed-point-style merging)
-    ssv, extra = extrapolation.fixedpoint.begin(ssv, extra_old, dt=dt)
-    ssv, extra = extrapolation.fixedpoint.complete(ssv, extra, output_scale=1.0)
+    ssv, extra = extrapolation.begin(ssv, extra_old, dt=dt)
+    ssv, extra = extrapolation.complete(ssv, extra, output_scale=1.0)
 
     # Correct
     _, cond_cor = ssv.observe_qoi(observation_std=0.0)

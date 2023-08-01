@@ -7,7 +7,7 @@ from probdiffeq.statespace import _extra
 from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
-def ibm_blockdiag(ode_shape, num_derivatives):
+def ibm_blockdiag_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (n,) = ode_shape
     factory, params = scalar_extra.extrapolation_bundle_ibm(
