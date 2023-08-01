@@ -8,7 +8,6 @@ import jax.numpy as jnp
 
 from probdiffeq import _adaptive, _collocate, _markov, solution, taylor
 from probdiffeq.backend import tree_array_util
-from probdiffeq.strategies import smoothers
 
 
 def simulate_terminal_values(
@@ -117,10 +116,9 @@ def solve_and_save_at(
     """
     _assert_tuple(initial_values)
 
-    if isinstance(solver.strategy, smoothers._Smoother):
-        msg1 = "A conventional smoother cannot be used. "
-        msg2 = "Did you mean ``smoothers.FixedPointSmoother()``?"
-        warnings.warn(msg1 + msg2)
+    if not solver.strategy.is_suitable_for_save_at:
+        msg = "Strategy {solver.strategy} cannot be used in save_at mode. "
+        warnings.warn(msg)
 
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options

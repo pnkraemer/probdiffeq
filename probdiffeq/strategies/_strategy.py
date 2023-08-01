@@ -31,16 +31,28 @@ class State(containers.NamedTuple):
 class Strategy(Generic[S, P]):
     """Inference strategy interface."""
 
-    def __init__(self, extrapolation, correction):
+    def __init__(
+        self,
+        extrapolation,
+        correction,
+        *,
+        interpolate_fun,
+        string_repr,
+        right_corner_fun,
+        offgrid_marginals_fun,
+        is_suitable_for_save_at,
+    ):
         self.extrapolation = extrapolation
         self.correction = correction
 
+        self.is_suitable_for_save_at = is_suitable_for_save_at
+        self._string_repr = string_repr
+        self._interpolate_fun = interpolate_fun
+        self._right_corner_fun = right_corner_fun
+        self._offgrid_marginals_fun = offgrid_marginals_fun
+
     def __repr__(self):
-        name = self.__class__.__name__
-        arg1 = self.extrapolation
-        arg2 = self.correction
-        # no calibration in __repr__ because it will leave again soon.
-        return f"{name}({arg1}, {arg2})"
+        return self._string_repr
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
@@ -77,24 +89,64 @@ class Strategy(Generic[S, P]):
     def case_right_corner(
         self, t, *, s0: S, s1: S, output_scale
     ) -> _interp.InterpRes[S]:
-        raise NotImplementedError
+        if self._right_corner_fun is not None:
+            return self._right_corner_fun(
+                t,
+                s0=s0,
+                s1=s1,
+                output_scale=output_scale,
+                extrapolation=self.extrapolation,
+            )
+        return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
         self, t, *, s0: S, s1: S, output_scale
     ) -> _interp.InterpRes[S]:
-        raise NotImplementedError
+        return self._interpolate_fun(
+            t, output_scale=output_scale, s0=s0, s1=s1, extrapolation=self.extrapolation
+        )
 
     def offgrid_marginals(
         self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
     ):
-        raise NotImplementedError
+        if self._offgrid_marginals_fun is None:
+            raise NotImplementedError
+        return self._offgrid_marginals_fun(
+            t,
+            marginals=marginals,
+            output_scale=output_scale,
+            posterior=posterior,
+            posterior_previous=posterior_previous,
+            t0=t0,
+            t1=t1,
+            init=self.init,
+            interpolate=self.case_interpolate,
+            extract=self.extract,
+        )
 
     def tree_flatten(self):
         # todo: they should all be 'aux'?
         children = (self.correction,)
-        aux = (self.extrapolation,)
+        aux = (
+            self.extrapolation,
+            self._interpolate_fun,
+            self._right_corner_fun,
+            self._offgrid_marginals_fun,
+            self._string_repr,
+            self.is_suitable_for_save_at,
+        )
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        return cls(*aux, *children)
+        (corr,) = children
+        extra, interp, right_corner, offgrid, string, suitable = aux
+        return cls(
+            extrapolation=extra,
+            correction=corr,
+            interpolate_fun=interp,
+            right_corner_fun=right_corner,
+            offgrid_marginals_fun=offgrid,
+            string_repr=string,
+            is_suitable_for_save_at=suitable,
+        )
