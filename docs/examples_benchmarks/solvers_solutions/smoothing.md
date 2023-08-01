@@ -42,12 +42,6 @@ config.update("jax_platform_name", "cpu")
 ```
 
 ```python
-def strategy_to_string(strat):
-    name_strategy = strat.__class__.__name__
-    return f"{name_strategy}"
-```
-
-```python
 f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 10.0))
 
 
@@ -90,7 +84,7 @@ eks0sol = ivpsolve.solve_with_python_while_loop(
 )
 
 plt.subplots(figsize=(5, 3))
-plt.title(f"{strategy_to_string(eks0.strategy)} solution")
+plt.title("Smoother solution")
 plt.plot(eks0sol.t, eks0sol.u, ".-")
 plt.show()
 ```
@@ -115,10 +109,10 @@ coarse, _ = solution.offgrid_marginals_searchsorted(
 fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
 
-ax1.set_title(f"{strategy_to_string(eks0.strategy)} solution (dense)")
+ax1.set_title("Dense marginals")
 ax1.plot(ts_dense, dense, ".")
 
-ax2.set_title(f"{strategy_to_string(eks0.strategy)} solution (coarse)")
+ax2.set_title("Coarse marginals")
 ax2.plot(ts_coarse, coarse, ".")
 plt.show()
 ```
@@ -143,7 +137,7 @@ fixptsol = ivpsolve.solve_and_save_at(
 )
 
 plt.subplots(figsize=(5, 3))
-plt.title(f"{strategy_to_string(eks0_fixpt.strategy)} solution")
+plt.title("Dense marginals (via solve_and_save_at)")
 plt.plot(fixptsol.t, fixptsol.u, ".-")
 plt.show()
 ```
