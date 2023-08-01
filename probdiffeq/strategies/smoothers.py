@@ -58,38 +58,6 @@ class _Smoother(_strategy.Strategy):
         return u, marginals
 
 
-@jax.tree_util.register_pytree_node_class
-class _FixedPointSmoother(_strategy.Strategy):
-    """Fixed-point smoother.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-
-    def case_right_corner(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ):
-        # See case_interpolate() for detailed explanation of why this works.
-
-        # Todo: this prepares _future_ steps, so shouldn't it happen
-        #  at initialisation instead of at completion?
-        ssv, extra = self.extrapolation.reset(s1.ssv, s1.extra)
-        accepted = _strategy.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
-        previous = _strategy.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
-        return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
-
-    def case_interpolate(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
-        return _fixedpoint_interpolate(
-            t, s0=s0, s1=s1, output_scale=output_scale, extrapolation=self.extrapolation
-        )
-
-
 # todo: state_t0 and state_t1 variable names
 def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     """Interpolate.
@@ -127,6 +95,43 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # The other two are the extrapolated solution
     s_1 = _strategy.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
     return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
+
+
+@jax.tree_util.register_pytree_node_class
+class _FixedPointSmoother(_strategy.Strategy):
+    """Fixed-point smoother.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
+
+    def case_right_corner(
+        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
+    ):
+        return _fixedpoint_right_corner(
+            t, s0=s0, s1=s1, output_scale=output_scale, extrapolation=self.extrapolation
+        )
+
+    def case_interpolate(
+        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
+    ) -> _interp.InterpRes[_strategy.State]:
+        return _fixedpoint_interpolate(
+            t, s0=s0, s1=s1, output_scale=output_scale, extrapolation=self.extrapolation
+        )
+
+
+def _fixedpoint_right_corner(t, *, s0, s1, output_scale, extrapolation):
+    # See case_interpolate() for detailed explanation of why this works.
+    # Todo: this prepares _future_ steps, so shouldn't it happen
+    #  at initialisation instead of at completion?
+    ssv, extra = extrapolation.reset(s1.ssv, s1.extra)
+    accepted = _strategy.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
+    previous = _strategy.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
+    return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
 
 
 def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
