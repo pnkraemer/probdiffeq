@@ -37,20 +37,22 @@ class Strategy(Generic[S, P]):
         correction,
         *,
         interpolate_fun,
-        string_representation,
-        right_corner_fun=None,
-        offgrid_marginals_fun=None,
+        string_repr,
+        right_corner_fun,
+        offgrid_marginals_fun,
+        is_suitable_for_save_at,
     ):
         self.extrapolation = extrapolation
         self.correction = correction
 
-        self._string_representation = string_representation
+        self.is_suitable_for_save_at = is_suitable_for_save_at
+        self._string_repr = string_repr
         self._interpolate_fun = interpolate_fun
         self._right_corner_fun = right_corner_fun
         self._offgrid_marginals_fun = offgrid_marginals_fun
 
     def __repr__(self):
-        return self._string_representation
+        return self._string_repr
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
@@ -111,6 +113,7 @@ class Strategy(Generic[S, P]):
             raise NotImplementedError
         return self._offgrid_marginals_fun(
             t,
+            marginals=marginals,
             output_scale=output_scale,
             posterior=posterior,
             posterior_previous=posterior_previous,
@@ -129,19 +132,21 @@ class Strategy(Generic[S, P]):
             self._interpolate_fun,
             self._right_corner_fun,
             self._offgrid_marginals_fun,
-            self._string_representation,
+            self._string_repr,
+            self.is_suitable_for_save_at,
         )
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (corr,) = children
-        extra, interp, right_corner, offgrid, string = aux
+        extra, interp, right_corner, offgrid, string, suitable = aux
         return cls(
             extrapolation=extra,
             correction=corr,
             interpolate_fun=interp,
             right_corner_fun=right_corner,
             offgrid_marginals_fun=offgrid,
-            string_representation=string,
+            string_repr=string,
+            is_suitable_for_save_at=suitable,
         )

@@ -14,7 +14,9 @@ def smoother(*impl):
     strategy = _strategy.Strategy(
         extra.smoother,
         corr,
-        string_representation="<Smoother strategy>",
+        string_repr=f"<Smoother with {extra}, {corr}>",
+        right_corner_fun=None,
+        is_suitable_for_save_at=False,
         interpolate_fun=_smoother_interpolate,
         offgrid_marginals_fun=_smoother_offgrid_marginals,
     )
@@ -27,9 +29,11 @@ def smoother_fixedpoint(*impl):
     strategy = _strategy.Strategy(
         extra.fixedpoint,
         corr,
-        string_representation="<Fixed-point strategy>",
+        string_repr=f"<Fixed-point with {extra}, {corr}>",
         interpolate_fun=_fixedpoint_interpolate,
         right_corner_fun=_fixedpoint_right_corner,
+        offgrid_marginals_fun=None,
+        is_suitable_for_save_at=True,
     )
     return strategy, calib
 

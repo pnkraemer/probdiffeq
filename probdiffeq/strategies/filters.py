@@ -13,7 +13,9 @@ def filter(*impl):
     strategy = _strategy.Strategy(
         extra.filter,
         corr,
-        string_representation="<Filter strategy>",
+        string_repr=f"<Filter with {extra}, {corr}>",
+        right_corner_fun=None,
+        is_suitable_for_save_at=True,
         interpolate_fun=_filter_interpolate,
         offgrid_marginals_fun=_filter_offgrid_marginals,
     )
@@ -23,6 +25,7 @@ def filter(*impl):
 def _filter_offgrid_marginals(
     t,
     *,
+    marginals,
     output_scale,
     posterior,
     posterior_previous,
