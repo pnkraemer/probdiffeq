@@ -46,16 +46,43 @@ class _Smoother(_strategy.Strategy):
         t1,
         output_scale,
     ):
-        acc, _sol, _prev = self.case_interpolate(
-            t=t,
-            s1=self.init(t1, posterior),
-            s0=self.init(t0, posterior_previous),
+        return _smoother_offgrid_marginals(
+            t,
+            marginals=marginals,
             output_scale=output_scale,
+            posterior=posterior,
+            posterior_previous=posterior_previous,
+            t0=t0,
+            t1=t1,
+            init=self.init,
+            extract=self.extract,
+            interpolate=self.case_interpolate,
         )
-        t, posterior = self.extract(acc)
-        marginals = posterior.conditional.marginalise(marginals)
-        u = marginals.extract_qoi_from_sample(marginals.mean)
-        return u, marginals
+
+
+def _smoother_offgrid_marginals(
+    t,
+    *,
+    marginals,
+    output_scale,
+    posterior,
+    posterior_previous,
+    t0,
+    t1,
+    init,
+    extract,
+    interpolate,
+):
+    acc, _sol, _prev = interpolate(
+        t=t,
+        s1=init(t1, posterior),
+        s0=init(t0, posterior_previous),
+        output_scale=output_scale,
+    )
+    t, posterior = extract(acc)
+    marginals = posterior.conditional.marginalise(marginals)
+    u = marginals.extract_qoi_from_sample(marginals.mean)
+    return u, marginals
 
 
 # todo: state_t0 and state_t1 variable names
