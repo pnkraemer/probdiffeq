@@ -10,28 +10,38 @@ from probdiffeq.statespace.scalar import extra as scalar_extra
 def ibm_blockdiag(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (n,) = ode_shape
-    ibm = scalar_extra.extrapolation_bundle_ibm(num_derivatives=num_derivatives)
-    ibm_stack = _tree_stack_duplicates(ibm, n=n)
-    fi, sm, fp = ibm_stack._filter, ibm_stack._smoother, ibm_stack._fixedpoint
-    dynamic, static = ibm_stack._dynamic, ibm_stack._static
-    return _extra.ExtrapolationBundle(
-        _blockdiag(fi),
-        _blockdiag(sm),
-        _blockdiag(fp),
-        *dynamic,
-        **static,
+    factory, params = scalar_extra.extrapolation_bundle_ibm(
+        num_derivatives=num_derivatives
     )
+    params_stack = _tree_stack_duplicates(params, n=n)
+    return _BlockDiagExtrapolationFactory(wraps=factory), params_stack
 
 
 def _tree_stack_duplicates(tree, n):
     return jax.tree_util.tree_map(lambda s: jnp.concatenate([s[None, ...]] * n), tree)
 
 
-def _blockdiag(ex: _extra.Extrapolation):
-    def custom_constructor(*args, **kwargs):
-        return _BlockDiag(ex(*args, **kwargs))
+class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
+    def __init__(self, wraps):
+        self.wraps = wraps
 
-    return custom_constructor
+    def filter(self, *params):
+        return _BlockDiag(self.wraps.filter(*params))
+
+    def smoother(self, *params):
+        return _BlockDiag(self.wraps.smoother(*params))
+
+    def fixedpoint(self, *params):
+        return _BlockDiag(self.wraps.fixedpoint(*params))
+
+
+#
+# def _blockdiag(ex: _extra.Extrapolation):
+#     def custom_constructor(*args, **kwargs):
+#         return _BlockDiag(ex(*args, **kwargs))
+#
+#     return custom_constructor
+#
 
 
 class _BlockDiag(_extra.Extrapolation):
