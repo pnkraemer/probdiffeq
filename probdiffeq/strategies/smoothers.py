@@ -45,8 +45,12 @@ class _Smoother(_strategy.Strategy):
         Subsequent IVP solver steps continue from the value at 't1'.
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
-        e_1 = self._extrapolate(s0=e_t, output_scale=output_scale, t=s1.t)
+        e_t = _extrapolate(
+            s0=s0, output_scale=output_scale, t=t, extrapolation=self.extrapolation
+        )
+        e_1 = _extrapolate(
+            s0=e_t, output_scale=output_scale, t=s1.t, extrapolation=self.extrapolation
+        )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
         # (This function assumes we are in the forward-pass, which is why we interpolate
@@ -87,12 +91,13 @@ class _Smoother(_strategy.Strategy):
         u = marginals.extract_qoi_from_sample(marginals.mean)
         return u, marginals
 
-    def _extrapolate(self, *, s0, output_scale, t):
-        dt = t - s0.t
-        ssv, extra = self.extrapolation.begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.complete(ssv, extra, output_scale=output_scale)
-        corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
-        return _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
+
+def _extrapolate(s0, output_scale, t, *, extrapolation):
+    dt = t - s0.t
+    ssv, extra = extrapolation.begin(s0.ssv, s0.extra, dt=dt)
+    ssv, extra = extrapolation.complete(ssv, extra, output_scale=output_scale)
+    corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
+    return _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -163,12 +168,19 @@ class _FixedPointSmoother(_strategy.Strategy):
         # No backward model condensing yet.
         # 'e_t': interpolated result at time 't'.
         # 'e_1': extrapolated result at time 't1'.
-        e_t = self._extrapolate(s0=s0, output_scale=output_scale, t=t)
+        e_t = _extrapolate(
+            s0=s0, output_scale=output_scale, t=t, extrapolation=self.extrapolation
+        )
 
         ssv, extra = self.extrapolation.reset(e_t.ssv, e_t.extra)
         prev_t = _strategy.State(t=e_t.t, ssv=ssv, extra=extra, corr=e_t.corr)
 
-        e_1 = self._extrapolate(s0=prev_t, output_scale=output_scale, t=s1.t)
+        e_1 = _extrapolate(
+            s0=prev_t,
+            output_scale=output_scale,
+            t=s1.t,
+            extrapolation=self.extrapolation,
+        )
 
         # Marginalise from t1 to t:
         # turn an extrapolation- ("e_t") into an interpolation-result ("i_t")
@@ -186,13 +198,3 @@ class _FixedPointSmoother(_strategy.Strategy):
 
         # Bundle up the results and return
         return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
-
-    # Auxiliary routines that are the same among all subclasses
-
-    def _extrapolate(self, *, s0, output_scale, t):
-        dt = t - s0.t
-        ssv, extra = self.extrapolation.begin(s0.ssv, s0.extra, dt=dt)
-        ssv, extra = self.extrapolation.complete(ssv, extra, output_scale=output_scale)
-
-        corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
-        return _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
