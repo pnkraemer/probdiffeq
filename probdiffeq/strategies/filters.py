@@ -7,11 +7,12 @@ from probdiffeq import _interp
 from probdiffeq.strategies import _strategy
 
 
-def filter(*impl):
+def filter(extra, corr, calib, /):
     """Create a filter strategy."""
-    extra, corr, calib = impl
+    factory, parameters = extra
+    extrapolation = factory.filter(*parameters)
     strategy = _strategy.Strategy(
-        extra.filter,
+        extrapolation,
         corr,
         string_repr=f"<Filter with {extra}, {corr}>",
         right_corner_fun=None,
