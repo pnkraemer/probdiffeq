@@ -26,18 +26,18 @@ def generate_solver(
     >>> from probdiffeq.strategies import smoothers
 
     >>> print(generate_solver())
-    _MLESolver(<Filter with <Isotropic IBM with num_derivatives=4>, <TS0 with ode_order=1>>)
+    <MLE-solver with <Filter with <Isotropic IBM with num_derivatives=4>, <TS0 with ode_order=1>>>
 
     >>> print(generate_solver(num_derivatives=1))
-    _MLESolver(<Filter with <Isotropic IBM with num_derivatives=1>, <TS0 with ode_order=1>>)
+    <MLE-solver with <Filter with <Isotropic IBM with num_derivatives=1>, <TS0 with ode_order=1>>>
 
     >>> print(generate_solver(solver_factory=ivpsolvers.solver_dynamic))
-    _DynamicSolver(<Filter with <Isotropic IBM with num_derivatives=4>, <TS0 with ode_order=1>>)
+    <Dynamic solver with <Filter with <Isotropic IBM with num_derivatives=4>, <TS0 with ode_order=1>>>
 
     >>> impl_fcty = recipes.ts1_dense
     >>> strat_fcty = smoothers.smoother
     >>> print(generate_solver(strategy_factory=strat_fcty, impl_factory=impl_fcty, ode_shape=(1,)))  # noqa: E501
-    _MLESolver(<Smoother with <Dense IBM with num_derivatives=4, ode_shape=(1,)>, <TS1 with ode_order=1>>)
+    <MLE-solver with <Smoother with <Dense IBM with num_derivatives=4, ode_shape=(1,)>, <TS1 with ode_order=1>>>
     """
     implementation = impl_factory(**impl_factory_kwargs)
     strategy = strategy_factory(*implementation)

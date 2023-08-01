@@ -11,7 +11,7 @@ from probdiffeq.backend import containers
 
 def solver_mle(strategy, calibration):
     """Create a solver that calibrates the output scale via maximum-likelihood."""
-    string_repr = f"<MLE-solver with {strategy}, {calibration}>"
+    string_repr = f"<MLE-solver with {strategy}>"
     return Solver(
         strategy,
         calibration.mle,
@@ -23,7 +23,7 @@ def solver_mle(strategy, calibration):
 
 def solver_dynamic(strategy, calibration):
     """Create a solver that calibrates the output scale dynamically."""
-    string_repr = f"<Dynamic solver with {strategy}, {calibration}>"
+    string_repr = f"<Dynamic solver with {strategy}>"
     return Solver(
         strategy,
         calibration.mle,
@@ -35,7 +35,7 @@ def solver_dynamic(strategy, calibration):
 
 def solver_calibrationfree(strategy, calibration):
     """Create a solver that does not calibrate the output scale automatically."""
-    string_repr = f"<Calibration-free solver with {strategy}, {calibration}>"
+    string_repr = f"<Calibration-free solver with {strategy}>"
     return Solver(
         strategy,
         calibration.mle,
@@ -250,31 +250,32 @@ def _step_mle(state, /, dt, parameters, vector_field, *, strategy):
     observed = state_strategy.corr  # clean this up next?
 
     # Calibrate
-    output_scale = state.output_scale_calibrated
-    n = state.num_steps
-    new_output_scale = _mle_update_output_scale(
-        diffsqrtm=output_scale, n=n, obs=observed
+    output_scale_calibrated = _mle_update_output_scale(
+        state.output_scale_calibrated, observed, num_data=state.num_steps
     )
     return _State(
         error_estimate=dt * error,
         strategy=state_strategy,
         output_scale_prior=state.output_scale_prior,
-        output_scale_calibrated=new_output_scale,
+        output_scale_calibrated=output_scale_calibrated,
         num_steps=state.num_steps + 1,
     )
 
 
-def _mle_update_output_scale(*, diffsqrtm, n, obs):
-    # Special consideration for block-diagonal models
-    # todo: move this function to calibration routines?
-    if jnp.ndim(diffsqrtm) > 0:
+def _mle_update_output_scale(output_scale_calibrated, observed, *, num_data):
+    """Update the MLE of the output-scale."""
+    # Special consideration for block-diagonal models:
+    if jnp.ndim(output_scale_calibrated) > 0:
+        # todo: move this function to calibration routines?
+        fun_vmap = jax.vmap(lambda *a: _mle_update_output_scale(*a, num_data=num_data))
+        return fun_vmap(output_scale_calibrated, observed)
 
-        def fn_partial(d, o):
-            return _mle_update_output_scale(diffsqrtm=d, n=n, obs=o)
+    zero_data = jnp.zeros_like(observed.mean)
+    mahalanobis_norm = observed.mahalanobis_norm(zero_data) / jnp.sqrt(zero_data.size)
 
-        fn_vmap = jax.vmap(fn_partial)
-        return fn_vmap(diffsqrtm, obs)
+    return _update_running_mean(output_scale_calibrated, mahalanobis_norm, num=num_data)
 
-    x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
-    sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(n) * diffsqrtm, x)
-    return sum_updated / jnp.sqrt(n + 1)
+
+def _update_running_mean(x, y, /, num):
+    sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * x, y)
+    return sum_updated / jnp.sqrt(num + 1)
