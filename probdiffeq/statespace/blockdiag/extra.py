@@ -35,15 +35,6 @@ class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
         return _BlockDiag(self.wraps.fixedpoint(*params))
 
 
-#
-# def _blockdiag(ex: _extra.Extrapolation):
-#     def custom_constructor(*args, **kwargs):
-#         return _BlockDiag(ex(*args, **kwargs))
-#
-#     return custom_constructor
-#
-
-
 class _BlockDiag(_extra.Extrapolation):
     def __init__(self, extra, /):
         self.extra = extra
