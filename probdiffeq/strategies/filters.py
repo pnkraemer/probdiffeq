@@ -14,7 +14,7 @@ def filter(extra, corr, calib, /):
     strategy = _strategy.Strategy(
         extrapolation,
         corr,
-        string_repr=f"<Filter with {extra}, {corr}>",
+        string_repr=f"<Filter with {factory.string_repr(*parameters)}, {corr}>",
         right_corner_fun=None,
         is_suitable_for_save_at=True,
         interpolate_fun=_filter_interpolate,

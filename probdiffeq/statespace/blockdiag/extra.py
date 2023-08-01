@@ -10,9 +10,7 @@ from probdiffeq.statespace.scalar import extra as scalar_extra
 def ibm_blockdiag_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (n,) = ode_shape
-    factory, params = scalar_extra.extrapolation_bundle_ibm(
-        num_derivatives=num_derivatives
-    )
+    factory, params = scalar_extra.ibm_scalar_factory(num_derivatives=num_derivatives)
     params_stack = _tree_stack_duplicates(params, n=n)
     return _BlockDiagExtrapolationFactory(wraps=factory), params_stack
 
@@ -24,6 +22,12 @@ def _tree_stack_duplicates(tree, n):
 class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
     def __init__(self, wraps):
         self.wraps = wraps
+
+    def string_repr(self, *params):
+        num_derivatives = self.filter(*params).num_derivatives
+        ode_shape = self.filter(*params).ode_shape
+        args = f"num_derivatives={num_derivatives}, ode_shape={ode_shape}"
+        return f"<Block-diagonal IBM with {args}>"
 
     def filter(self, *params):
         return _BlockDiag(self.wraps.filter(*params))

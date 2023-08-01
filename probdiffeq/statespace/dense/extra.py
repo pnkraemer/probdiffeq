@@ -30,6 +30,13 @@ def ibm_dense_factory(ode_shape, num_derivatives):
 
 
 class _DenseExtrapolationFactory(_extra.ExtrapolationFactory):
+    def string_repr(self, *params):
+        num_derivatives = self.filter(*params).num_derivatives
+        ode_shape = self.filter(*params).ode_shape
+        return (
+            f"<Dense IBM with num_derivatives={num_derivatives}, ode_shape={ode_shape}>"
+        )
+
     def __init__(self, ode_shape, *, num_derivatives):
         self.kwargs = {"num_derivatives": num_derivatives, "ode_shape": ode_shape}
 

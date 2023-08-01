@@ -19,6 +19,10 @@ C = TypeVar("C")
 # extrapolation *factories* instead of extrapolation models.
 class ExtrapolationFactory(abc.ABC):
     @abc.abstractmethod
+    def string_repr(self, *params):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def filter(self, *params):
         raise NotImplementedError
 

@@ -19,6 +19,10 @@ def ibm_iso_factory(num_derivatives):
 
 
 class _IsoExtrapolationFactory(_extra.ExtrapolationFactory):
+    def string_repr(self, *params):
+        num_derivatives = self.filter(*params).num_derivatives
+        return f"<Isotropic IBM with num_derivatives={num_derivatives}>"
+
     def filter(self, *params):
         return _IBMFi(*params)
 
