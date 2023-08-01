@@ -1,16 +1,30 @@
 """Interface for estimation strategies."""
 
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 import jax
 
 from probdiffeq import _interp
+from probdiffeq.backend import containers
+from probdiffeq.strategies import _strategy
 
 S = TypeVar("S")
 """A type-variable to indicate strategy-state types."""
 
 P = TypeVar("P")
 """A type-variable to indicate strategy-solution ("posterior") types."""
+
+
+class State(containers.NamedTuple):
+    t: Any
+    ssv: Any
+    extra: Any
+
+    corr: Any
+
+    @property
+    def u(self):
+        return self.ssv.u
 
 
 @jax.tree_util.register_pytree_node_class
@@ -28,11 +42,32 @@ class Strategy(Generic[S, P]):
         # no calibration in __repr__ because it will leave again soon.
         return f"{name}({arg1}, {arg2})"
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /) -> P:
-        raise NotImplementedError
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
+        sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
+        marginals = sol
+        u = taylor_coefficients[0]
+        return u, marginals, sol
 
-    def init(self, t, solution: P, /) -> S:
-        raise NotImplementedError
+    def init(self, t, posterior, /) -> _strategy.State:
+        ssv, extra = self.extrapolation.init(posterior)
+        ssv, corr = self.correction.init(ssv)
+        return _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr)
+
+    def begin(self, state: _strategy.State, /, *, dt, parameters, vector_field):
+        ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
+        ssv, corr = self.correction.begin(
+            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
+        )
+        return _strategy.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+
+    def complete(self, state, /, *, output_scale, parameters, vector_field):
+        ssv, extra = self.extrapolation.complete(
+            state.ssv, state.extra, output_scale=output_scale
+        )
+        ssv, corr = self.correction.complete(
+            ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
+        )
+        return _strategy.State(t=state.t, ssv=ssv, extra=extra, corr=corr)
 
     def extract(self, state: S, /) -> P:
         raise NotImplementedError
@@ -61,9 +96,3 @@ class Strategy(Generic[S, P]):
     @classmethod
     def tree_unflatten(cls, aux, children):
         return cls(*aux, *children)
-
-    def begin(self, state: S, /, *, dt, parameters, vector_field):
-        raise NotImplementedError
-
-    def complete(self, state, /, *, parameters, vector_field, output_scale):
-        raise NotImplementedError
