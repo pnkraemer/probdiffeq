@@ -11,64 +11,50 @@ def output_scale():
 
 class _IsoCalibrationFactory(_calib.CalibrationFactory):
     def dynamic(self) -> _calib.Calibration:
-        return _output_scale_dynamic()
+        """Construct a dynamic calibration routine."""
+
+        @jax.tree_util.Partial
+        def init(s, /):
+            return s
+
+        @jax.tree_util.Partial
+        def update(s, /):  # todo: make correct
+            return s
+
+        @jax.tree_util.Partial
+        def extract(s):
+            return s
+
+        return _calib.Calibration(init=init, update=update, extract=extract)
 
     def mle(self) -> _calib.Calibration:
-        return _output_scale_mle()
+        @jax.tree_util.Partial
+        def init(s, /):
+            return s
+
+        @jax.tree_util.Partial
+        def update(s, /):  # todo: make correct
+            return s
+
+        @jax.tree_util.Partial
+        def extract(s):
+            return s
+
+        return _calib.Calibration(init=init, update=update, extract=extract)
 
     def free(self) -> _calib.Calibration:
-        return _output_scale_free()
+        """Construct a calibration routine that does not actually do anything."""
 
+        @jax.tree_util.Partial
+        def init(s, /):
+            return s
 
-def _output_scale_mle():
-    """Construct an MLE calibration routine."""
+        @jax.tree_util.Partial
+        def update(s, /):  # todo: make correct
+            return s
 
-    @jax.tree_util.Partial
-    def init(s, /):
-        return s
+        @jax.tree_util.Partial
+        def extract(s):
+            return s
 
-    @jax.tree_util.Partial
-    def update(s, /):  # todo: make correct
-        return s
-
-    @jax.tree_util.Partial
-    def extract(s):
-        return s
-
-    return _calib.Calibration(init=init, update=update, extract=extract)
-
-
-def _output_scale_dynamic():
-    """Construct a dynamic calibration routine."""
-
-    @jax.tree_util.Partial
-    def init(s, /):
-        return s
-
-    @jax.tree_util.Partial
-    def update(s, /):  # todo: make correct
-        return s
-
-    @jax.tree_util.Partial
-    def extract(s):
-        return s
-
-    return _calib.Calibration(init=init, update=update, extract=extract)
-
-
-def _output_scale_free():
-    """Construct a calibration routine that does not actually do anything."""
-
-    @jax.tree_util.Partial
-    def init(s, /):
-        return s
-
-    @jax.tree_util.Partial
-    def update(s, /):  # todo: make correct
-        return s
-
-    @jax.tree_util.Partial
-    def extract(s):
-        return s
-
-    return _calib.Calibration(init=init, update=update, extract=extract)
+        return _calib.Calibration(init=init, update=update, extract=extract)
