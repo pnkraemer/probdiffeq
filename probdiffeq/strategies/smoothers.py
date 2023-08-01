@@ -1,7 +1,5 @@
 """''Global'' estimation: smoothing."""
 
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 
@@ -24,11 +22,6 @@ def smoother_fixedpoint(*impl):
 @jax.tree_util.register_pytree_node_class
 class _Smoother(_strategy.Strategy):
     """Smoother."""
-
-    def extract(self, state: _strategy.State, /) -> Tuple[float, _markov.MarkovSeqRev]:
-        ssv = self.correction.extract(state.ssv, state.corr)
-        sol = self.extrapolation.extract(ssv, state.extra)
-        return state.t, sol
 
     def case_right_corner(
         self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
@@ -193,11 +186,6 @@ class _FixedPointSmoother(_strategy.Strategy):
 
         # Bundle up the results and return
         return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
-
-    def extract(self, state: _strategy.State, /) -> Tuple[float, _markov.MarkovSeqRev]:
-        ssv = self.correction.extract(state.ssv, state.corr)
-        sol = self.extrapolation.extract(ssv, state.extra)
-        return state.t, sol
 
     # Auxiliary routines that are the same among all subclasses
 

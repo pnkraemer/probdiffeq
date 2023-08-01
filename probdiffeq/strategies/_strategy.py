@@ -69,8 +69,10 @@ class Strategy(Generic[S, P]):
         )
         return _strategy.State(t=state.t, ssv=ssv, extra=extra, corr=corr)
 
-    def extract(self, state: S, /) -> P:
-        raise NotImplementedError
+    def extract(self, state: _strategy.State, /):
+        ssv = self.correction.extract(state.ssv, state.corr)
+        sol = self.extrapolation.extract(ssv, state.extra)
+        return state.t, sol
 
     def case_right_corner(
         self, t, *, s0: S, s1: S, output_scale

@@ -18,12 +18,6 @@ def filter(*impl):
 class _Filter(_strategy.Strategy[_strategy.State, Any]):
     """Filter strategy."""
 
-    def extract(self, posterior: _strategy.State, /):
-        t = posterior.t
-        ssv = self.correction.extract(posterior.ssv, posterior.corr)
-        solution = self.extrapolation.extract(ssv, posterior.extra)
-        return t, solution
-
     def case_right_corner(
         self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
     ) -> _interp.InterpRes[_strategy.State]:  # s1.t == t
