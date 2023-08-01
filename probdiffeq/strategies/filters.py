@@ -1,5 +1,4 @@
 """Forward-only estimation: filtering."""
-from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -11,39 +10,14 @@ from probdiffeq.strategies import _strategy
 def filter(*impl):
     """Create a filter strategy."""
     extra, corr, calib = impl
-    return _Filter(extra.filter, corr), calib
-
-
-@jax.tree_util.register_pytree_node_class
-class _Filter(_strategy.Strategy[_strategy.State, Any]):
-    """Filter strategy."""
-
-    def case_right_corner(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:  # s1.t == t
-        return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
-
-    def case_interpolate(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
-        return _filter_interpolate(
-            t, output_scale=output_scale, s0=s0, s1=s1, extrapolation=self.extrapolation
-        )
-
-    def offgrid_marginals(
-        self, *, t, marginals, posterior, posterior_previous, t0, t1, output_scale
-    ):
-        return _filter_offgrid_marginals(
-            t,
-            output_scale=output_scale,
-            posterior=posterior,
-            posterior_previous=posterior_previous,
-            t0=t0,
-            t1=t1,
-            init=self.init,
-            interpolate=self.case_interpolate,
-            extract=self.extract,
-        )
+    strategy = _strategy.Strategy(
+        extra.filter,
+        corr,
+        string_representation="<Filter strategy>",
+        interpolate_fun=_filter_interpolate,
+        offgrid_marginals_fun=_filter_offgrid_marginals,
+    )
+    return strategy, calib
 
 
 def _filter_offgrid_marginals(
@@ -56,7 +30,7 @@ def _filter_offgrid_marginals(
     t1,
     init,
     interpolate,
-    extract
+    extract,
 ):
     _acc, sol, _prev = interpolate(
         t=t,

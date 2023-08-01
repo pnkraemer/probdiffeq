@@ -10,54 +10,28 @@ from probdiffeq.strategies import _strategy
 def smoother(*impl):
     """Create a smoother strategy."""
     extra, corr, calib = impl
-    return _Smoother(extra.smoother, corr), calib
+
+    strategy = _strategy.Strategy(
+        extra.smoother,
+        corr,
+        string_representation="<Smoother strategy>",
+        interpolate_fun=_smoother_interpolate,
+        offgrid_marginals_fun=_smoother_offgrid_marginals,
+    )
+    return strategy, calib
 
 
 def smoother_fixedpoint(*impl):
     """Create a fixedpoint-smoother strategy."""
     extra, corr, calib = impl
-    return _FixedPointSmoother(extra.fixedpoint, corr), calib
-
-
-@jax.tree_util.register_pytree_node_class
-class _Smoother(_strategy.Strategy):
-    """Smoother."""
-
-    def case_right_corner(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
-        return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
-
-    def case_interpolate(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
-        return _smoother_interpolate(
-            t, s0=s0, s1=s1, output_scale=output_scale, extrapolation=self.extrapolation
-        )
-
-    def offgrid_marginals(
-        self,
-        *,
-        t,
-        marginals,
-        posterior: _markov.MarkovSeqRev,
-        posterior_previous: _markov.MarkovSeqRev,
-        t0,
-        t1,
-        output_scale,
-    ):
-        return _smoother_offgrid_marginals(
-            t,
-            marginals=marginals,
-            output_scale=output_scale,
-            posterior=posterior,
-            posterior_previous=posterior_previous,
-            t0=t0,
-            t1=t1,
-            init=self.init,
-            extract=self.extract,
-            interpolate=self.case_interpolate,
-        )
+    strategy = _strategy.Strategy(
+        extra.fixedpoint,
+        corr,
+        string_representation="<Fixed-point strategy>",
+        interpolate_fun=_fixedpoint_interpolate,
+        right_corner_fun=_fixedpoint_right_corner,
+    )
+    return strategy, calib
 
 
 def _smoother_offgrid_marginals(
@@ -122,33 +96,6 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # The other two are the extrapolated solution
     s_1 = _strategy.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
     return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
-
-
-@jax.tree_util.register_pytree_node_class
-class _FixedPointSmoother(_strategy.Strategy):
-    """Fixed-point smoother.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-
-    def case_right_corner(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ):
-        return _fixedpoint_right_corner(
-            t, s0=s0, s1=s1, output_scale=output_scale, extrapolation=self.extrapolation
-        )
-
-    def case_interpolate(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
-        return _fixedpoint_interpolate(
-            t, s0=s0, s1=s1, output_scale=output_scale, extrapolation=self.extrapolation
-        )
 
 
 def _fixedpoint_right_corner(t, *, s0, s1, output_scale, extrapolation):
