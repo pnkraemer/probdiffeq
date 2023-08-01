@@ -11,17 +11,38 @@ from probdiffeq.backend import containers
 
 def solver_mle(strategy, calibration):
     """Create a solver that calibrates the output scale via maximum-likelihood."""
-    return _MLESolver(strategy, calibration.mle)
+    string_repr = f"<MLE-solver with {strategy}>"
+    return Solver(
+        strategy,
+        calibration.mle,
+        string_repr=string_repr,
+        step_fun=_step_mle,
+        requires_rescaling=True,
+    )
 
 
 def solver_dynamic(strategy, calibration):
     """Create a solver that calibrates the output scale dynamically."""
-    return _DynamicSolver(strategy, calibration.dynamic)
+    string_repr = f"<Dynamic solver with {strategy}>"
+    return Solver(
+        strategy,
+        calibration.mle,
+        string_repr=string_repr,
+        step_fun=_step_dynamic,
+        requires_rescaling=False,
+    )
 
 
 def solver_calibrationfree(strategy, calibration):
     """Create a solver that does not calibrate the output scale automatically."""
-    return _CalibrationFreeSolver(strategy, calibration.free)
+    string_repr = f"<Calibration-free solver with {strategy}>"
+    return Solver(
+        strategy,
+        calibration.mle,
+        string_repr=string_repr,
+        step_fun=_step_calibration_free,
+        requires_rescaling=False,
+    )
 
 
 class _State(containers.NamedTuple):
@@ -48,31 +69,28 @@ class _State(containers.NamedTuple):
 class Solver:
     """Interface for initial value problem solvers."""
 
-    def __init__(self, strategy, calibration, /):
+    def __init__(
+        self, strategy, calibration, /, *, step_fun, string_repr, requires_rescaling
+    ):
         self.strategy = strategy
         self.calibration = calibration
 
+        self.requires_rescaling = requires_rescaling
+
+        self._step_fun = step_fun
+        self._string_repr = string_repr
+
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.strategy})"
+        return self._string_repr
 
-    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        raise NotImplementedError
-
-    def extract(self, state: _State, /):
-        raise NotImplementedError
-
-    def solution_from_tcoeffs(
-        self, taylor_coefficients, /, t, output_scale, num_steps=1.0
-    ):
+    def solution_from_tcoeffs(self, tcoeffs, /, t, output_scale, num_steps=1.0):
         """Construct an initial `Solution` object.
 
         An (even if empty) solution object is needed to initialise the solver.
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
-        u, marginals, posterior = self.strategy.solution_from_tcoeffs(
-            taylor_coefficients
-        )
+        u, marginals, posterior = self.strategy.solution_from_tcoeffs(tcoeffs)
         return solution.Solution(
             t=t,
             posterior=posterior,
@@ -93,6 +111,16 @@ class Solver:
             output_scale_calibrated=output_scale,
             num_steps=num_steps,
         )
+
+    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
+        return self._step_fun(
+            state, dt, parameters, vector_field, strategy=self.strategy
+        )
+
+    def extract(self, state: _State, /):
+        t, posterior = self.strategy.extract(state.strategy)
+        output_scale = self.calibration.extract(state.output_scale_prior)
+        return t, posterior, output_scale, state.num_steps
 
     def interpolate_fun(self, t, s0: _State, s1: _State) -> _interp.InterpRes[_State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
@@ -133,155 +161,121 @@ class Solver:
 
     def tree_flatten(self):
         children = (self.strategy, self.calibration)
-        aux = ()
+        aux = (self._step_fun, self.requires_rescaling, self._string_repr)
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, _aux, children):
-        return cls(*children)
-
-
-@jax.tree_util.register_pytree_node_class
-class _CalibrationFreeSolver(Solver):
-    """Initial value problem solver.
-
-    No automatic output-scale calibration.
-    """
-
-    requires_rescaling = False
-
-    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        state_strategy = self.strategy.begin(
-            state.strategy,
-            dt=dt,
-            parameters=parameters,
-            vector_field=vector_field,
-        )
-        (error, _, cache_obs) = state_strategy.corr
-
-        state_strategy = self.strategy.complete(
-            state_strategy,
-            parameters=parameters,
-            vector_field=vector_field,
-            output_scale=state.output_scale_prior,
+    def tree_unflatten(cls, aux, children):
+        strategy, calibration = children
+        step_fun, rescaling, string_repr = aux
+        return cls(
+            strategy,
+            calibration,
+            step_fun=step_fun,
+            requires_rescaling=rescaling,
+            string_repr=string_repr,
         )
 
-        # Extract and return solution
-        return _State(
-            error_estimate=dt * error,
-            strategy=state_strategy,
-            output_scale_prior=state.output_scale_prior,
-            # Nothing happens in the field below:
-            #  but we cannot use "None" if we want to reuse the init()
-            #  method from abstract solvers (which populate this field).
-            output_scale_calibrated=state.output_scale_prior,
-            num_steps=state.num_steps + 1,
-        )
 
-    def extract(self, state: _State, /):
-        t, posterior = self.strategy.extract(state.strategy)
-        output_scale = self.calibration.extract(state.output_scale_prior)
-        return t, posterior, output_scale, state.num_steps
-
-
-@jax.tree_util.register_pytree_node_class
-class _DynamicSolver(Solver):
-    """Initial value problem solver with dynamic calibration of the output scale."""
-
-    requires_rescaling = False
-
-    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        state_strategy = self.strategy.begin(
-            state.strategy,
-            dt=dt,
-            parameters=parameters,
-            vector_field=vector_field,
-        )
-        (error, output_scale, _) = state_strategy.corr  # clean this up next?
-
-        state_strategy = self.strategy.complete(
-            state_strategy,
-            parameters=parameters,
-            vector_field=vector_field,
-            output_scale=output_scale,
-        )
-
-        # Return solution
-        return _State(
-            error_estimate=dt * error,
-            strategy=state_strategy,
-            output_scale_calibrated=output_scale,
-            # current scale becomes the new prior scale!
-            #  this is because dynamic solvers assume a piecewise-constant model
-            output_scale_prior=output_scale,
-            num_steps=state.num_steps + 1,
-        )
-
-    def extract(self, state: _State, /):
-        t, posterior = self.strategy.extract(state.strategy)
-        output_scale = self.calibration.extract(state.output_scale_calibrated)
-        return t, posterior, output_scale, state.num_steps
+def _step_calibration_free(state, /, dt, parameters, vector_field, *, strategy):
+    state_strategy = strategy.begin(
+        state.strategy,
+        dt=dt,
+        parameters=parameters,
+        vector_field=vector_field,
+    )
+    (error, _, cache_obs) = state_strategy.corr
+    state_strategy = strategy.complete(
+        state_strategy,
+        parameters=parameters,
+        vector_field=vector_field,
+        output_scale=state.output_scale_prior,
+    )
+    # Extract and return solution
+    return _State(
+        error_estimate=dt * error,
+        strategy=state_strategy,
+        output_scale_prior=state.output_scale_prior,
+        # Nothing happens in the field below:
+        #  but we cannot use "None" if we want to reuse the init()
+        #  method from abstract solvers (which populate this field).
+        output_scale_calibrated=state.output_scale_prior,
+        num_steps=state.num_steps + 1,
+    )
 
 
-@jax.tree_util.register_pytree_node_class
-class _MLESolver(Solver):
-    """Initial value problem solver with (quasi-)maximum-likelihood \
-     calibration of the output-scale."""
+def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy):
+    state_strategy = strategy.begin(
+        state.strategy,
+        dt=dt,
+        parameters=parameters,
+        vector_field=vector_field,
+    )
+    (error, output_scale, _) = state_strategy.corr  # clean this up next?
 
-    requires_rescaling = True
+    state_strategy = strategy.complete(
+        state_strategy,
+        parameters=parameters,
+        vector_field=vector_field,
+        output_scale=output_scale,
+    )
 
-    def step(self, *, state: _State, vector_field, dt, parameters) -> _State:
-        state_strategy = self.strategy.begin(
-            state.strategy,
-            dt=dt,
-            parameters=parameters,
-            vector_field=vector_field,
-        )
-        (error, output_scale, _) = state_strategy.corr  # clean this up next?
+    # Return solution
+    return _State(
+        error_estimate=dt * error,
+        strategy=state_strategy,
+        output_scale_calibrated=output_scale,
+        # current scale becomes the new prior scale!
+        #  this is because dynamic solvers assume a piecewise-constant model
+        output_scale_prior=output_scale,
+        num_steps=state.num_steps + 1,
+    )
 
-        state_strategy = self.strategy.complete(
-            state_strategy,
-            output_scale=state.output_scale_prior,
-            parameters=parameters,
-            vector_field=vector_field,
-        )
-        observed = state_strategy.corr  # clean this up next?
 
-        # Calibrate
-        output_scale = state.output_scale_calibrated
-        n = state.num_steps
-        new_output_scale = self._update_output_scale(
-            diffsqrtm=output_scale, n=n, obs=observed
-        )
-        return _State(
-            error_estimate=dt * error,
-            strategy=state_strategy,
-            output_scale_prior=state.output_scale_prior,
-            output_scale_calibrated=new_output_scale,
-            num_steps=state.num_steps + 1,
-        )
+def _step_mle(state, /, dt, parameters, vector_field, *, strategy):
+    state_strategy = strategy.begin(
+        state.strategy,
+        dt=dt,
+        parameters=parameters,
+        vector_field=vector_field,
+    )
+    (error, output_scale, _) = state_strategy.corr  # clean this up next?
 
-    @staticmethod
-    def _update_output_scale(*, diffsqrtm, n, obs):
-        # Special consideration for block-diagonal models
+    state_strategy = strategy.complete(
+        state_strategy,
+        output_scale=state.output_scale_prior,
+        parameters=parameters,
+        vector_field=vector_field,
+    )
+    observed = state_strategy.corr  # clean this up next?
+
+    # Calibrate
+    output_scale_calibrated = _mle_update_output_scale(
+        state.output_scale_calibrated, observed, num_data=state.num_steps
+    )
+    return _State(
+        error_estimate=dt * error,
+        strategy=state_strategy,
+        output_scale_prior=state.output_scale_prior,
+        output_scale_calibrated=output_scale_calibrated,
+        num_steps=state.num_steps + 1,
+    )
+
+
+def _mle_update_output_scale(output_scale_calibrated, observed, *, num_data):
+    """Update the MLE of the output-scale."""
+    # Special consideration for block-diagonal models:
+    if jnp.ndim(output_scale_calibrated) > 0:
         # todo: move this function to calibration routines?
-        if jnp.ndim(diffsqrtm) > 0:
+        fun_vmap = jax.vmap(lambda *a: _mle_update_output_scale(*a, num_data=num_data))
+        return fun_vmap(output_scale_calibrated, observed)
 
-            def fn_partial(d, o):
-                fn = _MLESolver._update_output_scale
-                return fn(diffsqrtm=d, n=n, obs=o)
+    zero_data = jnp.zeros_like(observed.mean)
+    mahalanobis_norm = observed.mahalanobis_norm(zero_data) / jnp.sqrt(zero_data.size)
 
-            fn_vmap = jax.vmap(fn_partial)
-            return fn_vmap(diffsqrtm, obs)
+    return _update_running_mean(output_scale_calibrated, mahalanobis_norm, num=num_data)
 
-        x = obs.mahalanobis_norm(jnp.zeros_like(obs.mean)) / jnp.sqrt(obs.mean.size)
-        sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(n) * diffsqrtm, x)
-        return sum_updated / jnp.sqrt(n + 1)
 
-    def extract(self, state: _State, /):
-        # Read output-scale
-        output_scale = self.calibration.extract(state.output_scale_calibrated)
-
-        # Extract and return results
-        t, posterior = self.strategy.extract(state.strategy)
-        return t, posterior, output_scale, state.num_steps
+def _update_running_mean(x, y, /, num):
+    sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * x, y)
+    return sum_updated / jnp.sqrt(num + 1)
