@@ -7,14 +7,14 @@ from probdiffeq import _interp, _markov
 from probdiffeq.strategies import _strategy
 
 
-def smoother(*impl):
+def smoother(extra, corr, calib, /):
     """Create a smoother strategy."""
-    extra, corr, calib = impl
-
+    factory, parameters = extra
+    extrapolation = factory.smoother(*parameters)
     strategy = _strategy.Strategy(
-        extra.smoother,
+        extrapolation,
         corr,
-        string_repr=f"<Smoother with {extra}, {corr}>",
+        string_repr=f"<Smoother with {factory.string_repr(*parameters)}, {corr}>",
         right_corner_fun=None,
         is_suitable_for_save_at=False,
         interpolate_fun=_smoother_interpolate,
@@ -23,13 +23,14 @@ def smoother(*impl):
     return strategy, calib
 
 
-def smoother_fixedpoint(*impl):
+def smoother_fixedpoint(extra, corr, calib, /):
     """Create a fixedpoint-smoother strategy."""
-    extra, corr, calib = impl
+    factory, parameters = extra
+    extrapolation = factory.fixedpoint(*parameters)
     strategy = _strategy.Strategy(
-        extra.fixedpoint,
+        extrapolation,
         corr,
-        string_repr=f"<Fixed-point with {extra}, {corr}>",
+        string_repr=f"<Fixed-point with {factory.string_repr(*parameters)}, {corr}>",
         interpolate_fun=_fixedpoint_interpolate,
         right_corner_fun=_fixedpoint_right_corner,
         offgrid_marginals_fun=None,

@@ -8,11 +8,8 @@ from probdiffeq import _interp
 from probdiffeq.backend import containers
 from probdiffeq.strategies import _strategy
 
-S = TypeVar("S")
-"""A type-variable to indicate strategy-state types."""
-
 P = TypeVar("P")
-"""A type-variable to indicate strategy-solution ("posterior") types."""
+"""A type-variable to indicate solution ("posterior") types."""
 
 
 class State(containers.NamedTuple):
@@ -28,7 +25,7 @@ class State(containers.NamedTuple):
 
 
 @jax.tree_util.register_pytree_node_class
-class Strategy(Generic[S, P]):
+class Strategy(Generic[P]):
     """Inference strategy interface."""
 
     def __init__(
@@ -87,8 +84,8 @@ class Strategy(Generic[S, P]):
         return state.t, sol
 
     def case_right_corner(
-        self, t, *, s0: S, s1: S, output_scale
-    ) -> _interp.InterpRes[S]:
+        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
+    ) -> _interp.InterpRes[_strategy.State]:
         if self._right_corner_fun is not None:
             return self._right_corner_fun(
                 t,
@@ -100,8 +97,8 @@ class Strategy(Generic[S, P]):
         return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, t, *, s0: S, s1: S, output_scale
-    ) -> _interp.InterpRes[S]:
+        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
+    ) -> _interp.InterpRes[_strategy.State]:
         return self._interpolate_fun(
             t, output_scale=output_scale, s0=s0, s1=s1, extrapolation=self.extrapolation
         )

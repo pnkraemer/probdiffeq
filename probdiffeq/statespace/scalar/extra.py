@@ -114,12 +114,28 @@ def extrapolate_precon(
     return marginal
 
 
-def extrapolation_bundle_ibm(num_derivatives):
+def ibm_scalar_factory(num_derivatives):
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
     precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-    dynamic = (a, q_sqrtm, precon)
-    static = {}
-    return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
+
+    factory = _ScalarExtrapolationFactory()
+    params = (a, q_sqrtm, precon)
+    return factory, params
+
+
+class _ScalarExtrapolationFactory(_extra.ExtrapolationFactory):
+    def string_repr(self, *params):
+        num_derivatives = self.filter(*params).num_derivatives
+        return f"<Scalar IBM with num_derivatives={num_derivatives}>"
+
+    def filter(self, *params):
+        return _IBMFi(*params)
+
+    def smoother(self, *params):
+        return _IBMSm(*params)
+
+    def fixedpoint(self, *params):
+        return _IBMFp(*params)
 
 
 class _IBMFi(_extra.Extrapolation):

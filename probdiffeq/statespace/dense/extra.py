@@ -8,7 +8,7 @@ from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.dense import variables
 
 
-def ibm_dense(ode_shape, num_derivatives):
+def ibm_dense_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (d,) = ode_shape
 
@@ -23,9 +23,31 @@ def ibm_dense(ode_shape, num_derivatives):
         return p1, p2
 
     eye_d = jnp.eye(d)
-    dynamic = (jnp.kron(eye_d, a), jnp.kron(eye_d, q_sqrtm), preconditioner)
-    static = {"num_derivatives": num_derivatives, "ode_shape": ode_shape}
-    return _extra.ExtrapolationBundle(_IBMFi, _IBMSm, _IBMFp, *dynamic, **static)
+    params = (jnp.kron(eye_d, a), jnp.kron(eye_d, q_sqrtm), preconditioner)
+
+    factory = _DenseExtrapolationFactory(ode_shape, num_derivatives=num_derivatives)
+    return factory, params
+
+
+class _DenseExtrapolationFactory(_extra.ExtrapolationFactory):
+    def string_repr(self, *params):
+        num_derivatives = self.filter(*params).num_derivatives
+        ode_shape = self.filter(*params).ode_shape
+        return (
+            f"<Dense IBM with num_derivatives={num_derivatives}, ode_shape={ode_shape}>"
+        )
+
+    def __init__(self, ode_shape, *, num_derivatives):
+        self.kwargs = {"num_derivatives": num_derivatives, "ode_shape": ode_shape}
+
+    def filter(self, *params):
+        return _IBMFi(*params, **self.kwargs)
+
+    def smoother(self, *params):
+        return _IBMSm(*params, **self.kwargs)
+
+    def fixedpoint(self, *params):
+        return _IBMFp(*params, **self.kwargs)
 
 
 class _IBMFi(_extra.Extrapolation):

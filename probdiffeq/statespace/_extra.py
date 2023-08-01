@@ -1,8 +1,7 @@
 """Various interfaces."""
 
+import abc
 from typing import Generic, Tuple, TypeVar
-
-import jax
 
 from probdiffeq.statespace import variables
 
@@ -13,44 +12,27 @@ C = TypeVar("C")
 """A type-variable to alias extrapolation-caches."""
 
 
-@jax.tree_util.register_pytree_node_class
-class ExtrapolationBundle:
-    def __init__(self, filter, smoother, fixedpoint, *dynamic, **static):
-        self._filter = filter
-        self._smoother = smoother
-        self._fixedpoint = fixedpoint
-        self._dynamic = dynamic
-        self._static = static
+# At the point of choosing the recipe
+# (aka selecting the desired state-space model factorisation),
+# it is too early to know whether we solve forward-in-time only (aka filtering)
+# or require a dense, or fixed-point solution. Therefore, the recipes return
+# extrapolation *factories* instead of extrapolation models.
+class ExtrapolationFactory(abc.ABC):
+    @abc.abstractmethod
+    def string_repr(self, *params):
+        raise NotImplementedError
 
-    def __repr__(self):
-        return repr(self.filter)
+    @abc.abstractmethod
+    def filter(self, *params):
+        raise NotImplementedError
 
-    def tree_flatten(self):
-        children = (self._dynamic,)
-        aux = self._filter, self._smoother, self._fixedpoint, self._static
-        return children, aux
+    @abc.abstractmethod
+    def smoother(self, *params):
+        raise NotImplementedError
 
-    @classmethod
-    def tree_unflatten(cls, aux, children):
-        filter, smoother, fixedpoint, static = aux
-        (dynamic,) = children
-        return cls(filter, smoother, fixedpoint, *dynamic, **static)
-
-    @property
-    def num_derivatives(self):
-        return self.filter.num_derivatives
-
-    @property
-    def filter(self):
-        return self._filter(*self._dynamic, **self._static)
-
-    @property
-    def smoother(self):
-        return self._smoother(*self._dynamic, **self._static)
-
-    @property
-    def fixedpoint(self):
-        return self._fixedpoint(*self._dynamic, **self._static)
+    @abc.abstractmethod
+    def fixedpoint(self, *params):
+        raise NotImplementedError
 
 
 class Extrapolation(Generic[S, C]):
@@ -67,13 +49,13 @@ class Extrapolation(Generic[S, C]):
     def solution_from_tcoeffs(self, taylor_coefficients, /) -> S:
         raise NotImplementedError
 
+    def init(self, sol, /):
+        raise NotImplementedError
+
     def begin(self, ssv: S, extra: C, /, dt) -> Tuple[S, C]:
         raise NotImplementedError
 
     def complete(self, ssv: S, extra: C, /, output_scale) -> Tuple[S, C]:
-        raise NotImplementedError
-
-    def init(self, sol, /):
         raise NotImplementedError
 
     def extract(self, ssv, extra, /):
