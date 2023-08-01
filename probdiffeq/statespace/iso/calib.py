@@ -6,11 +6,18 @@ from probdiffeq.statespace import _calib
 
 def output_scale():
     """Construct (a buffet of) isotropic calibration strategies."""
-    mle = _output_scale_mle()
-    dynamic = _output_scale_dynamic()
-    free = _output_scale_free()
+    return _IsoCalibrationFactory()
 
-    return _calib.CalibrationBundle(mle=mle, dynamic=dynamic, free=free)
+
+class _IsoCalibrationFactory(_calib.CalibrationFactory):
+    def dynamic(self) -> _calib.Calibration:
+        return _output_scale_dynamic()
+
+    def mle(self) -> _calib.Calibration:
+        return _output_scale_mle()
+
+    def free(self) -> _calib.Calibration:
+        return _output_scale_free()
 
 
 def _output_scale_mle():
@@ -28,7 +35,7 @@ def _output_scale_mle():
     def extract(s):
         return s
 
-    return _calib.Calib(init=init, update=update, extract=extract)
+    return _calib.Calibration(init=init, update=update, extract=extract)
 
 
 def _output_scale_dynamic():
@@ -46,7 +53,7 @@ def _output_scale_dynamic():
     def extract(s):
         return s
 
-    return _calib.Calib(init=init, update=update, extract=extract)
+    return _calib.Calibration(init=init, update=update, extract=extract)
 
 
 def _output_scale_free():
@@ -64,4 +71,4 @@ def _output_scale_free():
     def extract(s):
         return s
 
-    return _calib.Calib(init=init, update=update, extract=extract)
+    return _calib.Calibration(init=init, update=update, extract=extract)
