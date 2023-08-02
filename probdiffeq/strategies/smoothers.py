@@ -17,7 +17,7 @@ def smoother(extra, corr, calib, /):
         is_suitable_for_save_at=False,
         string_repr=f"<Smoother with {factory.string_repr(*parameters)}, {corr}>",
         # Right-corner: use default
-        impl_right_corner=None,
+        impl_right_corner="default",
         # Interpolate like a smoother:
         impl_interpolate=_smoother_interpolate,
         impl_offgrid_marginals=_smoother_offgrid_marginals,

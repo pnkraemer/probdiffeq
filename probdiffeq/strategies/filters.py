@@ -17,7 +17,7 @@ def filter(extra, corr, calib, /):
         string_repr=f"<Filter with {factory.string_repr(*parameters)}, {corr}>",
         is_suitable_for_save_at=True,
         # Right-corner: use default
-        impl_right_corner=None,
+        impl_right_corner="default",
         # Filtering behaviour for interpolation
         impl_interpolate=_filter_interpolate,
         impl_offgrid_marginals=_filter_offgrid_marginals,

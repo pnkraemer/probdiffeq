@@ -23,8 +23,8 @@ class Strategy(Generic[P]):
         string_repr,
         is_suitable_for_save_at,
         impl_interpolate,
-        impl_right_corner,
-        impl_offgrid_marginals,
+        impl_right_corner,  # use "default" for default-behaviour
+        impl_offgrid_marginals,  # use None if not available
     ):
         # Content
         self.extrapolation = extrapolation
@@ -75,7 +75,7 @@ class Strategy(Generic[P]):
         self, t, *, s0: _common.State, s1: _common.State, output_scale
     ) -> _interp.InterpRes[_common.State]:
         # If specific choice is provided, use that.
-        if self.impl_right_corner is not None:
+        if self.impl_right_corner != "default":
             return self.impl_right_corner(
                 t,
                 s0=s0,
