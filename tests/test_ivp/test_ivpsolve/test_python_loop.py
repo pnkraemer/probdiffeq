@@ -28,7 +28,12 @@ def fixture_python_loop_solution(problem):
     problem_kwargs = {"t0": t0, "t1": t1, "parameters": f_args}
 
     solver = test_util.generate_solver(num_derivatives=4)
-    adaptive_kwargs = {"solver": solver, "atol": 1e-2, "rtol": 1e-2}
+    adaptive_kwargs = {
+        "solver": solver,
+        "output_scale": 1.0,
+        "atol": 1e-2,
+        "rtol": 1e-2,
+    }
     solution = ivpsolve.solve_with_python_while_loop(
         *problem_args, **problem_kwargs, **adaptive_kwargs
     )

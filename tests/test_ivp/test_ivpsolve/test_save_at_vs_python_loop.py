@@ -22,7 +22,12 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Generate a solver
     solver = test_util.generate_solver(num_derivatives=2)
-    adaptive_kwargs = {"solver": solver, "atol": 1e-2, "rtol": 1e-2}
+    adaptive_kwargs = {
+        "solver": solver,
+        "output_scale": 1.0,
+        "atol": 1e-2,
+        "rtol": 1e-2,
+    }
 
     # Compute an adaptive solution and interpolate
     ts = jnp.linspace(t0, t1, num=15, endpoint=True)

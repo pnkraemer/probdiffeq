@@ -24,6 +24,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
         "t0": t0,
         "t1": t1,
         "solver": solver,
+        "output_scale": 1.0,
         "atol": 1e-2,
         "rtol": 1e-2,
         # Any clipped controller will do.
@@ -34,7 +35,12 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     )
 
     grid_adaptive = solution_adaptive.t
+    fixed_kwargs = {
+        "grid": grid_adaptive,
+        "solver": solver,
+        "output_scale": 1.0,
+    }
     solution_fixed = ivpsolve.solve_fixed_grid(
-        *problem_args, grid=grid_adaptive, parameters=f_args, solver=solver
+        *problem_args, **problem_kwargs, **fixed_kwargs
     )
     assert testing.tree_all_allclose(solution_adaptive, solution_fixed)
