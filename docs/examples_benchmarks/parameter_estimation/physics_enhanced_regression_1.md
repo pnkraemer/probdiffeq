@@ -178,7 +178,7 @@ The solution looks much better:
 
 ```python
 solution_wrong = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=p
+    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=p, output_scale=1.0
 )
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_wrong.u)

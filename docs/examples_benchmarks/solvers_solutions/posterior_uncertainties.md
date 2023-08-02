@@ -69,6 +69,7 @@ sol = ivpsolve.solve_and_save_at(
     solver=ts0,
     rtol=1e-2,
     atol=1e-2,
+    output_scale=1.0,
     parameters=f_args,
 )
 ```
@@ -127,6 +128,7 @@ sol = ivpsolve.solve_and_save_at(
     solver=ts0,
     rtol=1e-2,
     atol=1e-2,
+    output_scale=1.0,
     parameters=f_args,
 )
 ```

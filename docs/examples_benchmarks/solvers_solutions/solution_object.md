@@ -66,6 +66,7 @@ sol = ivpsolve.solve_with_python_while_loop(
     parameters=f_args,
     atol=1e-1,
     rtol=1e-1,
+    output_scale=1.0,
 )
 ```
 

@@ -65,6 +65,7 @@ sol = ivpsolve.solve_with_python_while_loop(
     t0=t0,
     t1=t1,
     rtol=1e-2,
+    output_scale=1.0,
     solver=solver,
     parameters=f_args,
     control=controls.IntegralClipped(),

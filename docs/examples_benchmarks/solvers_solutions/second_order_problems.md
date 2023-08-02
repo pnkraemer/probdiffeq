@@ -63,6 +63,7 @@ solution = ivpsolve.solve_and_save_at(
     solver=ts0_1,
     atol=1e-5,
     rtol=1e-5,
+    output_scale=1.0,
     parameters=f_args,
 )
 ```
@@ -101,6 +102,7 @@ solution = ivpsolve.solve_and_save_at(
     solver=ts0_2,
     atol=1e-5,
     rtol=1e-5,
+    output_scale=1.0,
     parameters=f_args,
 )
 ```
