@@ -40,9 +40,8 @@ def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
 
     # Calibrate
     output_scale = calibration.update(state.output_scale, observed=observed)
-    # output_scale_calibrated = _mle_update_output_scale(
-    #     state.output_scale_calibrated, observed, num_data=state.num_steps
-    # )
+
+    # Return
     return _common.State(
         error_estimate=dt * error,
         strategy=state_strategy,
@@ -71,7 +70,10 @@ def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibrati
         vector_field=vector_field,
     )
     (error, observed, _) = state_strategy.corr  # clean this up next?
+
+    # part of the refactor; let's keep for a bit
     assert not isinstance(observed, jax.Array)
+
     output_scale = calibration.update(state.output_scale, observed=observed)
 
     prior, _calibrated = calibration.extract(output_scale)
