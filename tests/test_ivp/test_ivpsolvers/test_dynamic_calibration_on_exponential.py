@@ -18,17 +18,17 @@ def case_isotropic_factorisation():
     def iso_factory(ode_shape, num_derivatives):
         return recipes.ts0_iso(num_derivatives=num_derivatives)
 
-    return iso_factory
+    return iso_factory, 1.0
 
 
 @testing.case()  # this implies success of the scalar solver
 def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag
+    return recipes.ts0_blockdiag, jnp.ones((1,))
 
 
 @testing.case()
 def case_dense_factorisation():
-    return recipes.ts1_dense
+    return recipes.ts1_dense, 2.0
 
 
 @testing.fixture(name="problem")
@@ -43,11 +43,12 @@ def fixture_problem():
 
 
 @testing.fixture(name="dynamic_solution_approximation_error")
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def fixture_approximation_error_low(problem, impl_factory):
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
+def fixture_approximation_error_low(problem, factorisation):
     vf, u0, (t0, t1), f_args, solution = problem
     problem_args = (vf, (u0,))
 
+    impl_factory, output_scale = factorisation
     solver = test_util.generate_solver(
         # Problem setup chosen that when combined with ts1_dense,
         # only the dynamic solver can pass the test.
@@ -58,7 +59,12 @@ def fixture_approximation_error_low(problem, impl_factory):
         ode_shape=(1,),
     )
     grid = jnp.linspace(t0, t1, num=20)
-    solver_kwargs = {"grid": grid, "parameters": f_args, "solver": solver}
+    solver_kwargs = {
+        "grid": grid,
+        "parameters": f_args,
+        "solver": solver,
+        "output_scale": output_scale,
+    }
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
 
     return _rmse(approximation.u[-1], solution(t1))
