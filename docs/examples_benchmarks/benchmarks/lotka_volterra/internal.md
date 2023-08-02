@@ -108,19 +108,23 @@ Let's start with finding the fastest probabilistic IVP solver.
 # Some helper functions
 
 
-def impl_to_method_config(impl, *, label):
-    return strategy_to_method_config(filters.filter(*impl), label=label)
+def impl_to_method_config(impl, *, label, output_scale):
+    return strategy_to_method_config(
+        filters.filter(*impl), label=label, output_scale=output_scale
+    )
 
 
-def strategy_to_method_config(strategy, *, label):
+def strategy_to_method_config(strategy, *, label, output_scale):
     solver = calibrated.mle(*strategy)
-    return workprecision.MethodConfig(method=solver_to_method(solver), label=label)
+    method = solver_to_method(solver, output_scale=output_scale)
+    return workprecision.MethodConfig(method=method, label=label)
 
 
-def solver_to_method(solver):
+def solver_to_method(solver, output_scale):
     return {
         "solver": solver,
         "control": controls.ProportionalIntegral(),
+        "output_scale": output_scale,
     }
 ```
 
@@ -149,10 +153,10 @@ slr1_gh = cubature_to_slr1(gh_fn, ode_shape=ode_shape)
 
 # Methods
 methods = [
-    impl_to_method_config(impl=ts1, label="TS1()"),
-    impl_to_method_config(impl=slr1_sci, label="SLR1(SCI)"),
-    impl_to_method_config(impl=slr1_ut, label="SLR1(UT)"),
-    impl_to_method_config(impl=slr1_gh, label="SLR1(GH)"),
+    impl_to_method_config(impl=ts1, label="TS1()", output_scale=1.0),
+    impl_to_method_config(impl=slr1_sci, label="SLR1(SCI)", output_scale=1.0),
+    impl_to_method_config(impl=slr1_ut, label="SLR1(UT)", output_scale=1.0),
+    impl_to_method_config(impl=slr1_gh, label="SLR1(GH)", output_scale=1.0),
 ]
 ```
 
@@ -183,9 +187,9 @@ ts0_dense = recipes.ts0_dense(ode_shape=ode_shape)
 
 # Methods
 methods = [
-    impl_to_method_config(ts0_iso, label="IsoTS0()"),
-    impl_to_method_config(ts0_batch, label="BatchTS0()"),
-    impl_to_method_config(ts0_dense, label="DenseTS0()"),
+    impl_to_method_config(ts0_iso, label="IsoTS0()", output_scale=1.0),
+    impl_to_method_config(ts0_batch, label="BatchTS0()", output_scale=jnp.ones((2,))),
+    impl_to_method_config(ts0_dense, label="DenseTS0()", output_scale=1.0),
 ]
 ```
 
@@ -211,10 +215,14 @@ The isotropic solver and the dense solver actually compute the same posterior (t
 # Methods
 impl = recipes.ts0_iso()
 methods = [
-    strategy_to_method_config(filters.filter(*impl), label="Filter"),
-    strategy_to_method_config(smoothers.smoother(*impl), label="Smoother"),
+    strategy_to_method_config(filters.filter(*impl), label="Filter", output_scale=1.0),
     strategy_to_method_config(
-        smoothers.smoother_fixedpoint(*impl), label="FixedPointSmoother"
+        smoothers.smoother(*impl), label="Smoother", output_scale=1.0
+    ),
+    strategy_to_method_config(
+        smoothers.smoother_fixedpoint(*impl),
+        label="FixedPointSmoother",
+        output_scale=1.0,
     ),
 ]
 ```
@@ -265,12 +273,16 @@ slr1_high = recipes.slr1_dense(ode_shape=ode_shape, num_derivatives=num_high)
 
 # Methods
 methods = [
-    impl_to_method_config(ts0_iso_low, label=f"IsoTS0({num_low})"),
-    impl_to_method_config(ts0_iso_medium, label=f"IsoTS0({num_medium})"),
-    impl_to_method_config(ts1_low, label=f"DenseTS1({num_low})"),
-    impl_to_method_config(ts1_medium, label=f"DenseTS1({num_medium})"),
-    impl_to_method_config(ts1_high, label=f"DenseTS1({num_high})"),
-    impl_to_method_config(slr1_high, label=f"DenseSLR1({num_high})"),
+    impl_to_method_config(ts0_iso_low, label=f"IsoTS0({num_low})", output_scale=1.0),
+    impl_to_method_config(
+        ts0_iso_medium, label=f"IsoTS0({num_medium})", output_scale=1.0
+    ),
+    impl_to_method_config(ts1_low, label=f"DenseTS1({num_low})", output_scale=1.0),
+    impl_to_method_config(
+        ts1_medium, label=f"DenseTS1({num_medium})", output_scale=1.0
+    ),
+    impl_to_method_config(ts1_high, label=f"DenseTS1({num_high})", output_scale=1.0),
+    impl_to_method_config(slr1_high, label=f"DenseSLR1({num_high})", output_scale=1.0),
 ]
 ```
 

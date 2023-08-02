@@ -157,7 +157,11 @@ def strategy_to_method_config(strategy, *, key, label):
     # Use a clipped control because |f(u0)|=0 which is why
     # the initial step-size suggestion becomes a little bit fragile.
     return workprecision.MethodConfig(
-        method={"solver": solver, "control": controls.ProportionalIntegralClipped()},
+        method={
+            "solver": solver,
+            "control": controls.ProportionalIntegralClipped(),
+            "output_scale": 1.0,
+        },
         label="ProbDiffEq: " + label,
         key=key,
         jit=True,

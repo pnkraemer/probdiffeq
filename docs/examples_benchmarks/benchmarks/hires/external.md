@@ -127,7 +127,7 @@ def impl_to_method_config(impl, *, label):
 def strategy_to_method_config(strategy, *, label):
     solver = calibrated.dynamic(*strategy)
     return workprecision.MethodConfig(
-        method={"solver": solver},
+        method={"solver": solver, "output_scale": 1.0},
         label="ProbDiffEq: " + label,
         key="probdiffeq",
         jit=True,
