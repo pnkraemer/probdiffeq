@@ -57,7 +57,7 @@ class Solver:
 
     def extract(self, state: _common.State, /):
         t, posterior = self.strategy.extract(state.strategy)
-        output_scale = self.calibration.extract(state.output_scale_prior)
+        output_scale = self.calibration.extract(state.output_scale_calibrated)
         return t, posterior, output_scale, state.num_steps
 
     def interpolate_fun(

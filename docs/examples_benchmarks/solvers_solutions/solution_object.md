@@ -25,8 +25,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import ivpsolve, solution
 from probdiffeq.doc_util import notebook
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
 ```
@@ -51,7 +52,7 @@ def vector_field(y, *, t, p):
 
 
 # Make a solver
-solver = ivpsolvers.solver_dynamic(*smoothers.smoother(*recipes.ts0_iso()))
+solver = calibrated.dynamic(*smoothers.smoother(*recipes.ts0_iso()))
 ```
 
 ```python

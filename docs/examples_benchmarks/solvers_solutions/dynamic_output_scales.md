@@ -29,8 +29,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve
 from probdiffeq.doc_util import notebook
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 ```
@@ -60,8 +61,8 @@ num_derivatives = 1
 implementation = recipes.ts1_dense(ode_shape=(1,), num_derivatives=num_derivatives)
 strategy = filters.filter(*implementation)
 
-dynamic = ivpsolvers.solver_dynamic(*strategy)
-mle = ivpsolvers.solver_mle(*strategy)
+dynamic = calibrated.dynamic(*strategy)
+mle = calibrated.mle(*strategy)
 ```
 
 ```python
@@ -97,8 +98,8 @@ ax[0][1].plot(
 ax[0][0].legend()
 ax[0][1].legend()
 
-ax[0][0].set_title(f"solver_dynamic(nu={num_derivatives})")
-ax[0][1].set_title(f"solver_mle(nu={num_derivatives})")
+ax[0][0].set_title(f"dynamic(nu={num_derivatives})")
+ax[0][1].set_title(f"mle(nu={num_derivatives})")
 ax[0][0].set_ylabel("Solution")
 ax[1][0].set_ylabel("Output-scale")
 ax[1][0].set_xlabel("Time t")
@@ -145,8 +146,8 @@ ax[0][1].semilogy(
 ax[0][0].legend()
 ax[0][1].legend()
 
-ax[0][0].set_title(f"solver_dynamic(nu={num_derivatives})")
-ax[0][1].set_title(f"solver_mle(nu={num_derivatives})")
+ax[0][0].set_title(f"dynamic(nu={num_derivatives})")
+ax[0][1].set_title(f"mle(nu={num_derivatives})")
 ax[0][0].set_ylabel("Solution (log-scale)")
 ax[1][0].set_ylabel("Output-scale (log-scale)")
 ax[1][0].set_xlabel("Time t")

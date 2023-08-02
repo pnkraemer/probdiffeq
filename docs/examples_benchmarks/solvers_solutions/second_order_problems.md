@@ -22,8 +22,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve
 from probdiffeq.doc_util import notebook
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 ```
@@ -48,7 +49,7 @@ def vf_1(y, t, p):
     return f(y, *p)
 
 
-ts0_1 = ivpsolvers.solver_mle(*filters.filter(*recipes.ts0_iso()))
+ts0_1 = calibrated.mle(*filters.filter(*recipes.ts0_iso()))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
@@ -86,7 +87,7 @@ def vf_2(y, dy, t, p):
 
 # One derivative more than above because we don't transform to first order
 implementation = recipes.ts0_iso(ode_order=2, num_derivatives=5)
-ts0_2 = ivpsolvers.solver_mle(*filters.filter(*implementation))
+ts0_2 = calibrated.mle(*filters.filter(*implementation))
 ts = jnp.linspace(t0, t1, endpoint=True, num=500)
 ```
 
