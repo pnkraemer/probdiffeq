@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _calib
+from probdiffeq.statespace import calib
 
 
 def output_scale():
@@ -12,7 +12,7 @@ def output_scale():
     return DenseFactory()
 
 
-class DenseMostRecent(_calib.Calibration):
+class DenseMostRecent(calib.Calibration):
     def init(self, prior):
         return prior
 
@@ -26,7 +26,7 @@ class DenseMostRecent(_calib.Calibration):
         return state, state
 
 
-class DenseRunningMean(_calib.Calibration):
+class DenseRunningMean(calib.Calibration):
     def init(self, prior):
         return prior, prior, 0.0
 
@@ -50,7 +50,7 @@ def _update_running_mean(mean, x, /, num):
     return sum_updated / jnp.sqrt(num + 1)
 
 
-class DenseFactory(_calib.CalibrationFactory):
+class DenseFactory(calib.CalibrationFactory):
     def most_recent(self) -> DenseMostRecent:
         return DenseMostRecent()
 

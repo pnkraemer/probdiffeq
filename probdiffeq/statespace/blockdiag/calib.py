@@ -2,8 +2,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _calib
-from probdiffeq.statespace.scalar import calib
+from probdiffeq.statespace import calib
+from probdiffeq.statespace.scalar import calib as scalar_calib
 
 
 def output_scale(ode_shape):
@@ -11,7 +11,7 @@ def output_scale(ode_shape):
     return BlockDiagFactory(ode_shape=ode_shape)
 
 
-class BlockDiag(_calib.Calibration):
+class BlockDiag(calib.Calibration):
     def __init__(self, wraps, *, ode_shape):
         self.wraps = wraps
         self.ode_shape = ode_shape
@@ -29,16 +29,16 @@ class BlockDiag(_calib.Calibration):
         return jax.vmap(self.wraps.extract)(state)
 
 
-class BlockDiagFactory(_calib.CalibrationFactory):
+class BlockDiagFactory(calib.CalibrationFactory):
     def __init__(self, *, ode_shape):
         self.ode_shape = ode_shape
 
     def most_recent(self):
-        wraps = calib.ScalarMostRecent()
+        wraps = scalar_calib.ScalarMostRecent()
         return BlockDiag(wraps, ode_shape=self.ode_shape)
 
     def running_mean(self):
-        wraps = calib.ScalarRunningMean()
+        wraps = scalar_calib.ScalarRunningMean()
         return BlockDiag(wraps, ode_shape=self.ode_shape)
 
 

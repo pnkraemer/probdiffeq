@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _calib
+from probdiffeq.statespace import calib
 
 
 def output_scale():
@@ -11,7 +11,7 @@ def output_scale():
     return CalibrationFactory()
 
 
-class ScalarMostRecent(_calib.Calibration):
+class ScalarMostRecent(calib.Calibration):
     def init(self, prior):
         return prior
 
@@ -25,7 +25,7 @@ class ScalarMostRecent(_calib.Calibration):
         return state, state
 
 
-class ScalarRunningMean(_calib.Calibration):
+class ScalarRunningMean(calib.Calibration):
     def init(self, prior):
         return prior, prior, 0.0
 
@@ -49,7 +49,7 @@ def _update_running_mean(mean, x, /, num):
     return sum_updated / jnp.sqrt(num + 1)
 
 
-class CalibrationFactory(_calib.CalibrationFactory):
+class CalibrationFactory(calib.CalibrationFactory):
     pass
 
 

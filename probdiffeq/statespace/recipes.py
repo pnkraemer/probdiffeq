@@ -3,7 +3,7 @@
 from typing import Any, Tuple
 
 from probdiffeq.backend import containers
-from probdiffeq.statespace import _extra, cubature
+from probdiffeq.statespace import _extra, calib, cubature
 from probdiffeq.statespace.blockdiag import calib as bd_calib
 from probdiffeq.statespace.blockdiag import corr as bd_corr
 from probdiffeq.statespace.blockdiag import extra as bd_extra
@@ -33,7 +33,7 @@ class _Impl(containers.NamedTuple):
     corr: Any
     """Correction method."""
 
-    calibration_factory: Any
+    calibration_factory: calib.CalibrationFactory
     """Calibration factory."""
 
 

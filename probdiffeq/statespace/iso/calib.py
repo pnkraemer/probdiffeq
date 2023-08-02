@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _calib
+from probdiffeq.statespace import calib
 
 
 def output_scale():
@@ -11,7 +11,7 @@ def output_scale():
     return IsoFactory()
 
 
-class IsoRunningMean(_calib.Calibration):
+class IsoRunningMean(calib.Calibration):
     def init(self, prior):
         return prior, prior, 0.0
 
@@ -35,7 +35,7 @@ def _update_running_mean(mean, x, /, num):
     return sum_updated / jnp.sqrt(num + 1)
 
 
-class IsoMostRecent(_calib.Calibration):
+class IsoMostRecent(calib.Calibration):
     def init(self, prior):
         return prior
 
@@ -49,7 +49,7 @@ class IsoMostRecent(_calib.Calibration):
         return state, state
 
 
-class IsoFactory(_calib.CalibrationFactory):
+class IsoFactory(calib.CalibrationFactory):
     def running_mean(self) -> IsoRunningMean:
         """Construct a dynamic calibration routine."""
         return IsoRunningMean()
