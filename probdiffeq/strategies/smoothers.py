@@ -4,14 +4,14 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp, _markov
-from probdiffeq.strategies import _strategy
+from probdiffeq.strategies import _common, strategy
 
 
 def smoother(extra, corr, calib, /):
     """Create a smoother strategy."""
     factory, parameters = extra
     extrapolation = factory.smoother(*parameters)
-    strategy = _strategy.Strategy(
+    strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
         string_repr=f"<Smoother with {factory.string_repr(*parameters)}, {corr}>",
@@ -20,14 +20,14 @@ def smoother(extra, corr, calib, /):
         interpolate_fun=_smoother_interpolate,
         offgrid_marginals_fun=_smoother_offgrid_marginals,
     )
-    return strategy, calib
+    return strategy_impl, calib
 
 
 def smoother_fixedpoint(extra, corr, calib, /):
     """Create a fixedpoint-smoother strategy."""
     factory, parameters = extra
     extrapolation = factory.fixedpoint(*parameters)
-    strategy = _strategy.Strategy(
+    strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
         string_repr=f"<Fixed-point with {factory.string_repr(*parameters)}, {corr}>",
@@ -36,7 +36,7 @@ def smoother_fixedpoint(extra, corr, calib, /):
         offgrid_marginals_fun=None,
         is_suitable_for_save_at=True,
     )
-    return strategy, calib
+    return strategy_impl, calib
 
 
 def _smoother_offgrid_marginals(
@@ -95,11 +95,11 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     mseq_t = _markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)
     ssv, _ = extrapolation.init(mseq_t)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
-    state_at_t = _strategy.State(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
+    state_at_t = _common.State(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
     # The state at t1 gets a new backward model; it must remember how to
     # get back to t, not to t0.
     # The other two are the extrapolated solution
-    s_1 = _strategy.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
+    s_1 = _common.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
     return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
 
@@ -108,8 +108,8 @@ def _fixedpoint_right_corner(t, *, s0, s1, output_scale, extrapolation):
     # Todo: this prepares _future_ steps, so shouldn't it happen
     #  at initialisation instead of at completion?
     ssv, extra = extrapolation.reset(s1.ssv, s1.extra)
-    accepted = _strategy.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
-    previous = _strategy.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
+    accepted = _common.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
+    previous = _common.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
     return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
 
 
@@ -160,7 +160,7 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
     )
 
     ssv, extra = extrapolation.reset(e_t.ssv, e_t.extra)
-    prev_t = _strategy.State(t=e_t.t, ssv=ssv, extra=extra, corr=e_t.corr)
+    prev_t = _common.State(t=e_t.t, ssv=ssv, extra=extra, corr=e_t.corr)
 
     e_1 = _extrapolate(
         s0=prev_t,
@@ -178,10 +178,10 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
     mseq_t = _markov.MarkovSeqRev(init=rv_t, conditional=bw_t_to_qoi)
     ssv_t, _ = extrapolation.init(mseq_t)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
-    sol_t = _strategy.State(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
+    sol_t = _common.State(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
 
     # Future IVP solver stepping continues from here:
-    acc_t1 = _strategy.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
+    acc_t1 = _common.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
 
     # Bundle up the results and return
     return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
@@ -192,4 +192,4 @@ def _extrapolate(s0, output_scale, t, *, extrapolation):
     ssv, extra = extrapolation.begin(s0.ssv, s0.extra, dt=dt)
     ssv, extra = extrapolation.complete(ssv, extra, output_scale=output_scale)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
-    return _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
+    return _common.State(t=t, ssv=ssv, extra=extra, corr=corr_like)

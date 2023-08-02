@@ -112,6 +112,7 @@ nav:
           - calibrated: api_docs/ivpsolvers/calibrated.md
           - uncalibrated: api_docs/ivpsolvers/uncalibrated.md
       - strategies:
+          - strategy: api_docs/strategies/strategy.md
           - filters: api_docs/strategies/filters.md
           - smoothers: api_docs/strategies/smoothers.md
       - statespace:

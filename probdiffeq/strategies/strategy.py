@@ -1,27 +1,14 @@
 """Interface for estimation strategies."""
 
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import jax
 
 from probdiffeq import _interp
-from probdiffeq.backend import containers
-from probdiffeq.strategies import _strategy
+from probdiffeq.strategies import _common
 
 P = TypeVar("P")
 """A type-variable to indicate solution ("posterior") types."""
-
-
-class State(containers.NamedTuple):
-    t: Any
-    ssv: Any
-    extra: Any
-
-    corr: Any
-
-    @property
-    def u(self):
-        return self.ssv.u
 
 
 @jax.tree_util.register_pytree_node_class
@@ -54,17 +41,17 @@ class Strategy(Generic[P]):
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         return self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
-    def init(self, t, posterior, /) -> _strategy.State:
+    def init(self, t, posterior, /) -> _common.State:
         ssv, extra = self.extrapolation.init(posterior)
         ssv, corr = self.correction.init(ssv)
-        return _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr)
+        return _common.State(t=t, ssv=ssv, extra=extra, corr=corr)
 
-    def begin(self, state: _strategy.State, /, *, dt, parameters, vector_field):
+    def begin(self, state: _common.State, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
         ssv, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        return _strategy.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+        return _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
         ssv, extra = self.extrapolation.complete(
@@ -73,16 +60,16 @@ class Strategy(Generic[P]):
         ssv, corr = self.correction.complete(
             ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
         )
-        return _strategy.State(t=state.t, ssv=ssv, extra=extra, corr=corr)
+        return _common.State(t=state.t, ssv=ssv, extra=extra, corr=corr)
 
-    def extract(self, state: _strategy.State, /):
+    def extract(self, state: _common.State, /):
         ssv = self.correction.extract(state.ssv, state.corr)
         sol = self.extrapolation.extract(ssv, state.extra)
         return state.t, sol
 
     def case_right_corner(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
+        self, t, *, s0: _common.State, s1: _common.State, output_scale
+    ) -> _interp.InterpRes[_common.State]:
         if self._right_corner_fun is not None:
             return self._right_corner_fun(
                 t,
@@ -94,8 +81,8 @@ class Strategy(Generic[P]):
         return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
-        self, t, *, s0: _strategy.State, s1: _strategy.State, output_scale
-    ) -> _interp.InterpRes[_strategy.State]:
+        self, t, *, s0: _common.State, s1: _common.State, output_scale
+    ) -> _interp.InterpRes[_common.State]:
         return self._interpolate_fun(
             t, output_scale=output_scale, s0=s0, s1=s1, extrapolation=self.extrapolation
         )

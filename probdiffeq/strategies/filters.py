@@ -4,14 +4,14 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
-from probdiffeq.strategies import _strategy
+from probdiffeq.strategies import _common, strategy
 
 
 def filter(extra, corr, calib, /):
     """Create a filter strategy."""
     factory, parameters = extra
     extrapolation = factory.filter(*parameters)
-    strategy = _strategy.Strategy(
+    strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
         string_repr=f"<Filter with {factory.string_repr(*parameters)}, {corr}>",
@@ -20,7 +20,7 @@ def filter(extra, corr, calib, /):
         interpolate_fun=_filter_interpolate,
         offgrid_marginals_fun=_filter_offgrid_marginals,
     )
-    return strategy, calib
+    return strategy_impl, calib
 
 
 def _filter_offgrid_marginals(
@@ -54,5 +54,5 @@ def _filter_interpolate(t, *, output_scale, s0, s1, extrapolation):
     ssv, extra = extrapolation.begin(s0.ssv, s0.extra, dt=dt)
     ssv, extra = extrapolation.complete(ssv, extra, output_scale=output_scale)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
-    extrapolated = _strategy.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
+    extrapolated = _common.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
     return _interp.InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
