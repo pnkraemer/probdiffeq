@@ -1,7 +1,9 @@
 """Calibration tools."""
 
+import jax
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util
 from probdiffeq.statespace import _calib
 
 
@@ -26,13 +28,26 @@ class DenseMostRecent(_calib.Calibration):
 
 class DenseRunningMean(_calib.Calibration):
     def init(self, prior):
-        raise NotImplementedError
+        return prior, prior, 0.0
 
     def update(self, state, /, observed):
-        raise NotImplementedError
+        prior, calibrated, num_data = state
+
+        zero_data = jnp.zeros_like(observed.mean)
+        mahalanobis_norm = observed.mahalanobis_norm(zero_data)
+        new_term = mahalanobis_norm / jnp.sqrt(zero_data.size)
+
+        calibrated = _update_running_mean(calibrated, new_term, num=num_data)
+        return prior, calibrated, num_data + 1.0
 
     def extract(self, state, /):
-        raise NotImplementedError
+        prior, calibrated, _num_data = state
+        return prior, calibrated
+
+
+def _update_running_mean(mean, x, /, num):
+    sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+    return sum_updated / jnp.sqrt(num + 1)
 
 
 class DenseFactory(_calib.CalibrationFactory):
@@ -41,3 +56,16 @@ class DenseFactory(_calib.CalibrationFactory):
 
     def running_mean(self) -> DenseRunningMean:
         return DenseRunningMean()
+
+
+# Register objects as (empty) pytrees. todo: temporary?!
+jax.tree_util.register_pytree_node(
+    nodetype=DenseRunningMean,
+    flatten_func=lambda _: ((), ()),
+    unflatten_func=lambda *a: DenseRunningMean(),
+)
+jax.tree_util.register_pytree_node(
+    nodetype=DenseMostRecent,
+    flatten_func=lambda _: ((), ()),
+    unflatten_func=lambda *a: DenseMostRecent(),
+)

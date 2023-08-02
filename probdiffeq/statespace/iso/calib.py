@@ -15,7 +15,7 @@ class IsoRunningMean(_calib.Calibration):
     def init(self, prior):
         return prior, prior, 0.0
 
-    def update(self, state, /, *, observed):
+    def update(self, state, /, observed):
         prior, calibrated, num_data = state
 
         zero_data = jnp.zeros_like(observed.mean)
@@ -39,7 +39,7 @@ class IsoMostRecent(_calib.Calibration):
     def init(self, prior):
         return prior
 
-    def update(self, _state, /, *, observed):
+    def update(self, _state, /, observed):
         zero_data = jnp.zeros_like(observed.mean)
         mahalanobis_norm = observed.mahalanobis_norm(zero_data)
         calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
