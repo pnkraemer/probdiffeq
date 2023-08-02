@@ -26,51 +26,56 @@ def case_ts0_iso():
     def ts0_iso_factory(ode_shape, num_derivatives):
         return recipes.ts0_iso(num_derivatives=num_derivatives)
 
-    return ts0_iso_factory
+    return ts0_iso_factory, 1.0
 
 
 @testing.case()
 def case_slr1_blockdiag():
-    return recipes.slr1_blockdiag
+    return recipes.slr1_blockdiag, jnp.ones((2,))
 
 
 @testing.case()
 def case_ts0_blockdiag():
-    return recipes.ts0_blockdiag
+    return recipes.ts0_blockdiag, jnp.ones((2,))
 
 
 @testing.case()
 def case_ts1_dense():
-    return recipes.ts1_dense
+    return recipes.ts1_dense, 1.0
 
 
 @testing.case()
 def case_ts0_dense():
-    return recipes.ts0_dense
+    return recipes.ts0_dense, 1.0
 
 
 @testing.case()
 def case_slr1_dense():
-    return recipes.slr1_dense
+    return recipes.slr1_dense, 1.0
 
 
 @testing.case()
 def case_slr0_dense():
-    return recipes.slr0_dense
+    return recipes.slr0_dense, 1.0
 
 
 @testing.fixture(name="solution")
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def fixture_recipe_solution(problem, impl_factory):
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
+def fixture_recipe_solution(problem, factorisation):
     vf, u0, (t0, t1), f_args = problem
 
     problem_args = (vf, (u0,))
     problem_kwargs = {"t0": t0, "t1": t1, "parameters": f_args}
-
+    impl_factory, output_scale = factorisation
     solver = test_util.generate_solver(
         num_derivatives=2, impl_factory=impl_factory, ode_shape=jnp.shape(u0)
     )
-    adaptive_kwargs = {"solver": solver, "atol": 1e-2, "rtol": 1e-2}
+    adaptive_kwargs = {
+        "solver": solver,
+        "atol": 1e-2,
+        "rtol": 1e-2,
+        "output_scale": output_scale,
+    }
     solution = ivpsolve.simulate_terminal_values(
         *problem_args, **problem_kwargs, **adaptive_kwargs
     )
