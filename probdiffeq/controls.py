@@ -2,68 +2,70 @@
 
 import dataclasses
 import functools
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import containers
 
-S = TypeVar("S")
-"""Controller state."""
+T = TypeVar("T")
+"""A type-variable to indicate the controller's state."""
 
 
 @dataclasses.dataclass
-class Control(Generic[S]):
+class Controller(Generic[T]):
     """Control algorithm."""
 
-    init: Callable
+    init: Callable[[Any], T]
     """Initialise the controller state."""
 
-    clip: Callable
+    clip: Callable[[T, Any, Any], T]
     """(Optionally) clip the current step to not exceed t1."""
 
-    apply: Callable
+    apply: Callable[[T, Any, Any], T]
     r"""Propose a time-step $\Delta t$."""
 
-    extract: Callable
+    extract: Callable[[T], Any]
     """Extract the time-step from the controller state."""
 
 
-class _PIState(containers.NamedTuple):
-    """Proportional-integral controller state."""
+class PIState(containers.NamedTuple):
+    """Proportional-integral-controller state."""
 
     dt_proposed: float
     error_norm_previously_accepted: float
 
 
-def proportional_integral(**options) -> Control[_PIState]:
+def proportional_integral(**options) -> Controller[PIState]:
+    """Construct a proportional-integral-controller."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
     extract = _proportional_integral_extract
-    return Control(init=init, apply=apply, extract=extract, clip=_no_clip)
+    return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def proportional_integral_clipped(**options) -> Control[_PIState]:
+def proportional_integral_clipped(**options) -> Controller[PIState]:
+    """Construct a proportional-integral-controller with time-clipping."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
     extract = _proportional_integral_extract
     clip = _proportional_integral_clip
-    return Control(init=init, apply=apply, extract=extract, clip=clip)
+    return Controller(init=init, apply=apply, extract=extract, clip=clip)
 
 
 def _proportional_integral_init(dt0, /):
-    return _PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
+    return PIState(dt_proposed=dt0, error_norm_previously_accepted=1.0)
 
 
-def _proportional_integral_clip(state: _PIState, /, t, *, t1) -> _PIState:
+def _proportional_integral_clip(state: PIState, /, t, t1) -> PIState:
     dt = state.dt_proposed
     dt_clipped = jnp.minimum(dt, t1 - t)
-    return _PIState(dt_clipped, state.error_norm_previously_accepted)
+    return PIState(dt_clipped, state.error_norm_previously_accepted)
 
 
 def _proportional_integral_apply(
-    state: _PIState,
+    state: PIState,
     /,
     error_normalised,
     error_contraction_rate,
@@ -72,7 +74,7 @@ def _proportional_integral_apply(
     factor_max=10.0,
     power_integral_unscaled=0.3,
     power_proportional_unscaled=0.4,
-) -> _PIState:
+) -> PIState:
     n1 = power_integral_unscaled / error_contraction_rate
     n2 = power_proportional_unscaled / error_contraction_rate
 
@@ -89,40 +91,42 @@ def _proportional_integral_apply(
     )
 
     dt_proposed = scale_factor * state.dt_proposed
-    state = _PIState(
+    state = PIState(
         dt_proposed=dt_proposed,
         error_norm_previously_accepted=error_norm_previously_accepted,
     )
     return state
 
 
-def _proportional_integral_extract(state: _PIState, /):
+def _proportional_integral_extract(state: PIState, /):
     return state.dt_proposed
 
 
-def integral(**options) -> Control[float]:
+def integral(**options) -> Controller[float]:
+    """Construct an integral-controller."""
     init = functools.partial(_integral_init, **options)
     apply = functools.partial(_integral_apply, **options)
     extract = functools.partial(_integral_extract, **options)
-    return Control(init=init, apply=apply, extract=extract, clip=_no_clip)
+    return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def integral_clipped(**options) -> Control[float]:
+def integral_clipped(**options) -> Controller[float]:
+    """Construct an integral-controller with time-clipping."""
     init = functools.partial(_integral_init)
     apply = functools.partial(_integral_apply, **options)
     extract = functools.partial(_integral_extract)
-    return Control(init=init, apply=apply, extract=extract, clip=_integral_clip)
+    return Controller(init=init, apply=apply, extract=extract, clip=_integral_clip)
 
 
 def _integral_init(dt0, /):
     return dt0
 
 
-def _integral_clip(dt, /, t, *, t1):
+def _integral_clip(dt, /, t, t1):
     return jnp.minimum(dt, t1 - t)
 
 
-def _no_clip(dt, /, t, *, t1):
+def _no_clip(dt, /, t, t1):
     return dt
 
 
@@ -158,7 +162,7 @@ def _flatten(ctrl):
 
 def _unflatten(aux, _children):
     init, apply, clip, extract = aux
-    return Control(init=init, apply=apply, clip=clip, extract=extract)
+    return Controller(init=init, apply=apply, clip=clip, extract=extract)
 
 
-jax.tree_util.register_pytree_node(Control, _flatten, _unflatten)
+jax.tree_util.register_pytree_node(Controller, _flatten, _unflatten)
