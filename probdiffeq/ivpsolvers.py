@@ -9,36 +9,36 @@ from probdiffeq import _interp, _sqrt_util, solution
 from probdiffeq.backend import containers
 
 
-def solver_mle(strategy, calibration):
+def solver_mle(strategy, calibration_factory):
     """Create a solver that calibrates the output scale via maximum-likelihood."""
     string_repr = f"<MLE-solver with {strategy}>"
     return Solver(
         strategy,
-        calibration.mle,
+        calibration_factory.mle(),
         string_repr=string_repr,
         step_fun=_step_mle,
         requires_rescaling=True,
     )
 
 
-def solver_dynamic(strategy, calibration):
+def solver_dynamic(strategy, calibration_factory):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
     return Solver(
         strategy,
-        calibration.mle,
+        calibration_factory.dynamic(),
         string_repr=string_repr,
         step_fun=_step_dynamic,
         requires_rescaling=False,
     )
 
 
-def solver_calibrationfree(strategy, calibration):
+def solver_calibrationfree(strategy, calibration_factory):
     """Create a solver that does not calibrate the output scale automatically."""
     string_repr = f"<Calibration-free solver with {strategy}>"
     return Solver(
         strategy,
-        calibration.mle,
+        calibration_factory.free(),
         string_repr=string_repr,
         step_fun=_step_calibration_free,
         requires_rescaling=False,

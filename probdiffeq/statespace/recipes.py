@@ -28,21 +28,23 @@ class _Impl(containers.NamedTuple):
     """
 
     extra_factory: Tuple[_extra.ExtrapolationFactory, Any]
-    """Extrapolation method."""
+    """Extrapolation factory."""
 
     corr: Any
     """Correction method."""
 
-    calib: Any
-    """Calibration method."""
+    calibration_factory: Any
+    """Calibration factory."""
 
 
 def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
     corr = iso_corr.taylor_order_zero(ode_order=ode_order)
     extra_factory = iso_extra.ibm_iso_factory(num_derivatives=num_derivatives)
-    calib = iso_calib.output_scale()
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = iso_calib.output_scale()
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -61,8 +63,12 @@ def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
     output_scale_scalar = scalar_calib.output_scale()
-    calib = bd_calib.output_scale(output_scale_scalar, ode_shape=ode_shape)
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = bd_calib.output_scale(
+        output_scale_scalar, ode_shape=ode_shape
+    )
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -71,8 +77,12 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
     output_scale_scalar = scalar_calib.output_scale()
-    calib = bd_calib.output_scale(output_scale_scalar, ode_shape=ode_shape)
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = bd_calib.output_scale(
+        output_scale_scalar, ode_shape=ode_shape
+    )
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -80,8 +90,10 @@ def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     extra_factory = dense_extra.ibm_dense_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calib = dense_calib.output_scale()
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = dense_calib.output_scale()
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -89,8 +101,10 @@ def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     extra_factory = dense_extra.ibm_dense_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calib = dense_calib.output_scale()
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = dense_calib.output_scale()
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def slr1_dense(
@@ -106,8 +120,10 @@ def slr1_dense(
     extra_factory = dense_extra.ibm_dense_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calib = dense_calib.output_scale()
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = dense_calib.output_scale()
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def slr0_dense(
@@ -133,12 +149,16 @@ def slr0_dense(
     extra_factory = dense_extra.ibm_dense_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calib = dense_calib.output_scale()
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = dense_calib.output_scale()
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
     corr = scalar_corr.taylor_order_zero(ode_order=ode_order)
     extra_factory = scalar_extra.ibm_scalar_factory(num_derivatives=num_derivatives)
-    calib = scalar_calib.output_scale()
-    return _Impl(corr=corr, extra_factory=extra_factory, calib=calib)
+    calibration_factory = scalar_calib.output_scale()
+    return _Impl(
+        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
+    )
