@@ -83,6 +83,8 @@ Notable breaking changes:
 * IVP solvers have been moved to their own subpackage. The file size was growing out of hand.
   Update your code as follows: Instead of importing `solver_mle`, `solver_dynamic`, and `solver_calibrationfree` from ivpsolvers.py,
   import `mle` and `dynamic` from ivpsolvers.calibrated, and `solver` from `ivpsolvers.uncalibrated`.
+* In all IVP solvers, the `output_scale` parameter is compulsory. The reason is that the type of this parameter depends on the selected state-space model factorisation, and only the user knows which solver has been chosen.
+  To update your code, select an `output_scale` value that is usually a scalar (e.g. 1.); for block-diagonal models, make the shape of the output-scale match the shape of the ODE state-space (e.g. (2,) for Lotka-Volterra).
 
 Notable enhancements:
 
