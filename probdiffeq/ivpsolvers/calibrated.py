@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _interp, _sqrt_util
+from probdiffeq import _interp
 from probdiffeq.ivpsolvers import _common, solver
 
 
@@ -55,38 +55,37 @@ def dynamic(strategy, calibration_factory):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
     return CalibratedSolver(
-        strategy,
-        calibration_factory.dynamic(),
+        strategy=strategy,
+        calibration=calibration_factory.most_recent(),
         string_repr=string_repr,
-        step_fun=_step_dynamic,
+        impl_step=_step_dynamic,
         requires_rescaling=False,
     )
 
 
-def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy):
+def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibration):
     state_strategy = strategy.begin(
         state.strategy,
         dt=dt,
         parameters=parameters,
         vector_field=vector_field,
     )
-    (error, output_scale, _) = state_strategy.corr  # clean this up next?
+    (error, observed, _) = state_strategy.corr  # clean this up next?
+    output_scale = calibration.update(state.output_scale, observed=observed)
 
+    prior, _calibrated = calibration.extract(output_scale)
     state_strategy = strategy.complete(
         state_strategy,
         parameters=parameters,
         vector_field=vector_field,
-        output_scale=output_scale,
+        output_scale=prior,
     )
 
     # Return solution
     return _common.State(
         error_estimate=dt * error,
         strategy=state_strategy,
-        output_scale_calibrated=output_scale,
-        # current scale becomes the new prior scale!
-        #  this is because dynamic solvers assume a piecewise-constant model
-        output_scale_prior=output_scale,
+        output_scale=output_scale,
         num_steps=state.num_steps + 1,
     )
 
@@ -101,7 +100,7 @@ class CalibratedSolver(solver.Solver[_common.State]):
     def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
         state_strategy = self.strategy.init(t, posterior)
         error_estimate = jnp.empty_like(state_strategy.u)
-        calib_state = self.calibration.init(prior=output_scale, calibrated=output_scale)
+        calib_state = self.calibration.init(output_scale)
         return _common.State(
             error_estimate=error_estimate,
             strategy=state_strategy,

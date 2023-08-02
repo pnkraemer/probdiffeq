@@ -12,8 +12,8 @@ def output_scale():
 
 
 class IsoRunningMean(_calib.Calibration):
-    def init(self, prior, calibrated):
-        return prior, calibrated, 0.0
+    def init(self, prior):
+        return prior, prior, 0.0
 
     def update(self, state, /, *, observed):
         prior, calibrated, num_data = state
@@ -36,7 +36,17 @@ def _update_running_mean(mean, x, /, num):
 
 
 class IsoMostRecent(_calib.Calibration):
-    pass
+    def init(self, prior):
+        return (prior, prior)
+
+    def update(self, state, /, *, observed):
+        zero_data = jnp.zeros_like(observed.mean)
+        mahalanobis_norm = observed.mahalanobis_norm(zero_data)
+        calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
+        return calibrated, calibrated
+
+    def extract(self, state, /):
+        return state
 
 
 class IsoFactory(_calib.CalibrationFactory):
