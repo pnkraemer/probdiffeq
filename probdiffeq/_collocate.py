@@ -10,11 +10,11 @@ from probdiffeq.backend import tree_array_util
 
 def solve_and_save_at(
     vector_field,
-    *,
     t,
     posterior,
     output_scale,
     num_steps,
+    *,
     save_at,
     adaptive_solver,
     dt0,
@@ -100,11 +100,11 @@ def solve_with_python_while_loop(*args, **kwargs):
 
 def _solution_generator(
     vector_field,
-    *,
     t,
     posterior,
     output_scale,
     num_steps,
+    *,
     dt0,
     t1,
     adaptive_solver,
@@ -139,7 +139,7 @@ def _solution_generator(
 
 
 def solve_fixed_grid(
-    vector_field, *, posterior, output_scale, num_steps, grid, solver, parameters
+    vector_field, posterior, output_scale, num_steps, *, grid, solver, parameters
 ):
     t0 = grid[0]
     state0 = solver.init(t0, posterior, output_scale, num_steps)

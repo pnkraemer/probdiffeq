@@ -5,7 +5,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _interp, _sqrt_util, solution
+from probdiffeq import _interp, _sqrt_util
 from probdiffeq.backend import containers
 
 
@@ -90,15 +90,8 @@ class Solver:
         Thus, this method is kind-of a helper function to make the rest of the
         initialisation code a bit simpler.
         """
-        u, marginals, posterior = self.strategy.solution_from_tcoeffs(tcoeffs)
-        return solution.Solution(
-            t=t,
-            posterior=posterior,
-            marginals=marginals,
-            output_scale=output_scale,
-            u=u,
-            num_steps=num_steps,
-        )
+        posterior = self.strategy.solution_from_tcoeffs(tcoeffs)
+        return t, posterior, output_scale, num_steps
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _State:
         state_strategy = self.strategy.init(t, posterior)
