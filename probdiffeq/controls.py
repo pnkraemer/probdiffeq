@@ -2,7 +2,7 @@
 
 import dataclasses
 import functools
-from typing import Any, Callable, Generic, Tuple, TypeVar
+from typing import Callable, Generic, Tuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -15,16 +15,16 @@ T = TypeVar("T")
 class Controller(Generic[T]):
     """Control algorithm."""
 
-    init: Callable[[Any], T]
+    init: Callable[[float], T]
     """Initialise the controller state."""
 
-    clip: Callable[[T, Any, Any], T]
+    clip: Callable[[T, float, float], T]
     """(Optionally) clip the current step to not exceed t1."""
 
-    apply: Callable[[T, Any, Any], T]
+    apply: Callable[[T, float, float], T]
     r"""Propose a time-step $\Delta t$."""
 
-    extract: Callable[[T], Any]
+    extract: Callable[[T], float]
     """Extract the time-step from the controller state."""
 
 
