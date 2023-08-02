@@ -14,11 +14,13 @@ def smoother(extra, corr, calib, /):
     strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
-        string_repr=f"<Smoother with {factory.string_repr(*parameters)}, {corr}>",
-        right_corner_fun=None,
         is_suitable_for_save_at=False,
-        interpolate_fun=_smoother_interpolate,
-        offgrid_marginals_fun=_smoother_offgrid_marginals,
+        string_repr=f"<Smoother with {factory.string_repr(*parameters)}, {corr}>",
+        # Right-corner: use default
+        impl_right_corner=None,
+        # Interpolate like a smoother:
+        impl_interpolate=_smoother_interpolate,
+        impl_offgrid_marginals=_smoother_offgrid_marginals,
     )
     return strategy_impl, calib
 
@@ -30,11 +32,13 @@ def smoother_fixedpoint(extra, corr, calib, /):
     strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
-        string_repr=f"<Fixed-point with {factory.string_repr(*parameters)}, {corr}>",
-        interpolate_fun=_fixedpoint_interpolate,
-        right_corner_fun=_fixedpoint_right_corner,
-        offgrid_marginals_fun=None,
         is_suitable_for_save_at=True,
+        string_repr=f"<Fixed-point with {factory.string_repr(*parameters)}, {corr}>",
+        # Offgrid-marginals are not available
+        impl_offgrid_marginals=None,
+        # Interpolate like a fixedpoint-smoother
+        impl_interpolate=_fixedpoint_interpolate,
+        impl_right_corner=_fixedpoint_right_corner,
     )
     return strategy_impl, calib
 

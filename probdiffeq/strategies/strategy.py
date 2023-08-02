@@ -20,23 +20,27 @@ class Strategy(Generic[P]):
         extrapolation,
         correction,
         *,
-        interpolate_fun,
         string_repr,
-        right_corner_fun,
-        offgrid_marginals_fun,
         is_suitable_for_save_at,
+        impl_interpolate,
+        impl_right_corner,
+        impl_offgrid_marginals,
     ):
+        # Content
         self.extrapolation = extrapolation
         self.correction = correction
 
+        # Some meta-information
+        self.string_repr = string_repr
         self.is_suitable_for_save_at = is_suitable_for_save_at
-        self._string_repr = string_repr
-        self._interpolate_fun = interpolate_fun
-        self._right_corner_fun = right_corner_fun
-        self._offgrid_marginals_fun = offgrid_marginals_fun
+
+        # Implementations of functionality that varies
+        self.impl_interpolate = impl_interpolate
+        self.impl_right_corner = impl_right_corner
+        self.impl_offgrid_marginals = impl_offgrid_marginals
 
     def __repr__(self):
-        return self._string_repr
+        return self.string_repr
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         return self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
@@ -70,29 +74,34 @@ class Strategy(Generic[P]):
     def case_right_corner(
         self, t, *, s0: _common.State, s1: _common.State, output_scale
     ) -> _interp.InterpRes[_common.State]:
-        if self._right_corner_fun is not None:
-            return self._right_corner_fun(
+        # If specific choice is provided, use that.
+        if self.impl_right_corner is not None:
+            return self.impl_right_corner(
                 t,
                 s0=s0,
                 s1=s1,
                 output_scale=output_scale,
                 extrapolation=self.extrapolation,
             )
+
+        # Otherwise, apply default behaviour.
         return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(
         self, t, *, s0: _common.State, s1: _common.State, output_scale
     ) -> _interp.InterpRes[_common.State]:
-        return self._interpolate_fun(
+        return self.impl_interpolate(
             t, output_scale=output_scale, s0=s0, s1=s1, extrapolation=self.extrapolation
         )
 
     def offgrid_marginals(
         self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
     ):
-        if self._offgrid_marginals_fun is None:
+        # If implementation is not provided, then offgrid_marginals is impossible.
+        if self.impl_offgrid_marginals is None:
             raise NotImplementedError
-        return self._offgrid_marginals_fun(
+
+        return self.impl_offgrid_marginals(
             t,
             marginals=marginals,
             output_scale=output_scale,
@@ -109,25 +118,28 @@ class Strategy(Generic[P]):
         # todo: they should all be 'aux'?
         children = (self.correction,)
         aux = (
+            # Content
             self.extrapolation,
-            self._interpolate_fun,
-            self._right_corner_fun,
-            self._offgrid_marginals_fun,
-            self._string_repr,
+            # Meta-info
+            self.string_repr,
             self.is_suitable_for_save_at,
+            # Implementations
+            self.impl_interpolate,
+            self.impl_right_corner,
+            self.impl_offgrid_marginals,
         )
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (corr,) = children
-        extra, interp, right_corner, offgrid, string, suitable = aux
+        extra, string, suitable, interp, right_corner, offgrid = aux
         return cls(
             extrapolation=extra,
             correction=corr,
-            interpolate_fun=interp,
-            right_corner_fun=right_corner,
-            offgrid_marginals_fun=offgrid,
             string_repr=string,
             is_suitable_for_save_at=suitable,
+            impl_interpolate=interp,
+            impl_right_corner=right_corner,
+            impl_offgrid_marginals=offgrid,
         )

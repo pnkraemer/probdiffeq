@@ -15,10 +15,12 @@ def filter(extra, corr, calib, /):
         extrapolation,
         corr,
         string_repr=f"<Filter with {factory.string_repr(*parameters)}, {corr}>",
-        right_corner_fun=None,
         is_suitable_for_save_at=True,
-        interpolate_fun=_filter_interpolate,
-        offgrid_marginals_fun=_filter_offgrid_marginals,
+        # Right-corner: use default
+        impl_right_corner=None,
+        # Filtering behaviour for interpolation
+        impl_interpolate=_filter_interpolate,
+        impl_offgrid_marginals=_filter_offgrid_marginals,
     )
     return strategy_impl, calib
 
