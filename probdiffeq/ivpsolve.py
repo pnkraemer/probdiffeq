@@ -59,7 +59,7 @@ def simulate_terminal_values(
         dt0=dt0,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
-        interpolate=(solver.interpolate_fun, solver.right_corner_fun),
+        interpolate=(solver.interpolate, solver.right_corner),
     )
     # "squeeze"-type functionality (there is only a single state!)
     squeeze_fun = functools.partial(jnp.squeeze, axis=0)
@@ -148,7 +148,7 @@ def solve_and_save_at(
         dt0=dt0,
         parameters=parameters,
         while_loop_fn=while_loop_fn_temporal,
-        interpolate=(solver.interpolate_fun, solver.right_corner_fun),
+        interpolate=(solver.interpolate, solver.right_corner),
     )
 
     if solver.requires_rescaling:
@@ -222,7 +222,7 @@ def solve_with_python_while_loop(
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
-        interpolate=(solver.interpolate_fun, solver.right_corner_fun),
+        interpolate=(solver.interpolate, solver.right_corner),
     )
     # I think the user expects the initial time-point to be part of the grid
     # (Even though t0 is not computed by this function)

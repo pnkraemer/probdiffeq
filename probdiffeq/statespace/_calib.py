@@ -7,10 +7,18 @@ from typing import Callable
 from probdiffeq.backend import containers
 
 
-class Calibration(containers.NamedTuple):
-    init: Callable
-    update: Callable
-    extract: Callable
+class Calibration(abc.ABC):
+    @abc.abstractmethod
+    def init(self, prior, calibrated):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(self, state, /, *, observed):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract(self, state, /):
+        raise NotImplementedError
 
 
 # See _extra.ExtrapolationFactory for what is going on here.
@@ -19,13 +27,9 @@ class Calibration(containers.NamedTuple):
 # The factory below allows delaying this decision to later on.
 class CalibrationFactory(abc.ABC):
     @abc.abstractmethod
-    def mle(self) -> Calibration:
+    def running_mean(self) -> Calibration:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def dynamic(self) -> Calibration:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def free(self) -> Calibration:
+    def most_recent(self) -> Calibration:
         raise NotImplementedError
