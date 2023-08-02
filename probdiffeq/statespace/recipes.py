@@ -62,10 +62,7 @@ def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     extra_factory = bd_extra.ibm_blockdiag_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    output_scale_scalar = scalar_calib.output_scale()
-    calibration_factory = bd_calib.output_scale(
-        output_scale_scalar, ode_shape=ode_shape
-    )
+    calibration_factory = bd_calib.output_scale(ode_shape=ode_shape)
     return _Impl(
         corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
     )
@@ -76,10 +73,7 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     extra_factory = bd_extra.ibm_blockdiag_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    output_scale_scalar = scalar_calib.output_scale()
-    calibration_factory = bd_calib.output_scale(
-        output_scale_scalar, ode_shape=ode_shape
-    )
+    calibration_factory = bd_calib.output_scale(ode_shape=ode_shape)
     return _Impl(
         corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
     )

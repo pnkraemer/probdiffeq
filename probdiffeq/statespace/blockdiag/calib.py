@@ -3,11 +3,54 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.statespace import _calib
+from probdiffeq.statespace.scalar import calib
 
 
-def output_scale(output_scale_scalar, *, ode_shape):
+def output_scale(ode_shape):
     """Construct (a buffet of) isotropic calibration strategies."""
-    return _BlockDiagCalibrationFactory(output_scale_scalar, ode_shape=ode_shape)
+    return BlockDiagFactory(ode_shape=ode_shape)
+
+
+class BlockDiagMostRecent(_calib.Calibration):
+    def __init__(self, *, ode_shape):
+        self.ode_shape = ode_shape
+
+        self.wraps = calib.ScalarMostRecent()
+
+    def init(self, prior):
+        prior_promoted = prior * jnp.ones(self.ode_shape)
+        return jax.vmap(self.wraps.init)(prior_promoted)
+
+    def update(self, state, /, observed):
+        return jax.vmap(self.wraps.update)(state, observed)
+
+    def extract(self, state, /):
+        return jax.vmap(self.wraps.extract)(state)
+
+
+class BlockDiagRunningMean(_calib.Calibration):
+    def __init__(self, *, ode_shape):
+        self.ode_shape = ode_shape
+
+    def init(self, prior):
+        raise NotImplementedError
+
+    def update(self, state, /, observed):
+        raise NotImplementedError
+
+    def extract(self, state, /):
+        raise NotImplementedError
+
+
+class BlockDiagFactory(_calib.CalibrationFactory):
+    def __init__(self, *, ode_shape):
+        self.ode_shape = ode_shape
+
+    def most_recent(self) -> BlockDiagMostRecent:
+        return BlockDiagMostRecent(ode_shape=self.ode_shape)
+
+    def running_mean(self) -> BlockDiagRunningMean:
+        return BlockDiagRunningMean(ode_shape=self.ode_shape)
 
 
 class _BlockDiagCalibrationFactory(_calib.CalibrationFactory):

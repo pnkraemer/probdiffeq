@@ -2,18 +2,15 @@
 
 
 import abc
-from typing import Callable
-
-from probdiffeq.backend import containers
 
 
 class Calibration(abc.ABC):
     @abc.abstractmethod
-    def init(self, prior, calibrated):
+    def init(self, prior):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def update(self, state, /, *, observed):
+    def update(self, state, /, observed):
         raise NotImplementedError
 
     @abc.abstractmethod

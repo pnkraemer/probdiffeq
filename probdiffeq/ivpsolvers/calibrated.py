@@ -71,6 +71,7 @@ def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibrati
         vector_field=vector_field,
     )
     (error, observed, _) = state_strategy.corr  # clean this up next?
+    assert not isinstance(observed, jax.Array)
     output_scale = calibration.update(state.output_scale, observed=observed)
 
     prior, _calibrated = calibration.extract(output_scale)

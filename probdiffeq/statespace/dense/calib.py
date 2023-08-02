@@ -1,57 +1,43 @@
 """Calibration tools."""
 
-import jax
+import jax.numpy as jnp
 
 from probdiffeq.statespace import _calib
 
 
 def output_scale():
     """Construct (a buffet of) isotropic calibration strategies."""
-    return _DenseCalibrationFactory()
+    return DenseFactory()
 
 
-class _DenseCalibrationFactory(_calib.CalibrationFactory):
-    def dynamic(self) -> _calib.Calibration:
-        @jax.tree_util.Partial
-        def init(s, /):
-            return s
+class DenseMostRecent(_calib.Calibration):
+    def init(self, prior):
+        return prior
 
-        @jax.tree_util.Partial
-        def update(s, /):  # todo: make correct
-            return s
+    def update(self, state, /, observed):
+        zero_data = jnp.zeros_like(observed.mean)
+        mahalanobis_norm = observed.mahalanobis_norm(zero_data)
+        calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
+        return calibrated
 
-        @jax.tree_util.Partial
-        def extract(s):
-            return s
+    def extract(self, state, /):
+        return state, state
 
-        return _calib.Calibration(init=init, update=update, extract=extract)
 
-    def mle(self) -> _calib.Calibration:
-        @jax.tree_util.Partial
-        def init(s, /):
-            return s
+class DenseRunningMean(_calib.Calibration):
+    def init(self, prior):
+        raise NotImplementedError
 
-        @jax.tree_util.Partial
-        def update(s, /):
-            return s
+    def update(self, state, /, observed):
+        raise NotImplementedError
 
-        @jax.tree_util.Partial
-        def extract(s, /):
-            return s
+    def extract(self, state, /):
+        raise NotImplementedError
 
-        return _calib.Calibration(init=init, update=update, extract=extract)
 
-    def free(self) -> _calib.Calibration:
-        @jax.tree_util.Partial
-        def init(s, /):
-            return s
+class DenseFactory(_calib.CalibrationFactory):
+    def most_recent(self) -> DenseMostRecent:
+        return DenseMostRecent()
 
-        @jax.tree_util.Partial
-        def update(s, /):
-            return s
-
-        @jax.tree_util.Partial
-        def extract(s, /):
-            return s
-
-        return _calib.Calibration(init=init, update=update, extract=extract)
+    def running_mean(self) -> DenseRunningMean:
+        return DenseRunningMean()

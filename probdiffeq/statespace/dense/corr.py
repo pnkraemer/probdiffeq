@@ -109,7 +109,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, output_scale, (b,))
+        return ssv, (error_estimate, observed, (b,))
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         l_obs_nonsquare = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
@@ -194,7 +194,7 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, output_scale, (jvp_fn, (b,)))
+        return ssv, (error_estimate, observed, (jvp_fn, (b,)))
 
     def complete(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
@@ -306,7 +306,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, output_scale, cache)
+        return ssv, (error_estimate, marginals, cache)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         # Select the required derivatives
@@ -415,7 +415,7 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, output_scale, cache)
+        return ssv, (error_estimate, marginals, cache)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         # Select the required derivatives
