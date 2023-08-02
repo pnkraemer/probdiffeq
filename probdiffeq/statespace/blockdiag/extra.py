@@ -69,6 +69,13 @@ class _BlockDiag(_extra.Extrapolation):
         return fn(self.extra, ssv, extra, dt)
 
     def complete(self, ssv, extra, /, output_scale):
+        if jnp.ndim(output_scale) == 0:
+            raise ValueError(
+                f"Output-scale with ndim={1} expected, "
+                f"but output-scale {output_scale} with "
+                f"ndim={jnp.ndim(output_scale)} received."
+            )
+
         fn = jax.vmap(type(self.extra).complete)
         return fn(self.extra, ssv, extra, output_scale)
 

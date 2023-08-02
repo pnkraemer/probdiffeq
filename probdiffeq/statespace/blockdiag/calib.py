@@ -18,8 +18,10 @@ class BlockDiag(_calib.Calibration):
         self.wraps = wraps
 
     def init(self, prior):
-        prior_promoted = prior * jnp.ones(self.ode_shape)
-        return jax.vmap(self.wraps.init)(prior_promoted)
+        if jnp.ndim(prior) == 0:
+            raise ValueError
+
+        return jax.vmap(self.wraps.init)(prior)
 
     def update(self, state, /, observed):
         return jax.vmap(self.wraps.update)(state, observed)
