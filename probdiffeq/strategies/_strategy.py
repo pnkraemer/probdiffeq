@@ -52,10 +52,7 @@ class Strategy(Generic[P]):
         return self._string_repr
 
     def solution_from_tcoeffs(self, taylor_coefficients, /):
-        sol = self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
-        marginals = sol
-        u = taylor_coefficients[0]
-        return u, marginals, sol
+        return self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
     def init(self, t, posterior, /) -> _strategy.State:
         ssv, extra = self.extrapolation.init(posterior)
