@@ -13,9 +13,8 @@ def output_scale(ode_shape):
 
 class BlockDiag(_calib.Calibration):
     def __init__(self, wraps, *, ode_shape):
-        self.ode_shape = ode_shape
-
         self.wraps = wraps
+        self.ode_shape = ode_shape
 
     def init(self, prior):
         if jnp.ndim(prior) == 0:
