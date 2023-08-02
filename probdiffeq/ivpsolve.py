@@ -2,6 +2,7 @@
 
 import functools
 import warnings
+from typing import Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -347,3 +348,87 @@ def _assert_tuple(x, /):
     todo: allow other containers.
     """
     assert isinstance(x, tuple)
+
+
+R = TypeVar("R")
+"""Type-variable for random variables used in \
+ generic initial value problem solutions."""
+
+
+@jax.tree_util.register_pytree_node_class
+class Solution(Generic[R]):
+    """Estimated initial value problem solution."""
+
+    def __init__(
+        self,
+        t,
+        u,
+        output_scale,
+        marginals: R,
+        posterior,
+        num_steps,
+    ):
+        self.t = t
+        self.u = u
+        self.output_scale = output_scale
+        self.marginals = marginals
+        self.posterior = posterior
+        self.num_steps = num_steps
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"t={self.t},"
+            f"u={self.u},"
+            f"output_scale={self.output_scale},"
+            f"marginals={self.marginals},"
+            f"posterior={self.posterior},"
+            f"num_steps={self.num_steps},"
+            ")"
+        )
+
+    def tree_flatten(self):
+        children = (
+            self.t,
+            self.u,
+            self.marginals,
+            self.posterior,
+            self.output_scale,
+            self.num_steps,
+        )
+        aux = ()
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, _aux, children):
+        t, u, marginals, posterior, output_scale, n = children
+        return cls(
+            t=t,
+            u=u,
+            marginals=marginals,
+            posterior=posterior,
+            output_scale=output_scale,
+            num_steps=n,
+        )
+
+    def __len__(self):
+        if jnp.ndim(self.t) < 1:
+            raise ValueError("Solution object not batched :(")
+        return self.t.shape[0]
+
+    def __getitem__(self, item):
+        if jnp.ndim(self.t) < 1:
+            raise ValueError("Solution object not batched :(")
+
+        if jnp.ndim(self.t) == 1 and item != -1:
+            msg = "Access to non-terminal states is not available."
+            raise ValueError(msg)
+
+        return jax.tree_util.tree_map(lambda s: s[item, ...], self)
+
+    def __iter__(self):
+        if jnp.ndim(self.t) <= 1:
+            raise ValueError("Solution object not batched :(")
+
+        for i in range(self.t.shape[0]):
+            yield self[i]

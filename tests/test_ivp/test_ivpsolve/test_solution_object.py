@@ -62,8 +62,8 @@ def test_iter_impossible(approximate_solution):
             pass
 
 
-@testing.fixture(name="approximate_solution_vmap")
-def fixture_approximate_solution_vmap(problem):
+@testing.fixture(name="approximate_solution_batched")
+def fixture_approximate_solution_batched(problem):
     vf, u0, (t0, t1), f_args = problem
     solver = test_util.generate_solver(num_derivatives=1)
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
@@ -83,21 +83,21 @@ def fixture_approximate_solution_vmap(problem):
     return solve(jnp.stack((u0, u0 + 0.1, u0 + 0.2)))
 
 
-def test_vmap_getitem_possible(approximate_solution_vmap):
-    solution_type = type(approximate_solution_vmap)
+def test_batched_getitem_possible(approximate_solution_batched):
+    solution_type = type(approximate_solution_batched)
     for idx in (0, 1, 2):
-        approximate_solution = approximate_solution_vmap[idx]
+        approximate_solution = approximate_solution_batched[idx]
         assert isinstance(approximate_solution, solution_type)
-        assert jnp.allclose(approximate_solution.t, approximate_solution_vmap.t[idx])
-        assert jnp.allclose(approximate_solution.u, approximate_solution_vmap.u[idx])
+        assert jnp.allclose(approximate_solution.t, approximate_solution_batched.t[idx])
+        assert jnp.allclose(approximate_solution.u, approximate_solution_batched.u[idx])
 
 
-def test_vmap_iter_possible(approximate_solution_vmap):
-    solution_type = type(approximate_solution_vmap)
-    for idx, approximate_solution in enumerate(approximate_solution_vmap):
+def test_batched_iter_possible(approximate_solution_batched):
+    solution_type = type(approximate_solution_batched)
+    for idx, approximate_solution in enumerate(approximate_solution_batched):
         assert isinstance(approximate_solution, solution_type)
-        assert jnp.allclose(approximate_solution.t, approximate_solution_vmap.t[idx])
-        assert jnp.allclose(approximate_solution.u, approximate_solution_vmap.u[idx])
+        assert jnp.allclose(approximate_solution.t, approximate_solution_batched.t[idx])
+        assert jnp.allclose(approximate_solution.u, approximate_solution_batched.u[idx])
 
 
 def test_marginal_nth_derivative_of_solution(approximate_solution):
