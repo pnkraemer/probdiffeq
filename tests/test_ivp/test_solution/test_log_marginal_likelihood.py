@@ -3,8 +3,9 @@ import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, solution, test_util
+from probdiffeq import ivpsolve, solution, test_util
 from probdiffeq.backend import testing
+from probdiffeq.ivpsolvers import uncalibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -46,7 +47,7 @@ def fixture_solution_save_at(problem, impl_fn):
     solver = test_util.generate_solver(
         strategy_factory=smoothers.smoother_fixedpoint,
         impl_factory=impl_fn,
-        solver_factory=ivpsolvers.solver_calibrationfree,
+        solver_factory=uncalibrated.solver,
         ode_shape=jnp.shape(u0),
         num_derivatives=2,
     )
@@ -141,7 +142,7 @@ def test_raises_error_for_filter(problem):
 
     recipe = recipes.ts0_iso(num_derivatives=4)
     strategy, calibration = filters.filter(*recipe)
-    solver = ivpsolvers.solver_calibrationfree(strategy, calibration)
+    solver = uncalibrated.solver(strategy, calibration)
     grid = jnp.linspace(t0, t1, num=3)
 
     sol = ivpsolve.solve_fixed_grid(

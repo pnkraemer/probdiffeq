@@ -1,13 +1,13 @@
 """Test utilities."""
 
-from probdiffeq import ivpsolvers
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 
 
 def generate_solver(
     *,
-    solver_factory=ivpsolvers.solver_mle,
+    solver_factory=calibrated.mle,
     strategy_factory=filters.filter,
     impl_factory=recipes.ts0_iso,
     **impl_factory_kwargs,
