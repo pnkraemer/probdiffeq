@@ -13,7 +13,7 @@ from probdiffeq.strategies import smoothers
 
 
 @jax.jit
-def vector_field(y, *, t, p):
+def vf(y, *, t, p):
     return p * y * (1 - y)
 
 
@@ -32,7 +32,13 @@ solver = calibrated.mle(*strategy)
 
 # Solve
 solution = ivpsolve.solve_with_python_while_loop(
-    vector_field, initial_values=(u0,), t0=t0, t1=t1, solver=solver, parameters=0.5
+    vf,
+    initial_values=(u0,),
+    t0=t0,
+    t1=t1,
+    solver=solver,
+    output_scale=1.0,
+    parameters=0.5,
 )
 
 
