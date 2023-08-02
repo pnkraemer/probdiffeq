@@ -51,7 +51,7 @@ class AdaptiveIVPSolver(Generic[T]):
         reference_state_fn=_reference_state_fn_max_abs,
     ):
         if control is None:
-            control = controls.ProportionalIntegral()
+            control = controls.proportional_integral()
 
         self.solver = solver
         self.while_loop_fn = while_loop_fn

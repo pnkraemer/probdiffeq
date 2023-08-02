@@ -85,6 +85,9 @@ Notable breaking changes:
   import `mle` and `dynamic` from ivpsolvers.calibrated, and `solver` from `ivpsolvers.uncalibrated`.
 * In all IVP solvers, the `output_scale` parameter is compulsory. The reason is that the type of this parameter depends on the selected state-space model factorisation, and only the user knows which solver has been chosen.
   To update your code, select an `output_scale` value that is usually a scalar (e.g. 1.); for block-diagonal models, make the shape of the output-scale match the shape of the ODE state-space (e.g. (2,) for Lotka-Volterra).
+* Controller-constructors are purely functional now. To update your code, replace, e.g., `ProportionalControl(*args)` with `proportional_control(*args)`.
+  The reason for this refactoring was an unnecessary complicated class-inheritance structure.
+
 
 Notable enhancements:
 

@@ -68,7 +68,7 @@ sol = ivpsolve.solve_with_python_while_loop(
     output_scale=1.0,
     solver=solver,
     parameters=f_args,
-    control=controls.IntegralClipped(),
+    control=controls.integral_clipped(),
 )
 ```
 

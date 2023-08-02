@@ -159,7 +159,7 @@ def strategy_to_method_config(strategy, *, key, label):
     return workprecision.MethodConfig(
         method={
             "solver": solver,
-            "control": controls.ProportionalIntegralClipped(),
+            "control": controls.proportional_integral_clipped(),
             "output_scale": 1.0,
         },
         label="ProbDiffEq: " + label,

@@ -123,7 +123,7 @@ def strategy_to_method_config(strategy, *, label, output_scale):
 def solver_to_method(solver, output_scale):
     return {
         "solver": solver,
-        "control": controls.ProportionalIntegral(),
+        "control": controls.proportional_integral(),
         "output_scale": output_scale,
     }
 ```

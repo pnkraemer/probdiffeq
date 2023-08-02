@@ -28,7 +28,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
         "atol": 1e-2,
         "rtol": 1e-2,
         # Any clipped controller will do.
-        "control": controls.IntegralClipped(),
+        "control": controls.integral_clipped(),
     }
     solution_adaptive = ivpsolve.solve_with_python_while_loop(
         *problem_args, **problem_kwargs, **adaptive_kwargs
