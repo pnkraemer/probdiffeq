@@ -117,7 +117,12 @@ solver = uncalibrated.solver(*strategy)
 
 ```python
 sol = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=grid, solver=solver, parameters=f_args
+    vf,
+    initial_values=(u0,),
+    grid=grid,
+    solver=solver,
+    output_scale=1.0,
+    parameters=f_args,
 )
 
 plt.plot(sol.t, sol.u, ".-", label="Initial estimate")
@@ -154,12 +159,17 @@ plt.plot(sol.t, data, "-", linewidth=5, alpha=0.5, label="Data")
 
 
 sol = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=grid, solver=solver, parameters=p
+    vf, initial_values=(u0,), grid=grid, solver=solver, output_scale=1.0, parameters=p
 )
 plt.plot(sol.t, sol.u, ".-", label="Final guess")
 
 sol = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=grid, solver=solver, parameters=f_args
+    vf,
+    initial_values=(u0,),
+    grid=grid,
+    solver=solver,
+    output_scale=1.0,
+    parameters=f_args,
 )
 plt.plot(sol.t, sol.u, ".-", label="Initial guess")
 

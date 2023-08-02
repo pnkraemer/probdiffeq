@@ -123,6 +123,7 @@ def solver_to_method(solver):
     return {
         "solver": solver,
         "control": controls.ProportionalIntegral(),
+        "output_scale": 1.0,
     }
 
 

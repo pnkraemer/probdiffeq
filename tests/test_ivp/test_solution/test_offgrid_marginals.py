@@ -26,23 +26,24 @@ def case_isotropic_factorisation():
     def iso_factory(ode_shape, num_derivatives):
         return recipes.ts0_iso(num_derivatives=num_derivatives)
 
-    return iso_factory
+    return iso_factory, 2.0
 
 
 @testing.case()  # this implies success of the scalar solver
 def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag
+    return recipes.ts0_blockdiag, jnp.ones((2,)) * 2.0
 
 
 @testing.case()
 def case_dense_factorisation():
-    return recipes.ts0_dense
+    return recipes.ts0_dense, 2.0
 
 
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def test_filter_marginals_close_only_to_left_boundary(problem, impl_factory):
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
+def test_filter_marginals_close_only_to_left_boundary(problem, factorisation):
     """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, u0, (t0, t1), f_args = problem
+    impl_factory, output_scale = factorisation
     solver = test_util.generate_solver(
         num_derivatives=1,
         impl_factory=impl_factory,
@@ -56,6 +57,7 @@ def test_filter_marginals_close_only_to_left_boundary(problem, impl_factory):
         t1=t1,
         parameters=f_args,
         solver=solver,
+        output_scale=output_scale,
         atol=1e-2,
         rtol=1e-2,
     )
@@ -68,10 +70,11 @@ def test_filter_marginals_close_only_to_left_boundary(problem, impl_factory):
     assert not jnp.allclose(u[0], sol.u[1], atol=1e-3, rtol=1e-3)
 
 
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
-def test_smoother_marginals_close_to_both_boundaries(problem, impl_factory):
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
+def test_smoother_marginals_close_to_both_boundaries(problem, factorisation):
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, u0, (t0, t1), f_args = problem
+    impl_factory, output_scale = factorisation
     solver = test_util.generate_solver(
         num_derivatives=1,
         impl_factory=impl_factory,
@@ -85,6 +88,7 @@ def test_smoother_marginals_close_to_both_boundaries(problem, impl_factory):
         t1=t1,
         parameters=f_args,
         solver=solver,
+        output_scale=output_scale,
         atol=1e-2,
         rtol=1e-2,
     )

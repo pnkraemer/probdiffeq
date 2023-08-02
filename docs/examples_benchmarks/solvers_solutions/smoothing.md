@@ -64,6 +64,7 @@ ekf0sol = ivpsolve.simulate_terminal_values(
     t0=t0,
     t1=t1,
     solver=ekf0,
+    output_scale=1.0,
     parameters=f_args,
 )
 print(ekf0sol.t, ekf0sol.u)
@@ -81,6 +82,7 @@ eks0sol = ivpsolve.solve_with_python_while_loop(
     t0=t0,
     t1=t1,
     solver=eks0,
+    output_scale=1.0,
     parameters=f_args,
 )
 
@@ -134,6 +136,7 @@ fixptsol = ivpsolve.solve_and_save_at(
     initial_values=(u0,),
     save_at=ts_dense,  # reuse from above
     solver=eks0_fixpt,
+    output_scale=1.0,
     parameters=f_args,
 )
 

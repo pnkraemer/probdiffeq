@@ -163,7 +163,7 @@ class _BlockDiag(_corr.Correction):
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
         output_scale = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
         error_estimate = obs_unbatch.cov_sqrtm_lower
-        return ssv, (output_scale * error_estimate, output_scale, cache)
+        return ssv, (output_scale * error_estimate, obs_unbatch, cache)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         fn = jax.vmap(type(self.corr).complete, in_axes=(0, 0, 0, None, None, None))

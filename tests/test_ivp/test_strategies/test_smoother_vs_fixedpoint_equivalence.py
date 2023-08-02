@@ -17,17 +17,17 @@ def case_isotropic_factorisation():
     def iso_factory(ode_shape, num_derivatives):
         return recipes.ts0_iso(num_derivatives=num_derivatives)
 
-    return iso_factory
+    return iso_factory, 1.0
 
 
 @testing.case()  # this implies success of the scalar solver
 def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag
+    return recipes.ts0_blockdiag, jnp.ones((2,))
 
 
 @testing.case()
 def case_dense_factorisation():
-    return recipes.ts0_dense
+    return recipes.ts0_dense, 1.0
 
 
 @testing.fixture(name="problem")
@@ -43,14 +43,20 @@ def fixture_problem():
 
 
 @testing.fixture(name="solver_setup")
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_")
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
 # Run with clipped and non-clipped controllers to cover both interpolation and clipping
 # around the end(s) of time-intervals.
-def fixture_solver_setup(problem, impl_factory):
+def fixture_solver_setup(problem, factorisation):
     vf, u0, (t0, t1), f_args = problem
 
+    impl_factory, output_scale = factorisation
     args = (vf, (u0,))
-    kwargs = {"parameters": f_args, "atol": 1e-3, "rtol": 1e-3}
+    kwargs = {
+        "parameters": f_args,
+        "atol": 1e-3,
+        "rtol": 1e-3,
+        "output_scale": output_scale,
+    }
 
     def impl_factory_wrapped():
         return impl_factory(ode_shape=jnp.shape(u0), num_derivatives=2)

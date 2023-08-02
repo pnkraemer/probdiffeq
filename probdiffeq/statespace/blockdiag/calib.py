@@ -2,49 +2,57 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _calib
+from probdiffeq.statespace import calib
+from probdiffeq.statespace.scalar import calib as scalar_calib
 
 
-def output_scale(output_scale_scalar, *, ode_shape):
+def output_scale(ode_shape):
     """Construct (a buffet of) isotropic calibration strategies."""
-    return _BlockDiagCalibrationFactory(output_scale_scalar, ode_shape=ode_shape)
+    return BlockDiagFactory(ode_shape=ode_shape)
 
 
-class _BlockDiagCalibrationFactory(_calib.CalibrationFactory):
-    def __init__(self, wraps, ode_shape):
+class BlockDiag(calib.Calibration):
+    def __init__(self, wraps, *, ode_shape):
         self.wraps = wraps
         self.ode_shape = ode_shape
 
-    def dynamic(self) -> _calib.Calibration:
-        return _blockdiag(self.wraps.dynamic(), ode_shape=self.ode_shape)
+    def init(self, prior):
+        if jnp.ndim(prior) == 0:
+            raise ValueError
 
-    def mle(self) -> _calib.Calibration:
-        return _blockdiag(self.wraps.mle(), ode_shape=self.ode_shape)
+        return jax.vmap(self.wraps.init)(prior)
 
-    def free(self) -> _calib.Calibration:
-        return _blockdiag(self.wraps.free(), ode_shape=self.ode_shape)
+    def update(self, state, /, observed):
+        return jax.vmap(self.wraps.update)(state, observed)
+
+    def extract(self, state, /):
+        return jax.vmap(self.wraps.extract)(state)
 
 
-def _blockdiag(output_scale_scalar, *, ode_shape):
-    @jax.tree_util.Partial
-    def init(s, /):
-        # todo: raise warning/error if shape has to be promoted?
-        #  don't just promote by default.
-        s_arr = s * jnp.ones(ode_shape)
-        return jax.vmap(output_scale_scalar.init)(s_arr)
+class BlockDiagFactory(calib.CalibrationFactory):
+    def __init__(self, *, ode_shape):
+        self.ode_shape = ode_shape
 
-    @jax.tree_util.Partial
-    def update(s, /):
-        return jax.vmap(output_scale_scalar.update)(s)
+    def most_recent(self):
+        wraps = scalar_calib.ScalarMostRecent()
+        return BlockDiag(wraps, ode_shape=self.ode_shape)
 
-    @jax.tree_util.Partial
-    def extract(s):
-        if jnp.ndim(s) > 1:
-            # For block-diagonal SSMs:
-            # The shape of the solution is (N, d, ...). So we have to vmap along axis=1
-            # This only affects extract() because the other functions assume (N,) = ().
-            return jax.vmap(output_scale_scalar.extract, in_axes=1, out_axes=1)(s)
+    def running_mean(self):
+        wraps = scalar_calib.ScalarRunningMean()
+        return BlockDiag(wraps, ode_shape=self.ode_shape)
 
-        return jax.vmap(output_scale_scalar.extract)(s)
 
-    return _calib.Calibration(init=init, update=update, extract=extract)
+# Register objects as (empty) pytrees. todo: temporary?!
+def _flatten(node):
+    return (node.wraps,), node.ode_shape
+
+
+def _unflatten(nodetype, ode_shape, wraps):
+    return nodetype(*wraps, ode_shape=ode_shape)
+
+
+jax.tree_util.register_pytree_node(
+    nodetype=BlockDiag,
+    flatten_func=_flatten,
+    unflatten_func=lambda *a: _unflatten(BlockDiag, *a),
+)

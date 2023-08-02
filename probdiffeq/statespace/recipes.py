@@ -3,7 +3,7 @@
 from typing import Any, Tuple
 
 from probdiffeq.backend import containers
-from probdiffeq.statespace import _extra, cubature
+from probdiffeq.statespace import _extra, calib, cubature
 from probdiffeq.statespace.blockdiag import calib as bd_calib
 from probdiffeq.statespace.blockdiag import corr as bd_corr
 from probdiffeq.statespace.blockdiag import extra as bd_extra
@@ -33,7 +33,7 @@ class _Impl(containers.NamedTuple):
     corr: Any
     """Correction method."""
 
-    calibration_factory: Any
+    calibration_factory: calib.CalibrationFactory
     """Calibration factory."""
 
 
@@ -62,10 +62,7 @@ def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     extra_factory = bd_extra.ibm_blockdiag_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    output_scale_scalar = scalar_calib.output_scale()
-    calibration_factory = bd_calib.output_scale(
-        output_scale_scalar, ode_shape=ode_shape
-    )
+    calibration_factory = bd_calib.output_scale(ode_shape=ode_shape)
     return _Impl(
         corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
     )
@@ -76,10 +73,7 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     extra_factory = bd_extra.ibm_blockdiag_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    output_scale_scalar = scalar_calib.output_scale()
-    calibration_factory = bd_calib.output_scale(
-        output_scale_scalar, ode_shape=ode_shape
-    )
+    calibration_factory = bd_calib.output_scale(ode_shape=ode_shape)
     return _Impl(
         corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
     )

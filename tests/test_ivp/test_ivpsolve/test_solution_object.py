@@ -30,6 +30,7 @@ def fixture_approximate_solution(problem):
         t1=t1,
         parameters=f_args,
         solver=solver,
+        output_scale=1.0,
         atol=1e-2,
         rtol=1e-2,
     )
@@ -76,6 +77,7 @@ def fixture_approximate_solution_batched(problem):
             save_at=save_at,
             parameters=f_args,
             solver=solver,
+            output_scale=1.0,
             atol=1e-2,
             rtol=1e-2,
         )

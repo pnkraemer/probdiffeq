@@ -1,56 +1,68 @@
 """Calibration."""
 import jax
+import jax.numpy as jnp
 
-from probdiffeq.statespace import _calib
+from probdiffeq import _sqrt_util
+from probdiffeq.statespace import calib
 
 
 def output_scale():
     """Construct (a buffet of) isotropic calibration strategies."""
-    return _ScalarCalibrationFactory()
+    return CalibrationFactory()
 
 
-class _ScalarCalibrationFactory(_calib.CalibrationFactory):
-    def dynamic(self) -> _calib.Calibration:
-        @jax.tree_util.Partial
-        def init(s, /):
-            return s
+class ScalarMostRecent(calib.Calibration):
+    def init(self, prior):
+        return prior
 
-        @jax.tree_util.Partial
-        def update(s, /):  # todo: make correct
-            return s
+    def update(self, _state, /, observed):
+        zero_data = jnp.zeros_like(observed.mean)
+        mahalanobis_norm = observed.mahalanobis_norm(zero_data)
+        calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
+        return calibrated
 
-        @jax.tree_util.Partial
-        def extract(s):
-            return s
+    def extract(self, state, /):
+        return state, state
 
-        return _calib.Calibration(init=init, update=update, extract=extract)
 
-    def mle(self) -> _calib.Calibration:
-        @jax.tree_util.Partial
-        def init(s, /):
-            return s
+class ScalarRunningMean(calib.Calibration):
+    def init(self, prior):
+        return prior, prior, 0.0
 
-        @jax.tree_util.Partial
-        def update(s, /):
-            return s
+    def update(self, state, /, observed):
+        prior, calibrated, num_data = state
 
-        @jax.tree_util.Partial
-        def extract(s):
-            return s
+        zero_data = jnp.zeros_like(observed.mean)
+        mahalanobis_norm = observed.mahalanobis_norm(zero_data)
+        new_term = mahalanobis_norm / jnp.sqrt(zero_data.size)
 
-        return _calib.Calibration(init=init, update=update, extract=extract)
+        calibrated = _update_running_mean(calibrated, new_term, num=num_data)
+        return prior, calibrated, num_data + 1.0
 
-    def free(self) -> _calib.Calibration:
-        @jax.tree_util.Partial
-        def init(s, /):
-            return s
+    def extract(self, state, /):
+        prior, calibrated, _num_data = state
+        return prior, calibrated
 
-        @jax.tree_util.Partial
-        def update(s, /):
-            return s
 
-        @jax.tree_util.Partial
-        def extract(s):
-            return s
+def _update_running_mean(mean, x, /, num):
+    sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+    return sum_updated / jnp.sqrt(num + 1)
 
-        return _calib.Calibration(init=init, update=update, extract=extract)
+
+class CalibrationFactory(calib.CalibrationFactory):
+    pass
+
+
+# todo: run tests for scalar solvers
+
+# Register objects as (empty) pytrees. todo: temporary?!
+jax.tree_util.register_pytree_node(
+    nodetype=ScalarRunningMean,
+    flatten_func=lambda _: ((), ()),
+    unflatten_func=lambda *a: ScalarRunningMean(),
+)
+jax.tree_util.register_pytree_node(
+    nodetype=ScalarMostRecent,
+    flatten_func=lambda _: ((), ()),
+    unflatten_func=lambda *a: ScalarMostRecent(),
+)

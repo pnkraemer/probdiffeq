@@ -23,32 +23,41 @@ def fixture_problem():
 
 
 @testing.case()
-def case_impl_isotropic_factorisation():
+def case_isotropic_factorisation():
     def iso_factory(ode_shape, num_derivatives):
         return recipes.ts0_iso(num_derivatives=num_derivatives)
 
-    return iso_factory
+    return iso_factory, 2.0
 
 
 @testing.case()  # this implies success of the scalar solver
-def case_impl_blockdiag_factorisation():
-    return recipes.ts0_blockdiag
+def case_blockdiag_factorisation():
+    return recipes.ts0_blockdiag, jnp.ones((2,)) * 2.0
 
 
 @testing.case()
-def case_impl_dense_factorisation():
-    return recipes.ts0_dense
+def case_dense_factorisation():
+    return recipes.ts0_dense, 2.0
 
 
-@testing.parametrize_with_cases("impl_factory", cases=".", prefix="case_impl")
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_impl")
 @testing.case()
-def case_sol_vary_the_statespace(problem, impl_factory):
+def case_sol_vary_the_statespace(problem, factorisation):
     vf, u0, (t0, t1), params = problem
+    impl_factory, output_scale = factorisation
     recipe = impl_factory(num_derivatives=4, ode_shape=jnp.shape(u0))
     strategy, calibration = filters.filter(*recipe)
     solver = uncalibrated.solver(strategy, calibration)
     sol = ivpsolve.simulate_terminal_values(
-        vf, (u0,), t0=t0, t1=t1, parameters=params, solver=solver, atol=1e-2, rtol=1e-2
+        vf,
+        (u0,),
+        t0=t0,
+        t1=t1,
+        parameters=params,
+        solver=solver,
+        output_scale=output_scale,
+        atol=1e-2,
+        rtol=1e-2,
     )
     return sol, strategy
 
@@ -64,7 +73,15 @@ def case_sol_vary_the_strategy(problem, strategy_fun):
     strategy, calibration = strategy_fun(*recipe)
     solver = uncalibrated.solver(strategy, calibration)
     sol = ivpsolve.simulate_terminal_values(
-        vf, (u0,), t0=t0, t1=t1, parameters=params, solver=solver, atol=1e-2, rtol=1e-2
+        vf,
+        (u0,),
+        t0=t0,
+        t1=t1,
+        parameters=params,
+        solver=solver,
+        output_scale=1.0,
+        atol=1e-2,
+        rtol=1e-2,
     )
     return sol, strategy
 
