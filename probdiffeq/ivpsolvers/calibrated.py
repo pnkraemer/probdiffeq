@@ -20,7 +20,7 @@ def mle(strategy, calibration_factory):
 
 
 def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
-    _, output_scale_prior = calibration.extract(state.output_scale)
+    output_scale_prior, _calibrated = calibration.extract(state.output_scale)
 
     state_strategy = strategy.begin(
         state.strategy,
@@ -123,7 +123,7 @@ class CalibratedSolver(solver.Solver[_common.State]):
 
     def extract(self, state: _common.State, /):
         t, posterior = self.strategy.extract(state.strategy)
-        _, output_scale = self.calibration.extract(state.output_scale)
+        _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, posterior, output_scale, state.num_steps
 
     def interpolate(
