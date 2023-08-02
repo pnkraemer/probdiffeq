@@ -28,8 +28,9 @@ import scipy.integrate
 from diffeqzoo import backend, ivps
 from jax import config
 
-from probdiffeq import controls, ivpsolvers
+from probdiffeq import controls
 from probdiffeq.doc_util import benchmark, info, notebook, workprecision
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 ```
@@ -151,7 +152,7 @@ def impl_to_method_config(impl, *, key, label):
 def strategy_to_method_config(strategy, *, key, label):
     # Use a solver_dynamic because vdP has such aggressively
     # different output scales
-    solver = ivpsolvers.solver_dynamic(*strategy)
+    solver = calibrated.dynamic(*strategy)
 
     # Use a clipped control because |f(u0)|=0 which is why
     # the initial step-size suggestion becomes a little bit fragile.

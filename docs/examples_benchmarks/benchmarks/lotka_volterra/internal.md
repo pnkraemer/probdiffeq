@@ -27,8 +27,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax import config
 
-from probdiffeq import controls, ivpsolvers
+from probdiffeq import controls
 from probdiffeq.doc_util import benchmark, info, notebook, workprecision
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import cubature, recipes
 from probdiffeq.strategies import filters, smoothers
 ```
@@ -112,7 +113,7 @@ def impl_to_method_config(impl, *, label):
 
 
 def strategy_to_method_config(strategy, *, label):
-    solver = ivpsolvers.solver_mle(*strategy)
+    solver = calibrated.mle(*strategy)
     return workprecision.MethodConfig(method=solver_to_method(solver), label=label)
 
 
