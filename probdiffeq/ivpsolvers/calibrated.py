@@ -4,13 +4,13 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.ivpsolvers import _common, api
+from probdiffeq.ivpsolvers import _common, solver
 
 
 def mle(strategy, calibration_factory):
     """Create a solver that calibrates the output scale via maximum-likelihood."""
     string_repr = f"<MLE-solver with {strategy}>"
-    return api.Solver(
+    return solver.Solver(
         strategy,
         calibration_factory.mle(),
         string_repr=string_repr,
@@ -71,7 +71,7 @@ def _update_running_mean(x, y, /, num):
 def dynamic(strategy, calibration_factory):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
-    return api.Solver(
+    return solver.Solver(
         strategy,
         calibration_factory.dynamic(),
         string_repr=string_repr,

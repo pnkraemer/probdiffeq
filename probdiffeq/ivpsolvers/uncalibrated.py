@@ -1,12 +1,13 @@
 """Uncalibrated IVP solvers."""
 
-from probdiffeq.ivpsolvers import _common, api
+from probdiffeq.ivpsolvers import _common
+from probdiffeq.ivpsolvers import solver as solver_module
 
 
 def solver(strategy, calibration_factory):
     """Create a solver that does not calibrate the output scale automatically."""
     string_repr = f"<Calibration-free solver with {strategy}>"
-    return api.Solver(
+    return solver_module.Solver(
         strategy,
         calibration_factory.free(),
         string_repr=string_repr,
