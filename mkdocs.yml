@@ -107,7 +107,10 @@ nav:
               - examples_benchmarks/benchmarks/hires/external.ipynb
   - API Documentation:
       - ivpsolve: api_docs/ivpsolve.md
-      - ivpsolvers: api_docs/ivpsolvers.md
+      - ivpsolvers:
+          - solver: api_docs/ivpsolvers/solver.md
+          - calibrated: api_docs/ivpsolvers/calibrated.md
+          - uncalibrated: api_docs/ivpsolvers/uncalibrated.md
       - strategies:
           - filters: api_docs/strategies/filters.md
           - smoothers: api_docs/strategies/smoothers.md

@@ -80,6 +80,9 @@ Notable breaking changes:
 * The support for Python 3.8 has been dropped. Why? Because JAX' support for python 3.8 has been dropped.
 * `Solution.__getitem__(self, item)` is now only allowed if either `item = -1` or if the solution is the result of a vmap-type operation.
   Every other implementation has always been mathematically incorrect.
+* IVP solvers have been moved to their own subpackage. The file size was growing out of hand.
+  Update your code as follows: Instead of importing `solver_mle`, `solver_dynamic`, and `solver_calibrationfree` from ivpsolvers.py,
+  import `mle` and `dynamic` from ivpsolvers.calibrated, and `solver` from `ivpsolvers.uncalibrated`.
 
 Notable enhancements:
 

@@ -7,8 +7,9 @@ but not for the dynamic solver.
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, test_util
+from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 
 
@@ -51,7 +52,7 @@ def fixture_approximation_error_low(problem, impl_factory):
         # Problem setup chosen that when combined with ts1_dense,
         # only the dynamic solver can pass the test.
         # For some reason, zeroth-order solvers always do well.
-        solver_factory=ivpsolvers.solver_dynamic,
+        solver_factory=calibrated.dynamic,
         num_derivatives=1,
         impl_factory=impl_factory,
         ode_shape=(1,),

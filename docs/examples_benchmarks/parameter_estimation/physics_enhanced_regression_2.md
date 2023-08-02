@@ -98,8 +98,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import ivpsolve, solution
 from probdiffeq.doc_util import notebook
+from probdiffeq.ivpsolvers import uncalibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 ```
@@ -138,7 +139,7 @@ theta_guess = u0  # initial guess
 # Create a probabilistic solver
 impl = recipes.ts0_iso(num_derivatives=2)
 strategy = filters.filter(*impl)
-solver = ivpsolvers.solver_calibrationfree(*strategy)
+solver = uncalibrated.solver(*strategy)
 ```
 
 ```python

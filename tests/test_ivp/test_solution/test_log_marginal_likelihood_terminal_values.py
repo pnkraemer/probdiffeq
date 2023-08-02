@@ -3,8 +3,9 @@ import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import ivpsolve, solution
 from probdiffeq.backend import testing
+from probdiffeq.ivpsolvers import uncalibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 
@@ -45,7 +46,7 @@ def case_sol_vary_the_statespace(problem, impl_factory):
     vf, u0, (t0, t1), params = problem
     recipe = impl_factory(num_derivatives=4, ode_shape=jnp.shape(u0))
     strategy, calibration = filters.filter(*recipe)
-    solver = ivpsolvers.solver_calibrationfree(strategy, calibration)
+    solver = uncalibrated.solver(strategy, calibration)
     sol = ivpsolve.simulate_terminal_values(
         vf, (u0,), t0=t0, t1=t1, parameters=params, solver=solver, atol=1e-2, rtol=1e-2
     )
@@ -61,7 +62,7 @@ def case_sol_vary_the_strategy(problem, strategy_fun):
     vf, u0, (t0, t1), params = problem
     recipe = recipes.ts0_iso(num_derivatives=4)
     strategy, calibration = strategy_fun(*recipe)
-    solver = ivpsolvers.solver_calibrationfree(strategy, calibration)
+    solver = uncalibrated.solver(strategy, calibration)
     sol = ivpsolve.simulate_terminal_values(
         vf, (u0,), t0=t0, t1=t1, parameters=params, solver=solver, atol=1e-2, rtol=1e-2
     )

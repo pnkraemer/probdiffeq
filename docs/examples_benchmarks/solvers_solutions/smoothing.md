@@ -26,8 +26,9 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, ivpsolvers, solution
+from probdiffeq import ivpsolve, solution
 from probdiffeq.doc_util import notebook
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters, smoothers
 ```
@@ -56,7 +57,7 @@ If you are interested in the terminal value of the ODE solution, you can use fil
 But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient here.
 
 ```python
-ekf0 = ivpsolvers.solver_mle(*filters.filter(*recipes.ts0_iso()))
+ekf0 = calibrated.mle(*filters.filter(*recipes.ts0_iso()))
 ekf0sol = ivpsolve.simulate_terminal_values(
     vf,
     initial_values=(u0,),
@@ -73,7 +74,7 @@ print(ekf0sol.t, ekf0sol.u)
 If you are used to calling traditional solve() methods, use one a conventional smoother (i.e. not the fixed-point smoother).
 
 ```python
-eks0 = ivpsolvers.solver_mle(*smoothers.smoother(*recipes.ts0_iso()))
+eks0 = calibrated.mle(*smoothers.smoother(*recipes.ts0_iso()))
 eks0sol = ivpsolve.solve_with_python_while_loop(
     vf,
     initial_values=(u0,),
@@ -127,7 +128,7 @@ use the solve_and_save_at function together with a fixed-point smoother.
 
 
 ```python
-eks0_fixpt = ivpsolvers.solver_mle(*smoothers.smoother_fixedpoint(*recipes.ts0_iso()))
+eks0_fixpt = calibrated.mle(*smoothers.smoother_fixedpoint(*recipes.ts0_iso()))
 fixptsol = ivpsolve.solve_and_save_at(
     vf,
     initial_values=(u0,),

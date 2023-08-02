@@ -26,8 +26,8 @@ import scipy.integrate
 from diffeqzoo import backend, ivps
 from jax import config
 
-from probdiffeq import ivpsolvers
 from probdiffeq.doc_util import benchmark, info, notebook, workprecision
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 ```
@@ -125,7 +125,7 @@ def impl_to_method_config(impl, *, label):
 
 
 def strategy_to_method_config(strategy, *, label):
-    solver = ivpsolvers.solver_dynamic(*strategy)
+    solver = calibrated.dynamic(*strategy)
     return workprecision.MethodConfig(
         method={"solver": solver},
         label="ProbDiffEq: " + label,

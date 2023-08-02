@@ -1,13 +1,13 @@
 """Test utilities."""
 
-from probdiffeq import ivpsolvers
+from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import filters
 
 
 def generate_solver(
     *,
-    solver_factory=ivpsolvers.solver_mle,
+    solver_factory=calibrated.mle,
     strategy_factory=filters.filter,
     impl_factory=recipes.ts0_iso,
     **impl_factory_kwargs,
@@ -21,7 +21,7 @@ def generate_solver(
     >>> config.update("jax_platform_name", "cpu")
     >>> jnp.set_printoptions(suppress=True, precision=2)  # summarise arrays
 
-    >>> from probdiffeq import ivpsolvers
+    >>> from probdiffeq.ivpsolvers import calibrated
     >>> from probdiffeq.statespace import recipes
     >>> from probdiffeq.strategies import smoothers
 
@@ -31,7 +31,7 @@ def generate_solver(
     >>> print(generate_solver(num_derivatives=1))
     <MLE-solver with <Filter with <Isotropic IBM with num_derivatives=1>, <TS0 with ode_order=1>>>
 
-    >>> print(generate_solver(solver_factory=ivpsolvers.solver_dynamic))
+    >>> print(generate_solver(solver_factory=calibrated.dynamic))
     <Dynamic solver with <Filter with <Isotropic IBM with num_derivatives=4>, <TS0 with ode_order=1>>>
 
     >>> impl_fcty = recipes.ts1_dense
