@@ -150,7 +150,7 @@ class _BlockDiag(_corr.Correction):
     def init(self, ssv, /):
         return jax.vmap(type(self.corr).init)(self.corr, ssv)
 
-    def begin(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         select_fn = jax.vmap(type(self.corr).select_derivatives)
         m0, m1 = select_fn(self.corr, ssv.hidden_state)
 

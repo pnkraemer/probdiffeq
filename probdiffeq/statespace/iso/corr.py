@@ -23,7 +23,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         obs_like = variables.IsoNormalQOI(bias_like, chol_like)
         return x, obs_like
 
-    def begin(self, x: variables.IsoSSV, c, /, vector_field, t, p):
+    def estimate_error(self, x: variables.IsoSSV, c, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)

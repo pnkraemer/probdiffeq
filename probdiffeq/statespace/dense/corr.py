@@ -83,7 +83,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         obs_like = variables.DenseNormal(m_like, chol_like, target_shape=None)
         return ssv, obs_like
 
-    def begin(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         m0 = self.e0(ssv.hidden_state.mean)
         m1 = self.e1(ssv.hidden_state.mean)
         cov_sqrtm_lower = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
@@ -169,7 +169,7 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         obs_like = variables.DenseNormal(m_like, chol_like, target_shape=None)
         return ssv, obs_like
 
-    def begin(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         def ode_residual(s):
             x0 = self.e0(s)
             x1 = self.e1(s)
@@ -276,7 +276,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         ode_order, ode_shape, linearise_fn = aux
         return cls(ode_order=ode_order, ode_shape=ode_shape, linearise_fn=linearise_fn)
 
-    def begin(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(ssv.hidden_state.mean)
         r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T
@@ -385,7 +385,7 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         obs_like = variables.DenseNormal(m_like, chol_like, target_shape=None)
         return ssv, obs_like
 
-    def begin(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         # Compute the linearisation point
         m_0 = self.e0(ssv.hidden_state.mean)
         r_0 = self.e0_vect(ssv.hidden_state.cov_sqrtm_lower).T

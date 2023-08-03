@@ -36,7 +36,7 @@ class Correction(Generic[S, C], abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin(self, ssv: S, corr: C, /, vector_field, t, p) -> Tuple[S, C]:
+    def estimate_error(self, ssv: S, corr: C, /, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod

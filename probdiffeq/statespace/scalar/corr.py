@@ -88,7 +88,7 @@ class _TaylorZerothOrder(_corr.Correction):
         obs_like = variables.NormalQOI(m_like, chol_like)
         return ssv, obs_like
 
-    def begin(self, ssv: variables.SSV, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv: variables.SSV, corr, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(ssv.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, ssv.hidden_state)
