@@ -7,27 +7,25 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace import _corr, cubature
-from probdiffeq.statespace.dense import linearise, variables
+from probdiffeq.statespace.dense import linearise, linearise_ode, variables
 
 
 def taylor_order_zero(*, ode_shape, ode_order):
-    _tmp = functools.partial(linearise.ode_constraint_0th, ode_shape=ode_shape)
-    linearise_fun = functools.partial(_tmp, ode_order=ode_order)
+    fun = linearise_ode.constraint_0th(ode_order=ode_order, ode_shape=ode_shape)
     return _DenseODEConstraint(
         ode_shape=ode_shape,
         ode_order=ode_order,
-        linearise_fun=linearise_fun,
+        linearise_fun=fun,
         string_repr=f"<TS0 with ode_order={ode_order}>",
     )
 
 
 def taylor_order_one(*, ode_shape, ode_order):
-    _tmp = functools.partial(linearise.ode_constraint_1st, ode_shape=ode_shape)
-    linearise_fun = functools.partial(_tmp, ode_order=ode_order)
+    fun = linearise_ode.constraint_1st(ode_order=ode_order, ode_shape=ode_shape)
     return _DenseODEConstraint(
         ode_shape=ode_shape,
         ode_order=ode_order,
-        linearise_fun=linearise_fun,
+        linearise_fun=fun,
         string_repr=f"<TS1 with ode_order={ode_order}>",
     )
 
