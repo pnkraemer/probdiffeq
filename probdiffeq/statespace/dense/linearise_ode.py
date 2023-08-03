@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace.dense import variables
+from probdiffeq.statespace.dense import linearise, variables
 
 # todo:
 #  statistical linear regression (zeroth order)
@@ -15,25 +15,31 @@ from probdiffeq.statespace.dense import variables
 #  statistical linear regression (Bayesian cubature)
 
 
-def constraint_0th(linearise_fun, /, *, ode_shape, ode_order):
+def constraint_0th(*, ode_shape, ode_order):
     def linearise_fun_wrapped(fun, mean):
         select = functools.partial(_select_derivative, ode_shape=ode_shape)
-
+        a0 = functools.partial(select, i=slice(0, ode_order))
         a1 = functools.partial(select, i=ode_order)
 
-        fx = linearise_fun(fun, mean)
+        if jnp.shape(a0(mean)) != (ode_order,) + ode_shape:
+            raise ValueError(f"{jnp.shape(a0(mean))} != {(ode_order,) + ode_shape}")
+
+        fx = linearise.ts0(fun, a0(mean))
         return _autobatch_linop(a1), -fx
 
     return linearise_fun_wrapped
 
 
-def constraint_1st(linearise_fun, /, *, ode_shape, ode_order):
+def constraint_1st(*, ode_shape, ode_order):
     def new(fun, mean, /):
-        jvp, fx = linearise_fun(fun, mean)
-
         select = functools.partial(_select_derivative, ode_shape=ode_shape)
         a0 = functools.partial(select, i=slice(0, ode_order))
         a1 = functools.partial(select, i=ode_order)
+
+        if jnp.shape(a0(mean)) != (ode_order,) + ode_shape:
+            raise ValueError(f"{jnp.shape(a0(mean))} != {(ode_order,) + ode_shape}")
+
+        jvp, fx = linearise.ts1(fun, a0(mean))
 
         def A(x):
             x1 = a1(x)
