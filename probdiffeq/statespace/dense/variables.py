@@ -41,6 +41,14 @@ def marginalise_deterministic(rv, trafo):
     return DenseNormal(A(mean) + b, cov_sqrtm_lower_new, target_shape=None)
 
 
+def marginalise_stochastic(rv, conditional):
+    A, noise = conditional
+
+    R_stack = (A(rv.cov_sqrtm_lower).T, noise.cov_sqrtm_lower.T)
+    cov_sqrtm_lower_new = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+    return DenseNormal(A(rv.mean) + noise.mean, cov_sqrtm_lower_new, target_shape=None)
+
+
 def revert_deterministic(rv, trafo):
     # Extract information
     A, b = trafo
@@ -56,6 +64,24 @@ def revert_deterministic(rv, trafo):
     m_cor = mean - gain @ (A(mean) + b)
     corrected = DenseNormal(m_cor, r_cor.T, target_shape=rv.target_shape)
     observed = DenseNormal(A(mean) + b, r_obs.T, target_shape=None)
+    return observed, (corrected, gain)
+
+
+def revert_stochastic(rv, conditional):
+    # Extract information
+    A, noise = conditional
+    mean, cov_sqrtm_lower = rv.mean, rv.cov_sqrtm_lower
+
+    # QR-decomposition
+    # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
+    r_obs, (r_cor, gain) = _sqrt_util.revert_conditional(
+        R_X_F=A(cov_sqrtm_lower).T, R_X=cov_sqrtm_lower.T, R_YX=noise.cov_sqrtm_lower.T
+    )
+
+    # Gather terms and return
+    m_cor = mean - gain @ (A(mean) + noise.mean)
+    corrected = DenseNormal(m_cor, r_cor.T, target_shape=rv.target_shape)
+    observed = DenseNormal(A(mean) + noise.mean, r_obs.T, target_shape=None)
     return observed, (corrected, gain)
 
 

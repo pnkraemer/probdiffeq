@@ -22,10 +22,11 @@ def ts0(fn, m):
 
 def ts1(fn, m):
     """Linearise a function with a first-order Taylor series."""
-    return jax.linearize(fn, m)
+    b, jvp = jax.linearize(fn, m)
+    return jvp, b - jvp(m)
 
 
-def slr1(*, fn, x, cubature_rule):
+def slr1(fn, x, *, cubature_rule):
     """Linearise a function with first-order statistical linear regression."""
     # Create sigma-points
     pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
@@ -47,7 +48,7 @@ def slr1(*, fn, x, cubature_rule):
     return linop_cond, rv_cond
 
 
-def slr0(*, fn, x, cubature_rule):
+def slr0(fn, x, *, cubature_rule):
     """Linearise a function with zeroth-order statistical linear regression.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -66,7 +67,10 @@ def slr0(*, fn, x, cubature_rule):
     fx_mean = cubature_rule.weights_sqrtm**2 @ fx
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-    return variables.DenseNormal(fx_mean, fx_centered_normed.T, target_shape=None)
+
+    cov_sqrtm = _sqrt_util.triu_via_qr(fx_centered_normed)
+
+    return variables.DenseNormal(fx_mean, cov_sqrtm.T, target_shape=None)
 
 
 def ode_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts0):
@@ -77,6 +81,28 @@ def ode_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts0)
 
     fx = linearise_fun(fun, a0(mean))
     return _autobatch_linop(a1), -fx
+
+
+def ode_constraint_0th_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun):
+    if ode_order > 1:
+        raise ValueError
+
+    # Projection functions
+    select = functools.partial(_select_derivative, ode_shape=ode_shape)
+    a0 = _autobatch_linop(functools.partial(select, i=0))
+    a1 = _autobatch_linop(functools.partial(select, i=1))
+
+    # Extract the linearisation point
+    m0, r_0_nonsquare = a0(rv.mean), a0(rv.cov_sqrtm_lower)
+    r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+    linearisation_pt = variables.DenseNormal(m0, r_0_square.T, target_shape=None)
+
+    # Gather the variables and return
+    noise = linearise_fun(fun, linearisation_pt)
+    bias = variables.DenseNormal(
+        -noise.mean, noise.cov_sqrtm_lower, target_shape=noise.target_shape
+    )
+    return a1, bias
 
 
 def ode_constraint_1st(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts1):
@@ -92,6 +118,33 @@ def ode_constraint_1st(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts1)
 
     rx = a1(mean) - fx
     return _autobatch_linop(A), rx - A(mean)
+
+
+def ode_constraint_1st_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun):
+    if ode_order > 1:
+        raise ValueError
+
+    # Projection functions
+    select = functools.partial(_select_derivative, ode_shape=ode_shape)
+    a0 = _autobatch_linop(functools.partial(select, i=0))
+    a1 = _autobatch_linop(functools.partial(select, i=1))
+
+    # Extract the linearisation point
+    m0, r_0_nonsquare = a0(rv.mean), a0(rv.cov_sqrtm_lower)
+    r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+    linearisation_pt = variables.DenseNormal(m0, r_0_square.T, target_shape=None)
+
+    # Gather the variables and return
+    matrix, noise = linearise_fun(fun, linearisation_pt)
+
+    def A(x):
+        return a1(x) - matrix @ a0(x)
+
+    rx = a1(rv.mean) - noise.mean
+    bias = variables.DenseNormal(
+        rx - A(rv.mean), noise.cov_sqrtm_lower, target_shape=noise.target_shape
+    )
+    return _autobatch_linop(A), bias
 
 
 def _select_derivative_vect(x, i, *, ode_shape):
