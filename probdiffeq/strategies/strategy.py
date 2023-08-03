@@ -52,10 +52,11 @@ class Strategy(Generic[P]):
 
     def begin(self, state: _common.State, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
-        ssv, corr = self.correction.begin(
+        error, observed, (ssv, corr) = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        return _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+        state = _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+        return error, observed, state
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
         ssv, extra = self.extrapolation.complete(

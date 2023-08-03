@@ -21,14 +21,12 @@ def mle(strategy, calibration_factory):
 
 def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
     output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-
-    state_strategy = strategy.begin(
+    error, _, state_strategy = strategy.begin(
         state.strategy,
         dt=dt,
         parameters=parameters,
         vector_field=vector_field,
     )
-    (error, _, _) = state_strategy.corr  # clean this up next?
 
     state_strategy = strategy.complete(
         state_strategy,
@@ -63,16 +61,12 @@ def dynamic(strategy, calibration_factory):
 
 
 def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibration):
-    state_strategy = strategy.begin(
+    error, observed, state_strategy = strategy.begin(
         state.strategy,
         dt=dt,
         parameters=parameters,
         vector_field=vector_field,
     )
-    (error, observed, _) = state_strategy.corr  # clean this up next?
-
-    # part of the refactor; let's keep for a bit
-    assert not isinstance(observed, jax.Array)
 
     output_scale = calibration.update(state.output_scale, observed=observed)
 

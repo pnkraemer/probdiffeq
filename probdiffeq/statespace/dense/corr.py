@@ -194,11 +194,12 @@ class _DenseTaylorFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, observed, (jvp_fn, (b,)))
+        cache = (jvp_fn, (b,))
+        return error_estimate, observed, (ssv, cache)
 
     def complete(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        *_, (jvp_fn, (b,)) = corr
+        (jvp_fn, (b,)) = corr
         jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
         l_obs_nonsquare = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
 

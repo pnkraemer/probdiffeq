@@ -96,7 +96,7 @@ class _TaylorZerothOrder(_corr.Correction):
         output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
-        return ssv, (error_estimate, observed, cache)
+        return error_estimate, observed, (ssv, cache)
 
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
@@ -112,7 +112,7 @@ class _TaylorZerothOrder(_corr.Correction):
         return m0, m1
 
     def complete(self, ssv: variables.SSV, corr, /, vector_field, t, p):
-        *_, (b,) = corr
+        (b,) = corr
         m_ext, l_ext = (ssv.hidden_state.mean, ssv.hidden_state.cov_sqrtm_lower)
 
         l_obs_nonsquare = l_ext[self.ode_order, :]
