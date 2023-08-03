@@ -54,15 +54,12 @@ class _DenseTS0(_corr.Correction):
         self.ode_shape = ode_shape
 
         # Turn this into an argument if other linearisation functions apply
-        self.linearise_fn = linearise.ts0
-
-        # Selection matrices
-        fn, fn_vect = _select_derivative, _select_derivative_vect
-        select = functools.partial(fn, ode_shape=self.ode_shape)
-        select_vect = functools.partial(fn_vect, ode_shape=self.ode_shape)
-        self.e0 = functools.partial(select, i=slice(0, self.ode_order))
-        self.e1 = functools.partial(select, i=self.ode_order)
-        self.e1_vect = functools.partial(select_vect, i=self.ode_order)
+        self.linearise = functools.partial(
+            _linearise_constraint_0th,
+            ode_shape=ode_shape,
+            ode_order=ode_order,
+            linearise_fun=linearise.ts0,
+        )
 
     def __repr__(self):
         return f"<TS0 with ode_order={self.ode_order}>"
@@ -84,58 +81,52 @@ class _DenseTS0(_corr.Correction):
         return ssv, obs_like
 
     def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
-        m0 = self.e0(ssv.hidden_state.mean)
-        m1 = self.e1(ssv.hidden_state.mean)
-        cov_sqrtm_lower = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
-
         def f_wrapped(s):
-            """Evaluate the ODE vector field at (x, Dx, D^2x, ...).
-
-            The time-point and the parameter are fixed.
-            If the vector field depends on x and Dx, this wrapper receives the
-            stack (x, Dx) as an input (instead of, e.g., a tuple).
-            """
             return vector_field(*s, t=t, p=p)
 
-        fx = self.linearise_fn(fn=f_wrapped, m=m0)
+        A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
+        observed = variables.marginalise_deterministic(ssv.hidden_state, (A, b))
 
-        b = m1 - fx
-        l_obs_raw = _sqrt_util.triu_via_qr(cov_sqrtm_lower.T).T
-        observed = variables.DenseNormal(b, l_obs_raw, target_shape=None)
-
-        mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
-        output_scale = mahalanobis_norm / jnp.sqrt(b.size)
-        error_estimate_unscaled = observed.marginal_stds()
-        error_estimate = output_scale * error_estimate_unscaled
-
-        # Return scaled error estimate and other quantities
-        return (error_estimate, observed, (b,))
+        error_estimate = _estimate_error(observed)
+        return error_estimate, observed, (A, b)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
-        l_obs_nonsquare = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
+        A, b = corr
+        observed, (cor, _gn) = variables.revert_deterministic(ssv.hidden_state, (A, b))
 
-        # Compute correction according to ext -> obs
-        r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ssv.hidden_state.cov_sqrtm_lower.T
-        )
-
-        # Gather observation terms
-        (b,) = corr
-        observed = variables.DenseNormal(
-            mean=b, cov_sqrtm_lower=r_obs.T, target_shape=None
-        )
-
-        # Gather correction terms
-        m_cor = ssv.hidden_state.mean - gain @ b
-        cor = variables.DenseNormal(
-            mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=ssv.target_shape
-        )
-        u = m_cor.reshape(ssv.target_shape, order="F")[0, :]
+        u = jnp.reshape(cor.mean, ssv.target_shape, order="F")[0, :]
         ssv = variables.DenseSSV(u, cor, target_shape=ssv.target_shape)
         return ssv, observed
 
     def extract(self, ssv, corr, /):
         return ssv
+
+
+def _linearise_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun):
+    select = functools.partial(_select_derivative, ode_shape=ode_shape)
+
+    a0 = functools.partial(select, i=slice(0, ode_order))
+    a1 = functools.partial(select, i=ode_order)
+    A0, A1 = _autobatch_linop(a0), _autobatch_linop(a1)
+
+    fx = linearise_fun(fun, A0(mean))
+    return A1, -fx
+
+
+def _autobatch_linop(fun):
+    def fun_(x):
+        if jnp.ndim(x) > 1:
+            return jax.vmap(fun_, in_axes=1, out_axes=1)(x)
+        return fun(x)
+
+    return fun_
+
+
+def _estimate_error(observed, /):
+    mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(observed.mean))
+    output_scale = mahalanobis_norm / jnp.sqrt(observed.mean.size)
+    error_estimate_unscaled = observed.marginal_stds()
+    return output_scale * error_estimate_unscaled
 
 
 @jax.tree_util.register_pytree_node_class

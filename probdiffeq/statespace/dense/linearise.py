@@ -13,7 +13,7 @@ from probdiffeq.statespace.dense import variables
 #  statistical linear regression (Bayesian cubature)
 
 
-def ts0(*, fn, m):
+def ts0(fn, m):
     """Linearise a function with a zeroth-order Taylor series."""
     return fn(m)
 
