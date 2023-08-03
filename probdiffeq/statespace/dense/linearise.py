@@ -73,17 +73,20 @@ def slr0(fn, x, *, cubature_rule):
     return variables.DenseNormal(fx_mean, cov_sqrtm.T, target_shape=None)
 
 
-def ode_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts0):
-    if mean.shape != ode_shape:
-        raise ValueError
+def ode_constraint_0th(linearise_fun, /, *, ode_shape, ode_order):
+    def linearise_fun_wrapped(fun, mean):
+        if mean.shape != ode_shape:
+            raise ValueError
 
-    select = functools.partial(_select_derivative, ode_shape=ode_shape)
+        select = functools.partial(_select_derivative, ode_shape=ode_shape)
 
-    a0 = functools.partial(select, i=slice(0, ode_order))
-    a1 = functools.partial(select, i=ode_order)
+        a0 = functools.partial(select, i=slice(0, ode_order))
+        a1 = functools.partial(select, i=ode_order)
 
-    fx = linearise_fun(fun, a0(mean))
-    return _autobatch_linop(a1), -fx
+        fx = linearise_fun(fun, a0(mean))
+        return _autobatch_linop(a1), -fx
+
+    return linearise_fun_wrapped
 
 
 def ode_constraint_0th_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun):
@@ -129,32 +132,35 @@ def ode_constraint_1st(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts1)
     return _autobatch_linop(A), rx - A(mean)
 
 
-def ode_constraint_1st_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun):
-    if rv.mean.shape != ode_shape:
-        raise ValueError
+def ode_constraint_1st_noisy(linearise_fun, /, *, ode_shape, ode_order):
+    def new(fun, rv):
+        if rv.mean.shape != ode_shape:
+            raise ValueError
 
-    if ode_order > 1:
-        raise ValueError
+        if ode_order > 1:
+            raise ValueError
 
-    # Projection functions
-    select = functools.partial(_select_derivative, ode_shape=ode_shape)
-    a0 = _autobatch_linop(functools.partial(select, i=0))
-    a1 = _autobatch_linop(functools.partial(select, i=1))
+        # Projection functions
+        select = functools.partial(_select_derivative, ode_shape=ode_shape)
+        a0 = _autobatch_linop(functools.partial(select, i=0))
+        a1 = _autobatch_linop(functools.partial(select, i=1))
 
-    # Extract the linearisation point
-    m0, r_0_nonsquare = a0(rv.mean), a0(rv.cov_sqrtm_lower)
-    r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
-    linearisation_pt = variables.DenseNormal(m0, r_0_square.T, target_shape=None)
+        # Extract the linearisation point
+        m0, r_0_nonsquare = a0(rv.mean), a0(rv.cov_sqrtm_lower)
+        r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+        linearisation_pt = variables.DenseNormal(m0, r_0_square.T, target_shape=None)
 
-    # Gather the variables and return
-    J, noise = linearise_fun(fun, linearisation_pt)
+        # Gather the variables and return
+        J, noise = linearise_fun(fun, linearisation_pt)
 
-    def A(x):
-        return a1(x) - J(a0(x))
+        def A(x):
+            return a1(x) - J(a0(x))
 
-    mean, cov_lower = noise.mean, noise.cov_sqrtm_lower
-    bias = variables.DenseNormal(-mean, cov_lower, target_shape=noise.target_shape)
-    return _autobatch_linop(A), bias
+        mean, cov_lower = noise.mean, noise.cov_sqrtm_lower
+        bias = variables.DenseNormal(-mean, cov_lower, target_shape=noise.target_shape)
+        return _autobatch_linop(A), bias
+
+    return new
 
 
 def _select_derivative(x, i, *, ode_shape):

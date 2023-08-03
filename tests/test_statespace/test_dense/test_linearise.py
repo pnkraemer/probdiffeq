@@ -1,26 +1,3 @@
-"""Tests for linearisation.
-
-Technically, this is tested already (indirectly);
-but debugging is a lot easier with separate tests.
-"""
-import functools
-
-import jax.numpy as jnp
-
-from probdiffeq.backend import testing
-from probdiffeq.statespace import cubature
-from probdiffeq.statespace.dense import linearise, variables
-
-
-@testing.fixture(name="setup")
-def fixture_setup():
-    def vf(y, /):
-        return y * (1.0 - y)
-
-    x0 = jnp.asarray([0.7])
-    return vf, x0
-
-
 def test_ts1(setup):
     vf, x0 = setup
     A, b = linearise.ts1(vf, x0)
@@ -79,9 +56,8 @@ def test_ode_constraint_1st_noisy_almost_exact(setup, noise=1e-5):
 
     cubature_rule = cubature.gauss_hermite(input_shape=(1,))
     fun = functools.partial(linearise.slr1, cubature_rule=cubature_rule)
-    A, bias = linearise.ode_constraint_1st_noisy(
-        vf, rv0, ode_shape=(1,), ode_order=1, linearise_fun=fun
-    )
+    ode_linearise = linearise.ode_constraint_1st_noisy(fun, ode_shape=(1,), ode_order=1)
+    A, bias = ode_linearise(vf, rv0)
 
     rv = variables.DenseNormal(jnp.stack([x0] * 3), jnp.eye(3), target_shape=(3, 1))
     assert jnp.allclose(A(rv.mean) + bias.mean, rv.mean[1] - vf(rv.mean[0]))
@@ -93,12 +69,19 @@ def test_ode_constraint_1st_noisy_inexact_but_calibrated(setup, noise=1e-1):
 
     cubature_rule = cubature.gauss_hermite(input_shape=(1,))
     fun = functools.partial(linearise.slr1, cubature_rule=cubature_rule)
-    A, b = linearise.ode_constraint_1st_noisy(
-        vf, rv0, ode_shape=(1,), ode_order=1, linearise_fun=fun
-    )
+
+    ode_linearise = linearise.ode_constraint_1st_noisy(fun, ode_shape=(1,), ode_order=1)
+    A, b = ode_linearise(vf, rv0)
 
     rv = variables.DenseNormal(jnp.stack([x0] * 3), jnp.eye(3), target_shape=(3, 1))
+    linearisation = A(x0) + b.mean
+    truth = rv.mean[1] - vf(rv.mean[0])
+    standard_deviation = rv.mean[1] - vf(rv.mean[0])
 
-    error_abs = jnp.abs(A(x0) + b.mean - (rv.mean[1] - vf(rv.mean[0])))
+    error_abs = jnp.abs((linearisation - truth) / standard_deviation)
     error_rel = error_abs / jnp.abs(b.cov_sqrtm_lower)
     assert 0.5 < error_rel < 2.0
+
+
+def test_linearisation_allclose(linearisation, truth):
+    return jnp.allclose(linearisation, truth)
