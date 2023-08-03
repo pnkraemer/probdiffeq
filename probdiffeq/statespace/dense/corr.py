@@ -60,7 +60,6 @@ def statistical_order_one(
     )
 
 
-@jax.tree_util.register_pytree_node_class
 class _DenseODEConstraint(_corr.Correction):
     def __init__(self, ode_shape, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
@@ -72,22 +71,6 @@ class _DenseODEConstraint(_corr.Correction):
 
     def __repr__(self):
         return self.string_repr
-
-    # todo: move outside class
-    def tree_flatten(self):
-        children = ()
-        aux = self.ode_order, self.ode_shape, self.linearise, self.string_repr
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, _children):
-        ode_order, ode_shape, lin, string_repr = aux
-        return cls(
-            ode_order=ode_order,
-            ode_shape=ode_shape,
-            linearise_fun=lin,
-            string_repr=string_repr,
-        )
 
     def init(self, ssv, /):
         m_like = jnp.zeros(self.ode_shape)
@@ -367,3 +350,26 @@ def _select_derivative(x, i, *, ode_shape):
     (d,) = ode_shape
     x_reshaped = jnp.reshape(x, (-1, d), order="F")
     return x_reshaped[i, ...]
+
+
+def _constraint_flatten(node):
+    children = ()
+    aux = node.ode_order, node.ode_shape, node.linearise, node.string_repr
+    return children, aux
+
+
+def _constraint_unflatten(aux, _children):
+    ode_order, ode_shape, lin, string_repr = aux
+    return _DenseODEConstraint(
+        ode_order=ode_order,
+        ode_shape=ode_shape,
+        linearise_fun=lin,
+        string_repr=string_repr,
+    )
+
+
+jax.tree_util.register_pytree_node(
+    nodetype=_DenseODEConstraint,
+    flatten_func=_constraint_flatten,
+    unflatten_func=_constraint_unflatten,
+)

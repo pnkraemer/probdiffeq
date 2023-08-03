@@ -3,8 +3,6 @@
 import abc
 from typing import Generic, Tuple, TypeVar
 
-import jax
-
 from probdiffeq.statespace import variables
 
 S = TypeVar("S", bound=variables.SSV)
@@ -14,22 +12,11 @@ C = TypeVar("C")
 """A type-variable to alias correction-caches."""
 
 
-@jax.tree_util.register_pytree_node_class
 class Correction(Generic[S, C], abc.ABC):
     """Correction model interface."""
 
     def __init__(self, ode_order):
         self.ode_order = ode_order
-
-    def tree_flatten(self):
-        children = ()
-        aux = (self.ode_order,)
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, _children):
-        (ode_order,) = aux
-        return cls(ode_order=ode_order)
 
     @abc.abstractmethod
     def init(self, x, /):
@@ -46,3 +33,23 @@ class Correction(Generic[S, C], abc.ABC):
     @abc.abstractmethod
     def extract(self, ssv, corr, /):
         raise NotImplementedError
+
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    # todo: delete
+
+    def tree_flatten(self):
+        children = ()
+        aux = (self.ode_order,)
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux, _children):
+        (ode_order,) = aux
+        return cls(ode_order=ode_order)
