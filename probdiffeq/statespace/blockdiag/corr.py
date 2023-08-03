@@ -1,5 +1,4 @@
 """Corrections."""
-from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -7,9 +6,6 @@ import jax.numpy as jnp
 from probdiffeq.statespace import _corr, cubature
 from probdiffeq.statespace.scalar import corr as scalar_corr
 from probdiffeq.statespace.scalar import variables as scalar_variables
-
-_SLR1CacheType = Tuple[Callable]
-"""Type-variable for the correction-cache."""
 
 
 def statistical_order_one(ode_shape, ode_order):
@@ -123,9 +119,6 @@ class _BlockDiagStatisticalFirstOrder(_corr.Correction):
 def taylor_order_zero(*args, **kwargs):
     ts0 = scalar_corr.taylor_order_zero(*args, **kwargs)
     return _BlockDiag(ts0)
-
-
-_TS0CacheType = Tuple[jax.Array]
 
 
 @jax.tree_util.register_pytree_node_class
