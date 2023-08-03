@@ -10,12 +10,26 @@ from probdiffeq.statespace import _corr, cubature
 from probdiffeq.statespace.dense import linearise, variables
 
 
-def taylor_order_zero(*args, **kwargs):
-    return _DenseTS0(*args, **kwargs)
+def taylor_order_zero(*, ode_shape, ode_order):
+    _tmp = functools.partial(linearise.ode_constraint_0th, ode_shape=ode_shape)
+    linearise_fun = functools.partial(_tmp, ode_order=ode_order)
+    return _DenseODEConstraint(
+        ode_shape=ode_shape,
+        ode_order=ode_order,
+        linearise_fun=linearise_fun,
+        string_repr=f"<TS0 with ode_order={ode_order}>",
+    )
 
 
-def taylor_order_one(*args, **kwargs):
-    return _DenseTS1(*args, **kwargs)
+def taylor_order_one(*, ode_shape, ode_order):
+    _tmp = functools.partial(linearise.ode_constraint_1st, ode_shape=ode_shape)
+    linearise_fun = functools.partial(_tmp, ode_order=ode_order)
+    return _DenseODEConstraint(
+        ode_shape=ode_shape,
+        ode_order=ode_order,
+        linearise_fun=linearise_fun,
+        string_repr=f"<TS1 with ode_order={ode_order}>",
+    )
 
 
 def statistical_order_zero(
@@ -47,32 +61,33 @@ def statistical_order_one(
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseTS0(_corr.Correction):
-    def __init__(self, ode_shape, ode_order):
+class _DenseODEConstraint(_corr.Correction):
+    def __init__(self, ode_shape, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
 
-        # Turn this into an argument if other linearisation functions apply
-        self.linearise = functools.partial(
-            _linearise_constraint_0th,
-            ode_shape=ode_shape,
-            ode_order=ode_order,
-            linearise_fun=linearise.ts0,
-        )
+        self.linearise = linearise_fun
+        self.string_repr = string_repr
 
     def __repr__(self):
-        return f"<TS0 with ode_order={self.ode_order}>"
+        return self.string_repr
 
+    # todo: move outside class
     def tree_flatten(self):
         children = ()
-        aux = self.ode_order, self.ode_shape
+        aux = self.ode_order, self.ode_shape, self.linearise, self.string_repr
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, _children):
-        ode_order, ode_shape = aux
-        return cls(ode_order=ode_order, ode_shape=ode_shape)
+        ode_order, ode_shape, lin, string_repr = aux
+        return cls(
+            ode_order=ode_order,
+            ode_shape=ode_shape,
+            linearise_fun=lin,
+            string_repr=string_repr,
+        )
 
     def init(self, ssv, /):
         m_like = jnp.zeros(self.ode_shape)
@@ -102,119 +117,11 @@ class _DenseTS0(_corr.Correction):
         return ssv
 
 
-def _linearise_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun):
-    select = functools.partial(_select_derivative, ode_shape=ode_shape)
-
-    a0 = functools.partial(select, i=slice(0, ode_order))
-    a1 = functools.partial(select, i=ode_order)
-    A0, A1 = _autobatch_linop(a0), _autobatch_linop(a1)
-
-    fx = linearise_fun(fun, A0(mean))
-    return A1, -fx
-
-
-def _autobatch_linop(fun):
-    def fun_(x):
-        if jnp.ndim(x) > 1:
-            return jax.vmap(fun_, in_axes=1, out_axes=1)(x)
-        return fun(x)
-
-    return fun_
-
-
 def _estimate_error(observed, /):
     mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(observed.mean))
     output_scale = mahalanobis_norm / jnp.sqrt(observed.mean.size)
     error_estimate_unscaled = observed.marginal_stds()
     return output_scale * error_estimate_unscaled
-
-
-@jax.tree_util.register_pytree_node_class
-class _DenseTS1(_corr.Correction):
-    def __init__(self, ode_shape, ode_order):
-        super().__init__(ode_order=ode_order)
-        assert len(ode_shape) == 1
-        self.ode_shape = ode_shape
-
-        # Selection matrices
-        select = functools.partial(_select_derivative, ode_shape=self.ode_shape)
-        self.e0 = functools.partial(select, i=slice(0, self.ode_order))
-        self.e1 = functools.partial(select, i=self.ode_order)
-
-    def __repr__(self):
-        return f"<TS1 with ode_order={self.ode_order}>"
-
-    def tree_flatten(self):
-        children = ()
-        aux = self.ode_order, self.ode_shape
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, _children):
-        ode_order, ode_shape = aux
-        return cls(ode_order=ode_order, ode_shape=ode_shape)
-
-    def init(self, ssv, /):
-        m_like = jnp.zeros(self.ode_shape)
-        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
-        obs_like = variables.DenseNormal(m_like, chol_like, target_shape=None)
-        return ssv, obs_like
-
-    def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
-        def ode_residual(s):
-            x0 = self.e0(s)
-            x1 = self.e1(s)
-            fx0 = vector_field(*x0, t=t, p=p)
-            return x1 - fx0
-
-        # Linearise the ODE residual (not the vector field!)
-        jvp_fn, (b,) = linearise.ts1(fn=ode_residual, m=ssv.hidden_state.mean)
-
-        # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        cov_sqrtm_lower = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
-
-        # Gather the observed variable
-        l_obs_raw = _sqrt_util.triu_via_qr(cov_sqrtm_lower.T).T
-        observed = variables.DenseNormal(b, l_obs_raw, target_shape=None)
-
-        # Extract the output scale and the error estimate
-        mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros_like(b))
-        output_scale = mahalanobis_norm / jnp.sqrt(b.size)
-        error_estimate_unscaled = observed.marginal_stds()
-        error_estimate = output_scale * error_estimate_unscaled
-
-        # Return scaled error estimate and other quantities
-        cache = (jvp_fn, (b,))
-        return error_estimate, observed, cache
-
-    def complete(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
-        # Evaluate sqrt(cov) -> J @ sqrt(cov)
-        (jvp_fn, (b,)) = corr
-        jvp_fn_vect = jax.vmap(jvp_fn, in_axes=1, out_axes=1)
-        l_obs_nonsquare = jvp_fn_vect(ssv.hidden_state.cov_sqrtm_lower)
-
-        # Compute the correction matrices
-        r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare.T, R_X=ssv.hidden_state.cov_sqrtm_lower.T
-        )
-
-        # Gather the observed variable
-        observed = variables.DenseNormal(
-            mean=b, cov_sqrtm_lower=r_obs.T, target_shape=None
-        )
-
-        # Gather the corrected variable
-        m_cor = ssv.hidden_state.mean - gain @ b
-        rv = variables.DenseNormal(
-            mean=m_cor, cov_sqrtm_lower=r_cor.T, target_shape=ssv.target_shape
-        )
-        u = m_cor.reshape(ssv.target_shape, order="F")[0, :]
-        ssv = variables.DenseSSV(u, rv, target_shape=ssv.target_shape)
-        return ssv, observed
-
-    def extract(self, ssv, _corr, /):
-        return ssv
 
 
 @jax.tree_util.register_pytree_node_class
