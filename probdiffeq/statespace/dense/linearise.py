@@ -1,9 +1,6 @@
 """Linearisation."""
 
-import functools
-
 import jax
-import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace.dense import variables

@@ -51,15 +51,11 @@ def constraint_1st(*, ode_shape, ode_order):
     return new
 
 
-# todo: constraint_statistical_0th
-def constraint_0th_statistical(linearise_fun, /, *, ode_shape, ode_order):
-    if ode_order > 1:
-        raise ValueError
+def constraint_statistical_0th(*, ode_shape, cubature_fun):
+    cubature = cubature_fun(input_shape=ode_shape)
+    linearise_fun = functools.partial(linearise.slr0, cubature_rule=cubature)
 
     def new(fun, rv, /):
-        if rv.mean.shape != ode_shape:
-            raise ValueError
-
         # Projection functions
         select = functools.partial(_select_derivative, ode_shape=ode_shape)
         a0 = _autobatch_linop(functools.partial(select, i=0))
@@ -80,14 +76,11 @@ def constraint_0th_statistical(linearise_fun, /, *, ode_shape, ode_order):
     return new
 
 
-def constraint_1st_statistical(linearise_fun, /, *, ode_shape, ode_order):
-    if ode_order > 1:
-        raise ValueError
+def constraint_statistical_1st(*, ode_shape, cubature_fun):
+    cubature = cubature_fun(input_shape=ode_shape)
+    linearise_fun = functools.partial(linearise.slr1, cubature_rule=cubature)
 
     def new(fun, rv):
-        if rv.mean.shape != ode_shape:
-            raise ValueError
-
         # Projection functions
         select = functools.partial(_select_derivative, ode_shape=ode_shape)
         a0 = _autobatch_linop(functools.partial(select, i=0))
