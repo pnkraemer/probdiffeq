@@ -11,11 +11,11 @@ from probdiffeq.statespace.dense import linearise, variables
 
 
 def taylor_order_zero(*args, **kwargs):
-    return _DenseTaylorZerothOrder(*args, **kwargs)
+    return _DenseTS0(*args, **kwargs)
 
 
 def taylor_order_one(*args, **kwargs):
-    return _DenseTaylorFirstOrder(*args, **kwargs)
+    return _DenseTS1(*args, **kwargs)
 
 
 def statistical_order_zero(
@@ -25,7 +25,7 @@ def statistical_order_zero(
 ):
     cubature_rule = cubature_rule_fn(input_shape=ode_shape)
     linearise_fn = functools.partial(linearise.slr0, cubature_rule=cubature_rule)
-    return _DenseStatisticalZerothOrder(
+    return _DenseSLR0(
         ode_shape=ode_shape,
         ode_order=ode_order,
         linearise_fn=linearise_fn,
@@ -39,7 +39,7 @@ def statistical_order_one(
 ):
     cubature_rule = cubature_rule_fn(input_shape=ode_shape)
     linearise_fn = functools.partial(linearise.slr1, cubature_rule=cubature_rule)
-    return _DenseStatisticalFirstOrder(
+    return _DenseSLR1(
         ode_shape=ode_shape,
         ode_order=ode_order,
         linearise_fn=linearise_fn,
@@ -47,7 +47,7 @@ def statistical_order_one(
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseTaylorZerothOrder(_corr.Correction):
+class _DenseTS0(_corr.Correction):
     def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -139,7 +139,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseTaylorFirstOrder(_corr.Correction):
+class _DenseTS1(_corr.Correction):
     def __init__(self, ode_shape, ode_order):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -227,7 +227,7 @@ class _DenseTaylorFirstOrder(_corr.Correction):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseStatisticalZerothOrder(_corr.Correction):
+class _DenseSLR0(_corr.Correction):
     """Zeroth-order statistical linear regression in state-space models \
      with dense covariance structure.
 
@@ -346,7 +346,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
 
 
 @jax.tree_util.register_pytree_node_class
-class _DenseStatisticalFirstOrder(_corr.Correction):
+class _DenseSLR1(_corr.Correction):
     def __init__(self, ode_shape, ode_order, linearise_fn):
         if ode_order > 1:
             raise ValueError
