@@ -1,30 +1,27 @@
 """Linearisation."""
 
-
 import jax
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace.dense import variables
 
 # todo:
-#  statistical linear regression (zeroth order)
-#  statistical linear regression (cov-free)
 #  statistical linear regression (Jacobian)
 #  statistical linear regression (Bayesian cubature)
 
 
-def ts0(*, fn, m):
+def ts0(fn, m):
     """Linearise a function with a zeroth-order Taylor series."""
     return fn(m)
 
 
-def ts1(*, fn, m):
+def ts1(fn, m):
     """Linearise a function with a first-order Taylor series."""
-    b, jvp_fn = jax.linearize(fn, m)
-    return jvp_fn, (b,)
+    b, jvp = jax.linearize(fn, m)
+    return jvp, b - jvp(m)
 
 
-def slr1(*, fn, x, cubature_rule):
+def slr1(fn, x, *, cubature_rule):
     """Linearise a function with first-order statistical linear regression."""
     # Create sigma-points
     pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
@@ -43,10 +40,10 @@ def slr1(*, fn, x, cubature_rule):
     )
     mean_cond = fx_mean - linop_cond @ x.mean
     rv_cond = variables.DenseNormal(mean_cond, cov_sqrtm_cond.T, target_shape=None)
-    return linop_cond, rv_cond
+    return lambda v: linop_cond @ v, rv_cond
 
 
-def slr0(*, fn, x, cubature_rule):
+def slr0(fn, x, *, cubature_rule):
     """Linearise a function with zeroth-order statistical linear regression.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -65,4 +62,7 @@ def slr0(*, fn, x, cubature_rule):
     fx_mean = cubature_rule.weights_sqrtm**2 @ fx
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-    return variables.DenseNormal(fx_mean, fx_centered_normed.T, target_shape=None)
+
+    cov_sqrtm = _sqrt_util.triu_via_qr(fx_centered_normed)
+
+    return variables.DenseNormal(fx_mean, cov_sqrtm.T, target_shape=None)
