@@ -29,7 +29,7 @@ class UncalibratedSolver(solver_module.Solver[_common.State]):
     def step(
         self, state: _common.State, *, vector_field, dt, parameters
     ) -> _common.State:
-        error, _observed, state_strategy = self.strategy.begin(
+        error, _observed, state_strategy = self.strategy.predict_error(
             state.strategy,
             dt=dt,
             parameters=parameters,
