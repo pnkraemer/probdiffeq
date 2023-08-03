@@ -52,7 +52,7 @@ class Strategy(Generic[P]):
 
     def begin(self, state: _common.State, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
-        error, observed, (ssv, corr) = self.correction.begin(
+        error, observed, corr = self.correction.begin(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
         state = _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)

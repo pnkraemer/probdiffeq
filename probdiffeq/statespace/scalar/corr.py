@@ -96,7 +96,7 @@ class _TaylorZerothOrder(_corr.Correction):
         output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed, (ssv, cache)
+        return error_estimate, observed, cache
 
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx

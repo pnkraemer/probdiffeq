@@ -195,7 +195,7 @@ class _DenseTaylorFirstOrder(_corr.Correction):
 
         # Return scaled error estimate and other quantities
         cache = (jvp_fn, (b,))
-        return error_estimate, observed, (ssv, cache)
+        return error_estimate, observed, cache
 
     def complete(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
         # Evaluate sqrt(cov) -> J @ sqrt(cov)

@@ -39,7 +39,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         error_estimate_unscaled = obs.marginal_std() * jnp.ones_like(bias)
         error_estimate = error_estimate_unscaled * output_scale
         cache = (bias,)
-        return error_estimate, obs, (x, cache)
+        return error_estimate, obs, cache
 
     def complete(self, x: variables.IsoSSV, co, /, vector_field, t, p):
         (bias,) = co
