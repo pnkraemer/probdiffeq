@@ -6,8 +6,6 @@ from probdiffeq import _sqrt_util
 from probdiffeq.statespace.dense import variables
 
 # todo:
-#  statistical linear regression (zeroth order)
-#  statistical linear regression (cov-free)
 #  statistical linear regression (Jacobian)
 #  statistical linear regression (Bayesian cubature)
 
