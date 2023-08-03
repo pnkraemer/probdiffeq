@@ -74,6 +74,9 @@ def slr0(fn, x, *, cubature_rule):
 
 
 def ode_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts0):
+    if mean.shape != ode_shape:
+        raise ValueError
+
     select = functools.partial(_select_derivative, ode_shape=ode_shape)
 
     a0 = functools.partial(select, i=slice(0, ode_order))
@@ -84,6 +87,9 @@ def ode_constraint_0th(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts0)
 
 
 def ode_constraint_0th_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun):
+    if rv.mean.shape != ode_shape:
+        raise ValueError
+
     if ode_order > 1:
         raise ValueError
 
@@ -106,6 +112,9 @@ def ode_constraint_0th_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun)
 
 
 def ode_constraint_1st(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts1):
+    if mean.shape != ode_shape:
+        raise ValueError
+
     select = functools.partial(_select_derivative, ode_shape=ode_shape)
 
     a0 = functools.partial(select, i=slice(0, ode_order))
@@ -121,6 +130,9 @@ def ode_constraint_1st(fun, mean, /, *, ode_shape, ode_order, linearise_fun=ts1)
 
 
 def ode_constraint_1st_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun):
+    if rv.mean.shape != ode_shape:
+        raise ValueError
+
     if ode_order > 1:
         raise ValueError
 
@@ -135,24 +147,14 @@ def ode_constraint_1st_noisy(fun, rv, /, *, ode_shape, ode_order, linearise_fun)
     linearisation_pt = variables.DenseNormal(m0, r_0_square.T, target_shape=None)
 
     # Gather the variables and return
-    matrix, noise = linearise_fun(fun, linearisation_pt)
+    J, noise = linearise_fun(fun, linearisation_pt)
 
     def A(x):
-        return a1(x) - matrix @ a0(x)
+        return a1(x) - J(a0(x))
 
-    rx = a1(rv.mean) - noise.mean
-    bias = variables.DenseNormal(
-        rx - A(rv.mean), noise.cov_sqrtm_lower, target_shape=noise.target_shape
-    )
+    mean, cov_lower = noise.mean, noise.cov_sqrtm_lower
+    bias = variables.DenseNormal(-mean, cov_lower, target_shape=noise.target_shape)
     return _autobatch_linop(A), bias
-
-
-def _select_derivative_vect(x, i, *, ode_shape):
-    def select_fn(s):
-        return _select_derivative(s, i, ode_shape=ode_shape)
-
-    select = jax.vmap(select_fn, in_axes=1, out_axes=1)
-    return select(x)
 
 
 def _select_derivative(x, i, *, ode_shape):
