@@ -165,7 +165,7 @@ class StatisticalFirstOrder(_corr.Correction):
     def extract(self, ssv, corr):
         return ssv
 
-    def begin(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError
 
     def calibrate(
@@ -197,7 +197,7 @@ class StatisticalFirstOrder(_corr.Correction):
 
         error_estimate_unscaled = marginals.marginal_stds()
         error_estimate = error_estimate_unscaled * output_scale
-        return error_estimate, output_scale
+        return error_estimate, output_scale, marginals
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError

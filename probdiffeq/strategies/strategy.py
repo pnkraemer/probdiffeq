@@ -50,6 +50,7 @@ class Strategy(Generic[P]):
         ssv, corr = self.correction.init(ssv)
         return _common.State(t=t, ssv=ssv, extra=extra, corr=corr)
 
+    # todo: rename to predict_error()?
     def begin(self, state: _common.State, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
         error, observed, corr = self.correction.estimate_error(

@@ -68,7 +68,7 @@ class _BlockDiagStatisticalFirstOrder(_corr.Correction):
     def extract(self, ssv, corr, /):
         return ssv
 
-    def begin(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         cache = (vmap_f,)
@@ -83,13 +83,13 @@ class _BlockDiagStatisticalFirstOrder(_corr.Correction):
 
         # Compute output scale and error estimate
         calibrate_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.calibrate)
-        error_estimate, output_scale = calibrate_fn(
+        error_estimate, output_scale, marginals = calibrate_fn(
             self._mm, fx_mean, fx_centered_normed, ssv.hidden_state
         )
-        return ssv, (output_scale * error_estimate, output_scale, cache)
+        return output_scale * error_estimate, marginals, cache
 
     def complete(self, ssv, corr, /, vector_field, t, p):
-        *_, (vmap_f,) = corr
+        (vmap_f,) = corr
 
         H, noise = self.linearize(ssv, vmap_f)
 

@@ -109,7 +109,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, observed, (b,))
+        return (error_estimate, observed, (b,))
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         l_obs_nonsquare = self.e1_vect(ssv.hidden_state.cov_sqrtm_lower)
@@ -120,7 +120,7 @@ class _DenseTaylorZerothOrder(_corr.Correction):
         )
 
         # Gather observation terms
-        *_, (b,) = corr
+        (b,) = corr
         observed = variables.DenseNormal(
             mean=b, cov_sqrtm_lower=r_obs.T, target_shape=None
         )
@@ -307,7 +307,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, marginals, cache)
+        return error_estimate, marginals, cache
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         # Select the required derivatives
@@ -321,7 +321,7 @@ class _DenseStatisticalZerothOrder(_corr.Correction):
         lin_pt = variables.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # Apply statistical linear regression to the ODE vector field
-        *_, (f_wrapped, *_) = corr
+        (f_wrapped, *_) = corr
         noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
@@ -416,7 +416,7 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         error_estimate = output_scale * error_estimate_unscaled
 
         # Return scaled error estimate and other quantities
-        return ssv, (error_estimate, marginals, cache)
+        return error_estimate, marginals, cache
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         # Select the required derivatives
@@ -430,7 +430,7 @@ class _DenseStatisticalFirstOrder(_corr.Correction):
         lin_pt = variables.DenseNormal(m_0, r_0_square.T, target_shape=ssv.target_shape)
 
         # Apply statistical linear regression to the ODE vector field
-        *_, (f_wrapped, *_) = corr
+        (f_wrapped, *_) = corr
         H, noise = self.linearise_fn(fn=f_wrapped, x=lin_pt)
 
         # Compute the sigma-point correction of the ODE residual
