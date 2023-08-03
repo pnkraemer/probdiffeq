@@ -1,5 +1,6 @@
-"""Various interfaces."""
+"""Correction-model API."""
 
+import abc
 from typing import Generic, Tuple, TypeVar
 
 import jax
@@ -14,7 +15,7 @@ C = TypeVar("C")
 
 
 @jax.tree_util.register_pytree_node_class
-class Correction(Generic[S, C]):
+class Correction(Generic[S, C], abc.ABC):
     """Correction model interface."""
 
     def __init__(self, ode_order):
@@ -30,8 +31,18 @@ class Correction(Generic[S, C]):
         (ode_order,) = aux
         return cls(ode_order=ode_order)
 
+    @abc.abstractmethod
+    def init(self, x, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def begin(self, ssv: S, corr: C, /, vector_field, t, p) -> Tuple[S, C]:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def complete(self, ssv: S, corr: C, /, vector_field, t, p) -> Tuple[S, C]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract(self, ssv, corr, /):
         raise NotImplementedError
