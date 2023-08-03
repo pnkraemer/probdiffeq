@@ -45,7 +45,7 @@ def slr1(fn, x, *, cubature_rule):
     )
     mean_cond = fx_mean - linop_cond @ x.mean
     rv_cond = variables.DenseNormal(mean_cond, cov_sqrtm_cond.T, target_shape=None)
-    return linop_cond, rv_cond
+    return lambda v: linop_cond @ v, rv_cond
 
 
 def slr0(fn, x, *, cubature_rule):

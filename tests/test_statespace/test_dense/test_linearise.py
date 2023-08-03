@@ -9,9 +9,9 @@ from probdiffeq.statespace import cubature
 from probdiffeq.statespace.dense import linearise, variables
 
 
-def test_output_format_ts1():
+def test_ts1():
     def vf(y, /):
-        return y * (1. - y)
+        return y * (1.0 - y)
 
     x0 = jnp.asarray([0.7])
     A, b = linearise.ts1(vf, x0)
@@ -21,18 +21,18 @@ def test_output_format_ts1():
     assert not jnp.allclose(A(x0 - x0) + b, vf(x0))
 
 
-def test_output_format_ts0():
+def test_ts0():
     def vf(y, /):
-        return y * (1. - y)
+        return y * (1.0 - y)
 
     x0 = jnp.asarray([0.7])
     b = linearise.ts0(vf, x0)
     assert jnp.allclose(b, vf(x0))
 
 
-def test_output_format_slr0_almost_exact(noise=1e-5):
+def test_slr0_almost_exact(noise=1e-5):
     def vf(y, /):
-        return y * (1. - y)
+        return y * (1.0 - y)
 
     x0 = jnp.asarray([0.7])
     rv0 = variables.DenseNormal(x0, jnp.eye(1) * noise, target_shape=None)
@@ -41,9 +41,9 @@ def test_output_format_slr0_almost_exact(noise=1e-5):
     assert jnp.allclose(b.mean, vf(x0))
 
 
-def test_output_format_slr0_inexact_but_calibrated(noise=1e-1):
+def test_slr0_inexact_but_calibrated(noise=1e-1):
     def vf(y, /):
-        return y * (1. - y)
+        return y * (1.0 - y)
 
     x0 = jnp.asarray([0.7])
     rv0 = variables.DenseNormal(x0, jnp.eye(1) * noise, target_shape=None)
@@ -52,3 +52,31 @@ def test_output_format_slr0_inexact_but_calibrated(noise=1e-1):
 
     error = jnp.abs(b.mean - vf(rv0.mean)) / jnp.abs(b.cov_sqrtm_lower)
     assert 0.1 < error < 10.0
+
+
+def test_slr1_almost_exact(noise=1e-5):
+    def vf(y, /):
+        return y * (1.0 - y)
+
+    x0 = jnp.asarray([0.7])
+    rv0 = variables.DenseNormal(x0, jnp.eye(1) * noise, target_shape=None)
+
+    A, b = linearise.slr1(
+        vf, rv0, cubature_rule=cubature.gauss_hermite(input_shape=(1,))
+    )
+    assert jnp.allclose(A(x0) + b.mean, vf(x0))
+
+
+def test_slr1_inexact_but_calibrated(noise=1e-1):
+    def vf(y, /):
+        return y * (1.0 - y)
+
+    x0 = jnp.asarray([0.7])
+    rv0 = variables.DenseNormal(x0, jnp.eye(1) * noise, target_shape=None)
+
+    A, b = linearise.slr1(
+        vf, rv0, cubature_rule=cubature.gauss_hermite(input_shape=(1,))
+    )
+
+    error = jnp.abs(A(x0) + b.mean - vf(rv0.mean)) / jnp.abs(b.cov_sqrtm_lower)
+    assert 0.5 < error < 2.0
