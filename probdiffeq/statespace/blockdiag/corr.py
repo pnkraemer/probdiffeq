@@ -68,7 +68,7 @@ class _BlockDiagStatisticalFirstOrder(_corr.Correction):
     def extract(self, ssv, corr, /):
         return ssv
 
-    def begin(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         # Vmap relevant functions
         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
         cache = (vmap_f,)
@@ -83,13 +83,13 @@ class _BlockDiagStatisticalFirstOrder(_corr.Correction):
 
         # Compute output scale and error estimate
         calibrate_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.calibrate)
-        error_estimate, output_scale = calibrate_fn(
+        error_estimate, output_scale, marginals = calibrate_fn(
             self._mm, fx_mean, fx_centered_normed, ssv.hidden_state
         )
-        return ssv, (output_scale * error_estimate, output_scale, cache)
+        return output_scale * error_estimate, marginals, cache
 
     def complete(self, ssv, corr, /, vector_field, t, p):
-        *_, (vmap_f,) = corr
+        (vmap_f,) = corr
 
         H, noise = self.linearize(ssv, vmap_f)
 
@@ -150,7 +150,7 @@ class _BlockDiag(_corr.Correction):
     def init(self, ssv, /):
         return jax.vmap(type(self.corr).init)(self.corr, ssv)
 
-    def begin(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         select_fn = jax.vmap(type(self.corr).select_derivatives)
         m0, m1 = select_fn(self.corr, ssv.hidden_state)
 
@@ -162,8 +162,9 @@ class _BlockDiag(_corr.Correction):
         mahalanobis_fn = scalar_variables.NormalQOI.mahalanobis_norm
         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
         output_scale = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
-        error_estimate = obs_unbatch.cov_sqrtm_lower
-        return ssv, (output_scale * error_estimate, obs_unbatch, cache)
+        error_estimate = output_scale * obs_unbatch.cov_sqrtm_lower
+
+        return error_estimate, obs_unbatch, cache
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         fn = jax.vmap(type(self.corr).complete, in_axes=(0, 0, 0, None, None, None))

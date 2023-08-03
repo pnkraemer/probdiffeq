@@ -23,7 +23,7 @@ class _IsoTaylorZerothOrder(_corr.Correction):
         obs_like = variables.IsoNormalQOI(bias_like, chol_like)
         return x, obs_like
 
-    def begin(self, x: variables.IsoSSV, c, /, vector_field, t, p):
+    def estimate_error(self, x: variables.IsoSSV, c, /, vector_field, t, p):
         m = x.hidden_state.mean
         m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
         bias = m1 - vector_field(*m0, t=t, p=p)
@@ -38,11 +38,11 @@ class _IsoTaylorZerothOrder(_corr.Correction):
 
         error_estimate_unscaled = obs.marginal_std() * jnp.ones_like(bias)
         error_estimate = error_estimate_unscaled * output_scale
-        cache = (error_estimate, obs, (bias,))
-        return x, cache
+        cache = (bias,)
+        return error_estimate, obs, cache
 
     def complete(self, x: variables.IsoSSV, co, /, vector_field, t, p):
-        *_, (bias,) = co
+        (bias,) = co
 
         m_ext = x.hidden_state.mean
         l_ext = x.hidden_state.cov_sqrtm_lower

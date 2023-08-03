@@ -88,7 +88,7 @@ class _TaylorZerothOrder(_corr.Correction):
         obs_like = variables.NormalQOI(m_like, chol_like)
         return ssv, obs_like
 
-    def begin(self, ssv: variables.SSV, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv: variables.SSV, corr, /, vector_field, t, p):
         m0, m1 = self.select_derivatives(ssv.hidden_state)
         fx = vector_field(*m0, t=t, p=p)
         cache, observed = self.marginalise_observation(fx, m1, ssv.hidden_state)
@@ -96,7 +96,7 @@ class _TaylorZerothOrder(_corr.Correction):
         output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
         error_estimate_unscaled = observed.marginal_stds()
         error_estimate = output_scale * error_estimate_unscaled
-        return ssv, (error_estimate, observed, cache)
+        return error_estimate, observed, cache
 
     def marginalise_observation(self, fx, m1, x):
         b = m1 - fx
@@ -112,7 +112,7 @@ class _TaylorZerothOrder(_corr.Correction):
         return m0, m1
 
     def complete(self, ssv: variables.SSV, corr, /, vector_field, t, p):
-        *_, (b,) = corr
+        (b,) = corr
         m_ext, l_ext = (ssv.hidden_state.mean, ssv.hidden_state.cov_sqrtm_lower)
 
         l_obs_nonsquare = l_ext[self.ode_order, :]
@@ -165,7 +165,7 @@ class StatisticalFirstOrder(_corr.Correction):
     def extract(self, ssv, corr):
         return ssv
 
-    def begin(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError
 
     def calibrate(
@@ -197,7 +197,7 @@ class StatisticalFirstOrder(_corr.Correction):
 
         error_estimate_unscaled = marginals.marginal_stds()
         error_estimate = error_estimate_unscaled * output_scale
-        return error_estimate, output_scale
+        return error_estimate, output_scale, marginals
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError

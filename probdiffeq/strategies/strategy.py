@@ -50,12 +50,13 @@ class Strategy(Generic[P]):
         ssv, corr = self.correction.init(ssv)
         return _common.State(t=t, ssv=ssv, extra=extra, corr=corr)
 
-    def begin(self, state: _common.State, /, *, dt, parameters, vector_field):
+    def predict_error(self, state: _common.State, /, *, dt, parameters, vector_field):
         ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
-        ssv, corr = self.correction.begin(
+        error, observed, corr = self.correction.estimate_error(
             ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        return _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+        state = _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+        return error, observed, state
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
         ssv, extra = self.extrapolation.complete(
