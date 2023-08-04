@@ -282,3 +282,10 @@ class StatisticalFirstOrder(_corr.Correction):
         rv_cor = variables.NormalHiddenState(m_bw, r_bw.T)
         cor = variables.SSV(m_bw[0], rv_cor)
         return cor, obs
+
+
+def estimate_error(observed, /):
+    mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
+    output_scale = mahalanobis_norm
+    error_estimate_unscaled = observed.marginal_stds()
+    return output_scale * error_estimate_unscaled

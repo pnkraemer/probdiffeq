@@ -41,6 +41,13 @@ def standard_normal(ndim, *, output_scale=1.0):
     return NormalHiddenState(mean, cov_sqrtm)
 
 
+def marginalise_deterministic(rv, trafo):
+    A, b = trafo
+    mean, cov_sqrtm_lower = rv.mean, rv.cov_sqrtm_lower
+    cov_sqrtm_lower_new = _sqrt_util.triu_via_qr(A(cov_sqrtm_lower)[None, ...].T).T
+    return NormalQOI(A(mean) + b, cov_sqrtm_lower_new)
+
+
 @jax.tree_util.register_pytree_node_class
 class ConditionalHiddenState(variables.Conditional):
     def __call__(self, x, /):

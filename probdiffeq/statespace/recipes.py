@@ -69,7 +69,7 @@ def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    corr = bd_corr.taylor_order_zero(ode_order=ode_order)
+    corr = bd_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
     extra_factory = bd_extra.ibm_blockdiag_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
