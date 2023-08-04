@@ -50,10 +50,12 @@ def _update_running_mean(mean, x, /, num):
 
 
 class CalibrationFactory(calib.CalibrationFactory):
-    pass
+    def most_recent(self):
+        return ScalarMostRecent()
 
+    def running_mean(self):
+        return ScalarRunningMean()
 
-# todo: run tests for scalar solvers
 
 # Register objects as (empty) pytrees. todo: temporary?!
 jax.tree_util.register_pytree_node(
