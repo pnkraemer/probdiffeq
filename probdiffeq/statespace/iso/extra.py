@@ -5,35 +5,40 @@ from typing import Any, Tuple
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
-from probdiffeq.statespace import _extra, _ibm_util
+from probdiffeq.statespace import _ibm_util, extra
 from probdiffeq.statespace.iso import variables
 
 
-def ibm_iso_factory(num_derivatives):
+def ibm_factory(num_derivatives) -> "_IsoExtrapolationFactory":
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
     precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-
-    factory = _IsoExtrapolationFactory()
-    params = (a, q_sqrtm, precon)
-    return factory, params
+    return _IsoExtrapolationFactory(args=(a, q_sqrtm, precon))
 
 
-class _IsoExtrapolationFactory(_extra.ExtrapolationFactory):
-    def string_repr(self, *params):
-        num_derivatives = self.filter(*params).num_derivatives
+class _IsoExtrapolationFactory(extra.ExtrapolationFactory):
+    def __init__(self, args):
+        self.args = args
+
+    def string_repr(self):
+        num_derivatives = self.filter().num_derivatives
         return f"<Isotropic IBM with num_derivatives={num_derivatives}>"
 
-    def filter(self, *params):
-        return _IBMFi(*params)
+    def filter(self):
+        return _IBMFi(*self.args)
 
-    def smoother(self, *params):
-        return _IBMSm(*params)
+    def smoother(self):
+        return _IBMSm(*self.args)
 
-    def fixedpoint(self, *params):
-        return _IBMFp(*params)
+    def fixedpoint(self):
+        return _IBMFp(*self.args)
 
 
-class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
+class _IBMFi(extra.Extrapolation):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
+
     @property
     def num_derivatives(self):
         return self.a.shape[0] - 1
@@ -87,7 +92,12 @@ class _IBMFi(_extra.Extrapolation[variables.IsoSSV, Any]):
         return ssv.hidden_state
 
 
-class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
+class _IBMSm(extra.Extrapolation):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"
@@ -150,7 +160,12 @@ class _IBMSm(_extra.Extrapolation[variables.IsoSSV, Any]):
         return variables.IsoSSV(m_ext[0, :], extrapolated), bw_model
 
 
-class _IBMFp(_extra.Extrapolation[variables.IsoSSV, Any]):
+class _IBMFp(extra.Extrapolation):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<Isotropic IBM with {args2}>"

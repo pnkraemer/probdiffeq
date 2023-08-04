@@ -17,11 +17,7 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     attribute of the extrapolation model.
     """
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
-    factory, params = extra.ibm_iso_factory(num_derivatives=n)
-    for impl in [
-        factory.filter(*params),
-        factory.smoother(*params),
-        factory.fixedpoint(*params),
-    ]:
+    factory = extra.ibm_factory(num_derivatives=n)
+    for impl in [factory.filter(), factory.smoother(), factory.fixedpoint()]:
         with testing.raises(ValueError):
             _ = impl.solution_from_tcoeffs(tcoeffs_wrong_length)

@@ -120,6 +120,7 @@ nav:
           - cubature: api_docs/statespace/cubature.md
           - variables: api_docs/statespace/variables.md
           - calib: api_docs/statespace/calib.md
+          - extra: api_docs/statespace/extra.md
           - corr: api_docs/statespace/corr.md
           - dense:
               - extra: api_docs/statespace/dense/extra.md

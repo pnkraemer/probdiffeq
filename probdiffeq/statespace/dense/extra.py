@@ -4,11 +4,11 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
-from probdiffeq.statespace import _extra, _ibm_util
+from probdiffeq.statespace import _ibm_util, extra
 from probdiffeq.statespace.dense import variables
 
 
-def ibm_dense_factory(ode_shape, num_derivatives):
+def ibm_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (d,) = ode_shape
 
@@ -25,38 +25,49 @@ def ibm_dense_factory(ode_shape, num_derivatives):
     eye_d = jnp.eye(d)
     params = (jnp.kron(eye_d, a), jnp.kron(eye_d, q_sqrtm), preconditioner)
 
-    factory = _DenseExtrapolationFactory(ode_shape, num_derivatives=num_derivatives)
-    return factory, params
+    return _DenseExtrapolationFactory(
+        ode_shape=ode_shape, num_derivatives=num_derivatives, args=params
+    )
 
 
-class _DenseExtrapolationFactory(_extra.ExtrapolationFactory):
+class _DenseExtrapolationFactory(extra.ExtrapolationFactory):
+    def __init__(self, args, **kwargs):
+        self.kwargs = kwargs
+        self.args = args
+
     def string_repr(self, *params):
-        num_derivatives = self.filter(*params).num_derivatives
-        ode_shape = self.filter(*params).ode_shape
+        num_derivatives = self.filter().num_derivatives
+        ode_shape = self.filter().ode_shape
         return (
             f"<Dense IBM with num_derivatives={num_derivatives}, ode_shape={ode_shape}>"
         )
 
-    def __init__(self, ode_shape, *, num_derivatives):
-        self.kwargs = {"num_derivatives": num_derivatives, "ode_shape": ode_shape}
+    def filter(self):
+        return _IBMFi(*self.args, **self.kwargs)
 
-    def filter(self, *params):
-        return _IBMFi(*params, **self.kwargs)
+    def smoother(self):
+        return _IBMSm(*self.args, **self.kwargs)
 
-    def smoother(self, *params):
-        return _IBMSm(*params, **self.kwargs)
-
-    def fixedpoint(self, *params):
-        return _IBMFp(*params, **self.kwargs)
+    def fixedpoint(self):
+        return _IBMFp(*self.args, **self.kwargs)
 
 
-class _IBMFi(_extra.Extrapolation):
-    def __init__(self, *args, num_derivatives, ode_shape):
-        super().__init__(*args)
-
+class _IBMFi(extra.Extrapolation):
+    def __init__(
+        self,
+        a,
+        q_sqrtm_lower,
+        preconditioner,
+        num_derivatives,
+        ode_shape,
+    ):
         self.num_derivatives = num_derivatives
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
+
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
 
     @property
     def target_shape(self):
@@ -116,13 +127,22 @@ class _IBMFi(_extra.Extrapolation):
         return ssv, None
 
 
-class _IBMSm(_extra.Extrapolation):
-    def __init__(self, *args, num_derivatives, ode_shape):
-        super().__init__(*args)
-
+class _IBMSm(extra.Extrapolation):
+    def __init__(
+        self,
+        a,
+        q_sqrtm_lower,
+        preconditioner,
+        num_derivatives,
+        ode_shape,
+    ):
         self.num_derivatives = num_derivatives
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
+
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
 
     @property
     def target_shape(self):
@@ -205,13 +225,22 @@ class _IBMSm(_extra.Extrapolation):
         return ext, bw_model
 
 
-class _IBMFp(_extra.Extrapolation):
-    def __init__(self, *args, num_derivatives, ode_shape):
-        super().__init__(*args)
-
+class _IBMFp(extra.Extrapolation):
+    def __init__(
+        self,
+        a,
+        q_sqrtm_lower,
+        preconditioner,
+        num_derivatives,
+        ode_shape,
+    ):
         self.num_derivatives = num_derivatives
         assert len(ode_shape) == 1
         self.ode_shape = ode_shape
+
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
 
     @property
     def target_shape(self):

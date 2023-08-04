@@ -3,43 +3,44 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _extra
+from probdiffeq.statespace import extra
 from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
-def ibm_blockdiag_factory(ode_shape, num_derivatives):
+def ibm_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (n,) = ode_shape
-    factory, params = scalar_extra.ibm_scalar_factory(num_derivatives=num_derivatives)
-    params_stack = _tree_stack_duplicates(params, n=n)
-    return _BlockDiagExtrapolationFactory(wraps=factory), params_stack
+    factory = scalar_extra.ibm_factory(num_derivatives=num_derivatives)
+    params_stack = _tree_stack_duplicates(factory.args, n=n)
+    factory.args = params_stack
+    return _BlockDiagExtrapolationFactory(wraps=factory)
 
 
 def _tree_stack_duplicates(tree, n):
     return jax.tree_util.tree_map(lambda s: jnp.concatenate([s[None, ...]] * n), tree)
 
 
-class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
+class _BlockDiagExtrapolationFactory(extra.ExtrapolationFactory):
     def __init__(self, wraps):
         self.wraps = wraps
 
-    def string_repr(self, *params):
-        num_derivatives = self.filter(*params).num_derivatives
-        ode_shape = self.filter(*params).ode_shape
+    def string_repr(self):
+        num_derivatives = self.filter().num_derivatives
+        ode_shape = self.filter().ode_shape
         args = f"num_derivatives={num_derivatives}, ode_shape={ode_shape}"
         return f"<Block-diagonal IBM with {args}>"
 
-    def filter(self, *params):
-        return _BlockDiag(self.wraps.filter(*params))
+    def filter(self):
+        return _BlockDiag(self.wraps.filter())
 
-    def smoother(self, *params):
-        return _BlockDiag(self.wraps.smoother(*params))
+    def smoother(self):
+        return _BlockDiag(self.wraps.smoother())
 
-    def fixedpoint(self, *params):
-        return _BlockDiag(self.wraps.fixedpoint(*params))
+    def fixedpoint(self):
+        return _BlockDiag(self.wraps.fixedpoint())
 
 
-class _BlockDiag(_extra.Extrapolation):
+class _BlockDiag(extra.Extrapolation):
     def __init__(self, extra, /):
         self.extra = extra
 

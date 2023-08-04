@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
-from probdiffeq.statespace import _extra, _ibm_util
+from probdiffeq.statespace import _ibm_util, extra
 from probdiffeq.statespace.scalar import variables
 
 
@@ -114,31 +114,38 @@ def extrapolate_precon(
     return marginal
 
 
-def ibm_scalar_factory(num_derivatives):
+def ibm_factory(num_derivatives):
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
     precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
-    factory = _ScalarExtrapolationFactory()
-    params = (a, q_sqrtm, precon)
-    return factory, params
+    factory = _ScalarExtrapolationFactory(args=(a, q_sqrtm, precon))
+    return factory
 
 
-class _ScalarExtrapolationFactory(_extra.ExtrapolationFactory):
-    def string_repr(self, *params):
-        num_derivatives = self.filter(*params).num_derivatives
+class _ScalarExtrapolationFactory(extra.ExtrapolationFactory):
+    def __init__(self, args):
+        self.args = args
+
+    def string_repr(self):
+        num_derivatives = self.filter().num_derivatives
         return f"<Scalar IBM with num_derivatives={num_derivatives}>"
 
-    def filter(self, *params):
-        return _IBMFi(*params)
+    def filter(self):
+        return _IBMFi(*self.args)
 
-    def smoother(self, *params):
-        return _IBMSm(*params)
+    def smoother(self):
+        return _IBMSm(*self.args)
 
-    def fixedpoint(self, *params):
-        return _IBMFp(*params)
+    def fixedpoint(self):
+        return _IBMFp(*self.args)
 
 
-class _IBMFi(_extra.Extrapolation):
+class _IBMFi(extra.Extrapolation):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"
@@ -183,7 +190,12 @@ class _IBMFi(_extra.Extrapolation):
         return ssv, None
 
 
-class _IBMSm(_extra.Extrapolation):
+class _IBMSm(extra.Extrapolation):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"
@@ -246,7 +258,12 @@ class _IBMSm(_extra.Extrapolation):
         return ssv, bw_model
 
 
-class _IBMFp(_extra.Extrapolation):
+class _IBMFp(extra.Extrapolation):
+    def __init__(self, a, q_sqrtm_lower, preconditioner):
+        self.a = a
+        self.q_sqrtm_lower = q_sqrtm_lower
+        self.preconditioner = preconditioner
+
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"

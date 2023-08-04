@@ -1,24 +1,26 @@
 """State-space model recipes."""
-
-from typing import Any, Tuple
-
 from probdiffeq.backend import containers
-from probdiffeq.statespace import _extra, calib, corr, cubature
-from probdiffeq.statespace.blockdiag import calib as bd_calib
-from probdiffeq.statespace.blockdiag import corr as bd_corr
-from probdiffeq.statespace.blockdiag import extra as bd_extra
-from probdiffeq.statespace.dense import calib as dense_calib
-from probdiffeq.statespace.dense import corr as dense_corr
-from probdiffeq.statespace.dense import extra as dense_extra
-from probdiffeq.statespace.iso import calib as iso_calib
-from probdiffeq.statespace.iso import corr as iso_corr
-from probdiffeq.statespace.iso import extra as iso_extra
-from probdiffeq.statespace.scalar import calib as scalar_calib
-from probdiffeq.statespace.scalar import corr as scalar_corr
-from probdiffeq.statespace.scalar import extra as scalar_extra
+from probdiffeq.statespace import calib, corr, cubature, extra
 
-# todo: make strategies into factory function.
-#  This allows moving the calibration up to solver-level!
+# isort: off
+
+import probdiffeq.statespace.blockdiag.calib
+import probdiffeq.statespace.blockdiag.corr
+import probdiffeq.statespace.blockdiag.extra
+
+import probdiffeq.statespace.dense.calib
+import probdiffeq.statespace.dense.corr
+import probdiffeq.statespace.dense.extra
+
+import probdiffeq.statespace.iso.calib
+import probdiffeq.statespace.iso.corr
+import probdiffeq.statespace.iso.extra
+
+import probdiffeq.statespace.scalar.calib
+import probdiffeq.statespace.scalar.corr
+import probdiffeq.statespace.scalar.extra
+
+# isort: on
 
 
 class _Impl(containers.NamedTuple):
@@ -27,65 +29,55 @@ class _Impl(containers.NamedTuple):
     Contains an extrapolation, correction, and calibration style.
     """
 
-    extra_factory: Tuple[_extra.ExtrapolationFactory, Any]
+    extrapolation: extra.ExtrapolationFactory
     """Extrapolation factory."""
 
     correction: corr.Correction
     """Correction method."""
 
-    calibration_factory: calib.CalibrationFactory
+    calibration: calib.CalibrationFactory
     """Calibration factory."""
 
 
 def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
-    correction = iso_corr.taylor_order_zero(ode_order=ode_order)
-    extra_factory = iso_extra.ibm_iso_factory(num_derivatives=num_derivatives)
-    calibration_factory = iso_calib.output_scale()
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
-    )
+    correction = probdiffeq.statespace.iso.corr.taylor_order_zero(ode_order=ode_order)
+    ibm = probdiffeq.statespace.iso.extra.ibm_factory(num_derivatives=num_derivatives)
+    calibration = probdiffeq.statespace.iso.calib.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = bd_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
-    extra_factory = bd_extra.ibm_blockdiag_factory(
+    correction = probdiffeq.statespace.blockdiag.corr.taylor_order_zero(
+        ode_shape=ode_shape, ode_order=ode_order
+    )
+    ibm = probdiffeq.statespace.blockdiag.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration_factory = bd_calib.output_scale(ode_shape=ode_shape)
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
-    )
+    calibration = probdiffeq.statespace.blockdiag.calib.output_scale(ode_shape)
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
 def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = dense_corr.taylor_order_one(ode_shape=ode_shape, ode_order=ode_order)
-    extra_factory = dense_extra.ibm_dense_factory(
+    correction = probdiffeq.statespace.dense.corr.taylor_order_one(
+        ode_shape=ode_shape, ode_order=ode_order
+    )
+    ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration_factory = dense_calib.output_scale()
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
-    )
+    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = dense_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
-    extra_factory = dense_extra.ibm_dense_factory(
+    correction = probdiffeq.statespace.dense.corr.taylor_order_zero(
+        ode_shape=ode_shape, ode_order=ode_order
+    )
+    ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration_factory = dense_calib.output_scale()
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
-    )
+    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
 def slr1_dense(
@@ -95,18 +87,14 @@ def slr1_dense(
     ode_order=1,
     num_derivatives=4,
 ) -> _Impl:
-    correction = dense_corr.statistical_order_one(
+    correction = probdiffeq.statespace.dense.corr.statistical_order_one(
         ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
     )
-    extra_factory = dense_extra.ibm_dense_factory(
+    ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration_factory = dense_calib.output_scale()
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
-    )
+    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
 def slr0_dense(
@@ -126,26 +114,22 @@ def slr0_dense(
         and without any deprecation policy.
 
     """
-    correction = dense_corr.statistical_order_zero(
+    correction = probdiffeq.statespace.dense.corr.statistical_order_zero(
         ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
     )
-    extra_factory = dense_extra.ibm_dense_factory(
+    ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration_factory = dense_calib.output_scale()
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
-    )
+    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = scalar_corr.taylor_order_zero(ode_order=ode_order)
-    extra_factory = scalar_extra.ibm_scalar_factory(num_derivatives=num_derivatives)
-    calibration_factory = scalar_calib.output_scale()
-    return _Impl(
-        correction=correction,
-        extra_factory=extra_factory,
-        calibration_factory=calibration_factory,
+    correction = probdiffeq.statespace.scalar.corr.taylor_order_zero(
+        ode_order=ode_order
     )
+    ibm = probdiffeq.statespace.scalar.extra.ibm_factory(
+        num_derivatives=num_derivatives
+    )
+    calibration = probdiffeq.statespace.scalar.calib.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
