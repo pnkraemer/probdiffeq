@@ -8,7 +8,7 @@ from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.dense import variables
 
 
-def ibm_dense_factory(ode_shape, num_derivatives):
+def ibm_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (d,) = ode_shape
 

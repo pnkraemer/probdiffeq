@@ -9,7 +9,7 @@ from probdiffeq.statespace import _extra, _ibm_util
 from probdiffeq.statespace.iso import variables
 
 
-def ibm_iso_factory(num_derivatives):
+def ibm_factory(num_derivatives) -> "_IsoExtrapolationFactory":
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
     precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
     return _IsoExtrapolationFactory(args=(a, q_sqrtm, precon))

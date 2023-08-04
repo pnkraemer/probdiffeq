@@ -114,7 +114,7 @@ def extrapolate_precon(
     return marginal
 
 
-def ibm_scalar_factory(num_derivatives):
+def ibm_factory(num_derivatives):
     a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
     precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
