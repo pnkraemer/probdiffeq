@@ -72,20 +72,13 @@ class Strategy(Generic[P]):
         sol = self.extrapolation.extract(ssv, state.extra)
         return state.t, sol
 
-    def case_right_corner(
-        self, t, *, s0: _common.State, s1: _common.State, output_scale
-    ) -> _interp.InterpRes[_common.State]:
+    def case_right_corner(self, state_at_t1: _common.State) -> _interp.InterpRes:
         # If specific choice is provided, use that.
         if self.impl_right_corner != "default":
-            return self.impl_right_corner(
-                t,
-                s0=s0,
-                s1=s1,
-                output_scale=output_scale,
-                extrapolation=self.extrapolation,
-            )
+            return self.impl_right_corner(state_at_t1, extrapolation=self.extrapolation)
 
         # Otherwise, apply default behaviour.
+        s1 = state_at_t1
         return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
 
     def case_interpolate(

@@ -40,7 +40,7 @@ def solve_and_save_at(
         accepted, solution, previous = jax.lax.cond(
             accepted.t > t_next,
             interpolate_fun,
-            right_corner_fun,
+            lambda _, *a: right_corner_fun(*a),
             t_next,
             previous,
             accepted,
@@ -132,7 +132,7 @@ def _solution_generator(
         accepted, solution, previous = interpolate_fun(s1=accepted, s0=previous, t=t1)
     else:
         assert accepted.t == t1
-        accepted, solution, previous = right_corner_fun(s1=accepted, s0=previous, t=t1)
+        accepted, solution, previous = right_corner_fun(previous, accepted)
 
     sol_solver, _sol_control = adaptive_solver.extract(solution, control)
     yield sol_solver

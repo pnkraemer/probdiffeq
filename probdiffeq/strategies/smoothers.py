@@ -77,7 +77,7 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
       and the backward transition from t to t0.
     * Extrapolating from t to t1, which gives another "filtering" marginal
       and the backward transition from t1 to t.
-    * Applying the t1-to-t backward transition to compute the interpolation result.
+    * Applying the new t1-to-t backward transition to compute the interpolation result.
       This intermediate result is informed about its "right-hand side" datum.
 
     Subsequent interpolations continue from the value at 't'.
@@ -107,14 +107,14 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
 
-def _fixedpoint_right_corner(t, *, s0, s1, output_scale, extrapolation):
+def _fixedpoint_right_corner(state_at_t1, *, extrapolation):
     # See case_interpolate() for detailed explanation of why this works.
     # Todo: this prepares _future_ steps, so shouldn't it happen
     #  at initialisation instead of at completion?
-    ssv, extra = extrapolation.reset(s1.ssv, s1.extra)
-    accepted = _common.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
-    previous = _common.State(t=s1.t, ssv=ssv, extra=extra, corr=s1.corr)
-    return _interp.InterpRes(accepted=accepted, solution=s1, previous=previous)
+    ssv, extra = extrapolation.reset(state_at_t1.ssv, state_at_t1.extra)
+    acc = _common.State(t=state_at_t1.t, ssv=ssv, extra=extra, corr=state_at_t1.corr)
+    pre = _common.State(t=state_at_t1.t, ssv=ssv, extra=extra, corr=state_at_t1.corr)
+    return _interp.InterpRes(accepted=acc, solution=state_at_t1, previous=pre)
 
 
 def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
@@ -131,7 +131,7 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
 
     The difference to smoother-interpolation is quite subtle:
 
-    * The backward transition of the value at 't' is merged with that at 't0'.
+    * The backward transition of the solution at 't' is merged with that at 't0'.
       The reason is that the backward transition at 't0' knows
       "how to get to the quantity of interest",
       and this is precisely what we want to interpolate.
@@ -148,9 +148,9 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
 
     These distinctions are precisely why we need three fields
     in every interpolation result:
-    the solution,
-    the continue-interpolation-from-here,
-    and the continue-stepping-from-here.
+        the solution,
+        the continue-interpolation-from-here,
+        and the continue-stepping-from-here.
     All three are different for fixed point smoothers.
     (Really, I try removing one of them monthly and
     then don't understand why tests fail.)
