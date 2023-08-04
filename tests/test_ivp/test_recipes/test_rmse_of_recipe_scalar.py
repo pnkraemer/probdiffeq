@@ -1,4 +1,5 @@
-"""Assert that every recipe yields a decent ODE approximation."""
+"""Test for scalar recipes."""
+
 import diffeqzoo.ivps
 import diffrax
 import jax
@@ -6,13 +7,12 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
-from probdiffeq.statespace import cubature, recipes
+from probdiffeq.statespace import recipes
 
 
 @testing.fixture(name="problem")
 def fixture_problem():
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 2.0  # Short time-intervals are sufficient for this test.
+    f, u0, (t0, t1), f_args = diffeqzoo.ivps.logistic()
 
     @jax.jit
     def vf(x, *, t, p):  # pylint: disable=unused-argument
@@ -22,44 +22,8 @@ def fixture_problem():
 
 
 @testing.case()
-def case_ts0_iso():
-    def ts0_iso_factory(ode_shape, num_derivatives):
-        return recipes.ts0_iso(num_derivatives=num_derivatives)
-
-    return ts0_iso_factory, 1.0
-
-
-@testing.case()
-def case_ts0_blockdiag():
-    return recipes.ts0_blockdiag, jnp.ones((2,))
-
-
-@testing.case()
-def case_ts1_dense():
-    return recipes.ts1_dense, 1.0
-
-
-@testing.case()
-def case_ts0_dense():
-    return recipes.ts0_dense, 1.0
-
-
-@testing.case()
-def case_slr1_dense():
-    return recipes.slr1_dense, 1.0
-
-
-@testing.case()
-def case_slr1_dense_gauss_hermite():
-    def recipe(**kwargs):
-        return recipes.slr1_dense(cubature_rule_fn=cubature.gauss_hermite, **kwargs)
-
-    return recipe, 1.0
-
-
-@testing.case()
-def case_slr0_dense():
-    return recipes.slr0_dense, 1.0
+def case_ts0_scalar():
+    return recipes.ts0_scalar, 1.0
 
 
 @testing.fixture(name="solution")
@@ -70,9 +34,7 @@ def fixture_recipe_solution(problem, factorisation):
     problem_args = (vf, (u0,))
     problem_kwargs = {"t0": t0, "t1": t1, "parameters": f_args}
     impl_factory, output_scale = factorisation
-    solver = test_util.generate_solver(
-        num_derivatives=2, impl_factory=impl_factory, ode_shape=jnp.shape(u0)
-    )
+    solver = test_util.generate_solver(num_derivatives=2, impl_factory=impl_factory)
     adaptive_kwargs = {
         "solver": solver,
         "atol": 1e-2,

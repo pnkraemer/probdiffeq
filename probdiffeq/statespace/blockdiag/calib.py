@@ -23,6 +23,8 @@ class BlockDiag(calib.Calibration):
         return jax.vmap(self.wraps.init)(prior)
 
     def update(self, state, /, observed):
+        print(observed.mean.shape)
+        print(observed.cov_sqrtm_lower.shape)
         return jax.vmap(self.wraps.update)(state, observed)
 
     def extract(self, state, /):
