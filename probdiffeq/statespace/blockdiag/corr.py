@@ -88,10 +88,6 @@ def _error_estimate(observed, /):
 
 
 #
-# def taylor_order_zero(*args, **kwargs):
-#     ts0 = scalar_corr.taylor_order_zero(*args, **kwargs)
-#     return _BlockDiag(ts0)
-#
 # def statistical_order_one(ode_shape, ode_order):
 #     cubature_fn = cubature.blockdiag(cubature.third_order_spherical)
 #     cubature_rule = cubature_fn(input_shape=ode_shape)
@@ -200,53 +196,6 @@ def _error_estimate(observed, /):
 #         )
 #
 #
-# @jax.tree_util.register_pytree_node_class
-# class _BlockDiag(_corr.Correction):
-#     def __init__(self, corr, /):
-#         super().__init__(ode_order=corr.ode_order)
-#         self.corr = corr
-#
-#     def __repr__(self):
-#         return f"{self.__class__.__name__}({self.corr})"
-#
-#     def tree_flatten(self):
-#         children = (self.corr,)
-#         aux = ()
-#         return children, aux
-#
-#     @classmethod
-#     def tree_unflatten(cls, _aux, children):
-#         (corr,) = children
-#         return cls(corr)
-#
-#     def init(self, ssv, /):
-#         return jax.vmap(type(self.corr).init)(self.corr, ssv)
-#
-#     def estimate_error(self, ssv, corr, /, vector_field, t, p):
-#         select_fn = jax.vmap(type(self.corr).select_derivatives)
-#         m0, m1 = select_fn(self.corr, ssv.hidden_state)
-#
-#         fx = vector_field(*m0.T, t=t, p=p)
-#
-#         marginalise_fn = jax.vmap(type(self.corr).marginalise_observation)
-#         cache, obs_unbatch = marginalise_fn(self.corr, fx, m1, ssv.hidden_state)
-#
-#         mahalanobis_fn = scalar_variables.NormalQOI.mahalanobis_norm
-#         mahalanobis_fn_vmap = jax.vmap(mahalanobis_fn)
-#         output_scale = mahalanobis_fn_vmap(obs_unbatch, jnp.zeros_like(m1))
-#         error_estimate = output_scale * obs_unbatch.cov_sqrtm_lower
-#
-#         return error_estimate, obs_unbatch, cache
-#
-#     def complete(self, ssv, corr, /, vector_field, t, p):
-#         fn = jax.vmap(type(self.corr).complete, in_axes=(0, 0, 0, None, None, None))
-#         return fn(self.corr, ssv, corr, vector_field, t, p)
-#
-#     def extract(self, ssv, corr):
-#         return ssv
-#
-#     def _cov_sqrtm_lower(self, cov_sqrtm_lower):
-#         return cov_sqrtm_lower[:, self.ode_order, ...]
 
 
 def _constraint_flatten(node):

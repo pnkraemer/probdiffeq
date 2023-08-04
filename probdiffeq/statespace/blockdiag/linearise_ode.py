@@ -1,10 +1,6 @@
-import functools
+"""ODE linearisation."""
 
-import jax
-import jax.numpy as jnp
-
-from probdiffeq import _sqrt_util
-from probdiffeq.statespace.dense import linearise, variables
+from probdiffeq.statespace.dense import linearise
 
 
 def constraint_0th(*, ode_order):
