@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
-from probdiffeq.statespace import _extra, _ibm_util
+from probdiffeq.statespace import _ibm_util, extra
 from probdiffeq.statespace.dense import variables
 
 
@@ -30,7 +30,7 @@ def ibm_factory(ode_shape, num_derivatives):
     )
 
 
-class _DenseExtrapolationFactory(_extra.ExtrapolationFactory):
+class _DenseExtrapolationFactory(extra.ExtrapolationFactory):
     def __init__(self, args, **kwargs):
         self.kwargs = kwargs
         self.args = args
@@ -52,7 +52,7 @@ class _DenseExtrapolationFactory(_extra.ExtrapolationFactory):
         return _IBMFp(*self.args, **self.kwargs)
 
 
-class _IBMFi(_extra.Extrapolation):
+class _IBMFi(extra.Extrapolation):
     def __init__(
         self,
         a,
@@ -127,7 +127,7 @@ class _IBMFi(_extra.Extrapolation):
         return ssv, None
 
 
-class _IBMSm(_extra.Extrapolation):
+class _IBMSm(extra.Extrapolation):
     def __init__(
         self,
         a,
@@ -225,7 +225,7 @@ class _IBMSm(_extra.Extrapolation):
         return ext, bw_model
 
 
-class _IBMFp(_extra.Extrapolation):
+class _IBMFp(extra.Extrapolation):
     def __init__(
         self,
         a,

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
-from probdiffeq.statespace import _extra, _ibm_util
+from probdiffeq.statespace import _ibm_util, extra
 from probdiffeq.statespace.scalar import variables
 
 
@@ -122,7 +122,7 @@ def ibm_factory(num_derivatives):
     return factory
 
 
-class _ScalarExtrapolationFactory(_extra.ExtrapolationFactory):
+class _ScalarExtrapolationFactory(extra.ExtrapolationFactory):
     def __init__(self, args):
         self.args = args
 
@@ -140,7 +140,7 @@ class _ScalarExtrapolationFactory(_extra.ExtrapolationFactory):
         return _IBMFp(*self.args)
 
 
-class _IBMFi(_extra.Extrapolation):
+class _IBMFi(extra.Extrapolation):
     def __init__(self, a, q_sqrtm_lower, preconditioner):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
@@ -190,7 +190,7 @@ class _IBMFi(_extra.Extrapolation):
         return ssv, None
 
 
-class _IBMSm(_extra.Extrapolation):
+class _IBMSm(extra.Extrapolation):
     def __init__(self, a, q_sqrtm_lower, preconditioner):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower
@@ -258,7 +258,7 @@ class _IBMSm(_extra.Extrapolation):
         return ssv, bw_model
 
 
-class _IBMFp(_extra.Extrapolation):
+class _IBMFp(extra.Extrapolation):
     def __init__(self, a, q_sqrtm_lower, preconditioner):
         self.a = a
         self.q_sqrtm_lower = q_sqrtm_lower

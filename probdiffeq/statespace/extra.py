@@ -1,4 +1,4 @@
-"""Various interfaces."""
+"""Extrapolation model interfaces."""
 
 import abc
 

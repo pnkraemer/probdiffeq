@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _extra
+from probdiffeq.statespace import extra
 from probdiffeq.statespace.scalar import extra as scalar_extra
 
 
@@ -20,7 +20,7 @@ def _tree_stack_duplicates(tree, n):
     return jax.tree_util.tree_map(lambda s: jnp.concatenate([s[None, ...]] * n), tree)
 
 
-class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
+class _BlockDiagExtrapolationFactory(extra.ExtrapolationFactory):
     def __init__(self, wraps):
         self.wraps = wraps
 
@@ -40,7 +40,7 @@ class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
         return _BlockDiag(self.wraps.fixedpoint())
 
 
-class _BlockDiag(_extra.Extrapolation):
+class _BlockDiag(extra.Extrapolation):
     def __init__(self, extra, /):
         self.extra = extra
 
