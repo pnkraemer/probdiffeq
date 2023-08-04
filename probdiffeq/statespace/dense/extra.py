@@ -12,7 +12,7 @@ def ibm_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
     (d,) = ode_shape
 
-    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
     precon_1d = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
     @jax.tree_util.Partial

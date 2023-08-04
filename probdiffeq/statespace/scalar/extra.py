@@ -114,12 +114,11 @@ def extrapolate_precon(
     return marginal
 
 
-def ibm_factory(num_derivatives):
-    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives=num_derivatives)
+def ibm_factory(num_derivatives, output_scale=1.0):
+    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
     precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
-    factory = _ScalarExtrapolationFactory(args=(a, q_sqrtm, precon))
-    return factory
+    return _ScalarExtrapolationFactory(args=(a, q_sqrtm, precon))
 
 
 class _ScalarExtrapolationFactory(extra.ExtrapolationFactory):
@@ -138,6 +137,13 @@ class _ScalarExtrapolationFactory(extra.ExtrapolationFactory):
 
     def fixedpoint(self):
         return _IBMFp(*self.args)
+
+
+jax.tree_util.register_pytree_node(
+    nodetype=_ScalarExtrapolationFactory,
+    flatten_func=lambda a: (a.args, ()),
+    unflatten_func=lambda a, b: _ScalarExtrapolationFactory(b),
+)
 
 
 class _IBMFi(extra.Extrapolation):

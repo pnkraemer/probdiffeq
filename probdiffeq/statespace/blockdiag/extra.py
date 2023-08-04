@@ -9,10 +9,8 @@ from probdiffeq.statespace.scalar import extra as scalar_extra
 
 def ibm_factory(ode_shape, num_derivatives):
     assert len(ode_shape) == 1
-    (n,) = ode_shape
-    factory = scalar_extra.ibm_factory(num_derivatives=num_derivatives)
-    params_stack = _tree_stack_duplicates(factory.args, n=n)
-    factory.args = params_stack
+    fun_vmap = jax.vmap(scalar_extra.ibm_factory, in_axes=(None, 0))
+    factory = fun_vmap(num_derivatives, jnp.ones(ode_shape))
     return _BlockDiagExtrapolationFactory(wraps=factory)
 
 
