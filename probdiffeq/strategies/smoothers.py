@@ -7,15 +7,15 @@ from probdiffeq import _interp, _markov
 from probdiffeq.strategies import _common, strategy
 
 
-def smoother(extra, corr, calib, /):
+def smoother(extrapolation_factory, corr, calib, /):
     """Create a smoother strategy."""
-    factory, parameters = extra
-    extrapolation = factory.smoother(*parameters)
+    extrapolation = extrapolation_factory.smoother()
+    extrapolation_repr = extrapolation_factory.string_repr()
     strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
         is_suitable_for_save_at=False,
-        string_repr=f"<Smoother with {factory.string_repr(*parameters)}, {corr}>",
+        string_repr=f"<Smoother with {extrapolation_repr}, {corr}>",
         # Right-corner: use default
         impl_right_corner="default",
         # Interpolate like a smoother:
@@ -25,15 +25,15 @@ def smoother(extra, corr, calib, /):
     return strategy_impl, calib
 
 
-def smoother_fixedpoint(extra, corr, calib, /):
+def smoother_fixedpoint(extrapolation_factory, corr, calib, /):
     """Create a fixedpoint-smoother strategy."""
-    factory, parameters = extra
-    extrapolation = factory.fixedpoint(*parameters)
+    extrapolation = extrapolation_factory.fixedpoint()
+    extrapolation_repr = extrapolation_factory.string_repr()
     strategy_impl = strategy.Strategy(
         extrapolation,
         corr,
         is_suitable_for_save_at=True,
-        string_repr=f"<Fixed-point with {factory.string_repr(*parameters)}, {corr}>",
+        string_repr=f"<Fixed-point with {extrapolation_repr}, {corr}>",
         # Offgrid-marginals are not available
         impl_offgrid_marginals=None,
         # Interpolate like a fixedpoint-smoother

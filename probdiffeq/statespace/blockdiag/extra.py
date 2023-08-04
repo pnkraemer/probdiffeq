@@ -12,7 +12,7 @@ def ibm_blockdiag_factory(ode_shape, num_derivatives):
     (n,) = ode_shape
     factory, params = scalar_extra.ibm_scalar_factory(num_derivatives=num_derivatives)
     params_stack = _tree_stack_duplicates(params, n=n)
-    return _BlockDiagExtrapolationFactory(wraps=factory), params_stack
+    return _BlockDiagExtrapolationFactory(wraps=factory, args=params_stack)
 
 
 def _tree_stack_duplicates(tree, n):
@@ -23,19 +23,19 @@ class _BlockDiagExtrapolationFactory(_extra.ExtrapolationFactory):
     def __init__(self, wraps):
         self.wraps = wraps
 
-    def string_repr(self, *params):
+    def string_repr(self):
         num_derivatives = self.filter(*params).num_derivatives
         ode_shape = self.filter(*params).ode_shape
         args = f"num_derivatives={num_derivatives}, ode_shape={ode_shape}"
         return f"<Block-diagonal IBM with {args}>"
 
-    def filter(self, *params):
+    def filter(self):
         return _BlockDiag(self.wraps.filter(*params))
 
-    def smoother(self, *params):
+    def smoother(self):
         return _BlockDiag(self.wraps.smoother(*params))
 
-    def fixedpoint(self, *params):
+    def fixedpoint(self):
         return _BlockDiag(self.wraps.fixedpoint(*params))
 
 

@@ -1,7 +1,5 @@
 """State-space model recipes."""
 
-from typing import Any, Tuple
-
 from probdiffeq.backend import containers
 from probdiffeq.statespace import _extra, calib, corr, cubature
 from probdiffeq.statespace.blockdiag import calib as bd_calib
@@ -27,7 +25,7 @@ class _Impl(containers.NamedTuple):
     Contains an extrapolation, correction, and calibration style.
     """
 
-    extra_factory: Tuple[_extra.ExtrapolationFactory, Any]
+    extra_factory: _extra.ExtrapolationFactory
     """Extrapolation factory."""
 
     correction: corr.Correction
