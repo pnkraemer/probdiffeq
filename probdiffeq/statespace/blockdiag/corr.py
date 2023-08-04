@@ -5,7 +5,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _corr
+from probdiffeq.statespace import corr
 from probdiffeq.statespace.blockdiag import linearise_ode, variables
 from probdiffeq.statespace.scalar import corr as scalar_corr
 from probdiffeq.statespace.scalar import variables as scalar_variables
@@ -21,7 +21,7 @@ def taylor_order_zero(*, ode_shape, ode_order):
     )
 
 
-class _BlockDiagODEConstraint(_corr.Correction):
+class _BlockDiagODEConstraint(corr.Correction):
     def __init__(self, *, ode_order, ode_shape, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1

@@ -41,6 +41,36 @@ def standard_normal(ndim, *, output_scale=1.0):
     return NormalHiddenState(mean, cov_sqrtm)
 
 
+def marginalise_deterministic_qoi(rv, trafo):
+    A, b = trafo
+    mean, cov_sqrtm_lower = rv.mean, rv.cov_sqrtm_lower
+
+    cov_sqrtm_lower_new = _sqrt_util.triu_via_qr(A(cov_sqrtm_lower)[:, None])
+    cov_sqrtm_lower_squeezed = jnp.reshape(cov_sqrtm_lower_new, ())
+    return NormalQOI(A(mean) + b, cov_sqrtm_lower_squeezed)
+
+
+def revert_deterministic_qoi(rv, trafo):
+    # Extract information
+    A, b = trafo
+    mean, cov_sqrtm_lower = rv.mean, rv.cov_sqrtm_lower
+
+    # QR-decomposition
+    # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
+    r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
+        R_X_F=A(cov_sqrtm_lower)[:, None], R_X=cov_sqrtm_lower.T
+    )
+    cov_sqrtm_lower_obs = jnp.reshape(r_obs, ())
+    cov_sqrtm_lower_cor = r_cor.T
+    gain = jnp.squeeze(gain, axis=-1)
+
+    # Gather terms and return
+    m_cor = mean - gain * (A(mean) + b)
+    corrected = NormalHiddenState(m_cor, cov_sqrtm_lower_cor)
+    observed = NormalQOI(A(mean) + b, cov_sqrtm_lower_obs)
+    return observed, (corrected, gain)
+
+
 @jax.tree_util.register_pytree_node_class
 class ConditionalHiddenState(variables.Conditional):
     def __call__(self, x, /):

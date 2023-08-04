@@ -1,15 +1,86 @@
 """Implementations for scalar initial value problems."""
 
+import functools
+
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _corr
-from probdiffeq.statespace.scalar import variables
+from probdiffeq.statespace import corr
+from probdiffeq.statespace.scalar import linearise_ode, variables
 
 
-def taylor_order_zero(*args, **kwargs):
-    return _TaylorZerothOrder(*args, **kwargs)
+def taylor_order_zero(*, ode_order):
+    fun = linearise_ode.constraint_0th(ode_order=ode_order)
+    return _ODEConstraint(
+        ode_order=ode_order,
+        linearise_fun=fun,
+        string_repr=f"<TS0 with ode_order={ode_order}>",
+    )
+
+
+class _ODEConstraint(corr.Correction):
+    def __init__(self, ode_order, linearise_fun, string_repr):
+        super().__init__(ode_order=ode_order)
+
+        self.linearise = linearise_fun
+        self.string_repr = string_repr
+
+    def __repr__(self):
+        return self.string_repr
+
+    def init(self, ssv, /):
+        bias_like = jnp.empty(())
+        chol_like = jnp.empty(())
+        obs_like = variables.NormalQOI(bias_like, chol_like)
+        return ssv, obs_like
+
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
+        def f_wrapped(s):
+            return vector_field(*s, t=t, p=p)
+
+        A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
+        observed = variables.marginalise_deterministic_qoi(ssv.hidden_state, (A, b))
+
+        error_estimate = estimate_error(observed)
+        return error_estimate, observed, (A, b)
+
+    def complete(self, ssv, corr, /, vector_field, t, p):
+        A, b = corr
+        obs, (cor, _gn) = variables.revert_deterministic_qoi(ssv.hidden_state, (A, b))
+        print(cor.mean.shape)
+        u = cor.mean[0]
+        ssv = variables.SSV(u, cor)
+        return ssv, obs
+
+    def extract(self, ssv, corr, /):
+        return ssv
+
+
+def estimate_error(observed, /):
+    mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
+    output_scale = mahalanobis_norm
+    error_estimate_unscaled = observed.marginal_stds()
+    return output_scale * error_estimate_unscaled
+
+
+def _constraint_flatten(node):
+    children = ()
+    aux = node.ode_order, node.linearise, node.string_repr
+    return children, aux
+
+
+def _constraint_unflatten(aux, _children, *, nodetype):
+    ode_order, lin, string_repr = aux
+    return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
+
+
+for nodetype in [_ODEConstraint]:
+    jax.tree_util.register_pytree_node(
+        nodetype=nodetype,
+        flatten_func=_constraint_flatten,
+        unflatten_func=functools.partial(_constraint_unflatten, nodetype=nodetype),
+    )
 
 
 def correct_affine_qoi_noisy(rv, affine, *, stdev):
@@ -74,65 +145,3 @@ def correct_affine_ode_2nd(rv, affine):
         mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor
     )
     return observed, (corrected, gain)
-
-
-@jax.tree_util.register_pytree_node_class
-class _TaylorZerothOrder(_corr.Correction):
-    def __repr__(self):
-        return f"<TS0 with ode_order={self.ode_order}>"
-
-    def init(self, ssv, /):
-        m_like = jnp.zeros(())
-        chol_like = jnp.zeros(())
-        obs_like = variables.NormalQOI(m_like, chol_like)
-        return ssv, obs_like
-
-    def estimate_error(self, ssv: variables.SSV, corr, /, vector_field, t, p):
-        m0, m1 = self.select_derivatives(ssv.hidden_state)
-        fx = vector_field(*m0, t=t, p=p)
-        cache, observed = self.marginalise_observation(fx, m1, ssv.hidden_state)
-        mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
-        output_scale = mahalanobis_norm / jnp.sqrt(m1.size)
-        error_estimate_unscaled = observed.marginal_stds()
-        error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed, cache
-
-    def marginalise_observation(self, fx, m1, x):
-        b = m1 - fx
-        cov_sqrtm_lower = x.cov_sqrtm_lower[self.ode_order, :]
-        l_obs_raw = _sqrt_util.triu_via_qr(cov_sqrtm_lower[:, None])
-        l_obs = jnp.reshape(l_obs_raw, ())
-        observed = variables.NormalQOI(b, l_obs)
-        cache = (b,)
-        return cache, observed
-
-    def select_derivatives(self, x):
-        m0, m1 = x.mean[: self.ode_order], x.mean[self.ode_order]
-        return m0, m1
-
-    def complete(self, ssv: variables.SSV, corr, /, vector_field, t, p):
-        (b,) = corr
-        m_ext, l_ext = (ssv.hidden_state.mean, ssv.hidden_state.cov_sqrtm_lower)
-
-        l_obs_nonsquare = l_ext[self.ode_order, :]
-        r_obs_mat, (r_cor, gain_mat) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=l_obs_nonsquare[:, None], R_X=l_ext.T
-        )
-        r_obs = jnp.reshape(r_obs_mat, ())
-        gain = jnp.reshape(gain_mat, (-1,))
-        m_cor = m_ext - gain * b
-        observed = variables.NormalQOI(mean=b, cov_sqrtm_lower=r_obs.T)
-
-        rv_cor = variables.NormalHiddenState(mean=m_cor, cov_sqrtm_lower=r_cor.T)
-        corrected = variables.SSV(m_cor[0], rv_cor)
-        return corrected, observed
-
-    def extract(self, ssv, corr):
-        return ssv
-
-
-def estimate_error(observed, /):
-    mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
-    output_scale = mahalanobis_norm
-    error_estimate_unscaled = observed.marginal_stds()
-    return output_scale * error_estimate_unscaled
