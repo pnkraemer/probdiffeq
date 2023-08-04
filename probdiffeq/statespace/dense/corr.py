@@ -5,7 +5,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _corr, cubature
+from probdiffeq.statespace import corr, cubature
 from probdiffeq.statespace.dense import linearise_ode, variables
 
 
@@ -61,7 +61,7 @@ def statistical_order_one(
     )
 
 
-class _DenseODEConstraint(_corr.Correction):
+class _DenseODEConstraint(corr.Correction):
     def __init__(self, ode_shape, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1
@@ -101,7 +101,7 @@ class _DenseODEConstraint(_corr.Correction):
         return ssv
 
 
-class _DenseODEConstraintNoisy(_corr.Correction):
+class _DenseODEConstraintNoisy(corr.Correction):
     def __init__(self, ode_shape, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
         assert len(ode_shape) == 1

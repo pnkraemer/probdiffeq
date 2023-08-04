@@ -37,6 +37,7 @@ exclude_also = [
     # Debugging-only code should not be measured
     "def __repr__",
     # Interfaces should not be measured
+    "@abc.abstractmethod",
     "raise NotImplementedError",
     # Tree flattening/unflattening is not always called but important
     # once functions are jitted by the user

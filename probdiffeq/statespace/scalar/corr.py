@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _corr
+from probdiffeq.statespace import corr
 from probdiffeq.statespace.scalar import linearise_ode, variables
 
 
@@ -19,7 +19,7 @@ def taylor_order_zero(*, ode_order):
     )
 
 
-class _ODEConstraint(_corr.Correction):
+class _ODEConstraint(corr.Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
