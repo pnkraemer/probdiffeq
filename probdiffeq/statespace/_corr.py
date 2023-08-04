@@ -1,18 +1,9 @@
 """Correction-model API."""
 
 import abc
-from typing import Generic, Tuple, TypeVar
-
-from probdiffeq.statespace import variables
-
-S = TypeVar("S", bound=variables.SSV)
-"""A type-variable to alias appropriate state-space variable types."""
-
-C = TypeVar("C")
-"""A type-variable to alias correction-caches."""
 
 
-class Correction(Generic[S, C], abc.ABC):
+class Correction(abc.ABC):
     """Correction model interface."""
 
     def __init__(self, ode_order):
@@ -23,33 +14,13 @@ class Correction(Generic[S, C], abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def estimate_error(self, ssv: S, corr: C, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, ssv: S, corr: C, /, vector_field, t, p) -> Tuple[S, C]:
+    def complete(self, ssv, corr, /, vector_field, t, p):
         raise NotImplementedError
 
     @abc.abstractmethod
     def extract(self, ssv, corr, /):
         raise NotImplementedError
-
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    # todo: delete
-
-    def tree_flatten(self):
-        children = ()
-        aux = (self.ode_order,)
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, aux, _children):
-        (ode_order,) = aux
-        return cls(ode_order=ode_order)

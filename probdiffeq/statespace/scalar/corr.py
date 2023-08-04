@@ -5,6 +5,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util
 from probdiffeq.statespace import _corr
 from probdiffeq.statespace.scalar import linearise_ode, variables
 
@@ -80,3 +81,67 @@ for nodetype in [_ODEConstraint]:
         flatten_func=_constraint_flatten,
         unflatten_func=functools.partial(_constraint_unflatten, nodetype=nodetype),
     )
+
+
+def correct_affine_qoi_noisy(rv, affine, *, stdev):
+    # Read inputs
+    A, b = affine
+
+    # Apply observation model to covariance
+    cov_sqrtm = rv.cov_sqrtm_lower
+    cov_sqrtm_obs_nonsquare = jnp.dot(A, cov_sqrtm[0, ...])
+
+    # Revert the conditional covariances
+    cov_sqrtm_obs_upper, (
+        cov_sqrtm_cor_upper,
+        gain,
+    ) = _sqrt_util.revert_conditional(
+        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T,
+        R_X=rv.cov_sqrtm_lower.T,
+        R_YX=jnp.ones((1, 1)) * stdev,
+    )
+    cov_sqrtm_obs = cov_sqrtm_obs_upper.T
+    cov_sqrtm_cor = cov_sqrtm_cor_upper.T
+    gain = gain[:, 0]  # "squeeze"; output shape is (), not (1,)
+
+    # Gather the observed variable
+    mean_obs = jnp.dot(A, rv.mean[0, ...]) + b
+    observed = variables.NormalQOI(mean=mean_obs, cov_sqrtm_lower=cov_sqrtm_obs)
+
+    # Gather the corrected variable
+    mean_cor = rv.mean - gain * mean_obs
+    corrected = variables.NormalHiddenState(
+        mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor
+    )
+    return observed, (corrected, gain)
+
+
+def correct_affine_ode_2nd(rv, affine):
+    # Read inputs
+    A, b = affine
+
+    # Apply observation model to covariance
+    cov_sqrtm = rv.cov_sqrtm_lower
+    cov_sqrtm_obs_nonsquare = cov_sqrtm[2, ...] - jnp.dot(A, cov_sqrtm[0, ...])
+
+    # Revert the conditional covariances
+    cov_sqrtm_obs_upper, (
+        cov_sqrtm_cor_upper,
+        gain,
+    ) = _sqrt_util.revert_conditional_noisefree(
+        R_X_F=cov_sqrtm_obs_nonsquare[None, :].T, R_X=rv.cov_sqrtm_lower.T
+    )
+    cov_sqrtm_obs = cov_sqrtm_obs_upper.T
+    cov_sqrtm_cor = cov_sqrtm_cor_upper.T
+    gain = gain[:, 0]  # "squeeze"; output shape is (), not (1,)
+
+    # Gather the observed variable
+    mean_obs = rv.mean[2, ...] - jnp.dot(A, rv.mean[0, ...]) - b
+    observed = variables.NormalQOI(mean=mean_obs, cov_sqrtm_lower=cov_sqrtm_obs)
+
+    # Gather the corrected variable
+    mean_cor = rv.mean - gain * mean_obs
+    corrected = variables.NormalHiddenState(
+        mean=mean_cor, cov_sqrtm_lower=cov_sqrtm_cor
+    )
+    return observed, (corrected, gain)
