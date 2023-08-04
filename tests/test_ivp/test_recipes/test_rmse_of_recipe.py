@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
-from probdiffeq.statespace import recipes
+from probdiffeq.statespace import cubature, recipes
 
 
 @testing.fixture(name="problem")
@@ -47,6 +47,14 @@ def case_ts0_dense():
 @testing.case()
 def case_slr1_dense():
     return recipes.slr1_dense, 1.0
+
+
+@testing.case()
+def case_slr1_dense_gauss_hermite():
+    def recipe(**kwargs):
+        return recipes.slr1_dense(cubature_rule_fn=cubature.gauss_hermite, **kwargs)
+
+    return recipe, 1.0
 
 
 @testing.case()
