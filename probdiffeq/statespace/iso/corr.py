@@ -1,64 +1,82 @@
 """Corrections."""
+import functools
 
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
 from probdiffeq.statespace import _corr
-from probdiffeq.statespace.iso import variables
+from probdiffeq.statespace.iso import linearise_ode, variables
 
 
-def taylor_order_zero(*args, **kwargs):
-    return _IsoTaylorZerothOrder(*args, **kwargs)
+def taylor_order_zero(*, ode_order):
+    fun = linearise_ode.constraint_0th(ode_order=ode_order)
+    return _IsoODEConstraint(
+        ode_order=ode_order,
+        linearise_fun=fun,
+        string_repr=f"<TS0 with ode_order={ode_order}>",
+    )
 
 
-@jax.tree_util.register_pytree_node_class
-class _IsoTaylorZerothOrder(_corr.Correction):
+class _IsoODEConstraint(_corr.Correction):
+    def __init__(self, ode_order, linearise_fun, string_repr):
+        super().__init__(ode_order=ode_order)
+
+        self.linearise = linearise_fun
+        self.string_repr = string_repr
+
     def __repr__(self):
-        return f"<TS0 with ode_order={self.ode_order}>"
+        return self.string_repr
 
-    def init(self, x, /):
-        bias_like = jnp.empty_like(x.hidden_state.mean[0, :])
+    def init(self, ssv, /):
+        bias_like = jnp.empty_like(ssv.hidden_state.mean[0, :])
         chol_like = jnp.empty(())
         obs_like = variables.IsoNormalQOI(bias_like, chol_like)
-        return x, obs_like
+        return ssv, obs_like
 
-    def estimate_error(self, x: variables.IsoSSV, c, /, vector_field, t, p):
-        m = x.hidden_state.mean
-        m0, m1 = m[: self.ode_order, ...], m[self.ode_order, ...]
-        bias = m1 - vector_field(*m0, t=t, p=p)
-        cov_sqrtm_lower = x.hidden_state.cov_sqrtm_lower[self.ode_order, ...]
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
+        def f_wrapped(s):
+            return vector_field(*s, t=t, p=p)
 
-        l_obs_nonscalar = _sqrt_util.triu_via_qr(cov_sqrtm_lower[:, None])
-        l_obs = jnp.reshape(l_obs_nonscalar, ())
-        obs = variables.IsoNormalQOI(bias, l_obs)
+        A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
+        observed = variables.marginalise_deterministic_qoi(ssv.hidden_state, (A, b))
 
-        mahalanobis_norm = obs.mahalanobis_norm(jnp.zeros_like(m1))
-        output_scale = mahalanobis_norm / jnp.sqrt(bias.size)
+        error_estimate = _estimate_error(observed)
+        return error_estimate, observed, (A, b)
 
-        error_estimate_unscaled = obs.marginal_std() * jnp.ones_like(bias)
-        error_estimate = error_estimate_unscaled * output_scale
-        cache = (bias,)
-        return error_estimate, obs, cache
+    def complete(self, ssv, corr, /, vector_field, t, p):
+        A, b = corr
+        obs, (cor, _gn) = variables.revert_deterministic_qoi(ssv.hidden_state, (A, b))
 
-    def complete(self, x: variables.IsoSSV, co, /, vector_field, t, p):
-        (bias,) = co
+        u = cor.mean[0, :]
+        ssv = variables.IsoSSV(u, cor)
+        return ssv, obs
 
-        m_ext = x.hidden_state.mean
-        l_ext = x.hidden_state.cov_sqrtm_lower
-        l_obs = l_ext[self.ode_order, ...]
+    def extract(self, ssv, corr, /):
+        return ssv
 
-        l_obs_nonscalar = _sqrt_util.triu_via_qr(l_obs[:, None])
-        l_obs_scalar = jnp.reshape(l_obs_nonscalar, ())
 
-        observed = variables.IsoNormalQOI(mean=bias, cov_sqrtm_lower=l_obs_scalar)
+def _estimate_error(obs, /):
+    mahalanobis_norm = obs.mahalanobis_norm(jnp.zeros_like(obs.mean))
+    output_scale = mahalanobis_norm / jnp.sqrt(obs.mean.size)
 
-        g = (l_ext @ l_obs.T) / l_obs_scalar  # shape (n,)
-        m_cor = m_ext - g[:, None] * bias[None, :] / l_obs_scalar
-        l_cor = l_ext - g[:, None] * l_obs[None, :] / l_obs_scalar
-        corrected = variables.IsoNormalHiddenState(mean=m_cor, cov_sqrtm_lower=l_cor)
-        ssv = variables.IsoSSV(m_cor[0, :], corrected)
-        return ssv, observed
+    error_estimate_unscaled = obs.marginal_std() * jnp.ones_like(obs.mean)
+    return error_estimate_unscaled * output_scale
 
-    def extract(self, x, c, /):
-        return x
+
+def _constraint_flatten(node):
+    children = ()
+    aux = node.ode_order, node.linearise, node.string_repr
+    return children, aux
+
+
+def _constraint_unflatten(aux, _children, *, nodetype):
+    ode_order, lin, string_repr = aux
+    return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
+
+
+for nodetype in [_IsoODEConstraint]:
+    jax.tree_util.register_pytree_node(
+        nodetype=nodetype,
+        flatten_func=_constraint_flatten,
+        unflatten_func=functools.partial(_constraint_unflatten, nodetype=nodetype),
+    )
