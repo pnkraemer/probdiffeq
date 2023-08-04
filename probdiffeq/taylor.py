@@ -182,7 +182,7 @@ def _runge_kutta_starter_fn(
 
     # Initialise
     ode_shape = initial_values[0].shape
-    factory = extra.ibm_iso_factory(num_derivatives=num)
+    factory = extra.ibm_factory(num_derivatives=num)
     extrapolation = factory.fixedpoint()
 
     solution = variables.unit_markov_sequence(num_derivatives=num, ode_shape=ode_shape)
