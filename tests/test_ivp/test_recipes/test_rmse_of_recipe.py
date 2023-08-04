@@ -30,11 +30,6 @@ def case_ts0_iso():
 
 
 @testing.case()
-def case_slr1_blockdiag():
-    return recipes.slr1_blockdiag, jnp.ones((2,))
-
-
-@testing.case()
 def case_ts0_blockdiag():
     return recipes.ts0_blockdiag, jnp.ones((2,))
 

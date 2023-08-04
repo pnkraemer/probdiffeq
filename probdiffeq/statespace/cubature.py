@@ -1,7 +1,5 @@
 """Cubature rules."""
 
-from typing import Any, Callable
-
 import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
@@ -14,39 +12,6 @@ class PositiveCubatureRule(containers.NamedTuple):
 
     points: jax.Array
     weights_sqrtm: jax.Array
-
-
-CubatureFactory = Callable[[Any], PositiveCubatureRule]
-"""Signature for the methods compatible with transformations à la `blockdiag()`."""
-
-
-def blockdiag(cubature_fn: CubatureFactory) -> CubatureFactory:
-    """Turn a cubature-factory into a blockdiagonal-cubature-factory.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-    # Todo: is this what _we want_?
-    #  It is what we had so far, but how does the complexity of this mess
-    #  scale with the dimensionality of the problem?
-    #  It would be more efficient if S would not depend on the dimension anymore.
-    #  Currently it does. If we simply stacked 'd' 1-dimensional rules
-    #  on top of each other, the complexity reduces
-    #  (but the solver seems to suffer a lot...)
-
-    def fn(input_shape, **kwargs):
-        instance = cubature_fn(input_shape=input_shape, **kwargs)
-
-        d, *_ = input_shape
-        points = instance.points.T  # (d, S)
-        weights_sqrtm = jnp.stack(d * [instance.weights_sqrtm])  # (d, S)
-        return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
-
-    return fn
 
 
 def third_order_spherical(input_shape) -> PositiveCubatureRule:

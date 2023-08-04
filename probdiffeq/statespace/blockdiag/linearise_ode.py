@@ -1,6 +1,6 @@
 """ODE linearisation."""
 
-from probdiffeq.statespace.dense import linearise
+from probdiffeq.statespace.blockdiag import linearise
 
 
 def constraint_0th(*, ode_order):

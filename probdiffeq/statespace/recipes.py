@@ -47,27 +47,6 @@ def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
     )
 
 
-def slr1_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    """First-order statistical linear regression in state-space models \
-     with a block-diagonal structure.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-    corr = bd_corr.statistical_order_one(ode_shape=ode_shape, ode_order=ode_order)
-    extra_factory = bd_extra.ibm_blockdiag_factory(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
-    calibration_factory = bd_calib.output_scale(ode_shape=ode_shape)
-    return _Impl(
-        corr=corr, extra_factory=extra_factory, calibration_factory=calibration_factory
-    )
-
-
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     corr = bd_corr.taylor_order_zero(ode_shape=ode_shape, ode_order=ode_order)
     extra_factory = bd_extra.ibm_blockdiag_factory(

@@ -5,14 +5,10 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import _corr, cubature
+from probdiffeq.statespace import _corr
 from probdiffeq.statespace.blockdiag import linearise_ode, variables
 from probdiffeq.statespace.scalar import corr as scalar_corr
 from probdiffeq.statespace.scalar import variables as scalar_variables
-
-# todo: implementing blockdiags via vmap is a bit awkward to maintain.
-#  maybe change to verbose implementation and use vmap only in implementation functions
-#  (i.e. don't depend on scalar... but this is a bit too big of a refactor for now)
 
 
 def taylor_order_zero(*, ode_shape, ode_order):
@@ -22,22 +18,6 @@ def taylor_order_zero(*, ode_shape, ode_order):
         ode_order=ode_order,
         linearise_fun=fun,
         string_repr=f"<TS0 with ode_order={ode_order}>",
-    )
-
-
-def statistical_order_one(
-    ode_shape,
-    ode_order,
-    cubature_rule_fn=cubature.third_order_spherical,
-):
-    linearise_fun = linearise_ode.constraint_statistical_1st(
-        ode_shape=ode_shape, cubature_fun=cubature_rule_fn
-    )
-    return _DenseODEConstraintNoisy(
-        ode_shape=ode_shape,
-        ode_order=ode_order,
-        linearise_fun=linearise_fun,
-        string_repr=f"<SLR1 with ode_order={ode_order}>",
     )
 
 
@@ -67,7 +47,7 @@ class _BlockDiagODEConstraint(_corr.Correction):
 
         observed = variables.marginalise_deterministic(ssv.hidden_state, (A, b))
 
-        error_estimate = _error_estimate(observed)
+        error_estimate = _estimate_error(observed)
         return error_estimate, observed, (A, b)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
@@ -83,119 +63,8 @@ class _BlockDiagODEConstraint(_corr.Correction):
         return ssv
 
 
-def _error_estimate(observed, /):
+def _estimate_error(observed, /):
     return jax.vmap(scalar_corr.estimate_error)(observed)
-
-
-#
-# def statistical_order_one(ode_shape, ode_order):
-#     cubature_fn = cubature.blockdiag(cubature.third_order_spherical)
-#     cubature_rule = cubature_fn(input_shape=ode_shape)
-#     return _BlockDiagStatisticalFirstOrder(
-#         ode_shape=ode_shape, ode_order=ode_order, cubature_rule=cubature_rule
-#     )
-# #
-#
-# @jax.tree_util.register_pytree_node_class
-# class _BlockDiagStatisticalFirstOrder(_corr.Correction):
-#     """First-order statistical linear regression in state-space models \
-#      with block-diagonal covariance structure.
-#
-#     !!! warning "Warning: highly EXPERIMENTAL feature!"
-#         This feature is highly experimental.
-#         There is no guarantee that it works correctly.
-#         It might be deleted tomorrow
-#         and without any deprecation policy.
-#
-#     """
-#
-#     def __init__(self, ode_shape, ode_order, cubature_rule):
-#         if ode_order > 1:
-#             raise ValueError
-#
-#         super().__init__(ode_order=ode_order)
-#         self.ode_shape = ode_shape
-#
-#         self._mm = scalar_corr.StatisticalFirstOrder(
-#             ode_order=ode_order, cubature_rule=cubature_rule
-#         )
-#
-#     @property
-#     def cubature_rule(self):
-#         return self._mm.cubature_rule
-#
-#     def tree_flatten(self):
-#         # todo: should this call super().tree_flatten()?
-#         children = (self.cubature_rule,)
-#         aux = self.ode_order, self.ode_shape
-#         return children, aux
-#
-#     @classmethod
-#     def tree_unflatten(cls, aux, children):
-#         (cubature_rule,) = children
-#         ode_order, ode_shape = aux
-#         return cls(
-#             ode_order=ode_order, ode_shape=ode_shape, cubature_rule=cubature_rule
-#         )
-#
-#     def init(self, ssv, /):
-#         return jax.vmap(type(self._mm).init)(self._mm, ssv)
-#
-#     def extract(self, ssv, corr, /):
-#         return ssv
-#
-#     def estimate_error(self, ssv, corr, /, vector_field, t, p):
-#         # Vmap relevant functions
-#         vmap_f = jax.vmap(jax.tree_util.Partial(vector_field, t=t, p=p))
-#         cache = (vmap_f,)
-#
-#         # Evaluate vector field at sigma-points
-#         sigma_points_fn = jax.vmap(type(self._mm).transform_sigma_points)
-#         sigma_points, _, _ = sigma_points_fn(self._mm, ssv.hidden_state)
-#
-#         fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
-#         center_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.center)
-#         fx_mean, _, fx_centered_normed = center_fn(self._mm, fx)
-#
-#         # Compute output scale and error estimate
-#         calibrate_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.calibrate)
-#         error_estimate, output_scale, marginals = calibrate_fn(
-#             self._mm, fx_mean, fx_centered_normed, ssv.hidden_state
-#         )
-#         return output_scale * error_estimate, marginals, cache
-#
-#     def complete(self, ssv, corr, /, vector_field, t, p):
-#         (vmap_f,) = corr
-#
-#         H, noise = self.linearize(ssv, vmap_f)
-#
-#         compl_fn = scalar_corr.StatisticalFirstOrder.complete_post_linearize
-#         fn = jax.vmap(compl_fn)
-#         return fn(self._mm, H, ssv.hidden_state, noise)
-#
-#     def linearize(self, ssv, vmap_f):
-#         # Transform the sigma-points
-#         sigma_points_fn = jax.vmap(type(self._mm).transform_sigma_points)
-#         sigma_points, _, sigma_points_centered_normed = sigma_points_fn(
-#             self._mm, ssv.hidden_state
-#         )
-#
-#         # Evaluate the vector field at the sigma-points
-#         fx = vmap_f(sigma_points.T).T  # (d, S).T = (S, d) -> (S, d) -> transpose again
-#         center_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.center)
-#         fx_mean, _, fx_centered_normed = center_fn(self._mm, fx)
-#
-#         # Complete the linearization
-#         lin_fn = jax.vmap(scalar_corr.StatisticalFirstOrder.linearization_matrices)
-#         return lin_fn(
-#             self._mm,
-#             fx_centered_normed,
-#             fx_mean,
-#             sigma_points_centered_normed,
-#             ssv.hidden_state,
-#         )
-#
-#
 
 
 def _constraint_flatten(node):
