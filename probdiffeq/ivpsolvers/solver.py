@@ -44,5 +44,5 @@ class Solver(abc.ABC, Generic[T]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def right_corner(self, s0: T, s1: T) -> _interp.InterpRes[T]:
+    def no_interpolate(self, s0: T, s1: T) -> _interp.InterpRes[T]:
         raise NotImplementedError

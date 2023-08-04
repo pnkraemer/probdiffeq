@@ -67,8 +67,8 @@ class UncalibratedSolver(solver_module.Solver[_common.State]):
         acc = self._interp_make_state(acc_p, reference=s1)
         return _interp.InterpRes(accepted=acc, solution=sol, previous=prev)
 
-    def right_corner(self, state_at_t0, state_at_t1) -> _interp.InterpRes:
-        acc_p, sol_p, prev_p = self.strategy.case_right_corner(state_at_t1.strategy)
+    def no_interpolate(self, state_at_t0, state_at_t1) -> _interp.InterpRes:
+        acc_p, sol_p, prev_p = self.strategy.case_no_interpolate(state_at_t1.strategy)
 
         prev = self._interp_make_state(prev_p, reference=state_at_t0)
         sol = self._interp_make_state(sol_p, reference=state_at_t1)

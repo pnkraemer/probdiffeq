@@ -17,7 +17,7 @@ def smoother(extrapolation_factory, corr, calib, /):
         is_suitable_for_save_at=False,
         string_repr=f"<Smoother with {extrapolation_repr}, {corr}>",
         # Right-corner: use default
-        impl_right_corner="default",
+        impl_no_interpolate="default",
         # Interpolate like a smoother:
         impl_interpolate=_smoother_interpolate,
         impl_offgrid_marginals=_smoother_offgrid_marginals,
@@ -38,7 +38,7 @@ def smoother_fixedpoint(extrapolation_factory, corr, calib, /):
         impl_offgrid_marginals=None,
         # Interpolate like a fixedpoint-smoother
         impl_interpolate=_fixedpoint_interpolate,
-        impl_right_corner=_fixedpoint_right_corner,
+        impl_no_interpolate=_fixedpoint_no_interpolate,
     )
     return strategy_impl, calib
 
@@ -107,7 +107,7 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
 
-def _fixedpoint_right_corner(state_at_t1, *, extrapolation):
+def _fixedpoint_no_interpolate(state_at_t1, *, extrapolation):
     # See case_interpolate() for detailed explanation of why this works.
     # Todo: this prepares _future_ steps, so shouldn't it happen
     #  at initialisation instead of at completion?

@@ -22,7 +22,7 @@ def solve_and_save_at(
     while_loop_fn,
     interpolate,
 ):
-    interpolate_fun, right_corner_fun = interpolate
+    interpolate_fun, no_interpolate_fun = interpolate
 
     def advance(acc_prev_ctrl, t_next):
         # Advance until accepted.t >= t_next.
@@ -40,7 +40,7 @@ def solve_and_save_at(
         accepted, solution, previous = jax.lax.cond(
             accepted.t > t_next,
             interpolate_fun,
-            lambda _, *a: right_corner_fun(*a),
+            lambda _, *a: no_interpolate_fun(*a),
             t_next,
             previous,
             accepted,
@@ -112,7 +112,7 @@ def _solution_generator(
     interpolate,
 ):
     """Generate a probabilistic IVP solution iteratively."""
-    interpolate_fun, right_corner_fun = interpolate
+    interpolate_fun, no_interpolate_fun = interpolate
 
     accepted, control = adaptive_solver.init(
         t, posterior, output_scale, num_steps, dt0=dt0
@@ -132,7 +132,7 @@ def _solution_generator(
         accepted, solution, previous = interpolate_fun(s1=accepted, s0=previous, t=t1)
     else:
         assert accepted.t == t1
-        accepted, solution, previous = right_corner_fun(previous, accepted)
+        accepted, solution, previous = no_interpolate_fun(previous, accepted)
 
     sol_solver, _sol_control = adaptive_solver.extract(solution, control)
     yield sol_solver

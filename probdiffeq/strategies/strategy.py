@@ -23,7 +23,7 @@ class Strategy(Generic[P]):
         string_repr,
         is_suitable_for_save_at,
         impl_interpolate,
-        impl_right_corner,  # use "default" for default-behaviour
+        impl_no_interpolate,  # use "default" for default-behaviour
         impl_offgrid_marginals,  # use None if not available
     ):
         # Content
@@ -36,7 +36,7 @@ class Strategy(Generic[P]):
 
         # Implementations of functionality that varies
         self.impl_interpolate = impl_interpolate
-        self.impl_right_corner = impl_right_corner
+        self.impl_no_interpolate = impl_no_interpolate
         self.impl_offgrid_marginals = impl_offgrid_marginals
 
     def __repr__(self):
@@ -72,10 +72,12 @@ class Strategy(Generic[P]):
         sol = self.extrapolation.extract(ssv, state.extra)
         return state.t, sol
 
-    def case_right_corner(self, state_at_t1: _common.State) -> _interp.InterpRes:
+    def case_no_interpolate(self, state_at_t1: _common.State) -> _interp.InterpRes:
         # If specific choice is provided, use that.
-        if self.impl_right_corner != "default":
-            return self.impl_right_corner(state_at_t1, extrapolation=self.extrapolation)
+        if self.impl_no_interpolate != "default":
+            return self.impl_no_interpolate(
+                state_at_t1, extrapolation=self.extrapolation
+            )
 
         # Otherwise, apply default behaviour.
         s1 = state_at_t1
@@ -119,7 +121,7 @@ class Strategy(Generic[P]):
             self.is_suitable_for_save_at,
             # Implementations
             self.impl_interpolate,
-            self.impl_right_corner,
+            self.impl_no_interpolate,
             self.impl_offgrid_marginals,
         )
         return children, aux
@@ -127,13 +129,13 @@ class Strategy(Generic[P]):
     @classmethod
     def tree_unflatten(cls, aux, children):
         (corr,) = children
-        extra, string, suitable, interp, right_corner, offgrid = aux
+        extra, string, suitable, interp, no_interpolate, offgrid = aux
         return cls(
             extrapolation=extra,
             correction=corr,
             string_repr=string,
             is_suitable_for_save_at=suitable,
             impl_interpolate=interp,
-            impl_right_corner=right_corner,
+            impl_no_interpolate=no_interpolate,
             impl_offgrid_marginals=offgrid,
         )
