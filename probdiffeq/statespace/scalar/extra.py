@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
 from probdiffeq.statespace import _ibm_util, extra
-from probdiffeq.statespace.scalar import variables
+from probdiffeq.statespace.backend import backend
 
 
 def ibm_discretise_fwd(
@@ -42,8 +42,8 @@ def ibm_transitions_precon(dt, /, num_derivatives, output_scale):
 
 
 def extrapolate_precon_with_reversal(
-    rv: variables.NormalHiddenState,
-    conditional: variables.ConditionalHiddenState,
+    rv,
+    conditional,
     preconditioner: Tuple[jax.Array, jax.Array],
 ):
     """Extrapolate and compute smoothing gains in a preconditioned model.
@@ -86,8 +86,8 @@ def extrapolate_precon_with_reversal(
 
 
 def extrapolate_precon(
-    rv: variables.NormalHiddenState,
-    conditional: variables.ConditionalHiddenState,
+    rv,
+    conditional,
     preconditioner: Tuple[jax.Array, jax.Array],
 ):
     # Read quantities
@@ -161,10 +161,9 @@ class _IBMFi(extra.Extrapolation):
         return self.a.shape[0] - 1
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
-        return variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
+        return backend.ssm_util.stack_tcoeffs(tcoeffs, self.num_derivatives)
 
-    def init(self, sol: variables.NormalHiddenState, /):
+    def init(self, sol, /):
         return variables.SSV(sol.mean[0], sol), None
 
     def extract(self, ssv, extra, /):

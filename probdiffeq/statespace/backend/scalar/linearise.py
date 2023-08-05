@@ -1,7 +1,7 @@
-from probdiffeq.statespace.backend import linearise
+from probdiffeq.statespace.backend import _linearise
 
 
-class LineariseODEBackEnd(linearise.LineariseODEBackEnd):
+class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
     def constraint_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             fx = ts0(fun, mean[:ode_order])

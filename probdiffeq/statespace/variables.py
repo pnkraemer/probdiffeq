@@ -2,7 +2,11 @@
 
 from typing import Tuple
 
+import jax
 
+
+#
+#
 class Normal:
     """Normal-distributed random variables.
 
@@ -28,29 +32,32 @@ class Normal:
         mean, cov_sqrtm_lower = children
         return cls(mean=mean, cov_sqrtm_lower=cov_sqrtm_lower)
 
-    def logpdf(self, u, /):
-        raise NotImplementedError
 
-    def transform_unit_sample(self, x, /):
-        raise NotImplementedError
+#
+#     def logpdf(self, u, /):
+#         raise NotImplementedError
+#
+#     def transform_unit_sample(self, x, /):
+#         raise NotImplementedError
+#
+#     def scale_covariance(self, output_scale):
+#         raise NotImplementedError
+#
+#     def mahalanobis_norm(self, u, /):
+#         raise NotImplementedError
+#
+#     @property
+#     def sample_shape(self) -> Tuple[int]:
+#         return self.mean.shape
+#
+#     def extract_qoi_from_sample(self, u, /):
+#         raise NotImplementedError
+#
+#     def marginal_nth_derivative(self, n):
+#         raise NotImplementedError
 
-    def scale_covariance(self, output_scale):
-        raise NotImplementedError
 
-    def mahalanobis_norm(self, u, /):
-        raise NotImplementedError
-
-    @property
-    def sample_shape(self) -> Tuple[int]:
-        return self.mean.shape
-
-    def extract_qoi_from_sample(self, u, /):
-        raise NotImplementedError
-
-    def marginal_nth_derivative(self, n):
-        raise NotImplementedError
-
-
+@jax.tree_util.register_pytree_node_class
 class SSV:
     """State-space variables.
 
@@ -97,6 +104,7 @@ class SSV:
         raise NotImplementedError
 
 
+#
 class Conditional:
     """Conditional distribution interface.
 
@@ -121,11 +129,13 @@ class Conditional:
         transition, noise = children
         return cls(transition=transition, noise=noise)
 
-    def __call__(self, x, /):
-        raise NotImplementedError
 
-    def scale_covariance(self, output_scale):
-        raise NotImplementedError
-
-    def marginalise(self, rv, /):
-        raise NotImplementedError
+#
+#     def __call__(self, x, /):
+#         raise NotImplementedError
+#
+#     def scale_covariance(self, output_scale):
+#         raise NotImplementedError
+#
+#     def marginalise(self, rv, /):
+#         raise NotImplementedError

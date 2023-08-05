@@ -1,12 +1,12 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace.backend import cond
+from probdiffeq.statespace.backend import _cond
 from probdiffeq.statespace.backend.scalar import random
 
 
-class ConditionalBackEnd(cond.ConditionalBackEnd):
-    def marginalise_transformation(self, x: random.Normal, transformation, /):
+class ConditionalBackEnd(_cond.ConditionalBackEnd):
+    def marginalise_transformation(self, x, transformation, /):
         A, b = transformation
         mean, cov_sqrtm_lower = x.mean, x.cov_sqrtm_lower
 

@@ -3,7 +3,7 @@ from typing import Any
 import jax.numpy as jnp
 
 from probdiffeq.backend import containers
-from probdiffeq.statespace.backend import random
+from probdiffeq.statespace.backend import _random
 
 
 class Normal(containers.NamedTuple):
@@ -11,7 +11,7 @@ class Normal(containers.NamedTuple):
     cholesky: Any
 
 
-class RandomVariableBackEnd(random.RandomVariableBackEnd):
+class RandomVariableBackEnd(_random.RandomVariableBackEnd):
     def qoi_like(self):
         mean = jnp.empty(())
         cholesky = jnp.empty(())
