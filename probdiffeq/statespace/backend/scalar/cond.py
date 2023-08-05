@@ -37,6 +37,9 @@ class TransformImpl(_cond.ConditionalImpl):
         observed = random.Normal(A(rv.mean) + b, cov_sqrtm_lower_obs)
         return observed, (corrected, gain)
 
+    def merge(self, cond1, cond2, /):
+        raise NotImplementedError
+
 
 class ConditionalImpl(_cond.ConditionalImpl):
     def marginalise(self, rv, conditional, /):
@@ -66,6 +69,18 @@ class ConditionalImpl(_cond.ConditionalImpl):
     def apply(self, x, conditional, /):
         a, noise = conditional
         return random.Normal(a @ x + noise.mean, noise.cholesky)
+
+    def merge(self, previous, incoming, /):
+        A, b = previous
+        C, d = incoming
+
+        g = A @ C
+        xi = A @ d.mean + b.mean
+        R_stack = ((A @ d.cholesky).T, b.cholesky.T)
+        Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+        noise = random.Normal(xi, Xi)
+        return g, noise
 
 
 class ConditionalBackEnd(_cond.ConditionalBackEnd):

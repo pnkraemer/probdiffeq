@@ -14,6 +14,10 @@ class ConditionalImpl(abc.ABC):
     def apply(self, x, conditional, /):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def merge(self, cond1, cond2, /):
+        raise NotImplementedError
+
 
 class ConditionalBackEnd(abc.ABC):
     @property

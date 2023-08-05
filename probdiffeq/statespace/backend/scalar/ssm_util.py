@@ -46,3 +46,8 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         cov_sqrtm = jnp.zeros((ndim, ndim))
         noise = random.Normal(mean, cov_sqrtm)
         return transition, noise
+
+    def standard_normal(self, ndim, output_scale):
+        mean = jnp.zeros((ndim,))
+        cholesky = output_scale * jnp.eye(ndim)
+        return random.Normal(mean, cholesky)
