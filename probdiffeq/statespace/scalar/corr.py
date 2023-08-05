@@ -44,9 +44,9 @@ class _ODEConstraint(corr.Correction):
             return vector_field(*s, t=t, p=p)
 
         A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
-        observed = backend.rv.marginalise_deterministic_qoi(ssv.hidden_state, (A, b))
+        observed = backend.cond.marginalise_transformation(ssv.hidden_state, (A, b))
 
-        error_estimate = backend.error.estimate_error(observed)
+        error_estimate = backend.error.estimate(observed)
         return error_estimate, observed, (A, b)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
