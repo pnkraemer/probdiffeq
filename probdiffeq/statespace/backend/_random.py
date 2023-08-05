@@ -21,3 +21,7 @@ class RandomVariableBackEnd(abc.ABC):
     @abc.abstractmethod
     def qoi(self, rv):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def rescale_cholesky(self, rv, factor, /):
+        raise NotImplementedError

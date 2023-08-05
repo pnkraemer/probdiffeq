@@ -178,26 +178,39 @@ class _IBMFi(extra.Extrapolation):
         rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
 
         m_ext_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.cond.conditional(m_ext_p, cond)
+        extrapolated_p = backend.cond.conditional.apply(m_ext_p, cond)
 
         extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
         qoi = backend.random.qoi(extrapolated)
         ssv = variables.SSV(qoi, extrapolated)
-        cache = (p, p_inv, extrapolated)
+        cache = (cond, (p, p_inv), rv_p)
         return ssv, cache
 
     def complete(self, ssv, extra, /, output_scale):
-        p, p_inv, l0 = extra
-        m_ext = ssv.hidden_state.mean
-        l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
-            R_stack=(
-                (self.a @ (p_inv[:, None] * l0)).T,
-                (output_scale * self.q_sqrtm_lower).T,
-            )
-        ).T
-        l_ext = p[:, None] * l_ext_p
+        cond, (p, p_inv), rv_p = extra
 
-        rv = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
+        # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
+        A, noise = cond
+        noise = backend.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p = backend.cond.conditional.marginalise(rv_p, (A, noise))
+        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+
+        # Gather and return
+        u = backend.random.qoi(extrapolated)
+        ssv = variables.SSV(u, extrapolated)
+        return ssv, None
+
+        #
+        # m_ext = ssv.hidden_state.mean
+        # l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
+        #     R_stack=(
+        #         (self.a @ (p_inv[:, None] * l0)).T,
+        #         (output_scale * self.q_sqrtm_lower).T,
+        #     )
+        # ).T
+        # l_ext = p[:, None] * l_ext_p
+        #
+        # rv = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
         ssv = variables.SSV(m_ext[0], rv)
         return ssv, None
 

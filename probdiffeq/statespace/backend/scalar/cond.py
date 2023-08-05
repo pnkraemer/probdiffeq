@@ -5,31 +5,62 @@ from probdiffeq.statespace.backend import _cond
 from probdiffeq.statespace.backend.scalar import random
 
 
-class ConditionalBackEnd(_cond.ConditionalBackEnd):
-    def marginalise_transformation(self, x, transformation, /):
+class TransformImpl(_cond.ConditionalImpl):
+    def apply(self, x, conditional, /):
+        raise NotImplementedError
+
+    def marginalise(self, rv, transformation, /):
+        # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
         A, b = transformation
-        mean, cov_sqrtm_lower = x.mean, x.cov_sqrtm_lower
+        cholesky_new = _sqrt_util.triu_via_qr(A(rv.cholesky)[:, None])
+        cholesky_new_squeezed = jnp.reshape(cholesky_new, ())
+        return random.Normal(A(rv.mean) + b, cholesky_new_squeezed)
 
-        cov_sqrtm_lower_new = _sqrt_util.triu_via_qr(A(cov_sqrtm_lower)[:, None])
-        cov_sqrtm_lower_squeezed = jnp.reshape(cov_sqrtm_lower_new, ())
-        return random.Normal(A(mean) + b, cov_sqrtm_lower_squeezed)
+    def revert(self, rv, transformation, /):
+        # Assumes that A maps a vector to a scalar...
 
-    def revert_transformation(self, rv, transformation, /):
         # Extract information
         A, b = transformation
-        mean, cov_sqrtm_lower = rv.mean, rv.cov_sqrtm_lower
 
         # QR-decomposition
-        # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
+        # (todo: rename revert_conditional_noisefree to transformation_revert_cov_sqrt())
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
-            R_X_F=A(cov_sqrtm_lower)[:, None], R_X=cov_sqrtm_lower.T
+            R_X_F=A(rv.cholesky)[:, None], R_X=rv.cholesky.T
         )
         cov_sqrtm_lower_obs = jnp.reshape(r_obs, ())
         cov_sqrtm_lower_cor = r_cor.T
         gain = jnp.squeeze(gain, axis=-1)
 
         # Gather terms and return
-        m_cor = mean - gain * (A(mean) + b)
+        m_cor = rv.mean - gain * (A(rv.mean) + b)
         corrected = random.Normal(m_cor, cov_sqrtm_lower_cor)
-        observed = random.Normal(A(mean) + b, cov_sqrtm_lower_obs)
+        observed = random.Normal(A(rv.mean) + b, cov_sqrtm_lower_obs)
         return observed, (corrected, gain)
+
+
+class ConditionalImpl(_cond.ConditionalImpl):
+    def marginalise(self, rv, conditional, /):
+        A, noise = conditional
+
+        mean = A @ rv.mean
+        cholesky_T = _sqrt_util.sum_of_sqrtm_factors(
+            R_stack=((A @ rv.cholesky).T, noise.cholesky.T)
+        )
+        return random.Normal(mean, cholesky_T.T)
+
+    def revert(self, rv, conditional, /):
+        raise NotImplementedError
+
+    def apply(self, x, conditional, /):
+        a, noise = conditional
+        return random.Normal(a @ x + noise.mean, noise.cholesky)
+
+
+class ConditionalBackEnd(_cond.ConditionalBackEnd):
+    @property
+    def conditional(self) -> ConditionalImpl:
+        return ConditionalImpl()
+
+    @property
+    def transform(self) -> ConditionalImpl:
+        return TransformImpl()

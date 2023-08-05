@@ -29,3 +29,6 @@ class RandomVariableBackEnd(_random.RandomVariableBackEnd):
 
     def mean(self, rv):
         return rv.mean
+
+    def rescale_cholesky(self, rv, factor):
+        return Normal(rv.mean, factor * rv.cholesky)

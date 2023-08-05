@@ -18,9 +18,7 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         return random.Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
-        mean = random.mean(rv)
-        cholesky = random.cholesky(rv)
-        return random.Normal(p * mean, p[:, None] * cholesky)
+        return random.Normal(p * rv.mean, p[:, None] * rv.cholesky)
 
     def ibm_transitions(self, num_derivatives, output_scale):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
