@@ -11,7 +11,7 @@ from probdiffeq.statespace.backend import (
 
 class BackEnd:
     def __init__(self):
-        self._fact: factorisations.Factorisation = None
+        self._fact: factorisation.Factorisation = None
 
     def select(self, which, **kwargs):
         self._fact = factorisations.choose(which, **kwargs)

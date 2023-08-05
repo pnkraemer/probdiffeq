@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
-from probdiffeq.statespace import _ibm_util, extra
+from probdiffeq.statespace import _ibm_util, extra, variables
 from probdiffeq.statespace.backend import backend
 
 
@@ -115,10 +115,13 @@ def extrapolate_precon(
 
 
 def ibm_factory(num_derivatives, output_scale=1.0):
-    a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
-    precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
-
-    return _ScalarExtrapolationFactory(args=(a, q_sqrtm, precon))
+    discretise = backend.ssm_util.ibm_transitions(num_derivatives, output_scale)
+    return _ScalarExtrapolationFactory(args=(discretise, num_derivatives))
+    #
+    # a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
+    # precon = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+    #
+    # return _ScalarExtrapolationFactory(args=(a, q_sqrtm, precon))
 
 
 class _ScalarExtrapolationFactory(extra.ExtrapolationFactory):
@@ -147,37 +150,41 @@ jax.tree_util.register_pytree_node(
 
 
 class _IBMFi(extra.Extrapolation):
-    def __init__(self, a, q_sqrtm_lower, preconditioner):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-        self.preconditioner = preconditioner
+    def __init__(self, discretise, num_derivatives):
+        self.discretise = discretise
+        self.num_derivatives = num_derivatives
 
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"
 
-    @property
-    def num_derivatives(self):
-        return self.a.shape[0] - 1
-
     def solution_from_tcoeffs(self, tcoeffs, /):
-        return backend.ssm_util.stack_tcoeffs(tcoeffs, self.num_derivatives)
+        return backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
 
     def init(self, sol, /):
+        u = backend.random.qoi(sol)
+
         return variables.SSV(sol.mean[0], sol), None
 
     def extract(self, ssv, extra, /):
         return ssv.hidden_state
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self.preconditioner(dt=dt)
-        m0_p = p_inv * ssv.hidden_state.mean
-        l0 = ssv.hidden_state.cov_sqrtm_lower
-        m_ext_p = self.a @ m0_p
-        m_ext = p * m_ext_p
-        q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
-        return variables.SSV(m_ext[0], extrapolated), (p, p_inv, l0)
+        cond, (p, p_inv) = self.discretise(dt)
+        # p, p_inv = self.preconditioner(dt=dt)
+        # todo: IBM is a function that returns (A, (q, Q)), (p, pinv) = discretise(dt)
+
+        rv = ssv.hidden_state
+        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+
+        m_ext_p = backend.random.mean(rv_p)
+        extrapolated_p = backend.cond.conditional(m_ext_p, cond)
+
+        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        qoi = backend.random.qoi(extrapolated)
+        ssv = variables.SSV(qoi, extrapolated)
+        cache = (p, p_inv, extrapolated)
+        return ssv, cache
 
     def complete(self, ssv, extra, /, output_scale):
         p, p_inv, l0 = extra

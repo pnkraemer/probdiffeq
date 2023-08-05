@@ -1,9 +1,5 @@
 import abc
 
-import probdiffeq.statespace.backend.scalar.cond
-import probdiffeq.statespace.backend.scalar.linearise
-import probdiffeq.statespace.backend.scalar.random
-import probdiffeq.statespace.backend.scalar.ssm_util
 from probdiffeq.statespace.backend import _cond, _linearise, _random, _ssm_util
 
 
@@ -25,21 +21,17 @@ class Factorisation(abc.ABC):
         raise NotImplementedError
 
 
-class ScalarFactorisation(Factorisation):
-    def linearise_ode(self):
-        return probdiffeq.statespace.backend.scalar.linearise.LineariseODEBackEnd()
-
-    def random(self):
-        return probdiffeq.statespace.backend.scalar.random.RandomVariableBackEnd()
-
-    def cond(self):
-        return probdiffeq.statespace.backend.scalar.cond.ConditionalBackEnd()
-
-    def ssm_util(self):
-        return probdiffeq.statespace.backend.scalar.ssm_util.SSMUtilBackEnd()
-
-
-def choose(which, /, **kwargs) -> Factorisation:
+def choose(which, /):
     if which == "scalar":
-        return ScalarFactorisation(**kwargs)
+        # Import outside toplevel.
+        # Why?
+        # 1. To avoid cyclic imports
+        # 2. To avoid import errors if some backends require additional dependencies
+        # 3. To keep the import-namespace clean
+        #    (factorisations.ScalarFactorisation is easier to read than
+        #     probdiffeq.statespace.backend.scalar.factorisations.ScalarFactorisation())
+        from probdiffeq.statespace.backend.scalar import factorisations
+
+        return factorisations.ScalarFactorisation()
+
     raise ValueError
