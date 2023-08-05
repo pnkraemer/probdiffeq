@@ -71,7 +71,11 @@ def simulate_terminal_values(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        posterior = backend.random.rescale_cholesky(posterior, output_scale)
+
+        if isinstance(posterior, _markov.MarkovSeqRev):
+            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        else:
+            posterior = backend.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):

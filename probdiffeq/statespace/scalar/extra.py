@@ -171,8 +171,6 @@ class _IBMFi(extra.Extrapolation):
 
     def begin(self, ssv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
-        # p, p_inv = self.preconditioner(dt=dt)
-        # todo: IBM is a function that returns (A, (q, Q)), (p, pinv) = discretise(dt)
 
         rv = ssv.hidden_state
         rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
@@ -200,43 +198,27 @@ class _IBMFi(extra.Extrapolation):
         ssv = variables.SSV(u, extrapolated)
         return ssv, None
 
-        #
-        # m_ext = ssv.hidden_state.mean
-        # l_ext_p = _sqrt_util.sum_of_sqrtm_factors(
-        #     R_stack=(
-        #         (self.a @ (p_inv[:, None] * l0)).T,
-        #         (output_scale * self.q_sqrtm_lower).T,
-        #     )
-        # ).T
-        # l_ext = p[:, None] * l_ext_p
-        #
-        # rv = variables.NormalHiddenState(mean=m_ext, cov_sqrtm_lower=l_ext)
-        ssv = variables.SSV(m_ext[0], rv)
-        return ssv, None
-
 
 class _IBMSm(extra.Extrapolation):
-    def __init__(self, a, q_sqrtm_lower, preconditioner):
-        self.a = a
-        self.q_sqrtm_lower = q_sqrtm_lower
-        self.preconditioner = preconditioner
+    def __init__(self, discretise, num_derivatives):
+        self.discretise = discretise
+        self.num_derivatives = num_derivatives
 
     def __repr__(self):
         args2 = f"num_derivatives={self.num_derivatives}"
         return f"<IBM with {args2}>"
 
-    @property
-    def num_derivatives(self):
-        return self.a.shape[0] - 1
-
     def solution_from_tcoeffs(self, tcoeffs, /):
-        m0, c_sqrtm0 = _stack_tcoeffs(tcoeffs, num_derivatives=self.num_derivatives)
-        rv = variables.NormalHiddenState(mean=m0, cov_sqrtm_lower=c_sqrtm0)
-        cond = variables.identity_conditional(ndim=len(tcoeffs))
+        rv = backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        cond = backend.ssm_util.identity_conditional(ndim=len(tcoeffs))
         return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def init(self, sol: _markov.MarkovSeqRev, /):
-        ssv = variables.SSV(sol.init.mean[0], sol.init)
+        hidden_state = sol.init
+
+        # it is always this function -- remove u from SSV (and remove SSV altogether?)
+        u = backend.random.qoi(hidden_state)
+        ssv = variables.SSV(u, hidden_state)
         extra = sol.conditional
         return ssv, extra
 
@@ -244,18 +226,35 @@ class _IBMSm(extra.Extrapolation):
         return _markov.MarkovSeqRev(init=ssv.hidden_state, conditional=extra)
 
     def begin(self, ssv, extra, /, dt):
-        p, p_inv = self.preconditioner(dt=dt)
-        m0_p = p_inv * ssv.hidden_state.mean
-        l0 = ssv.hidden_state.cov_sqrtm_lower
-        m_ext_p = self.a @ m0_p
-        m_ext = p * m_ext_p
-        q_sqrtm = p[:, None] * self.q_sqrtm_lower
-        extrapolated = variables.NormalHiddenState(m_ext, q_sqrtm)
-        ssv = variables.SSV(m_ext[0], extrapolated)
-        cache = (extra, m_ext_p, m0_p, p, p_inv, l0)
+        cond, (p, p_inv) = self.discretise(dt)
+
+        rv = ssv.hidden_state
+        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+
+        m_ext_p = backend.random.mean(rv_p)
+        extrapolated_p = backend.cond.conditional.apply(m_ext_p, cond)
+
+        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        qoi = backend.random.qoi(extrapolated)
+        ssv = variables.SSV(qoi, extrapolated)
+        cache = (cond, (p, p_inv), rv_p)
         return ssv, cache
 
     def complete(self, ssv, extra, /, output_scale):
+        cond, (p, p_inv), rv_p = extra
+
+        # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
+        A, noise = cond
+        noise = backend.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = backend.cond.conditional.revert(rv_p, (A, noise))
+        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        cond = backend.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+
+        # Gather and return
+        u = backend.random.qoi(extrapolated)
+        ssv = variables.SSV(u, extrapolated)
+        return ssv, cond
+
         _, m_ext_p, m0_p, p, p_inv, l0 = extra
         m_ext = ssv.hidden_state.mean
 

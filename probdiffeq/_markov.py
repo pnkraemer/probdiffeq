@@ -63,6 +63,16 @@ class MarkovSeqPreconRev(Generic[S]):
         return cls(init=init, conditional=conditional, preconditioner=preconditioner)
 
 
+from probdiffeq.statespace.backend import backend
+
+
+def rescale_cholesky(markov_seq, factor):
+    init = backend.random.rescale_cholesky(markov_seq.init, factor)
+    A, noise = markov_seq.conditional
+    noise = backend.random.rescale_cholesky(noise, factor)
+    return MarkovSeqRev(init=init, conditional=(A, noise))
+
+
 @jax.tree_util.register_pytree_node_class
 class MarkovSeqRev(Generic[S]):
     """Markov sequence. A discretised Markov process."""

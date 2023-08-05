@@ -20,6 +20,12 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
     def preconditioner_apply(self, rv, p, /):
         return random.Normal(p * rv.mean, p[:, None] * rv.cholesky)
 
+    def preconditioner_apply_cond(self, cond, p, p_inv, /):
+        A, noise = cond
+        A = p[:, None] * A * p_inv[None, :]
+        noise = random.Normal(p * noise.mean, p[:, None] * noise.cholesky)
+        return A, noise
+
     def ibm_transitions(self, num_derivatives, output_scale):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
         q0 = jnp.zeros((num_derivatives + 1,))
@@ -32,3 +38,11 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
             return (a, noise), (p, p_inv)
 
         return discretise
+
+    def identity_conditional(self, ndim):
+        transition = jnp.eye(ndim)
+
+        mean = jnp.zeros((ndim,))
+        cov_sqrtm = jnp.zeros((ndim, ndim))
+        noise = random.Normal(mean, cov_sqrtm)
+        return transition, noise

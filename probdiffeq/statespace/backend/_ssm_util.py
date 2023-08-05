@@ -13,5 +13,13 @@ class SSMUtilBackEnd(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def preconditioner_apply_cond(self, cond, p, p_inv, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def ibm_transitions(self, num_derivatives, output_scale):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def identity_conditional(self, ndim):
         raise NotImplementedError

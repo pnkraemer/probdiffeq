@@ -49,7 +49,19 @@ class ConditionalImpl(_cond.ConditionalImpl):
         return random.Normal(mean, cholesky_T.T)
 
     def revert(self, rv, conditional, /):
-        raise NotImplementedError
+        a, noise = conditional
+
+        r_ext, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
+            R_X_F=(a @ rv.cholesky).T,
+            R_X=rv.cholesky.T,
+            R_YX=(noise.cholesky).T,
+        )
+        m_ext = a @ rv.mean + noise.mean
+        m_cond = rv.mean - g_bw_p @ m_ext
+
+        marginal = random.Normal(m_ext, r_ext.T)
+        noise = random.Normal(m_cond, r_bw_p.T)
+        return marginal, (g_bw_p, noise)
 
     def apply(self, x, conditional, /):
         a, noise = conditional
