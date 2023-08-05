@@ -7,14 +7,17 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace import corr
-from probdiffeq.statespace.scalar import linearise_ode, variables
+from probdiffeq.statespace.backend import backend
+
+# from probdiffeq.statespace.scalar import linearise_ode, variables
 
 
 def taylor_order_zero(*, ode_order):
-    fun = linearise_ode.constraint_0th(ode_order=ode_order)
+    backend.select("scalar")
+    # fun = linearise_ode.constraint_0th(ode_order=ode_order)
     return _ODEConstraint(
         ode_order=ode_order,
-        linearise_fun=fun,
+        linearise_fun=backend.linearise_ode.constraint_0th(ode_order=ode_order),
         string_repr=f"<TS0 with ode_order={ode_order}>",
     )
 
@@ -30,9 +33,10 @@ class _ODEConstraint(corr.Correction):
         return self.string_repr
 
     def init(self, ssv, /):
-        bias_like = jnp.empty(())
-        chol_like = jnp.empty(())
-        obs_like = variables.NormalQOI(bias_like, chol_like)
+        obs_like = backend.rv.qoi_like()
+        # bias_like = jnp.empty(())
+        # chol_like = jnp.empty(())
+        # obs_like = variables.NormalQOI(bias_like, chol_like)
         return ssv, obs_like
 
     def estimate_error(self, ssv, corr, /, vector_field, t, p):
@@ -40,17 +44,16 @@ class _ODEConstraint(corr.Correction):
             return vector_field(*s, t=t, p=p)
 
         A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
-        observed = variables.marginalise_deterministic_qoi(ssv.hidden_state, (A, b))
+        observed = backend.rv.marginalise_deterministic_qoi(ssv.hidden_state, (A, b))
 
-        error_estimate = estimate_error(observed)
+        error_estimate = backend.error.estimate_error(observed)
         return error_estimate, observed, (A, b)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         A, b = corr
-        obs, (cor, _gn) = variables.revert_deterministic_qoi(ssv.hidden_state, (A, b))
-        print(cor.mean.shape)
+        obs, (cor, _gn) = backend.rv.revert_deterministic_qoi(ssv.hidden_state, (A, b))
         u = cor.mean[0]
-        ssv = variables.SSV(u, cor)
+        ssv = backend.ssv.SSV(u, cor)
         return ssv, obs
 
     def extract(self, ssv, corr, /):
