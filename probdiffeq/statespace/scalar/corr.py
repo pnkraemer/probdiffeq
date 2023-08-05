@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import corr
+from probdiffeq.statespace import corr, variables
 from probdiffeq.statespace.backend import backend
 
 # from probdiffeq.statespace.scalar import linearise_ode, variables
@@ -33,10 +33,7 @@ class _ODEConstraint(corr.Correction):
         return self.string_repr
 
     def init(self, ssv, /):
-        obs_like = backend.rv.qoi_like()
-        # bias_like = jnp.empty(())
-        # chol_like = jnp.empty(())
-        # obs_like = variables.NormalQOI(bias_like, chol_like)
+        obs_like = backend.random.qoi_like()
         return ssv, obs_like
 
     def estimate_error(self, ssv, corr, /, vector_field, t, p):
@@ -46,14 +43,14 @@ class _ODEConstraint(corr.Correction):
         A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
         observed = backend.cond.marginalise_transformation(ssv.hidden_state, (A, b))
 
-        error_estimate = backend.error.estimate(observed)
+        error_estimate = estimate_error(observed)
         return error_estimate, observed, (A, b)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         A, b = corr
-        obs, (cor, _gn) = backend.rv.revert_deterministic_qoi(ssv.hidden_state, (A, b))
-        u = cor.mean[0]
-        ssv = backend.ssv.SSV(u, cor)
+        obs, (cor, _gn) = backend.cond.revert_transformation(ssv.hidden_state, (A, b))
+        u = backend.random.qoi(cor)
+        ssv = variables.SSV(u, cor)
         return ssv, obs
 
     def extract(self, ssv, corr, /):
@@ -61,9 +58,9 @@ class _ODEConstraint(corr.Correction):
 
 
 def estimate_error(observed, /):
-    mahalanobis_norm = observed.mahalanobis_norm(jnp.zeros(()))
-    output_scale = mahalanobis_norm
-    error_estimate_unscaled = observed.marginal_stds()
+    zero_data = jnp.zeros_like(backend.random.mean(observed))
+    output_scale = backend.random.mahalanobis_norm(zero_data, rv=observed)
+    error_estimate_unscaled = backend.random.standard_deviation(observed)
     return output_scale * error_estimate_unscaled
 
 

@@ -1,10 +1,9 @@
 import abc
 
 import probdiffeq.statespace.backend.scalar.cond
-import probdiffeq.statespace.backend.scalar.error
 import probdiffeq.statespace.backend.scalar.linearise
-import probdiffeq.statespace.backend.scalar.rv
-from probdiffeq.statespace.backend import cond, linearise, rv
+import probdiffeq.statespace.backend.scalar.random
+from probdiffeq.statespace.backend import cond, linearise, random
 
 
 class Factorisation(abc.ABC):
@@ -15,7 +14,7 @@ class Factorisation(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def rv(self) -> rv.RandomVariableBackEnd:
+    def random(self) -> random.RandomVariableBackEnd:
         raise NotImplementedError
 
     @property
@@ -30,19 +29,15 @@ class ScalarFactorisation(Factorisation):
         return probdiffeq.statespace.backend.scalar.linearise.LineariseODEBackEnd()
 
     @property
-    def rv(self):
-        return probdiffeq.statespace.backend.scalar.rv.RandomVariableBackEnd()
+    def random(self):
+        return probdiffeq.statespace.backend.scalar.random.RandomVariableBackEnd()
 
     @property
     def cond(self):
         return probdiffeq.statespace.backend.scalar.cond.ConditionalBackEnd()
 
-    @property
-    def error(self):
-        return probdiffeq.statespace.backend.scalar.error.ErrorBackEnd()
 
-
-def choose(which, /) -> Factorisation:
+def choose(which, /, **kwargs) -> Factorisation:
     if which == "scalar":
-        return ScalarFactorisation()
+        return ScalarFactorisation(**kwargs)
     raise ValueError

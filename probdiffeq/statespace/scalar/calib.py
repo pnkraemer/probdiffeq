@@ -4,6 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.statespace import calib
+from probdiffeq.statespace.backend import backend
 
 
 def output_scale():
@@ -16,8 +17,8 @@ class ScalarMostRecent(calib.Calibration):
         return prior
 
     def update(self, _state, /, observed):
-        zero_data = jnp.zeros_like(observed.mean)
-        mahalanobis_norm = observed.mahalanobis_norm(zero_data)
+        zero_data = jnp.zeros_like(random.mean(observed))
+        mahalanobis_norm = random.mahalanobis_norm(zero_data, observed)
         calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
         return calibrated
 
