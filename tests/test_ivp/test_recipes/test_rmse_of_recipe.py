@@ -36,7 +36,6 @@ def case_ts0_blockdiag():
 
 @testing.case()
 def case_ts1_dense():
-    backend.select("dense", ode_shape=(2,))
     return recipes.ts1_dense, 1.0
 
 

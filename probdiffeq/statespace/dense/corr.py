@@ -9,26 +9,6 @@ from probdiffeq.statespace import corr, cubature
 from probdiffeq.statespace.dense import linearise_ode, variables
 
 
-def taylor_order_zero(*, ode_shape, ode_order):
-    fun = linearise_ode.constraint_0th(ode_order=ode_order, ode_shape=ode_shape)
-    return _DenseODEConstraint(
-        ode_shape=ode_shape,
-        ode_order=ode_order,
-        linearise_fun=fun,
-        string_repr=f"<TS0 with ode_order={ode_order}>",
-    )
-
-
-def taylor_order_one(*, ode_shape, ode_order):
-    fun = linearise_ode.constraint_1st(ode_order=ode_order, ode_shape=ode_shape)
-    return _DenseODEConstraint(
-        ode_shape=ode_shape,
-        ode_order=ode_order,
-        linearise_fun=fun,
-        string_repr=f"<TS1 with ode_order={ode_order}>",
-    )
-
-
 def statistical_order_zero(
     ode_shape,
     ode_order,
@@ -59,46 +39,6 @@ def statistical_order_one(
         linearise_fun=linearise_fun,
         string_repr=f"<SLR1 with ode_order={ode_order}>",
     )
-
-
-class _DenseODEConstraint(corr.Correction):
-    def __init__(self, ode_shape, ode_order, linearise_fun, string_repr):
-        super().__init__(ode_order=ode_order)
-        assert len(ode_shape) == 1
-        self.ode_shape = ode_shape
-
-        self.linearise = linearise_fun
-        self.string_repr = string_repr
-
-    def __repr__(self):
-        return self.string_repr
-
-    def init(self, ssv, /):
-        m_like = jnp.zeros(self.ode_shape)
-        chol_like = jnp.zeros(self.ode_shape + self.ode_shape)
-        obs_like = variables.DenseNormal(m_like, chol_like, target_shape=None)
-        return ssv, obs_like
-
-    def estimate_error(self, ssv: variables.DenseSSV, corr, /, vector_field, t, p):
-        def f_wrapped(s):
-            return vector_field(*s, t=t, p=p)
-
-        A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
-        observed = variables.marginalise_deterministic(ssv.hidden_state, (A, b))
-
-        error_estimate = _estimate_error(observed)
-        return error_estimate, observed, (A, b)
-
-    def complete(self, ssv, corr, /, vector_field, t, p):
-        A, b = corr
-        observed, (cor, _gn) = variables.revert_deterministic(ssv.hidden_state, (A, b))
-
-        u = jnp.reshape(cor.mean, ssv.target_shape, order="F")[0, :]
-        ssv = variables.DenseSSV(u, cor, target_shape=ssv.target_shape)
-        return ssv, observed
-
-    def extract(self, ssv, corr, /):
-        return ssv
 
 
 class _DenseODEConstraintNoisy(corr.Correction):
@@ -166,7 +106,7 @@ def _constraint_unflatten(aux, _children, *, nodetype):
     )
 
 
-for nodetype in [_DenseODEConstraint, _DenseODEConstraintNoisy]:
+for nodetype in [_DenseODEConstraintNoisy]:
     jax.tree_util.register_pytree_node(
         nodetype=nodetype,
         flatten_func=_constraint_flatten,

@@ -83,6 +83,14 @@ def taylor_order_zero(*, ode_order) -> ODEConstraint:
     )
 
 
+def taylor_order_one(*, ode_order) -> ODEConstraint:
+    return ODEConstraint(
+        ode_order=ode_order,
+        linearise_fun=statespace.linearise_ode.constraint_1st(ode_order=ode_order),
+        string_repr=f"<TS0 with ode_order={ode_order}>",
+    )
+
+
 def _constraint_flatten(node):
     children = ()
     aux = node.ode_order, node.linearise, node.string_repr
