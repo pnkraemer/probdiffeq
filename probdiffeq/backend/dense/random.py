@@ -1,5 +1,6 @@
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import _random, containers
@@ -15,7 +16,11 @@ class RandomVariableBackEnd(_random.RandomVariableBackEnd):
         self.ode_shape = ode_shape
 
     def mahalanobis_norm(self, u, /, rv):
-        raise NotImplementedError
+        residual_white = jax.scipy.linalg.solve_triangular(
+            rv.cholesky.T, u - rv.mean, lower=False, trans="T"
+        )
+        mahalanobis = jnp.linalg.qr(residual_white[:, None], mode="r")
+        return jnp.reshape(jnp.abs(mahalanobis), ())
 
     def mean(self, rv):
         return rv.mean
@@ -31,7 +36,12 @@ class RandomVariableBackEnd(_random.RandomVariableBackEnd):
         return Normal(mean, cholesky)
 
     def rescale_cholesky(self, rv, factor, /):
-        raise NotImplementedError
+        cholesky = factor[..., None, None] * rv.cholesky
+        return Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        raise NotImplementedError
+        def std(x):
+            std_mat = jnp.linalg.qr(x[..., None], mode="r")
+            return jnp.reshape(std_mat, ())
+
+        return jax.vmap(std)(rv.cholesky)

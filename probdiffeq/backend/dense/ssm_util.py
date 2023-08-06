@@ -55,8 +55,6 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         return random.Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
-        print("P", jax.tree_util.tree_map(jnp.shape, p))
-        print("RV", jax.tree_util.tree_map(jnp.shape, rv))
         mean = p * rv.mean
         cholesky = p[:, None] * rv.cholesky
         return random.Normal(mean, cholesky)
@@ -68,4 +66,4 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         raise NotImplementedError
 
     def update_mean(self, mean, x, /, num):
-        raise NotImplementedError
+        return _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
