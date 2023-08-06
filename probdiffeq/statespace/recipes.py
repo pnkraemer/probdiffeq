@@ -16,7 +16,8 @@ import probdiffeq.statespace.iso.calib
 import probdiffeq.statespace.iso.corr
 import probdiffeq.statespace.iso.extra
 
-import probdiffeq.statespace.scalar.calib
+#
+# import probdiffeq.statespace.scalar.calib
 import probdiffeq.statespace.scalar.corr
 import probdiffeq.statespace.scalar.extra
 
@@ -43,7 +44,7 @@ def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
     correction = probdiffeq.statespace.iso.corr.taylor_order_zero(ode_order=ode_order)
     ibm = probdiffeq.statespace.iso.extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = probdiffeq.statespace.iso.calib.output_scale()
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
@@ -54,7 +55,7 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     ibm = probdiffeq.statespace.blockdiag.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration = probdiffeq.statespace.blockdiag.calib.output_scale(ode_shape)
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
@@ -65,7 +66,7 @@ def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
@@ -76,7 +77,7 @@ def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
@@ -93,7 +94,7 @@ def slr1_dense(
     ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
@@ -120,7 +121,7 @@ def slr0_dense(
     ibm = probdiffeq.statespace.dense.extra.ibm_factory(
         ode_shape=ode_shape, num_derivatives=num_derivatives
     )
-    calibration = probdiffeq.statespace.dense.calib.output_scale()
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
 
@@ -133,5 +134,5 @@ def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
     ibm = probdiffeq.statespace.scalar.extra.ibm_factory(
         num_derivatives=num_derivatives
     )
-    calibration = probdiffeq.statespace.scalar.calib.output_scale()
+    calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
