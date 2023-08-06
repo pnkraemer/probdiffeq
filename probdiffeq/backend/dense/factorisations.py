@@ -1,8 +1,8 @@
-from probdiffeq.statespace.backend import factorisations
-from probdiffeq.statespace.backend.dense import cond, linearise, random, ssm_util
+from probdiffeq.backend import _factorisations
+from probdiffeq.backend.dense import cond, linearise, random, ssm_util
 
 
-class DenseFactorisation(factorisations.Factorisation):
+class DenseFactorisation(_factorisations.Factorisation):
     def __init__(self, ode_shape, order="F"):
         self.ode_shape = ode_shape
         self.order = order

@@ -8,8 +8,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _adaptive, _collocate, _markov, taylor
-from probdiffeq.backend import tree_array_util
-from probdiffeq.statespace.backend import backend
+from probdiffeq.backend import statespace, tree_array_util
 
 
 def simulate_terminal_values(
@@ -75,14 +74,14 @@ def simulate_terminal_values(
         if isinstance(posterior, _markov.MarkovSeqRev):
             posterior = _markov.rescale_cholesky(posterior, output_scale)
         else:
-            posterior = backend.random.rescale_cholesky(posterior, output_scale)
+            posterior = statespace.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, _markov.MarkovSeqRev):
         marginals = posterior.init
     else:
         marginals = posterior
-    u = backend.random.qoi(marginals)
+    u = statespace.random.qoi(marginals)
     # u = marginals.extract_qoi_from_sample(marginals.mean)
     return Solution(
         t=t1,

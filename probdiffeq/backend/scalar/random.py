@@ -2,8 +2,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from probdiffeq.backend import containers
-from probdiffeq.statespace.backend import _random
+from probdiffeq.backend import _random, containers
 
 
 class Normal(containers.NamedTuple):

@@ -1,20 +1,14 @@
 """State-space model backend."""
 
-from probdiffeq.statespace.backend import (
-    _cond,
-    _linearise,
-    _random,
-    _ssm_util,
-    factorisations,
-)
+from probdiffeq.backend import _cond, _factorisations, _linearise, _random, _ssm_util
 
 
 class BackEnd:
     def __init__(self):
-        self._fact: factorisation.Factorisation = None
+        self._fact: _factorisations.Factorisation = None
 
     def select(self, which, **kwargs):
-        self._fact = factorisations.choose(which, **kwargs)
+        self._fact = _factorisations.choose(which, **kwargs)
 
     @property
     def linearise_ode(self) -> _linearise.LineariseODEBackEnd:

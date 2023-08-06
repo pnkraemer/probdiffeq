@@ -1,8 +1,8 @@
-from probdiffeq.statespace.backend import factorisations
-from probdiffeq.statespace.backend.scalar import cond, linearise, random, ssm_util
+from probdiffeq.backend import _factorisations
+from probdiffeq.backend.scalar import cond, linearise, random, ssm_util
 
 
-class ScalarFactorisation(factorisations.Factorisation):
+class ScalarFactorisation(_factorisations.Factorisation):
     def linearise_ode(self):
         return linearise.LineariseODEBackEnd()
 

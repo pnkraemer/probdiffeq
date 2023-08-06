@@ -5,8 +5,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov, _sqrt_util
+from probdiffeq.backend import statespace
 from probdiffeq.statespace import _ibm_util, extra, variables
-from probdiffeq.statespace.backend import backend
 
 
 def ibm_discretise_fwd(
@@ -16,8 +16,8 @@ def ibm_discretise_fwd(
 
     Initialises with a scaled standard normal distribution.
     """
-    init = backend.ssm_util.standard_normal(num_derivatives + 1, output_scale)
-    discretise = backend.ssm_util.ibm_transitions(num_derivatives, output_scale)
+    init = statespace.ssm_util.standard_normal(num_derivatives + 1, output_scale)
+    discretise = statespace.ssm_util.ibm_transitions(num_derivatives, output_scale)
     cond, precon = jax.vmap(discretise)(dts)
     # transitions_vmap = jax.vmap(ibm_transitions_precon, in_axes=(0, None, None))
     # cond, precon = transitions_vmap(dts, num_derivatives, output_scale)
@@ -116,7 +116,7 @@ def extrapolate_precon(
 
 
 def ibm_factory(num_derivatives, output_scale=1.0):
-    discretise = backend.ssm_util.ibm_transitions(num_derivatives, output_scale)
+    discretise = statespace.ssm_util.ibm_transitions(num_derivatives, output_scale)
     return _ScalarExtrapolationFactory(args=(discretise, num_derivatives))
     #
     # a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
@@ -160,10 +160,10 @@ class _IBMFi(extra.Extrapolation):
         return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        return backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        return statespace.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
 
     def init(self, sol, /):
-        u = backend.random.qoi(sol)
+        u = statespace.random.qoi(sol)
 
         return variables.SSV(sol.mean[0], sol), None
 
@@ -174,13 +174,13 @@ class _IBMFi(extra.Extrapolation):
         cond, (p, p_inv) = self.discretise(dt)
 
         rv = ssv.hidden_state
-        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.cond.conditional.apply(m_ext_p, cond)
+        m_ext_p = statespace.random.mean(rv_p)
+        extrapolated_p = statespace.cond.conditional.apply(m_ext_p, cond)
 
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        qoi = backend.random.qoi(extrapolated)
+        extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
+        qoi = statespace.random.qoi(extrapolated)
         ssv = variables.SSV(qoi, extrapolated)
         cache = (cond, (p, p_inv), rv_p)
         return ssv, cache
@@ -190,12 +190,12 @@ class _IBMFi(extra.Extrapolation):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = backend.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p = backend.cond.conditional.marginalise(rv_p, (A, noise))
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        noise = statespace.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p = statespace.cond.conditional.marginalise(rv_p, (A, noise))
+        extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
 
         # Gather and return
-        u = backend.random.qoi(extrapolated)
+        u = statespace.random.qoi(extrapolated)
         ssv = variables.SSV(u, extrapolated)
         return ssv, None
 
@@ -210,15 +210,15 @@ class _IBMSm(extra.Extrapolation):
         return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        rv = backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
-        cond = backend.ssm_util.identity_conditional(ndim=len(tcoeffs))
+        rv = statespace.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        cond = statespace.ssm_util.identity_conditional(ndim=len(tcoeffs))
         return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def init(self, sol: _markov.MarkovSeqRev, /):
         hidden_state = sol.init
 
         # it is always this function -- remove u from SSV (and remove SSV altogether?)
-        u = backend.random.qoi(hidden_state)
+        u = statespace.random.qoi(hidden_state)
         ssv = variables.SSV(u, hidden_state)
         extra = sol.conditional
         return ssv, extra
@@ -230,13 +230,13 @@ class _IBMSm(extra.Extrapolation):
         cond, (p, p_inv) = self.discretise(dt)
 
         rv = ssv.hidden_state
-        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.cond.conditional.apply(m_ext_p, cond)
+        m_ext_p = statespace.random.mean(rv_p)
+        extrapolated_p = statespace.cond.conditional.apply(m_ext_p, cond)
 
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        qoi = backend.random.qoi(extrapolated)
+        extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
+        qoi = statespace.random.qoi(extrapolated)
         ssv = variables.SSV(qoi, extrapolated)
         cache = (cond, (p, p_inv), rv_p)
         return ssv, cache
@@ -246,13 +246,13 @@ class _IBMSm(extra.Extrapolation):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = backend.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = backend.cond.conditional.revert(rv_p, (A, noise))
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        cond = backend.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+        noise = statespace.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = statespace.cond.conditional.revert(rv_p, (A, noise))
+        extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
+        cond = statespace.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
 
         # Gather and return
-        u = backend.random.qoi(extrapolated)
+        u = statespace.random.qoi(extrapolated)
         ssv = variables.SSV(u, extrapolated)
         return ssv, cond
 
@@ -267,15 +267,15 @@ class _IBMFp(extra.Extrapolation):
         return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        rv = backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
-        cond = backend.ssm_util.identity_conditional(ndim=len(tcoeffs))
+        rv = statespace.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        cond = statespace.ssm_util.identity_conditional(ndim=len(tcoeffs))
         return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def init(self, sol: _markov.MarkovSeqRev, /):
         hidden_state = sol.init
 
         # it is always this function -- remove u from SSV (and remove SSV altogether?)
-        u = backend.random.qoi(hidden_state)
+        u = statespace.random.qoi(hidden_state)
         ssv = variables.SSV(u, hidden_state)
         extra = sol.conditional
         return ssv, extra
@@ -287,13 +287,13 @@ class _IBMFp(extra.Extrapolation):
         cond, (p, p_inv) = self.discretise(dt)
 
         rv = ssv.hidden_state
-        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.cond.conditional.apply(m_ext_p, cond)
+        m_ext_p = statespace.random.mean(rv_p)
+        extrapolated_p = statespace.cond.conditional.apply(m_ext_p, cond)
 
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        qoi = backend.random.qoi(extrapolated)
+        extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
+        qoi = statespace.random.qoi(extrapolated)
         ssv = variables.SSV(qoi, extrapolated)
         cache = (cond, (p, p_inv), rv_p, extra)
         return ssv, cache
@@ -303,16 +303,16 @@ class _IBMFp(extra.Extrapolation):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = backend.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = backend.cond.conditional.revert(rv_p, (A, noise))
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        cond = backend.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+        noise = statespace.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = statespace.cond.conditional.revert(rv_p, (A, noise))
+        extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
+        cond = statespace.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
 
         # Merge conditionals
-        cond = backend.cond.conditional.merge(bw0, cond)
+        cond = statespace.cond.conditional.merge(bw0, cond)
 
         # Gather and return
-        u = backend.random.qoi(extrapolated)
+        u = statespace.random.qoi(extrapolated)
         ssv = variables.SSV(u, extrapolated)
         return ssv, cond
 
@@ -321,7 +321,7 @@ class _IBMFp(extra.Extrapolation):
         return ssv, bw_model
 
     def reset(self, ssv, _extra, /):
-        cond = backend.ssm_util.identity_conditional(ndim=self.num_derivatives + 1)
+        cond = statespace.ssm_util.identity_conditional(ndim=self.num_derivatives + 1)
         return ssv, cond
 
 

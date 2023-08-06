@@ -1,5 +1,5 @@
 """State-space model recipes."""
-from probdiffeq.backend import containers
+from probdiffeq.backend import containers, statespace
 from probdiffeq.statespace import calib, corr, cubature, extra
 
 # isort: off
@@ -125,6 +125,8 @@ def slr0_dense(
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
+    statespace.select("scalar")
+
     correction = probdiffeq.statespace.scalar.corr.taylor_order_zero(
         ode_order=ode_order
     )

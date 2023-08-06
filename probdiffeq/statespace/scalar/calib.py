@@ -3,8 +3,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
+from probdiffeq.backend import statespace
 from probdiffeq.statespace import calib
-from probdiffeq.statespace.backend import backend
 
 
 def output_scale():
@@ -17,8 +17,8 @@ class ScalarMostRecent(calib.Calibration):
         return prior
 
     def update(self, _state, /, observed):
-        zero_data = jnp.zeros_like(backend.random.mean(observed))
-        mahalanobis_norm = backend.random.mahalanobis_norm(zero_data, observed)
+        zero_data = jnp.zeros_like(statespace.random.mean(observed))
+        mahalanobis_norm = statespace.random.mahalanobis_norm(zero_data, observed)
         calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
         return calibrated
 
@@ -33,8 +33,8 @@ class ScalarRunningMean(calib.Calibration):
     def update(self, state, /, observed):
         prior, calibrated, num_data = state
 
-        zero_data = jnp.zeros_like(backend.random.mean(observed))
-        mahalanobis_norm = backend.random.mahalanobis_norm(zero_data, observed)
+        zero_data = jnp.zeros_like(statespace.random.mean(observed))
+        mahalanobis_norm = statespace.random.mahalanobis_norm(zero_data, observed)
         new_term = mahalanobis_norm / jnp.sqrt(zero_data.size)
 
         calibrated = _update_running_mean(calibrated, new_term, num=num_data)

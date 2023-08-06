@@ -1,9 +1,9 @@
 """SSM utilities."""
 import jax.numpy as jnp
 
+from probdiffeq.backend import _ssm_util
+from probdiffeq.backend.scalar import random
 from probdiffeq.statespace import _ibm_util
-from probdiffeq.statespace.backend import _ssm_util
-from probdiffeq.statespace.backend.scalar import random
 
 
 class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):

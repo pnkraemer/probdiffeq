@@ -1,4 +1,3 @@
-"""Backend functionality.
+from probdiffeq.backend import _statespace_backend
 
-This includes, for example, utility functions or dependency-wrappers.
-"""
+statespace = _statespace_backend.BackEnd()

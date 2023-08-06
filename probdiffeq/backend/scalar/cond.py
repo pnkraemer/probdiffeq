@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace.backend import _cond
-from probdiffeq.statespace.backend.scalar import random
+from probdiffeq.backend import _cond
+from probdiffeq.backend.scalar import random
 
 
 class TransformImpl(_cond.ConditionalImpl):

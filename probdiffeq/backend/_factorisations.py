@@ -1,6 +1,6 @@
 import abc
 
-from probdiffeq.statespace.backend import _cond, _linearise, _random, _ssm_util
+from probdiffeq.backend import _cond, _linearise, _random, _ssm_util
 
 
 class Factorisation(abc.ABC):
@@ -28,14 +28,14 @@ def choose(which, /, **kwargs):
         # 1. To avoid cyclic imports
         # 2. To avoid import errors if some backends require additional dependencies
         # 3. To keep the import-namespace clean
-        #    (factorisations.ScalarFactorisation is easier to read than
-        #     probdiffeq.statespace.backend.scalar.factorisations.ScalarFactorisation())
-        from probdiffeq.statespace.backend.scalar import factorisations
+        #    (_factorisations.ScalarFactorisation is easier to read than
+        #     probdiffeq.backend.scalar._factorisations.ScalarFactorisation())
+        from probdiffeq.backend.scalar import factorisations
 
         return factorisations.ScalarFactorisation()
     if which == "dense":
-        from probdiffeq.statespace.backend.dense import factorisations
+        from probdiffeq.backend.dense import factorisations
 
         return factorisations.DenseFactorisation(**kwargs)
-        return
+
     raise ValueError
