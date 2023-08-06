@@ -21,7 +21,7 @@ class Factorisation(abc.ABC):
         raise NotImplementedError
 
 
-def choose(which, /):
+def choose(which, /, **kwargs):
     if which == "scalar":
         # Import outside toplevel.
         # Why?
@@ -33,5 +33,9 @@ def choose(which, /):
         from probdiffeq.statespace.backend.scalar import factorisations
 
         return factorisations.ScalarFactorisation()
+    if which == "dense":
+        from probdiffeq.statespace.backend.dense import factorisations
 
+        return factorisations.DenseFactorisation(**kwargs)
+        return
     raise ValueError

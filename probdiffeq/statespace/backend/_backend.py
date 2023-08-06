@@ -22,6 +22,8 @@ class BackEnd:
 
     @property
     def random(self) -> _random.RandomVariableBackEnd:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
         return self._fact.random()
 
     @property

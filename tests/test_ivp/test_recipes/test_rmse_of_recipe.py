@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
 from probdiffeq.statespace import cubature, recipes
+from probdiffeq.statespace.backend import backend
 
 
 @testing.fixture(name="problem")
@@ -36,6 +37,7 @@ def case_ts0_blockdiag():
 
 @testing.case()
 def case_ts1_dense():
+    backend.select("dense", ode_shape=(2,))
     return recipes.ts1_dense, 1.0
 
 
