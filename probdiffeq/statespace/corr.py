@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import statespace
-from probdiffeq.statespace import variables
+from probdiffeq.statespace import cubature, variables
 
 
 class Correction(abc.ABC):
@@ -68,6 +68,43 @@ class ODEConstraint(Correction):
         return ssv
 
 
+class ODEConstraintNoisy(Correction):
+    def __init__(self, ode_order, linearise_fun, string_repr):
+        super().__init__(ode_order=ode_order)
+
+        self.linearise = linearise_fun
+        self.string_repr = string_repr
+
+    def __repr__(self):
+        return self.string_repr
+
+    def init(self, ssv, /):
+        obs_like = statespace.random.qoi_like()
+        return ssv, obs_like
+
+    def estimate_error(self, ssv, corr, /, vector_field, t, p):
+        f_wrapped = functools.partial(vector_field, t=t, p=p)
+        A, b = self.linearise(f_wrapped, ssv.hidden_state)
+        observed = statespace.cond.conditional.marginalise(ssv.hidden_state, (A, b))
+
+        error_estimate = estimate_error(observed)
+        return error_estimate, observed, (A, b)
+
+    def complete(self, ssv, corr, /, vector_field, t, p):
+        # Re-linearise (because the linearisation point changed)
+        f_wrapped = functools.partial(vector_field, t=t, p=p)
+        A, b = self.linearise(f_wrapped, ssv.hidden_state)
+
+        # Condition
+        obs, (cor, _gn) = statespace.cond.transform.revert(ssv.hidden_state, (A, b))
+        u = statespace.random.qoi(cor)
+        ssv = variables.SSV(u, cor)
+        return ssv, obs
+
+    def extract(self, ssv, corr, /):
+        return ssv
+
+
 def estimate_error(observed, /):
     zero_data = jnp.zeros_like(statespace.random.mean(observed))
     output_scale = statespace.random.mahalanobis_norm(zero_data, rv=observed)
@@ -87,7 +124,16 @@ def taylor_order_one(*, ode_order) -> ODEConstraint:
     return ODEConstraint(
         ode_order=ode_order,
         linearise_fun=statespace.linearise_ode.constraint_1st(ode_order=ode_order),
-        string_repr=f"<TS0 with ode_order={ode_order}>",
+        string_repr=f"<TS1 with ode_order={ode_order}>",
+    )
+
+
+def statistical_order_one(cubature_fun=cubature.third_order_spherical):
+    linearise_fun = statespace.linearise_ode.constraint_statistical_1st(cubature_fun)
+    return ODEConstraintNoisy(
+        ode_order=1,
+        linearise_fun=linearise_fun,
+        string_repr=f"<SLR1 with ode_order={1}>",
     )
 
 
@@ -102,7 +148,7 @@ def _constraint_unflatten(aux, _children, *, nodetype):
     return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
 
 
-for nodetype in [ODEConstraint]:
+for nodetype in [ODEConstraint, ODEConstraintNoisy]:
     jax.tree_util.register_pytree_node(
         nodetype=nodetype,
         flatten_func=_constraint_flatten,

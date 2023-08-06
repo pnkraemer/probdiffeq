@@ -3,7 +3,9 @@ import functools
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util
 from probdiffeq.backend import _linearise
+from probdiffeq.backend.dense import random
 
 
 class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
@@ -42,6 +44,32 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
 
         return new
 
+    def constraint_statistical_1st(self, cubature_fun):
+        cubature_rule = cubature_fun(input_shape=self.ode_shape)
+        linearise_fun = functools.partial(slr1, cubature_rule=cubature_rule)
+
+        def new(fun, rv, /):
+            # Projection functions
+            a0 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=0))
+            a1 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=1))
+
+            # Extract the linearisation point
+            m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
+            r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+            linearisation_pt = random.Normal(m0, r_0_square.T)
+
+            # Gather the variables and return
+            J, noise = linearise_fun(fun, linearisation_pt)
+
+            def A(x):
+                return a1(x) - J(a0(x))
+
+            mean, cov_lower = noise.mean, noise.cholesky
+            bias = random.Normal(-mean, cov_lower)
+            return _autobatch_linop(A), bias
+
+        return new
+
     def _select_dy(self, x, idx_or_slice):
         (d,) = self.ode_shape
         x_reshaped = jnp.reshape(x, (-1, d), order="F")
@@ -64,3 +92,25 @@ def ts0(fn, m):
 def ts1(fn, m):
     b, jvp = jax.linearize(fn, m)
     return jvp, b - jvp(m)
+
+
+def slr1(fn, x, *, cubature_rule):
+    """Linearise a function with first-order statistical linear regression."""
+    # Create sigma-points
+    pts_centered = cubature_rule.points @ x.cholesky.T
+    pts = x.mean[None, :] + pts_centered
+    pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
+
+    # Evaluate the nonlinear function
+    fx = jax.vmap(fn)(pts)
+    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
+    fx_centered = fx - fx_mean[None, :]
+    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
+
+    # Compute statistical linear regression matrices
+    _, (cov_sqrtm_cond, linop_cond) = _sqrt_util.revert_conditional_noisefree(
+        R_X_F=pts_centered_normed, R_X=fx_centered_normed
+    )
+    mean_cond = fx_mean - linop_cond @ x.mean
+    rv_cond = random.Normal(mean_cond, cov_sqrtm_cond.T)
+    return lambda v: linop_cond @ v, rv_cond
