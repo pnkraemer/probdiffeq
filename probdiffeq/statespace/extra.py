@@ -10,29 +10,6 @@ from probdiffeq.backend import statespace
 from probdiffeq.statespace import variables
 
 
-# At the point of choosing the recipe
-# (aka selecting the desired state-space model factorisation),
-# it is too early to know whether we solve forward-in-time only (aka filtering)
-# or require a dense, or fixed-point solution. Therefore, the recipes return
-# extrapolation *factories* instead of extrapolation models.
-class ExtrapolationFactory(abc.ABC):
-    @abc.abstractmethod
-    def string_repr(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def filter(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def smoother(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def fixedpoint(self):
-        raise NotImplementedError
-
-
 class Extrapolation(abc.ABC):
     """Extrapolation model interface."""
 
@@ -57,34 +34,27 @@ class Extrapolation(abc.ABC):
         raise NotImplementedError
 
 
-def ibm_factory(num_derivatives, output_scale=1.0):
-    discretise = statespace.ssm_util.ibm_transitions(num_derivatives, output_scale)
-    return IBMExtrapolationFactory(args=(discretise, num_derivatives))
-
-
-class IBMExtrapolationFactory(ExtrapolationFactory):
-    def __init__(self, args):
-        self.args = args
-
+# At the point of choosing the recipe
+# (aka selecting the desired state-space model factorisation),
+# it is too early to know whether we solve forward-in-time only (aka filtering)
+# or require a dense, or fixed-point solution. Therefore, the recipes return
+# extrapolation *factories* instead of extrapolation models.
+class ExtrapolationFactory(abc.ABC):
+    @abc.abstractmethod
     def string_repr(self):
-        num_derivatives = self.filter().num_derivatives
-        return f"<Scalar IBM with num_derivatives={num_derivatives}>"
+        raise NotImplementedError
 
-    def filter(self):
-        return IBMFilterImpl(*self.args)
+    @abc.abstractmethod
+    def filter(self) -> Extrapolation:
+        raise NotImplementedError
 
-    def smoother(self):
-        return IBMSmootherImpl(*self.args)
+    @abc.abstractmethod
+    def smoother(self) -> Extrapolation:
+        raise NotImplementedError
 
-    def fixedpoint(self):
-        return IBMFixedPointImpl(*self.args)
-
-
-jax.tree_util.register_pytree_node(
-    nodetype=IBMExtrapolationFactory,
-    flatten_func=lambda a: (a.args, ()),
-    unflatten_func=lambda a, b: IBMExtrapolationFactory(b),
-)
+    @abc.abstractmethod
+    def fixedpoint(self) -> Extrapolation:
+        raise NotImplementedError
 
 
 class IBMFilterImpl(Extrapolation):
@@ -278,3 +248,33 @@ for impl in [IBMFilterImpl, IBMSmootherImpl, IBMFixedPointImpl]:
         flatten_func=_flatten,
         unflatten_func=functools.partial(_unflatten, impl),
     )
+
+
+class IBMExtrapolationFactory(ExtrapolationFactory):
+    def __init__(self, args):
+        self.args = args
+
+    def string_repr(self):
+        num_derivatives = self.filter().num_derivatives
+        return f"<IBM with num_derivatives={num_derivatives}>"
+
+    def filter(self):
+        return IBMFilterImpl(*self.args)
+
+    def smoother(self):
+        return IBMSmootherImpl(*self.args)
+
+    def fixedpoint(self):
+        return IBMFixedPointImpl(*self.args)
+
+
+jax.tree_util.register_pytree_node(
+    nodetype=IBMExtrapolationFactory,
+    flatten_func=lambda a: (a.args, ()),
+    unflatten_func=lambda a, b: IBMExtrapolationFactory(b),
+)
+
+
+def ibm_factory(num_derivatives, output_scale=1.0) -> IBMExtrapolationFactory:
+    discretise = statespace.ssm_util.ibm_transitions(num_derivatives, output_scale)
+    return IBMExtrapolationFactory(args=(discretise, num_derivatives))
