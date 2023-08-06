@@ -2,7 +2,6 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
 from probdiffeq.backend import statespace
 from probdiffeq.statespace import calib
 
@@ -37,17 +36,12 @@ class ScalarRunningMean(calib.Calibration):
         mahalanobis_norm = statespace.random.mahalanobis_norm(zero_data, observed)
         new_term = mahalanobis_norm / jnp.sqrt(zero_data.size)
 
-        calibrated = _update_running_mean(calibrated, new_term, num=num_data)
+        calibrated = statespace.ssm_util.update_mean(calibrated, new_term, num=num_data)
         return prior, calibrated, num_data + 1.0
 
     def extract(self, state, /):
         prior, calibrated, _num_data = state
         return prior, calibrated
-
-
-def _update_running_mean(mean, x, /, num):
-    sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
-    return sum_updated / jnp.sqrt(num + 1)
 
 
 class CalibrationFactory(calib.CalibrationFactory):

@@ -20,6 +20,10 @@ class SSMUtilBackEnd(abc.ABC):
     def ibm_transitions(self, num_derivatives, output_scale):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def update_mean(self, mean, x, /, num):
+        raise NotImplementedError
+
     # todo: move those to random.py and cond.py instead?
 
     @abc.abstractmethod

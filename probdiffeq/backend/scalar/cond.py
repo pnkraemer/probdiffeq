@@ -23,7 +23,8 @@ class TransformImpl(_cond.ConditionalImpl):
         A, b = transformation
 
         # QR-decomposition
-        # (todo: rename revert_conditional_noisefree to transformation_revert_cov_sqrt())
+        # (todo: rename revert_conditional_noisefree
+        #  to transformation_revert_cov_sqrt())
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=A(rv.cholesky)[:, None], R_X=rv.cholesky.T
         )
@@ -89,5 +90,5 @@ class ConditionalBackEnd(_cond.ConditionalBackEnd):
         return ConditionalImpl()
 
     @property
-    def transform(self) -> ConditionalImpl:
+    def transform(self) -> TransformImpl:
         return TransformImpl()

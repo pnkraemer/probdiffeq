@@ -1,6 +1,7 @@
 """SSM utilities."""
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util
 from probdiffeq.backend import _ssm_util
 from probdiffeq.backend.scalar import random
 from probdiffeq.statespace import _ibm_util
@@ -51,3 +52,7 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         mean = jnp.zeros((ndim,))
         cholesky = output_scale * jnp.eye(ndim)
         return random.Normal(mean, cholesky)
+
+    def update_mean(self, mean, x, /, num):
+        sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+        return sum_updated / jnp.sqrt(num + 1)
