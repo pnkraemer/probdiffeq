@@ -57,7 +57,7 @@ class ExtrapolationFactory(abc.ABC):
         raise NotImplementedError
 
 
-class IBMFilterImpl(Extrapolation):
+class PreconFilter(Extrapolation):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
@@ -106,7 +106,7 @@ class IBMFilterImpl(Extrapolation):
         return ssv, None
 
 
-class IBMSmootherImpl(Extrapolation):
+class PreconSmoother(Extrapolation):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
@@ -163,7 +163,7 @@ class IBMSmootherImpl(Extrapolation):
         return ssv, cond
 
 
-class IBMFixedPointImpl(Extrapolation):
+class PreconFixedPoint(Extrapolation):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
@@ -242,7 +242,7 @@ def _unflatten(nodetype, _aux, children):
     return nodetype(*children)
 
 
-for impl in [IBMFilterImpl, IBMSmootherImpl, IBMFixedPointImpl]:
+for impl in [PreconFilter, PreconSmoother, PreconFixedPoint]:
     jax.tree_util.register_pytree_node(
         nodetype=impl,
         flatten_func=_flatten,
@@ -259,13 +259,13 @@ class IBMExtrapolationFactory(ExtrapolationFactory):
         return f"<IBM with num_derivatives={num_derivatives}>"
 
     def filter(self):
-        return IBMFilterImpl(*self.args)
+        return PreconFilter(*self.args)
 
     def smoother(self):
-        return IBMSmootherImpl(*self.args)
+        return PreconSmoother(*self.args)
 
     def fixedpoint(self):
-        return IBMFixedPointImpl(*self.args)
+        return PreconFixedPoint(*self.args)
 
 
 jax.tree_util.register_pytree_node(
