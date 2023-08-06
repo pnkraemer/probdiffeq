@@ -138,8 +138,8 @@ class PreconSmoother(Extrapolation):
         rv = ssv.hidden_state
         rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = statespace.random.mean(rv_p)
-        extrapolated_p = statespace.cond.conditional.apply(m_ext_p, cond)
+        m_p = statespace.random.mean(rv_p)
+        extrapolated_p = statespace.cond.conditional.apply(m_p, cond)
 
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
         qoi = statespace.random.qoi(extrapolated)

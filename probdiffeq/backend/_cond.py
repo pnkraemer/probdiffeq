@@ -19,6 +19,16 @@ class ConditionalImpl(abc.ABC):
         raise NotImplementedError
 
 
+class TransformImpl(abc.ABC):
+    @abc.abstractmethod
+    def marginalise(self, rv, conditional, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def revert(self, rv, conditional, /):
+        raise NotImplementedError
+
+
 class ConditionalBackEnd(abc.ABC):
     @property
     @abc.abstractmethod
@@ -27,5 +37,5 @@ class ConditionalBackEnd(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def transform(self) -> ConditionalImpl:
+    def transform(self) -> TransformImpl:
         raise NotImplementedError

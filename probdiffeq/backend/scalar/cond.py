@@ -5,10 +5,7 @@ from probdiffeq.backend import _cond
 from probdiffeq.backend.scalar import random
 
 
-class TransformImpl(_cond.ConditionalImpl):
-    def apply(self, x, conditional, /):
-        raise NotImplementedError
-
+class TransformImpl(_cond.TransformImpl):
     def marginalise(self, rv, transformation, /):
         # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
         A, b = transformation
@@ -37,9 +34,6 @@ class TransformImpl(_cond.ConditionalImpl):
         corrected = random.Normal(m_cor, cov_sqrtm_lower_cor)
         observed = random.Normal(A(rv.mean) + b, cov_sqrtm_lower_obs)
         return observed, (corrected, gain)
-
-    def merge(self, cond1, cond2, /):
-        raise NotImplementedError
 
 
 class ConditionalImpl(_cond.ConditionalImpl):

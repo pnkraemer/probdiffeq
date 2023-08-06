@@ -71,12 +71,10 @@ def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    correction = probdiffeq.statespace.dense.corr.taylor_order_zero(
-        ode_shape=ode_shape, ode_order=ode_order
-    )
-    ibm = probdiffeq.statespace.dense.extra.ibm_factory(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
+    statespace.select("dense", ode_shape=ode_shape)
+
+    correction = probdiffeq.statespace.corr.taylor_order_zero(ode_order=ode_order)
+    ibm = probdiffeq.statespace.extra.ibm_factory(num_derivatives=num_derivatives)
     calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 
