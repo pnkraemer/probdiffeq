@@ -18,7 +18,7 @@ import probdiffeq.statespace.iso.extra
 
 #
 # import probdiffeq.statespace.scalar.calib
-import probdiffeq.statespace.scalar.corr
+# import probdiffeq.statespace.scalar.corr
 import probdiffeq.statespace.scalar.extra
 
 # isort: on
@@ -128,9 +128,7 @@ def slr0_dense(
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
     statespace.select("scalar")
 
-    correction = probdiffeq.statespace.scalar.corr.taylor_order_zero(
-        ode_order=ode_order
-    )
+    correction = probdiffeq.statespace.corr.taylor_order_zero(ode_order=ode_order)
     ibm = probdiffeq.statespace.scalar.extra.ibm_factory(
         num_derivatives=num_derivatives
     )
