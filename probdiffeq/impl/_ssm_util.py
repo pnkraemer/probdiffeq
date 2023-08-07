@@ -34,6 +34,6 @@ class SSMUtilBackend(abc.ABC):
     def standard_normal(self, num_derivatives_per_ode_dimension, /, output_scale):
         raise NotImplementedError
 
-    # solution to the BVP problem
-    def bias_to_standard_noise(self, bias, /, factor):
+    @abc.abstractmethod
+    def conditional_to_derivative(self, i, standard_deviation):
         raise NotImplementedError

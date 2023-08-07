@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
@@ -56,3 +57,11 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def update_mean(self, mean, x, /, num):
         sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
+
+    def conditional_to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[i, ...]
+
+        bias = jnp.zeros(self.ode_shape)
+        eye = jnp.eye(*self.ode_shape)
+        return A, _normal.Normal(bias, standard_deviation * eye)

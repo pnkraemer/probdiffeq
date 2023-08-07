@@ -12,6 +12,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov
 from probdiffeq.backend import containers
+from probdiffeq.impl import impl
 
 # todo: the functions in here should only depend on posteriors / strategies!
 
@@ -179,9 +180,14 @@ class _KalFiltState(containers.NamedTuple):
 #  But this only works if the ODE posterior uses the preconditioner (I think).
 # todo: we should allow proper noise, and proper information functions.
 #  But it is not clear which data structure that should be.
-def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
+def _kalman_filter(u, /, mseq, standard_deviation, *, strategy, reverse=True):
+    assert jnp.isscalar(standard_deviation)
+    observation_model = impl.ssm_util.conditional_to_derivative(0, standard_deviation)
+
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
+    _, (_gain, init) = impl.transform.revert(rv_terminal, observation_model)
+
     init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
 
     # Scan over the remaining data points
