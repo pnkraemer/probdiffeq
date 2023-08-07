@@ -61,14 +61,16 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
-            linop, noise = linearise_fun(fun, linearisation_pt)
+            J, noise = linearise_fun(fun, linearisation_pt)
 
             def A(x):
-                return a1(x) - linop @ a0(x)
+                return a1(x) - J @ a0(x)
+
+            linop = matfree.linop_from_callable(A)
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            return jax.jacfwd(A)(rv.mean), bias
+            return linop, bias
 
         return new
 
@@ -90,7 +92,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            return jax.jacfwd(a1)(rv.mean), bias
+            linop = matfree.linop_from_callable(a1)
+            return linop, bias
 
         return new
 

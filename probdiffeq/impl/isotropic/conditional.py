@@ -1,15 +1,18 @@
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _conditional
+from probdiffeq.impl import _conditional, matfree
 from probdiffeq.impl.isotropic import _normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         A, noise = conditional
+        assert isinstance(A, matfree.LinOp)
+
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):
         matrix, noise = conditional
+        assert isinstance(matrix, matfree.LinOp)
 
         mean = matrix @ rv.mean + noise.mean
 
@@ -20,6 +23,8 @@ class ConditionalBackend(_conditional.ConditionalBackend):
     def merge(self, cond1, cond2, /):
         A, b = cond1
         C, d = cond2
+        assert isinstance(A, matfree.LinOp)
+        assert isinstance(C, matfree.LinOp)
 
         g = A @ C
         xi = A @ d.mean + b.mean
@@ -31,6 +36,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
+        assert isinstance(matrix, matfree.LinOp)
 
         r_ext_p, (r_bw_p, gain) = _sqrt_util.revert_conditional(
             R_X_F=(matrix @ rv.cholesky).T,

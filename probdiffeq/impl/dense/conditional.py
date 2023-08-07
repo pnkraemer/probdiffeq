@@ -4,22 +4,24 @@ import jax
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import containers
-from probdiffeq.impl import _conditional
+from probdiffeq.impl import _conditional, matfree
 from probdiffeq.impl.dense import _normal
 
 
 class Conditional(containers.NamedTuple):
-    matmul: Callable
+    matmul: matfree.LinOp
     noise: _normal.Normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         matrix, noise = conditional
+        assert isinstance(matrix, matfree.LinOp)
         return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):
         matmul, noise = conditional
+        assert isinstance(matmul, matfree.LinOp)
         R_stack = ((matmul @ rv.cholesky).T, noise.cholesky.T)
         cholesky_new = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
         return _normal.Normal(matmul @ rv.mean + noise.mean, cholesky_new)
@@ -30,6 +32,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
         mean, cholesky = rv.mean, rv.cholesky
+        assert isinstance(matrix, matfree.LinOp)
 
         # QR-decomposition
         # (todo: rename revert_conditional_noisefree to

@@ -1,13 +1,14 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _transform
+from probdiffeq.impl import _transform, matfree
 from probdiffeq.impl.isotropic import _normal
 
 
 class TransformBackend(_transform.TransformBackend):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
+        assert isinstance(A, matfree.LinOp)
         mean, cholesky = rv.mean, rv.cholesky
         cholesky_new = _sqrt_util.triu_via_qr((A @ cholesky)[None, ...].T)
         cholesky_squeezed = jnp.reshape(cholesky_new, ())
@@ -16,6 +17,7 @@ class TransformBackend(_transform.TransformBackend):
     def revert(self, rv, transformation, /):
         A, b = transformation
         mean, cholesky = rv.mean, rv.cholesky
+        assert isinstance(A, matfree.LinOp)
 
         # QR-decomposition
         # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())

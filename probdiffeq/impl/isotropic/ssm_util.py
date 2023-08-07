@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _ibm_util, _ssm_util
+from probdiffeq.impl import _ibm_util, _ssm_util, matfree
 from probdiffeq.impl.isotropic import _normal
 
 
@@ -14,12 +14,12 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
         q0 = jnp.zeros((num_derivatives + 1,) + self.ode_shape)
         noise = _normal.Normal(q0, q_sqrtm)
-
+        A = matfree.linop_from_matmul(a)
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return (a, noise), (p, p_inv)
+            return (A, noise), (p, p_inv)
 
         return discretise
 
