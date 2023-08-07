@@ -38,3 +38,14 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def rescale_cholesky(self, rv, factor):
         return _normal.Normal(rv.mean, factor * rv.cholesky)
+
+    def cholesky(self, rv):
+        return rv.cholesky
+
+    def cov_dense(self, rv):
+        if rv.mean.ndim > 1:
+            return jax.vmap(self.cov_dense)(rv)
+        return rv.cholesky @ rv.cholesky.T
+
+    def marginal_nth_derivative(self, rv):
+        raise NotImplementedError
