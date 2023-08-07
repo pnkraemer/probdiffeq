@@ -275,6 +275,6 @@ jax.tree_util.register_pytree_node(
 )
 
 
-def ibm_factory(num_derivatives, output_scale=1.0) -> IBMExtrapolationFactory:
-    discretise = statespace.ssm_util.ibm_transitions(num_derivatives, output_scale)
+def ibm_factory(num_derivatives) -> IBMExtrapolationFactory:
+    discretise = statespace.ssm_util.ibm_transitions(num_derivatives)
     return IBMExtrapolationFactory(args=(discretise, num_derivatives))

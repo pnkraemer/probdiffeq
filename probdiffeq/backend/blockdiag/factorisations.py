@@ -13,16 +13,16 @@ class BlockDiagFactorisation(_factorisations.Factorisation):
         self.ode_shape = ode_shape
 
     def conditional(self):
-        raise NotImplementedError
+        return conditional.ConditionalBackend()
 
     def linearise(self):
         return linearise.LinearisationBackend()
 
     def random(self):
-        raise NotImplementedError
+        return random.RandomVariableBackend(ode_shape=self.ode_shape)
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackend()
+        return ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)
 
     def transform(self):
-        raise NotImplementedError
+        return transform.TransformBackend()

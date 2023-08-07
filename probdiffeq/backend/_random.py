@@ -3,7 +3,7 @@ import abc
 
 class RandomVariableBackend(abc.ABC):
     @abc.abstractmethod
-    def qoi_like(self):
+    def qoi_like(self):  # todo: move to ssm_util
         raise NotImplementedError
 
     @abc.abstractmethod

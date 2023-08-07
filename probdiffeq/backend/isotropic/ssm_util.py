@@ -7,9 +7,12 @@ from probdiffeq.statespace import _ibm_util
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def ibm_transitions(self, num_derivatives, output_scale):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
-        q0 = jnp.zeros((num_derivatives + 1, 1))  # "1" suffices for broadcasting
+        q0 = jnp.zeros((num_derivatives + 1,) + self.ode_shape)
         noise = _normal.Normal(q0, q_sqrtm)
 
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)

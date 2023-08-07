@@ -22,7 +22,7 @@ class IsotropicFactorisation(_factorisations.Factorisation):
         return random.RandomVariableBackend(ode_shape=self.ode_shape)
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackend()
+        return ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)
 
     def transform(self):
         return transform.TransformBackend()
