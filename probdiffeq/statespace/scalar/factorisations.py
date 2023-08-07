@@ -1,5 +1,5 @@
-from probdiffeq.backend import _factorisations
-from probdiffeq.backend.scalar import (
+from probdiffeq.statespace import _factorisations
+from probdiffeq.statespace.scalar import (
     conditional,
     linearise,
     random,

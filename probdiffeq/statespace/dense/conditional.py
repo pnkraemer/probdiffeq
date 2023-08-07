@@ -3,8 +3,9 @@ from typing import Callable
 import jax
 
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import _conditional, containers
-from probdiffeq.backend.dense import _normal
+from probdiffeq.backend import containers
+from probdiffeq.statespace import _conditional
+from probdiffeq.statespace.dense import _normal
 
 
 class Conditional(containers.NamedTuple):

@@ -1,5 +1,11 @@
-from probdiffeq.backend import _factorisations
-from probdiffeq.backend.dense import conditional, linearise, random, ssm_util, transform
+from probdiffeq.statespace import _factorisations
+from probdiffeq.statespace.dense import (
+    conditional,
+    linearise,
+    random,
+    ssm_util,
+    transform,
+)
 
 
 class DenseFactorisation(_factorisations.Factorisation):

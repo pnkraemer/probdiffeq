@@ -7,11 +7,6 @@ from probdiffeq.backend import containers
 
 class State(containers.NamedTuple):
     t: Any
-    ssv: Any
-    extra: Any
-
-    corr: Any
-
-    @property
-    def u(self):
-        return self.ssv.u
+    hidden: Any
+    aux_extra: Any
+    aux_corr: Any

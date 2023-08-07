@@ -1,4 +1,4 @@
-from probdiffeq.backend import _linearise
+from probdiffeq.statespace import _linearise
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):

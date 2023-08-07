@@ -5,6 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _interp
 from probdiffeq.ivpsolvers import _common, solver
+from probdiffeq.statespace import backend
 
 
 def mle(strategy, calibration_factory):
@@ -34,7 +35,7 @@ def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
         parameters=parameters,
         vector_field=vector_field,
     )
-    observed = state_strategy.corr  # clean this up next?
+    observed = state_strategy.aux_corr
 
     # Calibrate
     output_scale = calibration.update(state.output_scale, observed=observed)
@@ -96,7 +97,8 @@ class CalibratedSolver(solver.Solver[_common.State]):
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
         state_strategy = self.strategy.init(t, posterior)
-        error_estimate = jnp.empty_like(state_strategy.u)
+        qoi = backend.random.qoi(state_strategy.hidden)
+        error_estimate = jnp.empty_like(qoi)
         calib_state = self.calibration.init(output_scale)
         return _common.State(
             error_estimate=error_estimate,
@@ -145,7 +147,8 @@ class CalibratedSolver(solver.Solver[_common.State]):
     def _interp_make_state(
         self, state_strategy, *, reference: _common.State
     ) -> _common.State:
-        error_estimate = jnp.empty_like(state_strategy.u)
+        u = backend.random.qoi(state_strategy.hidden)
+        error_estimate = jnp.empty_like(u)
         return _common.State(
             strategy=state_strategy,
             error_estimate=error_estimate,

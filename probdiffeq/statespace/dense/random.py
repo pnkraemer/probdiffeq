@@ -3,8 +3,9 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import _random, containers
-from probdiffeq.backend.dense import _normal
+from probdiffeq.backend import containers
+from probdiffeq.statespace import _random
+from probdiffeq.statespace.dense import _normal
 
 
 class RandomVariableBackend(_random.RandomVariableBackend):

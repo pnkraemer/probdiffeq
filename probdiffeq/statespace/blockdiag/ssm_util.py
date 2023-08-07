@@ -2,9 +2,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import _ssm_util
-from probdiffeq.backend.blockdiag import _normal
-from probdiffeq.statespace import _ibm_util
+from probdiffeq.statespace import _ibm_util, _ssm_util
+from probdiffeq.statespace.blockdiag import _normal
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):

@@ -2,9 +2,8 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import _ssm_util
-from probdiffeq.backend.scalar import _normal
-from probdiffeq.statespace import _ibm_util
+from probdiffeq.statespace import _ibm_util, _ssm_util
+from probdiffeq.statespace.scalar import _normal
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):
@@ -40,7 +39,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, num_hidden_states_per_ode_dim):
+    def identity_conditional(self, ndim, /):
         transition = jnp.eye(ndim)
         mean = jnp.zeros((ndim,))
         cov_sqrtm = jnp.zeros((ndim, ndim))

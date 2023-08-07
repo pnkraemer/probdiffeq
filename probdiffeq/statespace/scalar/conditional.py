@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import _conditional
-from probdiffeq.backend.scalar import _normal
+from probdiffeq.statespace import _conditional
+from probdiffeq.statespace.scalar import _normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):

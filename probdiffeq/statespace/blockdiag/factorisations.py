@@ -1,5 +1,5 @@
-from probdiffeq.backend import _factorisations
-from probdiffeq.backend.blockdiag import (
+from probdiffeq.statespace import _factorisations
+from probdiffeq.statespace.blockdiag import (
     conditional,
     linearise,
     random,

@@ -16,7 +16,3 @@ class State(containers.NamedTuple):
     @property
     def t(self):
         return self.strategy.t
-
-    @property
-    def u(self):
-        return self.strategy.u

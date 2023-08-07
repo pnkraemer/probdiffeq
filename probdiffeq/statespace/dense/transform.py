@@ -3,8 +3,9 @@ from typing import Callable
 import jax
 
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import _transform, containers
-from probdiffeq.backend.dense import _normal
+from probdiffeq.backend import containers
+from probdiffeq.statespace import _transform
+from probdiffeq.statespace.dense import _normal
 
 
 class Transformation(containers.NamedTuple):

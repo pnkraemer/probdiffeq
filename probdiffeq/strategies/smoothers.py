@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp, _markov
-from probdiffeq.backend import statespace
+from probdiffeq.statespace import backend
 from probdiffeq.strategies import _common, strategy
 
 
@@ -95,16 +95,20 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # (This function assumes we are in the forward-pass, which is why we interpolate
     # back from the "filtering" state. In the context of offgrid_marginals,
     # the backward-interpolation step is repeated from the smoothing marginals)
-    bw_t1_to_t, bw_t_to_t0 = e_1.extra, e_t.extra
-    rv_at_t = statespace.conditional.marginalise(s1.ssv.hidden_state, bw_t1_to_t)
+    bw_t1_to_t, bw_t_to_t0 = e_1.aux_extra, e_t.aux_extra
+    rv_at_t = backend.conditional.marginalise(s1.hidden, bw_t1_to_t)
     mseq_t = _markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)
     ssv, _ = extrapolation.init(mseq_t)
-    corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
-    state_at_t = _common.State(t=t, ssv=ssv, corr=corr_like, extra=bw_t_to_t0)
+    corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.aux_corr)
+    state_at_t = _common.State(
+        t=t, hidden=ssv, aux_corr=corr_like, aux_extra=bw_t_to_t0
+    )
     # The state at t1 gets a new backward model; it must remember how to
     # get back to t, not to t0.
     # The other two are the extrapolated solution
-    s_1 = _common.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
+    s_1 = _common.State(
+        t=s1.t, hidden=s1.hidden, aux_corr=s1.aux_corr, aux_extra=bw_t1_to_t
+    )
     return _interp.InterpRes(accepted=s_1, solution=state_at_t, previous=state_at_t)
 
 
@@ -112,9 +116,13 @@ def _fixedpoint_right_corner(state_at_t1, *, extrapolation):
     # See case_interpolate() for detailed explanation of why this works.
     # Todo: this prepares _future_ steps, so shouldn't it happen
     #  at initialisation instead of at completion?
-    ssv, extra = extrapolation.reset(state_at_t1.ssv, state_at_t1.extra)
-    acc = _common.State(t=state_at_t1.t, ssv=ssv, extra=extra, corr=state_at_t1.corr)
-    pre = _common.State(t=state_at_t1.t, ssv=ssv, extra=extra, corr=state_at_t1.corr)
+    ssv, extra = extrapolation.reset(state_at_t1.hidden, state_at_t1.aux_extra)
+    acc = _common.State(
+        t=state_at_t1.t, hidden=ssv, aux_extra=extra, aux_corr=state_at_t1.aux_corr
+    )
+    pre = _common.State(
+        t=state_at_t1.t, hidden=ssv, aux_extra=extra, aux_corr=state_at_t1.aux_corr
+    )
     return _interp.InterpRes(accepted=acc, solution=state_at_t1, previous=pre)
 
 
@@ -164,8 +172,8 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
         s0=s0, output_scale=output_scale, t=t, extrapolation=extrapolation
     )
 
-    ssv, extra = extrapolation.reset(e_t.ssv, e_t.extra)
-    prev_t = _common.State(t=e_t.t, ssv=ssv, extra=extra, corr=e_t.corr)
+    ssv, extra = extrapolation.reset(e_t.hidden, e_t.aux_extra)
+    prev_t = _common.State(t=e_t.t, hidden=ssv, aux_extra=extra, aux_corr=e_t.aux_corr)
 
     e_1 = _extrapolate(
         s0=prev_t,
@@ -178,15 +186,17 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # turn an extrapolation- ("e_t") into an interpolation-result ("i_t")
     # Note how we use the bw_to_to_qoi backward model!
     # (Which is different for the non-fixed-point smoother)
-    bw_t1_to_t, bw_t_to_qoi = e_1.extra, e_t.extra
-    rv_t = statespace.conditional.marginalise(s1.ssv.hidden_state, bw_t1_to_t)
+    bw_t1_to_t, bw_t_to_qoi = e_1.aux_extra, e_t.aux_extra
+    rv_t = backend.conditional.marginalise(s1.hidden, bw_t1_to_t)
     mseq_t = _markov.MarkovSeqRev(init=rv_t, conditional=bw_t_to_qoi)
     ssv_t, _ = extrapolation.init(mseq_t)
-    corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.corr)
-    sol_t = _common.State(t=t, ssv=ssv_t, corr=corr_like, extra=bw_t_to_qoi)
+    corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.aux_corr)
+    sol_t = _common.State(t=t, hidden=ssv_t, aux_corr=corr_like, aux_extra=bw_t_to_qoi)
 
     # Future IVP solver stepping continues from here:
-    acc_t1 = _common.State(t=s1.t, ssv=s1.ssv, corr=s1.corr, extra=bw_t1_to_t)
+    acc_t1 = _common.State(
+        t=s1.t, hidden=s1.hidden, aux_corr=s1.aux_corr, aux_extra=bw_t1_to_t
+    )
 
     # Bundle up the results and return
     return _interp.InterpRes(accepted=acc_t1, solution=sol_t, previous=prev_t)
@@ -194,7 +204,7 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
 
 def _extrapolate(s0, output_scale, t, *, extrapolation):
     dt = t - s0.t
-    ssv, extra = extrapolation.begin(s0.ssv, s0.extra, dt=dt)
+    ssv, extra = extrapolation.begin(s0.hidden, s0.aux_extra, dt=dt)
     ssv, extra = extrapolation.complete(ssv, extra, output_scale=output_scale)
-    corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
-    return _common.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
+    corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
+    return _common.State(t=t, hidden=ssv, aux_extra=extra, aux_corr=corr_like)

@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
-from probdiffeq.backend import _random
-from probdiffeq.backend.blockdiag import _normal
+from probdiffeq.statespace import _random
+from probdiffeq.statespace.blockdiag import _normal
 
 
 class RandomVariableBackend(_random.RandomVariableBackend):

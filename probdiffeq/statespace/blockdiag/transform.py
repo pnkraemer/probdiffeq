@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import _transform
-from probdiffeq.backend.blockdiag import _normal
+from probdiffeq.statespace import _transform
+from probdiffeq.statespace.blockdiag import _normal
 
 
 class TransformBackend(_transform.TransformBackend):

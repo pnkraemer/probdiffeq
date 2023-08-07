@@ -46,30 +46,31 @@ class Strategy(Generic[P]):
         return self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
     def init(self, t, posterior, /) -> _common.State:
-        ssv, extra = self.extrapolation.init(posterior)
-        ssv, corr = self.correction.init(ssv)
-        return _common.State(t=t, ssv=ssv, extra=extra, corr=corr)
+        rv, extra = self.extrapolation.init(posterior)
+        rv, corr = self.correction.init(rv)
+        return _common.State(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
     def predict_error(self, state: _common.State, /, *, dt, parameters, vector_field):
-        ssv, extra = self.extrapolation.begin(state.ssv, state.extra, dt=dt)
+        hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         error, observed, corr = self.correction.estimate_error(
-            ssv, state.corr, vector_field=vector_field, t=state.t, p=parameters
+            hidden, state.aux_corr, vector_field=vector_field, t=state.t, p=parameters
         )
-        state = _common.State(t=state.t + dt, ssv=ssv, extra=extra, corr=corr)
+        t = state.t + dt
+        state = _common.State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
 
     def complete(self, state, /, *, output_scale, parameters, vector_field):
-        ssv, extra = self.extrapolation.complete(
-            state.ssv, state.extra, output_scale=output_scale
+        hidden, extra = self.extrapolation.complete(
+            state.hidden, state.aux_extra, output_scale=output_scale
         )
-        ssv, corr = self.correction.complete(
-            ssv, state.corr, p=parameters, t=state.t, vector_field=vector_field
+        hidden, corr = self.correction.complete(
+            hidden, state.aux_corr, p=parameters, t=state.t, vector_field=vector_field
         )
-        return _common.State(t=state.t, ssv=ssv, extra=extra, corr=corr)
+        return _common.State(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
     def extract(self, state: _common.State, /):
-        ssv = self.correction.extract(state.ssv, state.corr)
-        sol = self.extrapolation.extract(ssv, state.extra)
+        hidden = self.correction.extract(state.hidden, state.aux_corr)
+        sol = self.extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
     def case_right_corner(self, state_at_t1: _common.State) -> _interp.InterpRes:

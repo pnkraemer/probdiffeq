@@ -53,8 +53,8 @@ def _filter_interpolate(t, *, output_scale, s0, s1, extrapolation):
     # A filter interpolates by extrapolating from the previous time-point
     # to the in-between variable. That's it.
     dt = t - s0.t
-    ssv, extra = extrapolation.begin(s0.ssv, s0.extra, dt=dt)
-    ssv, extra = extrapolation.complete(ssv, extra, output_scale=output_scale)
-    corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.corr)
-    extrapolated = _common.State(t=t, ssv=ssv, extra=extra, corr=corr_like)
+    hidden, extra = extrapolation.begin(s0.hidden, s0.aux_extra, dt=dt)
+    hidden, extra = extrapolation.complete(hidden, extra, output_scale=output_scale)
+    corr = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
+    extrapolated = _common.State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
     return _interp.InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
