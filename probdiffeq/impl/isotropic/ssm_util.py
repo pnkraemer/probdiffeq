@@ -47,9 +47,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         A, noise = cond
 
         assert isinstance(A, matfree.MatrixLinOp)
-
         A_scaled = p[:, None] * A.matrix * p_inv[None, :]
         A_new = matfree.linop_from_matmul(A_scaled)
+
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
         return A_new, noise
 
@@ -67,5 +67,6 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
             return x[i, ...]
 
         bias = jnp.zeros(self.ode_shape)
-        eye = jnp.eye(*self.ode_shape)
-        return A, _normal.Normal(bias, standard_deviation * eye)
+        eye = jnp.ones(())
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        return matfree.linop_from_callable(A), noise

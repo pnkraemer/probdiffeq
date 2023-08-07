@@ -140,12 +140,10 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for log-posterior
 
-    if jnp.shape(observation_std) != (jnp.shape(u)[0],):
+    if jnp.shape(observation_std) != ():
         raise ValueError(
             f"Observation-noise shape {jnp.shape(observation_std)} does not match "
-            f"the observation shape {jnp.shape(u)}. "
-            f"Expected observation-noise shape: "
-            f"{(jnp.shape(u)[0],)} != {jnp.shape(observation_std)}. "
+            f"the expected observation shape {()}. "
         )
 
     if jnp.ndim(u) < 2:
@@ -186,9 +184,9 @@ def _kalman_filter(u, /, mseq, standard_deviation, *, strategy, reverse=True):
 
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
-    _, (_gain, init) = impl.transform.revert(rv_terminal, observation_model)
+    _, (_gain, init) = impl.conditional.revert(rv_terminal, observation_model)
 
-    init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
+    # init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
 
     # Scan over the remaining data points
     lml_state, _ = jax.lax.scan(

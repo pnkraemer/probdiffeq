@@ -18,6 +18,7 @@ def linop_from_callable(func):
 
 # Why? Because transformations/conditionals can either be
 # matrices or matrix-free linear operators.
+#
 # We have to build a generic version of those that can
 # 1) Behave like matmul (i.e. behave *exactly* like A @ x, where x can be any array)
 # 2) Are vmap'able; the vmap-output can be used as an input to scan(...xs=)
@@ -25,6 +26,11 @@ def linop_from_callable(func):
 #
 # Always using a matrix fails because QOI-conditioning must use indexing/slicing.
 # Always using an operator fails because merging and vmapping becomes awkward.
+#
+# But we also don't want to have two implementations
+# (one for matrices and one for callables)
+# for all transformations and conditionals. So we need to find the common denominator.
+#
 #
 # Can we simplify this?
 
