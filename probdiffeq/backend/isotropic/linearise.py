@@ -17,3 +17,7 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
 
     def constraint_statistical_1st(self, cubature_fun):
         raise NotImplementedError
+
+
+def ts0(fn, m):
+    return fn(m)

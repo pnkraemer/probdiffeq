@@ -25,7 +25,7 @@ class Factorisation(abc.ABC):
         raise NotImplementedError
 
 
-def choose(which, /, **options_for_dense_factorisation):
+def choose(which, /, *, ode_shape=()):
     if which == "scalar":
         # Import outside toplevel.
         # Why?
@@ -40,10 +40,10 @@ def choose(which, /, **options_for_dense_factorisation):
     if which == "dense":
         from probdiffeq.backend.dense import factorisations
 
-        return factorisations.DenseFactorisation(**options_for_dense_factorisation)
+        return factorisations.DenseFactorisation(ode_shape=ode_shape)
     if which == "isotropic":
         from probdiffeq.backend.isotropic import factorisations
 
-        return factorisations.IsotropicFactorisation()
+        return factorisations.IsotropicFactorisation(ode_shape=ode_shape)
 
     raise ValueError

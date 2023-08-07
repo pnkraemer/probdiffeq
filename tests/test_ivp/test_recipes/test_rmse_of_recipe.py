@@ -23,10 +23,7 @@ def fixture_problem():
 
 @testing.case()
 def case_ts0_iso():
-    def ts0_iso_factory(ode_shape, num_derivatives):
-        return recipes.ts0_iso(num_derivatives=num_derivatives)
-
-    return ts0_iso_factory, 1.0
+    return recipes.ts0_iso, 1.0
 
 
 @testing.case()

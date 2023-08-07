@@ -40,9 +40,9 @@ class _Impl(containers.NamedTuple):
     """Calibration factory."""
 
 
-def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
+def ts0_iso(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
-    statespace.select("isotropic")
+    statespace.select("isotropic", ode_shape=ode_shape)
 
     correction = probdiffeq.statespace.corr.taylor_order_zero(ode_order=ode_order)
     ibm = probdiffeq.statespace.extra.ibm_factory(num_derivatives=num_derivatives)

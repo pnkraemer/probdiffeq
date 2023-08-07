@@ -1,19 +1,28 @@
 from probdiffeq.backend import _factorisations
-from probdiffeq.backend.isotropic import conditional, linearise, random, ssm_util
+from probdiffeq.backend.isotropic import (
+    conditional,
+    linearise,
+    random,
+    ssm_util,
+    transform,
+)
 
 
 class IsotropicFactorisation(_factorisations.Factorisation):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def conditional(self):
-        raise NotImplementedError
+        return conditional.ConditionalBackEnd()
 
     def linearise_ode(self):
         return linearise.LineariseODEBackEnd()
 
     def random(self):
-        raise NotImplementedError
+        return random.RandomVariableBackEnd(ode_shape=self.ode_shape)
 
     def ssm_util(self):
-        raise NotImplementedError
+        return ssm_util.SSMUtilBackEnd()
 
     def transform(self):
-        raise NotImplementedError
+        return transform.TransformBackEnd()
