@@ -36,13 +36,12 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return (lambda s: a @ s, noise), (p, p_inv)
+            return (a, noise), (p, p_inv)
 
         return discretise
 
     def identity_conditional(self, ndim):
         transition = jnp.eye(ndim)
-
         mean = jnp.zeros((ndim,))
         cov_sqrtm = jnp.zeros((ndim, ndim))
         noise = random.Normal(mean, cov_sqrtm)
