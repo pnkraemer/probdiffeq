@@ -96,7 +96,7 @@ class ODEConstraintNoisy(Correction):
         A, b = self.linearise(f_wrapped, ssv.hidden_state)
 
         # Condition
-        obs, (cor, _gn) = statespace.cond.transform.revert(ssv.hidden_state, (A, b))
+        obs, (cor, _gn) = statespace.cond.conditional.revert(ssv.hidden_state, (A, b))
         u = statespace.random.qoi(cor)
         ssv = variables.SSV(u, cor)
         return ssv, obs

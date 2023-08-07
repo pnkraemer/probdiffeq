@@ -52,7 +52,7 @@ def case_slr1_dense():
 @testing.case()
 def case_slr1_dense_gauss_hermite():
     def recipe(**kwargs):
-        return recipes.slr1_dense(cubature_rule_fn=cubature.gauss_hermite, **kwargs)
+        return recipes.slr1_dense(cubature_fun=cubature.gauss_hermite, **kwargs)
 
     return recipe, 1.0
 

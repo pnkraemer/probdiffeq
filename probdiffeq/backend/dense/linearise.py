@@ -59,14 +59,14 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
             linearisation_pt = random.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
-            J, noise = linearise_fun(fun, linearisation_pt)
+            linop, noise = linearise_fun(fun, linearisation_pt)
 
             def A(x):
-                return a1(x) - J(a0(x))
+                return a1(x) - linop @ a0(x)
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = random.Normal(-mean, cov_lower)
-            return _autobatch_linop(A), bias
+            return jax.jacfwd(A)(rv.mean), bias
 
         return new
 
@@ -113,4 +113,4 @@ def slr1(fn, x, *, cubature_rule):
     )
     mean_cond = fx_mean - linop_cond @ x.mean
     rv_cond = random.Normal(mean_cond, cov_sqrtm_cond.T)
-    return lambda v: linop_cond @ v, rv_cond
+    return linop_cond, rv_cond
