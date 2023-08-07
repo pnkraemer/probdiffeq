@@ -8,6 +8,8 @@ import jax.scipy.stats
 
 from probdiffeq.backend import statespace, testing
 
+# todo: test for blockdiag
+
 
 @testing.fixture(name="setup")
 @testing.parametrize("d", [1, 10])
@@ -23,7 +25,7 @@ def fixture_setup(d):
 
 def test_logpdf_dense(setup):
     statespace.select("dense")
-    m, cov_cholesky = setup
+    mean, cholesky = setup
 
     def fn1(x):
         rv = statespace.random.variable(mean, cholesky)
@@ -34,7 +36,7 @@ def test_logpdf_dense(setup):
             x, mean=mean, cov=cholesky @ cholesky.T
         )
 
-    u = m + 1e-3
+    u = mean + 1e-3
     pdf1 = fn1(u)
     pdf2 = fn2(u)
     assert jnp.allclose(pdf1, pdf2)
@@ -48,7 +50,7 @@ def test_logpdf_iso(setup):
     statespace.select("isotropic")
 
     mean, cholesky = setup
-    standard_deviation = jnp.trace(cov_cholesky)
+    standard_deviation = jnp.trace(cholesky)
 
     def fn1(x):
         rv = statespace.random.variable(mean, standard_deviation)
@@ -56,10 +58,35 @@ def test_logpdf_iso(setup):
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
-            x, mean=mean, cov=standard_deviation**2 * jnp.eye(len(m))
+            x, mean=mean, cov=standard_deviation**2 * jnp.eye(len(mean))
         )
 
-    u = m + 1e-3
+    u = mean + 1e-3
+    pdf1 = fn1(u)
+    pdf2 = fn2(u)
+    assert jnp.allclose(pdf1, pdf2)
+
+    pdf1 = jax.grad(fn1)(u)
+    pdf2 = jax.grad(fn2)(u)
+    assert jnp.allclose(pdf1, pdf2)
+
+
+def test_logpdf_blockdiag(setup):
+    statespace.select("blockdiag")
+
+    mean, cholesky = setup
+    standard_deviation = jnp.diagonal(cholesky)
+
+    def fn1(x):
+        rv = statespace.random.variable(mean, standard_deviation)
+        return statespace.random.logpdf(x, rv)
+
+    def fn2(x):
+        return jax.scipy.stats.multivariate_normal.logpdf(
+            x, mean=mean, cov=jnp.diag(standard_deviation**2)
+        )
+
+    u = mean + 1e-3
     pdf1 = fn1(u)
     pdf2 = fn2(u)
     assert jnp.allclose(pdf1, pdf2)
@@ -85,7 +112,7 @@ def test_logpdf_scalar(setup):
             x, mean=mean, cov=standard_deviation**2
         )
 
-    u = m + 1e-3
+    u = m[0] + 1e-3
     pdf1 = fn1(u)
     pdf2 = fn2(u)
     assert jnp.allclose(pdf1, pdf2)

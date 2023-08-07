@@ -14,6 +14,13 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def mahalanobis_norm(self, u, /, rv):
         return (rv.mean - u) / rv.cholesky  # return array of norms! See calibration
 
+    def logpdf(self, u, /, rv):
+        residual_white = (rv.mean - u) / rv.cholesky
+        x1 = jnp.square(residual_white)
+        x2 = u.size * 2.0 * jnp.log(jnp.abs(rv.cholesky))
+        x3 = u.size * jnp.log(jnp.pi * 2)
+        return jnp.sum(-0.5 * (x1 + x2 + x3))
+
     def mean(self, rv):
         return rv.mean
 

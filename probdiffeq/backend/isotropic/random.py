@@ -16,6 +16,13 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         residual_white_matrix = jnp.linalg.qr(residual_white[:, None], mode="r")
         return jnp.reshape(jnp.abs(residual_white_matrix), ())
 
+    def logpdf(self, u, /, rv):
+        residual_white = (rv.mean - u) / rv.cholesky
+        x1 = jnp.dot(residual_white, residual_white)
+        x2 = u.size * 2.0 * jnp.log(jnp.abs(rv.cholesky))
+        x3 = u.size * jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
+
     def mean(self, rv):
         return rv.mean
 

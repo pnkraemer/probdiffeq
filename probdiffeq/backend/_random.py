@@ -15,6 +15,10 @@ class RandomVariableBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def logpdf(self, u, /, rv):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def standard_deviation(self, rv):
         raise NotImplementedError
 

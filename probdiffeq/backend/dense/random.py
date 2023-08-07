@@ -21,6 +21,20 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         mahalanobis = jnp.linalg.qr(residual_white[:, None], mode="r")
         return jnp.reshape(jnp.abs(mahalanobis), ())
 
+    def logpdf(self, u, /, rv):
+        # The cholesky factor is triangular, so we compute a cheap slogdet.
+        # todo: cache those?
+        diagonal = jnp.diagonal(rv.cholesky, axis1=-1, axis2=-2)
+        slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+
+        residual_white = jax.scipy.linalg.solve_triangular(
+            rv.cholesky.T, u - rv.mean, lower=False, trans="T"
+        )
+        x1 = jnp.dot(residual_white, residual_white)
+        x2 = 2.0 * slogdet
+        x3 = u.size * jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
+
     def mean(self, rv):
         return rv.mean
 

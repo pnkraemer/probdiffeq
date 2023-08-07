@@ -19,6 +19,13 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         res_white = (u - rv.mean) / rv.cholesky
         return jnp.abs(res_white)
 
+    def logpdf(self, u, /, rv):
+        x1 = 2.0 * jnp.log(jnp.abs(rv.cholesky))  # logdet
+        residual_white = (u - rv.mean) / rv.cholesky
+        x2 = jnp.square(residual_white)
+        x3 = jnp.log(jnp.pi * 2)
+        return -0.5 * (x1 + x2 + x3)
+
     def standard_deviation(self, rv):
         return jnp.abs(rv.cholesky)
 
