@@ -27,9 +27,13 @@ class SSMUtilBackend(abc.ABC):
     # todo: move those to random.py and cond.py instead?
 
     @abc.abstractmethod
-    def identity_conditional(self, ndim):
+    def identity_conditional(self, num_derivatives_per_ode_dimension, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def standard_normal(self, ndim, output_scale):
+    def standard_normal(self, num_derivatives_per_ode_dimension, /, output_scale):
+        raise NotImplementedError
+
+    # solution to the BVP problem
+    def bias_to_standard_noise(self, bias, /, factor):
         raise NotImplementedError

@@ -25,7 +25,7 @@ class Factorisation(abc.ABC):
         raise NotImplementedError
 
 
-def choose(which, /, *, ode_shape=()):
+def choose(which, /, *, ode_shape=None):
     # In this function, we import outside toplevel.
     #
     # Why?
@@ -39,6 +39,8 @@ def choose(which, /, *, ode_shape=()):
         from probdiffeq.backend.scalar import factorisations
 
         return factorisations.ScalarFactorisation()
+    if ode_shape is None:
+        raise ValueError("Please provide an ODE shape.")
     if which == "dense":
         from probdiffeq.backend.dense import factorisations
 

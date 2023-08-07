@@ -280,5 +280,14 @@ def ibm_factory(num_derivatives) -> IBMExtrapolationFactory:
     return IBMExtrapolationFactory(args=(discretise, num_derivatives))
 
 
-def ibm_discretise_fwd():
-    pass
+def ibm_discretise_fwd(dts, /, *, num_derivatives):
+    discretise = statespace.ssm_util.ibm_transitions(num_derivatives)
+    return jax.vmap(discretise)(dts)
+
+
+def unit_markov_sequence(num_derivatives):
+    cond = statespace.ssm_util.identity_conditional(num_derivatives + 1)
+    init = statespace.ssm_util.standard_normal(num_derivatives + 1, 1.0)
+    print(init)
+
+    return _markov.MarkovSeqRev(init=init, conditional=cond)

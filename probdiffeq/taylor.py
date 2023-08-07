@@ -8,7 +8,8 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq.backend import containers, statespace
+from probdiffeq.backend import containers
+from probdiffeq.statespace import extra
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -180,11 +181,9 @@ def _runge_kutta_starter_fn(
     # Run fixed-point smoother
 
     # Initialise
-    ode_shape = initial_values[0].shape
     factory = extra.ibm_factory(num_derivatives=num)
     extrapolation = factory.fixedpoint()
-
-    solution = variables.unit_markov_sequence(num_derivatives=num, ode_shape=ode_shape)
+    solution = extra.unit_markov_sequence(num_derivatives=num)
 
     # Estimate
     u0_full = _fixed_point_smoother(extrapolation, solution, ys=ys, dts=jnp.diff(ts))

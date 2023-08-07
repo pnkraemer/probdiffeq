@@ -23,8 +23,12 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, ndim):
-        raise NotImplementedError
+    def identity_conditional(self, num_hidden_states_per_ode_dim, /):
+        m0 = jnp.zeros((num_hidden_states_per_ode_dim,) + self.ode_shape)
+        c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
+        noise = _normal.Normal(m0, c0)
+        matrix = jnp.eye(num_hidden_states_per_ode_dim)
+        return matrix, noise
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -42,8 +46,10 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
         raise NotImplementedError
 
-    def standard_normal(self, ndim, output_scale):
-        raise NotImplementedError
+    def standard_normal(self, num, /, output_scale):
+        mean = jnp.zeros((num,) + self.ode_shape)
+        cholesky = output_scale * jnp.eye(num)
+        return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
         sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)

@@ -3,7 +3,7 @@
 Place all tests that have no better place here.
 """
 from probdiffeq.backend import testing
-from probdiffeq.statespace import extra
+from probdiffeq.statespace import recipes
 
 
 @testing.parametrize("incr", [1, -1])
@@ -17,7 +17,7 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     attribute of the extrapolation model.
     """
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
-    factory = extra.ts0_iso(num_derivatives=n).extrapolation_factory
+    factory = recipes.ts0_iso(num_derivatives=n, ode_shape=(1,)).extrapolation
     for impl in [factory.filter(), factory.smoother(), factory.fixedpoint()]:
         with testing.raises(ValueError):
             _ = impl.solution_from_tcoeffs(tcoeffs_wrong_length)

@@ -32,7 +32,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, ndim):
+    def identity_conditional(self, num_hidden_states_per_ode_dim):
         raise NotImplementedError
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
@@ -62,7 +62,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
         raise NotImplementedError
 
-    def standard_normal(self, ndim, output_scale):
+    def standard_normal(self, num_hidden_states_per_ode_dim, output_scale):
         raise NotImplementedError
 
     def update_mean(self, mean, x, /, num):

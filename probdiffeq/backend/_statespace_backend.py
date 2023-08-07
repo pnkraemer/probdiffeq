@@ -15,10 +15,14 @@ class Backend:
         self._fact: _factorisations.Factorisation = None
 
     def select(self, which, **kwargs):
+        # if self._fact is not None:
+        #     raise ValueError(f"Factorisation {self._fact} has been selected already.")
         self._fact = _factorisations.choose(which, **kwargs)
 
     @property
     def linearise(self) -> _linearise.LinearisationBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
         return self._fact.linearise()
 
     @property
@@ -29,12 +33,18 @@ class Backend:
 
     @property
     def conditional(self) -> _conditional.ConditionalBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
         return self._fact.conditional()
 
     @property
     def transform(self) -> _transform.TransformBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
         return self._fact.transform()
 
     @property
     def ssm_util(self) -> _ssm_util.SSMUtilBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
         return self._fact.ssm_util()

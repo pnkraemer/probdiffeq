@@ -34,6 +34,7 @@ def _constrain_bconds_affine_separable(
     bcond_first, bcond_second = bconds
 
     # First boundary condition
+
     _, (init, _) = corr.correct_affine_qoi_noisy(prior.init, bcond_first, stdev=nugget)
 
     # Loop over time
