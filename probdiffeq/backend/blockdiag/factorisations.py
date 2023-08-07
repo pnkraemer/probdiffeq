@@ -22,7 +22,7 @@ class BlockDiagFactorisation(_factorisations.Factorisation):
         raise NotImplementedError
 
     def ssm_util(self):
-        raise NotImplementedError
+        return ssm_util.SSMUtilBackend()
 
     def transform(self):
         raise NotImplementedError
