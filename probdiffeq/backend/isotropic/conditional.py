@@ -3,7 +3,7 @@ from probdiffeq.backend import _conditional
 from probdiffeq.backend.isotropic import _normal
 
 
-class ConditionalBackEnd(_conditional.ConditionalBackEnd):
+class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         A, noise = conditional
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)

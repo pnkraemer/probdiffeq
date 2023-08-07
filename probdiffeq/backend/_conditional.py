@@ -1,7 +1,7 @@
 import abc
 
 
-class ConditionalBackEnd(abc.ABC):
+class ConditionalBackend(abc.ABC):
     @abc.abstractmethod
     def marginalise(self, rv, conditional, /):
         raise NotImplementedError

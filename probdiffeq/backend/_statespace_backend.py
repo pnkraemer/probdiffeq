@@ -10,7 +10,7 @@ from probdiffeq.backend import (
 )
 
 
-class BackEnd:
+class Backend:
     def __init__(self):
         self._fact: _factorisations.Factorisation = None
 
@@ -18,23 +18,23 @@ class BackEnd:
         self._fact = _factorisations.choose(which, **kwargs)
 
     @property
-    def linearise_ode(self) -> _linearise.LineariseODEBackEnd:
-        return self._fact.linearise_ode()
+    def linearise(self) -> _linearise.LinearisationBackend:
+        return self._fact.linearise()
 
     @property
-    def random(self) -> _random.RandomVariableBackEnd:
+    def random(self) -> _random.RandomVariableBackend:
         if self._fact is None:
             raise ValueError("Select a factorisation first.")
         return self._fact.random()
 
     @property
-    def conditional(self) -> _conditional.ConditionalBackEnd:
+    def conditional(self) -> _conditional.ConditionalBackend:
         return self._fact.conditional()
 
     @property
-    def transform(self) -> _transform.TransformBackEnd:
+    def transform(self) -> _transform.TransformBackend:
         return self._fact.transform()
 
     @property
-    def ssm_util(self) -> _ssm_util.SSMUtilBackEnd:
+    def ssm_util(self) -> _ssm_util.SSMUtilBackend:
         return self._fact.ssm_util()

@@ -1,7 +1,7 @@
 from probdiffeq.backend import _linearise
 
 
-class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
+class LinearisationBackend(_linearise.LinearisationBackend):
     def constraint_1st(self, ode_order):
         raise NotImplementedError
 

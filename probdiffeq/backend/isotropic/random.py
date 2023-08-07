@@ -4,7 +4,7 @@ from probdiffeq.backend import _random
 from probdiffeq.backend.isotropic import _normal
 
 
-class RandomVariableBackEnd(_random.RandomVariableBackEnd):
+class RandomVariableBackend(_random.RandomVariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 

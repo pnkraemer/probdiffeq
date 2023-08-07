@@ -12,7 +12,7 @@ class Transformation(containers.NamedTuple):
     bias: jax.Array
 
 
-class TransformBackEnd(_transform.TransformBackEnd):
+class TransformBackend(_transform.TransformBackend):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
         cholesky_new = _sqrt_util.triu_via_qr(A(rv.cholesky).T).T

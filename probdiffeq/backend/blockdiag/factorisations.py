@@ -1,5 +1,5 @@
 from probdiffeq.backend import _factorisations
-from probdiffeq.backend.isotropic import (
+from probdiffeq.backend.blockdiag import (
     conditional,
     linearise,
     random,
@@ -8,21 +8,21 @@ from probdiffeq.backend.isotropic import (
 )
 
 
-class IsotropicFactorisation(_factorisations.Factorisation):
+class BlockDiagFactorisation(_factorisations.Factorisation):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
     def conditional(self):
-        return conditional.ConditionalBackend()
+        raise NotImplementedError
 
     def linearise(self):
         return linearise.LinearisationBackend()
 
     def random(self):
-        return random.RandomVariableBackend(ode_shape=self.ode_shape)
+        raise NotImplementedError
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackend()
+        raise NotImplementedError
 
     def transform(self):
-        return transform.TransformBackend()
+        raise NotImplementedError

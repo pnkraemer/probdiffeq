@@ -9,17 +9,17 @@ from probdiffeq.backend.scalar import (
 
 
 class ScalarFactorisation(_factorisations.Factorisation):
-    def linearise_ode(self):
-        return linearise.LineariseODEBackEnd()
+    def linearise(self):
+        return linearise.LinearisationBackend()
 
     def random(self):
-        return random.RandomVariableBackEnd()
+        return random.RandomVariableBackend()
 
     def conditional(self):
-        return conditional.ConditionalBackEnd()
+        return conditional.ConditionalBackend()
 
     def transform(self):
-        return transform.TransformBackEnd()
+        return transform.TransformBackend()
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackEnd()
+        return ssm_util.SSMUtilBackend()

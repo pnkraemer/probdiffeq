@@ -1,7 +1,7 @@
 import abc
 
 
-class LineariseODEBackEnd(abc.ABC):
+class LinearisationBackend(abc.ABC):
     @abc.abstractmethod
     def constraint_0th(self, ode_order):
         raise NotImplementedError

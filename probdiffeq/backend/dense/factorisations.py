@@ -7,17 +7,17 @@ class DenseFactorisation(_factorisations.Factorisation):
         # todo: add "order="F"" key
         self.ode_shape = ode_shape
 
-    def linearise_ode(self):
-        return linearise.LineariseODEBackEnd(ode_shape=self.ode_shape)
+    def linearise(self):
+        return linearise.LinearisationBackend(ode_shape=self.ode_shape)
 
     def random(self):
-        return random.RandomVariableBackEnd(ode_shape=self.ode_shape)
+        return random.RandomVariableBackend(ode_shape=self.ode_shape)
 
     def conditional(self):
-        return conditional.ConditionalBackEnd()
+        return conditional.ConditionalBackend()
 
     def transform(self):
-        return transform.TransformBackEnd()
+        return transform.TransformBackend()
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackEnd(ode_shape=self.ode_shape)
+        return ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)

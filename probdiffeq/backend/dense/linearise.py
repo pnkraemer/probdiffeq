@@ -8,7 +8,7 @@ from probdiffeq.backend import _linearise
 from probdiffeq.backend.dense import _normal
 
 
-class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
+class LinearisationBackend(_linearise.LinearisationBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 

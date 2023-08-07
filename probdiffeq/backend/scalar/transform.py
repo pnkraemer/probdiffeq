@@ -5,7 +5,7 @@ from probdiffeq.backend import _transform
 from probdiffeq.backend.scalar import _normal
 
 
-class TransformBackEnd(_transform.TransformBackEnd):
+class TransformBackend(_transform.TransformBackend):
     def marginalise(self, rv, transformation, /):
         # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
         matmul, b = transformation

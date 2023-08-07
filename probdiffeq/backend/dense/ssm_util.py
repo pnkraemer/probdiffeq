@@ -7,7 +7,7 @@ from probdiffeq.backend.dense import _normal
 from probdiffeq.statespace import _ibm_util
 
 
-class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
+class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 

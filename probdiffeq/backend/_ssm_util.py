@@ -3,7 +3,7 @@
 import abc
 
 
-class SSMUtilBackEnd(abc.ABC):
+class SSMUtilBackend(abc.ABC):
     @abc.abstractmethod
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         raise NotImplementedError

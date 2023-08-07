@@ -118,7 +118,7 @@ def estimate_error(observed, /):
 def taylor_order_zero(*, ode_order) -> ODEConstraint:
     return ODEConstraint(
         ode_order=ode_order,
-        linearise_fun=statespace.linearise_ode.constraint_0th(ode_order=ode_order),
+        linearise_fun=statespace.linearise.constraint_0th(ode_order=ode_order),
         string_repr=f"<TS0 with ode_order={ode_order}>",
     )
 
@@ -126,13 +126,13 @@ def taylor_order_zero(*, ode_order) -> ODEConstraint:
 def taylor_order_one(*, ode_order) -> ODEConstraint:
     return ODEConstraint(
         ode_order=ode_order,
-        linearise_fun=statespace.linearise_ode.constraint_1st(ode_order=ode_order),
+        linearise_fun=statespace.linearise.constraint_1st(ode_order=ode_order),
         string_repr=f"<TS1 with ode_order={ode_order}>",
     )
 
 
 def statistical_order_one(cubature_fun=cubature.third_order_spherical):
-    linearise_fun = statespace.linearise_ode.constraint_statistical_1st(cubature_fun)
+    linearise_fun = statespace.linearise.constraint_statistical_1st(cubature_fun)
     return ODEConstraintNoisy(
         ode_order=1,
         linearise_fun=linearise_fun,
@@ -141,7 +141,7 @@ def statistical_order_one(cubature_fun=cubature.third_order_spherical):
 
 
 def statistical_order_zero(cubature_fun=cubature.third_order_spherical):
-    linearise_fun = statespace.linearise_ode.constraint_statistical_0th(cubature_fun)
+    linearise_fun = statespace.linearise.constraint_statistical_0th(cubature_fun)
     return ODEConstraintNoisy(
         ode_order=1,
         linearise_fun=linearise_fun,

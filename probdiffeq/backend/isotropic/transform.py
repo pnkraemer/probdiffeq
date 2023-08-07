@@ -5,7 +5,7 @@ from probdiffeq.backend import _transform
 from probdiffeq.backend.isotropic import _normal
 
 
-class TransformBackEnd(_transform.TransformBackEnd):
+class TransformBackend(_transform.TransformBackend):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
         mean, cholesky = rv.mean, rv.cholesky

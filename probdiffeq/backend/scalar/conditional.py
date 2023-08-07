@@ -5,7 +5,7 @@ from probdiffeq.backend import _conditional
 from probdiffeq.backend.scalar import _normal
 
 
-class ConditionalBackEnd(_conditional.ConditionalBackEnd):
+class ConditionalBackend(_conditional.ConditionalBackend):
     def marginalise(self, rv, conditional, /):
         matrix, noise = conditional
 

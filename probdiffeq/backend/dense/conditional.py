@@ -12,7 +12,7 @@ class Conditional(containers.NamedTuple):
     noise: _normal.Normal
 
 
-class ConditionalBackEnd(_conditional.ConditionalBackEnd):
+class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         matrix, noise = conditional
         return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)

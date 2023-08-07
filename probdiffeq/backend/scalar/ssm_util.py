@@ -7,7 +7,7 @@ from probdiffeq.backend.scalar import _normal
 from probdiffeq.statespace import _ibm_util
 
 
-class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
+class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
             msg1 = "The number of Taylor coefficients does not match "

@@ -6,7 +6,7 @@ from probdiffeq.backend.isotropic import _normal
 from probdiffeq.statespace import _ibm_util
 
 
-class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
+class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def ibm_transitions(self, num_derivatives, output_scale):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
         q0 = jnp.zeros((num_derivatives + 1, 1))  # "1" suffices for broadcasting

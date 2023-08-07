@@ -1,7 +1,7 @@
 import abc
 
 
-class RandomVariableBackEnd(abc.ABC):
+class RandomVariableBackend(abc.ABC):
     @abc.abstractmethod
     def qoi_like(self):
         raise NotImplementedError

@@ -6,7 +6,7 @@ from probdiffeq.backend import _random, containers
 from probdiffeq.backend.scalar import _normal
 
 
-class RandomVariableBackEnd(_random.RandomVariableBackEnd):
+class RandomVariableBackend(_random.RandomVariableBackend):
     def qoi_like(self):
         mean = jnp.empty(())
         cholesky = jnp.empty(())

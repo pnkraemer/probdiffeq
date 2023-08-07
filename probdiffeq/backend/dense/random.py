@@ -7,7 +7,7 @@ from probdiffeq.backend import _random, containers
 from probdiffeq.backend.dense import _normal
 
 
-class RandomVariableBackEnd(_random.RandomVariableBackEnd):
+class RandomVariableBackend(_random.RandomVariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 

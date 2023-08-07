@@ -1,7 +1,7 @@
 import abc
 
 
-class TransformBackEnd(abc.ABC):
+class TransformBackend(abc.ABC):
     @abc.abstractmethod
     def marginalise(self, rv, transformation, /):
         raise NotImplementedError
