@@ -8,10 +8,10 @@ from probdiffeq.backend.scalar import random
 class TransformImpl(_cond.TransformImpl):
     def marginalise(self, rv, transformation, /):
         # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
-        A, b = transformation
-        cholesky_new = _sqrt_util.triu_via_qr(A(rv.cholesky)[:, None])
+        matmul, b = transformation
+        cholesky_new = _sqrt_util.triu_via_qr(matmul(rv.cholesky)[:, None])
         cholesky_new_squeezed = jnp.reshape(cholesky_new, ())
-        return random.Normal(A(rv.mean) + b, cholesky_new_squeezed)
+        return random.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
 
     def revert(self, rv, transformation, /):
         # Assumes that A maps a vector to a scalar...
@@ -38,32 +38,31 @@ class TransformImpl(_cond.TransformImpl):
 
 class ConditionalImpl(_cond.ConditionalImpl):
     def marginalise(self, rv, conditional, /):
-        A, noise = conditional
+        matmul, noise = conditional
 
-        mean = A @ rv.mean
-        cholesky_T = _sqrt_util.sum_of_sqrtm_factors(
-            R_stack=((A @ rv.cholesky).T, noise.cholesky.T)
-        )
+        mean = matmul(rv.mean)
+        R_stack = (matmul(rv.cholesky).T, noise.cholesky.T)
+        cholesky_T = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack)
         return random.Normal(mean, cholesky_T.T)
 
     def revert(self, rv, conditional, /):
-        a, noise = conditional
+        matmul, noise = conditional
 
         r_ext, (r_bw_p, g_bw_p) = _sqrt_util.revert_conditional(
-            R_X_F=(a @ rv.cholesky).T,
+            R_X_F=(matmul(rv.cholesky)).T,
             R_X=rv.cholesky.T,
-            R_YX=(noise.cholesky).T,
+            R_YX=noise.cholesky.T,
         )
-        m_ext = a @ rv.mean + noise.mean
+        m_ext = matmul(rv.mean) + noise.mean
         m_cond = rv.mean - g_bw_p @ m_ext
 
         marginal = random.Normal(m_ext, r_ext.T)
         noise = random.Normal(m_cond, r_bw_p.T)
-        return marginal, (g_bw_p, noise)
+        return marginal, (lambda s: g_bw_p @ s, noise)
 
     def apply(self, x, conditional, /):
-        a, noise = conditional
-        return random.Normal(a @ x + noise.mean, noise.cholesky)
+        matmul, noise = conditional
+        return random.Normal(matmul(x) + noise.mean, noise.cholesky)
 
     def merge(self, previous, incoming, /):
         A, b = previous

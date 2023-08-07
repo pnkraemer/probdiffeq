@@ -9,6 +9,12 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
 
         return linearise_fun_wrapped
 
+    def constraint_1st(self, ode_order):
+        raise NotImplementedError
+
+    def constraint_statistical_1st(self, cubature_fun):
+        raise NotImplementedError
+
 
 def ts0(fn, m):
     return fn(m)

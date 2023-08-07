@@ -1,6 +1,19 @@
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _cond
 from probdiffeq.backend.dense import random
+from probdiffeq.backend import containers
+from typing import Callable
+import jax
+
+
+class Conditional(containers.NamedTuple):
+    matmul: Callable
+    noise: random.Normal
+
+
+class Transformation(containers.NamedTuple):
+    matmul: Callable
+    bias: jax.Array
 
 
 class TransformImpl(_cond.TransformImpl):
@@ -10,7 +23,7 @@ class TransformImpl(_cond.TransformImpl):
         return random.Normal(A(rv.mean) + b, cholesky_new)
 
     def revert(self, rv, transformation, /):
-        A, b = transformation
+        matmul, b = transformation
         mean, cholesky = rv.mean, rv.cholesky
 
         # QR-decomposition
@@ -20,22 +33,22 @@ class TransformImpl(_cond.TransformImpl):
         )
 
         # Gather terms and return
-        m_cor = mean - gain @ (A(mean) + b)
+        m_cor = mean - gain @ (matmul(mean) + b)
         corrected = random.Normal(m_cor, r_cor.T)
-        observed = random.Normal(A(mean) + b, r_obs.T)
+        observed = random.Normal(matmul(mean) + b, r_obs.T)
         return observed, (corrected, gain)
 
 
 class ConditionalImpl(_cond.ConditionalImpl):
     def apply(self, x, conditional, /):
-        A, noise = conditional
-        return random.Normal(A @ x + noise.mean, noise.cholesky)
+        matmul, noise = conditional
+        return random.Normal(matmul(x) + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):
-        A, noise = conditional
-        R_stack = ((A @ rv.cholesky).T, noise.cholesky.T)
+        matmul, noise = conditional
+        R_stack = (matmul(rv.cholesky).T, noise.cholesky.T)
         cholesky_new = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-        return random.Normal(A @ rv.mean + noise.mean, cholesky_new)
+        return random.Normal(matmul(rv.mean) + noise.mean, cholesky_new)
 
     def merge(self, cond1, cond2, /):
         raise NotImplementedError

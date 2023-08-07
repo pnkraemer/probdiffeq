@@ -36,7 +36,7 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return (a, noise), (p, p_inv)
+            return (lambda s: a @ s, noise), (p, p_inv)
 
         return discretise
 

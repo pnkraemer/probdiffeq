@@ -28,7 +28,7 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
             p, p_inv = precon_fun(dt)
             p = jnp.tile(p, d)
             p_inv = jnp.tile(p_inv, d)
-            return (A, noise), (p, p_inv)
+            return (lambda s: A @ s, noise), (p, p_inv)
 
         return discretise
 
