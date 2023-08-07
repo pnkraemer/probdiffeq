@@ -33,4 +33,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
 
 def _transpose(matrix):
-    return jnp.transpose(matrix, axes=(0, -2, -1))
+    return jnp.transpose(matrix, axes=(0, -1, -2))

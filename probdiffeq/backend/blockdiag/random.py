@@ -9,9 +9,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         self.ode_shape = ode_shape
 
     def mahalanobis_norm(self, u, /, rv):
-        residual_white = (rv.mean - u) / rv.cholesky
-        residual_white_matrix = jnp.linalg.qr(residual_white[:, None], mode="r")
-        return jnp.reshape(jnp.abs(residual_white_matrix), ())
+        return (rv.mean - u) / rv.cholesky  # return array of norms! See calibration
 
     def mean(self, rv):
         return rv.mean

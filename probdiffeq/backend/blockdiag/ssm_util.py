@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util
 from probdiffeq.backend import _ssm_util
 from probdiffeq.backend.blockdiag import _normal
 from probdiffeq.statespace import _ibm_util
@@ -52,4 +53,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         raise NotImplementedError
 
     def update_mean(self, mean, x, /, num):
-        raise NotImplementedError
+        print(mean.shape, x.shape)
+
+        sum_of_scalars = jax.vmap(_sqrt_util.sqrt_sum_square_scalar)
+        sum_updated = sum_of_scalars(jnp.sqrt(num) * mean, x)
+        return sum_updated / jnp.sqrt(num + 1)

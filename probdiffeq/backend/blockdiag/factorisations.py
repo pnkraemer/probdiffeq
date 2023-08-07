@@ -25,4 +25,4 @@ class BlockDiagFactorisation(_factorisations.Factorisation):
         return ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)
 
     def transform(self):
-        return transform.TransformBackend()
+        return transform.TransformBackend(ode_shape=self.ode_shape)

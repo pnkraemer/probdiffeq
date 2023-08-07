@@ -109,10 +109,7 @@ def estimate_error(observed, /):
     zero_data = jnp.zeros_like(statespace.random.mean(observed))
     output_scale = statespace.random.mahalanobis_norm(zero_data, rv=observed)
     error_estimate_unscaled = statespace.random.standard_deviation(observed)
-
-    # Broadcast error estimate to (d,) shape
-    ones_like = jnp.ones_like(statespace.random.mean(observed))
-    return output_scale * error_estimate_unscaled * ones_like
+    return output_scale * error_estimate_unscaled
 
 
 def taylor_order_zero(*, ode_order) -> ODEConstraint:

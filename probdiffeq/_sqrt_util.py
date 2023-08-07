@@ -25,7 +25,7 @@ import jax
 import jax.numpy as jnp
 
 
-def revert_conditional_noisefree(*, R_X_F, R_X):
+def revert_conditional_noisefree(R_X_F, R_X):
     """Like revert_conditional, but without observation noise."""
     if not R_X_F.shape[1] <= R_X_F.shape[0]:
         msg = (
