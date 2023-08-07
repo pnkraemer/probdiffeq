@@ -52,14 +52,14 @@ class ODEConstraint(Correction):
             return vector_field(*s, t=t, p=p)
 
         A, b = self.linearise(f_wrapped, ssv.hidden_state.mean)
-        observed = statespace.cond.transform.marginalise(ssv.hidden_state, (A, b))
+        observed = statespace.transform.marginalise(ssv.hidden_state, (A, b))
 
         error_estimate = estimate_error(observed)
         return error_estimate, observed, (A, b)
 
     def complete(self, ssv, corr, /, vector_field, t, p):
         A, b = corr
-        obs, (cor, _gn) = statespace.cond.transform.revert(ssv.hidden_state, (A, b))
+        obs, (cor, _gn) = statespace.transform.revert(ssv.hidden_state, (A, b))
         u = statespace.random.qoi(cor)
         ssv = variables.SSV(u, cor)
         return ssv, obs
@@ -85,7 +85,7 @@ class ODEConstraintNoisy(Correction):
     def estimate_error(self, ssv, corr, /, vector_field, t, p):
         f_wrapped = functools.partial(vector_field, t=t, p=p)
         A, b = self.linearise(f_wrapped, ssv.hidden_state)
-        observed = statespace.cond.conditional.marginalise(ssv.hidden_state, (A, b))
+        observed = statespace.conditional.marginalise(ssv.hidden_state, (A, b))
 
         error_estimate = estimate_error(observed)
         return error_estimate, observed, (A, b)
@@ -96,7 +96,7 @@ class ODEConstraintNoisy(Correction):
         A, b = self.linearise(f_wrapped, ssv.hidden_state)
 
         # Condition
-        obs, (cor, _gn) = statespace.cond.conditional.revert(ssv.hidden_state, (A, b))
+        obs, (cor, _gn) = statespace.conditional.revert(ssv.hidden_state, (A, b))
         u = statespace.random.qoi(cor)
         ssv = variables.SSV(u, cor)
         return ssv, obs

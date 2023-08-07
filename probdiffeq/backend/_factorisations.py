@@ -1,6 +1,6 @@
 import abc
 
-from probdiffeq.backend import _cond, _linearise, _random, _ssm_util
+from probdiffeq.backend import _conditional, _linearise, _random, _ssm_util, _transform
 
 
 class Factorisation(abc.ABC):
@@ -13,7 +13,11 @@ class Factorisation(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cond(self) -> _cond.ConditionalBackEnd:
+    def transform(self) -> _transform.TransformBackEnd:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def conditional(self) -> _conditional.ConditionalBackEnd:
         raise NotImplementedError
 
     @abc.abstractmethod

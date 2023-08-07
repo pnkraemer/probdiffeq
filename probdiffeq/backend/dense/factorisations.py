@@ -1,5 +1,5 @@
 from probdiffeq.backend import _factorisations
-from probdiffeq.backend.dense import cond, linearise, random, ssm_util
+from probdiffeq.backend.dense import conditional, linearise, random, ssm_util, transform
 
 
 class DenseFactorisation(_factorisations.Factorisation):
@@ -13,8 +13,11 @@ class DenseFactorisation(_factorisations.Factorisation):
     def random(self):
         return random.RandomVariableBackEnd(ode_shape=self.ode_shape)
 
-    def cond(self):
-        return cond.ConditionalBackEnd(ode_shape=self.ode_shape)
+    def conditional(self):
+        return conditional.ConditionalBackEnd()
+
+    def transform(self):
+        return transform.TransformBackEnd()
 
     def ssm_util(self):
         return ssm_util.SSMUtilBackEnd(ode_shape=self.ode_shape)

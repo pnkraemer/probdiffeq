@@ -1,6 +1,13 @@
 """State-space model backend."""
 
-from probdiffeq.backend import _cond, _factorisations, _linearise, _random, _ssm_util
+from probdiffeq.backend import (
+    _conditional,
+    _factorisations,
+    _linearise,
+    _random,
+    _ssm_util,
+    _transform,
+)
 
 
 class BackEnd:
@@ -21,8 +28,12 @@ class BackEnd:
         return self._fact.random()
 
     @property
-    def cond(self) -> _cond.ConditionalBackEnd:
-        return self._fact.cond()
+    def conditional(self) -> _conditional.ConditionalBackEnd:
+        return self._fact.conditional()
+
+    @property
+    def transform(self) -> _transform.TransformBackEnd:
+        return self._fact.transform()
 
     @property
     def ssm_util(self) -> _ssm_util.SSMUtilBackEnd:

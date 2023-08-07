@@ -83,7 +83,7 @@ class PreconFilter(Extrapolation):
         rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
         m_ext_p = statespace.random.mean(rv_p)
-        extrapolated_p = statespace.cond.conditional.apply(m_ext_p, cond)
+        extrapolated_p = statespace.conditional.apply(m_ext_p, cond)
 
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
         qoi = statespace.random.qoi(extrapolated)
@@ -97,7 +97,7 @@ class PreconFilter(Extrapolation):
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
         noise = statespace.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p = statespace.cond.conditional.marginalise(rv_p, (A, noise))
+        extrapolated_p = statespace.conditional.marginalise(rv_p, (A, noise))
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
 
         # Gather and return
@@ -139,7 +139,7 @@ class PreconSmoother(Extrapolation):
         rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
         m_p = statespace.random.mean(rv_p)
-        extrapolated_p = statespace.cond.conditional.apply(m_p, cond)
+        extrapolated_p = statespace.conditional.apply(m_p, cond)
 
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
         qoi = statespace.random.qoi(extrapolated)
@@ -153,7 +153,7 @@ class PreconSmoother(Extrapolation):
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
         noise = statespace.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = statespace.cond.conditional.revert(rv_p, (A, noise))
+        extrapolated_p, cond_p = statespace.conditional.revert(rv_p, (A, noise))
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
         cond = statespace.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
 
@@ -196,7 +196,7 @@ class PreconFixedPoint(Extrapolation):
         rv_p = statespace.ssm_util.preconditioner_apply(rv, p_inv)
 
         m_ext_p = statespace.random.mean(rv_p)
-        extrapolated_p = statespace.cond.conditional.apply(m_ext_p, cond)
+        extrapolated_p = statespace.conditional.apply(m_ext_p, cond)
 
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
         qoi = statespace.random.qoi(extrapolated)
@@ -210,12 +210,12 @@ class PreconFixedPoint(Extrapolation):
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
         noise = statespace.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = statespace.cond.conditional.revert(rv_p, (A, noise))
+        extrapolated_p, cond_p = statespace.conditional.revert(rv_p, (A, noise))
         extrapolated = statespace.ssm_util.preconditioner_apply(extrapolated_p, p)
         cond = statespace.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
 
         # Merge conditionals
-        cond = statespace.cond.conditional.merge(bw0, cond)
+        cond = statespace.conditional.merge(bw0, cond)
 
         # Gather and return
         u = statespace.random.qoi(extrapolated)
