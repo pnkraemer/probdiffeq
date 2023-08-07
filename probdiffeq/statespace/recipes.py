@@ -94,8 +94,7 @@ def slr1_dense(
 def slr0_dense(
     *,
     ode_shape,
-    cubature_rule_fn=cubature.third_order_spherical,
-    ode_order=1,
+    cubature_fun=cubature.third_order_spherical,
     num_derivatives=4,
 ) -> _Impl:
     """Zeroth-order statistical linear regression in state-space models \
@@ -108,12 +107,10 @@ def slr0_dense(
         and without any deprecation policy.
 
     """
-    correction = probdiffeq.statespace.dense.corr.statistical_order_zero(
-        ode_shape=ode_shape, ode_order=ode_order, cubature_rule_fn=cubature_rule_fn
-    )
-    ibm = probdiffeq.statespace.dense.extra.ibm_factory(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
-    )
+    statespace.select("dense", ode_shape=ode_shape)
+
+    correction = probdiffeq.statespace.corr.statistical_order_zero(cubature_fun)
+    ibm = probdiffeq.statespace.extra.ibm_factory(num_derivatives=num_derivatives)
     calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 

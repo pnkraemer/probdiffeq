@@ -137,6 +137,15 @@ def statistical_order_one(cubature_fun=cubature.third_order_spherical):
     )
 
 
+def statistical_order_zero(cubature_fun=cubature.third_order_spherical):
+    linearise_fun = statespace.linearise_ode.constraint_statistical_0th(cubature_fun)
+    return ODEConstraintNoisy(
+        ode_order=1,
+        linearise_fun=linearise_fun,
+        string_repr=f"<SLR0 with ode_order={1}>",
+    )
+
+
 def _constraint_flatten(node):
     children = ()
     aux = node.ode_order, node.linearise, node.string_repr

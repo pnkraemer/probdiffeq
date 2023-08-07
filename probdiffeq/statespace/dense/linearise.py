@@ -41,28 +41,3 @@ def slr1(fn, x, *, cubature_rule):
     mean_cond = fx_mean - linop_cond @ x.mean
     rv_cond = variables.DenseNormal(mean_cond, cov_sqrtm_cond.T, target_shape=None)
     return lambda v: linop_cond @ v, rv_cond
-
-
-def slr0(fn, x, *, cubature_rule):
-    """Linearise a function with zeroth-order statistical linear regression.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-    # Create sigma-points
-    pts_centered = cubature_rule.points @ x.cov_sqrtm_lower.T
-    pts = x.mean[None, :] + pts_centered
-
-    # Evaluate the nonlinear function
-    fx = jax.vmap(fn)(pts)
-    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
-    fx_centered = fx - fx_mean[None, :]
-    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-
-    cov_sqrtm = _sqrt_util.triu_via_qr(fx_centered_normed)
-
-    return variables.DenseNormal(fx_mean, cov_sqrtm.T, target_shape=None)

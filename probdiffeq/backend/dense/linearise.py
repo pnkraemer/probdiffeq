@@ -70,6 +70,28 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
 
         return new
 
+    def constraint_statistical_0th(self, cubature_fun):
+        cubature_rule = cubature_fun(input_shape=self.ode_shape)
+        linearise_fun = functools.partial(slr0, cubature_rule=cubature_rule)
+
+        def new(fun, rv, /):
+            # Projection functions
+            a0 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=0))
+            a1 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=1))
+
+            # Extract the linearisation point
+            m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
+            r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+            linearisation_pt = random.Normal(m0, r_0_square.T)
+
+            # Gather the variables and return
+            noise = linearise_fun(fun, linearisation_pt)
+            mean, cov_lower = noise.mean, noise.cholesky
+            bias = random.Normal(-mean, cov_lower)
+            return jax.jacfwd(a1)(rv.mean), bias
+
+        return new
+
     def _select_dy(self, x, idx_or_slice):
         (d,) = self.ode_shape
         x_reshaped = jnp.reshape(x, (-1, d), order="F")
@@ -114,3 +136,28 @@ def slr1(fn, x, *, cubature_rule):
     mean_cond = fx_mean - linop_cond @ x.mean
     rv_cond = random.Normal(mean_cond, cov_sqrtm_cond.T)
     return linop_cond, rv_cond
+
+
+def slr0(fn, x, *, cubature_rule):
+    """Linearise a function with zeroth-order statistical linear regression.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This feature is highly experimental.
+        There is no guarantee that it works correctly.
+        It might be deleted tomorrow
+        and without any deprecation policy.
+
+    """
+    # Create sigma-points
+    pts_centered = cubature_rule.points @ x.cholesky.T
+    pts = x.mean[None, :] + pts_centered
+
+    # Evaluate the nonlinear function
+    fx = jax.vmap(fn)(pts)
+    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
+    fx_centered = fx - fx_mean[None, :]
+    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
+
+    cov_sqrtm = _sqrt_util.triu_via_qr(fx_centered_normed)
+
+    return random.Normal(fx_mean, cov_sqrtm.T)
