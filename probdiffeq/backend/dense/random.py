@@ -11,6 +11,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
+    def variable(self, mean, cholesky):
+        return _normal.Normal(mean, cholesky)
+
     def mahalanobis_norm(self, u, /, rv):
         residual_white = jax.scipy.linalg.solve_triangular(
             rv.cholesky.T, u - rv.mean, lower=False, trans="T"

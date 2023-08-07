@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace.scalar import extra
+from probdiffeq.statespace import extra
 
 
 def test_marginal_moments_are_correct(num_derivatives=1):

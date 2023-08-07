@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import bvpsolve
-from probdiffeq.statespace.scalar import extra
+from probdiffeq.backend import statespace
 
 
 def test_solve_separable_affine_2nd(num_derivatives=4):

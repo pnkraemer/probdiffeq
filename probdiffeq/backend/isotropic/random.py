@@ -8,6 +8,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
+    def variable(self, mean, cholesky):
+        return _normal.Normal(mean, cholesky)
+
     def mahalanobis_norm(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = jnp.linalg.qr(residual_white[:, None], mode="r")

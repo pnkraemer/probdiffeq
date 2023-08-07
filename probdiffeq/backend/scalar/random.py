@@ -12,6 +12,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         cholesky = jnp.empty(())
         return _normal.Normal(mean, cholesky)
 
+    def variable(self, mean, cholesky):
+        return _normal.Normal(mean, cholesky)
+
     def mahalanobis_norm(self, u, /, rv):
         res_white = (u - rv.mean) / rv.cholesky
         return jnp.abs(res_white)

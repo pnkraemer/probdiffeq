@@ -8,8 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq.backend import containers
-from probdiffeq.statespace.iso import extra, variables
+from probdiffeq.backend import containers, statespace
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])

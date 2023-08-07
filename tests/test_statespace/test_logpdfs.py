@@ -6,10 +6,7 @@ Necessary because the implementation has been faulty in the past. Never again.
 import jax.numpy as jnp
 import jax.scipy.stats
 
-from probdiffeq.backend import testing
-from probdiffeq.statespace.dense import variables as vars_dense
-from probdiffeq.statespace.iso import variables as vars_iso
-from probdiffeq.statespace.scalar import variables as vars_scalar
+from probdiffeq.backend import statespace, testing
 
 
 @testing.fixture(name="setup")
@@ -25,14 +22,16 @@ def fixture_setup(d):
 
 
 def test_logpdf_dense(setup):
+    statespace.select("dense")
     m, cov_cholesky = setup
 
     def fn1(x):
-        return vars_dense.DenseNormal(m, cov_cholesky, target_shape=None).logpdf(x)
+        rv = statespace.random.variable(mean, cholesky)
+        return statespace.random.logpdf(x, rv)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
-            x, mean=m, cov=cov_cholesky @ cov_cholesky.T
+            x, mean=mean, cov=cholesky @ cholesky.T
         )
 
     u = m + 1e-3
@@ -46,15 +45,18 @@ def test_logpdf_dense(setup):
 
 
 def test_logpdf_iso(setup):
-    m, cov_cholesky = setup
-    variance = jnp.trace(cov_cholesky)
+    statespace.select("isotropic")
+
+    mean, cholesky = setup
+    standard_deviation = jnp.trace(cov_cholesky)
 
     def fn1(x):
-        return vars_iso.IsoNormalQOI(m, variance).logpdf(x)
+        rv = statespace.random.variable(mean, standard_deviation)
+        return statespace.random.logpdf(x, rv)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
-            x, mean=m, cov=variance**2 * jnp.eye(len(m))
+            x, mean=mean, cov=standard_deviation**2 * jnp.eye(len(m))
         )
 
     u = m + 1e-3
@@ -68,22 +70,26 @@ def test_logpdf_iso(setup):
 
 
 def test_logpdf_scalar(setup):
+    statespace.select("scalar")
+
     m, cov_cholesky = setup
     mean = jnp.linalg.norm(m)
-    variance = jnp.trace(cov_cholesky)
+    standard_deviation = jnp.trace(cov_cholesky)
 
     def fn1(x):
-        return vars_scalar.NormalQOI(mean, variance).logpdf(x)
+        rv = statespace.random.variable(mean, standard_deviation)
+        return statespace.random.logpdf(x, rv)
 
     def fn2(x):
-        logpdf_fn = jax.scipy.stats.multivariate_normal.logpdf
-        return logpdf_fn(x, mean=mean, cov=variance**2)
+        return jax.scipy.stats.multivariate_normal.logpdf(
+            x, mean=mean, cov=standard_deviation**2
+        )
 
-    u = mean + 1e-3
+    u = m + 1e-3
     pdf1 = fn1(u)
     pdf2 = fn2(u)
     assert jnp.allclose(pdf1, pdf2)
 
-    pdf1 = jax.grad(fn1)(mean)
-    pdf2 = jax.grad(fn2)(mean)
+    pdf1 = jax.grad(fn1)(u)
+    pdf2 = jax.grad(fn2)(u)
     assert jnp.allclose(pdf1, pdf2)
