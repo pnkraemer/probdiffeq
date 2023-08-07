@@ -106,6 +106,9 @@ class AdaptiveIVPSolver(Generic[T]):
         def extract(s):
             return s.proposed, s.control
 
+        print(jax.tree_util.tree_map(jnp.shape, init(state0, control0)))
+        print(jax.tree_util.tree_map(jnp.shape, body_fn(init(state0, control0))))
+
         state_new = self.while_loop_fn(cond_fn, body_fn, init(state0, control0))
         return extract(state_new)
 

@@ -23,10 +23,9 @@ class ConditionalBackend(_conditional.ConditionalBackend):
     def merge(self, cond1, cond2, /):
         A, b = cond1
         C, d = cond2
-        assert isinstance(A, matfree.LinOp)
-        assert isinstance(C, matfree.LinOp)
 
-        g = A @ C
+        g = matfree.merge_linops(A, C)
+
         xi = A @ d.mean + b.mean
         R_stack = ((A @ d.cholesky).T, b.cholesky.T)
         Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack).T
@@ -51,4 +50,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
-        return extrapolated, (gain, corrected)
+        return extrapolated, (matfree.linop_from_matmul(gain), corrected)

@@ -28,7 +28,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = jnp.eye(num_hidden_states_per_ode_dim)
-        return matrix, noise
+        return matfree.linop_from_matmul(matrix), noise
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -45,9 +45,13 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
         A, noise = cond
-        A = p[:, None] * A * p_inv[None, :]
+
+        assert isinstance(A, matfree.MatrixLinOp)
+
+        A_scaled = p[:, None] * A.matrix * p_inv[None, :]
+        A_new = matfree.linop_from_matmul(A_scaled)
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return A, noise
+        return A_new, noise
 
     def standard_normal(self, num, /, output_scale):
         mean = jnp.zeros((num,) + self.ode_shape)

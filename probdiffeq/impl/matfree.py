@@ -1,54 +1,81 @@
 """Matrix-free stuff."""
 
+import abc
 import dataclasses
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, TypeVar
 
 import jax
 
 
 def linop_from_matmul(matrix):
-    return LinOp(lambda s, m: m @ s, params=matrix)
+    return MatrixLinOp(matrix)
 
 
 def linop_from_callable(func):
-    return LinOp(lambda s, m: func(s), params=())
+    return CallableLinOp(func)
 
 
 # Why? Because transformations/conditionals can either be
 # matrices or matrix-free linear operators.
 # We have to build a generic version of those that can
 # 1) Behave like matmul (i.e. behave *exactly* like A @ x, where x can be any array)
-# 2) Are vmap'able
-# 3) Can be used as inputs to scan(...xs=?)
-# 4) Can be implemented matrix-free (we do a lot of slicing and a lot of JVPs)
+# 2) Are vmap'able; the vmap-output can be used as an input to scan(...xs=)
+# 3) Can be implemented matrix-free (we do a lot of slicing and a lot of JVPs)
+#
+# Always using a matrix fails because QOI-conditioning must use indexing/slicing.
+# Always using an operator fails because merging and vmapping becomes awkward.
+#
+# Can we simplify this?
 
 
-@dataclasses.dataclass(frozen=True)
-class LinOp:
-    func: Callable
-    params: jax.Array
+class LinOp(abc.ABC):
+    @abc.abstractmethod
+    def __matmul__(self, other):
+        raise NotImplementedError
 
-    # Do we provide both call and matmul?
+
+class MatrixLinOp(LinOp):
+    def __init__(self, matrix, /):
+        self.matrix = matrix
 
     def __matmul__(self, other):
-        return self.func(other, self.params)
-
-    def __iter__(self):
-        for p in self.params:
-            yield LinOp(self.func, p)
+        return self.matrix @ other
 
 
-def _flatten(linop):
-    children = linop.params
-    aux = linop.matmul
+class CallableLinOp(LinOp):
+    def __init__(self, func, /):
+        self.func = func
+
+    def __matmul__(self, other):
+        return self.func(other)
+
+
+T = TypeVar("T")
+
+
+def merge_linops(linop1: T, linop2: T) -> T:
+    if isinstance(linop1, MatrixLinOp):
+        return MatrixLinOp(linop1.matrix @ linop2.matrix)
+    raise ValueError
+
+
+def _matrix_flatten(linop):
+    children = (linop.matrix,)
+    aux = ()
     return children, aux
 
 
-def _unflatten(aux, children):
-    matmul = aux
-    params = children
-    return LinOp(matmul=matmul, params=params)
+def _matrix_unflatten(_aux, children):
+    (matrix,) = children
+    return MatrixLinOp(matrix)
 
 
-jax.tree_util.register_pytree_node(LinOp, _flatten, _unflatten)
+jax.tree_util.register_pytree_node(MatrixLinOp, _matrix_flatten, _matrix_unflatten)
+
+#
+# def merge_matmul_linops(linop1, linop2):
+#     assert not linop1.is_matfree
+#     assert not linop2.is_matfree
+#     return linop_from_matmul(linop1.params @ linop2.params)
+#
