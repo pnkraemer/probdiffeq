@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
+from probdiffeq.impl import impl
 from probdiffeq.ivpsolvers import _common
 from probdiffeq.ivpsolvers import solver as solver_module
 
@@ -18,7 +19,7 @@ def solver(strategy, _unneeded):
 class UncalibratedSolver(solver_module.Solver[_common.State]):
     def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
         state_strategy = self.strategy.init(t, posterior)
-        error_estimate = jnp.empty_like(state_strategy.u)
+        error_estimate = jnp.empty_like(impl.random.qoi(state_strategy.hidden))
         return _common.State(
             error_estimate=error_estimate,
             strategy=state_strategy,
@@ -78,7 +79,8 @@ class UncalibratedSolver(solver_module.Solver[_common.State]):
     def _interp_make_state(
         self, state_strategy, *, reference: _common.State
     ) -> _common.State:
-        error_estimate = jnp.empty_like(state_strategy.u)
+        u = impl.random.qoi(state_strategy.hidden)
+        error_estimate = jnp.empty_like(u)
         return _common.State(
             strategy=state_strategy,
             error_estimate=error_estimate,

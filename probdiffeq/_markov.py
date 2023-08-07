@@ -160,3 +160,19 @@ class MarkovSeqRev(Generic[S]):
         init = self.init.scale_covariance(output_scale)
         conditional = self.conditional.scale_covariance(output_scale)
         return MarkovSeqRev(init=init, conditional=conditional)
+
+
+def marginals(markov_seq: MarkovSeqRev):
+    def step(x, cond):
+        extrapolated = impl.conditional.marginalise(x, cond)
+        return extrapolated, extrapolated
+
+    # If we hold many 'init's, choose the terminal one.
+    _, noise = markov_seq.conditional
+    if noise.mean.shape == markov_seq.init.mean.shape:
+        init = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
+    else:
+        init = markov_seq.init
+
+    _, marg = jax.lax.scan(step, init=init, xs=markov_seq.conditional, reverse=True)
+    return marg

@@ -43,7 +43,10 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(p[:, None] * rv.mean, p[:, None] * rv.cholesky)
 
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
-        raise NotImplementedError
+        A, noise = cond
+        A = p[:, None] * A * p_inv[None, :]
+        noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
+        return A, noise
 
     def standard_normal(self, num, /, output_scale):
         mean = jnp.zeros((num,) + self.ode_shape)

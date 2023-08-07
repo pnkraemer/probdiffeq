@@ -18,7 +18,31 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         return _normal.Normal(mean, cholesky)
 
     def merge(self, cond1, cond2, /):
-        raise NotImplementedError
+        A, b = cond1
+        C, d = cond2
+
+        g = A @ C
+        xi = A @ d.mean + b.mean
+        R_stack = ((A @ d.cholesky).T, b.cholesky.T)
+        Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack).T
+
+        noise = _normal.Normal(xi, Xi)
+        return g, noise
 
     def revert(self, rv, conditional, /):
-        raise NotImplementedError
+        matrix, noise = conditional
+
+        r_ext_p, (r_bw_p, gain) = _sqrt_util.revert_conditional(
+            R_X_F=(matrix @ rv.cholesky).T,
+            R_X=rv.cholesky.T,
+            R_YX=noise.cholesky.T,
+        )
+        extrapolated_cholesky = r_ext_p.T
+        corrected_cholesky = r_bw_p.T
+
+        extrapolated_mean = matrix @ rv.mean + noise.mean
+        corrected_mean = rv.mean - gain @ extrapolated_mean
+
+        extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
+        corrected = _normal.Normal(corrected_mean, corrected_cholesky)
+        return extrapolated, (gain, corrected)

@@ -24,10 +24,7 @@ def fixture_problem():
 
 @testing.case()
 def case_isotropic_factorisation():
-    def iso_factory(ode_shape, num_derivatives):
-        return recipes.ts0_iso(num_derivatives=num_derivatives)
-
-    return iso_factory, 2.0
+    return recipes.ts0_iso, 2.0
 
 
 @testing.case()  # this implies success of the scalar solver
