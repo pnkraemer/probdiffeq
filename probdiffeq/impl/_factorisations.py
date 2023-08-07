@@ -1,12 +1,6 @@
 import abc
 
-from probdiffeq.statespace import (
-    _conditional,
-    _linearise,
-    _random,
-    _ssm_util,
-    _transform,
-)
+from probdiffeq.impl import _conditional, _linearise, _random, _ssm_util, _transform
 
 
 class Factorisation(abc.ABC):
@@ -39,24 +33,24 @@ def choose(which, /, *, ode_shape=None):
     # 2. To avoid import errors if some backends require additional dependencies
     # 3. To keep the import-namespace clean
     #    (factorisations.ScalarFactorisation is easier to read than
-    #     probdiffeq.backend.scalar.factorisations.ScalarFactorisation())
+    #     probdiffeq.impl.scalar.factorisations.ScalarFactorisation())
     #
     if which == "scalar":
-        from probdiffeq.statespace.scalar import factorisations
+        from probdiffeq.impl.scalar import factorisations
 
         return factorisations.ScalarFactorisation()
     if ode_shape is None:
         raise ValueError("Please provide an ODE shape.")
     if which == "dense":
-        from probdiffeq.statespace.dense import factorisations
+        from probdiffeq.impl.dense import factorisations
 
         return factorisations.DenseFactorisation(ode_shape=ode_shape)
     if which == "isotropic":
-        from probdiffeq.statespace.isotropic import factorisations
+        from probdiffeq.impl.isotropic import factorisations
 
         return factorisations.IsotropicFactorisation(ode_shape=ode_shape)
     if which == "blockdiag":
-        from probdiffeq.statespace.blockdiag import factorisations
+        from probdiffeq.impl.blockdiag import factorisations
 
         return factorisations.BlockDiagFactorisation(ode_shape=ode_shape)
 

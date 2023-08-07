@@ -6,8 +6,8 @@ import jax.numpy as jnp
 
 from probdiffeq import controls
 from probdiffeq.backend import containers
+from probdiffeq.impl import impl
 from probdiffeq.ivpsolvers import solver
-from probdiffeq.statespace import backend
 
 
 class _RejectionState(containers.NamedTuple):
@@ -124,8 +124,8 @@ class AdaptiveIVPSolver(Generic[T]):
             parameters=parameters,
         )
         # Normalise the error and propose a new step.
-        u_proposed = backend.random.qoi(state_proposed.strategy.hidden)
-        u_step_from = backend.random.qoi(state_proposed.strategy.hidden)
+        u_proposed = impl.random.qoi(state_proposed.strategy.hidden)
+        u_step_from = impl.random.qoi(state_proposed.strategy.hidden)
         u = self.reference_state_fn(u_proposed, u_step_from)
         error_normalised = self._normalise_error(
             error_estimate=state_proposed.error_estimate,

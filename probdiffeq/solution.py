@@ -162,7 +162,7 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     return result
 
 
-# todo: this smells a lot like a `backend.SSV` object.
+# todo: this smells a lot like a `impl.SSV` object.
 #  But merging those two data structures might be in the far future.
 
 
@@ -175,7 +175,7 @@ class _KalFiltState(containers.NamedTuple):
 # todo: this should return a Filtering posterior or a smoothing posterior
 #  which could then be plotted. Right?
 #  (We might also want some dense-output/checkpoint kind of thing here)
-# todo: we should reuse the extrapolation model backend.
+# todo: we should reuse the extrapolation model impl.
 #  But this only works if the ODE posterior uses the preconditioner (I think).
 # todo: we should allow proper noise, and proper information functions.
 #  But it is not clear which data structure that should be.

@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _conditional
-from probdiffeq.statespace.blockdiag import _normal
+from probdiffeq.impl import _conditional
+from probdiffeq.impl.blockdiag import _normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):

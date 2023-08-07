@@ -4,8 +4,8 @@ import jax
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import containers
-from probdiffeq.statespace import _conditional
-from probdiffeq.statespace.dense import _normal
+from probdiffeq.impl import _conditional
+from probdiffeq.impl.dense import _normal
 
 
 class Conditional(containers.NamedTuple):

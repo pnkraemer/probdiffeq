@@ -6,7 +6,7 @@ import functools
 import jax
 
 from probdiffeq import _markov
-from probdiffeq.statespace import backend
+from probdiffeq.impl import impl
 
 
 class Extrapolation(abc.ABC):
@@ -66,7 +66,7 @@ class PreconFilter(Extrapolation):
         return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        return backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        return impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
 
     def init(self, sol, /):
         return sol, None
@@ -77,12 +77,12 @@ class PreconFilter(Extrapolation):
     def begin(self, rv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
-        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.conditional.apply(m_ext_p, cond)
+        m_ext_p = impl.random.mean(rv_p)
+        extrapolated_p = impl.conditional.apply(m_ext_p, cond)
 
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
@@ -91,9 +91,9 @@ class PreconFilter(Extrapolation):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = backend.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p = backend.conditional.marginalise(rv_p, (A, noise))
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        noise = impl.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p = impl.conditional.marginalise(rv_p, (A, noise))
+        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
 
         # Gather and return
         return extrapolated, None
@@ -109,8 +109,8 @@ class PreconSmoother(Extrapolation):
         return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        rv = backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
-        cond = backend.ssm_util.identity_conditional(len(tcoeffs))
+        rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        cond = impl.ssm_util.identity_conditional(len(tcoeffs))
         return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def init(self, sol: _markov.MarkovSeqRev, /):
@@ -122,12 +122,12 @@ class PreconSmoother(Extrapolation):
     def begin(self, rv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
-        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.conditional.apply(m_p, cond)
+        m_p = impl.random.mean(rv_p)
+        extrapolated_p = impl.conditional.apply(m_p, cond)
 
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
@@ -136,10 +136,10 @@ class PreconSmoother(Extrapolation):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = backend.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = backend.conditional.revert(rv_p, (A, noise))
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        cond = backend.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+        noise = impl.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
+        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        cond = impl.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
 
         # Gather and return
         return extrapolated, cond
@@ -155,8 +155,8 @@ class PreconFixedPoint(Extrapolation):
         return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
-        rv = backend.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
-        cond = backend.ssm_util.identity_conditional(len(tcoeffs))
+        rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        cond = impl.ssm_util.identity_conditional(len(tcoeffs))
         return _markov.MarkovSeqRev(init=rv, conditional=cond)
 
     def init(self, sol: _markov.MarkovSeqRev, /):
@@ -168,12 +168,12 @@ class PreconFixedPoint(Extrapolation):
     def begin(self, rv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
-        rv_p = backend.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = backend.random.mean(rv_p)
-        extrapolated_p = backend.conditional.apply(m_ext_p, cond)
+        m_ext_p = impl.random.mean(rv_p)
+        extrapolated_p = impl.conditional.apply(m_ext_p, cond)
 
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p, extra)
         return extrapolated, cache
 
@@ -182,19 +182,19 @@ class PreconFixedPoint(Extrapolation):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = backend.random.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = backend.conditional.revert(rv_p, (A, noise))
-        extrapolated = backend.ssm_util.preconditioner_apply(extrapolated_p, p)
-        cond = backend.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+        noise = impl.random.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
+        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        cond = impl.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
 
         # Merge conditionals
-        cond = backend.conditional.merge(bw0, cond)
+        cond = impl.conditional.merge(bw0, cond)
 
         # Gather and return
         return extrapolated, cond
 
     def reset(self, ssv, _extra, /):
-        cond = backend.ssm_util.identity_conditional(self.num_derivatives + 1)
+        cond = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
         return ssv, cond
 
 
@@ -213,11 +213,11 @@ def _unflatten(nodetype, _aux, children):
     return nodetype(*children)
 
 
-for impl in [PreconFilter, PreconSmoother, PreconFixedPoint]:
+for nodetype in [PreconFilter, PreconSmoother, PreconFixedPoint]:
     jax.tree_util.register_pytree_node(
-        nodetype=impl,
+        nodetype=nodetype,
         flatten_func=_flatten,
-        unflatten_func=functools.partial(_unflatten, impl),
+        unflatten_func=functools.partial(_unflatten, nodetype),
     )
 
 
@@ -247,18 +247,18 @@ jax.tree_util.register_pytree_node(
 
 
 def ibm_factory(num_derivatives) -> IBMExtrapolationFactory:
-    discretise = backend.ssm_util.ibm_transitions(num_derivatives)
+    discretise = impl.ssm_util.ibm_transitions(num_derivatives)
     return IBMExtrapolationFactory(args=(discretise, num_derivatives))
 
 
 def ibm_discretise_fwd(dts, /, *, num_derivatives):
-    discretise = backend.ssm_util.ibm_transitions(num_derivatives)
+    discretise = impl.ssm_util.ibm_transitions(num_derivatives)
     return jax.vmap(discretise)(dts)
 
 
 def unit_markov_sequence(num_derivatives):
-    cond = backend.ssm_util.identity_conditional(num_derivatives + 1)
-    init = backend.ssm_util.standard_normal(num_derivatives + 1, 1.0)
+    cond = impl.ssm_util.identity_conditional(num_derivatives + 1)
+    init = impl.ssm_util.standard_normal(num_derivatives + 1, 1.0)
     print(init)
 
     return _markov.MarkovSeqRev(init=init, conditional=cond)

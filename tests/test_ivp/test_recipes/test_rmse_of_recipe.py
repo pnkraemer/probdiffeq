@@ -6,7 +6,8 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
-from probdiffeq.statespace import backend, cubature, recipes
+from probdiffeq.impl import impl
+from probdiffeq.statespace import cubature, recipes
 
 
 @testing.fixture(name="problem")

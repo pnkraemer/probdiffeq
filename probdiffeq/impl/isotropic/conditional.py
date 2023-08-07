@@ -1,6 +1,6 @@
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _conditional
-from probdiffeq.statespace.isotropic import _normal
+from probdiffeq.impl import _conditional
+from probdiffeq.impl.isotropic import _normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):

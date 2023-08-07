@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _ibm_util, _ssm_util
-from probdiffeq.statespace.isotropic import _normal
+from probdiffeq.impl import _ibm_util, _ssm_util
+from probdiffeq.impl.isotropic import _normal
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):

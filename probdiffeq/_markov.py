@@ -5,7 +5,7 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import backend
+from probdiffeq.impl import impl
 
 S = TypeVar("S")
 """A type-variable to alias appropriate state-space variable types."""
@@ -66,9 +66,9 @@ class MarkovSeqPreconRev(Generic[S]):
 
 
 def rescale_cholesky(markov_seq, factor):
-    init = backend.random.rescale_cholesky(markov_seq.init, factor)
+    init = impl.random.rescale_cholesky(markov_seq.init, factor)
     A, noise = markov_seq.conditional
-    noise = backend.random.rescale_cholesky(noise, factor)
+    noise = impl.random.rescale_cholesky(noise, factor)
     return MarkovSeqRev(init=init, conditional=(A, noise))
 
 

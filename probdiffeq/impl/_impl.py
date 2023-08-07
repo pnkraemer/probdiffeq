@@ -1,6 +1,6 @@
-"""State-space model backend."""
+"""State-space model impl."""
 
-from probdiffeq.statespace import (
+from probdiffeq.impl import (
     _conditional,
     _factorisations,
     _linearise,

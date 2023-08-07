@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp, _markov
-from probdiffeq.statespace import backend
+from probdiffeq.impl import impl
 from probdiffeq.strategies import _common, strategy
 
 
@@ -96,7 +96,7 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # back from the "filtering" state. In the context of offgrid_marginals,
     # the backward-interpolation step is repeated from the smoothing marginals)
     bw_t1_to_t, bw_t_to_t0 = e_1.aux_extra, e_t.aux_extra
-    rv_at_t = backend.conditional.marginalise(s1.hidden, bw_t1_to_t)
+    rv_at_t = impl.conditional.marginalise(s1.hidden, bw_t1_to_t)
     mseq_t = _markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)
     ssv, _ = extrapolation.init(mseq_t)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.aux_corr)
@@ -187,7 +187,7 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # Note how we use the bw_to_to_qoi backward model!
     # (Which is different for the non-fixed-point smoother)
     bw_t1_to_t, bw_t_to_qoi = e_1.aux_extra, e_t.aux_extra
-    rv_t = backend.conditional.marginalise(s1.hidden, bw_t1_to_t)
+    rv_t = impl.conditional.marginalise(s1.hidden, bw_t1_to_t)
     mseq_t = _markov.MarkovSeqRev(init=rv_t, conditional=bw_t_to_qoi)
     ssv_t, _ = extrapolation.init(mseq_t)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.aux_corr)

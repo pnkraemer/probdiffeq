@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.statespace import _linearise
-from probdiffeq.statespace.dense import _normal
+from probdiffeq.impl import _linearise
+from probdiffeq.impl.dense import _normal
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):

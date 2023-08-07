@@ -1,6 +1,7 @@
 """State-space model recipes."""
 from probdiffeq.backend import containers
-from probdiffeq.statespace import backend, calib, corr, cubature, extra
+from probdiffeq.impl import impl
+from probdiffeq.statespace import calib, corr, cubature, extra
 
 
 class _Impl(containers.NamedTuple):
@@ -21,7 +22,7 @@ class _Impl(containers.NamedTuple):
 
 def ts0_iso(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
-    backend.select("isotropic", ode_shape=ode_shape)
+    impl.select("isotropic", ode_shape=ode_shape)
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
@@ -30,7 +31,7 @@ def ts0_iso(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    backend.select("blockdiag", ode_shape=ode_shape)
+    impl.select("blockdiag", ode_shape=ode_shape)
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
@@ -39,7 +40,7 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    backend.select("dense", ode_shape=ode_shape)
+    impl.select("dense", ode_shape=ode_shape)
 
     correction = corr.taylor_order_one(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
@@ -48,7 +49,7 @@ def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
-    backend.select("dense", ode_shape=ode_shape)
+    impl.select("dense", ode_shape=ode_shape)
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
@@ -62,7 +63,7 @@ def slr1_dense(
     cubature_fun=cubature.third_order_spherical,
     num_derivatives=4,
 ) -> _Impl:
-    backend.select("dense", ode_shape=ode_shape)
+    impl.select("dense", ode_shape=ode_shape)
 
     correction = corr.statistical_order_one(cubature_fun)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
@@ -86,7 +87,7 @@ def slr0_dense(
         and without any deprecation policy.
 
     """
-    backend.select("dense", ode_shape=ode_shape)
+    impl.select("dense", ode_shape=ode_shape)
 
     correction = corr.statistical_order_zero(cubature_fun)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
@@ -95,7 +96,7 @@ def slr0_dense(
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
-    backend.select("scalar")
+    impl.select("scalar")
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
