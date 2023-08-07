@@ -4,7 +4,7 @@ import jax
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _transform, containers
-from probdiffeq.backend.dense import random
+from probdiffeq.backend.dense import _normal
 
 
 class Transformation(containers.NamedTuple):
@@ -16,7 +16,7 @@ class TransformBackEnd(_transform.TransformBackEnd):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
         cholesky_new = _sqrt_util.triu_via_qr(A(rv.cholesky).T).T
-        return random.Normal(A(rv.mean) + b, cholesky_new)
+        return _normal.Normal(A(rv.mean) + b, cholesky_new)
 
     def revert(self, rv, transformation, /):
         matmul, b = transformation
@@ -30,6 +30,6 @@ class TransformBackEnd(_transform.TransformBackEnd):
 
         # Gather terms and return
         m_cor = mean - gain @ (matmul(mean) + b)
-        corrected = random.Normal(m_cor, r_cor.T)
-        observed = random.Normal(matmul(mean) + b, r_obs.T)
+        corrected = _normal.Normal(m_cor, r_cor.T)
+        observed = _normal.Normal(matmul(mean) + b, r_obs.T)
         return observed, (corrected, gain)

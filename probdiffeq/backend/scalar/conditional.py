@@ -2,7 +2,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _conditional
-from probdiffeq.backend.scalar import random
+from probdiffeq.backend.scalar import _normal
 
 
 class ConditionalBackEnd(_conditional.ConditionalBackEnd):
@@ -12,7 +12,7 @@ class ConditionalBackEnd(_conditional.ConditionalBackEnd):
         mean = matrix @ rv.mean
         R_stack = ((matrix @ rv.cholesky).T, noise.cholesky.T)
         cholesky_T = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack)
-        return random.Normal(mean, cholesky_T.T)
+        return _normal.Normal(mean, cholesky_T.T)
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
@@ -25,13 +25,13 @@ class ConditionalBackEnd(_conditional.ConditionalBackEnd):
         m_ext = matrix @ rv.mean + noise.mean
         m_cond = rv.mean - g_bw_p @ m_ext
 
-        marginal = random.Normal(m_ext, r_ext.T)
-        noise = random.Normal(m_cond, r_bw_p.T)
+        marginal = _normal.Normal(m_ext, r_ext.T)
+        noise = _normal.Normal(m_cond, r_bw_p.T)
         return marginal, (g_bw_p, noise)
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
-        return random.Normal(matrix @ x + noise.mean, noise.cholesky)
+        return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
 
     def merge(self, previous, incoming, /):
         A, b = previous
@@ -42,5 +42,5 @@ class ConditionalBackEnd(_conditional.ConditionalBackEnd):
         R_stack = ((A @ d.cholesky).T, b.cholesky.T)
         Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
-        noise = random.Normal(xi, Xi)
+        noise = _normal.Normal(xi, Xi)
         return g, noise

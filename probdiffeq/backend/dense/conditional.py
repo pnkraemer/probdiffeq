@@ -4,24 +4,24 @@ import jax
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _conditional, containers
-from probdiffeq.backend.dense import random
+from probdiffeq.backend.dense import _normal
 
 
 class Conditional(containers.NamedTuple):
     matmul: Callable
-    noise: random.Normal
+    noise: _normal.Normal
 
 
 class ConditionalBackEnd(_conditional.ConditionalBackEnd):
     def apply(self, x, conditional, /):
         matrix, noise = conditional
-        return random.Normal(matrix @ x + noise.mean, noise.cholesky)
+        return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):
         matmul, noise = conditional
         R_stack = ((matmul @ rv.cholesky).T, noise.cholesky.T)
         cholesky_new = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-        return random.Normal(matmul @ rv.mean + noise.mean, cholesky_new)
+        return _normal.Normal(matmul @ rv.mean + noise.mean, cholesky_new)
 
     def merge(self, cond1, cond2, /):
         raise NotImplementedError
@@ -40,6 +40,6 @@ class ConditionalBackEnd(_conditional.ConditionalBackEnd):
         # Gather terms and return
         mean_observed = matrix @ mean + noise.mean
         m_cor = mean - gain @ mean_observed
-        corrected = random.Normal(m_cor, r_cor.T)
-        observed = random.Normal(mean_observed, r_obs.T)
+        corrected = _normal.Normal(m_cor, r_cor.T)
+        observed = _normal.Normal(mean_observed, r_obs.T)
         return observed, (corrected, gain)

@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _linearise
-from probdiffeq.backend.dense import random
+from probdiffeq.backend.dense import _normal
 
 
 class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
@@ -56,7 +56,7 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
             r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
-            linearisation_pt = random.Normal(m0, r_0_square.T)
+            linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
             linop, noise = linearise_fun(fun, linearisation_pt)
@@ -65,7 +65,7 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
                 return a1(x) - linop @ a0(x)
 
             mean, cov_lower = noise.mean, noise.cholesky
-            bias = random.Normal(-mean, cov_lower)
+            bias = _normal.Normal(-mean, cov_lower)
             return jax.jacfwd(A)(rv.mean), bias
 
         return new
@@ -82,12 +82,12 @@ class LineariseODEBackEnd(_linearise.LineariseODEBackEnd):
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
             r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
-            linearisation_pt = random.Normal(m0, r_0_square.T)
+            linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
-            bias = random.Normal(-mean, cov_lower)
+            bias = _normal.Normal(-mean, cov_lower)
             return jax.jacfwd(a1)(rv.mean), bias
 
         return new
@@ -134,7 +134,7 @@ def slr1(fn, x, *, cubature_rule):
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
     mean_cond = fx_mean - linop_cond @ x.mean
-    rv_cond = random.Normal(mean_cond, cov_sqrtm_cond.T)
+    rv_cond = _normal.Normal(mean_cond, cov_sqrtm_cond.T)
     return linop_cond, rv_cond
 
 
@@ -160,4 +160,4 @@ def slr0(fn, x, *, cubature_rule):
 
     cov_sqrtm = _sqrt_util.triu_via_qr(fx_centered_normed)
 
-    return random.Normal(fx_mean, cov_sqrtm.T)
+    return _normal.Normal(fx_mean, cov_sqrtm.T)

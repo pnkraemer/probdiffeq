@@ -42,8 +42,10 @@ class _Impl(containers.NamedTuple):
 
 def ts0_iso(*, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
-    correction = probdiffeq.statespace.iso.corr.taylor_order_zero(ode_order=ode_order)
-    ibm = probdiffeq.statespace.iso.extra.ibm_factory(num_derivatives=num_derivatives)
+    statespace.select("isotropic")
+
+    correction = probdiffeq.statespace.corr.taylor_order_zero(ode_order=ode_order)
+    ibm = probdiffeq.statespace.extra.ibm_factory(num_derivatives=num_derivatives)
     calibration = probdiffeq.statespace.calib.output_scale()
     return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
 

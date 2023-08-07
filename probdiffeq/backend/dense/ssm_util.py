@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _ssm_util
-from probdiffeq.backend.dense import random
+from probdiffeq.backend.dense import _normal
 from probdiffeq.statespace import _ibm_util
 
 
@@ -20,7 +20,7 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
 
         ndim = d * (num_derivatives + 1)
         q0 = jnp.zeros((ndim,))
-        noise = random.Normal(q0, Q)
+        noise = _normal.Normal(q0, Q)
 
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
@@ -52,12 +52,12 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         ndim = (num_derivatives + 1) * ode_dim
         c_sqrtm0_corrected = jnp.zeros((ndim, ndim))
 
-        return random.Normal(m0_corrected, c_sqrtm0_corrected)
+        return _normal.Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
         mean = p * rv.mean
         cholesky = p[:, None] * rv.cholesky
-        return random.Normal(mean, cholesky)
+        return _normal.Normal(mean, cholesky)
 
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
         raise NotImplementedError

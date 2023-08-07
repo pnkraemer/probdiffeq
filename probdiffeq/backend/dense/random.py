@@ -4,11 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import _random, containers
-
-
-class Normal(containers.NamedTuple):
-    mean: Any
-    cholesky: Any
+from probdiffeq.backend.dense import _normal
 
 
 class RandomVariableBackEnd(_random.RandomVariableBackEnd):
@@ -33,11 +29,11 @@ class RandomVariableBackEnd(_random.RandomVariableBackEnd):
     def qoi_like(self):
         mean = jnp.empty(self.ode_shape)
         cholesky = jnp.empty(self.ode_shape + self.ode_shape)
-        return Normal(mean, cholesky)
+        return _normal.Normal(mean, cholesky)
 
     def rescale_cholesky(self, rv, factor, /):
         cholesky = factor[..., None, None] * rv.cholesky
-        return Normal(rv.mean, cholesky)
+        return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
         def std(x):

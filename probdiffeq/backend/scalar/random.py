@@ -3,18 +3,14 @@ from typing import Any
 import jax.numpy as jnp
 
 from probdiffeq.backend import _random, containers
-
-
-class Normal(containers.NamedTuple):
-    mean: Any
-    cholesky: Any
+from probdiffeq.backend.scalar import _normal
 
 
 class RandomVariableBackEnd(_random.RandomVariableBackEnd):
     def qoi_like(self):
         mean = jnp.empty(())
         cholesky = jnp.empty(())
-        return Normal(mean, cholesky)
+        return _normal.Normal(mean, cholesky)
 
     def mahalanobis_norm(self, u, /, rv):
         res_white = (u - rv.mean) / rv.cholesky
@@ -30,4 +26,4 @@ class RandomVariableBackEnd(_random.RandomVariableBackEnd):
         return rv.mean
 
     def rescale_cholesky(self, rv, factor):
-        return Normal(rv.mean, factor * rv.cholesky)
+        return _normal.Normal(rv.mean, factor * rv.cholesky)

@@ -4,9 +4,11 @@ from typing import Tuple
 
 import jax
 
+#
+#
+# todo: remove
 
-#
-#
+
 class Normal:
     """Normal-distributed random variables.
 
@@ -56,6 +58,8 @@ class Normal:
 #     def marginal_nth_derivative(self, n):
 #         raise NotImplementedError
 
+# todo: remove
+
 
 @jax.tree_util.register_pytree_node_class
 class SSV:
@@ -104,7 +108,7 @@ class SSV:
         raise NotImplementedError
 
 
-#
+# todo: remove
 class Conditional:
     """Conditional distribution interface.
 

@@ -2,7 +2,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _transform
-from probdiffeq.backend.scalar import random
+from probdiffeq.backend.scalar import _normal
 
 
 class TransformBackEnd(_transform.TransformBackEnd):
@@ -11,7 +11,7 @@ class TransformBackEnd(_transform.TransformBackEnd):
         matmul, b = transformation
         cholesky_new = _sqrt_util.triu_via_qr(matmul(rv.cholesky)[:, None])
         cholesky_new_squeezed = jnp.reshape(cholesky_new, ())
-        return random.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
+        return _normal.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
 
     def revert(self, rv, transformation, /):
         # Assumes that A maps a vector to a scalar...
@@ -31,6 +31,6 @@ class TransformBackEnd(_transform.TransformBackEnd):
 
         # Gather terms and return
         m_cor = rv.mean - gain * (A(rv.mean) + b)
-        corrected = random.Normal(m_cor, cov_sqrtm_lower_cor)
-        observed = random.Normal(A(rv.mean) + b, cov_sqrtm_lower_obs)
+        corrected = _normal.Normal(m_cor, cov_sqrtm_lower_cor)
+        observed = _normal.Normal(A(rv.mean) + b, cov_sqrtm_lower_obs)
         return observed, (corrected, gain)

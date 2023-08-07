@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import _ssm_util
-from probdiffeq.backend.scalar import random
+from probdiffeq.backend.scalar import _normal
 from probdiffeq.statespace import _ibm_util
 
 
@@ -16,21 +16,21 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         m0_matrix = jnp.stack(tcoeffs)
         m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
         c_sqrtm0_corrected = jnp.zeros((num_derivatives + 1, num_derivatives + 1))
-        return random.Normal(m0_corrected, c_sqrtm0_corrected)
+        return _normal.Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
-        return random.Normal(p * rv.mean, p[:, None] * rv.cholesky)
+        return _normal.Normal(p * rv.mean, p[:, None] * rv.cholesky)
 
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
         A, noise = cond
         A = p[:, None] * A * p_inv[None, :]
-        noise = random.Normal(p * noise.mean, p[:, None] * noise.cholesky)
+        noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
         return A, noise
 
     def ibm_transitions(self, num_derivatives, output_scale):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
         q0 = jnp.zeros((num_derivatives + 1,))
-        noise = random.Normal(q0, q_sqrtm)
+        noise = _normal.Normal(q0, q_sqrtm)
 
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
@@ -44,13 +44,13 @@ class SSMUtilBackEnd(_ssm_util.SSMUtilBackEnd):
         transition = jnp.eye(ndim)
         mean = jnp.zeros((ndim,))
         cov_sqrtm = jnp.zeros((ndim, ndim))
-        noise = random.Normal(mean, cov_sqrtm)
+        noise = _normal.Normal(mean, cov_sqrtm)
         return transition, noise
 
     def standard_normal(self, ndim, output_scale):
         mean = jnp.zeros((ndim,))
         cholesky = output_scale * jnp.eye(ndim)
-        return random.Normal(mean, cholesky)
+        return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
         sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
