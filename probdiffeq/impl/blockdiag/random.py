@@ -36,6 +36,17 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        return jnp.abs(
-            rv.cholesky
-        )  # todo: this is only true of rv is an "observed" Rv...
+        # todo: this is only true of rv is an "observed" Rv...
+        return jnp.abs(rv.cholesky)
+
+    def cholesky(self, rv):
+        return rv.cholesky
+
+    def cov_dense(self, rv):
+        if rv.cholesky.ndim > 3:
+            return jax.vmap(self.cov_dense)(rv)
+        cholesky_T = jnp.transpose(rv.cholesky, axes=(0, 2, 1))
+        return jnp.einsum("ijk,ikl->ijl", rv.cholesky, cholesky_T)
+
+    def marginal_nth_derivative(self, rv):
+        raise NotImplementedError

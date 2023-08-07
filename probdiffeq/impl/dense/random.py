@@ -60,3 +60,14 @@ class RandomVariableBackend(_random.RandomVariableBackend):
             return jnp.reshape(std_mat, ())
 
         return jax.vmap(std)(rv.cholesky)
+
+    def cholesky(self, rv):
+        return rv.cholesky
+
+    def cov_dense(self, rv):
+        if jnp.ndim(rv.cholesky) > 2:
+            return jax.vmap(self.cov_dense)(rv)
+        return rv.cholesky @ rv.cholesky.T
+
+    def marginal_nth_derivative(self, rv):
+        raise NotImplementedError
