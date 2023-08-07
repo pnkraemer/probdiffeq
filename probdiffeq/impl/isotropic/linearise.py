@@ -1,4 +1,4 @@
-from probdiffeq.impl import _linearise
+from probdiffeq.impl import _linearise, matfree
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):
@@ -8,7 +8,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
     def constraint_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             fx = ts0(fun, mean[:ode_order, ...])
-            return lambda s: s[ode_order, ...], -fx
+            linop = matfree.linop_from_callable(lambda s: s[ode_order, ...])
+            return linop, -fx
 
         return linearise_fun_wrapped
 

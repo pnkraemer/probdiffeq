@@ -14,22 +14,22 @@ class TransformBackend(_transform.TransformBackend):
         A, b = transformation
         mean, cholesky = rv.mean, rv.cholesky
 
-        cov_new = jax.vmap(_sqrt_util.triu_via_qr)(A(cholesky)[:, :, None])
+        cov_new = jax.vmap(_sqrt_util.triu_via_qr)((A @ cholesky)[:, :, None])
         cov_new = jnp.squeeze(cov_new, axis=(-2, -1))
-        return _normal.Normal(A(mean) + b, cov_new)
+        return _normal.Normal(A @ mean + b, cov_new)
 
     def revert(self, rv, transformation, /):
-        matmul, bias = transformation
+        A, bias = transformation
 
         # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
         cholesky_upper = jnp.transpose(rv.cholesky, axes=(0, -1, -2))
         r_obs, (r_cor, gain) = jax.vmap(_sqrt_util.revert_conditional_noisefree)(
-            matmul(rv.cholesky)[..., None], cholesky_upper
+            (A @ rv.cholesky)[..., None], cholesky_upper
         )
         cholesky_obs = jnp.reshape(r_obs, (-1,))
         cholesky_cor = jnp.transpose(r_cor, axes=(0, -1, -2))
         # Gather terms and return
-        mean_observed = matmul(rv.mean) + bias
+        mean_observed = (A @ rv.mean) + bias
         gain = jnp.reshape(gain, self.ode_shape + (-1,))
 
         m_cor = rv.mean - (gain * (mean_observed[..., None]))

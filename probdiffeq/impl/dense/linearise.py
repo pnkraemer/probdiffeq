@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _linearise
+from probdiffeq.impl import _linearise, matfree
 from probdiffeq.impl.dense import _normal
 
 
@@ -21,7 +21,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
 
             fx = ts0(fun, a0(mean))
-            return _autobatch_linop(a1), -fx
+            linop = matfree.linop_from_callable(_autobatch_linop(a1))
+            return linop, -fx
 
         return linearise_fun_wrapped
 
@@ -40,7 +41,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 x0 = a0(x)
                 return x1 - jvp(x0)
 
-            return _autobatch_linop(A), -fx
+            linop = matfree.linop_from_callable(_autobatch_linop(A))
+            return linop, -fx
 
         return new
 

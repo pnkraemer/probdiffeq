@@ -57,3 +57,6 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         sum_of_scalars = jax.vmap(_sqrt_util.sqrt_sum_square_scalar)
         sum_updated = sum_of_scalars(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
+
+    def conditional_to_derivative(self, i, standard_deviation):
+        raise NotImplementedError

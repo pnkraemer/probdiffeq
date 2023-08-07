@@ -66,3 +66,6 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def update_mean(self, mean, x, /, num):
         return _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+
+    def conditional_to_derivative(self, i, standard_deviation):
+        raise NotImplementedError
