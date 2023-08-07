@@ -5,6 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
+from probdiffeq.impl import impl
 
 
 @testing.fixture(name="problem")
@@ -22,7 +23,7 @@ def fixture_problem():
 @testing.fixture(name="approximate_solution")
 def fixture_approximate_solution(problem):
     vf, u0, (t0, t1), f_args = problem
-    solver = test_util.generate_solver(num_derivatives=1)
+    solver = test_util.generate_solver(num_derivatives=1, ode_shape=(2,))
     return ivpsolve.solve_with_python_while_loop(
         vf,
         (u0,),
@@ -66,7 +67,7 @@ def test_iter_impossible(approximate_solution):
 @testing.fixture(name="approximate_solution_batched")
 def fixture_approximate_solution_batched(problem):
     vf, u0, (t0, t1), f_args = problem
-    solver = test_util.generate_solver(num_derivatives=1)
+    solver = test_util.generate_solver(num_derivatives=1, ode_shape=(2,))
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
 
     @jax.vmap
@@ -106,9 +107,10 @@ def test_marginal_nth_derivative_of_solution(approximate_solution):
     """Assert that each $n$th derivative matches the quantity of interest's shape."""
     # Assert that the marginals have the same shape as the qoi.
     for i in (0, 1):
-        derivatives = approximate_solution.marginals.marginal_nth_derivative(i)
+        marginals = approximate_solution.marginals
+        derivatives = impl.random.marginal_nth_derivative(marginals, i)
         assert derivatives.mean.shape == approximate_solution.u.shape
 
     # if the requested derivative is not in the state-space model, raise a ValueError
     with testing.raises(ValueError):
-        approximate_solution.marginals.marginal_nth_derivative(100)
+        _ = impl.random.marginal_nth_derivative(approximate_solution.marginals, 100)

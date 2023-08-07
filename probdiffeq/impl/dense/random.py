@@ -40,8 +40,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return rv.mean
 
     def qoi(self, rv):
-        mean = rv.mean
-        mean_reshaped = jnp.reshape(mean, (-1,) + self.ode_shape, order="F")
+        if jnp.ndim(rv.mean) > 1:
+            return jax.vmap(self.qoi)(rv)
+        mean_reshaped = jnp.reshape(rv.mean, (-1,) + self.ode_shape, order="F")
         return mean_reshaped[0]
 
     def qoi_like(self):

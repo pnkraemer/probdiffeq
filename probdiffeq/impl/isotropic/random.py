@@ -1,5 +1,7 @@
+import jax
 import jax.numpy as jnp
 
+from probdiffeq import _sqrt_util  # todo: get sqrt-util into "impl" package...
 from probdiffeq.impl import _random
 from probdiffeq.impl.isotropic import _normal
 
@@ -32,11 +34,30 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(mean, cholesky)
 
     def qoi(self, rv):
-        return rv.mean[0, :]
+        return rv.mean[..., 0, :]
+
+    def cholesky(self, rv):
+        return rv.cholesky
+
+    def cov_dense(self, rv):
+        if rv.cholesky.ndim > 2:
+            return jax.vmap(self.cov_dense)(rv)
+        return rv.cholesky @ rv.cholesky.T
 
     def rescale_cholesky(self, rv, factor, /):
-        cholesky = factor[..., None] * rv.cholesky
+        cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
         return rv.cholesky  # todo: this is only true of rv is an "observed" Rv...
+
+    def marginal_nth_derivative(self, rv, i):
+        if jnp.ndim(rv.mean) > 2:
+            return jax.vmap(self.marginal_nth_derivative, in_axes=(0, None))(rv, i)
+
+        if i > jnp.shape(rv.mean)[0]:
+            raise ValueError
+
+        mean = rv.mean[i, :]
+        cholesky = _sqrt_util.triu_via_qr((rv.cholesky[i, :])[:, None].T).T
+        return _normal.Normal(mean, cholesky)

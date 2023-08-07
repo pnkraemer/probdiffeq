@@ -19,7 +19,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     problem_args = (vf, (u0,))
     problem_kwargs = {"parameters": f_args}
 
-    solver = test_util.generate_solver(num_derivatives=2)
+    solver = test_util.generate_solver(num_derivatives=2, ode_shape=(2,))
     adaptive_kwargs = {
         "t0": t0,
         "t1": t1,

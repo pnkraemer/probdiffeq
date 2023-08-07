@@ -21,7 +21,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     problem_kwargs = {"parameters": f_args}
 
     # Generate a solver
-    solver = test_util.generate_solver(num_derivatives=2)
+    solver = test_util.generate_solver(num_derivatives=2, ode_shape=(2,))
     adaptive_kwargs = {
         "solver": solver,
         "output_scale": 1.0,

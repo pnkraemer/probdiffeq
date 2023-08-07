@@ -27,7 +27,7 @@ def fixture_python_loop_solution(problem):
     problem_args = (vf, (u0,))
     problem_kwargs = {"t0": t0, "t1": t1, "parameters": f_args}
 
-    solver = test_util.generate_solver(num_derivatives=4)
+    solver = test_util.generate_solver(num_derivatives=4, ode_shape=(2,))
     adaptive_kwargs = {
         "solver": solver,
         "output_scale": 1.0,

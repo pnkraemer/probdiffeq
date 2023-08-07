@@ -21,7 +21,7 @@ def fixture_problem_args_kwargs():
 
 @testing.fixture(name="solver_kwargs")
 def fixture_solver_kwargs():
-    solver = test_util.generate_solver(num_derivatives=2)
+    solver = test_util.generate_solver(num_derivatives=2, ode_shape=(2,))
     return {"solver": solver, "output_scale": 1.0, "atol": 1e-2, "rtol": 1e-2}
 
 

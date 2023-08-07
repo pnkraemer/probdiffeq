@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
+from probdiffeq.impl import impl
 from probdiffeq.strategies import _common, strategy
 
 
@@ -45,7 +46,7 @@ def _filter_offgrid_marginals(
         output_scale=output_scale,
     )
     t, posterior = extract(sol)
-    u = posterior.extract_qoi_from_sample(posterior.mean)
+    u = impl.random.qoi(posterior)
     return u, posterior
 
 

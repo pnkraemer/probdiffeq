@@ -2,6 +2,9 @@ import abc
 
 
 class RandomVariableBackend(abc.ABC):
+    # todo: is this module getting out of hand?
+    #  Split into three modules "SSMState, stats, normal"?
+
     @abc.abstractmethod
     def variable(self, mean, cholesky):
         raise NotImplementedError
@@ -27,9 +30,21 @@ class RandomVariableBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def cholesky(self, rv):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def cov_dense(self, rv):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def qoi(self, rv):
         raise NotImplementedError
 
     @abc.abstractmethod
     def rescale_cholesky(self, rv, factor, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def marginal_nth_derivative(self, rv):
         raise NotImplementedError

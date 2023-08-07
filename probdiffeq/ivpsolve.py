@@ -83,7 +83,6 @@ def simulate_terminal_values(
     else:
         marginals = posterior
     u = impl.random.qoi(marginals)
-    # u = marginals.extract_qoi_from_sample(marginals.mean)
     return Solution(
         t=t1,
         u=u,
@@ -160,14 +159,17 @@ def solve_and_save_at(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        posterior = posterior.scale_covariance(output_scale)
+        if isinstance(posterior, _markov.MarkovSeqRev):
+            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        else:
+            posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     _, posterior_t0, *_ = solution_t0
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = marginals.extract_qoi_from_sample(marginals.mean)
+    u = impl.random.qoi(marginals)
     return Solution(
         t=save_at,
         u=u,
@@ -234,14 +236,17 @@ def solve_with_python_while_loop(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        posterior = posterior.scale_covariance(output_scale)
+        if isinstance(posterior, _markov.MarkovSeqRev):
+            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        else:
+            posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     _, posterior_t0, *_ = solution_t0
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = marginals.extract_qoi_from_sample(marginals.mean)
+    u = impl.random.qoi(marginals)
     return Solution(
         t=t,
         u=u,
@@ -289,14 +294,17 @@ def solve_fixed_grid(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        posterior = posterior.scale_covariance(output_scale)
+        if isinstance(posterior, _markov.MarkovSeqRev):
+            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        else:
+            posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = solution_t0
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = marginals.extract_qoi_from_sample(marginals.mean)
+    u = impl.random.qoi(marginals)
     return Solution(
         t=grid,
         u=u,

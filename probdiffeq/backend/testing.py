@@ -13,6 +13,8 @@ import jax.numpy as jnp
 import pytest
 import pytest_cases
 
+from probdiffeq.impl import impl
+
 case = pytest_cases.case
 filterwarnings = pytest.mark.filterwarnings
 parametrize = pytest.mark.parametrize
@@ -42,12 +44,6 @@ def _tree_allclose(tree1, tree2, **kwargs):
 
 
 def marginals_allclose(m1, m2, /):
-    mean_allclose = jnp.allclose(m1.mean, m2.mean)
-
-    def square(x):
-        if jnp.ndim(x) > 2:
-            return jax.vmap(square)(x)
-        return x @ x.T
-
-    cov_allclose = jnp.allclose(square(m1.cov_sqrtm_lower), square(m2.cov_sqrtm_lower))
+    mean_allclose = jnp.allclose(impl.random.mean(m1), impl.random.mean(m2))
+    cov_allclose = jnp.allclose(impl.random.cov_dense(m1), impl.random.cov_dense(m2))
     return mean_allclose and cov_allclose
