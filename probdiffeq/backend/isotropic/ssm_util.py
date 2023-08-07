@@ -10,8 +10,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def ibm_transitions(self, num_derivatives, output_scale):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
+    def ibm_transitions(self, num_derivatives):
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
         q0 = jnp.zeros((num_derivatives + 1,) + self.ode_shape)
         noise = _normal.Normal(q0, q_sqrtm)
 

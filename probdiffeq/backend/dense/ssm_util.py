@@ -11,8 +11,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def ibm_transitions(self, num_derivatives, output_scale):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
+    def ibm_transitions(self, num_derivatives):
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
         (d,) = self.ode_shape
         eye_d = jnp.eye(d)
         A = jnp.kron(eye_d, a)
