@@ -102,13 +102,10 @@ class ODEConstraintNoisy(Correction):
 
 
 def estimate_error(observed, /):
-    zero_data = jnp.zeros_like(impl.random.mean(observed))
+    zero_data = jnp.zeros(())
     output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
     error_estimate_unscaled = impl.random.standard_deviation(observed)
-
-    # Broadcast error estimate to (d,) shape
-    ones_like = jnp.ones_like(impl.random.mean(observed))
-    return output_scale * error_estimate_unscaled * ones_like
+    return output_scale * error_estimate_unscaled
 
 
 def taylor_order_zero(*, ode_order) -> ODEConstraint:

@@ -14,8 +14,11 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(mean, cholesky)
 
     def mahalanobis_norm_relative(self, u, /, rv):
+        # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
-        return (rv.mean - u) / rv.cholesky / jnp.sqrt(rv.mean.size)
+        mean = jnp.reshape(rv.mean, self.ode_shape)
+        cholesky = jnp.reshape(rv.cholesky, self.ode_shape)
+        return (mean - u) / cholesky / jnp.sqrt(mean.size)
 
     def logpdf(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
@@ -41,8 +44,8 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        # todo: this is only true of rv is an "observed" Rv...
-        return jnp.abs(rv.cholesky)
+        # assumes rv.chol = (d,1,1)
+        return jnp.abs(jnp.reshape(rv.cholesky, (-1,)))
 
     def cholesky(self, rv):
         return rv.cholesky
