@@ -114,16 +114,15 @@ class MarkovSeqRev(Generic[S]):
             _, samp_prev = carry
             conditional, base = conditionals_and_base_samples
 
-            cond = conditional(samp_prev)
-            samp = cond.transform_unit_sample(base)
-            qoi = cond.extract_qoi_from_sample(samp)
-
-            return (qoi, samp), (qoi, samp)
+            rv = impl.conditional.apply(samp_prev, conditional)
+            sample = impl.random.transform_unit_sample(base, rv)
+            qoi = impl.random.qoi_from_sample(sample)
+            return (qoi, sample), (qoi, sample)
 
         # Compute a sample at the terminal value
         init = jax.tree_util.tree_map(lambda s: s[-1, ...], self.init)
-        init_sample = init.transform_unit_sample(base_sample[-1])
-        init_qoi = init.extract_qoi_from_sample(init_sample)
+        init_sample = impl.random.transform_unit_sample(base_sample[-1], init)
+        init_qoi = impl.random.qoi_from_sample(init_sample)
         init_val = (init_qoi, init_sample)
 
         # Loop over backward models and the remaining base samples
@@ -153,7 +152,8 @@ class MarkovSeqRev(Generic[S]):
     @property
     def sample_shape(self):
         # The number of samples is one larger than the number of conditionals
-        n, *shape_single_sample = self.conditional.noise.sample_shape
+        _, noise = self.conditional
+        n, *shape_single_sample = impl.random.sample_shape(noise)
         return (n + 1,) + tuple(shape_single_sample)
 
     def scale_covariance(self, output_scale):

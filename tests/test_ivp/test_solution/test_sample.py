@@ -5,6 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, test_util
 from probdiffeq.backend import testing
+from probdiffeq.impl import impl
 from probdiffeq.statespace import recipes
 from probdiffeq.strategies import smoothers
 
@@ -72,7 +73,7 @@ def test_sample_shape(approximate_solution, shape):
     # todo: remove "u" from this output?
     u, samples = sol.posterior.sample(key, shape=shape)
     assert u.shape == shape + sol.u.shape
-    assert samples.shape == shape + sol.marginals.sample_shape
+    assert samples.shape == shape + impl.random.sample_shape(sol.marginals)
 
     # Todo: test values of the samples by checking a chi2 statistic
     #  in terms of the joint posterior. But this requires a joint_posterior()

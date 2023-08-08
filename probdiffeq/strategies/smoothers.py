@@ -64,8 +64,8 @@ def _smoother_offgrid_marginals(
         output_scale=output_scale,
     )
     t, posterior = extract(acc)
-    marginals = posterior.conditional.marginalise(marginals)
-    u = marginals.extract_qoi_from_sample(marginals.mean)
+    marginals = impl.conditional.marginalise(marginals, posterior.conditional)
+    u = impl.random.qoi(marginals)
     return u, marginals
 
 

@@ -57,3 +57,12 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def marginal_nth_derivative(self, rv):
         raise NotImplementedError
+
+    def sample_shape(self, rv):
+        return rv.mean.shape
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
+
+    def qoi_from_sample(self, sample, /):
+        return sample[..., 0]

@@ -48,3 +48,15 @@ class RandomVariableBackend(abc.ABC):
     @abc.abstractmethod
     def marginal_nth_derivative(self, rv):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def sample_shape(self, rv):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def transform_unit_sample(self, unit_sample, /, rv):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def qoi_from_sample(self, sample, /):
+        raise NotImplementedError
