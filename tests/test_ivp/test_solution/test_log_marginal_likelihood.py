@@ -67,8 +67,9 @@ def fixture_solution_save_at(problem, factorisation):
 def test_output_is_a_scalar_and_not_nan_and_not_inf(solution_save_at):
     sol, solver = solution_save_at
     data = sol.u + 0.005
+    k, _ = sol.u.shape
     lml = solution.log_marginal_likelihood(
-        observation_std=1.0,
+        observation_std=jnp.ones((k,)),
         u=data,
         posterior=sol.posterior,
         strategy=solver.strategy,

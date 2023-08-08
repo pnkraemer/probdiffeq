@@ -19,7 +19,13 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return jnp.reshape(jnp.abs(residual_white_matrix), ())
 
     def logpdf(self, u, /, rv):
+        # if the gain is qoi-to-hidden, the data is a (d,) array.
+        # this is problematic for the isotropic model unless we explicitly broadcast.
+        if jnp.ndim(u) == 1:
+            u = u[None, :]
+
         residual_white = (rv.mean - u) / rv.cholesky
+        residual_white = jnp.reshape(residual_white, self.ode_shape)
         x1 = jnp.dot(residual_white, residual_white)
         x2 = u.size * 2.0 * jnp.log(jnp.abs(rv.cholesky))
         x3 = u.size * jnp.log(jnp.pi * 2)

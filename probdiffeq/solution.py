@@ -140,10 +140,12 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for log-posterior
 
-    if jnp.shape(observation_std) != ():
+    if jnp.shape(observation_std) != (jnp.shape(u)[0],):
         raise ValueError(
             f"Observation-noise shape {jnp.shape(observation_std)} does not match "
-            f"the expected observation shape {()}. "
+            f"the observation shape {jnp.shape(u)}. "
+            f"Expected observation-noise shape: "
+            f"{(jnp.shape(u)[0],)} != {jnp.shape(observation_std)}. "
         )
 
     if jnp.ndim(u) < 2:
@@ -178,9 +180,11 @@ class _KalFiltState(containers.NamedTuple):
 #  But this only works if the ODE posterior uses the preconditioner (I think).
 # todo: we should allow proper noise, and proper information functions.
 #  But it is not clear which data structure that should be.
-def _kalman_filter(u, /, mseq, standard_deviation, *, strategy, reverse=True):
-    assert jnp.isscalar(standard_deviation)
-    observation_model = impl.ssm_util.conditional_to_derivative(0, standard_deviation)
+def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
+    model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
+    models = model_fun(0, standard_deviations)
+    print(models)
+    assert False
 
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
@@ -198,19 +202,8 @@ def _kalman_filter(u, /, mseq, standard_deviation, *, strategy, reverse=True):
 
 def _init_fn(rv, data, *, observation_model):
     observed, conditional = impl.conditional.revert(rv, observation_model)
-    print(rv)
-    print(data)
-    print(conditional)
-    print(
-        "THe issue is: the gain is shape (3,1), and we would have to apply it via broadcasting. Do we?"
-    )
-    print(
-        "Why is it not working? Is the conditional_to_derivative nonsense? What shapes do we expect????"
-    )
     corrected = impl.conditional.apply(data, conditional)
     logpdf = impl.random.logpdf(data, observed)
-    print(conditional)
-
     return _KalFiltState(corrected, 1.0, log_marginal_likelihood=logpdf)
 
 

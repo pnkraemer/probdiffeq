@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
 from probdiffeq.impl import _cond_util, _conditional, matfree
@@ -8,6 +9,10 @@ from probdiffeq.impl.isotropic import _normal
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         A, noise = conditional
+        # if the gain is qoi-to-hidden, the data is a (d,) array.
+        # this is problematic for the isotropic model unless we explicitly broadcast.
+        if jnp.ndim(x) == 1:
+            x = x[None, :]
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):

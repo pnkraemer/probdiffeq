@@ -5,7 +5,9 @@
 # from dataclasses import dataclass
 # from typing import Callable, TypeVar
 #
-# import jax
+import jax
+
+
 #
 #
 # def linop_from_matmul(matrix):
@@ -71,20 +73,22 @@ class CallableLinOp:
 #     if isinstance(linop1, MatrixLinOp):
 #         return MatrixLinOp(linop1.matrix @ linop2.matrix)
 #     raise ValueError
-#
-#
-# def _matrix_flatten(linop):
-#     children = (linop.matrix,)
-#     aux = ()
-#     return children, aux
-#
-#
-# def _matrix_unflatten(_aux, children):
-#     (matrix,) = children
-#     return MatrixLinOp(matrix)
-#
-#
-# jax.tree_util.register_pytree_node(MatrixLinOp, _matrix_flatten, _matrix_unflatten)
+
+
+def _linop_flatten(linop):
+    children = ()
+    aux = (linop.func,)
+    return children, aux
+
+
+def _linop_unflatten(aux, _children):
+    (func,) = aux
+    return linop_from_callable(func)
+
+
+jax.tree_util.register_pytree_node(CallableLinOp, _linop_flatten, _linop_unflatten)
+
+# jax.tree_util.register_pytree_node(MatrixLinOp, _linop_flatten, _linop_unflatten)
 #
 # #
 # # def merge_matmul_linops(linop1, linop2):
