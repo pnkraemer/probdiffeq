@@ -1,3 +1,5 @@
+"""Random variable implementations."""
+import jax
 import jax.numpy as jnp
 
 from probdiffeq.impl import _random
@@ -25,8 +27,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return rv.mean
 
     def qoi_like(self):
-        mean_and_cholesky = jnp.empty(self.ode_shape)
-        return _normal.Normal(mean_and_cholesky, mean_and_cholesky)
+        mean = jnp.empty(self.ode_shape + (1,))
+        cholesky = jnp.empty(self.ode_shape + (1, 1))
+        return _normal.Normal(mean, cholesky)
 
     def qoi(self, rv):
         return rv.mean[..., 0]

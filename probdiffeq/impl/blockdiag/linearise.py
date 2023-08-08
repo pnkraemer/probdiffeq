@@ -9,9 +9,9 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             fx = ts0(fun, m0.T)
 
             def a1(s):
-                return s[:, ode_order, ...]
+                return s[:, [ode_order], ...]
 
-            return matfree.parametrised_linop(lambda v, _p: a1(v)), -fx
+            return matfree.parametrised_linop(lambda v, _p: a1(v)), -fx[:, None]
 
         return linearise_fun_wrapped
 
