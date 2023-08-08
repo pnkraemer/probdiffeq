@@ -27,19 +27,28 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         return _normal.Normal(mean, _transpose(cholesky))
 
     def merge(self, cond1, cond2, /):
-        raise NotImplementedError
+        A, b = cond1
+        C, d = cond2
+
+        g = A @ C
+        xi = (A @ d.mean[..., None])[..., 0] + b.mean
+        R_stack = (_transpose(A @ d.cholesky), _transpose(b.cholesky))
+        Xi = _transpose(jax.vmap(_sqrt_util.sum_of_sqrtm_factors)(R_stack))
+
+        noise = _normal.Normal(xi, Xi)
+        return _cond_util.Conditional(g, noise)
 
     def revert(self, rv, conditional, /):
         A, noise = conditional
-        rv_chol_upper = jnp.transpose(rv.cholesky, axes=(0, -1, -2))
-        noise_chol_upper = jnp.transpose(noise.cholesky, axes=(0, -1, -2))
-        A_rv_chol_upper = jnp.transpose(A @ rv.cholesky, axes=(0, -1, -2))
+        rv_chol_upper = jnp.transpose(rv.cholesky, axes=(0, 2, 1))
+        noise_chol_upper = jnp.transpose(noise.cholesky, axes=(0, 2, 1))
+        A_rv_chol_upper = jnp.transpose(A @ rv.cholesky, axes=(0, 2, 1))
 
         revert = jax.vmap(_sqrt_util.revert_conditional)
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
 
-        cholesky_obs = jnp.transpose(r_obs, axes=(0, -1, -2))
-        cholesky_cor = jnp.transpose(r_cor, axes=(0, -1, -2))
+        cholesky_obs = jnp.transpose(r_obs, axes=(0, 2, 1))
+        cholesky_cor = jnp.transpose(r_cor, axes=(0, 2, 1))
 
         # Gather terms and return
         mean_observed = (A @ rv.mean[..., None])[..., 0] + noise.mean
@@ -50,4 +59,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
 
 def _transpose(matrix):
-    return jnp.transpose(matrix, axes=(0, -1, -2))
+    return jnp.transpose(matrix, axes=(0, 2, 1))
