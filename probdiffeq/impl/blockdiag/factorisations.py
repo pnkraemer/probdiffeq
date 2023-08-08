@@ -1,3 +1,4 @@
+"""Factorisations."""
 from probdiffeq.impl import _factorisations
 from probdiffeq.impl.blockdiag import (
     conditional,

@@ -1,7 +1,6 @@
+"""Conditionals."""
 import abc
 from typing import Generic, TypeVar
-
-import jax
 
 # todo: solve this transform/derivative matrix/matmul dilemma
 
