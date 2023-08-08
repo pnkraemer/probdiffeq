@@ -1,8 +1,9 @@
+"""State-space model utilities."""
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _ibm_util, _ssm_util
+from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util
 from probdiffeq.impl.blockdiag import _normal
 
 
@@ -26,8 +27,14 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, ndim):
-        raise NotImplementedError
+    def identity_conditional(self, ndim, /):
+        matrix_shape = self.ode_shape + (ndim, ndim)
+        m0 = jnp.zeros(self.ode_shape + (ndim,) + self.ode_shape)
+        c0 = jnp.zeros(matrix_shape)
+        noise = _normal.Normal(m0, c0)
+
+        matrix = jnp.eye(*matrix_shape)
+        return _cond_util.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:

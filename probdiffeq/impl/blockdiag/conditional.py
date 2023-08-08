@@ -1,8 +1,9 @@
+"""Conditional implementation."""
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _conditional
+from probdiffeq.impl import _cond_util, _conditional
 from probdiffeq.impl.blockdiag import _normal
 
 
@@ -29,7 +30,23 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         raise NotImplementedError
 
     def revert(self, rv, conditional, /):
-        raise NotImplementedError
+        A, noise = conditional
+        rv_chol_upper = jnp.transpose(rv.cholesky, axes=(0, -1, -2))
+        noise_chol_upper = jnp.transpose(noise.cholesky, axes=(0, -1, -2))
+        A_rv_chol_upper = jnp.transpose(A @ rv.cholesky, axes=(0, -1, -2))
+
+        revert = jax.vmap(_sqrt_util.revert_conditional)
+        r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
+
+        cholesky_obs = jnp.transpose(r_obs, axes=(0, -1, -2))
+        cholesky_cor = jnp.transpose(r_cor, axes=(0, -1, -2))
+
+        # Gather terms and return
+        mean_observed = (A @ rv.mean[..., None])[..., 0] + noise.mean
+        m_cor = rv.mean - (gain @ (mean_observed[..., None]))[..., 0]
+        corrected = _normal.Normal(m_cor, cholesky_cor)
+        observed = _normal.Normal(mean_observed, cholesky_obs)
+        return observed, _cond_util.Conditional(gain, corrected)
 
 
 def _transpose(matrix):

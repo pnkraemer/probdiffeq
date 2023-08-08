@@ -1,3 +1,4 @@
+"""Linearisation."""
 from probdiffeq.impl import _linearise, matfree
 
 
@@ -7,11 +8,10 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             m0 = mean[:, :ode_order]
             fx = ts0(fun, m0.T)
 
-            @matfree.linop_from_callable
             def a1(s):
                 return s[:, ode_order, ...]
 
-            return a1, -fx
+            return matfree.parametrised_linop(lambda v, _p: a1(v)), -fx
 
         return linearise_fun_wrapped
 

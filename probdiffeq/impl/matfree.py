@@ -1,21 +1,12 @@
-# """Matrix-free stuff."""
-#
-# import abc
+"""Matrix-free API."""
 import dataclasses
 from typing import Any, Callable
 
-#
 import jax
 
 
 def parametrised_linop(func, /, params=None):
-    return CallableLinOp(func, params)
-
-
-# not sure whether we have to add parameters here.
-# Why? Because when we linearise+vmap,
-# the operators are surely different for each time-step?
-# But what is the result?
+    return CallableLinOp(func=func, params=params)
 
 
 @dataclasses.dataclass(frozen=True)

@@ -50,7 +50,7 @@ def revert_conditional_noisefree(R_X_F, R_X):
 
 
 # rename: reparametrise_conditional_correlation?
-def revert_conditional(*, R_X_F, R_X, R_YX):
+def revert_conditional(R_X_F, R_X, R_YX):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
 
     What does this mean? Assume we have two normally-distributed random variables,
