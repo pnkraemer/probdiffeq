@@ -1,5 +1,7 @@
+import jax
+
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _conditional, matfree
+from probdiffeq.impl import _cond_util, _conditional, matfree
 from probdiffeq.impl.isotropic import _normal
 
 
@@ -10,7 +12,6 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
     def marginalise(self, rv, conditional, /):
         matrix, noise = conditional
-        assert isinstance(matrix, matfree.LinOp)
 
         mean = matrix @ rv.mean + noise.mean
 
@@ -22,14 +23,13 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         A, b = cond1
         C, d = cond2
 
-        g = matfree.merge_linops(A, C)
-
+        g = A @ C
         xi = A @ d.mean + b.mean
         R_stack = ((A @ d.cholesky).T, b.cholesky.T)
         Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack).T
 
         noise = _normal.Normal(xi, Xi)
-        return g, noise
+        return _cond_util.Conditional(g, noise)
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
@@ -47,4 +47,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
-        return extrapolated, (gain, corrected)
+        return extrapolated, _cond_util.Conditional(gain, corrected)

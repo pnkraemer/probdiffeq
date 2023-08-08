@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _transform, matfree
+from probdiffeq.impl import _cond_util, _transform, matfree
 from probdiffeq.impl.isotropic import _normal
 
 
@@ -16,7 +16,6 @@ class TransformBackend(_transform.TransformBackend):
     def revert(self, rv, transformation, /):
         A, b = transformation
         mean, cholesky = rv.mean, rv.cholesky
-        assert isinstance(A, matfree.LinOp)
 
         # QR-decomposition
         # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
@@ -31,4 +30,4 @@ class TransformBackend(_transform.TransformBackend):
         m_cor = mean - gain * (mean_observed[None, ...])
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, (corrected, gain)
+        return observed, _cond_util.Conditional(gain, corrected)

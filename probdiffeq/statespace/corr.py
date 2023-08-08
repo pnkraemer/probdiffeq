@@ -59,8 +59,8 @@ class ODEConstraint(Correction):
 
     def complete(self, hidden_state, corr, /, vector_field, t, p):
         A, b = corr
-        obs, (cor, _gn) = impl.transform.revert(hidden_state, (A, b))
-        return cor, obs
+        observed, (_gain, corrected) = impl.transform.revert(hidden_state, (A, b))
+        return corrected, observed
 
     def extract(self, ssv, corr, /):
         return ssv
@@ -94,8 +94,8 @@ class ODEConstraintNoisy(Correction):
         A, b = self.linearise(f_wrapped, hidden_state)
 
         # Condition
-        obs, (cor, _gn) = impl.conditional.revert(hidden_state, (A, b))
-        return cor, obs
+        observed, (_gain, corrected) = impl.conditional.revert(hidden_state, (A, b))
+        return corrected, observed
 
     def extract(self, hidden_state, corr, /):
         return hidden_state

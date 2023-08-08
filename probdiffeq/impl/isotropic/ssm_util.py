@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _ibm_util, _ssm_util, matfree
+from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util, matfree
 from probdiffeq.impl.isotropic import _normal
 
 
@@ -18,7 +18,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return (A, noise), (p, p_inv)
+            return _cond_util.Conditional(A, noise), (p, p_inv)
 
         return discretise
 
@@ -27,7 +27,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = jnp.eye(num_hidden_states_per_ode_dim)
-        return matrix, noise
+        return _cond_util.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -45,12 +45,10 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
         A, noise = cond
 
-        assert isinstance(A, matfree.MatrixLinOp)
-        A_scaled = p[:, None] * A.matrix * p_inv[None, :]
-        A_new = matfree.linop_from_matmul(A_scaled)
+        A_new = p[:, None] * A * p_inv[None, :]
 
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return A_new, noise
+        return _cond_util.Conditional(A_new, noise)
 
     def standard_normal(self, num, /, output_scale):
         mean = jnp.zeros((num,) + self.ode_shape)
@@ -69,4 +67,4 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         bias = jnp.zeros(self.ode_shape)
         eye = jnp.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        return matfree.linop_from_callable(A), noise
+        return _cond_util.Conditional(matfree.linop_from_callable(A), noise)

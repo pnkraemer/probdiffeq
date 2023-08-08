@@ -1,6 +1,8 @@
 import abc
 from typing import Generic, TypeVar
 
+import jax
+
 # todo: solve this transform/derivative matrix/matmul dilemma
 
 T = TypeVar("T")
@@ -8,7 +10,7 @@ T = TypeVar("T")
 
 class ConditionalBackend(abc.ABC, Generic[T]):
     @abc.abstractmethod
-    def marginalise(self, rv: T, conditional, /) -> T:
+    def marginalise(self, rv: T, conditional, /):
         raise NotImplementedError
 
     @abc.abstractmethod
