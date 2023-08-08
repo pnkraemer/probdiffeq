@@ -103,7 +103,7 @@ class ODEConstraintNoisy(Correction):
 
 def estimate_error(observed, /):
     zero_data = jnp.zeros_like(impl.random.mean(observed))
-    output_scale = impl.random.mahalanobis_norm(zero_data, rv=observed)
+    output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
     error_estimate_unscaled = impl.random.standard_deviation(observed)
 
     # Broadcast error estimate to (d,) shape

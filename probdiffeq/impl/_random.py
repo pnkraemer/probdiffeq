@@ -14,7 +14,7 @@ class RandomVariableBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def mahalanobis_norm(self, u, /, rv):
+    def mahalanobis_norm_relative(self, u, /, rv):
         raise NotImplementedError
 
     @abc.abstractmethod

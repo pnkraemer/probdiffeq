@@ -13,8 +13,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def variable(self, mean, cholesky):
         return _normal.Normal(mean, cholesky)
 
-    def mahalanobis_norm(self, u, /, rv):
-        return (rv.mean - u) / rv.cholesky  # return array of norms! See calibration
+    def mahalanobis_norm_relative(self, u, /, rv):
+        # return array of norms! See calibration
+        return (rv.mean - u) / rv.cholesky / jnp.sqrt(rv.mean.size)
 
     def logpdf(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
@@ -35,6 +36,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return rv.mean[..., 0]
 
     def rescale_cholesky(self, rv, factor, /):
+        print(factor.shape, rv.cholesky.shape)
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 

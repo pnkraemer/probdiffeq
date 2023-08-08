@@ -14,10 +14,10 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def variable(self, mean, cholesky):
         return _normal.Normal(mean, cholesky)
 
-    def mahalanobis_norm(self, u, /, rv):
+    def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = jnp.linalg.qr(residual_white[:, None], mode="r")
-        return jnp.reshape(jnp.abs(residual_white_matrix), ())
+        return jnp.reshape(jnp.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # if the gain is qoi-to-hidden, the data is a (d,) array.

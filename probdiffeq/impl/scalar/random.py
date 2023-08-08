@@ -1,8 +1,7 @@
-from typing import Any
-
+"""Random variable implementation."""
+import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import containers
 from probdiffeq.impl import _random
 from probdiffeq.impl.scalar import _normal
 
@@ -16,9 +15,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def variable(self, mean, cholesky):
         return _normal.Normal(mean, cholesky)
 
-    def mahalanobis_norm(self, u, /, rv):
+    def mahalanobis_norm_relative(self, u, /, rv):
         res_white = (u - rv.mean) / rv.cholesky
-        return jnp.abs(res_white)
+        return jnp.abs(res_white) / jnp.sqrt(rv.mean.size)
 
     def logpdf(self, u, /, rv):
         x1 = 2.0 * jnp.log(jnp.abs(rv.cholesky))  # logdet

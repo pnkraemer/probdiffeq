@@ -1,9 +1,7 @@
-from typing import Any
-
+"""Random variable implementation."""
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import containers
 from probdiffeq.impl import _random
 from probdiffeq.impl.dense import _normal
 
@@ -15,12 +13,12 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def variable(self, mean, cholesky):
         return _normal.Normal(mean, cholesky)
 
-    def mahalanobis_norm(self, u, /, rv):
+    def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = jax.scipy.linalg.solve_triangular(
             rv.cholesky.T, u - rv.mean, lower=False, trans="T"
         )
         mahalanobis = jnp.linalg.qr(residual_white[:, None], mode="r")
-        return jnp.reshape(jnp.abs(mahalanobis), ())
+        return jnp.reshape(jnp.abs(mahalanobis) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # The cholesky factor is triangular, so we compute a cheap slogdet.

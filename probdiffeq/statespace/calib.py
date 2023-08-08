@@ -4,7 +4,6 @@
 import abc
 
 import jax
-import jax.numpy as jnp
 
 from probdiffeq.impl import impl
 
@@ -35,9 +34,7 @@ class MostRecent(Calibration):
         return prior
 
     def update(self, _state, /, observed):
-        zero_data = jnp.zeros_like(impl.random.mean(observed))
-        mahalanobis_norm = impl.random.mahalanobis_norm(zero_data, observed)
-        calibrated = mahalanobis_norm / jnp.sqrt(zero_data.size)
+        calibrated = impl.random.mahalanobis_norm_relative(0.0, observed)
         return calibrated
 
     def extract(self, state, /):
@@ -51,10 +48,7 @@ class RunningMean(Calibration):
     def update(self, state, /, observed):
         prior, calibrated, num_data = state
 
-        zero_data = jnp.zeros_like(impl.random.mean(observed))
-        mahalanobis_norm = impl.random.mahalanobis_norm(zero_data, observed)
-        new_term = mahalanobis_norm / jnp.sqrt(zero_data.size)
-
+        new_term = impl.random.mahalanobis_norm_relative(0.0, observed)
         calibrated = impl.ssm_util.update_mean(calibrated, new_term, num=num_data)
         return prior, calibrated, num_data + 1.0
 
