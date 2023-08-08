@@ -3,12 +3,13 @@ import diffeqzoo.ivps
 import jax.numpy as jnp
 
 from probdiffeq import taylor
-from probdiffeq.backend import statespace, testing
+from probdiffeq.backend import testing
+from probdiffeq.impl import impl
 
 
 @testing.case()
 def case_runge_kutta_starter():
-    statespace.select("isotropic", ode_shape=(2,))
+    impl.select("isotropic", ode_shape=(2,))
     return taylor.make_runge_kutta_starter_fn()
 
 

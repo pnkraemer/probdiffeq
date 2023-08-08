@@ -24,7 +24,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         mean = jnp.einsum("ijk,ik->ij", matrix, rv.mean) + noise.mean
 
-        chol1 = _transpose(jnp.einsum("ijk,ikk->ijk", matrix, rv.cholesky))
+        chol1 = _transpose(matrix @ rv.cholesky)
         chol2 = _transpose(noise.cholesky)
         R_stack = (chol1, chol2)
         cholesky = jax.vmap(_sqrt_util.sum_of_sqrtm_factors)(R_stack)

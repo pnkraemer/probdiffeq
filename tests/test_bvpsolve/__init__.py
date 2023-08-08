@@ -1,4 +1,4 @@
 """Tests for BVP solvers."""
-from probdiffeq.backend import statespace
+from probdiffeq.impl import impl
 
-statespace.select("scalar")
+impl.select("scalar")

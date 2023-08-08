@@ -6,9 +6,8 @@ Necessary because the implementation has been faulty in the past. Never again.
 import jax.numpy as jnp
 import jax.scipy.stats
 
-from probdiffeq.backend import statespace, testing
-
-# todo: test for blockdiag
+from probdiffeq.backend import testing
+from probdiffeq.impl import impl
 
 
 @testing.fixture(name="setup")
@@ -24,12 +23,12 @@ def fixture_setup(d):
 
 
 def test_logpdf_dense(setup):
-    statespace.select("dense")
     mean, cholesky = setup
+    impl.select("dense", ode_shape=jnp.shape(mean))
 
     def fn1(x):
-        rv = statespace.random.variable(mean, cholesky)
-        return statespace.random.logpdf(x, rv)
+        rv = impl.random.variable(mean, cholesky)
+        return impl.random.logpdf(x, rv)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
@@ -47,14 +46,14 @@ def test_logpdf_dense(setup):
 
 
 def test_logpdf_iso(setup):
-    statespace.select("isotropic")
-
     mean, cholesky = setup
+    impl.select("isotropic", ode_shape=jnp.shape(mean))
+
     standard_deviation = jnp.trace(cholesky)
 
     def fn1(x):
-        rv = statespace.random.variable(mean, standard_deviation)
-        return statespace.random.logpdf(x, rv)
+        rv = impl.random.variable(mean, standard_deviation)
+        return impl.random.logpdf(x, rv)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
@@ -72,14 +71,14 @@ def test_logpdf_iso(setup):
 
 
 def test_logpdf_blockdiag(setup):
-    statespace.select("blockdiag")
-
     mean, cholesky = setup
+    impl.select("blockdiag", ode_shape=jnp.shape(mean))
+
     standard_deviation = jnp.diagonal(cholesky)
 
     def fn1(x):
-        rv = statespace.random.variable(mean, standard_deviation)
-        return statespace.random.logpdf(x, rv)
+        rv = impl.random.variable(mean, standard_deviation)
+        return impl.random.logpdf(x, rv)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
@@ -97,15 +96,15 @@ def test_logpdf_blockdiag(setup):
 
 
 def test_logpdf_scalar(setup):
-    statespace.select("scalar")
-
     m, cov_cholesky = setup
     mean = jnp.linalg.norm(m)
+    impl.select("scalar", ode_shape=jnp.shape(mean))
+
     standard_deviation = jnp.trace(cov_cholesky)
 
     def fn1(x):
-        rv = statespace.random.variable(mean, standard_deviation)
-        return statespace.random.logpdf(x, rv)
+        rv = impl.random.variable(mean, standard_deviation)
+        return impl.random.logpdf(x, rv)
 
     def fn2(x):
         return jax.scipy.stats.multivariate_normal.logpdf(
