@@ -67,4 +67,5 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         bias = jnp.zeros(self.ode_shape)
         eye = jnp.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        return _cond_util.Conditional(matfree.linop_from_callable(A), noise)
+        linop = matfree.parametrised_linop(lambda s, _p: A(s))
+        return _cond_util.Conditional(linop, noise)

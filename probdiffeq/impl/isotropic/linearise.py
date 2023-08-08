@@ -8,7 +8,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
     def constraint_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             fx = ts0(fun, mean[:ode_order, ...])
-            linop = matfree.linop_from_callable(lambda s: s[ode_order, ...])
+            linop = matfree.parametrised_linop(lambda s, _p: s[ode_order, ...])
             return linop, -fx
 
         return linearise_fun_wrapped
