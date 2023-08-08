@@ -1,7 +1,6 @@
-import jax.numpy as jnp
-
+"""Conditionals."""
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _conditional
+from probdiffeq.impl import _cond_util, _conditional
 from probdiffeq.impl.scalar import _normal
 
 
@@ -27,7 +26,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         marginal = _normal.Normal(m_ext, r_ext.T)
         noise = _normal.Normal(m_cond, r_bw_p.T)
-        return marginal, (g_bw_p, noise)
+        return marginal, _cond_util.Conditional(g_bw_p, noise)
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
@@ -43,4 +42,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
         noise = _normal.Normal(xi, Xi)
-        return g, noise
+        return _cond_util.Conditional(g, noise)

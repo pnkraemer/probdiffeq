@@ -1,7 +1,8 @@
+"""Random variable transformations."""
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _transform
+from probdiffeq.impl import _cond_util, _transform
 from probdiffeq.impl.scalar import _normal
 
 
@@ -33,4 +34,4 @@ class TransformBackend(_transform.TransformBackend):
         m_cor = rv.mean - gain * (A(rv.mean) + b)
         corrected = _normal.Normal(m_cor, cov_sqrtm_lower_cor)
         observed = _normal.Normal(A(rv.mean) + b, cov_sqrtm_lower_obs)
-        return observed, (corrected, gain)
+        return observed, _cond_util.Conditional(gain, corrected)

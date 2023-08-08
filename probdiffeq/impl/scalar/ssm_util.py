@@ -2,7 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _ibm_util, _ssm_util
+from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util
 from probdiffeq.impl.scalar import _normal
 
 
@@ -24,7 +24,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         A, noise = cond
         A = p[:, None] * A * p_inv[None, :]
         noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
-        return A, noise
+        return _cond_util.Conditional(A, noise)
 
     def ibm_transitions(self, num_derivatives):
         a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
@@ -35,7 +35,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return (a, noise), (p, p_inv)
+            return _cond_util.Conditional(a, noise), (p, p_inv)
 
         return discretise
 
@@ -44,9 +44,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         mean = jnp.zeros((ndim,))
         cov_sqrtm = jnp.zeros((ndim, ndim))
         noise = _normal.Normal(mean, cov_sqrtm)
-        return transition, noise
+        return _cond_util.Conditional(transition, noise)
 
-    def standard_normal(self, num_hidden_states_per_ode_dim, output_scale):
+    def standard_normal(self, ndim, /, output_scale):
         mean = jnp.zeros((ndim,))
         cholesky = output_scale * jnp.eye(ndim)
         return _normal.Normal(mean, cholesky)
