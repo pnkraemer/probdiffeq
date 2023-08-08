@@ -12,7 +12,7 @@ from probdiffeq.impl import (
 
 class Backend:
     def __init__(self):
-        self._fact: _factorisations.Factorisation = None
+        self._fact = None
 
     def select(self, which, **kwargs):
         # if self._fact is not None:

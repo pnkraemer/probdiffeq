@@ -39,7 +39,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return rv.mean[..., 0]
 
     def rescale_cholesky(self, rv, factor, /):
-        print(factor.shape, rv.cholesky.shape)
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 

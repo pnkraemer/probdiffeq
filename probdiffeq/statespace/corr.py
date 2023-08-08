@@ -102,6 +102,9 @@ class ODEConstraintNoisy(Correction):
 
 
 def estimate_error(observed, /):
+    # todo: the functions involved in error estimation are still a bit patchy.
+    #  for instance, they assume that they are called in exactly this error estimation
+    #  context. Same for qoi_like etc.
     zero_data = jnp.zeros(())
     output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
     error_estimate_unscaled = impl.random.standard_deviation(observed)

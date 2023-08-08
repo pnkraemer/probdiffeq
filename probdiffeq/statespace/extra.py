@@ -259,6 +259,4 @@ def ibm_discretise_fwd(dts, /, *, num_derivatives):
 def unit_markov_sequence(num_derivatives):
     cond = impl.ssm_util.identity_conditional(num_derivatives + 1)
     init = impl.ssm_util.standard_normal(num_derivatives + 1, 1.0)
-    print(init)
-
     return _markov.MarkovSeqRev(init=init, conditional=cond)

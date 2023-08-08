@@ -166,10 +166,10 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
 #  But merging those two data structures might be in the far future.
 
 
-class _KalFiltState(containers.NamedTuple):
+class _KalmanFilterState(containers.NamedTuple):
     rv: Any
     num_data_points: int
-    log_marginal_likelihood: float
+    logpdf: float
 
 
 # todo: this should return a Filtering posterior or a smoothing posterior
@@ -180,33 +180,34 @@ class _KalFiltState(containers.NamedTuple):
 # todo: we should allow proper noise, and proper information functions.
 #  But it is not clear which data structure that should be.
 def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
+    # Generate an observation-model for the QOI
     model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
     models = model_fun(0, standard_deviations)
 
     # Incorporate final data point
+
     def select(tree, idx_or_slice):
         return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
 
     rv, data, model = select(tree=(mseq.init, u, models), idx_or_slice=-1)
     init = _initialise(rv, data, model)
 
-    data, observation = select((u, models), idx_or_slice=slice(0, -1, 1))
-
     # Scan over the remaining data points
-    lml_state, _ = jax.lax.scan(
+    data, observation = select((u, models), idx_or_slice=slice(0, -1, 1))
+    kalman_state, _ = jax.lax.scan(
         f=lambda *a: (_step(*a), None),
         init=init,
         xs=(data, mseq.conditional, observation),
         reverse=reverse,
     )
-    return lml_state.log_marginal_likelihood
+    return kalman_state.logpdf
 
 
 def _initialise(rv, data, model):
     observed, conditional = impl.conditional.revert(rv, model)
     corrected = impl.conditional.apply(data, conditional)
     logpdf = impl.random.logpdf(data, observed)
-    return _KalFiltState(corrected, 1.0, log_marginal_likelihood=logpdf)
+    return _KalmanFilterState(corrected, 1.0, logpdf)
 
 
 def _step(state, problem):
@@ -219,5 +220,4 @@ def _step(state, problem):
 
     logpdf_new = impl.random.logpdf(data, observed)
     logpdf_mean = impl.ssm_util.update_mean(logpdf, logpdf_new, num_data)
-    state = _KalFiltState(corrected, num_data + 1.0, logpdf_mean)
-    return state
+    return _KalmanFilterState(corrected, num_data + 1.0, logpdf_mean)

@@ -9,10 +9,14 @@ from probdiffeq.impl.blockdiag import _normal
 
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
+        if jnp.ndim(x) == 1:
+            x = x[..., None]
+
+        def apply_unbatch(m, s, n):
+            return _normal.Normal(m @ s + n.mean, n.cholesky)
+
         matrix, noise = conditional
-        assert matrix.ndim == 3
-        mean = jnp.einsum("ijk,ik->ij", matrix, x) + noise.mean
-        return _normal.Normal(mean, noise.cholesky)
+        return jax.vmap(apply_unbatch)(matrix, x, noise)
 
     def marginalise(self, rv, conditional, /):
         matrix, noise = conditional

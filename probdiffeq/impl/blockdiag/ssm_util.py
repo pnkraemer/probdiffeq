@@ -61,16 +61,18 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         raise NotImplementedError
 
     def update_mean(self, mean, x, /, num):
-        sum_of_scalars = jax.vmap(_sqrt_util.sqrt_sum_square_scalar)
-        sum_updated = sum_of_scalars(jnp.sqrt(num) * mean, x)
+        if jnp.ndim(mean) > 0:
+            assert jnp.shape(mean) == jnp.shape(x)
+            return jax.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
+
+        sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
 
     def conditional_to_derivative(self, i, standard_deviation):
         def A(x):
-            derivative = x[:, i, ...]
-            return derivative[:, None, ...]
+            return x[:, [i], ...]
 
-        bias = jnp.zeros(self.ode_shape)
+        bias = jnp.zeros(self.ode_shape + (1,))
         eye = jnp.ones(self.ode_shape + (1, 1)) * jnp.eye(1)[None, ...]
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = matfree.parametrised_linop(lambda s, _p: A(s))
