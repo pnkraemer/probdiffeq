@@ -1,3 +1,4 @@
+"""Random variable implementation."""
 import jax
 import jax.numpy as jnp
 
@@ -27,7 +28,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white = jnp.reshape(residual_white, self.ode_shape)
         x1 = jnp.dot(residual_white, residual_white)
-        x2 = u.size * 2.0 * jnp.log(jnp.abs(rv.cholesky))
+        x2 = u.size * 2.0 * jnp.log(jnp.abs(jnp.reshape(rv.cholesky, ())))
         x3 = u.size * jnp.log(jnp.pi * 2)
         return -0.5 * (x1 + x2 + x3)
 

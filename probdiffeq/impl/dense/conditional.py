@@ -1,16 +1,7 @@
-from typing import Callable
-
-import jax
-
+"""Conditional implementation."""
 from probdiffeq import _sqrt_util
-from probdiffeq.backend import containers
 from probdiffeq.impl import _conditional, matfree
 from probdiffeq.impl.dense import _normal
-
-
-class Conditional(containers.NamedTuple):
-    matmul: matfree.LinOp
-    noise: _normal.Normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):
@@ -32,7 +23,6 @@ class ConditionalBackend(_conditional.ConditionalBackend):
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
         mean, cholesky = rv.mean, rv.cholesky
-        assert isinstance(matrix, matfree.LinOp)
 
         # QR-decomposition
         # (todo: rename revert_conditional_noisefree to

@@ -4,7 +4,6 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
-import functools
 from typing import Any
 
 import jax
@@ -183,63 +182,42 @@ class _KalFiltState(containers.NamedTuple):
 def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
     models = model_fun(0, standard_deviations)
-    print(models)
-    assert False
 
     # Incorporate final data point
-    rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
-    init = _init_fn(rv_terminal, u[-1], observation_model=observation_model)
+    def select(tree, idx_or_slice):
+        return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
+
+    rv, data, model = select(tree=(mseq.init, u, models), idx_or_slice=-1)
+    init = _initialise(rv, data, model)
+
+    data, observation = select((u, models), idx_or_slice=slice(0, -1, 1))
 
     # Scan over the remaining data points
     lml_state, _ = jax.lax.scan(
-        f=functools.partial(_filter_step, strategy=strategy),
+        f=lambda *a: (_step(*a), None),
         init=init,
-        xs=(mseq.conditional, u[:-1]),
+        xs=(data, mseq.conditional, observation),
         reverse=reverse,
     )
     return lml_state.log_marginal_likelihood
 
 
-def _init_fn(rv, data, *, observation_model):
-    observed, conditional = impl.conditional.revert(rv, observation_model)
+def _initialise(rv, data, model):
+    observed, conditional = impl.conditional.revert(rv, model)
     corrected = impl.conditional.apply(data, conditional)
     logpdf = impl.random.logpdf(data, observed)
     return _KalFiltState(corrected, 1.0, log_marginal_likelihood=logpdf)
 
 
-def _filter_step(state, problem, *, strategy):
-    bw_model, (obs_std, data) = problem
+def _step(state, problem):
+    data, conditional, observation = problem
+    rv, num_data, logpdf = state
 
-    state = _predict(state, problem=bw_model)
-    updates = _update(state, problem=(obs_std, data), strategy=strategy)
-    state = _apply_updates(state, updates=updates)
-    return state, state
+    rv = impl.conditional.marginalise(rv, conditional)
+    observed, reverse = impl.conditional.revert(rv, observation)
+    corrected = impl.conditional.apply(data, reverse)
 
-
-def _predict(state, *, problem):
-    """Extrapolate according to the given transition."""
-    rv = problem.marginalise(state.rv)
-    return _KalFiltState(rv, state.num_data_points, state.log_marginal_likelihood)
-
-
-def _update(state, problem, *, strategy):
-    """Observe the QOI and compute the 'local' log-marginal likelihood."""
-    obs_std, data = problem
-
-    rv_as_mseq = _markov.MarkovSeqRev(init=state.rv, conditional=None)
-    ssv, _ = strategy.extrapolation.init(rv_as_mseq)
-    observed, conditional = ssv.observe_qoi(observation_std=obs_std)
-
-    corrected = conditional(data)
-    lml = jnp.sum(observed.logpdf(data))
-    return corrected, lml
-
-
-def _apply_updates(state, /, *, updates):
-    """Update the 'global' log-marginal-likelihood and return a new state."""
-    corrected, lml_new = updates
-    num_data = state.num_data_points
-    lml_prev = state.log_marginal_likelihood
-
-    lml_updated = (num_data * lml_prev + lml_new) / (num_data + 1)
-    return _KalFiltState(corrected, num_data + 1, log_marginal_likelihood=lml_updated)
+    logpdf_new = impl.random.logpdf(data, observed)
+    logpdf_mean = impl.ssm_util.update_mean(logpdf, logpdf_new, num_data)
+    state = _KalFiltState(corrected, num_data + 1.0, logpdf_mean)
+    return state
