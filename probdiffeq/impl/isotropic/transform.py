@@ -8,7 +8,6 @@ from probdiffeq.impl.isotropic import _normal
 class TransformBackend(_transform.TransformBackend):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
-        assert isinstance(A, matfree.LinOp)
         mean, cholesky = rv.mean, rv.cholesky
         cholesky_new = _sqrt_util.triu_via_qr((A @ cholesky)[None, ...].T)
         cholesky_squeezed = jnp.reshape(cholesky_new, ())

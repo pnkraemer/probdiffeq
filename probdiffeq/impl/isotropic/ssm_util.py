@@ -11,10 +11,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         self.ode_shape = ode_shape
 
     def ibm_transitions(self, num_derivatives):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
+        A, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
         q0 = jnp.zeros((num_derivatives + 1,) + self.ode_shape)
         noise = _normal.Normal(q0, q_sqrtm)
-        A = matfree.linop_from_matmul(a)
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
@@ -28,7 +27,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = jnp.eye(num_hidden_states_per_ode_dim)
-        return matfree.linop_from_matmul(matrix), noise
+        return matrix, noise
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -64,9 +63,10 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def conditional_to_derivative(self, i, standard_deviation):
         def A(x):
-            return x[i, ...]
+            derivative = x[i, ...]
+            return derivative[None, ...]
 
         bias = jnp.zeros(self.ode_shape)
-        eye = jnp.ones(())
+        eye = jnp.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
         return matfree.linop_from_callable(A), noise

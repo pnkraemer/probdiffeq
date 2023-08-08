@@ -6,8 +6,6 @@ from probdiffeq.impl.isotropic import _normal
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         A, noise = conditional
-        assert isinstance(A, matfree.LinOp)
-
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):
@@ -35,7 +33,6 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
-        assert isinstance(matrix, matfree.LinOp)
 
         r_ext_p, (r_bw_p, gain) = _sqrt_util.revert_conditional(
             R_X_F=(matrix @ rv.cholesky).T,
@@ -50,4 +47,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
-        return extrapolated, (matfree.linop_from_matmul(gain), corrected)
+        return extrapolated, (gain, corrected)

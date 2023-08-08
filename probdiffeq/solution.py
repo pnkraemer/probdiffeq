@@ -184,30 +184,34 @@ def _kalman_filter(u, /, mseq, standard_deviation, *, strategy, reverse=True):
 
     # Incorporate final data point
     rv_terminal = jax.tree_util.tree_map(lambda x: x[-1, ...], mseq.init)
-    _, (_gain, init) = impl.conditional.revert(rv_terminal, observation_model)
-
-    # init = _init_fn(rv_terminal, (standard_deviations[-1], u[-1]), strategy=strategy)
+    init = _init_fn(rv_terminal, u[-1], observation_model=observation_model)
 
     # Scan over the remaining data points
     lml_state, _ = jax.lax.scan(
         f=functools.partial(_filter_step, strategy=strategy),
         init=init,
-        xs=(mseq.conditional, (standard_deviations[:-1], u[:-1])),
+        xs=(mseq.conditional, u[:-1]),
         reverse=reverse,
     )
     return lml_state.log_marginal_likelihood
 
 
-def _init_fn(rv, problem, *, strategy):
-    obs_std, data = problem
+def _init_fn(rv, data, *, observation_model):
+    observed, conditional = impl.conditional.revert(rv, observation_model)
+    print(rv)
+    print(data)
+    print(conditional)
+    print(
+        "THe issue is: the gain is shape (3,1), and we would have to apply it via broadcasting. Do we?"
+    )
+    print(
+        "Why is it not working? Is the conditional_to_derivative nonsense? What shapes do we expect????"
+    )
+    corrected = impl.conditional.apply(data, conditional)
+    logpdf = impl.random.logpdf(data, observed)
+    print(conditional)
 
-    rv_as_mseq = _markov.MarkovSeqRev(init=rv, conditional=None)
-    ssv, _ = strategy.extrapolation.init(rv_as_mseq)
-    obs, cond_cor = ssv.observe_qoi(observation_std=obs_std)
-
-    cor = cond_cor(data)
-    lml_new = jnp.sum(obs.logpdf(data))
-    return _KalFiltState(cor, 1.0, log_marginal_likelihood=lml_new)
+    return _KalFiltState(corrected, 1.0, log_marginal_likelihood=logpdf)
 
 
 def _filter_step(state, problem, *, strategy):
