@@ -1,7 +1,6 @@
 """Calibrated IVP solvers."""
 
 import jax
-import jax.numpy as jnp
 
 from probdiffeq import _interp
 from probdiffeq.impl import impl
@@ -146,8 +145,7 @@ class CalibratedSolver(solver.Solver[_common.State]):
     def _interp_make_state(
         self, state_strategy, *, reference: _common.State
     ) -> _common.State:
-        u = impl.random.qoi(state_strategy.hidden)
-        error_estimate = jnp.empty_like(u)
+        error_estimate = impl.ssm_util.prototype_error_estimate()
         return _common.State(
             strategy=state_strategy,
             error_estimate=error_estimate,
