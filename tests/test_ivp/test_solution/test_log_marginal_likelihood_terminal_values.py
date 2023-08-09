@@ -23,24 +23,21 @@ def fixture_problem():
 
 
 @testing.case()
-def case_isotropic_factorisation():
-    def iso_factory(ode_shape, num_derivatives):
-        return recipes.ts0_iso(num_derivatives=num_derivatives)
-
-    return iso_factory, 2.0
+def case_impl_isotropic_factorisation():
+    return recipes.ts0_iso, 2.0
 
 
 @testing.case()  # this implies success of the scalar solver
-def case_blockdiag_factorisation():
+def case_impl_blockdiag_factorisation():
     return recipes.ts0_blockdiag, jnp.ones((2,)) * 2.0
 
 
 @testing.case()
-def case_dense_factorisation():
+def case_impl_dense_factorisation():
     return recipes.ts0_dense, 2.0
 
 
-@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_impl")
+@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_impl_")
 @testing.case()
 def case_sol_vary_the_statespace(problem, factorisation):
     vf, u0, (t0, t1), params = problem
@@ -69,7 +66,7 @@ _STRATEGY_FUNS = [filters.filter, smoothers.smoother_fixedpoint, smoothers.smoot
 @testing.case()
 def case_sol_vary_the_strategy(problem, strategy_fun):
     vf, u0, (t0, t1), params = problem
-    recipe = recipes.ts0_iso(num_derivatives=4)
+    recipe = recipes.ts0_iso(ode_shape=(2,), num_derivatives=4)
     strategy, calibration = strategy_fun(*recipe)
     solver = uncalibrated.solver(strategy, calibration)
     sol = ivpsolve.simulate_terminal_values(

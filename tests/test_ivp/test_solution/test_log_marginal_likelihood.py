@@ -138,7 +138,7 @@ def test_raises_error_for_filter(problem):
     """Non-terminal value calls are not possible for filters."""
     vf, u0, (t0, t1), params = problem
 
-    recipe = recipes.ts0_iso(num_derivatives=4)
+    recipe = recipes.ts0_iso(num_derivatives=4, ode_shape=(2,))
     strategy, calibration = filters.filter(*recipe)
     solver = uncalibrated.solver(strategy, calibration)
     grid = jnp.linspace(t0, t1, num=3)

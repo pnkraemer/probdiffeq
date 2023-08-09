@@ -109,9 +109,14 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, st
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    ssv = strategy.init(None, posterior).ssv
-    obs, _ = ssv.observe_qoi(observation_std=observation_std)
-    return jnp.sum(obs.logpdf(u))
+    # Generate an observation-model for the QOI
+    model = impl.ssm_util.conditional_to_derivative(0, observation_std)
+    if isinstance(posterior, _markov.MarkovSeqRev):
+        rv = posterior.init
+    else:
+        rv = posterior
+    init = _initialise(rv, u, model)
+    return init.logpdf
 
 
 def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
