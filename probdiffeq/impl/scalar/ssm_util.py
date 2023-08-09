@@ -26,8 +26,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
         return _cond_util.Conditional(A, noise)
 
-    def ibm_transitions(self, num_derivatives):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
+    def ibm_transitions(self, num_derivatives, output_scale=1.0):
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
         q0 = jnp.zeros((num_derivatives + 1,))
         noise = _normal.Normal(q0, q_sqrtm)
 

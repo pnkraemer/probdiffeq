@@ -8,6 +8,8 @@ from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 
 
+# todo: fixedpointsmoother and kalmanfilter should be estimate()
+#  with two different methods. This saves a lot of code.
 def fixedpointsmoother_precon(data, /, init, conditional, observation_model):
     """Fixedpoint smoothing with a preconditioned prior."""
     # Incorporate final data point

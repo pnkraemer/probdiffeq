@@ -17,7 +17,7 @@ class SSMUtilBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ibm_transitions(self, num_derivatives):
+    def ibm_transitions(self, num_derivatives, output_scale=None):
         raise NotImplementedError
 
     @abc.abstractmethod

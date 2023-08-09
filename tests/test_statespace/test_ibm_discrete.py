@@ -3,51 +3,47 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.statespace import extra
+from probdiffeq.impl import impl
 
 
 def test_marginal_moments_are_correct(num_derivatives=1):
     """Solve a second-order, scalar, linear, separable BVP."""
+    impl.select("scalar")
     output_scale = 10.0
     t0, t1 = 0.0, 3.4123412
     grid = jnp.linspace(t0, t1, endpoint=True, num=20)
 
-    markovseq = extra.ibm_discretise_fwd(
-        jnp.diff(grid), num_derivatives=num_derivatives, output_scale=output_scale
-    )
+    init = impl.ssm_util.standard_normal(num_derivatives + 1, output_scale)
+    discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
+    transitions = jax.vmap(discretise)(jnp.diff(grid))
 
-    means, stds = _marginal_moments(markovseq)
+    means, stds = _marginal_moments(init, transitions)
+
     _assert_zero_mean(means)
     _assert_monotonously_increasing_std(stds)
     _assert_brownian_motion_std(
-        stds[-1, -1],
+        std_final=stds[-1, -1],
         std_init=output_scale,
         t0=t0,
         t1=t1,
         output_scale=output_scale,
-        num_derivatives=num_derivatives,
     )
 
 
-def _marginal_moments(precon_mseq):
+def _marginal_moments(init, transitions):
     def step(rv, model):
-        rv = extra.extrapolate_precon(rv, *model)
+        cond, (p, p_inv) = model
+        rv = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv = impl.conditional.marginalise(rv, cond)
+        rv = impl.ssm_util.preconditioner_apply(rv, p)
         return rv, rv
 
-    _, rvs = jax.lax.scan(
-        step,
-        init=precon_mseq.init,
-        xs=(precon_mseq.conditional, precon_mseq.preconditioner),
-        reverse=False,
-    )
-    means, cov_sqrtms = rvs.mean, rvs.cov_sqrtm_lower
+    _, rvs = jax.lax.scan(step, init=init, xs=transitions, reverse=False)
+    means = impl.random.mean(rvs)
 
-    @jax.vmap
-    def cov(x):
-        return x @ x.T
+    # todo: does this conflict with error estimation?
+    stds = impl.random.standard_deviation(rvs)
 
-    covs = cov(cov_sqrtms)
-    stds = jnp.sqrt(jax.vmap(jnp.diagonal)(covs))
     return means, stds
 
 
@@ -60,9 +56,7 @@ def _assert_monotonously_increasing_std(stds):
     assert jnp.all(diffs > 0), diffs
 
 
-def _assert_brownian_motion_std(
-    std_final, std_init, t0, t1, *, output_scale, num_derivatives
-):
+def _assert_brownian_motion_std(std_final, std_init, t0, t1, *, output_scale):
     received = std_final**2 - std_init**2
     expected = output_scale**2 * (t1 - t0)
     assert jnp.allclose(received, expected)

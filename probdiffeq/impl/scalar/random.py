@@ -22,7 +22,10 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return -0.5 * (x1 + x2 + x3)
 
     def standard_deviation(self, rv):
-        return jnp.abs(rv.cholesky)
+        if rv.cholesky.ndim > 1:
+            return jax.vmap(self.standard_deviation)(rv)
+
+        return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def qoi(self, rv):
         return rv.mean[0]
