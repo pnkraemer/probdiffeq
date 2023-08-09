@@ -1,10 +1,11 @@
+"""Random variable transformations."""
 from typing import Callable
 
 import jax
 
 from probdiffeq import _sqrt_util
 from probdiffeq.backend import containers
-from probdiffeq.impl import _transform
+from probdiffeq.impl import _cond_util, _transform
 from probdiffeq.impl.dense import _normal
 
 
@@ -24,7 +25,8 @@ class TransformBackend(_transform.TransformBackend):
         mean, cholesky = rv.mean, rv.cholesky
 
         # QR-decomposition
-        # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
+        # (todo: rename revert_conditional_noisefree to
+        #   revert_transformation_cov_sqrt())
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=(A @ cholesky).T, R_X=cholesky.T
         )
@@ -33,4 +35,4 @@ class TransformBackend(_transform.TransformBackend):
         m_cor = mean - gain @ (A @ mean + b)
         corrected = _normal.Normal(m_cor, r_cor.T)
         observed = _normal.Normal(A @ mean + b, r_obs.T)
-        return observed, (corrected, gain)
+        return observed, _cond_util.Conditional(gain, corrected)

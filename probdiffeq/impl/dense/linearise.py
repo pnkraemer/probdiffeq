@@ -68,7 +68,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             def A(x):
                 return a1(x) - J @ a0(x)
 
-            linop = matfree.linop_from_callable(A)
+            linop = matfree.parametrised_linop(lambda v, _p: A(v))
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
@@ -94,7 +94,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            linop = matfree.linop_from_callable(a1)
+            linop = matfree.parametrised_linop(lambda v, _p: a1(v))
             return linop, bias
 
         return new
