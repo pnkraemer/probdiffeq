@@ -65,10 +65,10 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(mean, cholesky)
 
     def qoi_from_sample(self, sample, /):
-        raise NotImplementedError
+        return sample[0, :]
 
     def sample_shape(self, rv):
-        raise NotImplementedError
+        return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
-        raise NotImplementedError
+        return rv.mean + rv.cholesky @ unit_sample
