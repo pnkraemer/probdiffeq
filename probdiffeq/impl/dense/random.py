@@ -43,11 +43,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         mean_reshaped = jnp.reshape(rv.mean, (-1,) + self.ode_shape, order="F")
         return mean_reshaped[0]
 
-    def prototype_qoi(self):
-        mean = jnp.empty(self.ode_shape)
-        cholesky = jnp.empty(self.ode_shape + self.ode_shape)
-        return _normal.Normal(mean, cholesky)
-
     def rescale_cholesky(self, rv, factor, /):
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
@@ -69,3 +64,12 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def marginal_nth_derivative(self, rv):
         raise NotImplementedError
+
+    def qoi_from_sample(self, sample, /):
+        raise NotImplementedError
+
+    def sample_shape(self, rv):
+        return rv.mean.shape
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + rv.cholesky @ unit_sample

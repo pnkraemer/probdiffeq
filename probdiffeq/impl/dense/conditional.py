@@ -1,18 +1,16 @@
 """Conditional implementation."""
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _conditional, matfree
+from probdiffeq.impl import _cond_util, _conditional
 from probdiffeq.impl.dense import _normal
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
         matrix, noise = conditional
-        assert isinstance(matrix, matfree.LinOp)
         return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):
         matmul, noise = conditional
-        assert isinstance(matmul, matfree.LinOp)
         R_stack = ((matmul @ rv.cholesky).T, noise.cholesky.T)
         cholesky_new = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
         return _normal.Normal(matmul @ rv.mean + noise.mean, cholesky_new)
@@ -36,4 +34,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         m_cor = mean - gain @ mean_observed
         corrected = _normal.Normal(m_cor, r_cor.T)
         observed = _normal.Normal(mean_observed, r_obs.T)
-        return observed, (corrected, gain)
+        return observed, _cond_util.Conditional(gain, corrected)

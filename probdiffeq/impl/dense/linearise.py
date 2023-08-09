@@ -22,7 +22,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
 
             fx = ts0(fun, a0(mean))
-            linop = matfree.linop_from_callable(_autobatch_linop(a1))
+            linop = matfree.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
             return linop, -fx
 
         return linearise_fun_wrapped
@@ -37,12 +37,13 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
             jvp, fx = ts1(fun, a0(mean))
 
+            @_autobatch_linop
             def A(x):
                 x1 = a1(x)
                 x0 = a0(x)
                 return x1 - jvp(x0)
 
-            linop = matfree.linop_from_callable(_autobatch_linop(A))
+            linop = matfree.parametrised_linop(lambda v, _p: A(v))
             return linop, -fx
 
         return new

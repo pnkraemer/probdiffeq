@@ -1,8 +1,8 @@
-import jax
+"""State-space model utilities."""
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _ibm_util, _ssm_util, matfree
+from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util
 from probdiffeq.impl.dense import _normal
 
 
@@ -21,15 +21,13 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         q0 = jnp.zeros((ndim,))
         noise = _normal.Normal(q0, Q)
 
-        linop = matfree.linop_from_matmul(A)
-
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
             p = jnp.tile(p, d)
             p_inv = jnp.tile(p_inv, d)
-            return (linop, noise), (p, p_inv)
+            return _cond_util.Conditional(A, noise), (p, p_inv)
 
         return discretise
 
@@ -71,3 +69,11 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def conditional_to_derivative(self, i, standard_deviation):
         raise NotImplementedError
+
+    def prototype_qoi(self):
+        mean = jnp.empty(self.ode_shape)
+        cholesky = jnp.empty(self.ode_shape + self.ode_shape)
+        return _normal.Normal(mean, cholesky)
+
+    def prototype_error_estimate(self):
+        return jnp.empty(self.ode_shape)
