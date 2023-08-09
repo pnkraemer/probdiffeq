@@ -1,9 +1,11 @@
 """Forward-only estimation: filtering."""
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
+from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 from probdiffeq.strategies import _common, strategy
 
@@ -59,3 +61,53 @@ def _filter_interpolate(t, *, output_scale, s0, s1, extrapolation):
     corr = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
     extrapolated = _common.State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
     return _interp.InterpRes(accepted=s1, solution=extrapolated, previous=extrapolated)
+
+
+def kalman_reverse(data, /, init, conditional, observation_model):
+    # Incorporate final data point
+
+    def select(tree, idx_or_slice):
+        return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
+
+    information_terminal = select((data, observation_model), idx_or_slice=-1)
+    init = _kalman_reverse_initialise(init, *information_terminal)
+
+    # Scan over the remaining data points
+    information = select((data, observation_model), idx_or_slice=slice(0, -1, 1))
+    return jax.lax.scan(
+        f=_kalman_reverse_step,
+        init=init,
+        xs=(conditional,) + information,
+        reverse=True,
+    )
+
+
+class _KalmanFilterState(containers.NamedTuple):
+    rv: Any
+    num_data_points: int
+    logpdf: float
+
+
+def _kalman_reverse_initialise(rv, data, model):
+    observed, conditional = impl.conditional.revert(rv, model)
+    corrected = impl.conditional.apply(data, conditional)
+    logpdf = impl.random.logpdf(data, observed)
+    return _KalmanFilterState(corrected, 1.0, logpdf)
+
+
+def _kalman_reverse_step(state, cond_and_data_and_obs):
+    conditional, data, observation = cond_and_data_and_obs
+    rv, num_data, logpdf = state
+
+    # Extrapolate-correct
+    rv = impl.conditional.marginalise(rv, conditional)
+    observed, reverse = impl.conditional.revert(rv, observation)
+    corrected = impl.conditional.apply(data, reverse)
+
+    # Update logpdf
+    logpdf_new = impl.random.logpdf(data, observed)
+    logpdf_mean = impl.ssm_util.update_mean(logpdf, logpdf_new, num_data)
+    state = _KalmanFilterState(corrected, num_data + 1.0, logpdf_mean)
+
+    # Scan-compatible output
+    return state, state

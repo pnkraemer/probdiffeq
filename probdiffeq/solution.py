@@ -4,14 +4,12 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
-from typing import Any
-
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _markov
-from probdiffeq.backend import containers
 from probdiffeq.impl import impl
+from probdiffeq.strategies import filters
 
 # todo: the functions in here should only depend on posteriors / strategies!
 
@@ -115,8 +113,16 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, st
         rv = posterior.init
     else:
         rv = posterior
-    init = _initialise(rv, u, model)
-    return init.logpdf
+
+    _corrected, logpdf = _condition_and_logpdf(rv, u, model)
+    return logpdf
+
+
+def _condition_and_logpdf(rv, data, model):
+    observed, conditional = impl.conditional.revert(rv, model)
+    corrected = impl.conditional.apply(data, conditional)
+    logpdf = impl.random.logpdf(data, observed)
+    return corrected, logpdf
 
 
 def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
@@ -163,66 +169,17 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
         msg2 = "cannot be computed with a filtering solution."
         raise TypeError(msg1 + msg2)
 
-    result = _kalman_filter(u, posterior, observation_std, strategy=strategy)
-    return result
-
-
-# todo: this smells a lot like a `impl.SSV` object.
-#  But merging those two data structures might be in the far future.
-
-
-class _KalmanFilterState(containers.NamedTuple):
-    rv: Any
-    num_data_points: int
-    logpdf: float
-
-
-# todo: this should return a Filtering posterior or a smoothing posterior
-#  which could then be plotted. Right?
-#  (We might also want some dense-output/checkpoint kind of thing here)
-# todo: we should reuse the extrapolation model impl.
-#  But this only works if the ODE posterior uses the preconditioner (I think).
-# todo: we should allow proper noise, and proper information functions.
-#  But it is not clear which data structure that should be.
-def _kalman_filter(u, /, mseq, standard_deviations, *, strategy, reverse=True):
     # Generate an observation-model for the QOI
     model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
-    models = model_fun(0, standard_deviations)
+    models = model_fun(0, observation_std)
 
-    # Incorporate final data point
+    # Select the terminal variable
+    rv = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
 
-    def select(tree, idx_or_slice):
-        return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
-
-    rv, data, model = select(tree=(mseq.init, u, models), idx_or_slice=-1)
-    init = _initialise(rv, data, model)
-
-    # Scan over the remaining data points
-    data, observation = select((u, models), idx_or_slice=slice(0, -1, 1))
-    kalman_state, _ = jax.lax.scan(
-        f=lambda *a: (_step(*a), None),
-        init=init,
-        xs=(data, mseq.conditional, observation),
-        reverse=reverse,
+    # Run the reverse Kalman filter
+    (_corrected, _num_data, logpdf), _ = filters.kalman_reverse(
+        u, init=rv, conditional=posterior.conditional, observation_model=models
     )
-    return kalman_state.logpdf
 
-
-def _initialise(rv, data, model):
-    observed, conditional = impl.conditional.revert(rv, model)
-    corrected = impl.conditional.apply(data, conditional)
-    logpdf = impl.random.logpdf(data, observed)
-    return _KalmanFilterState(corrected, 1.0, logpdf)
-
-
-def _step(state, problem):
-    data, conditional, observation = problem
-    rv, num_data, logpdf = state
-
-    rv = impl.conditional.marginalise(rv, conditional)
-    observed, reverse = impl.conditional.revert(rv, observation)
-    corrected = impl.conditional.apply(data, reverse)
-
-    logpdf_new = impl.random.logpdf(data, observed)
-    logpdf_mean = impl.ssm_util.update_mean(logpdf, logpdf_new, num_data)
-    return _KalmanFilterState(corrected, num_data + 1.0, logpdf_mean)
+    # Return only the logpdf
+    return logpdf
