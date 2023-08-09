@@ -1,23 +1,18 @@
 """Conditionals."""
 import abc
-from typing import Generic, TypeVar
-
-# todo: solve this transform/derivative matrix/matmul dilemma
-
-T = TypeVar("T")
 
 
-class ConditionalBackend(abc.ABC, Generic[T]):
+class ConditionalBackend(abc.ABC):
     @abc.abstractmethod
-    def marginalise(self, rv: T, conditional, /):
+    def marginalise(self, rv, conditional, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def revert(self, rv: T, conditional, /):
+    def revert(self, rv, conditional, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def apply(self, x: T, conditional, /):
+    def apply(self, x, conditional, /):
         raise NotImplementedError
 
     @abc.abstractmethod

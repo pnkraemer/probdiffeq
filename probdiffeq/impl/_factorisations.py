@@ -39,6 +39,7 @@ def choose(which, /, *, ode_shape=None):
         from probdiffeq.impl.scalar import factorisations
 
         return factorisations.ScalarFactorisation()
+
     if ode_shape is None:
         raise ValueError("Please provide an ODE shape.")
     if which == "dense":

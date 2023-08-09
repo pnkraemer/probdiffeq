@@ -1,3 +1,4 @@
+"""Linearisation."""
 import functools
 
 import jax
@@ -12,7 +13,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def constraint_0th(self, ode_order):
+    def ode_taylor_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
@@ -26,7 +27,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
         return linearise_fun_wrapped
 
-    def constraint_1st(self, ode_order):
+    def ode_taylor_1st(self, ode_order):
         def new(fun, mean, /):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
@@ -46,7 +47,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
         return new
 
-    def constraint_statistical_1st(self, cubature_fun):
+    def ode_statistical_1st(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         linearise_fun = functools.partial(slr1, cubature_rule=cubature_rule)
 
@@ -74,7 +75,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
         return new
 
-    def constraint_statistical_0th(self, cubature_fun):
+    def ode_statistical_0th(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         linearise_fun = functools.partial(slr0, cubature_rule=cubature_rule)
 

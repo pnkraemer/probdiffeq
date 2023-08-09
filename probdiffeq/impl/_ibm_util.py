@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 
 
-# todo: make output_scale compulsory!
 def system_matrices_1d(num_derivatives, output_scale):
     """Construct the IBM system matrices."""
     x = jnp.arange(num_derivatives + 1)
