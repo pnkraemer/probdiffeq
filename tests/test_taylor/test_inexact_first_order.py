@@ -9,7 +9,7 @@ from probdiffeq.impl import impl
 
 @testing.case()
 def case_runge_kutta_starter():
-    impl.select("isotropic", ode_shape=(2,))
+    impl.select("isotropic", ode_shape=(4,))
     return taylor.make_runge_kutta_starter_fn()
 
 

@@ -9,7 +9,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _markov
 from probdiffeq.impl import impl
-from probdiffeq.strategies import filters
+from probdiffeq.strategies import discrete
 
 # todo: the functions in here should only depend on posteriors / strategies!
 
@@ -174,7 +174,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     rv = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
 
     # Run the reverse Kalman filter
-    (_corrected, _num_data, logpdf), _ = filters.kalman_reverse(
+    (_corrected, _num_data, logpdf), _ = discrete.kalmanfilter_reverse(
         u, init=rv, conditional=posterior.conditional, observation_model=models
     )
 

@@ -1,15 +1,18 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 import functools
-from typing import Any, Callable, Tuple
+from typing import Callable, Tuple
 
 import jax
 import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq.backend import containers
-from probdiffeq.statespace import extra
+from probdiffeq.impl import impl
+from probdiffeq.strategies import discrete
+
+#
+# from probdiffeq.statespace import extra
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
@@ -178,74 +181,26 @@ def _runge_kutta_starter_fn(
         func, initial_values[0], ts, *parameters, atol=atol, rtol=rtol
     )
 
-    # Run fixed-point smoother
+    # Discretise the prior
+    rv = impl.ssm_util.standard_normal(num + 1, 1.0)
+    cond_initial = impl.ssm_util.identity_conditional(num + 1)
+    discretise = impl.ssm_util.ibm_transitions(num)
+    cond, precon = jax.vmap(discretise)(jnp.diff(ts))
 
-    # Initialise
-    factory = extra.ibm_factory(num_derivatives=num)
-    extrapolation = factory.fixedpoint()
-    solution = extra.unit_markov_sequence(num_derivatives=num)
+    # Generate an observation-model for the QOI
+    # (1e-7 observation noise for nuggets and for reusing existing code)
+    model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
+    models = model_fun(0, 1e-7 * jnp.ones_like(ts))
 
-    # Estimate
-    u0_full = _fixed_point_smoother(extrapolation, solution, ys=ys, dts=jnp.diff(ts))
-
-    # Turn the mean into a tuple of arrays and return
-    taylor_coefficients = tuple(u0_full.mean)
-    return taylor_coefficients
-
-
-class _FpState(containers.NamedTuple):
-    ssv: Any
-    extra: Any
-
-
-def _fixed_point_smoother(extrapolation, solution, ys, dts):
-    """Fit a Gauss-Markov process to observations of the ODE solution."""
-    # Initialise backward-transitions
-    state = _fixedpoint_init(solution, ys[0], extrapolation=extrapolation)
-
-    # Scan
-    fn = functools.partial(_fixedpoint_step, extrapolation=extrapolation)
-    state, _ = jax.lax.scan(fn, init=state, xs=(ys[1:], dts), reverse=False)
-
-    # Backward-marginalise to get the initial value
-    return state.extra.marginalise(state.ssv.hidden_state)
-
-
-def _fixedpoint_init(solution, y, *, extrapolation) -> _FpState:
-    # State-space variables
-    ssv, extra = extrapolation.init(solution)
-
-    # Initial data point
-    _, cond_cor = ssv.observe_qoi(observation_std=0.0)
-
-    rv = cond_cor(y)
-    # hack! This should rather be handled by some correction scheme.
-    u_like = jnp.empty_like(ssv.u)
-    corr = type(ssv)(u_like, rv)
-
-    # Return correction and backward-model
-    return _FpState(corr, extra)
-
-
-def _fixedpoint_step(carry: _FpState, x, *, extrapolation) -> Tuple[_FpState, None]:
-    # Read
-    (ssv, extra_old) = carry.ssv, carry.extra
-    y, dt = x
-
-    # Extrapolate (with fixed-point-style merging)
-    ssv, extra = extrapolation.begin(ssv, extra_old, dt=dt)
-    ssv, extra = extrapolation.complete(ssv, extra, output_scale=1.0)
-
-    # Correct
-    _, cond_cor = ssv.observe_qoi(observation_std=0.0)
-
-    rv = cond_cor(y)
-    # hack! This should rather be handled by some correction scheme.
-    u_like = jnp.empty_like(ssv.u)
-    corr = type(ssv)(u_like, rv)
-
-    # Return correction and backward-model
-    return _FpState(corr, extra), None
+    # Run the preconditioned fixedpoint smoother
+    (corrected, conditional), _ = discrete.fixedpointsmoother_precon(
+        ys,
+        init=(rv, cond_initial),
+        conditional=(cond, precon),
+        observation_model=models,
+    )
+    initial = impl.conditional.marginalise(corrected, conditional)
+    return tuple(impl.random.mean(initial))
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
