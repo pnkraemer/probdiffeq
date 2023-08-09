@@ -78,27 +78,24 @@ def _offgrid_marginals2(*, solution, t, solution_previous, solver):
     )
 
 
-def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, strategy):
+def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posterior):
     """Compute the log-marginal-likelihood of \
      observations of the IVP solution at the terminal value.
 
     Parameters
     ----------
-    observation_std
-        Standard deviation of the observation. Expected to be a scalar.
     u
         Observation. Expected to have shape (d,) for an ODE with shape (d,).
+    standard_deviation
+        Standard deviation of the observation. Expected to be a scalar.
     posterior
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
-    strategy
-        Strategy (that has been used to compute the solution).
-        Expected to correspond to a solution of an ODE with shape (d,).
     """
-    if jnp.shape(observation_std) != ():
+    if jnp.shape(standard_deviation) != ():
         raise ValueError(
             "Scalar observation noise expected. "
-            f"Shape {jnp.shape(observation_std)} received."
+            f"Shape {jnp.shape(standard_deviation)} received."
         )
 
     if jnp.ndim(u) >= 2:  # not valid for scalar or matrix-valued solutions
@@ -108,7 +105,7 @@ def log_marginal_likelihood_terminal_values(*, observation_std, u, posterior, st
         )
 
     # Generate an observation-model for the QOI
-    model = impl.ssm_util.conditional_to_derivative(0, observation_std)
+    model = impl.ssm_util.conditional_to_derivative(0, standard_deviation)
     if isinstance(posterior, _markov.MarkovSeqRev):
         rv = posterior.init
     else:
@@ -125,13 +122,13 @@ def _condition_and_logpdf(rv, data, model):
     return corrected, logpdf
 
 
-def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
+def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     """Compute the log-marginal-likelihood of \
      observations of the IVP solution.
 
     Parameters
     ----------
-    observation_std
+    standard_deviation
         Standard deviation of the observation. Expected to be have shape (n,).
     u
         Observation. Expected to have shape (n, d) for an ODE with shape (d,).
@@ -150,12 +147,12 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for log-posterior
 
-    if jnp.shape(observation_std) != (jnp.shape(u)[0],):
+    if jnp.shape(standard_deviation) != (jnp.shape(u)[0],):
         raise ValueError(
-            f"Observation-noise shape {jnp.shape(observation_std)} does not match "
+            f"Observation-noise shape {jnp.shape(standard_deviation)} does not match "
             f"the observation shape {jnp.shape(u)}. "
             f"Expected observation-noise shape: "
-            f"{(jnp.shape(u)[0],)} != {jnp.shape(observation_std)}. "
+            f"{(jnp.shape(u)[0],)} != {jnp.shape(standard_deviation)}. "
         )
 
     if jnp.ndim(u) < 2:
@@ -171,7 +168,7 @@ def log_marginal_likelihood(*, observation_std, u, posterior, strategy):
 
     # Generate an observation-model for the QOI
     model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
-    models = model_fun(0, observation_std)
+    models = model_fun(0, standard_deviation)
 
     # Select the terminal variable
     rv = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)

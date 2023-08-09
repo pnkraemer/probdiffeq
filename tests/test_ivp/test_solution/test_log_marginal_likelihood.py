@@ -69,10 +69,9 @@ def test_output_is_a_scalar_and_not_nan_and_not_inf(solution_save_at):
     data = sol.u + 0.005
     k, _ = sol.u.shape
     lml = solution.log_marginal_likelihood(
-        observation_std=jnp.ones((k,)),
-        u=data,
+        data,
+        standard_deviation=jnp.ones((k,)),
         posterior=sol.posterior,
-        strategy=solver.strategy,
     )
     assert lml.shape == ()
     assert not jnp.isnan(lml)
@@ -90,10 +89,9 @@ def test_that_function_raises_error_for_wrong_std_shape_too_many(solution_save_a
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones((k + 1,)),
-            u=data,
+            data,
+            standard_deviation=jnp.ones((k + 1,)),
             posterior=sol.posterior,
-            strategy=solver.strategy,
         )
 
 
@@ -108,10 +106,9 @@ def test_that_function_raises_error_for_wrong_std_shape_wrong_ndim(solution_save
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones((k, 1)),
-            u=data,
+            data,
+            standard_deviation=jnp.ones((k, 1)),
             posterior=sol.posterior,
-            strategy=solver.strategy,
         )
 
 
@@ -127,10 +124,9 @@ def test_raises_error_for_terminal_values(solution_save_at):
     posterior_t1 = jax.tree_util.tree_map(lambda s: s[-1], sol)
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
-            observation_std=jnp.ones_like(data[-1]),
-            u=data[-1],
+            data[-1],
+            standard_deviation=jnp.ones_like(data[-1]),
             posterior=posterior_t1,
-            strategy=solver.strategy,
         )
 
 
@@ -155,5 +151,5 @@ def test_raises_error_for_filter(problem):
     std = jnp.ones((sol.u.shape[0],))  # values irrelevant
     with testing.raises(TypeError, match="ilter"):
         _ = solution.log_marginal_likelihood(
-            observation_std=std, u=data, posterior=sol.posterior, strategy=strategy
+            data, standard_deviation=std, posterior=sol.posterior
         )
