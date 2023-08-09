@@ -66,7 +66,8 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         raise NotImplementedError
 
     def qoi_from_sample(self, sample, /):
-        raise NotImplementedError
+        sample_reshaped = jnp.reshape(sample, (-1,) + self.ode_shape, order="F")
+        return sample_reshaped[0]
 
     def sample_shape(self, rv):
         return rv.mean.shape

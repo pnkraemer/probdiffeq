@@ -1,8 +1,11 @@
 """State-space model utilities."""
+import functools
+
+import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util
+from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util, matfree
 from probdiffeq.impl.dense import _normal
 
 
@@ -31,8 +34,14 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, num_hidden_states_per_ode_dim):
-        raise NotImplementedError
+    def identity_conditional(self, ndim, /):
+        (d,) = self.ode_shape
+        n = ndim * d
+
+        A = jnp.eye(n)
+        m = jnp.zeros((n,))
+        C = jnp.zeros((n, n))
+        return _cond_util.Conditional(A, _normal.Normal(m, C))
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -59,7 +68,10 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def preconditioner_apply_cond(self, cond, p, p_inv, /):
-        raise NotImplementedError
+        A, noise = cond
+        noise = self.preconditioner_apply(noise, p)
+        A = p[:, None] * A * p_inv[None, :]
+        return _cond_util.Conditional(A, noise)
 
     def standard_normal(self, num_hidden_states_per_ode_dim, output_scale):
         raise NotImplementedError
@@ -67,8 +79,16 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def update_mean(self, mean, x, /, num):
         return _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
 
+    # todo: move to linearise.py?
     def conditional_to_derivative(self, i, standard_deviation):
-        raise NotImplementedError
+        a0 = functools.partial(self._select_dy, idx_or_slice=0)
+
+        (d,) = self.ode_shape
+        bias = jnp.zeros((d,))
+        eye = jnp.eye(d)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = matfree.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
+        return _cond_util.Conditional(linop, noise)
 
     def prototype_qoi(self):
         mean = jnp.empty(self.ode_shape)
@@ -77,3 +97,17 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def prototype_error_estimate(self):
         return jnp.empty(self.ode_shape)
+
+    def _select_dy(self, x, idx_or_slice):
+        (d,) = self.ode_shape
+        x_reshaped = jnp.reshape(x, (-1, d), order="F")
+        return x_reshaped[idx_or_slice, ...]
+
+
+def _autobatch_linop(fun):
+    def fun_(x):
+        if jnp.ndim(x) > 1:
+            return jax.vmap(fun_, in_axes=1, out_axes=1)(x)
+        return fun(x)
+
+    return fun_

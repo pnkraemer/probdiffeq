@@ -16,7 +16,13 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         return _normal.Normal(matmul @ rv.mean + noise.mean, cholesky_new)
 
     def merge(self, cond1, cond2, /):
-        raise NotImplementedError
+        A, b = cond1
+        C, d = cond2
+
+        g = A @ C
+        xi = A @ d.mean + b.mean
+        Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack=((A @ d.cholesky).T, b.cholesky.T))
+        return _cond_util.Conditional(g, _normal.Normal(xi, Xi.T))
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
