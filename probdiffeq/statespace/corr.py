@@ -33,7 +33,7 @@ class Correction(abc.ABC):
         raise NotImplementedError
 
 
-class ODEConstraint(Correction):
+class ODEConstraintTaylor(Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
@@ -44,7 +44,7 @@ class ODEConstraint(Correction):
         return self.string_repr
 
     def init(self, ssv, /):
-        obs_like = impl.random.qoi_like()
+        obs_like = impl.ssm_util.prototype_qoi()
         return ssv, obs_like
 
     def estimate_error(self, hidden_state, corr, /, vector_field, t, p):
@@ -66,7 +66,7 @@ class ODEConstraint(Correction):
         return ssv
 
 
-class ODEConstraintNoisy(Correction):
+class ODEConstraintStatistical(Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
@@ -77,7 +77,7 @@ class ODEConstraintNoisy(Correction):
         return self.string_repr
 
     def init(self, ssv, /):
-        obs_like = impl.random.qoi_like()
+        obs_like = impl.random.prototype_qoi()
         return ssv, obs_like
 
     def estimate_error(self, hidden_state, corr, /, vector_field, t, p):
@@ -104,23 +104,23 @@ class ODEConstraintNoisy(Correction):
 def estimate_error(observed, /):
     # todo: the functions involved in error estimation are still a bit patchy.
     #  for instance, they assume that they are called in exactly this error estimation
-    #  context. Same for qoi_like etc.
+    #  context. Same for prototype_qoi etc.
     zero_data = jnp.zeros(())
     output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
     error_estimate_unscaled = impl.random.standard_deviation(observed)
     return output_scale * error_estimate_unscaled
 
 
-def taylor_order_zero(*, ode_order) -> ODEConstraint:
-    return ODEConstraint(
+def taylor_order_zero(*, ode_order) -> ODEConstraintTaylor:
+    return ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_0th(ode_order=ode_order),
         string_repr=f"<TS0 with ode_order={ode_order}>",
     )
 
 
-def taylor_order_one(*, ode_order) -> ODEConstraint:
-    return ODEConstraint(
+def taylor_order_one(*, ode_order) -> ODEConstraintTaylor:
+    return ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_1st(ode_order=ode_order),
         string_repr=f"<TS1 with ode_order={ode_order}>",
@@ -129,7 +129,7 @@ def taylor_order_one(*, ode_order) -> ODEConstraint:
 
 def statistical_order_one(cubature_fun=cubature.third_order_spherical):
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
-    return ODEConstraintNoisy(
+    return ODEConstraintStatistical(
         ode_order=1,
         linearise_fun=linearise_fun,
         string_repr=f"<SLR1 with ode_order={1}>",
@@ -138,7 +138,7 @@ def statistical_order_one(cubature_fun=cubature.third_order_spherical):
 
 def statistical_order_zero(cubature_fun=cubature.third_order_spherical):
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
-    return ODEConstraintNoisy(
+    return ODEConstraintStatistical(
         ode_order=1,
         linearise_fun=linearise_fun,
         string_repr=f"<SLR0 with ode_order={1}>",
@@ -156,7 +156,7 @@ def _constraint_unflatten(aux, _children, *, nodetype):
     return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
 
 
-for nodetype in [ODEConstraint, ODEConstraintNoisy]:
+for nodetype in [ODEConstraintTaylor, ODEConstraintStatistical]:
     jax.tree_util.register_pytree_node(
         nodetype=nodetype,
         flatten_func=_constraint_flatten,

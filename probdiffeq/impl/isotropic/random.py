@@ -35,11 +35,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def mean(self, rv):
         return rv.mean
 
-    def qoi_like(self):
-        mean = jnp.empty(self.ode_shape)
-        cholesky = jnp.empty(())
-        return _normal.Normal(mean, cholesky)
-
     def qoi(self, rv):
         return rv.mean[..., 0, :]
 
@@ -68,3 +63,12 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         mean = rv.mean[i, :]
         cholesky = _sqrt_util.triu_via_qr((rv.cholesky[i, :])[:, None].T).T
         return _normal.Normal(mean, cholesky)
+
+    def qoi_from_sample(self, sample, /):
+        raise NotImplementedError
+
+    def sample_shape(self, rv):
+        raise NotImplementedError
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        raise NotImplementedError

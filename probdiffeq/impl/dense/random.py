@@ -43,7 +43,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         mean_reshaped = jnp.reshape(rv.mean, (-1,) + self.ode_shape, order="F")
         return mean_reshaped[0]
 
-    def qoi_like(self):
+    def prototype_qoi(self):
         mean = jnp.empty(self.ode_shape)
         cholesky = jnp.empty(self.ode_shape + self.ode_shape)
         return _normal.Normal(mean, cholesky)

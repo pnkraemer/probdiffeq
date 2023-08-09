@@ -30,7 +30,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def mean(self, rv):
         return rv.mean
 
-    def qoi_like(self):
+    def prototype_qoi(self):
         mean = jnp.empty(self.ode_shape + (1,))
         cholesky = jnp.empty(self.ode_shape + (1, 1))
         return _normal.Normal(mean, cholesky)

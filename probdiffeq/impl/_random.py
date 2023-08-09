@@ -10,10 +10,6 @@ class RandomVariableBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def qoi_like(self):  # todo: move to ssm_util
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def mahalanobis_norm_relative(self, u, /, rv):
         raise NotImplementedError
 

@@ -97,8 +97,7 @@ class CalibratedSolver(solver.Solver[_common.State]):
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
         state_strategy = self.strategy.init(t, posterior)
-        qoi = impl.random.qoi(state_strategy.hidden)
-        error_estimate = jnp.empty_like(qoi)
+        error_estimate = impl.ssm_util.prototype_error_estimate()
         calib_state = self.calibration.init(output_scale)
         return _common.State(
             error_estimate=error_estimate,

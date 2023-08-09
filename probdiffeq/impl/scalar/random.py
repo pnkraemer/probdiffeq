@@ -7,7 +7,7 @@ from probdiffeq.impl.scalar import _normal
 
 
 class RandomVariableBackend(_random.RandomVariableBackend):
-    def qoi_like(self):
+    def prototype_qoi(self):
         mean = jnp.empty(())
         cholesky = jnp.empty(())
         return _normal.Normal(mean, cholesky)
