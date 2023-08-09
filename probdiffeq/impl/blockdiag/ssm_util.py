@@ -77,3 +77,11 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = matfree.parametrised_linop(lambda s, _p: A(s))
         return _cond_util.Conditional(linop, noise)
+
+    def prototype_qoi(self):
+        mean = jnp.empty(self.ode_shape + (1,))
+        cholesky = jnp.empty(self.ode_shape + (1, 1))
+        return _normal.Normal(mean, cholesky)
+
+    def prototype_error_estimate(self):
+        return jnp.empty(self.ode_shape)

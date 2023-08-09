@@ -57,3 +57,11 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def conditional_to_derivative(self, i, standard_deviation):
         raise NotImplementedError
+
+    def prototype_qoi(self):
+        mean = jnp.empty(())
+        cholesky = jnp.empty(())
+        return _normal.Normal(mean, cholesky)
+
+    def prototype_error_estimate(self):
+        return jnp.empty(())
