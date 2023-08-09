@@ -64,22 +64,23 @@ def _filter_interpolate(t, *, output_scale, s0, s1, extrapolation):
 
 
 def kalman_reverse(data, /, init, conditional, observation_model):
+    """Reverse-time Kalman filter."""
     # Incorporate final data point
-
-    def select(tree, idx_or_slice):
-        return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
-
-    information_terminal = select((data, observation_model), idx_or_slice=-1)
+    information_terminal = _select((data, observation_model), idx_or_slice=-1)
     init = _kalman_reverse_initialise(init, *information_terminal)
 
     # Scan over the remaining data points
-    information = select((data, observation_model), idx_or_slice=slice(0, -1, 1))
+    information = _select((data, observation_model), idx_or_slice=slice(0, -1, 1))
     return jax.lax.scan(
         f=_kalman_reverse_step,
         init=init,
         xs=(conditional,) + information,
         reverse=True,
     )
+
+
+def _select(tree, idx_or_slice):
+    return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
 
 
 class _KalmanFilterState(containers.NamedTuple):
