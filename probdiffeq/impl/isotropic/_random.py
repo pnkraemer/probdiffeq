@@ -15,7 +15,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(mean, cholesky)
 
     def mahalanobis_norm_relative(self, u, /, rv):
-        print(rv.mean.shape, u.shape)
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = jnp.linalg.qr(residual_white.T, mode="r")
         return jnp.reshape(jnp.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
