@@ -34,10 +34,9 @@ def fixture_python_loop_solution(problem):
         "atol": 1e-2,
         "rtol": 1e-2,
     }
-    solution = ivpsolve.solve_with_python_while_loop(
+    return ivpsolve.solve_with_python_while_loop(
         *problem_args, **problem_kwargs, **adaptive_kwargs
     )
-    return solution
 
 
 @testing.fixture(name="diffrax_solution")

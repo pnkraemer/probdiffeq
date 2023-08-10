@@ -54,10 +54,9 @@ def fixture_recipe_solution(problem, strategy):
         "rtol": 1e-2,
         "output_scale": output_scale,
     }
-    solution = ivpsolve.simulate_terminal_values(
+    return ivpsolve.simulate_terminal_values(
         *problem_args, **problem_kwargs, **adaptive_kwargs
     )
-    return solution
 
 
 @testing.fixture(name="diffrax_solution")

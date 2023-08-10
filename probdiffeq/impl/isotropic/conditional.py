@@ -1,8 +1,7 @@
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _cond_util, _conditional, matfree
+from probdiffeq.impl import _cond_util, _conditional
 from probdiffeq.impl.isotropic import _normal
 
 

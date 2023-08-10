@@ -110,8 +110,11 @@ class AdaptiveIVPSolver(Generic[T]):
         return extract(state_new)
 
     def _attempt_step(self, *, state: _RejectionState, vector_field, t1, parameters):
-        """Perform a step with an IVP solver and \
-        propose a future time-step based on tolerances and error estimates."""
+        """Attempt a step.
+
+        Perform a step with an IVP solver and
+        propose a future time-step based on tolerances and error estimates.
+        """
         # Some controllers like to clip the terminal value instead of interpolating.
         # This must happen _before_ the step.
         state_control = self.control.clip(state.control, t=state.step_from.t, t1=t1)

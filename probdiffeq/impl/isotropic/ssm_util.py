@@ -12,7 +12,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def ibm_transitions(self, num_derivatives):
         A, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
-        q0 = jnp.zeros((num_derivatives + 1,) + self.ode_shape)
+        q0 = jnp.zeros((num_derivatives + 1, *self.ode_shape))
         noise = _normal.Normal(q0, q_sqrtm)
         precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
@@ -23,7 +23,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return discretise
 
     def identity_conditional(self, num_hidden_states_per_ode_dim, /):
-        m0 = jnp.zeros((num_hidden_states_per_ode_dim,) + self.ode_shape)
+        m0 = jnp.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
         c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = jnp.eye(num_hidden_states_per_ode_dim)
@@ -51,7 +51,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _cond_util.Conditional(A_new, noise)
 
     def standard_normal(self, num, /, output_scale):
-        mean = jnp.zeros((num,) + self.ode_shape)
+        mean = jnp.zeros((num, *self.ode_shape))
         cholesky = output_scale * jnp.eye(num)
         return _normal.Normal(mean, cholesky)
 

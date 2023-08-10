@@ -18,7 +18,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
-            if jnp.shape(a0(mean)) != (expected_shape := (ode_order,) + self.ode_shape):
+            if jnp.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
                 raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
 
             fx = ts0(fun, a0(mean))
@@ -32,7 +32,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
-            if jnp.shape(a0(mean)) != (expected_shape := (ode_order,) + self.ode_shape):
+            if jnp.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
                 raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
 
             jvp, fx = ts1(fun, a0(mean))

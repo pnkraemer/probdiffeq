@@ -17,6 +17,7 @@ class MethodConfig:
     def __init__(
         self, method, label, key=None, jit=True, tols_static=False, plotting_kwargs=None
     ):
+        """Construct a method-configuration."""
         self.method = method
         self.label = label
         self.key = key if key is not None else "probdiffeq"
@@ -39,6 +40,7 @@ class ProblemConfig:
         error_unit="RMSE",
         repeat=5,
     ):
+        """Construct a problem-configuration."""
         self.label = label
 
         # todo: the below is suboptimal.
@@ -66,6 +68,7 @@ class Results:
     """Work-precision diagram results."""
 
     def __init__(self, work, precision):
+        """Construct a result-collection."""
         self.work = work
         self.precision = precision
 
@@ -84,7 +87,8 @@ class Results:
 class Timings:
     """Work-precision diagram timings."""
 
-    def __init__(self, min, max, mean, stdev, data):
+    def __init__(self, min, max, mean, stdev, data):  # noqa: A002
+        """Construct a collection of timings."""
         self.min = min
         self.max = max
         self.mean = mean
@@ -108,7 +112,7 @@ class Timings:
 
     @classmethod
     def tree_unflatten(cls, _aux, children):
-        min, max, mean, stdev, data = children
+        min, max, mean, stdev, data = children  # noqa: A001
         return cls(min=min, max=max, mean=mean, stdev=stdev, data=data)
 
 
@@ -205,14 +209,12 @@ def plot(
 
     if title is not None:
         ax.set_title(title)
-    if xlabel is not None:
-        if ylabel_unit is not None:
-            xlabel += f" [{xlabel_unit}]"
-            ax.set_xlabel(xlabel)
-    if ylabel is not None:
-        if ylabel_unit is not None:
-            ylabel += f" [{ylabel_unit}]"
-            ax.set_ylabel(ylabel)
+    if xlabel is not None and ylabel_unit is not None:
+        xlabel += f" [{xlabel_unit}]"
+        ax.set_xlabel(xlabel)
+    if ylabel is not None and ylabel_unit is not None:
+        ylabel += f" [{ylabel_unit}]"
+        ax.set_ylabel(ylabel)
 
     ax.grid(which_grid)
     ax.legend()

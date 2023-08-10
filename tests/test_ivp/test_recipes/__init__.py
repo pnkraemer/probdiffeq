@@ -1,5 +1,4 @@
-"""
-Tests for state-space factorisations (at least, for the ones not tested otherwise).
+"""Tests for state-space factorisations (at least, for the ones not tested otherwise).
 
 To ensure that all state-space model factorisations work as expected,
 we need to consider extrapolation and correction separately.

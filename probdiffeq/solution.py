@@ -106,10 +106,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
 
     # Generate an observation-model for the QOI
     model = impl.ssm_util.conditional_to_derivative(0, standard_deviation)
-    if isinstance(posterior, _markov.MarkovSeqRev):
-        rv = posterior.init
-    else:
-        rv = posterior
+    rv = posterior.init if isinstance(posterior, _markov.MarkovSeqRev) else posterior
 
     _corrected, logpdf = _condition_and_logpdf(rv, u, model)
     return logpdf

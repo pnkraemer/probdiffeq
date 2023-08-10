@@ -34,8 +34,7 @@ class MostRecent(Calibration):
         return prior
 
     def update(self, _state, /, observed):
-        calibrated = impl.random.mahalanobis_norm_relative(0.0, observed)
-        return calibrated
+        return impl.random.mahalanobis_norm_relative(0.0, observed)
 
     def extract(self, state, /):
         return state, state

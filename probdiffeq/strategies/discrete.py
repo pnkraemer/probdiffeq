@@ -21,7 +21,7 @@ def fixedpointsmoother_precon(data, /, init, conditional, observation_model):
     return jax.lax.scan(
         f=_fixedpoint_precon_step,
         init=init,
-        xs=(conditional,) + information,
+        xs=(conditional, *information),
         reverse=True,
     )
 
@@ -66,7 +66,7 @@ def kalmanfilter_reverse(data, /, init, conditional, observation_model):
     return jax.lax.scan(
         f=_kalman_reverse_step,
         init=init,
-        xs=(conditional,) + information,
+        xs=(conditional, *information),
         reverse=True,
     )
 

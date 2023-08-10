@@ -38,8 +38,7 @@ def _pascal(a, /):
 
 def _batch_gram(k, /):
     k_vmapped_x = jax.vmap(k, in_axes=(0, None), out_axes=-1)
-    k_vmapped_xy = jax.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
-    return k_vmapped_xy
+    return jax.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
 
 
 def _binom(n, k):

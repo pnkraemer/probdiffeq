@@ -139,13 +139,14 @@ def affine_recursion(
     fx, jvp_fn = jax.linearize(vf, *initial_values)
 
     tmp = fx
-    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]  # noqa: F841
+    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
     return [*initial_values, fx, *fx_evaluations]
 
 
 def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
     """Create a routine that Taylor-expands an \
-     IVP solution with a Runge-Kutta starter."""
+    IVP solution with a Runge-Kutta starter.
+    """
     return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
 
 
@@ -167,7 +168,7 @@ def _runge_kutta_starter_fn(
         return initial_values
 
     if num == 1:
-        return initial_values + (vector_field(*initial_values, t=t, p=parameters),)
+        return (*initial_values, vector_field(*initial_values, t=t, p=parameters))
 
     # Generate data
 

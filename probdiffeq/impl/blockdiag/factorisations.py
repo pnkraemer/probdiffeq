@@ -1,29 +1,32 @@
 """Factorisations."""
 from probdiffeq.impl import _factorisations
 from probdiffeq.impl.blockdiag import (
-    conditional,
-    linearise,
-    random,
-    ssm_util,
-    transform,
+    _conditional,
+    _linearise,
+    _random,
+    _ssm_util,
+    _transform,
 )
 
 
 class BlockDiagFactorisation(_factorisations.Factorisation):
+    """Block-diagonal factorisation."""
+
     def __init__(self, ode_shape):
+        """Construct a block-diagonal factorisation."""
         self.ode_shape = ode_shape
 
     def conditional(self):
-        return conditional.ConditionalBackend()
+        return _conditional.ConditionalBackend()
 
     def linearise(self):
-        return linearise.LinearisationBackend()
+        return _linearise.LinearisationBackend()
 
     def random(self):
-        return random.RandomVariableBackend(ode_shape=self.ode_shape)
+        return _random.RandomVariableBackend(ode_shape=self.ode_shape)
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)
+        return _ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)
 
     def transform(self):
-        return transform.TransformBackend(ode_shape=self.ode_shape)
+        return _transform.TransformBackend(ode_shape=self.ode_shape)

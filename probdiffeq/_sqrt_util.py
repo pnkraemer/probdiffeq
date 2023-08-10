@@ -143,5 +143,4 @@ def triu_via_qr(R, /):
     # todo: enforce positive diagonals?
     #  (or expose this option; some equivalence tests might fail
     #   if we always use a positive diagonal.)
-    triu = jnp.linalg.qr(R, mode="r")
-    return triu
+    return jnp.linalg.qr(R, mode="r")

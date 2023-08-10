@@ -40,7 +40,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def qoi(self, rv):
         if jnp.ndim(rv.mean) > 1:
             return jax.vmap(self.qoi)(rv)
-        mean_reshaped = jnp.reshape(rv.mean, (-1,) + self.ode_shape, order="F")
+        mean_reshaped = jnp.reshape(rv.mean, (-1, *self.ode_shape), order="F")
         return mean_reshaped[0]
 
     def rescale_cholesky(self, rv, factor, /):
@@ -66,7 +66,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         raise NotImplementedError
 
     def qoi_from_sample(self, sample, /):
-        sample_reshaped = jnp.reshape(sample, (-1,) + self.ode_shape, order="F")
+        sample_reshaped = jnp.reshape(sample, (-1, *self.ode_shape), order="F")
         return sample_reshaped[0]
 
     def sample_shape(self, rv):
