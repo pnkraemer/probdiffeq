@@ -1,0 +1,69 @@
+"""Test-setup."""
+
+import warnings
+
+import diffeqzoo
+import jax
+import jax.numpy as jnp
+from diffeqzoo import backend
+from jax.config import config
+
+from probdiffeq.impl import impl
+
+# ODE examples must be in JAX
+backend.select("jax")
+
+# All warnings shall be errors
+warnings.filterwarnings("error")
+
+# Test on CPU.
+config.update("jax_platform_name", "cpu")
+
+# Double precision
+# Needed for equivalence tests for smoothers.
+config.update("jax_enable_x64", True)
+
+
+class _Setup:
+    def __init__(self):
+        self._which = None
+
+    def select(self, which, /):
+        if which == "scalar":
+            impl.select("scalar")
+        else:
+            impl.select(which, ode_shape=(2,))
+
+        self._which = which
+
+    def ode(self):
+        if self._which == "scalar":
+            raise ValueError
+
+        f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
+        t1 = 2.0  # Short time-intervals are sufficient for this test.
+
+        @jax.jit
+        def vf(x, *, t, p):  # noqa: ARG001
+            return f(x, *p)
+
+        return vf, (u0,), (t0, t1)
+
+    def ode_affine(self):
+        if self._which == "scalar":
+            raise ValueError
+
+        t0, t1 = 0.0, 2.0
+        u0 = jnp.ones((2,))
+
+        @jax.jit
+        def vf(x, *, t, p):  # noqa: ARG001
+            return 2 * x
+
+        def solution(t):
+            return jnp.exp(2 * t) * jnp.ones((2,))
+
+        return vf, (u0,), (t0, t1), solution
+
+
+setup = _Setup()

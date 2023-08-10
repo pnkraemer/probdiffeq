@@ -102,6 +102,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         x_reshaped = jnp.reshape(x, (-1, d), order="F")
         return x_reshaped[idx_or_slice, ...]
 
+    def prototype_output_scale(self):
+        return jnp.empty(())
+
 
 def _autobatch_linop(fun):
     def fun_(x):

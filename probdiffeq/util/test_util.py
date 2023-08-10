@@ -8,7 +8,7 @@ from probdiffeq.solvers.strategies import filters
 def generate_solver(
     *,
     solver_factory=calibrated.mle,
-    strategy_factory=filters.filter,
+    strategy_factory=filters.filter_adaptive,
     impl_factory=recipes.ts0_iso,
     **impl_factory_kwargs,
 ):
@@ -39,6 +39,7 @@ def generate_solver(
     >>> print(generate_solver(strategy_factory=strat_fcty, impl_factory=impl_fcty, ode_shape=(1,)))  # noqa: E501
     <MLE-solver with <Smoother with <Dense IBM with num_derivatives=4, ode_shape=(1,)>, <TS1 with ode_order=1>>>
     """
+    raise RuntimeError
     implementation = impl_factory(**impl_factory_kwargs)
     strategy = strategy_factory(*implementation)
     return solver_factory(*strategy)

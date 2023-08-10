@@ -4,73 +4,38 @@ Specifically, we solve a linear function with exponentially increasing output-sc
 This is difficult for the MLE- and calibration-free solver,
 but not for the dynamic solver.
 """
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.statespace import recipes
-from probdiffeq.util import test_util
+from probdiffeq.solvers.statespace import calibration, correction, extrapolation
+from probdiffeq.solvers.strategies import filters
+from tests.setup import setup
 
 
-@testing.case()
-def case_isotropic_factorisation():
-    return recipes.ts0_iso, 1.0
+def test_exponential_approximated_well():
+    vf, u0, (t0, t1), solution = setup.ode_affine()
 
+    problem_args = (vf, u0)
 
-@testing.case()  # this implies success of the scalar solver
-def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag, jnp.ones((1,))
+    ibm = extrapolation.ibm_adaptive(num_derivatives=1)
+    ts0 = correction.taylor_order_zero()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = calibrated.dynamic(strategy, calibration.output_scale())
 
-
-@testing.case()
-def case_dense_factorisation():
-    return recipes.ts1_dense, 2.0
-
-
-@testing.fixture(name="problem")
-def fixture_problem():
-    @jax.jit
-    def vf(x, *, t, p):  # noqa: ARG001
-        return p * x
-
-    p = 2.0
-    t0, t1 = 0.0, 2.0
-    return vf, jnp.ones((1,)), (t0, t1), p, lambda x: jnp.exp(p * x)
-
-
-@testing.fixture(name="dynamic_solution_approximation_error")
-@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
-def fixture_approximation_error_low(problem, factorisation):
-    vf, u0, (t0, t1), f_args, solution = problem
-    problem_args = (vf, (u0,))
-
-    impl_factory, output_scale = factorisation
-    solver = test_util.generate_solver(
-        # Problem setup chosen that when combined with ts1_dense,
-        # only the dynamic solver can pass the test.
-        # For some reason, zeroth-order solvers always do well.
-        solver_factory=calibrated.dynamic,
-        num_derivatives=1,
-        impl_factory=impl_factory,
-        ode_shape=(1,),
-    )
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     grid = jnp.linspace(t0, t1, num=20)
     solver_kwargs = {
         "grid": grid,
-        "parameters": f_args,
         "solver": solver,
         "output_scale": output_scale,
     }
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
 
-    return _rmse(approximation.u[-1], solution(t1))
+    rmse = _rmse(approximation.u[-1], solution(t1))
+    assert rmse < 0.1
 
 
 def _rmse(a, b):
     return jnp.linalg.norm((a - b) / b) / jnp.sqrt(b.size)
-
-
-def test_exponential_approximated_well(dynamic_solution_approximation_error):
-    assert dynamic_solution_approximation_error < 0.1

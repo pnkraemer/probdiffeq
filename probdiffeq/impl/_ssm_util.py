@@ -45,3 +45,7 @@ class SSMUtilBackend(abc.ABC):
     @abc.abstractmethod
     def prototype_error_estimate(self):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def prototype_output_scale(self):
+        raise NotImplementedError

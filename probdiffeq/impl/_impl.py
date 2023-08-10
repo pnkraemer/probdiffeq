@@ -15,8 +15,8 @@ class Backend:
         self._fact = None
 
     def select(self, which, **kwargs):
-        # if self._fact is not None:
-        #     raise ValueError(f"Factorisation {self._fact} has been selected already.")
+        if self._fact is not None:
+            raise ValueError(f"Factorisation {self._fact} has been selected already.")
         self._fact = _factorisations.choose(which, **kwargs)
 
     @property

@@ -8,11 +8,11 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import _common, strategy
 
 
-def filter(extrapolation_factory, corr, calib, /):  # noqa: A001
+def filter_adaptive(extrapolation_factory, corr, /):
     """Create a filter strategy."""
     extrapolation = extrapolation_factory.forward()
     extrapolation_repr = extrapolation_factory.string_repr()
-    strategy_impl = strategy.Strategy(
+    return strategy.Strategy(
         extrapolation,
         corr,
         string_repr=f"<Filter with {extrapolation_repr}, {corr}>",
@@ -23,7 +23,6 @@ def filter(extrapolation_factory, corr, calib, /):  # noqa: A001
         impl_interpolate=_filter_interpolate,
         impl_offgrid_marginals=_filter_offgrid_marginals,
     )
-    return strategy_impl, calib
 
 
 def _filter_offgrid_marginals(

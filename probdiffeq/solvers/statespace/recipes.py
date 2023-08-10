@@ -27,6 +27,7 @@ class _Impl(containers.NamedTuple):
 
 def ts0_iso(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
     """Zeroth-order Taylor linearisation with isotropic Kronecker structure."""
+    raise RuntimeError
     impl.select("isotropic", ode_shape=ode_shape)
 
     ts0 = correction.taylor_order_zero(ode_order=ode_order)
@@ -36,6 +37,7 @@ def ts0_iso(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
+    raise RuntimeError
     impl.select("blockdiag", ode_shape=ode_shape)
 
     ts0 = correction.taylor_order_zero(ode_order=ode_order)
@@ -45,6 +47,7 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
+    raise RuntimeError
     impl.select("dense", ode_shape=ode_shape)
 
     ts1 = correction.taylor_order_one(ode_order=ode_order)
@@ -54,6 +57,7 @@ def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
+    raise RuntimeError
     impl.select("dense", ode_shape=ode_shape)
 
     ts0 = correction.taylor_order_zero(ode_order=ode_order)
@@ -68,6 +72,7 @@ def slr1_dense(
     cubature_fun=cubature.third_order_spherical,
     num_derivatives=4,
 ) -> _Impl:
+    raise RuntimeError
     impl.select("dense", ode_shape=ode_shape)
 
     slr1 = correction.statistical_order_one(cubature_fun)
@@ -93,6 +98,7 @@ def slr0_dense(
         and without any deprecation policy.
 
     """
+    raise RuntimeError
     impl.select("dense", ode_shape=ode_shape)
 
     slr0 = correction.statistical_order_zero(cubature_fun)
@@ -102,6 +108,7 @@ def slr0_dense(
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
+    raise RuntimeError
     impl.select("scalar")
 
     ts0 = correction.taylor_order_zero(ode_order=ode_order)

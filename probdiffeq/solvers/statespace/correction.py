@@ -130,7 +130,7 @@ for nodetype in [ODEConstraintTaylor, ODEConstraintStatistical]:
     )
 
 
-def taylor_order_zero(*, ode_order) -> ODEConstraintTaylor:
+def taylor_order_zero(*, ode_order=1) -> ODEConstraintTaylor:
     return ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_0th(ode_order=ode_order),
