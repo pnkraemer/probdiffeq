@@ -56,3 +56,7 @@ class RandomVariableBackend(abc.ABC):
     @abc.abstractmethod
     def qoi_from_sample(self, sample, /):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def to_multivariate_normal(self, u, rv):
+        raise NotImplementedError

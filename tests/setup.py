@@ -98,5 +98,17 @@ class _Setup:
 
         return vf, (u0,), (t0, t1), solution
 
+    def rv(self):
+        key = jax.random.PRNGKey(2)
+
+        def _random_like(x):  # issue:
+            return jax.random.normal(key, shape=jnp.shape(x)) * x
+
+        output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+        discretise_func = impl.ssm_util.ibm_transitions(3, output_scale)
+        (_matrix, rv), _pre = discretise_func(0.5)
+        u = jax.tree_util.tree_map(_random_like, impl.random.mean(rv))
+        return u, rv
+
 
 setup = _Setup()

@@ -15,11 +15,15 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return jnp.abs(res_white) / jnp.sqrt(rv.mean.size)
 
     def logpdf(self, u, /, rv):
-        x1 = 2.0 * jnp.log(jnp.abs(rv.cholesky))  # logdet
-        residual_white = (u - rv.mean) / rv.cholesky
-        x2 = jnp.square(residual_white)
-        x3 = jnp.log(jnp.pi * 2)
-        return -0.5 * (x1 + x2 + x3)
+        dx = u - rv.mean
+        w = jax.scipy.linalg.solve_triangular(rv.cholesky, dx, lower=True, trans="T")
+
+        maha_term = jnp.dot(w, w)
+
+        diagonal = jnp.diagonal(rv.cholesky, axis1=-1, axis2=-2)
+        slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+        logdet_term = 2.0 * slogdet
+        return -0.5 * (logdet_term + maha_term + u.size * jnp.log(jnp.pi * 2))
 
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
@@ -66,3 +70,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + rv.cholesky @ unit_sample
+
+    def to_multivariate_normal(self, u, rv):
+        return u, (rv.mean, rv.cholesky @ rv.cholesky.T)

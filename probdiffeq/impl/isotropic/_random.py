@@ -25,12 +25,20 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         if jnp.ndim(u) == 1:
             u = u[None, :]
 
-        residual_white = (rv.mean - u) / rv.cholesky
-        residual_white = jnp.reshape(residual_white, self.ode_shape)
-        x1 = jnp.dot(residual_white, residual_white)
-        x2 = u.size * 2.0 * jnp.log(jnp.abs(jnp.reshape(rv.cholesky, ())))
-        x3 = u.size * jnp.log(jnp.pi * 2)
-        return -0.5 * (x1 + x2 + x3)
+        def logpdf_scalar(x, r):
+            dx = x - r.mean
+            w = jax.scipy.linalg.solve_triangular(r.cholesky, dx, lower=True, trans="T")
+
+            maha_term = jnp.dot(w, w)
+
+            diagonal = jnp.diagonal(r.cholesky, axis1=-1, axis2=-2)
+            slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+            logdet_term = 2.0 * slogdet
+            return -0.5 * (logdet_term + maha_term + x.size * jnp.log(jnp.pi * 2))
+
+        # Batch in the "mean" dimension and sum the results.
+        rv_batch = _normal.Normal(1, None)
+        return jnp.sum(jax.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
 
     def mean(self, rv):
         return rv.mean
@@ -76,3 +84,11 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + rv.cholesky @ unit_sample
+
+    def to_multivariate_normal(self, u, rv):
+        eye_d = jnp.eye(*self.ode_shape)
+        cov = rv.cholesky @ rv.cholesky.T
+        cov = jnp.kron(eye_d, cov)
+        mean = rv.mean.reshape((-1,), order="F")
+        u = u.reshape((-1,), order="F")
+        return u, (mean, cov)

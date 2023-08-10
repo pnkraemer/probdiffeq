@@ -75,7 +75,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def standard_normal(self, ndim, /, output_scale):
         eye_n = jnp.eye(ndim)
         eye_d = output_scale * jnp.eye(*self.ode_shape)
-        cholesky = jnp.kron(eye_n, eye_d)
+        cholesky = jnp.kron(eye_d, eye_n)
         mean = jnp.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
         return _normal.Normal(mean, cholesky)
 

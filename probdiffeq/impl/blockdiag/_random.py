@@ -21,11 +21,18 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return (mean - u) / cholesky / jnp.sqrt(mean.size)
 
     def logpdf(self, u, /, rv):
-        residual_white = (rv.mean - u) / rv.cholesky
-        x1 = jnp.square(residual_white)
-        x2 = u.size * 2.0 * jnp.log(jnp.abs(rv.cholesky))
-        x3 = u.size * jnp.log(jnp.pi * 2)
-        return jnp.sum(-0.5 * (x1 + x2 + x3))
+        def logpdf_scalar(x, r):
+            dx = x - r.mean
+            w = jax.scipy.linalg.solve_triangular(r.cholesky, dx, lower=True, trans="T")
+
+            maha_term = jnp.dot(w, w)
+
+            diagonal = jnp.diagonal(r.cholesky, axis1=-1, axis2=-2)
+            slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+            logdet_term = 2.0 * slogdet
+            return -0.5 * (logdet_term + maha_term + x.size * jnp.log(jnp.pi * 2))
+
+        return jnp.sum(jax.vmap(logpdf_scalar)(u, rv))
 
     def mean(self, rv):
         return rv.mean
@@ -72,3 +79,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[..., 0]
+
+    def to_multivariate_normal(self, u, rv):
+        mean = jnp.reshape(rv.mean.T, (-1,), order="F")
+        u = jnp.reshape(u.T, (-1,), order="F")
+        cov = jax.scipy.linalg.block_diag(*self.cov_dense(rv))
+        return u, (mean, cov)

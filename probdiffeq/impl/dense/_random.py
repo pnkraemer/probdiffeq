@@ -27,7 +27,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
 
         residual_white = jax.scipy.linalg.solve_triangular(
-            rv.cholesky.T, u - rv.mean, lower=False, trans="T"
+            rv.cholesky, u - rv.mean, lower=True, trans="T"
         )
         x1 = jnp.dot(residual_white, residual_white)
         x2 = 2.0 * slogdet
@@ -86,3 +86,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + rv.cholesky @ unit_sample
+
+    def to_multivariate_normal(self, u, rv):
+        return u, (rv.mean, rv.cholesky @ rv.cholesky.T)
