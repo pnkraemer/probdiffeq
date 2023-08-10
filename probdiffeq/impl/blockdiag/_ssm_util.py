@@ -84,3 +84,6 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def prototype_error_estimate(self):
         return jnp.empty(self.ode_shape)
+
+    def prototype_output_scale(self):
+        return jnp.empty(self.ode_shape)
