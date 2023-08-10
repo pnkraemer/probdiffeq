@@ -107,7 +107,7 @@ def _estimate_error(observed, /):
     #  context. Same for prototype_qoi etc.
     zero_data = jnp.zeros(())
     output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
-    error_estimate_unscaled = impl.random.standard_deviation(observed)
+    error_estimate_unscaled = jnp.squeeze(impl.random.standard_deviation(observed))
     return output_scale * error_estimate_unscaled
 
 

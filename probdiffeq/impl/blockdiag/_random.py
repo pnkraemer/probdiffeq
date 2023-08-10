@@ -38,8 +38,10 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        # assumes rv.chol = (d,1,1)
-        return jnp.abs(jnp.reshape(rv.cholesky, (-1,)))
+        if rv.cholesky.ndim > 1:
+            return jax.vmap(self.standard_deviation)(rv)
+
+        return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def cholesky(self, rv):
         return rv.cholesky

@@ -12,8 +12,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def ibm_transitions(self, num_derivatives):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale=1.0)
+    def ibm_transitions(self, num_derivatives, output_scale):
+        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
         (d,) = self.ode_shape
         eye_d = jnp.eye(d)
         A = jnp.kron(eye_d, a)
@@ -72,8 +72,12 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         A = p[:, None] * A * p_inv[None, :]
         return _cond_util.Conditional(A, noise)
 
-    def standard_normal(self, num_hidden_states_per_ode_dim, output_scale):
-        raise NotImplementedError
+    def standard_normal(self, ndim, /, output_scale):
+        eye_n = jnp.eye(ndim)
+        eye_d = output_scale * jnp.eye(*self.ode_shape)
+        cholesky = jnp.kron(eye_n, eye_d)
+        mean = jnp.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
+        return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
         return _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)

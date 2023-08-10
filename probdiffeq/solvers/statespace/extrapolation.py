@@ -4,6 +4,7 @@ import abc
 import functools
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
@@ -247,7 +248,8 @@ jax.tree_util.register_pytree_node(
 
 
 def ibm_adaptive(num_derivatives) -> IBMExtrapolationFactory:
-    discretise = impl.ssm_util.ibm_transitions(num_derivatives)
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
     return IBMExtrapolationFactory(args=(discretise, num_derivatives))
 
 

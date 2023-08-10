@@ -48,11 +48,11 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        def std(x):
-            std_mat = jnp.linalg.qr(x[..., None], mode="r")
-            return jnp.reshape(std_mat, ())
+        if rv.mean.ndim > 1:
+            return jax.vmap(self.standard_deviation)(rv)
 
-        return jax.vmap(std)(rv.cholesky)
+        diag = jnp.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
+        return jnp.sqrt(diag)
 
     def cholesky(self, rv):
         return rv.cholesky

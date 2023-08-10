@@ -59,7 +59,7 @@ def case_slr1_gauss_hermite():
 
 @testing.fixture(name="solution")
 @testing.parametrize_with_cases("correction_impl", cases=".", prefix="case_")
-def fixture_recipe_solution(correction_impl):
+def fixture_solution(correction_impl):
     vf, u0, (t0, t1) = setup.ode()
 
     problem_args = (vf, u0)

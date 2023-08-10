@@ -51,7 +51,11 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        return rv.cholesky  # todo: this is only true of rv is an "observed" Rv...
+        if rv.cholesky.ndim > 2:
+            return jax.vmap(self.standard_deviation)(rv)
+
+        diag = jnp.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
+        return jnp.sqrt(diag)
 
     def marginal_nth_derivative(self, rv, i):
         if jnp.ndim(rv.mean) > 2:

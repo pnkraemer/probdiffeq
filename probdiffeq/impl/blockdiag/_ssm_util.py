@@ -10,8 +10,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def ibm_transitions(self, num_derivatives):
-        output_scale = jnp.ones(self.ode_shape)
+    def ibm_transitions(self, num_derivatives, output_scale):
         system_matrices = jax.vmap(_ibm_util.system_matrices_1d, in_axes=(None, 0))
         a, q_sqrtm = system_matrices(num_derivatives, output_scale)
 
@@ -57,7 +56,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _cond_util.Conditional(A_new, noise)
 
     def standard_normal(self, ndim, output_scale):
-        raise NotImplementedError
+        mean = jnp.zeros((*self.ode_shape, ndim))
+        cholesky = output_scale[:, None, None] * jnp.eye(ndim)[None, ...]
+        return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
         if jnp.ndim(mean) > 0:
