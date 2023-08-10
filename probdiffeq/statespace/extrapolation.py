@@ -246,7 +246,7 @@ jax.tree_util.register_pytree_node(
 )
 
 
-def ibm_factory(num_derivatives) -> IBMExtrapolationFactory:
+def ibm_adaptive(num_derivatives) -> IBMExtrapolationFactory:
     discretise = impl.ssm_util.ibm_transitions(num_derivatives)
     return IBMExtrapolationFactory(args=(discretise, num_derivatives))
 

@@ -35,6 +35,9 @@ class MostRecent(Calibration):
         return state, state
 
 
+# todo: if we pass the mahalanobis_relative term to the update() function,
+#  it reduces to a generic stats() module that can also be used for e.g.
+#  marginal likelihoods. In this case, the MostRecent() stuff becomes void.
 class RunningMean(Calibration):
     def init(self, prior):
         return prior, prior, 0.0

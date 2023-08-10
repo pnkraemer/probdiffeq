@@ -25,7 +25,7 @@ class Correction(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, ssv, corr, /, vector_field, t, p):
+    def complete(self, ssv, corr, /):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -54,7 +54,7 @@ class ODEConstraintTaylor(Correction):
         A, b = self.linearise(f_wrapped, hidden_state.mean)
         observed = impl.transform.marginalise(hidden_state, (A, b))
 
-        error_estimate = estimate_error(observed)
+        error_estimate = _estimate_error(observed)
         return error_estimate, observed, (A, b)
 
     def complete(self, hidden_state, corr, /):
@@ -85,7 +85,7 @@ class ODEConstraintStatistical(Correction):
         A, b = self.linearise(f_wrapped, hidden_state)
         observed = impl.conditional.marginalise(hidden_state, (A, b))
 
-        error_estimate = estimate_error(observed)
+        error_estimate = _estimate_error(observed)
         return error_estimate, observed, (A, b, f_wrapped)
 
     def complete(self, hidden_state, corr, /):
@@ -101,7 +101,7 @@ class ODEConstraintStatistical(Correction):
         return hidden_state
 
 
-def estimate_error(observed, /):
+def _estimate_error(observed, /):
     # todo: the functions involved in error estimation are still a bit patchy.
     #  for instance, they assume that they are called in exactly this error estimation
     #  context. Same for prototype_qoi etc.
@@ -109,6 +109,25 @@ def estimate_error(observed, /):
     output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
     error_estimate_unscaled = impl.random.standard_deviation(observed)
     return output_scale * error_estimate_unscaled
+
+
+def _constraint_flatten(node):
+    children = ()
+    aux = node.ode_order, node.linearise, node.string_repr
+    return children, aux
+
+
+def _constraint_unflatten(aux, _children, *, nodetype):
+    ode_order, lin, string_repr = aux
+    return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
+
+
+for nodetype in [ODEConstraintTaylor, ODEConstraintStatistical]:
+    jax.tree_util.register_pytree_node(
+        nodetype=nodetype,
+        flatten_func=_constraint_flatten,
+        unflatten_func=functools.partial(_constraint_unflatten, nodetype=nodetype),
+    )
 
 
 def taylor_order_zero(*, ode_order) -> ODEConstraintTaylor:
@@ -142,23 +161,4 @@ def statistical_order_zero(cubature_fun=cubature.third_order_spherical):
         ode_order=1,
         linearise_fun=linearise_fun,
         string_repr=f"<SLR0 with ode_order={1}>",
-    )
-
-
-def _constraint_flatten(node):
-    children = ()
-    aux = node.ode_order, node.linearise, node.string_repr
-    return children, aux
-
-
-def _constraint_unflatten(aux, _children, *, nodetype):
-    ode_order, lin, string_repr = aux
-    return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
-
-
-for nodetype in [ODEConstraintTaylor, ODEConstraintStatistical]:
-    jax.tree_util.register_pytree_node(
-        nodetype=nodetype,
-        flatten_func=_constraint_flatten,
-        unflatten_func=functools.partial(_constraint_unflatten, nodetype=nodetype),
     )
