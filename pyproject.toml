@@ -47,6 +47,7 @@ exclude_also = [
 
 
 [tool.ruff]
+include = ["*.py", "**/pyproject.toml", "*.ipynb"]
 # See: https://beta.ruff.rs/docs/rules/
 select = ["E", "F", "D", "UP", "B", "A", "ICN", "PT", "Q", "RET", "SIM", "ARG", "RUF"]
 ignore = [

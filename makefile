@@ -2,9 +2,8 @@
 .PHONY: format lint test doc example run-benchmarks clean
 
 format:
-	isort --quiet .
 	black --quiet .
-	nbqa black --quiet docs/quickstart/ docs/examples_benchmarks/
+	isort --quiet .
 	nbqa isort --quiet docs/quickstart/ docs/examples_benchmarks/
 	jupytext --quiet --sync docs/quickstart/*.ipynb
 	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*.ipynb
