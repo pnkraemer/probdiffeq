@@ -9,7 +9,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
     def ode_taylor_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             fx = ts0(fun, mean[:ode_order, ...])
-            linop = _matfree.parametrised_linop(lambda s, _p: s[ode_order, ...])
+            linop = _matfree.parametrised_linop(lambda s, _p: s[[ode_order], ...])
             return linop, -fx
 
         return linearise_fun_wrapped

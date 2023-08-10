@@ -15,8 +15,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(mean, cholesky)
 
     def mahalanobis_norm_relative(self, u, /, rv):
+        print(rv.mean.shape, u.shape)
         residual_white = (rv.mean - u) / rv.cholesky
-        residual_white_matrix = jnp.linalg.qr(residual_white[:, None], mode="r")
+        residual_white_matrix = jnp.linalg.qr(residual_white.T, mode="r")
         return jnp.reshape(jnp.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
@@ -59,11 +60,9 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return _normal.Normal(rv.mean, cholesky)
 
     def standard_deviation(self, rv):
-        if rv.cholesky.ndim > 2:
+        if rv.cholesky.ndim > 1:
             return jax.vmap(self.standard_deviation)(rv)
-
-        diag = jnp.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
-        return jnp.sqrt(diag)
+        return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def marginal_nth_derivative(self, rv, i):
         if jnp.ndim(rv.mean) > 2:

@@ -70,7 +70,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _cond_util.Conditional(linop, noise)
 
     def prototype_qoi(self):
-        mean = jnp.empty(self.ode_shape)
+        mean = jnp.empty((1, *self.ode_shape))
         cholesky = jnp.empty(())
         return _normal.Normal(mean, cholesky)
 
