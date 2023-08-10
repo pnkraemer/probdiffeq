@@ -315,6 +315,7 @@ def solve_fixed_grid(
 def _userfriendly_output(*, posterior, posterior_t0):
     if isinstance(posterior, markov.MarkovSeqRev):
         marginals = markov.marginals(posterior)
+
         marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = tree_array_util.tree_append(marginals, marginal_t1)
 

@@ -2,84 +2,50 @@
 
 That is, when called with correct adaptive- and checkpoint-setups.
 """
-import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.solvers import solution
-from probdiffeq.solvers.statespace import recipes
+from probdiffeq.impl import impl
+from probdiffeq.solvers import solution, uncalibrated
+from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import smoothers
-from probdiffeq.util import test_util
-
-
-@testing.case()
-def case_isotropic_factorisation():
-    return recipes.ts0_iso, 1.0
-
-
-@testing.case()  # this implies success of the scalar solver
-def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag, jnp.ones((2,))
-
-
-@testing.case()
-def case_dense_factorisation():
-    return recipes.ts0_dense, 1.0
-
-
-@testing.fixture(name="problem")
-def fixture_problem():
-    f, u0, (t0, t1), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 4.0  # smaller time-span to decrease runtime
-
-    @jax.jit
-    def vf(x, *, t, p):  # noqa: ARG001
-        return f(x, *p)
-
-    return vf, jnp.atleast_1d(u0), (t0, t1), f_args
+from tests.setup import setup
 
 
 @testing.fixture(name="solver_setup")
-@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
-# Run with clipped and non-clipped controllers to cover both interpolation and clipping
-# around the end(s) of time-intervals.
-def fixture_solver_setup(problem, factorisation):
-    vf, u0, (t0, t1), f_args = problem
+def fixture_solver_setup():
+    vf, (u0,), (t0, t1) = setup.ode()
 
-    impl_factory, output_scale = factorisation
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     args = (vf, (u0,))
-    kwargs = {
-        "parameters": f_args,
-        "atol": 1e-3,
-        "rtol": 1e-3,
-        "output_scale": output_scale,
-    }
-
-    def impl_factory_wrapped():
-        return impl_factory(ode_shape=jnp.shape(u0), num_derivatives=2)
-
-    return args, kwargs, (t0, t1), impl_factory_wrapped
+    kwargs = {"atol": 1e-3, "rtol": 1e-3, "output_scale": output_scale}
+    return args, kwargs, (t0, t1)
 
 
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
-    args, kwargs, (t0, t1), impl_factory = solver_setup
-    solver = test_util.generate_solver(
-        strategy_factory=smoothers.smoother_adaptive, impl_factory=impl_factory
-    )
+    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.taylor_order_zero()
+    strategy = smoothers.smoother_adaptive(ibm, ts0)
+    solver = uncalibrated.solver(strategy)
+
+    args, kwargs, (t0, t1) = solver_setup
     return ivpsolve.solve_with_python_while_loop(
         *args, t0=t0, t1=t1, solver=solver, **kwargs
     )
 
 
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
+    """Test that with save_at=smoother_solution.t, the results should be identical."""
+    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.taylor_order_zero()
+    strategy = smoothers.fixedpoint_adaptive(ibm, ts0)
+    solver = uncalibrated.solver(strategy)
+
     save_at = solution_smoother.t
-    args, kwargs, _, impl_factory = solver_setup
-    solver = test_util.generate_solver(
-        strategy_factory=smoothers.smoother_fixedpoint, impl_factory=impl_factory
-    )
+    args, kwargs, _ = solver_setup
     solution_fixedpoint = ivpsolve.solve_and_save_at(
         *args, save_at=save_at, solver=solver, **kwargs
     )
@@ -87,22 +53,27 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
 
 
 def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_smoother):
-    args, kwargs, _, impl_factory = solver_setup
+    """Test that the interpolated smoother result equals the save_at result."""
+    args, kwargs, _ = solver_setup
     save_at = solution_smoother.t
 
-    # Re-generate the smoothing solver and compute the offgrid-marginals
-    solver_smoother = test_util.generate_solver(
-        strategy_factory=smoothers.smoother_adaptive, impl_factory=impl_factory
-    )
+    # Re-generate the smoothing solver
+    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.taylor_order_zero()
+    strategy = smoothers.smoother_adaptive(ibm, ts0)
+    solver_smoother = uncalibrated.solver(strategy)
+
+    # Compute the offgrid-marginals
     ts = jnp.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
     u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
     )
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
-    solver_fixedpoint = test_util.generate_solver(
-        strategy_factory=smoothers.smoother_fixedpoint, impl_factory=impl_factory
-    )
+    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.taylor_order_zero()
+    strategy = smoothers.fixedpoint_adaptive(ibm, ts0)
+    solver_fixedpoint = uncalibrated.solver(strategy)
     solution_fixedpoint = ivpsolve.solve_and_save_at(
         *args, save_at=ts, solver=solver_fixedpoint, **kwargs
     )

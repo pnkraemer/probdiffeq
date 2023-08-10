@@ -7,7 +7,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
     def marginalise(self, rv, conditional, /):
         matrix, noise = conditional
 
-        mean = matrix @ rv.mean
+        mean = matrix @ rv.mean + noise.mean
         R_stack = ((matrix @ rv.cholesky).T, noise.cholesky.T)
         cholesky_T = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack)
         return _normal.Normal(mean, cholesky_T.T)
