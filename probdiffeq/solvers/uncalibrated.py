@@ -6,7 +6,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import _common
 
 
-def solver(strategy):
+def solver(strategy, _calib, /):
     """Create a solver that does not calibrate the output scale automatically."""
     string_repr = f"<Uncalibrated solver with {strategy}>"
     return UncalibratedSolver(

@@ -1,10 +1,10 @@
 """Adaptive solvers for initial value problems (IVPs)."""
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import controls
+from probdiffeq import _solver, controls
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 
@@ -22,33 +22,17 @@ class _RejectionState(containers.NamedTuple):
     step_from: Any
 
 
-def _reference_state_fn_max_abs(sol, sol_previous):
-    return jnp.maximum(jnp.abs(sol), jnp.abs(sol_previous))
-
-
-T = TypeVar("T")
-"""A type-variable for (non-adaptive) IVP solvers."""
-
-
-# todo: should there be two (!) instances here?
-#  one that handles the rejection loop (with corresponding init, step, extract)
-#  and one that handles the step-interpolation-etc. version?
-#  Something feels like the interpolation should only operate on solution instances,
-#  not on state instances.
-
-
-class AdaptiveIVPSolver(Generic[T]):
+class AdaptiveIVPSolver:
     """Adaptive IVP solvers."""
 
     def __init__(
         self,
-        solver: T,
+        solver: _solver.Solver,
         atol=1e-4,
         rtol=1e-2,
         control=None,
         norm_ord=None,
         while_loop_fn=jax.lax.while_loop,
-        reference_state_fn=_reference_state_fn_max_abs,
     ):
         if control is None:
             control = controls.proportional_integral()
@@ -59,7 +43,6 @@ class AdaptiveIVPSolver(Generic[T]):
         self.rtol = rtol
         self.control = control
         self.norm_ord = norm_ord
-        self.reference_state_fn = reference_state_fn
 
     def __repr__(self):
         return (
@@ -69,7 +52,6 @@ class AdaptiveIVPSolver(Generic[T]):
             f"\n\trtol={self.rtol},"
             f"\n\tcontrol={self.control},"
             f"\n\tnorm_order={self.norm_ord},"
-            f"\n\treference_state_fn={self.reference_state_fn},"
             "\n)"
         )
 
@@ -128,7 +110,7 @@ class AdaptiveIVPSolver(Generic[T]):
         # Normalise the error and propose a new step.
         u_proposed = impl.random.qoi(state_proposed.strategy.hidden)
         u_step_from = impl.random.qoi(state_proposed.strategy.hidden)
-        u = self.reference_state_fn(u_proposed, u_step_from)
+        u = jnp.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
         error_normalised = self._normalise_error(
             error_estimate=state_proposed.error_estimate,
             u=u,
@@ -166,13 +148,13 @@ class AdaptiveIVPSolver(Generic[T]):
 
 def _asolver_flatten(asolver: AdaptiveIVPSolver):
     children = (asolver.solver, asolver.atol, asolver.rtol, asolver.control)
-    aux = asolver.norm_ord, asolver.reference_state_fn, asolver.while_loop_fn
+    aux = asolver.norm_ord, asolver.while_loop_fn
     return children, aux
 
 
 def _asolver_unflatten(aux, children):
     solver, atol, rtol, control = children
-    norm_ord, reference_state_fn, while_loop_fn = aux
+    norm_ord, while_loop_fn = aux
     return AdaptiveIVPSolver(
         solver=solver,
         while_loop_fn=while_loop_fn,
@@ -180,7 +162,6 @@ def _asolver_unflatten(aux, children):
         rtol=rtol,
         control=control,
         norm_ord=norm_ord,
-        reference_state_fn=reference_state_fn,
     )
 
 

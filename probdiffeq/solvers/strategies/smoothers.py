@@ -9,11 +9,11 @@ from probdiffeq.solvers import markov
 from probdiffeq.solvers.strategies import _common, strategy
 
 
-def smoother_adaptive(extrapolation_factory, corr, /):
+def smoother_adaptive(extrapolation_factory, corr, cal, /):
     """Create a smoother strategy."""
     extrapolation = extrapolation_factory.dense()
     extrapolation_repr = extrapolation_factory.string_repr()
-    return strategy.Strategy(
+    smoother = strategy.Strategy(
         extrapolation,
         corr,
         is_suitable_for_save_at=False,
@@ -24,6 +24,7 @@ def smoother_adaptive(extrapolation_factory, corr, /):
         impl_interpolate=_smoother_interpolate,
         impl_offgrid_marginals=_smoother_offgrid_marginals,
     )
+    return smoother, cal
 
 
 def smoother_fixedpoint(extrapolation_factory, corr, calib, /):

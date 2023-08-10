@@ -67,7 +67,7 @@ def fixture_filter_solution(solver_setup):
 def fixture_smoother_solution(solver_setup):
     args, kwargs, impl_factory = solver_setup
     solver = test_util.generate_solver(
-        strategy_factory=smoothers.smoother, impl_factory=impl_factory
+        strategy_factory=smoothers.smoother_adaptive, impl_factory=impl_factory
     )
     return ivpsolve.solve_fixed_grid(*args, solver=solver, **kwargs)
 

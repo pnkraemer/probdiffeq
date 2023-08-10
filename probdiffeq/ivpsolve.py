@@ -43,7 +43,7 @@ def simulate_terminal_values(
         t=t0,
         parameters=parameters,
     )
-    solution_t0 = solver.solution_from_tcoeffs(
+    initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -55,7 +55,7 @@ def simulate_terminal_values(
     save_at = jnp.asarray([t1])
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        *solution_t0,
+        *initial_condition,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -136,7 +136,7 @@ def solve_and_save_at(
         t=t0,
         parameters=parameters,
     )
-    solution_t0 = solver.solution_from_tcoeffs(
+    initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -147,7 +147,7 @@ def solve_and_save_at(
 
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
-        *solution_t0,
+        *initial_condition,
         save_at=save_at[1:],
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -165,7 +165,7 @@ def solve_and_save_at(
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
-    _, posterior_t0, *_ = solution_t0
+    _, posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
@@ -211,7 +211,7 @@ def solve_with_python_while_loop(
         t=t0,
         parameters=parameters,
     )
-    solution_t0 = solver.solution_from_tcoeffs(
+    initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
@@ -222,7 +222,7 @@ def solve_with_python_while_loop(
 
     t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),
-        *solution_t0,
+        *initial_condition,
         t1=t1,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -242,7 +242,7 @@ def solve_with_python_while_loop(
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
-    _, posterior_t0, *_ = solution_t0
+    _, posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
@@ -278,14 +278,14 @@ def solve_fixed_grid(
         t=grid[0],
         parameters=parameters,
     )
-    _, *solution_t0 = solver.solution_from_tcoeffs(
+    _, *initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
 
     # Compute the solution
     posterior, output_scale, num_steps = _collocate.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        *solution_t0,
+        *initial_condition,
         grid=grid,
         solver=solver,
         parameters=parameters,
@@ -300,7 +300,7 @@ def solve_fixed_grid(
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
-    posterior_t0, *_ = solution_t0
+    posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
