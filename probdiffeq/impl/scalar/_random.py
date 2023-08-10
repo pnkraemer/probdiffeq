@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random
+from probdiffeq.impl import _random, _sqrt_util
 from probdiffeq.impl.scalar import _normal
 
 
@@ -27,13 +27,12 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
         return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
-    def qoi(self, rv):
-        return rv.mean[..., 0]
-
     def mean(self, rv):
         return rv.mean
 
     def rescale_cholesky(self, rv, factor):
+        if jnp.ndim(factor) > 0:
+            return jax.vmap(self.rescale_cholesky)(rv, factor)
         return _normal.Normal(rv.mean, factor * rv.cholesky)
 
     def cholesky(self, rv):
@@ -44,8 +43,20 @@ class RandomVariableBackend(_random.RandomVariableBackend):
             return jax.vmap(self.cov_dense)(rv)
         return rv.cholesky @ rv.cholesky.T
 
-    def marginal_nth_derivative(self, rv):
-        raise NotImplementedError
+    def qoi(self, rv):
+        return rv.mean[..., 0]
+
+    def marginal_nth_derivative(self, rv, i):
+        if rv.mean.ndim > 1:
+            return jax.vmap(self.marginal_nth_derivative, in_axes=(0, None))(rv, i)
+
+        if i > rv.mean.shape[0]:
+            raise ValueError
+
+        m = rv.mean[i]
+        c = rv.cholesky[[i], :]
+        chol = _sqrt_util.triu_via_qr(c.T)
+        return _normal.Normal(jnp.reshape(m, ()), jnp.reshape(chol, ()))
 
     def qoi_from_sample(self, sample, /):
         return sample[0]

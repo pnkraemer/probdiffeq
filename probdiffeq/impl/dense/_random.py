@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random
+from probdiffeq.impl import _random, _sqrt_util
 from probdiffeq.impl.dense import _normal
 
 
@@ -62,8 +62,20 @@ class RandomVariableBackend(_random.RandomVariableBackend):
             return jax.vmap(self.cov_dense)(rv)
         return rv.cholesky @ rv.cholesky.T
 
-    def marginal_nth_derivative(self, rv):
-        raise NotImplementedError
+    def marginal_nth_derivative(self, rv, i):
+        if rv.mean.ndim > 1:
+            return jax.vmap(self.marginal_nth_derivative, in_axes=(0, None))(rv, i)
+
+        m = self._select(rv.mean, i)
+        c = jax.vmap(self._select, in_axes=(1, None), out_axes=1)(rv.cholesky, i)
+        c = _sqrt_util.triu_via_qr(c.T)
+        return _normal.Normal(m, c.T)
+
+    def _select(self, x, /, i):
+        x_reshaped = jnp.reshape(x, (-1, *self.ode_shape), order="F")
+        if i > x_reshaped.shape[0]:
+            raise ValueError
+        return x_reshaped[i]
 
     def qoi_from_sample(self, sample, /):
         sample_reshaped = jnp.reshape(sample, (-1, *self.ode_shape), order="F")
