@@ -1,4 +1,4 @@
-"""Calibration API."""
+"""Calibration functionality."""
 
 
 import abc
@@ -6,11 +6,6 @@ import abc
 import jax
 
 from probdiffeq.impl import impl
-
-
-def output_scale():
-    """Construct (a buffet of) isotropic calibration strategies."""
-    return CalibrationFactory()
 
 
 class Calibration(abc.ABC):
@@ -71,7 +66,7 @@ class CalibrationFactory:
         return MostRecent()
 
 
-def _unflatten(nodetype):
+def _unflatten_func(nodetype):
     return lambda *_a: nodetype()
 
 
@@ -80,5 +75,10 @@ for node in [RunningMean, MostRecent]:
     jax.tree_util.register_pytree_node(
         nodetype=node,
         flatten_func=lambda _: ((), ()),
-        unflatten_func=_unflatten(node),
+        unflatten_func=_unflatten_func(node),
     )
+
+
+def output_scale() -> CalibrationFactory:
+    """Construct (a buffet of) calibration strategies."""
+    return CalibrationFactory()

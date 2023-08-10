@@ -66,12 +66,7 @@ def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibrati
     output_scale = calibration.update(state.output_scale, observed=observed)
 
     prior, _calibrated = calibration.extract(output_scale)
-    state_strategy = strategy.complete(
-        state_strategy,
-        parameters=parameters,
-        vector_field=vector_field,
-        output_scale=prior,
-    )
+    state_strategy = strategy.complete(state_strategy, output_scale=prior)
 
     # Return solution
     return _common.State(

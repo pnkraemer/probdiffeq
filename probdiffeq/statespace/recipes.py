@@ -1,7 +1,7 @@
 """State-space model recipes."""
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
-from probdiffeq.statespace import calib, corr, cubature, extra
+from probdiffeq.statespace import calibration, corr, cubature, extra
 
 
 class _Impl(containers.NamedTuple):
@@ -16,7 +16,7 @@ class _Impl(containers.NamedTuple):
     correction: corr.Correction
     """Correction method."""
 
-    calibration: calib.CalibrationFactory
+    calibration: calibration.CalibrationFactory
     """Calibration factory."""
 
 
@@ -26,8 +26,8 @@ def ts0_iso(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
 
 
 def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -35,8 +35,8 @@ def ts0_blockdiag(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
 
 
 def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -44,8 +44,8 @@ def ts1_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
     correction = corr.taylor_order_one(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
 
 
 def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
@@ -53,8 +53,8 @@ def ts0_dense(*, ode_shape, ode_order=1, num_derivatives=4) -> _Impl:
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
 
 
 def slr1_dense(
@@ -67,8 +67,8 @@ def slr1_dense(
 
     correction = corr.statistical_order_one(cubature_fun)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
 
 
 def slr0_dense(
@@ -92,8 +92,8 @@ def slr0_dense(
 
     correction = corr.statistical_order_zero(cubature_fun)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
 
 
 def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
@@ -101,5 +101,5 @@ def ts0_scalar(*, ode_order=1, num_derivatives=4) -> _Impl:
 
     correction = corr.taylor_order_zero(ode_order=ode_order)
     ibm = extra.ibm_factory(num_derivatives=num_derivatives)
-    calibration = calib.output_scale()
-    return _Impl(correction=correction, extrapolation=ibm, calibration=calibration)
+    output_scale = calibration.output_scale()
+    return _Impl(correction=correction, extrapolation=ibm, calibration=output_scale)
