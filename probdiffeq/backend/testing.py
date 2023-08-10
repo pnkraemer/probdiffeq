@@ -21,8 +21,11 @@ parametrize = pytest.mark.parametrize
 parametrize_with_cases = pytest_cases.parametrize_with_cases
 raises = pytest.raises
 warns = pytest.warns
-skip = pytest.skip
 xfail = pytest.xfail
+
+
+def skip(reason):
+    return pytest.skip(reason=reason)
 
 
 def fixture(name=None, scope="module"):
