@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _linearise, matfree
+from probdiffeq.impl import _linearise, _matfree
 from probdiffeq.impl.dense import _normal
 
 
@@ -22,7 +22,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
 
             fx = ts0(fun, a0(mean))
-            linop = matfree.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
+            linop = _matfree.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
             return linop, -fx
 
         return linearise_fun_wrapped
@@ -43,7 +43,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 x0 = a0(x)
                 return x1 - jvp(x0)
 
-            linop = matfree.parametrised_linop(lambda v, _p: A(v))
+            linop = _matfree.parametrised_linop(lambda v, _p: A(v))
             return linop, -fx
 
         return new
@@ -68,7 +68,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             def A(x):
                 return a1(x) - J @ a0(x)
 
-            linop = matfree.parametrised_linop(lambda v, _p: A(v))
+            linop = _matfree.parametrised_linop(lambda v, _p: A(v))
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
@@ -94,7 +94,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            linop = matfree.parametrised_linop(lambda v, _p: a1(v))
+            linop = _matfree.parametrised_linop(lambda v, _p: a1(v))
             return linop, bias
 
         return new

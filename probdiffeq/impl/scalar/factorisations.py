@@ -1,19 +1,28 @@
+"""Scalar factorisation."""
 from probdiffeq.impl import _factorisations
-from probdiffeq.impl.scalar import conditional, linearise, random, ssm_util, transform
+from probdiffeq.impl.scalar import (
+    _conditional,
+    _linearise,
+    _random,
+    _ssm_util,
+    _transform,
+)
 
 
 class ScalarFactorisation(_factorisations.Factorisation):
+    """Scalar factorisation."""
+
     def linearise(self):
-        return linearise.LinearisationBackend()
+        return _linearise.LinearisationBackend()
 
     def random(self):
-        return random.RandomVariableBackend()
+        return _random.RandomVariableBackend()
 
     def conditional(self):
-        return conditional.ConditionalBackend()
+        return _conditional.ConditionalBackend()
 
     def transform(self):
-        return transform.TransformBackend()
+        return _transform.TransformBackend()
 
     def ssm_util(self):
-        return ssm_util.SSMUtilBackend()
+        return _ssm_util.SSMUtilBackend()

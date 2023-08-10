@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _sqrt_util
-from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util, matfree
+from probdiffeq.impl import _cond_util, _ibm_util, _matfree, _ssm_util
 from probdiffeq.impl.dense import _normal
 
 
@@ -87,7 +87,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         bias = jnp.zeros((d,))
         eye = jnp.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = matfree.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
+        linop = _matfree.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
         return _cond_util.Conditional(linop, noise)
 
     def prototype_qoi(self):
