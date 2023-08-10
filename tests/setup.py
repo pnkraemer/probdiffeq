@@ -38,8 +38,12 @@ class _Setup:
 
     def ode(self):
         if self._which == "scalar":
-            raise ValueError
+            return self._ode_scalar()
 
+        return self._ode_multi_dimensional()
+
+    @staticmethod
+    def _ode_multi_dimensional():
         f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
         t1 = 2.0  # Short time-intervals are sufficient for this test.
 
@@ -51,8 +55,11 @@ class _Setup:
 
     def ode_affine(self):
         if self._which == "scalar":
-            raise ValueError
+            return self._ode_affine_scalar()
+        return self._ode_affine_multi_dimensional()
 
+    @staticmethod
+    def _ode_affine_multi_dimensional():
         t0, t1 = 0.0, 2.0
         u0 = jnp.ones((2,))
 
@@ -62,6 +69,20 @@ class _Setup:
 
         def solution(t):
             return jnp.exp(2 * t) * jnp.ones((2,))
+
+        return vf, (u0,), (t0, t1), solution
+
+    @staticmethod
+    def _ode_affine_scalar():
+        t0, t1 = 0.0, 2.0
+        u0 = 1.0
+
+        @jax.jit
+        def vf(x, *, t, p):  # noqa: ARG001
+            return 2 * x
+
+        def solution(t):
+            return jnp.exp(2 * t)
 
         return vf, (u0,), (t0, t1), solution
 

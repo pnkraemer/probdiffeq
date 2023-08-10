@@ -32,6 +32,7 @@ def test_exponential_approximated_well():
         "output_scale": output_scale,
     }
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
+    print(approximation, solution)
 
     rmse = _rmse(approximation.u[-1], solution(t1))
     assert rmse < 0.1

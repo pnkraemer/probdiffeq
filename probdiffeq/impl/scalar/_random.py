@@ -28,7 +28,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def qoi(self, rv):
-        return rv.mean[0]
+        return rv.mean[..., 0]
 
     def mean(self, rv):
         return rv.mean

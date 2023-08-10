@@ -20,6 +20,7 @@ class SSMUtilBackend(abc.ABC):
     def ibm_transitions(self, num_derivatives, output_scale=None):
         raise NotImplementedError
 
+    # todo: rename to avoid confusion with conditionals?
     @abc.abstractmethod
     def update_mean(self, mean, x, /, num):
         raise NotImplementedError
@@ -37,6 +38,8 @@ class SSMUtilBackend(abc.ABC):
     @abc.abstractmethod
     def conditional_to_derivative(self, i, standard_deviation):
         raise NotImplementedError
+
+    # todo: move to a prototype module?
 
     @abc.abstractmethod
     def prototype_qoi(self):
