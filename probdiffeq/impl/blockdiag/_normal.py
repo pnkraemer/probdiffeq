@@ -6,6 +6,9 @@ class Normal:
         self.mean = mean
         self.cholesky = cholesky
 
+    def __repr__(self):
+        return f"Normal({self.mean}, cholesky={self.cholesky})"
+
 
 def _flatten(normal):
     children = (normal.mean, normal.cholesky)

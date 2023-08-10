@@ -70,9 +70,6 @@ def simulate_terminal_values(
     num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
 
     if solver.requires_rescaling:
-        if output_scale.ndim > 0:
-            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-
         if isinstance(posterior, markov.MarkovSeqRev):
             posterior = markov.rescale_cholesky(posterior, output_scale)
         else:

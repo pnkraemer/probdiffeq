@@ -3,6 +3,7 @@
 import warnings
 
 import diffeqzoo
+import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 from diffeqzoo import backend

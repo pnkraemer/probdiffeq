@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random
+from probdiffeq.impl import _random, _sqrt_util
 from probdiffeq.impl.blockdiag import _normal
 
 
@@ -50,8 +50,17 @@ class RandomVariableBackend(_random.RandomVariableBackend):
         cholesky_T = jnp.transpose(rv.cholesky, axes=(0, 2, 1))
         return jnp.einsum("ijk,ikl->ijl", rv.cholesky, cholesky_T)
 
-    def marginal_nth_derivative(self, rv):
-        raise NotImplementedError
+    def marginal_nth_derivative(self, rv, i):
+        if jnp.ndim(rv.mean) > 2:
+            return jax.vmap(self.marginal_nth_derivative, in_axes=(0, None))(rv, i)
+
+        if i > jnp.shape(rv.mean)[0]:
+            raise ValueError
+
+        mean = rv.mean[:, i]
+        cholesky = jax.vmap(_sqrt_util.triu_via_qr)((rv.cholesky[:, i, :])[..., None])
+        cholesky = jnp.transpose(cholesky, axes=(0, 2, 1))
+        return _normal.Normal(mean, cholesky)
 
     def sample_shape(self, rv):
         return rv.mean.shape

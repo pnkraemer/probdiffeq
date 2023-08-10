@@ -1,29 +1,33 @@
 """Compare simulate_terminal_values to solve_with_python_while_loop."""
 
-import diffeqzoo.ivps
 import jax
+import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.util import test_util
+from probdiffeq.impl import impl
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.statespace import correction, extrapolation
+from probdiffeq.solvers.strategies import filters
+from tests.setup import setup
 
 
 @testing.fixture(name="problem_args_kwargs")
 def fixture_problem_args_kwargs():
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 2.0  # Short time-intervals are sufficient for this test.
-
-    @jax.jit
-    def vf(x, *, t, p):  # noqa: ARG001
-        return f(x, *p)
-
-    return (vf, (u0,)), {"t0": t0, "t1": t1, "parameters": f_args}
+    vf, u0, (t0, t1) = setup.ode()
+    return (vf, u0), {"t0": t0, "t1": t1}
 
 
 @testing.fixture(name="solver_kwargs")
 def fixture_solver_kwargs():
-    solver = test_util.generate_solver(num_derivatives=2, ode_shape=(2,))
-    return {"solver": solver, "output_scale": 1.0, "atol": 1e-2, "rtol": 1e-2}
+    # Generate a solver
+    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.taylor_order_zero()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = calibrated.mle(strategy)
+
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    return {"solver": solver, "output_scale": output_scale, "atol": 1e-2, "rtol": 1e-2}
 
 
 @testing.fixture(name="solution_python_loop")
@@ -42,4 +46,6 @@ def test_terminal_values_identical(solution_python_loop, simulation_terminal_val
     """The terminal values must be identical."""
     expected = jax.tree_util.tree_map(lambda s: s[-1], solution_python_loop)
     received = simulation_terminal_values
+    print(expected)
+    print(received)
     assert testing.tree_all_allclose(received, expected)

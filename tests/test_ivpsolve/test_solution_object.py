@@ -1,38 +1,34 @@
 """Tests for interaction with the solution object."""
-import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.util import test_util
-
-
-@testing.fixture(name="problem")
-def fixture_problem():
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 2.0  # Short time-intervals are sufficient for this test.
-
-    @jax.jit
-    def vf(x, *, t, p):  # noqa: ARG001
-        return f(x, *p)
-
-    return vf, u0, (t0, t1), f_args
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.statespace import correction, extrapolation
+from probdiffeq.solvers.strategies import filters
+from tests.setup import setup
 
 
 @testing.fixture(name="approximate_solution")
-def fixture_approximate_solution(problem):
-    vf, u0, (t0, t1), f_args = problem
-    solver = test_util.generate_solver(num_derivatives=1, ode_shape=(2,))
+def fixture_approximate_solution():
+    vf, u0, (t0, t1) = setup.ode()
+
+    # Generate a solver
+    ibm = extrapolation.ibm_adaptive(num_derivatives=1)
+    ts0 = correction.taylor_order_zero()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = calibrated.mle(strategy)
+
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     return ivpsolve.solve_with_python_while_loop(
         vf,
-        (u0,),
+        u0,
         t0=t0,
         t1=t1,
-        parameters=f_args,
         solver=solver,
-        output_scale=1.0,
+        output_scale=output_scale,
         atol=1e-2,
         rtol=1e-2,
     )
@@ -66,9 +62,17 @@ def test_iter_impossible(approximate_solution):
 
 
 @testing.fixture(name="approximate_solution_batched")
-def fixture_approximate_solution_batched(problem):
-    vf, u0, (t0, t1), f_args = problem
-    solver = test_util.generate_solver(num_derivatives=1, ode_shape=(2,))
+def fixture_approximate_solution_batched():
+    vf, (u0,), (t0, t1) = setup.ode()
+
+    # Generate a solver
+    ibm = extrapolation.ibm_adaptive(num_derivatives=1)
+    ts0 = correction.taylor_order_zero()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = calibrated.mle(strategy)
+
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
 
     @jax.vmap
@@ -77,9 +81,8 @@ def fixture_approximate_solution_batched(problem):
             vf,
             (init,),
             save_at=save_at,
-            parameters=f_args,
             solver=solver,
-            output_scale=1.0,
+            output_scale=output_scale,
             atol=1e-2,
             rtol=1e-2,
         )

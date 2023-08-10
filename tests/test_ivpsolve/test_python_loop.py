@@ -1,37 +1,32 @@
 """Assert that solve_with_python_loop is accurate."""
-import diffeqzoo.ivps
 import diffrax
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.util import test_util
-
-
-@testing.fixture(name="problem")
-def fixture_problem():
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 2.0  # Short time-intervals are sufficient for this test.
-
-    @jax.jit
-    def vf(x, *, t, p):  # noqa: ARG001
-        return f(x, *p)
-
-    return vf, u0, (t0, t1), f_args
+from probdiffeq.impl import impl
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.statespace import correction, extrapolation
+from probdiffeq.solvers.strategies import filters
+from tests.setup import setup
 
 
 @testing.fixture(name="python_loop_solution")
-def fixture_python_loop_solution(problem):
-    vf, u0, (t0, t1), f_args = problem
+def fixture_python_loop_solution():
+    vf, u0, (t0, t1) = setup.ode()
 
-    problem_args = (vf, (u0,))
-    problem_kwargs = {"t0": t0, "t1": t1, "parameters": f_args}
+    problem_args = (vf, u0)
+    problem_kwargs = {"t0": t0, "t1": t1}
 
-    solver = test_util.generate_solver(num_derivatives=4, ode_shape=(2,))
+    ibm = extrapolation.ibm_adaptive(num_derivatives=4)
+    ts0 = correction.taylor_order_zero()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = calibrated.mle(strategy)
+
     adaptive_kwargs = {
         "solver": solver,
-        "output_scale": 1.0,
+        "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
         "atol": 1e-2,
         "rtol": 1e-2,
     }
@@ -41,8 +36,8 @@ def fixture_python_loop_solution(problem):
 
 
 @testing.fixture(name="diffrax_solution")
-def fixture_diffrax_solution(problem):
-    vf, u0, (t0, t1), f_args = problem
+def fixture_diffrax_solution():
+    vf, (u0,), (t0, t1) = setup.ode()
 
     # Solve the IVP
     @jax.jit
@@ -58,7 +53,6 @@ def fixture_diffrax_solution(problem):
         t1=t1,
         dt0=0.1,
         y0=u0,
-        args=f_args,
         saveat=diffrax.SaveAt(dense=True),
         stepsize_controller=diffrax.PIDController(atol=1e-10, rtol=1e-10),
     )
