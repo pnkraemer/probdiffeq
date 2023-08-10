@@ -5,8 +5,9 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
+from probdiffeq.impl import impl
+from probdiffeq.ivpsolvers import uncalibrated
+from probdiffeq.statespace import correction, extrapolation
 from probdiffeq.strategies import smoothers
 
 # Make a problem
@@ -21,13 +22,11 @@ u0 = jnp.asarray([0.1])
 t0, t1 = 0.0, 1.0
 
 # Make a solver:
-#     DenseTS1: dense covariance structure with first-order Taylor linearisation
-#     Smoother: Compute a global estimate of the solution
-#     solver_mle:
-#       Calibrate unknown parameters with (quasi-)maximum-likelihood estimation
-implementation = recipes.ts1_dense(ode_shape=(1,))
-strategy = smoothers.smoother(*implementation)
-solver = calibrated.mle(*strategy)
+impl.select("isotropic", ode_shape=(1,))
+ibm = extrapolation.ibm_adaptive(num_derivatives=4)
+ts0 = correction.taylor_order_zero(ode_order=1)
+strategy = smoothers.smoother_adaptive(ibm, ts0)
+solver = uncalibrated.solver(strategy)
 
 
 # Solve
