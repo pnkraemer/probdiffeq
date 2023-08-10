@@ -66,4 +66,4 @@ ignore = [
 ]
 [tool.ruff.per-file-ignores]
 # test_utils have long-line docstrings. Ignore line-too-long
-"probdiffeq/test_util.py" = ["E501"]
+"probdiffeq/util/test_util.py" = ["E501"]
