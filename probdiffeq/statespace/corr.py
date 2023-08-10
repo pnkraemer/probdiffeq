@@ -47,7 +47,7 @@ class ODEConstraintTaylor(Correction):
         obs_like = impl.ssm_util.prototype_qoi()
         return ssv, obs_like
 
-    def estimate_error(self, hidden_state, corr, /, vector_field, t, p):
+    def estimate_error(self, hidden_state, _corr, /, vector_field, t, p):
         def f_wrapped(s):
             return vector_field(*s, t=t, p=p)
 
@@ -57,12 +57,12 @@ class ODEConstraintTaylor(Correction):
         error_estimate = estimate_error(observed)
         return error_estimate, observed, (A, b)
 
-    def complete(self, hidden_state, corr, /, vector_field, t, p):
+    def complete(self, hidden_state, corr, /):
         A, b = corr
         observed, (_gain, corrected) = impl.transform.revert(hidden_state, (A, b))
         return corrected, observed
 
-    def extract(self, ssv, corr, /):
+    def extract(self, ssv, _corr, /):
         return ssv
 
 
@@ -80,24 +80,24 @@ class ODEConstraintStatistical(Correction):
         obs_like = impl.ssm_util.prototype_qoi()
         return ssv, obs_like
 
-    def estimate_error(self, hidden_state, corr, /, vector_field, t, p):
+    def estimate_error(self, hidden_state, _corr, /, vector_field, t, p):
         f_wrapped = functools.partial(vector_field, t=t, p=p)
         A, b = self.linearise(f_wrapped, hidden_state)
         observed = impl.conditional.marginalise(hidden_state, (A, b))
 
         error_estimate = estimate_error(observed)
-        return error_estimate, observed, (A, b)
+        return error_estimate, observed, (A, b, f_wrapped)
 
-    def complete(self, hidden_state, corr, /, vector_field, t, p):
+    def complete(self, hidden_state, corr, /):
         # Re-linearise (because the linearisation point changed)
-        f_wrapped = functools.partial(vector_field, t=t, p=p)
+        *_, f_wrapped = corr
         A, b = self.linearise(f_wrapped, hidden_state)
 
         # Condition
         observed, (_gain, corrected) = impl.conditional.revert(hidden_state, (A, b))
         return corrected, observed
 
-    def extract(self, hidden_state, corr, /):
+    def extract(self, hidden_state, _corr, /):
         return hidden_state
 
 

@@ -14,7 +14,7 @@ def fixture_problem():
     t1 = 2.0  # Short time-intervals are sufficient for this test.
 
     @jax.jit
-    def vf(x, *, t, p):  # pylint: disable=unused-argument
+    def vf(x, *, t, p):  # noqa: ARG001
         return f(x, *p)
 
     return vf, u0, (t0, t1), f_args

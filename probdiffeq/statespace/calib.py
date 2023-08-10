@@ -71,14 +71,14 @@ class CalibrationFactory:
         return MostRecent()
 
 
+def _unflatten(nodetype):
+    return lambda *_a: nodetype()
+
+
 # Register objects as (empty) pytrees. todo: temporary?!
-jax.tree_util.register_pytree_node(
-    nodetype=RunningMean,
-    flatten_func=lambda _: ((), ()),
-    unflatten_func=lambda *a: RunningMean(),
-)
-jax.tree_util.register_pytree_node(
-    nodetype=MostRecent,
-    flatten_func=lambda _: ((), ()),
-    unflatten_func=lambda *a: MostRecent(),
-)
+for node in [RunningMean, MostRecent]:
+    jax.tree_util.register_pytree_node(
+        nodetype=node,
+        flatten_func=lambda _: ((), ()),
+        unflatten_func=_unflatten(node),
+    )

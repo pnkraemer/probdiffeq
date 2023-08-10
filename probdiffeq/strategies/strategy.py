@@ -59,13 +59,11 @@ class Strategy(Generic[P]):
         state = _common.State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
 
-    def complete(self, state, /, *, output_scale, parameters, vector_field):
+    def complete(self, state, /, *, output_scale):
         hidden, extra = self.extrapolation.complete(
             state.hidden, state.aux_extra, output_scale=output_scale
         )
-        hidden, corr = self.correction.complete(
-            hidden, state.aux_corr, p=parameters, t=state.t, vector_field=vector_field
-        )
+        hidden, corr = self.correction.complete(hidden, state.aux_corr)
         return _common.State(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
     def extract(self, state: _common.State, /):

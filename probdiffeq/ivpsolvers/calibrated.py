@@ -28,12 +28,7 @@ def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
         vector_field=vector_field,
     )
 
-    state_strategy = strategy.complete(
-        state_strategy,
-        output_scale=output_scale_prior,
-        parameters=parameters,
-        vector_field=vector_field,
-    )
+    state_strategy = strategy.complete(state_strategy, output_scale=output_scale_prior)
     observed = state_strategy.aux_corr
 
     # Calibrate

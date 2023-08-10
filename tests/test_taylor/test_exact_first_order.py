@@ -26,7 +26,7 @@ def case_taylor_mode_doubling():
 def fixture_pb_with_solution():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
 
-    def vf(u, *, t, p):  # pylint: disable=unused-argument
+    def vf(u, *, t, p):  # noqa: ARG001
         return f(u, *p)
 
     solution = jnp.load("./tests/test_taylor/data/three_body_first_solution.npy")

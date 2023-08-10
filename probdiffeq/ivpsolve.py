@@ -107,8 +107,7 @@ def solve_and_save_at(
     propose_dt0_nugget=1e-5,
     **adaptive_solver_options,
 ):
-    """Solve an initial value problem \
-     and return the solution at a pre-determined grid.
+    """Solve an initial value problem and return the solution at a pre-determined grid.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         This feature is highly experimental.
@@ -121,7 +120,7 @@ def solve_and_save_at(
 
     if not solver.strategy.is_suitable_for_save_at:
         msg = "Strategy {solver.strategy} cannot be used in save_at mode. "
-        warnings.warn(msg)
+        warnings.warn(msg, stacklevel=1)
 
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options
@@ -371,6 +370,7 @@ class Solution(Generic[R]):
         posterior,
         num_steps,
     ):
+        """Construct a solution object."""
         self.t = t
         self.u = u
         self.output_scale = output_scale
@@ -379,6 +379,7 @@ class Solution(Generic[R]):
         self.num_steps = num_steps
 
     def __repr__(self):
+        """Evaluate a string-representation of the solution object."""
         return (
             f"{self.__class__.__name__}("
             f"t={self.t},"
@@ -415,11 +416,13 @@ class Solution(Generic[R]):
         )
 
     def __len__(self):
+        """Evaluate the length of a solution."""
         if jnp.ndim(self.t) < 1:
             raise ValueError("Solution object not batched :(")
         return self.t.shape[0]
 
     def __getitem__(self, item):
+        """Access a single item of the solution."""
         if jnp.ndim(self.t) < 1:
             raise ValueError("Solution object not batched :(")
 
@@ -430,6 +433,7 @@ class Solution(Generic[R]):
         return jax.tree_util.tree_map(lambda s: s[item, ...], self)
 
     def __iter__(self):
+        """Iterate through the solution."""
         if jnp.ndim(self.t) <= 1:
             raise ValueError("Solution object not batched :(")
 

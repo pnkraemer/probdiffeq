@@ -21,7 +21,7 @@ def case_taylor_mode():
 def fixture_pb_with_solution():
     f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
 
-    def vf(u, du, *, t, p):  # pylint: disable=unused-argument
+    def vf(u, du, *, t, p):  # noqa: ARG001
         return f(u, du, *p)
 
     solution = jnp.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")

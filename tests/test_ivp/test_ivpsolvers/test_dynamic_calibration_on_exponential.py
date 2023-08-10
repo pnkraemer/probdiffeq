@@ -31,7 +31,7 @@ def case_dense_factorisation():
 @testing.fixture(name="problem")
 def fixture_problem():
     @jax.jit
-    def vf(x, *, t, p):  # pylint: disable=unused-argument
+    def vf(x, *, t, p):  # noqa: ARG001
         return p * x
 
     p = 2.0

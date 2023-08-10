@@ -36,10 +36,7 @@ class UncalibratedSolver(solver_module.Solver[_common.State]):
             vector_field=vector_field,
         )
         state_strategy = self.strategy.complete(
-            state_strategy,
-            parameters=parameters,
-            vector_field=vector_field,
-            output_scale=state.output_scale,
+            state_strategy, output_scale=state.output_scale
         )
         # Extract and return solution
         return _common.State(

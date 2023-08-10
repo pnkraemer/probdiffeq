@@ -8,9 +8,9 @@ from probdiffeq.impl import impl
 from probdiffeq.strategies import _common, strategy
 
 
-def filter(extrapolation_factory, corr, calib, /):
+def filter(extrapolation_factory, corr, calib, /):  # noqa: A001
     """Create a filter strategy."""
-    extrapolation = extrapolation_factory.filter()
+    extrapolation = extrapolation_factory.forward()
     extrapolation_repr = extrapolation_factory.string_repr()
     strategy_impl = strategy.Strategy(
         extrapolation,
@@ -39,6 +39,8 @@ def _filter_offgrid_marginals(
     interpolate,
     extract,
 ):
+    del marginals
+
     _acc, sol, _prev = interpolate(
         t=t,
         s1=init(t1, posterior),

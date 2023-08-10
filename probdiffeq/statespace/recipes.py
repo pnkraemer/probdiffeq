@@ -77,8 +77,9 @@ def slr0_dense(
     cubature_fun=cubature.third_order_spherical,
     num_derivatives=4,
 ) -> _Impl:
-    """Zeroth-order statistical linear regression in state-space models \
-     with dense covariance structure.
+    """Zeroth-order statistical linear regression.
+
+     In state-space models with dense covariance structure.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         This feature is highly experimental.

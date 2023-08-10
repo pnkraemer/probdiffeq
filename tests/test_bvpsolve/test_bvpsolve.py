@@ -31,8 +31,8 @@ def test_solve_separable_affine_2nd(num_derivatives=4):
 
 
 def _marginal_moments(precon_mseq):
-    def step(carry, input):
-        trans, prec = input
+    def step(carry, inputs):
+        trans, prec = inputs
         rv = extra.extrapolate_precon(carry, trans, prec)
         return rv, rv
 

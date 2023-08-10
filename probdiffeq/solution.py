@@ -79,8 +79,7 @@ def _offgrid_marginals2(*, solution, t, solution_previous, solver):
 
 
 def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posterior):
-    """Compute the log-marginal-likelihood of \
-     observations of the IVP solution at the terminal value.
+    """Compute the log-marginal-likelihood at the terminal value.
 
     Parameters
     ----------
@@ -120,8 +119,7 @@ def _condition_and_logpdf(rv, data, model):
 
 
 def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
-    """Compute the log-marginal-likelihood of \
-     observations of the IVP solution.
+    """Compute the log-marginal-likelihood of observations of the IVP solution.
 
     Parameters
     ----------

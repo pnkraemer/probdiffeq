@@ -44,15 +44,15 @@ class ExtrapolationFactory(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def filter(self) -> Extrapolation:
+    def forward(self) -> Extrapolation:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def smoother(self) -> Extrapolation:
+    def dense(self) -> Extrapolation:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def fixedpoint(self) -> Extrapolation:
+    def save_at(self) -> Extrapolation:
         raise NotImplementedError
 
 
@@ -71,10 +71,10 @@ class PreconFilter(Extrapolation):
     def init(self, sol, /):
         return sol, None
 
-    def extract(self, hidden_state, extra, /):
+    def extract(self, hidden_state, _extra, /):
         return hidden_state
 
-    def begin(self, rv, extra, /, dt):
+    def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
         rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
@@ -86,7 +86,7 @@ class PreconFilter(Extrapolation):
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
-    def complete(self, ssv, extra, /, output_scale):
+    def complete(self, _ssv, extra, /, output_scale):
         cond, (p, p_inv), rv_p = extra
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
@@ -119,7 +119,7 @@ class PreconSmoother(Extrapolation):
     def extract(self, hidden_state, extra, /):
         return _markov.MarkovSeqRev(init=hidden_state, conditional=extra)
 
-    def begin(self, rv, extra, /, dt):
+    def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
         rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
@@ -226,23 +226,23 @@ class IBMExtrapolationFactory(ExtrapolationFactory):
         self.args = args
 
     def string_repr(self):
-        num_derivatives = self.filter().num_derivatives
+        num_derivatives = self.forward().num_derivatives
         return f"<IBM with num_derivatives={num_derivatives}>"
 
-    def filter(self):
+    def forward(self):
         return PreconFilter(*self.args)
 
-    def smoother(self):
+    def dense(self):
         return PreconSmoother(*self.args)
 
-    def fixedpoint(self):
+    def save_at(self):
         return PreconFixedPoint(*self.args)
 
 
 jax.tree_util.register_pytree_node(
     nodetype=IBMExtrapolationFactory,
     flatten_func=lambda a: (a.args, ()),
-    unflatten_func=lambda a, b: IBMExtrapolationFactory(b),
+    unflatten_func=lambda _a, b: IBMExtrapolationFactory(b),
 )
 
 

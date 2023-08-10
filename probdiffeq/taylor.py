@@ -144,9 +144,7 @@ def affine_recursion(
 
 
 def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
-    """Create a routine that Taylor-expands an \
-    IVP solution with a Runge-Kutta starter.
-    """
+    """Create an estimator that uses a Runge-Kutta starter."""
     return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
 
 
@@ -208,8 +206,7 @@ def _runge_kutta_starter_fn(
 def taylor_mode_doubling_fn(
     *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
 ):
-    """Taylor-expand the solution of an IVP \
-     with Taylor-mode differentiation and Newton's doubling.
+    """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         Support for Newton's doubling is highly experimental.

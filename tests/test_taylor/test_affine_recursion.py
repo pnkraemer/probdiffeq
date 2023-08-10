@@ -27,7 +27,7 @@ def _affine_problem(n):
     A0 = jnp.eye(2) * jnp.arange(1.0, 5.0).reshape((2, 2))
     b0 = jnp.arange(6.0, 8.0)
 
-    def vf(x, /, *, t, p):  # pylint: disable=unused-argument
+    def vf(x, /, *, t, p):  # noqa: ARG001
         A, b = p
         return A @ x + b
 

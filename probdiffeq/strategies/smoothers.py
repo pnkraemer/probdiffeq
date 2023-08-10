@@ -10,7 +10,7 @@ from probdiffeq.strategies import _common, strategy
 
 def smoother(extrapolation_factory, corr, calib, /):
     """Create a smoother strategy."""
-    extrapolation = extrapolation_factory.smoother()
+    extrapolation = extrapolation_factory.dense()
     extrapolation_repr = extrapolation_factory.string_repr()
     strategy_impl = strategy.Strategy(
         extrapolation,
@@ -28,7 +28,7 @@ def smoother(extrapolation_factory, corr, calib, /):
 
 def smoother_fixedpoint(extrapolation_factory, corr, calib, /):
     """Create a fixedpoint-smoother strategy."""
-    extrapolation = extrapolation_factory.fixedpoint()
+    extrapolation = extrapolation_factory.save_at()
     extrapolation_repr = extrapolation_factory.string_repr()
     strategy_impl = strategy.Strategy(
         extrapolation,
