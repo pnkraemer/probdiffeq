@@ -18,7 +18,8 @@ class TransformBackend(_transform.TransformBackend):
         mean, cholesky = rv.mean, rv.cholesky
 
         # QR-decomposition
-        # (todo: rename revert_conditional_noisefree to revert_transformation_cov_sqrt())
+        # (todo: rename revert_conditional_noisefree
+        #   to revert_transformation_cov_sqrt())
         r_obs, (r_cor, gain) = _sqrt_util.revert_conditional_noisefree(
             R_X_F=(A @ cholesky)[None, ...].T, R_X=cholesky.T
         )
