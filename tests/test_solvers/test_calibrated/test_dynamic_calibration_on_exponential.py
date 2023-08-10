@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.statespace import calibration, correction, extrapolation
+from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
 from tests.setup import setup
 
@@ -22,7 +22,7 @@ def test_exponential_approximated_well():
     ibm = extrapolation.ibm_adaptive(num_derivatives=1)
     ts0 = correction.taylor_order_zero()
     strategy = filters.filter_adaptive(ibm, ts0)
-    solver = calibrated.dynamic(strategy, calibration.output_scale())
+    solver = calibrated.dynamic(strategy)
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     grid = jnp.linspace(t0, t1, num=20)

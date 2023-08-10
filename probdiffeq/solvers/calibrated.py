@@ -1,4 +1,5 @@
 """Calibrated IVP solvers."""
+import abc
 
 import jax
 
@@ -7,11 +8,11 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import _common
 
 
-def mle(strategy, calibration_factory):
+def mle(strategy):
     """Create a solver that calibrates the output scale via maximum-likelihood."""
     string_repr = f"<MLE-solver with {strategy}>"
     return CalibratedSolver(
-        calibration=calibration_factory.running_mean(),
+        calibration=RunningMean(),
         impl_step=_step_mle,
         strategy=strategy,
         string_repr=string_repr,
@@ -43,12 +44,12 @@ def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
     )
 
 
-def dynamic(strategy, calibration_factory):
+def dynamic(strategy):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
     return CalibratedSolver(
         strategy=strategy,
-        calibration=calibration_factory.most_recent(),
+        calibration=MostRecent(),
         string_repr=string_repr,
         impl_step=_step_dynamic,
         requires_rescaling=False,
@@ -77,8 +78,67 @@ def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibrati
     )
 
 
+class Calibration(abc.ABC):
+    """Calibration implementation."""
+
+    @abc.abstractmethod
+    def init(self, prior):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(self, state, /, observed):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract(self, state, /):
+        raise NotImplementedError
+
+
+class MostRecent(Calibration):
+    def init(self, prior):
+        return prior
+
+    def update(self, _state, /, observed):
+        return impl.random.mahalanobis_norm_relative(0.0, observed)
+
+    def extract(self, state, /):
+        return state, state
+
+
+# todo: if we pass the mahalanobis_relative term to the update() function,
+#  it reduces to a generic stats() module that can also be used for e.g.
+#  marginal likelihoods. In this case, the MostRecent() stuff becomes void.
+class RunningMean(Calibration):
+    def init(self, prior):
+        return prior, prior, 0.0
+
+    def update(self, state, /, observed):
+        prior, calibrated, num_data = state
+
+        new_term = impl.random.mahalanobis_norm_relative(0.0, observed)
+        calibrated = impl.ssm_util.update_mean(calibrated, new_term, num=num_data)
+        return prior, calibrated, num_data + 1.0
+
+    def extract(self, state, /):
+        prior, calibrated, _num_data = state
+        return prior, calibrated
+
+
+def _unflatten_func(nodetype):
+    return lambda *_a: nodetype()
+
+
+# Register objects as (empty) pytrees. todo: temporary?!
+for node in [RunningMean, MostRecent]:
+    jax.tree_util.register_pytree_node(
+        nodetype=node,
+        flatten_func=lambda _: ((), ()),
+        unflatten_func=_unflatten_func(node),
+    )
+
+
 class CalibratedSolver(_solver.Solver[_common.State]):
-    def __init__(self, *, calibration, impl_step, **kwargs):
+    def __init__(self, *, calibration: Calibration, impl_step, **kwargs):
         super().__init__(**kwargs)
 
         self.calibration = calibration

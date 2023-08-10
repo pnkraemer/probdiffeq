@@ -1,4 +1,6 @@
 """State-space model recipes."""
+from typing import Any
+
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 from probdiffeq.solvers.statespace import (
@@ -21,7 +23,7 @@ class _Impl(containers.NamedTuple):
     correction: correction.Correction
     """Correction method."""
 
-    calibration: calibration.CalibrationFactory
+    calibration: Any
     """Calibration factory."""
 
 
