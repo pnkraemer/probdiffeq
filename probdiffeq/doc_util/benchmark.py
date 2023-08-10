@@ -14,6 +14,7 @@ class FirstOrderIVP:
     """First-order IVPs in the ProbDiffEq API."""
 
     def __init__(self, vector_field, initial_values, t0, t1):
+        """Construct a first-order IVP."""
         self.vector_field = vector_field
         self.initial_values = initial_values
         self.t0 = t0
@@ -60,7 +61,10 @@ class FirstOrderIVP:
 
 
 class DiffraxIVP:
+    """Diffrax-implementation of IVPs."""
+
     def __init__(self, term, y0, t0, t1):
+        """Construct a diffrax-implementation of an IVP."""
         self.term = term
         self.y0 = y0
         self.t0 = t0
@@ -84,6 +88,7 @@ class SecondOrderIVP:
     """First-order IVPs in the ProbDiffEq API."""
 
     def __init__(self, vector_field, initial_values, t0, t1):
+        """Construct a second-order IVP."""
         self.vector_field = vector_field
         self.initial_values = initial_values
         self.t0 = t0
@@ -99,7 +104,10 @@ class SecondOrderIVP:
 
 
 class JaxIVP:
+    """JAX-implementation of an IVP."""
+
     def __init__(self, func, y0, t):
+        """Construct a JAX-implementation of an IVP."""
         self.func = func
         self.y0 = y0
         self.t = t
@@ -114,7 +122,10 @@ class JaxIVP:
 
 
 class SciPyIVP:
+    """Scipy-implementation of an IVP."""
+
     def __init__(self, fun, t_span, y0, t_eval=None):
+        """Construct a Scipy-implementation of an IVP."""
         self.fun = fun
         self.t_span = t_span
         self.y0 = y0

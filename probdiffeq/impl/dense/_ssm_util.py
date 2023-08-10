@@ -81,7 +81,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     # todo: move to linearise.py?
     def conditional_to_derivative(self, i, standard_deviation):
-        a0 = functools.partial(self._select_dy, idx_or_slice=0)
+        a0 = functools.partial(self._select_dy, idx_or_slice=i)
 
         (d,) = self.ode_shape
         bias = jnp.zeros((d,))

@@ -119,7 +119,7 @@ def _integral_clip(dt, /, t, t1):
     return jnp.minimum(dt, t1 - t)
 
 
-def _no_clip(dt, /, t, t1):
+def _no_clip(dt, /, *_args, **_kwargs):
     return dt
 
 
