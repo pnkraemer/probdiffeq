@@ -1,7 +1,7 @@
 """Test equivalences between cubature rules."""
 import jax.numpy as jnp
 
-from probdiffeq.statespace import cubature
+from probdiffeq.solvers.statespace import cubature
 
 
 def test_third_order_spherical_vs_unscented_transform_scalar_input():

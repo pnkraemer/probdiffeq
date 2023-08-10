@@ -1,13 +1,12 @@
 """Uncalibrated IVP solvers."""
 import jax
 
-from probdiffeq import _interp
+from probdiffeq import _interp, _solver
 from probdiffeq.impl import impl
-from probdiffeq.ivpsolvers import _common
-from probdiffeq.ivpsolvers import solver as solver_module
+from probdiffeq.solvers import _common
 
 
-def solver(strategy, _unneeded):
+def solver(strategy):
     """Create a solver that does not calibrate the output scale automatically."""
     string_repr = f"<Uncalibrated solver with {strategy}>"
     return UncalibratedSolver(
@@ -15,7 +14,7 @@ def solver(strategy, _unneeded):
     )
 
 
-class UncalibratedSolver(solver_module.Solver[_common.State]):
+class UncalibratedSolver(_solver.Solver[_common.State]):
     def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
         state_strategy = self.strategy.init(t, posterior)
         error_estimate = impl.ssm_util.prototype_error_estimate()

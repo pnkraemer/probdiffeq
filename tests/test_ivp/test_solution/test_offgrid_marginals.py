@@ -3,10 +3,12 @@ import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, solution, test_util
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters, smoothers
+from probdiffeq.solvers import solution
+from probdiffeq.solvers.statespace import recipes
+from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.util import test_util
 
 
 @testing.fixture(name="problem")
@@ -75,7 +77,7 @@ def test_smoother_marginals_close_to_both_boundaries(problem, factorisation):
     solver = test_util.generate_solver(
         num_derivatives=1,
         impl_factory=impl_factory,
-        strategy_factory=smoothers.smoother,
+        strategy_factory=smoothers.smoother_adaptive,
         ode_shape=jnp.shape(u0),
     )
     sol = ivpsolve.solve_with_python_while_loop(

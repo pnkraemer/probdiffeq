@@ -7,9 +7,10 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _adaptive, _collocate, _markov, taylor
+from probdiffeq import _adaptive, _collocate
 from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
+from probdiffeq.solvers import markov, taylor
 
 
 def simulate_terminal_values(
@@ -72,13 +73,13 @@ def simulate_terminal_values(
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
 
-        if isinstance(posterior, _markov.MarkovSeqRev):
-            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        if isinstance(posterior, markov.MarkovSeqRev):
+            posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
-    if isinstance(posterior, _markov.MarkovSeqRev):
+    if isinstance(posterior, markov.MarkovSeqRev):
         marginals = posterior.init
     else:
         marginals = posterior
@@ -158,8 +159,8 @@ def solve_and_save_at(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        if isinstance(posterior, _markov.MarkovSeqRev):
-            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        if isinstance(posterior, markov.MarkovSeqRev):
+            posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
@@ -235,8 +236,8 @@ def solve_with_python_while_loop(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        if isinstance(posterior, _markov.MarkovSeqRev):
-            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        if isinstance(posterior, markov.MarkovSeqRev):
+            posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
@@ -293,8 +294,8 @@ def solve_fixed_grid(
     if solver.requires_rescaling:
         if output_scale.ndim > 0:
             output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        if isinstance(posterior, _markov.MarkovSeqRev):
-            posterior = _markov.rescale_cholesky(posterior, output_scale)
+        if isinstance(posterior, markov.MarkovSeqRev):
+            posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
             posterior = impl.random.rescale_cholesky(posterior, output_scale)
 
@@ -315,8 +316,8 @@ def solve_fixed_grid(
 
 
 def _userfriendly_output(*, posterior, posterior_t0):
-    if isinstance(posterior, _markov.MarkovSeqRev):
-        marginals = _markov.marginals(posterior)
+    if isinstance(posterior, markov.MarkovSeqRev):
+        marginals = markov.marginals(posterior)
         marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = tree_array_util.tree_append(marginals, marginal_t1)
 
@@ -324,7 +325,7 @@ def _userfriendly_output(*, posterior, posterior_t0):
         # Otherwise, information is lost, and we cannot, e.g., interpolate correctly.
         init_t0 = posterior_t0.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
-        posterior = _markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
+        posterior = markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
     else:
         posterior = tree_array_util.tree_prepend(posterior_t0, posterior)
         marginals = posterior

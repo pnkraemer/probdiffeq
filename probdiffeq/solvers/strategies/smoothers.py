@@ -3,16 +3,17 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _interp, _markov
+from probdiffeq import _interp
 from probdiffeq.impl import impl
-from probdiffeq.strategies import _common, strategy
+from probdiffeq.solvers import markov
+from probdiffeq.solvers.strategies import _common, strategy
 
 
-def smoother(extrapolation_factory, corr, calib, /):
+def smoother_adaptive(extrapolation_factory, corr, /):
     """Create a smoother strategy."""
     extrapolation = extrapolation_factory.dense()
     extrapolation_repr = extrapolation_factory.string_repr()
-    strategy_impl = strategy.Strategy(
+    return strategy.Strategy(
         extrapolation,
         corr,
         is_suitable_for_save_at=False,
@@ -23,7 +24,6 @@ def smoother(extrapolation_factory, corr, calib, /):
         impl_interpolate=_smoother_interpolate,
         impl_offgrid_marginals=_smoother_offgrid_marginals,
     )
-    return strategy_impl, calib
 
 
 def smoother_fixedpoint(extrapolation_factory, corr, calib, /):
@@ -97,7 +97,7 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # the backward-interpolation step is repeated from the smoothing marginals)
     bw_t1_to_t, bw_t_to_t0 = e_1.aux_extra, e_t.aux_extra
     rv_at_t = impl.conditional.marginalise(s1.hidden, bw_t1_to_t)
-    mseq_t = _markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)
+    mseq_t = markov.MarkovSeqRev(init=rv_at_t, conditional=bw_t_to_t0)
     ssv, _ = extrapolation.init(mseq_t)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.aux_corr)
     state_at_t = _common.State(
@@ -188,7 +188,7 @@ def _fixedpoint_interpolate(t, *, s0, s1, output_scale, extrapolation):
     # (Which is different for the non-fixed-point smoother)
     bw_t1_to_t, bw_t_to_qoi = e_1.aux_extra, e_t.aux_extra
     rv_t = impl.conditional.marginalise(s1.hidden, bw_t1_to_t)
-    mseq_t = _markov.MarkovSeqRev(init=rv_t, conditional=bw_t_to_qoi)
+    mseq_t = markov.MarkovSeqRev(init=rv_t, conditional=bw_t_to_qoi)
     ssv_t, _ = extrapolation.init(mseq_t)
     corr_like = jax.tree_util.tree_map(jnp.empty_like, s1.aux_corr)
     sol_t = _common.State(t=t, hidden=ssv_t, aux_corr=corr_like, aux_extra=bw_t_to_qoi)

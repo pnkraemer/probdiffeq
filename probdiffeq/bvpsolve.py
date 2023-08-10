@@ -11,7 +11,7 @@
 import jax
 
 from probdiffeq import _markov
-from probdiffeq.statespace import corr, extra
+from probdiffeq.solvers.statespace import corr, extra
 
 
 def solve_separable_affine_2nd(

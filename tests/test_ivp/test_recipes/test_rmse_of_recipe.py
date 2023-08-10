@@ -4,9 +4,10 @@ import diffrax
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, test_util
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.statespace import cubature, recipes
+from probdiffeq.solvers.statespace import cubature, recipes
+from probdiffeq.util import test_util
 
 
 @testing.fixture(name="problem")

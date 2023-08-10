@@ -3,9 +3,8 @@ from typing import Callable
 
 import jax
 
-from probdiffeq import _sqrt_util
 from probdiffeq.backend import containers
-from probdiffeq.impl import _cond_util, _transform
+from probdiffeq.impl import _cond_util, _sqrt_util, _transform
 from probdiffeq.impl.dense import _normal
 
 

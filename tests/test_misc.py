@@ -3,7 +3,7 @@
 Place all tests that have no better place here.
 """
 from probdiffeq.backend import testing
-from probdiffeq.statespace import recipes
+from probdiffeq.solvers.statespace import recipes
 
 
 @testing.parametrize("incr", [1, -1])

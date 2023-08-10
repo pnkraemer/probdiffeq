@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util  # todo: get sqrt-util into "impl" package...
+from probdiffeq.impl import _sqrt_util  # todo: get sqrt-util into "impl" package...
 from probdiffeq.impl import _random
 from probdiffeq.impl.isotropic import _normal
 

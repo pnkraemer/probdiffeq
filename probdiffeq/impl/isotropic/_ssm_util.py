@@ -1,8 +1,7 @@
 """State-space model utilities."""
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
-from probdiffeq.impl import _cond_util, _ibm_util, _matfree, _ssm_util
+from probdiffeq.impl import _cond_util, _ibm_util, _matfree, _sqrt_util, _ssm_util
 from probdiffeq.impl.isotropic import _normal
 
 

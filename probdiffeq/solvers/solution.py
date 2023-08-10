@@ -7,9 +7,9 @@ or to evaluate marginal likelihoods of observations of the solutions.
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _markov
 from probdiffeq.impl import impl
-from probdiffeq.strategies import discrete
+from probdiffeq.solvers import markov
+from probdiffeq.solvers.strategies import discrete
 
 # todo: the functions in here should only depend on posteriors / strategies!
 
@@ -105,7 +105,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
 
     # Generate an observation-model for the QOI
     model = impl.ssm_util.conditional_to_derivative(0, standard_deviation)
-    rv = posterior.init if isinstance(posterior, _markov.MarkovSeqRev) else posterior
+    rv = posterior.init if isinstance(posterior, markov.MarkovSeqRev) else posterior
 
     _corrected, logpdf = _condition_and_logpdf(rv, u, model)
     return logpdf
@@ -156,7 +156,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
         )
 
-    if not isinstance(posterior, _markov.MarkovSeqRev):
+    if not isinstance(posterior, markov.MarkovSeqRev):
         msg1 = "Time-series marginal likelihoods "
         msg2 = "cannot be computed with a filtering solution."
         raise TypeError(msg1 + msg2)

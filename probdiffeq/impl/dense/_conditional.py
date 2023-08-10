@@ -1,6 +1,5 @@
 """Conditional implementation."""
-from probdiffeq import _sqrt_util
-from probdiffeq.impl import _cond_util, _conditional
+from probdiffeq.impl import _cond_util, _conditional, _sqrt_util
 from probdiffeq.impl.dense import _normal
 
 

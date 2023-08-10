@@ -9,10 +9,10 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 from probdiffeq.impl import impl
-from probdiffeq.strategies import discrete
+from probdiffeq.solvers.strategies import discrete
 
 #
-# from probdiffeq.statespace import extra
+# from probdiffeq.solvers.statespace import extra
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])

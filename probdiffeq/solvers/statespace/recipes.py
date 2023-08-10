@@ -1,7 +1,12 @@
 """State-space model recipes."""
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
-from probdiffeq.statespace import calibration, correction, cubature, extrapolation
+from probdiffeq.solvers.statespace import (
+    calibration,
+    correction,
+    cubature,
+    extrapolation,
+)
 
 
 class _Impl(containers.NamedTuple):

@@ -5,7 +5,7 @@ from typing import Generic, TypeVar
 import jax
 
 from probdiffeq import _interp
-from probdiffeq.strategies import _common
+from probdiffeq.solvers.strategies import _common
 
 P = TypeVar("P")
 """A type-variable to indicate solution ("posterior") types."""

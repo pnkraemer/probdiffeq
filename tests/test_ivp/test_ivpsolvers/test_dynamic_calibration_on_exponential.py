@@ -7,10 +7,11 @@ but not for the dynamic solver.
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, test_util
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.statespace import recipes
+from probdiffeq.util import test_util
 
 
 @testing.case()

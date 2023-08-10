@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from probdiffeq import controls
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
-from probdiffeq.ivpsolvers import solver
 
 
 class _RejectionState(containers.NamedTuple):
@@ -27,7 +26,7 @@ def _reference_state_fn_max_abs(sol, sol_previous):
     return jnp.maximum(jnp.abs(sol), jnp.abs(sol_previous))
 
 
-T = TypeVar("T", bound=solver.Solver)
+T = TypeVar("T")
 """A type-variable for (non-adaptive) IVP solvers."""
 
 

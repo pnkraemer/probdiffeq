@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import _interp
 from probdiffeq.impl import impl
-from probdiffeq.strategies import _common, strategy
+from probdiffeq.solvers.strategies import _common, strategy
 
 
 def filter(extrapolation_factory, corr, calib, /):  # noqa: A001

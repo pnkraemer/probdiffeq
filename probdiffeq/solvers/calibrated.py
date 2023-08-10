@@ -2,9 +2,9 @@
 
 import jax
 
-from probdiffeq import _interp
+from probdiffeq import _interp, _solver
 from probdiffeq.impl import impl
-from probdiffeq.ivpsolvers import _common, solver
+from probdiffeq.solvers import _common
 
 
 def mle(strategy, calibration_factory):
@@ -77,7 +77,7 @@ def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibrati
     )
 
 
-class CalibratedSolver(solver.Solver[_common.State]):
+class CalibratedSolver(_solver.Solver[_common.State]):
     def __init__(self, *, calibration, impl_step, **kwargs):
         super().__init__(**kwargs)
 

@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve
 from probdiffeq.doc_util import notebook
 from probdiffeq.ivpsolvers import calibrated
 from probdiffeq.statespace import recipes

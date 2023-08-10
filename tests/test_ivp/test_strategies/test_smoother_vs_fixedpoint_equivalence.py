@@ -6,10 +6,12 @@ import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, solution, test_util
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import smoothers
+from probdiffeq.solvers import solution
+from probdiffeq.solvers.statespace import recipes
+from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.util import test_util
 
 
 @testing.case()
@@ -65,7 +67,7 @@ def fixture_solver_setup(problem, factorisation):
 def fixture_solution_smoother(solver_setup):
     args, kwargs, (t0, t1), impl_factory = solver_setup
     solver = test_util.generate_solver(
-        strategy_factory=smoothers.smoother, impl_factory=impl_factory
+        strategy_factory=smoothers.smoother_adaptive, impl_factory=impl_factory
     )
     return ivpsolve.solve_with_python_while_loop(
         *args, t0=t0, t1=t1, solver=solver, **kwargs
@@ -90,7 +92,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Re-generate the smoothing solver and compute the offgrid-marginals
     solver_smoother = test_util.generate_solver(
-        strategy_factory=smoothers.smoother, impl_factory=impl_factory
+        strategy_factory=smoothers.smoother_adaptive, impl_factory=impl_factory
     )
     ts = jnp.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
     u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(

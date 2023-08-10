@@ -4,8 +4,9 @@
 import diffeqzoo.ivps
 import jax
 
-from probdiffeq import controls, ivpsolve, test_util
+from probdiffeq import controls, ivpsolve
 from probdiffeq.backend import testing
+from probdiffeq.util import test_util
 
 
 def test_fixed_grid_result_matches_adaptive_grid_result():

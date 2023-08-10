@@ -4,8 +4,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _sqrt_util
-from probdiffeq.impl import _linearise, _matfree
+from probdiffeq.impl import _linearise, _matfree, _sqrt_util
 from probdiffeq.impl.dense import _normal
 
 

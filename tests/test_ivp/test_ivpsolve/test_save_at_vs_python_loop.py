@@ -3,8 +3,10 @@ import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, solution, test_util
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
+from probdiffeq.solvers import solution
+from probdiffeq.util import test_util
 
 
 def test_save_at_result_matches_interpolated_adaptive_result():

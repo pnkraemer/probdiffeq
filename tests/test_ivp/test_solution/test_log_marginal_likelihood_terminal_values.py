@@ -3,11 +3,11 @@ import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, solution
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.ivpsolvers import uncalibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters, smoothers
+from probdiffeq.solvers import solution, uncalibrated
+from probdiffeq.solvers.statespace import recipes
+from probdiffeq.solvers.strategies import filters, smoothers
 
 
 @testing.fixture(name="problem", scope="module")
@@ -59,7 +59,11 @@ def case_sol_vary_the_statespace(problem, factorisation):
     return sol, strategy
 
 
-_STRATEGY_FUNS = [filters.filter, smoothers.smoother_fixedpoint, smoothers.smoother]
+_STRATEGY_FUNS = [
+    filters.filter,
+    smoothers.smoother_fixedpoint,
+    smoothers.smoother_adaptive,
+]
 
 
 @testing.parametrize("strategy_fun", _STRATEGY_FUNS)

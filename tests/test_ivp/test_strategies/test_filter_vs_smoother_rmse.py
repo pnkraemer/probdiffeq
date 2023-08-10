@@ -4,10 +4,11 @@ import diffrax
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, test_util
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters, smoothers
+from probdiffeq.solvers.statespace import recipes
+from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.util import test_util
 
 
 @testing.case()

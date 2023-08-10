@@ -5,8 +5,8 @@ import functools
 
 import jax
 
-from probdiffeq import _markov
 from probdiffeq.impl import impl
+from probdiffeq.solvers import markov
 
 
 class Extrapolation(abc.ABC):
@@ -111,13 +111,13 @@ class PreconSmoother(Extrapolation):
     def solution_from_tcoeffs(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.ssm_util.identity_conditional(len(tcoeffs))
-        return _markov.MarkovSeqRev(init=rv, conditional=cond)
+        return markov.MarkovSeqRev(init=rv, conditional=cond)
 
-    def init(self, sol: _markov.MarkovSeqRev, /):
+    def init(self, sol: markov.MarkovSeqRev, /):
         return sol.init, sol.conditional
 
     def extract(self, hidden_state, extra, /):
-        return _markov.MarkovSeqRev(init=hidden_state, conditional=extra)
+        return markov.MarkovSeqRev(init=hidden_state, conditional=extra)
 
     def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
@@ -157,13 +157,13 @@ class PreconFixedPoint(Extrapolation):
     def solution_from_tcoeffs(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.ssm_util.identity_conditional(len(tcoeffs))
-        return _markov.MarkovSeqRev(init=rv, conditional=cond)
+        return markov.MarkovSeqRev(init=rv, conditional=cond)
 
-    def init(self, sol: _markov.MarkovSeqRev, /):
+    def init(self, sol: markov.MarkovSeqRev, /):
         return sol.init, sol.conditional
 
     def extract(self, hidden_state, extra, /):
-        return _markov.MarkovSeqRev(init=hidden_state, conditional=extra)
+        return markov.MarkovSeqRev(init=hidden_state, conditional=extra)
 
     def begin(self, rv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
@@ -259,4 +259,4 @@ def ibm_discretise_fwd(dts, /, *, num_derivatives):
 def unit_markov_sequence(num_derivatives):
     cond = impl.ssm_util.identity_conditional(num_derivatives + 1)
     init = impl.ssm_util.standard_normal(num_derivatives + 1, 1.0)
-    return _markov.MarkovSeqRev(init=init, conditional=cond)
+    return markov.MarkovSeqRev(init=init, conditional=cond)
