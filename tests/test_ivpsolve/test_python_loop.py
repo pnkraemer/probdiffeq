@@ -9,15 +9,13 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.fixture(name="python_loop_solution")
 def fixture_python_loop_solution():
     vf, u0, (t0, t1) = setup.ode()
-
-    problem_args = (vf, u0)
-    problem_kwargs = {"t0": t0, "t1": t1}
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=4)
     ts0 = correction.taylor_order_zero()
@@ -26,16 +24,18 @@ def fixture_python_loop_solution():
 
     dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
 
-    adaptive_kwargs = {
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
+    args = (vf, tcoeffs)
+    kwargs = {
+        "t0": t0,
+        "t1": t1,
         "solver": solver,
         "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
         "atol": 1e-2,
         "rtol": 1e-2,
         "dt0": dt0,
     }
-    return ivpsolve.solve_with_python_while_loop(
-        *problem_args, **problem_kwargs, **adaptive_kwargs
-    )
+    return ivpsolve.solve_with_python_while_loop(*args, **kwargs)
 
 
 @testing.fixture(name="diffrax_solution")

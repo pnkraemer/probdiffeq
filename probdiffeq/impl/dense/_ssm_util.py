@@ -44,8 +44,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
+            msg1 = f"The number of Taylor coefficients {len(tcoeffs)} does not match "
+            msg2 = f"the number of derivatives {num_derivatives+1} in the solver."
             raise ValueError(msg1 + msg2)
 
         if tcoeffs[0].shape != self.ode_shape:

@@ -10,34 +10,23 @@ import jax.numpy as jnp
 from probdiffeq import _adaptive, _collocate
 from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import markov, taylor
+from probdiffeq.solvers import markov
 
 # todo: make adaptive_solver and initial_condition arguments to the solver!
 
 
 def simulate_terminal_values(
     vector_field,
-    initial_values,
+    taylor_coefficients,
     t0,
     t1,
     solver,
     output_scale,
     dt0,
-    taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
     """Simulate the terminal values of an initial value problem."""
-    _assert_tuple(initial_values)
-
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver, **adaptive_solver_options)
-
-    num_derivatives = solver.strategy.extrapolation.num_derivatives
-    taylor_coefficients = taylor_fn(
-        vector_field=jax.tree_util.Partial(vector_field),
-        initial_values=initial_values,
-        num=num_derivatives + 1 - len(initial_values),
-        t=t0,
-    )
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
@@ -81,12 +70,11 @@ def simulate_terminal_values(
 
 def solve_and_save_at(
     vector_field,
-    initial_values,
+    taylor_coefficients,
     save_at,
     solver,
     output_scale,
     dt0,
-    taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
     """Solve an initial value problem and return the solution at a pre-determined grid.
@@ -98,8 +86,6 @@ def solve_and_save_at(
         and without any deprecation policy.
 
     """
-    _assert_tuple(initial_values)
-
     if not solver.strategy.is_suitable_for_save_at:
         msg = "Strategy {solver.strategy} cannot be used in save_at mode. "
         warnings.warn(msg, stacklevel=1)
@@ -107,13 +93,6 @@ def solve_and_save_at(
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver, **adaptive_solver_options)
 
     t0 = save_at[0]
-    num_derivatives = solver.strategy.extrapolation.num_derivatives
-    taylor_coefficients = taylor_fn(
-        vector_field=jax.tree_util.Partial(vector_field),
-        initial_values=initial_values,
-        num=num_derivatives + 1 - len(initial_values),
-        t=t0,
-    )
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
@@ -153,13 +132,12 @@ def solve_and_save_at(
 
 def solve_with_python_while_loop(
     vector_field,
-    initial_values,
+    taylor_coefficients,
     t0,
     t1,
     solver,
     output_scale,
     dt0,
-    taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
     """Solve an initial value problem with a native-Python while loop.
@@ -167,17 +145,8 @@ def solve_with_python_while_loop(
     !!! warning
         Not JITable, not reverse-mode-differentiable.
     """
-    _assert_tuple(initial_values)
     adaptive_solver = _adaptive.AdaptiveIVPSolver(
         solver=solver, **adaptive_solver_options
-    )
-    # todo: call solver.num_derivatives()?
-    num_derivatives = solver.strategy.extrapolation.num_derivatives
-    taylor_coefficients = taylor_fn(
-        vector_field=jax.tree_util.Partial(vector_field),
-        initial_values=initial_values,
-        num=num_derivatives + 1 - len(initial_values),
-        t=t0,
     )
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
@@ -221,23 +190,13 @@ def solve_with_python_while_loop(
 
 def solve_fixed_grid(
     vector_field,
-    initial_values,
+    taylor_coefficients,
     grid,
     solver,
     output_scale,
-    taylor_fn=taylor.taylor_mode_fn,
 ):
     """Solve an initial value problem on a fixed, pre-determined grid."""
-    _assert_tuple(initial_values)
-
     # Initialise the Taylor series
-    num_derivatives = solver.strategy.extrapolation.num_derivatives
-    taylor_coefficients = taylor_fn(
-        vector_field=jax.tree_util.Partial(vector_field),
-        initial_values=initial_values,
-        num=num_derivatives + 1 - len(initial_values),
-        t=grid[0],
-    )
     _, *initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
     )
@@ -290,14 +249,6 @@ def _userfriendly_output(*, posterior, posterior_t0):
         posterior = tree_array_util.tree_prepend(posterior_t0, posterior)
         marginals = posterior
     return marginals, posterior
-
-
-def _assert_tuple(x, /):
-    """Verify that the initial conditions are a tuple of arrays.
-
-    todo: allow other containers.
-    """
-    assert isinstance(x, tuple)
 
 
 R = TypeVar("R")

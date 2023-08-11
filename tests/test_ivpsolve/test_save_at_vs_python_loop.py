@@ -8,6 +8,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated, solution
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -16,7 +17,8 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     # Make a problem
     vf, u0, (t0, t1) = setup.ode()
 
-    problem_args = (vf, u0)
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=2)
+    problem_args = (vf, tcoeffs)
 
     # Generate a solver
     ibm = extrapolation.ibm_adaptive(num_derivatives=2)

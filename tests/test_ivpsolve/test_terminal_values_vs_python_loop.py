@@ -9,13 +9,16 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.fixture(name="problem_args_kwargs")
 def fixture_problem_args_kwargs():
     vf, u0, (t0, t1) = setup.ode()
-    return (vf, u0), {"t0": t0, "t1": t1}
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=2)
+
+    return (vf, tcoeffs), {"t0": t0, "t1": t1}
 
 
 @testing.fixture(name="solver_kwargs")

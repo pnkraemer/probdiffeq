@@ -8,6 +8,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -22,9 +23,10 @@ def fixture_approximate_solution():
     solver = calibrated.mle(strategy)
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=1)
     return ivpsolve.solve_with_python_while_loop(
         vf,
-        u0,
+        tcoeffs,
         t0=t0,
         t1=t1,
         dt0=0.1,
@@ -80,7 +82,7 @@ def fixture_approximate_solution_batched():
     def solve(init):
         return ivpsolve.solve_and_save_at(
             vf,
-            (init,),
+            (init, vf(init, t=None)),
             save_at=save_at,
             solver=solver,
             dt0=0.1,
