@@ -29,6 +29,7 @@ def fixture_approximation():
         solver=solver,
         atol=1e-2,
         rtol=1e-2,
+        dt0=0.1,
         output_scale=output_scale,
     )
 

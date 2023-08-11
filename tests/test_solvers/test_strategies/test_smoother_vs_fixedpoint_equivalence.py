@@ -20,7 +20,7 @@ def fixture_solver_setup():
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     args = (vf, (u0,))
-    kwargs = {"atol": 1e-3, "rtol": 1e-3, "output_scale": output_scale}
+    kwargs = {"atol": 1e-3, "rtol": 1e-3, "output_scale": output_scale, "dt0": 0.1}
     return args, kwargs, (t0, t1)
 
 

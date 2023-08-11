@@ -76,6 +76,7 @@ def fixture_solution(correction_impl):
         "solver": solver,
         "atol": 1e-2,
         "rtol": 1e-2,
+        "dt0": 0.1,
         "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
     }
     return ivpsolve.simulate_terminal_values(
