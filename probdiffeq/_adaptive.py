@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _solver, controls
-from probdiffeq.backend import containers
+from probdiffeq.backend import containers, control_flow
 from probdiffeq.impl import impl
 
 
@@ -32,13 +32,11 @@ class AdaptiveIVPSolver:
         rtol=1e-2,
         control=None,
         norm_ord=None,
-        while_loop_fn=jax.lax.while_loop,
     ):
         if control is None:
             control = controls.proportional_integral()
 
         self.solver = solver
-        self.while_loop_fn = while_loop_fn
         self.atol = atol
         self.rtol = rtol
         self.control = control
@@ -87,7 +85,8 @@ class AdaptiveIVPSolver:
         def extract(s):
             return s.proposed, s.control
 
-        state_new = self.while_loop_fn(cond_fn, body_fn, init(state0, control0))
+        init_val = init(state0, control0)
+        state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
 
     def _attempt_step(self, *, state: _RejectionState, vector_field, t1, parameters):
@@ -148,16 +147,15 @@ class AdaptiveIVPSolver:
 
 def _asolver_flatten(asolver: AdaptiveIVPSolver):
     children = (asolver.solver, asolver.atol, asolver.rtol, asolver.control)
-    aux = asolver.norm_ord, asolver.while_loop_fn
+    aux = (asolver.norm_ord,)
     return children, aux
 
 
 def _asolver_unflatten(aux, children):
     solver, atol, rtol, control = children
-    norm_ord, while_loop_fn = aux
+    (norm_ord,) = aux
     return AdaptiveIVPSolver(
         solver=solver,
-        while_loop_fn=while_loop_fn,
         atol=atol,
         rtol=rtol,
         control=control,

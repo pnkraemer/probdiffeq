@@ -22,17 +22,13 @@ def simulate_terminal_values(
     output_scale,
     dt0,
     parameters=(),
-    while_loop_fn_temporal=jax.lax.while_loop,
-    while_loop_fn_per_step=jax.lax.while_loop,
     taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
     """Simulate the terminal values of an initial value problem."""
     _assert_tuple(initial_values)
 
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options
-    )
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver, **adaptive_solver_options)
 
     num_derivatives = solver.strategy.extrapolation.num_derivatives
     taylor_coefficients = taylor_fn(
@@ -54,7 +50,6 @@ def simulate_terminal_values(
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
-        while_loop_fn=while_loop_fn_temporal,
         interpolate=(solver.interpolate, solver.right_corner),
     )
     # "squeeze"-type functionality (there is only a single state!)
@@ -94,8 +89,6 @@ def solve_and_save_at(
     dt0,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
-    while_loop_fn_temporal=jax.lax.while_loop,
-    while_loop_fn_per_step=jax.lax.while_loop,
     **adaptive_solver_options,
 ):
     """Solve an initial value problem and return the solution at a pre-determined grid.
@@ -113,9 +106,7 @@ def solve_and_save_at(
         msg = "Strategy {solver.strategy} cannot be used in save_at mode. "
         warnings.warn(msg, stacklevel=1)
 
-    adaptive_solver = _adaptive.AdaptiveIVPSolver(
-        solver=solver, while_loop_fn=while_loop_fn_per_step, **adaptive_solver_options
-    )
+    adaptive_solver = _adaptive.AdaptiveIVPSolver(solver, **adaptive_solver_options)
 
     t0 = save_at[0]
     num_derivatives = solver.strategy.extrapolation.num_derivatives
@@ -137,7 +128,6 @@ def solve_and_save_at(
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         parameters=parameters,
-        while_loop_fn=while_loop_fn_temporal,
         interpolate=(solver.interpolate, solver.right_corner),
     )
 

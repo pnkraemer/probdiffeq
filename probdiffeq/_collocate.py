@@ -5,7 +5,7 @@ Sequentially (and often, adaptively) constrain a random process to an ODE.
 
 import jax
 
-from probdiffeq.backend import tree_array_util
+from probdiffeq.backend import control_flow, tree_array_util
 
 
 def solve_and_save_at(
@@ -19,7 +19,6 @@ def solve_and_save_at(
     adaptive_solver,
     dt0,
     parameters,
-    while_loop_fn,
     interpolate,
 ):
     interpolate_fun, right_corner_fun = interpolate
@@ -33,7 +32,6 @@ def solve_and_save_at(
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
             parameters=parameters,
-            while_loop_fn=while_loop_fn,
         )
 
         # Either interpolate (t > t_next) or "finalise" (t == t_next)
@@ -71,7 +69,6 @@ def _advance_ivp_solution_adaptively(
     t1,
     adaptive_solver,
     parameters,
-    while_loop_fn,
 ):
     """Advance an IVP solution to the next state."""
 
@@ -86,11 +83,8 @@ def _advance_ivp_solution_adaptively(
         )
         return s1, s0, c1
 
-    return while_loop_fn(
-        cond_fun=cond_fun,
-        body_fun=body_fun,
-        init_val=(acc0, prev0, ctrl0),
-    )
+    init = (acc0, prev0, ctrl0)
+    return control_flow.while_loop(cond_fun, body_fun, init=init)
 
 
 def solve_with_python_while_loop(*args, **kwargs):
