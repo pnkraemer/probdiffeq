@@ -1,4 +1,6 @@
 """Conditionals."""
+import jax.numpy as jnp
+
 from probdiffeq.impl import _conditional
 from probdiffeq.impl.scalar import _normal
 from probdiffeq.impl.util import cholesky_util, cond_util
@@ -30,7 +32,8 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
-        return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
+        matrix = jnp.squeeze(matrix)
+        return _normal.Normal(jnp.dot(matrix, x) + noise.mean, noise.cholesky)
 
     def merge(self, previous, incoming, /):
         A, b = previous

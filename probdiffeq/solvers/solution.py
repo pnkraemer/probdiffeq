@@ -97,7 +97,8 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
             f"Shape {jnp.shape(standard_deviation)} received."
         )
 
-    if jnp.ndim(u) >= 2:  # not valid for scalar or matrix-valued solutions
+    # not valid for scalar or matrix-valued solutions
+    if jnp.ndim(u) > jnp.ndim(impl.ssm_util.prototype_qoi()):
         raise ValueError(
             "Terminal-value solution (ndim=1, shape=(n,)) expected. "
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
@@ -142,7 +143,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     # todo: complain if it is used with a filter, not a smoother?
     # todo: allow option for log-posterior
 
-    if jnp.shape(standard_deviation) != (jnp.shape(u)[0],):
+    if jnp.shape(standard_deviation) != jnp.shape(u)[:1]:
         raise ValueError(
             f"Observation-noise shape {jnp.shape(standard_deviation)} does not match "
             f"the observation shape {jnp.shape(u)}. "
@@ -150,7 +151,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
             f"{(jnp.shape(u)[0],)} != {jnp.shape(standard_deviation)}. "
         )
 
-    if jnp.ndim(u) < 2:
+    if jnp.ndim(u) < jnp.ndim(impl.ssm_util.prototype_qoi()) + 1:
         raise ValueError(
             "Time-series solution (ndim=2, shape=(n, m)) expected. "
             f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."

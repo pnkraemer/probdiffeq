@@ -61,8 +61,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def conditional_to_derivative(self, i, standard_deviation):
         def A(x):
-            derivative = x[i, ...]
-            return derivative[None, ...]
+            return x[[i], ...]
 
         bias = jnp.zeros(self.ode_shape)
         eye = jnp.eye(1)
@@ -71,6 +70,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return cond_util.Conditional(linop, noise)
 
     def prototype_qoi(self):
+        return jnp.empty(self.ode_shape)
+
+    def prototype_observed(self):
         mean = jnp.empty((1, *self.ode_shape))
         cholesky = jnp.empty(())
         return _normal.Normal(mean, cholesky)

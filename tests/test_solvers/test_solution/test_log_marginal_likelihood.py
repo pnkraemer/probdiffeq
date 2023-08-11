@@ -38,10 +38,9 @@ def fixture_sol():
 
 def test_output_is_a_scalar_and_not_nan_and_not_inf(sol):
     data = sol.u + 0.005
-    k, _ = sol.u.shape
     lml = solution.log_marginal_likelihood(
         data,
-        standard_deviation=jnp.ones((k,)),
+        standard_deviation=jnp.ones_like(sol.t),
         posterior=sol.posterior,
     )
     assert lml.shape == ()

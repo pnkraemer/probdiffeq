@@ -170,7 +170,6 @@ def marginals(markov_seq: MarkovSeqRev):
     # If we hold many 'init's, choose the terminal one.
     _, noise = markov_seq.conditional
     if noise.mean.shape == markov_seq.init.mean.shape:
-        print("yes")
         init = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
     else:
         print("no")

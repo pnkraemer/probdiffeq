@@ -80,6 +80,9 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return cond_util.Conditional(linop, noise)
 
     def prototype_qoi(self):
+        return jnp.empty(self.ode_shape)
+
+    def prototype_observed(self):
         mean = jnp.empty((*self.ode_shape, 1))
         cholesky = jnp.empty((*self.ode_shape, 1, 1))
         return _normal.Normal(mean, cholesky)

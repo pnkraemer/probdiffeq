@@ -72,7 +72,7 @@ def test_terminal_values_error_for_wrong_shapes(sol):
     # Non-scalar observation std
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
-            data[-1],
+            data,
             standard_deviation=jnp.ones((1,)),
             posterior=sol.posterior,
         )
@@ -80,7 +80,7 @@ def test_terminal_values_error_for_wrong_shapes(sol):
     # Data does not match u
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
-            data[None, :],
+            data[None, ...],
             standard_deviation=jnp.ones(()),
             posterior=sol.posterior,
         )
