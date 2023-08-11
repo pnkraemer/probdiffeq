@@ -4,8 +4,9 @@ from typing import Callable
 import jax
 
 from probdiffeq.backend import containers
-from probdiffeq.impl import _cond_util, _transform, sqrt_util
+from probdiffeq.impl import _transform
 from probdiffeq.impl.dense import _normal
+from probdiffeq.impl.util import cholesky_util, cond_util
 
 
 class Transformation(containers.NamedTuple):
@@ -16,7 +17,7 @@ class Transformation(containers.NamedTuple):
 class TransformBackend(_transform.TransformBackend):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
-        cholesky_new = sqrt_util.triu_via_qr((A @ rv.cholesky).T).T
+        cholesky_new = cholesky_util.triu_via_qr((A @ rv.cholesky).T).T
         return _normal.Normal(A @ rv.mean + b, cholesky_new)
 
     def revert(self, rv, transformation, /):
@@ -26,7 +27,7 @@ class TransformBackend(_transform.TransformBackend):
         # QR-decomposition
         # (todo: rename revert_conditional_noisefree to
         #   revert_transformation_cov_sqrt())
-        r_obs, (r_cor, gain) = sqrt_util.revert_conditional_noisefree(
+        r_obs, (r_cor, gain) = cholesky_util.revert_conditional_noisefree(
             R_X_F=(A @ cholesky).T, R_X=cholesky.T
         )
 
@@ -34,4 +35,4 @@ class TransformBackend(_transform.TransformBackend):
         m_cor = mean - gain @ (A @ mean + b)
         corrected = _normal.Normal(m_cor, r_cor.T)
         observed = _normal.Normal(A @ mean + b, r_obs.T)
-        return observed, _cond_util.Conditional(gain, corrected)
+        return observed, cond_util.Conditional(gain, corrected)

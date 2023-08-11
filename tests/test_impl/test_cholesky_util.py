@@ -7,7 +7,7 @@ from math import prod
 import jax.numpy as jnp
 
 from probdiffeq.backend import testing
-from probdiffeq.impl import sqrt_util
+from probdiffeq.impl.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 
@@ -22,7 +22,9 @@ def test_revert_kernel_scalar(HCshape, Cshape, Xshape):
     K = C @ HC.T @ jnp.linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
-    extra, (bw_noise, g) = sqrt_util.revert_conditional(R_X_F=HC.T, R_X=C.T, R_YX=X.T)
+    extra, (bw_noise, g) = cholesky_util.revert_conditional(
+        R_X_F=HC.T, R_X=C.T, R_YX=X.T
+    )
 
     def cov(x):
         return x.T @ x
@@ -41,7 +43,9 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
     K = C @ HC.T @ jnp.linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
-    extra, (bw_noise, g) = sqrt_util.revert_conditional_noisefree(R_X_F=HC.T, R_X=C.T)
+    extra, (bw_noise, g) = cholesky_util.revert_conditional_noisefree(
+        R_X_F=HC.T, R_X=C.T
+    )
 
     def cov(x):
         return x.T @ x
@@ -60,7 +64,7 @@ def test_sqrt_sum_square_scalar():
     b = 4.0
     c = 5.0
     expected = jnp.sqrt(a**2 + b**2 + c**2)
-    received = sqrt_util.sqrt_sum_square_scalar(a, b, c)
+    received = cholesky_util.sqrt_sum_square_scalar(a, b, c)
     assert jnp.allclose(expected, received)
 
 
@@ -69,4 +73,4 @@ def test_sqrt_sum_square_error():
     b = 4.0 * jnp.eye(2)
     c = 5.0 * jnp.eye(2)
     with testing.raises(ValueError, match="scalar"):
-        _ = sqrt_util.sqrt_sum_square_scalar(a, b, c)
+        _ = cholesky_util.sqrt_sum_square_scalar(a, b, c)

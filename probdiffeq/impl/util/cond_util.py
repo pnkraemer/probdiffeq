@@ -1,3 +1,4 @@
+"""Conditional-utilities."""
 from typing import Any
 
 import jax

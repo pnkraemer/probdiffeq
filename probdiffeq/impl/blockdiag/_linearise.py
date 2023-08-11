@@ -1,5 +1,6 @@
 """Linearisation."""
-from probdiffeq.impl import _linearise, _matfree
+from probdiffeq.impl import _linearise
+from probdiffeq.impl.util import linop_util
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):
@@ -11,7 +12,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             def a1(s):
                 return s[:, [ode_order], ...]
 
-            return _matfree.parametrised_linop(lambda v, _p: a1(v)), -fx[:, None]
+            return linop_util.parametrised_linop(lambda v, _p: a1(v)), -fx[:, None]
 
         return linearise_fun_wrapped
 

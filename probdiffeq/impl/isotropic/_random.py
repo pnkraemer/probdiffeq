@@ -2,9 +2,9 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import sqrt_util  # todo: get sqrt-util into "impl" package...
 from probdiffeq.impl import _random
 from probdiffeq.impl.isotropic import _normal
+from probdiffeq.impl.util import cholesky_util
 
 
 class RandomVariableBackend(_random.RandomVariableBackend):
@@ -71,7 +71,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
             raise ValueError
 
         mean = rv.mean[i, :]
-        cholesky = sqrt_util.triu_via_qr((rv.cholesky[i, :])[:, None].T).T
+        cholesky = cholesky_util.triu_via_qr((rv.cholesky[i, :])[:, None].T).T
         return _normal.Normal(mean, cholesky)
 
     def qoi_from_sample(self, sample, /):

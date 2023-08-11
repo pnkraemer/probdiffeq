@@ -1,8 +1,9 @@
 """State-space model utilities."""
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _ibm_util, _matfree, _ssm_util, sqrt_util
+from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.isotropic import _normal
+from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util, linop_util
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):
@@ -10,14 +11,14 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         self.ode_shape = ode_shape
 
     def ibm_transitions(self, num_derivatives, output_scale):
-        A, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
+        A, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
         q0 = jnp.zeros((num_derivatives + 1, *self.ode_shape))
         noise = _normal.Normal(q0, q_sqrtm)
-        precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return _cond_util.Conditional(A, noise), (p, p_inv)
+            return cond_util.Conditional(A, noise), (p, p_inv)
 
         return discretise
 
@@ -26,7 +27,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = jnp.eye(num_hidden_states_per_ode_dim)
-        return _cond_util.Conditional(matrix, noise)
+        return cond_util.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -47,7 +48,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         A_new = p[:, None] * A * p_inv[None, :]
 
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return _cond_util.Conditional(A_new, noise)
+        return cond_util.Conditional(A_new, noise)
 
     def standard_normal(self, num, /, output_scale):
         mean = jnp.zeros((num, *self.ode_shape))
@@ -55,7 +56,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        sum_updated = sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
 
     def conditional_to_derivative(self, i, standard_deviation):
@@ -66,8 +67,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         bias = jnp.zeros(self.ode_shape)
         eye = jnp.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = _matfree.parametrised_linop(lambda s, _p: A(s))
-        return _cond_util.Conditional(linop, noise)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return cond_util.Conditional(linop, noise)
 
     def prototype_qoi(self):
         mean = jnp.empty((1, *self.ode_shape))

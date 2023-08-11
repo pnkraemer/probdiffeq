@@ -3,7 +3,7 @@ import abc
 
 class RandomVariableBackend(abc.ABC):
     # todo: is this module getting out of hand?
-    #  Split into three modules "SSMState, stats, normal"?
+    #  Split into three modules "hidden, stats, normal"?
 
     @abc.abstractmethod
     def variable(self, mean, cholesky):

@@ -2,8 +2,9 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _conditional, sqrt_util
+from probdiffeq.impl import _conditional
 from probdiffeq.impl.blockdiag import _normal
+from probdiffeq.impl.util import cholesky_util, cond_util
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):
@@ -26,7 +27,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         chol1 = _transpose(matrix @ rv.cholesky)
         chol2 = _transpose(noise.cholesky)
         R_stack = (chol1, chol2)
-        cholesky = jax.vmap(sqrt_util.sum_of_sqrtm_factors)(R_stack)
+        cholesky = jax.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
         return _normal.Normal(mean, _transpose(cholesky))
 
     def merge(self, cond1, cond2, /):
@@ -36,10 +37,10 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         g = A @ C
         xi = (A @ d.mean[..., None])[..., 0] + b.mean
         R_stack = (_transpose(A @ d.cholesky), _transpose(b.cholesky))
-        Xi = _transpose(jax.vmap(sqrt_util.sum_of_sqrtm_factors)(R_stack))
+        Xi = _transpose(jax.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack))
 
         noise = _normal.Normal(xi, Xi)
-        return _cond_util.Conditional(g, noise)
+        return cond_util.Conditional(g, noise)
 
     def revert(self, rv, conditional, /):
         A, noise = conditional
@@ -47,7 +48,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         noise_chol_upper = jnp.transpose(noise.cholesky, axes=(0, 2, 1))
         A_rv_chol_upper = jnp.transpose(A @ rv.cholesky, axes=(0, 2, 1))
 
-        revert = jax.vmap(sqrt_util.revert_conditional)
+        revert = jax.vmap(cholesky_util.revert_conditional)
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
 
         cholesky_obs = jnp.transpose(r_obs, axes=(0, 2, 1))
@@ -58,7 +59,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         m_cor = rv.mean - (gain @ (mean_observed[..., None]))[..., 0]
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, _cond_util.Conditional(gain, corrected)
+        return observed, cond_util.Conditional(gain, corrected)
 
 
 def _transpose(matrix):

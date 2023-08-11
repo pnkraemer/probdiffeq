@@ -1,8 +1,9 @@
 """SSM utilities."""
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util, sqrt_util
+from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.scalar import _normal
+from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):
@@ -23,18 +24,18 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         A, noise = cond
         A = p[:, None] * A * p_inv[None, :]
         noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
-        return _cond_util.Conditional(A, noise)
+        return cond_util.Conditional(A, noise)
 
     def ibm_transitions(self, num_derivatives, output_scale=1.0):
-        a, q_sqrtm = _ibm_util.system_matrices_1d(num_derivatives, output_scale)
+        a, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
         q0 = jnp.zeros((num_derivatives + 1,))
         noise = _normal.Normal(q0, q_sqrtm)
 
-        precon_fun = _ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return _cond_util.Conditional(a, noise), (p, p_inv)
+            return cond_util.Conditional(a, noise), (p, p_inv)
 
         return discretise
 
@@ -43,7 +44,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         mean = jnp.zeros((ndim,))
         cov_sqrtm = jnp.zeros((ndim, ndim))
         noise = _normal.Normal(mean, cov_sqrtm)
-        return _cond_util.Conditional(transition, noise)
+        return cond_util.Conditional(transition, noise)
 
     def standard_normal(self, ndim, /, output_scale):
         mean = jnp.zeros((ndim,))
@@ -51,7 +52,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        sum_updated = sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
 
     def conditional_to_derivative(self, i, standard_deviation):

@@ -1,6 +1,7 @@
 """Conditionals."""
-from probdiffeq.impl import _cond_util, _conditional, sqrt_util
+from probdiffeq.impl import _conditional
 from probdiffeq.impl.scalar import _normal
+from probdiffeq.impl.util import cholesky_util, cond_util
 
 
 class ConditionalBackend(_conditional.ConditionalBackend):
@@ -9,13 +10,13 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         mean = matrix @ rv.mean + noise.mean
         R_stack = ((matrix @ rv.cholesky).T, noise.cholesky.T)
-        cholesky_T = sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack)
+        cholesky_T = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack)
         return _normal.Normal(mean, cholesky_T.T)
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
 
-        r_ext, (r_bw_p, g_bw_p) = sqrt_util.revert_conditional(
+        r_ext, (r_bw_p, g_bw_p) = cholesky_util.revert_conditional(
             R_X_F=(matrix @ rv.cholesky).T,
             R_X=rv.cholesky.T,
             R_YX=noise.cholesky.T,
@@ -25,7 +26,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
         marginal = _normal.Normal(m_ext, r_ext.T)
         noise = _normal.Normal(m_cond, r_bw_p.T)
-        return marginal, _cond_util.Conditional(g_bw_p, noise)
+        return marginal, cond_util.Conditional(g_bw_p, noise)
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
@@ -38,7 +39,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         g = A @ C
         xi = A @ d.mean + b.mean
         R_stack = ((A @ d.cholesky).T, b.cholesky.T)
-        Xi = sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
         noise = _normal.Normal(xi, Xi)
-        return _cond_util.Conditional(g, noise)
+        return cond_util.Conditional(g, noise)

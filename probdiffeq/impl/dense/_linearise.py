@@ -4,8 +4,9 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _linearise, _matfree, sqrt_util
+from probdiffeq.impl import _linearise
 from probdiffeq.impl.dense import _normal
+from probdiffeq.impl.util import cholesky_util, linop_util
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):
@@ -21,7 +22,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
 
             fx = ts0(fun, a0(mean))
-            linop = _matfree.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
             return linop, -fx
 
         return linearise_fun_wrapped
@@ -42,7 +43,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
                 x0 = a0(x)
                 return x1 - jvp(x0)
 
-            linop = _matfree.parametrised_linop(lambda v, _p: A(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: A(v))
             return linop, -fx
 
         return new
@@ -58,7 +59,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
-            r_0_square = sqrt_util.triu_via_qr(r_0_nonsquare.T)
+            r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
@@ -67,7 +68,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             def A(x):
                 return a1(x) - J @ a0(x)
 
-            linop = _matfree.parametrised_linop(lambda v, _p: A(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: A(v))
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
@@ -86,14 +87,14 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
-            r_0_square = sqrt_util.triu_via_qr(r_0_nonsquare.T)
+            r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            linop = _matfree.parametrised_linop(lambda v, _p: a1(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: a1(v))
             return linop, bias
 
         return new
@@ -136,7 +137,7 @@ def slr1(fn, x, *, cubature_rule):
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
     # Compute statistical linear regression matrices
-    _, (cov_sqrtm_cond, linop_cond) = sqrt_util.revert_conditional_noisefree(
+    _, (cov_sqrtm_cond, linop_cond) = cholesky_util.revert_conditional_noisefree(
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
     mean_cond = fx_mean - linop_cond @ x.mean
@@ -164,6 +165,6 @@ def slr0(fn, x, *, cubature_rule):
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
-    cov_sqrtm = sqrt_util.triu_via_qr(fx_centered_normed)
+    cov_sqrtm = cholesky_util.triu_via_qr(fx_centered_normed)
 
     return _normal.Normal(fx_mean, cov_sqrtm.T)
