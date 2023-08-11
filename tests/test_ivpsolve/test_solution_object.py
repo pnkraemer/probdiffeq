@@ -24,7 +24,7 @@ def fixture_approximate_solution():
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=1)
-    return ivpsolve.solve_with_python_while_loop(
+    return ivpsolve.solve_and_save_every_step(
         vf,
         tcoeffs,
         t0=t0,

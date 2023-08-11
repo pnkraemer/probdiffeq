@@ -21,7 +21,7 @@ def fixture_approximation():
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
-    return ivpsolve.solve_with_python_while_loop(
+    return ivpsolve.solve_and_save_every_step(
         vf,
         (u0,),
         t0=t0,

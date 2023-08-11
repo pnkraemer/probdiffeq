@@ -32,7 +32,7 @@ def fixture_solution_smoother(solver_setup):
     solver = uncalibrated.solver(strategy)
 
     args, kwargs, (t0, t1) = solver_setup
-    return ivpsolve.solve_with_python_while_loop(
+    return ivpsolve.solve_and_save_every_step(
         *args, t0=t0, t1=t1, solver=solver, **kwargs
     )
 

@@ -130,7 +130,7 @@ def solve_and_save_at(
     )
 
 
-def solve_with_python_while_loop(
+def solve_and_save_every_step(
     vector_field,
     taylor_coefficients,
     t0,
@@ -140,7 +140,9 @@ def solve_with_python_while_loop(
     dt0,
     **adaptive_solver_options,
 ):
-    """Solve an initial value problem with a native-Python while loop.
+    """Solve an initial value problem and save every step.
+
+    This function uses a native-Python while loop.
 
     !!! warning
         Not JITable, not reverse-mode-differentiable.
@@ -152,7 +154,7 @@ def solve_with_python_while_loop(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
 
-    t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
+    t, posterior, output_scale, num_steps = _collocate.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
         *initial_condition,
         t1=t1,

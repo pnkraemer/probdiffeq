@@ -36,7 +36,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Compute an adaptive solution and interpolate
     ts = jnp.linspace(t0, t1, num=15, endpoint=True)
-    solution_adaptive = ivpsolve.solve_with_python_while_loop(
+    solution_adaptive = ivpsolve.solve_and_save_every_step(
         *problem_args, t0=t0, t1=t1, **adaptive_kwargs
     )
     u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(

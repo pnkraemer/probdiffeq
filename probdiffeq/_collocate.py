@@ -84,7 +84,7 @@ def _advance_ivp_solution_adaptively(
     return control_flow.while_loop(cond_fun, body_fun, init=init)
 
 
-def solve_with_python_while_loop(*args, **kwargs):
+def solve_and_save_every_step(*args, **kwargs):
     generator = _solution_generator(*args, **kwargs)
     return tree_array_util.tree_stack(list(generator))
 

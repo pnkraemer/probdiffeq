@@ -1,4 +1,4 @@
-"""Compare simulate_terminal_values to solve_with_python_while_loop."""
+"""Compare simulate_terminal_values to solve_and_save_every_step."""
 
 import jax
 import jax.numpy as jnp
@@ -42,7 +42,7 @@ def fixture_solver_kwargs():
 @testing.fixture(name="solution_python_loop")
 def fixture_solution_with_python_while_loop(problem_args_kwargs, solver_kwargs):
     args, kwargs = problem_args_kwargs
-    return ivpsolve.solve_with_python_while_loop(*args, **kwargs, **solver_kwargs)
+    return ivpsolve.solve_and_save_every_step(*args, **kwargs, **solver_kwargs)
 
 
 @testing.fixture(name="simulation_terminal_values")

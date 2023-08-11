@@ -4,7 +4,7 @@ There is a base-configuration:
 
 ```python
 solver = test_util.generate_solver()
-solution = solve_with_python_while_loop(lotka_volterra, solver)
+solution = solve_and_save_every_step(lotka_volterra, solver)
 ```
 
 If this approximation is accurate (measured in error comparing to e.g. diffrax),
@@ -15,9 +15,9 @@ To guarantee that the other solution routines also work, we do the following:
 * simulate_terminal_values() with the same arguments
 should yield the same terminal value as the base case.
 * solve_and_save_at() should be identical to
-interpolating the solve_with_python_while_loop results
+interpolating the solve_and_save_every_step results
 * solve_fixed_grid() should be identical
-if the fixed grid is the solution grid of solve_with_python_while_loop
+if the fixed grid is the solution grid of solve_and_save_every_step
 
 If these tests pass, and assuming that interpolation is correct,
 the solution routines must be correct.
