@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random, _sqrt_util
+from probdiffeq.impl import _random, sqrt_util
 from probdiffeq.impl.blockdiag import _normal
 
 
@@ -67,7 +67,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
             raise ValueError
 
         mean = rv.mean[:, i]
-        cholesky = jax.vmap(_sqrt_util.triu_via_qr)((rv.cholesky[:, i, :])[..., None])
+        cholesky = jax.vmap(sqrt_util.triu_via_qr)((rv.cholesky[:, i, :])[..., None])
         cholesky = jnp.transpose(cholesky, axes=(0, 2, 1))
         return _normal.Normal(mean, cholesky)
 

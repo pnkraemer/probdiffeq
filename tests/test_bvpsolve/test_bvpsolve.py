@@ -42,7 +42,7 @@ def _marginal_moments(precon_mseq):
         xs=(precon_mseq.conditional, precon_mseq.preconditioner),
         reverse=False,
     )
-    means, cov_sqrtms = rvs.mean, rvs.cov_sqrtm_lower
+    means, cov_sqrtms = rvs.mean, rvs.cholesky
 
     @jax.vmap
     def cov(x):

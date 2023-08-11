@@ -4,7 +4,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _linearise, _matfree, _sqrt_util
+from probdiffeq.impl import _linearise, _matfree, sqrt_util
 from probdiffeq.impl.dense import _normal
 
 
@@ -58,7 +58,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
-            r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+            r_0_square = sqrt_util.triu_via_qr(r_0_nonsquare.T)
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
@@ -86,7 +86,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
-            r_0_square = _sqrt_util.triu_via_qr(r_0_nonsquare.T)
+            r_0_square = sqrt_util.triu_via_qr(r_0_nonsquare.T)
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
             # Gather the variables and return
@@ -136,7 +136,7 @@ def slr1(fn, x, *, cubature_rule):
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
     # Compute statistical linear regression matrices
-    _, (cov_sqrtm_cond, linop_cond) = _sqrt_util.revert_conditional_noisefree(
+    _, (cov_sqrtm_cond, linop_cond) = sqrt_util.revert_conditional_noisefree(
         R_X_F=pts_centered_normed, R_X=fx_centered_normed
     )
     mean_cond = fx_mean - linop_cond @ x.mean
@@ -164,6 +164,6 @@ def slr0(fn, x, *, cubature_rule):
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
-    cov_sqrtm = _sqrt_util.triu_via_qr(fx_centered_normed)
+    cov_sqrtm = sqrt_util.triu_via_qr(fx_centered_normed)
 
     return _normal.Normal(fx_mean, cov_sqrtm.T)

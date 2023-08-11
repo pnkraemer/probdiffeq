@@ -10,13 +10,13 @@
 
 import jax
 
-from probdiffeq import _markov
-from probdiffeq.solvers.statespace import corr, extra
+from probdiffeq.solvers import markov
+from probdiffeq.solvers.statespace import correction, extrapolation
 
 
 def solve_separable_affine_2nd(
-    ode, bconds, prior: _markov.MarkovSeqPreconFwd, *, bcond_nugget=1e-6
-) -> _markov.MarkovSeqPreconFwd:
+    ode, bconds, prior: markov.MarkovSeqPreconFwd, *, bcond_nugget=1e-6
+) -> markov.MarkovSeqPreconFwd:
     """Solve an affine, 2nd-order BVP with separable, affine boundary conditions.
 
     Currently restricted to scalar problems.
@@ -28,48 +28,54 @@ def solve_separable_affine_2nd(
 
 
 def _constrain_bconds_affine_separable(
-    bconds, prior: _markov.MarkovSeqPreconFwd, *, nugget
-) -> _markov.MarkovSeqPreconRev:
+    bconds, prior: markov.MarkovSeqPreconFwd, *, nugget
+) -> markov.MarkovSeqPreconRev:
     """Constrain a discrete prior to satisfy boundary conditions."""
     bcond_first, bcond_second = bconds
 
     # First boundary condition
 
-    _, (init, _) = corr.correct_affine_qoi_noisy(prior.init, bcond_first, stdev=nugget)
+    _, (init, _) = correction.correct_affine_qoi_noisy(
+        prior.init, bcond_first, stdev=nugget
+    )
 
     # Loop over time
     final, conditionals = jax.lax.scan(
-        lambda a, b: extra.extrapolate_precon_with_reversal(a, *b),
+        lambda a, b: extrapolation.extrapolate_precon_with_reversal(a, *b),
         init=init,
         xs=(prior.conditional, prior.preconditioner),
         reverse=False,
     )
 
     # Second boundary condition
-    _, (final, _) = corr.correct_affine_qoi_noisy(final, bcond_second, stdev=nugget)
+    _, (final, _) = correction.correct_affine_qoi_noisy(
+        final, bcond_second, stdev=nugget
+    )
 
     # Return reverse-Markov sequence
-    return _markov.MarkovSeqPreconRev(
+    return markov.MarkovSeqPreconRev(
         init=final, conditional=conditionals, preconditioner=prior.preconditioner
     )
 
 
 def _constrain_ode_affine_2nd(
-    vf, prior: _markov.MarkovSeqPreconRev
-) -> _markov.MarkovSeqPreconFwd:
+    vf, prior: markov.MarkovSeqPreconRev
+) -> markov.MarkovSeqPreconFwd:
     As, bs = vf
 
     # First ODE constraint
-    _, (final, _) = corr.correct_affine_ode_2nd(prior.init, affine=(As[-1], bs[-1]))
+    _, (final, _) = correction.correct_affine_ode_2nd(
+        prior.init, affine=(As[-1], bs[-1])
+    )
 
     # Run the extrapolate-correct loop (which includes the final ODE constraint)
 
     def step(rv_carry, ssm):
         observation_model, (transition, precon) = ssm
-        rv_ext, reversal = extra.extrapolate_precon_with_reversal(
+        rv_ext, reversal = extrapolation.extrapolate_precon_with_reversal(
             rv_carry, conditional=transition, preconditioner=precon
         )
-        _, (rv_corrected, _) = corr.correct_affine_ode_2nd(
+        _, (rv_corrected, _) = correction.correct_affine_ode_2nd(
             rv_ext, affine=observation_model
         )
         return rv_corrected, reversal
@@ -79,7 +85,7 @@ def _constrain_ode_affine_2nd(
     rv, transitions = jax.lax.scan(
         step, init=final, xs=(correction_remaining, extrapolation), reverse=True
     )
-    return _markov.MarkovSeqPreconFwd(
+    return markov.MarkovSeqPreconFwd(
         init=rv,
         conditional=transitions,
         preconditioner=prior.preconditioner,

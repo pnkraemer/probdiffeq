@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random, _sqrt_util
+from probdiffeq.impl import _random, sqrt_util
 from probdiffeq.impl.scalar import _normal
 
 
@@ -59,7 +59,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
         m = rv.mean[i]
         c = rv.cholesky[[i], :]
-        chol = _sqrt_util.triu_via_qr(c.T)
+        chol = sqrt_util.triu_via_qr(c.T)
         return _normal.Normal(jnp.reshape(m, ()), jnp.reshape(chol, ()))
 
     def qoi_from_sample(self, sample, /):

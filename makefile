@@ -17,8 +17,10 @@ lint:
 	pre-commit run --all-files
 
 test:
-	python -m doctest probdiffeq/*.py
-	pytest -n auto -v # parallelise, verbose output
+	IMPL=dense pytest -n auto -v # parallelise, verbose output
+	IMPL=isotropic pytest -n auto -v # parallelise, verbose output
+	IMPL=blockdiag pytest -n auto -v # parallelise, verbose output
+	IMPL=scalar pytest -n auto -v # parallelise, verbose output
 
 example:
 	jupytext --quiet --sync docs/quickstart/*.ipynb

@@ -1,77 +1,45 @@
 """Tests for sampling behaviour."""
-import diffeqzoo.ivps
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers.statespace import recipes
+from probdiffeq.solvers import uncalibrated
+from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import smoothers
-from probdiffeq.util import test_util
+from tests.setup import setup
 
 
-@testing.fixture(name="problem")
-def fixture_problem():
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-    t1 = 2.0  # Short time-intervals are sufficient for this test.
+@testing.fixture(name="approximation")
+def fixture_approximation():
+    vf, (u0,), (t0, t1) = setup.ode()
 
-    @jax.jit
-    def vf(x, *, t, p):  # noqa: ARG001
-        return f(x, *p)
+    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.taylor_order_zero()
+    strategy = smoothers.fixedpoint_adaptive(ibm, ts0)
+    solver = uncalibrated.solver(strategy)
 
-    return vf, u0, (t0, t1), f_args
-
-
-@testing.case()
-def case_isotropic_factorisation():
-    return recipes.ts0_iso, 2.0
-
-
-@testing.case()  # this implies success of the scalar solver
-def case_blockdiag_factorisation():
-    return recipes.ts0_blockdiag, jnp.ones((2,)) * 2.0
-
-
-@testing.case()
-def case_dense_factorisation():
-    return recipes.ts0_dense, 2.0
-
-
-@testing.fixture(name="approximate_solution")
-@testing.parametrize_with_cases("factorisation", cases=".", prefix="case_")
-def fixture_approximate_solution(problem, factorisation):
-    vf, u0, (t0, t1), f_args = problem
-    impl_factory, output_scale = factorisation
-    solver = test_util.generate_solver(
-        num_derivatives=1,
-        impl_factory=impl_factory,
-        strategy_factory=smoothers.smoother_adaptive,
-        ode_shape=jnp.shape(u0),
-    )
-    sol = ivpsolve.solve_with_python_while_loop(
+    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    return ivpsolve.solve_with_python_while_loop(
         vf,
         (u0,),
         t0=t0,
         t1=t1,
-        parameters=f_args,
         solver=solver,
-        output_scale=output_scale,
         atol=1e-2,
         rtol=1e-2,
+        output_scale=output_scale,
     )
-    return sol, solver
 
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_sample_shape(approximate_solution, shape):
-    sol, solver = approximate_solution
-
+def test_sample_shape(approximation, shape):
     key = jax.random.PRNGKey(seed=15)
     # todo: remove "u" from this output?
-    u, samples = sol.posterior.sample(key, shape=shape)
-    assert u.shape == shape + sol.u.shape
-    assert samples.shape == shape + impl.random.sample_shape(sol.marginals)
+    u, samples = approximation.posterior.sample(key, shape=shape)
+    assert u.shape == shape + approximation.u.shape
+    assert samples.shape == shape + impl.random.sample_shape(approximation.marginals)
 
     # Todo: test values of the samples by checking a chi2 statistic
     #  in terms of the joint posterior. But this requires a joint_posterior()

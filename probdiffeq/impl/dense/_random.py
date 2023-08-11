@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random, _sqrt_util
+from probdiffeq.impl import _random, sqrt_util
 from probdiffeq.impl.dense import _normal
 
 
@@ -68,7 +68,7 @@ class RandomVariableBackend(_random.RandomVariableBackend):
 
         m = self._select(rv.mean, i)
         c = jax.vmap(self._select, in_axes=(1, None), out_axes=1)(rv.cholesky, i)
-        c = _sqrt_util.triu_via_qr(c.T)
+        c = sqrt_util.triu_via_qr(c.T)
         return _normal.Normal(m, c.T)
 
     def _select(self, x, /, i):

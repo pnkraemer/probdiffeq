@@ -1,7 +1,7 @@
 """SSM utilities."""
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _ibm_util, _sqrt_util, _ssm_util
+from probdiffeq.impl import _cond_util, _ibm_util, _ssm_util, sqrt_util
 from probdiffeq.impl.scalar import _normal
 
 
@@ -51,7 +51,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        sum_updated = _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+        sum_updated = sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
 
     def conditional_to_derivative(self, i, standard_deviation):

@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _sqrt_util, _transform
+from probdiffeq.impl import _cond_util, _transform, sqrt_util
 from probdiffeq.impl.blockdiag import _normal
 
 
@@ -15,7 +15,7 @@ class TransformBackend(_transform.TransformBackend):
         mean, cholesky = rv.mean, rv.cholesky
 
         A_cholesky = A @ cholesky
-        cholesky = jax.vmap(_sqrt_util.triu_via_qr)(_transpose(A_cholesky))
+        cholesky = jax.vmap(sqrt_util.triu_via_qr)(_transpose(A_cholesky))
         mean = A @ mean + b
         return _normal.Normal(mean, cholesky)
 
@@ -24,7 +24,7 @@ class TransformBackend(_transform.TransformBackend):
         cholesky_upper = jnp.transpose(rv.cholesky, axes=(0, -1, -2))
         A_cholesky_upper = _transpose(A @ rv.cholesky)
 
-        revert_fun = jax.vmap(_sqrt_util.revert_conditional_noisefree)
+        revert_fun = jax.vmap(sqrt_util.revert_conditional_noisefree)
         r_obs, (r_cor, gain) = revert_fun(A_cholesky_upper, cholesky_upper)
         cholesky_obs = _transpose(r_obs)
         cholesky_cor = _transpose(r_cor)

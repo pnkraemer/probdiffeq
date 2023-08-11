@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _conditional, _sqrt_util
+from probdiffeq.impl import _cond_util, _conditional, sqrt_util
 from probdiffeq.impl.isotropic import _normal
 
 
@@ -19,7 +19,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         mean = matrix @ rv.mean + noise.mean
 
         R_stack = ((matrix @ rv.cholesky).T, noise.cholesky.T)
-        cholesky = _sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+        cholesky = sqrt_util.sum_of_sqrtm_factors(R_stack=R_stack).T
         return _normal.Normal(mean, cholesky)
 
     def merge(self, cond1, cond2, /):
@@ -29,7 +29,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         g = A @ C
         xi = A @ d.mean + b.mean
         R_stack = ((A @ d.cholesky).T, b.cholesky.T)
-        Xi = _sqrt_util.sum_of_sqrtm_factors(R_stack).T
+        Xi = sqrt_util.sum_of_sqrtm_factors(R_stack).T
 
         noise = _normal.Normal(xi, Xi)
         return _cond_util.Conditional(g, noise)
@@ -37,7 +37,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
 
-        r_ext_p, (r_bw_p, gain) = _sqrt_util.revert_conditional(
+        r_ext_p, (r_bw_p, gain) = sqrt_util.revert_conditional(
             R_X_F=(matrix @ rv.cholesky).T,
             R_X=rv.cholesky.T,
             R_YX=noise.cholesky.T,

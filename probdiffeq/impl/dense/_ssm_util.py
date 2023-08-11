@@ -4,7 +4,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _cond_util, _ibm_util, _matfree, _sqrt_util, _ssm_util
+from probdiffeq.impl import _cond_util, _ibm_util, _matfree, _ssm_util, sqrt_util
 from probdiffeq.impl.dense import _normal
 
 
@@ -80,7 +80,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        return _sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+        return sqrt_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
 
     # todo: move to linearise.py?
     def conditional_to_derivative(self, i, standard_deviation):
