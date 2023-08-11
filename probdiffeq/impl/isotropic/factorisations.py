@@ -3,6 +3,7 @@ from probdiffeq.impl import _factorisations
 from probdiffeq.impl.isotropic import (
     _conditional,
     _linearise,
+    _prototypes,
     _random,
     _ssm_util,
     _transform,
@@ -30,3 +31,6 @@ class IsotropicFactorisation(_factorisations.Factorisation):
 
     def transform(self):
         return _transform.TransformBackend()
+
+    def prototypes(self):
+        return _prototypes.PrototypeBackend(ode_shape=self.ode_shape)

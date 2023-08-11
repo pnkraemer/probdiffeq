@@ -94,24 +94,10 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         linop = linop_util.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
         return cond_util.Conditional(linop, noise)
 
-    def prototype_qoi(self):
-        return jnp.empty(self.ode_shape)
-
-    def prototype_observed(self):
-        mean = jnp.empty(self.ode_shape)
-        cholesky = jnp.empty(self.ode_shape + self.ode_shape)
-        return _normal.Normal(mean, cholesky)
-
-    def prototype_error_estimate(self):
-        return jnp.empty(self.ode_shape)
-
     def _select_dy(self, x, idx_or_slice):
         (d,) = self.ode_shape
         x_reshaped = jnp.reshape(x, (-1, d), order="F")
         return x_reshaped[idx_or_slice, ...]
-
-    def prototype_output_scale(self):
-        return jnp.empty(())
 
 
 def _autobatch_linop(fun):
