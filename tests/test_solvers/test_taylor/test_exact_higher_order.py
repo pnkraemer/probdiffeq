@@ -3,28 +3,30 @@
 import diffeqzoo.ivps
 import jax.numpy as jnp
 
-from probdiffeq import taylor
 from probdiffeq.backend import testing
+from probdiffeq.solvers.taylor import autodiff
 
 
 @testing.case()
 def case_forward_mode():
-    return taylor.forward_mode_fn
+    return autodiff.forward_mode
 
 
 @testing.case()
 def case_taylor_mode():
-    return taylor.taylor_mode_fn
+    return autodiff.taylor_mode
 
 
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
 
-    def vf(u, du, *, t, p):  # noqa: ARG001
-        return f(u, du, *p)
+    def vf(u, du, *, t):  # noqa: ARG001
+        return f(u, du, *f_args)
 
-    solution = jnp.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")
+    solution = jnp.load(
+        "./tests/test_solvers/test_taylor/data/van_der_pol_second_solution.npy"
+    )
     return (vf, (u0, du0), t0, f_args), solution
 
 
@@ -33,8 +35,6 @@ def fixture_pb_with_solution():
 def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num):
     (f, init, t0, params), solution = pb_with_solution
 
-    derivatives = taylor_fun(
-        vector_field=f, initial_values=init, t=t0, parameters=params, num=num
-    )
+    derivatives = taylor_fun(vector_field=f, initial_values=init, t=t0, num=num)
     for dy, dy_ref in zip(derivatives, solution):
         assert jnp.allclose(dy, dy_ref)

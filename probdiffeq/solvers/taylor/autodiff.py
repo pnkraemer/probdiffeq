@@ -8,14 +8,11 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq.impl import impl
-from probdiffeq.solvers.strategies import discrete
-
 # todo: split into subpackage
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def taylor_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int, t):
+def taylor_mode(*, vector_field: Callable, initial_values: Tuple, num: int, t):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
@@ -26,11 +23,11 @@ def taylor_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int, t
     primals = vf(*initial_values)
     taylor_coeffs = [*initial_values, primals]
 
-    def body_fn(tcoeffs, _):
+    def body(tcoeffs, _):
         # Pad the Taylor coefficients in zeros, call jet, and return the solution.
         # This works, because the $i$th output coefficient of jet()
         # is independent of the $i+j$th input coefficient
-        # (see also the explanation in taylor_mode_doubling_fn)
+        # (see also the explanation in taylor_mode_doubling)
         series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
         p, s_new = jax.experimental.jet.jet(vf, primals=initial_values, series=series)
 
@@ -51,9 +48,7 @@ def taylor_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int, t
         return taylor_coeffs
 
     # Compute all coefficients with scan().
-    taylor_coeffs, _ = jax.lax.scan(
-        body_fn, init=taylor_coeffs, xs=None, length=num - 1
-    )
+    taylor_coeffs, _ = jax.lax.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
     return taylor_coeffs
 
 
@@ -84,7 +79,7 @@ def _subsets(x, /, n):
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def forward_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int, t):
+def forward_mode(*, vector_field: Callable, initial_values: Tuple, num: int, t):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -118,85 +113,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def affine_recursion(*, vector_field: Callable, initial_values: Tuple, num: int, t):
-    """Evaluate the Taylor series of an affine differential equation.
-
-    !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`.
-
-    """
-    if num == 0:
-        return initial_values
-
-    vf = jax.tree_util.Partial(vector_field, t=t)
-    fx, jvp_fn = jax.linearize(vf, *initial_values)
-
-    tmp = fx
-    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
-    return [*initial_values, fx, *fx_evaluations]
-
-
-def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
-    """Create an estimator that uses a Runge-Kutta starter."""
-    return functools.partial(_runge_kutta_starter_fn, dt0=dt, atol=atol, rtol=rtol)
-
-
-# atol and rtol must be static bc. of jax.odeint...
-@functools.partial(jax.jit, static_argnames=["vector_field", "num", "atol", "rtol"])
-def _runge_kutta_starter_fn(
-    *, vector_field, initial_values, num: int, t, dt0, atol, rtol
-):
-    # todo [inaccuracy]: the initial-value uncertainty is discarded
-    # todo [feature]: allow implementations other than IsoIBM?
-    # todo [feature]: higher-order ODEs
-
-    # Assertions and early exits
-
-    if len(initial_values) > 1:
-        raise ValueError("Higher-order ODEs are not supported at the moment.")
-
-    if num == 0:
-        return initial_values
-
-    if num == 1:
-        return *initial_values, vector_field(*initial_values, t=t)
-
-    # Generate data
-
-    def func(y, t):
-        return vector_field(y, t=t)
-
-    # todo: allow flexible "solve" method?
-    k = num + 1  # important: k > num
-    ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
-    ys = jax.experimental.ode.odeint(func, initial_values[0], ts, atol=atol, rtol=rtol)
-
-    # Discretise the prior
-    rv = impl.ssm_util.standard_normal(num + 1, 1.0)
-    cond_initial = impl.ssm_util.identity_conditional(num + 1)
-    discretise = impl.ssm_util.ibm_transitions(num)
-    cond, precon = jax.vmap(discretise)(jnp.diff(ts))
-
-    # Generate an observation-model for the QOI
-    # (1e-7 observation noise for nuggets and for reusing existing code)
-    model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
-    models = model_fun(0, 1e-7 * jnp.ones_like(ts))
-
-    # Run the preconditioned fixedpoint smoother
-    (corrected, conditional), _ = discrete.fixedpointsmoother_precon(
-        ys,
-        init=(rv, cond_initial),
-        conditional=(cond, precon),
-        observation_model=models,
-    )
-    initial = impl.conditional.marginalise(corrected, conditional)
-    return tuple(impl.random.mean(initial))
-
-
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def taylor_mode_doubling_fn(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t
-):
+def taylor_mode_doubling(*, vector_field: Callable, initial_values: Tuple, num: int, t):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -232,7 +149,7 @@ def taylor_mode_doubling_fn(
     taylor_coefficients = [u0]
     while (deg := len(taylor_coefficients)) < num + 1:
         jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
-        fx, jvp_fn = jax.linearize(jet_embedded_deg, *taylor_coefficients)
+        fx, jvp = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
         # todo: can we jax.fori_loop() this loop?
@@ -250,7 +167,7 @@ def taylor_mode_doubling_fn(
             # "Taylor-mode autodiff for higher-order derivatives in JAX")
             # explain details.
             cs_padded = cs + [zeros] * (2 * deg - k - 1)
-            linear_combination = jvp_fn(*cs_padded)[k - deg]
+            linear_combination = jvp(*cs_padded)[k - deg]
             cs += [(fx[k] + linear_combination) / (k + 1)]
 
         # Store all new coefficients

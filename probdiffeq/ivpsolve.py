@@ -12,6 +12,8 @@ from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, taylor
 
+# todo: make adaptive_solver and initial_condition arguments to the solver!
+
 
 def simulate_terminal_values(
     vector_field,
