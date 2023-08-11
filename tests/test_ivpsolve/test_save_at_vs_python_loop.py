@@ -26,6 +26,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     adaptive_kwargs = {
         "solver": solver,
+        "dt0": 0.1,
         "atol": 1e-2,
         "rtol": 1e-2,
         "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),

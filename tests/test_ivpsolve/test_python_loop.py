@@ -29,6 +29,7 @@ def fixture_python_loop_solution():
         "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
         "atol": 1e-2,
         "rtol": 1e-2,
+        "dt0": 0.1,
     }
     return ivpsolve.solve_with_python_while_loop(
         *problem_args, **problem_kwargs, **adaptive_kwargs

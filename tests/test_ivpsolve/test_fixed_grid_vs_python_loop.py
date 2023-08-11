@@ -24,6 +24,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     adaptive_kwargs = {
         "t0": t0,
         "t1": t1,
+        "dt0": 0.1,
         "solver": solver,
         "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
         "atol": 1e-2,

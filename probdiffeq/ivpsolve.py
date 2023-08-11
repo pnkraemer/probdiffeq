@@ -20,12 +20,11 @@ def simulate_terminal_values(
     t1,
     solver,
     output_scale,
-    dt0=None,
+    dt0,
     parameters=(),
     while_loop_fn_temporal=jax.lax.while_loop,
     while_loop_fn_per_step=jax.lax.while_loop,
     taylor_fn=taylor.taylor_mode_fn,
-    propose_dt0_nugget=1e-5,
     **adaptive_solver_options,
 ):
     """Simulate the terminal values of an initial value problem."""
@@ -46,11 +45,6 @@ def simulate_terminal_values(
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
-
-    if dt0 is None:
-        f, u0s = vector_field, initial_values
-        nugget = propose_dt0_nugget
-        dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
     save_at = jnp.asarray([t1])
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
@@ -97,12 +91,11 @@ def solve_and_save_at(
     save_at,
     solver,
     output_scale,
-    dt0=None,
+    dt0,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     while_loop_fn_temporal=jax.lax.while_loop,
     while_loop_fn_per_step=jax.lax.while_loop,
-    propose_dt0_nugget=1e-5,
     **adaptive_solver_options,
 ):
     """Solve an initial value problem and return the solution at a pre-determined grid.
@@ -136,11 +129,6 @@ def solve_and_save_at(
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
-
-    if dt0 is None:
-        f, u0s = vector_field, initial_values
-        nugget = propose_dt0_nugget
-        dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
@@ -184,10 +172,9 @@ def solve_with_python_while_loop(
     t1,
     solver,
     output_scale,
-    dt0=None,
+    dt0,
     parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
-    propose_dt0_nugget=1e-5,
     **adaptive_solver_options,
 ):
     """Solve an initial value problem with a native-Python while loop.
@@ -211,11 +198,6 @@ def solve_with_python_while_loop(
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
     )
-
-    if dt0 is None:
-        f, u0s = vector_field, initial_values
-        nugget = propose_dt0_nugget
-        dt0 = propose_dt0(f, u0s, t0=t0, parameters=parameters, nugget=nugget)
 
     t, posterior, output_scale, num_steps = _collocate.solve_with_python_while_loop(
         jax.tree_util.Partial(vector_field),

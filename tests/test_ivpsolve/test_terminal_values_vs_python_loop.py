@@ -27,7 +27,13 @@ def fixture_solver_kwargs():
     solver = calibrated.mle(strategy)
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
-    return {"solver": solver, "output_scale": output_scale, "atol": 1e-2, "rtol": 1e-2}
+    return {
+        "solver": solver,
+        "dt0": 0.1,
+        "output_scale": output_scale,
+        "atol": 1e-2,
+        "rtol": 1e-2,
+    }
 
 
 @testing.fixture(name="solution_python_loop")
@@ -46,6 +52,4 @@ def test_terminal_values_identical(solution_python_loop, simulation_terminal_val
     """The terminal values must be identical."""
     expected = jax.tree_util.tree_map(lambda s: s[-1], solution_python_loop)
     received = simulation_terminal_values
-    print(expected)
-    print(received)
     assert testing.tree_all_allclose(received, expected)
