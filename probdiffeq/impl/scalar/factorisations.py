@@ -3,6 +3,7 @@ from probdiffeq.impl import _factorisations
 from probdiffeq.impl.scalar import (
     _conditional,
     _linearise,
+    _prototypes,
     _random,
     _ssm_util,
     _transform,
@@ -26,3 +27,6 @@ class ScalarFactorisation(_factorisations.Factorisation):
 
     def ssm_util(self):
         return _ssm_util.SSMUtilBackend()
+
+    def prototypes(self):
+        return _prototypes.PrototypeBackend()
