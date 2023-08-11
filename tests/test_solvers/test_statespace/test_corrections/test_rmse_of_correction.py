@@ -9,6 +9,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.statespace import correction, cubature, extrapolation
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -62,7 +63,8 @@ def case_slr1_gauss_hermite():
 def fixture_solution(correction_impl):
     vf, u0, (t0, t1) = setup.ode()
 
-    problem_args = (vf, u0)
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=2)
+    problem_args = (vf, tcoeffs)
     problem_kwargs = {"t0": t0, "t1": t1}
 
     if correction_impl == "not_implemented":
@@ -90,8 +92,8 @@ def fixture_diffrax_solution():
 
     # Solve the IVP
     @jax.jit
-    def vf_diffrax(t, y, args):
-        return vf(y, t=t, p=args)
+    def vf_diffrax(t, y, args):  # noqa: ARG001
+        return vf(y, t=t)
 
     term = diffrax.ODETerm(vf_diffrax)
     solver = diffrax.Dopri5()

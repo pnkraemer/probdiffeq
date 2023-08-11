@@ -9,6 +9,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -18,7 +19,8 @@ def fixture_solver_setup():
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     grid = jnp.linspace(t0, t1, endpoint=True, num=12)
-    problem_args = (vf, (u0,))
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    problem_args = (vf, tcoeffs)
     problem_kwargs = {"grid": grid, "output_scale": output_scale}
 
     return problem_args, problem_kwargs
@@ -52,8 +54,8 @@ def fixture_diffrax_solution():
 
     # Solve the IVP
     @jax.jit
-    def vf_diffrax(t, y, args):
-        return vf(y, t=t, p=args)
+    def vf_diffrax(t, y, args):  # noqa: ARG001
+        return vf(y, t=t)
 
     term = diffrax.ODETerm(vf_diffrax)
     solver = diffrax.Dopri5()

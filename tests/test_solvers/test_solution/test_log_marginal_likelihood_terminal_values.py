@@ -7,6 +7,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -35,9 +36,10 @@ def fixture_sol(strategy_func):
     strategy = strategy_func(ibm, ts0)
 
     solver = uncalibrated.solver(strategy)
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
     return ivpsolve.simulate_terminal_values(
         vf,
-        (u0,),
+        tcoeffs,
         t0=t0,
         t1=t1,
         solver=solver,

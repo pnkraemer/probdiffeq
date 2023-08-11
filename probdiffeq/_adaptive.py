@@ -108,13 +108,7 @@ class AdaptiveIVPSolver:
         u_proposed = impl.random.qoi(state_proposed.strategy.hidden)
         u_step_from = impl.random.qoi(state_proposed.strategy.hidden)
         u = jnp.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
-        error_normalised = self._normalise_error(
-            error_estimate=state_proposed.error_estimate,
-            u=u,
-            atol=self.atol,
-            rtol=self.rtol,
-            norm_ord=self.norm_ord,
-        )
+        error_normalised = self._normalise_error(state_proposed.error_estimate, u=u)
         error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
         state_control = self.control.apply(
             state_control,
@@ -128,11 +122,10 @@ class AdaptiveIVPSolver:
             step_from=state.step_from,
         )
 
-    @staticmethod
-    def _normalise_error(*, error_estimate, u, atol, rtol, norm_ord):
-        error_relative = error_estimate / (atol + rtol * jnp.abs(u))
+    def _normalise_error(self, error_estimate, *, u):
+        error_relative = error_estimate / (self.atol + self.rtol * jnp.abs(u))
         dim = jnp.atleast_1d(u).size
-        return jnp.linalg.norm(error_relative, ord=norm_ord) / jnp.sqrt(dim)
+        return jnp.linalg.norm(error_relative, ord=self.norm_ord) / jnp.sqrt(dim)
 
     def extract(self, accepted, control, /):
         solver_extract = self.solver.extract(accepted)

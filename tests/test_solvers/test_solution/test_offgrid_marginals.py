@@ -6,6 +6,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -19,9 +20,10 @@ def test_filter_marginals_close_only_to_left_boundary():
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+
     sol = ivpsolve.solve_fixed_grid(
         vf,
-        (u0,),
+        (u0, vf(u0, t=t0)),
         grid=jnp.linspace(t0, t1, endpoint=True, num=5),
         solver=solver,
         output_scale=output_scale,
@@ -45,9 +47,10 @@ def test_smoother_marginals_close_to_both_boundaries():
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
     sol = ivpsolve.solve_fixed_grid(
         vf,
-        (u0,),
+        tcoeffs,
         grid=jnp.linspace(t0, t1, endpoint=True, num=5),
         solver=solver,
         output_scale=output_scale,

@@ -8,6 +8,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -22,9 +23,10 @@ def fixture_sol():
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
     return ivpsolve.solve_and_save_at(
         vf,
-        (u0,),
+        tcoeffs,
         save_at=save_at,
         solver=solver,
         atol=1e-2,
@@ -106,9 +108,10 @@ def test_raises_error_for_filter():
     solver = uncalibrated.solver(strategy)
 
     grid = jnp.linspace(t0, t1, num=3)
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
     sol = ivpsolve.solve_fixed_grid(
         vf,
-        (u0,),
+        tcoeffs,
         grid=grid,
         solver=solver,
         output_scale=1.0,

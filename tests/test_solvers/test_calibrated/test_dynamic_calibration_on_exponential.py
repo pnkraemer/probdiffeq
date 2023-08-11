@@ -17,7 +17,7 @@ from tests.setup import setup
 def test_exponential_approximated_well():
     vf, u0, (t0, t1), solution = setup.ode_affine()
 
-    problem_args = (vf, u0)
+    problem_args = (vf, (*u0, vf(*u0, t=t0)))
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=1)
     ts0 = correction.taylor_order_zero()

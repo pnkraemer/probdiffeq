@@ -11,6 +11,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
@@ -19,7 +20,8 @@ def fixture_solver_setup():
     vf, (u0,), (t0, t1) = setup.ode()
 
     output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
-    args = (vf, (u0,))
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    args = (vf, tcoeffs)
     kwargs = {"atol": 1e-3, "rtol": 1e-3, "output_scale": output_scale, "dt0": 0.1}
     return args, kwargs, (t0, t1)
 
