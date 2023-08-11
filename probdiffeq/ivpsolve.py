@@ -21,7 +21,6 @@ def simulate_terminal_values(
     solver,
     output_scale,
     dt0,
-    parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
@@ -36,7 +35,6 @@ def simulate_terminal_values(
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
         t=t0,
-        parameters=parameters,
     )
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
@@ -49,7 +47,6 @@ def simulate_terminal_values(
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
-        parameters=parameters,
         interpolate=(solver.interpolate, solver.right_corner),
     )
     # "squeeze"-type functionality (there is only a single state!)
@@ -87,7 +84,6 @@ def solve_and_save_at(
     solver,
     output_scale,
     dt0,
-    parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
@@ -115,7 +111,6 @@ def solve_and_save_at(
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
         t=t0,
-        parameters=parameters,
     )
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
@@ -127,7 +122,6 @@ def solve_and_save_at(
         save_at=save_at[1:],
         adaptive_solver=adaptive_solver,
         dt0=dt0,
-        parameters=parameters,
         interpolate=(solver.interpolate, solver.right_corner),
     )
 
@@ -163,7 +157,6 @@ def solve_with_python_while_loop(
     solver,
     output_scale,
     dt0,
-    parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
     **adaptive_solver_options,
 ):
@@ -183,7 +176,6 @@ def solve_with_python_while_loop(
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
         t=t0,
-        parameters=parameters,
     )
     initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=t0, output_scale=output_scale
@@ -195,7 +187,6 @@ def solve_with_python_while_loop(
         t1=t1,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
-        parameters=parameters,
         interpolate=(solver.interpolate, solver.right_corner),
     )
     # I think the user expects the initial time-point to be part of the grid
@@ -232,7 +223,6 @@ def solve_fixed_grid(
     grid,
     solver,
     output_scale,
-    parameters=(),
     taylor_fn=taylor.taylor_mode_fn,
 ):
     """Solve an initial value problem on a fixed, pre-determined grid."""
@@ -245,7 +235,6 @@ def solve_fixed_grid(
         initial_values=initial_values,
         num=num_derivatives + 1 - len(initial_values),
         t=grid[0],
-        parameters=parameters,
     )
     _, *initial_condition = solver.solution_from_tcoeffs(
         taylor_coefficients, t=grid[0], output_scale=output_scale
@@ -257,7 +246,6 @@ def solve_fixed_grid(
         *initial_condition,
         grid=grid,
         solver=solver,
-        parameters=parameters,
     )
 
     if solver.requires_rescaling:

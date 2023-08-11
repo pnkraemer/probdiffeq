@@ -11,19 +11,16 @@ import jax.numpy as jnp
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import discrete
 
-#
-# from probdiffeq.solvers.statespace import extra
+# todo: split into subpackage
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def taylor_mode_fn(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
-):
+def taylor_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int, t):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
-    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    vf = jax.tree_util.Partial(vector_field, t=t)
 
     # Initial Taylor series (u_0, u_1, ..., u_k)
     primals = vf(*initial_values)
@@ -87,9 +84,7 @@ def _subsets(x, /, n):
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def forward_mode_fn(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
-):
+def forward_mode_fn(*, vector_field: Callable, initial_values: Tuple, num: int, t):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -98,7 +93,7 @@ def forward_mode_fn(
 
 
     """
-    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    vf = jax.tree_util.Partial(vector_field, t=t)
 
     g_n, g_0 = vf, vf
     taylor_coeffs = [*initial_values, vf(*initial_values)]
@@ -123,9 +118,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def affine_recursion(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
-):
+def affine_recursion(*, vector_field: Callable, initial_values: Tuple, num: int, t):
     """Evaluate the Taylor series of an affine differential equation.
 
     !!! warning "Compilation time"
@@ -135,7 +128,7 @@ def affine_recursion(
     if num == 0:
         return initial_values
 
-    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    vf = jax.tree_util.Partial(vector_field, t=t)
     fx, jvp_fn = jax.linearize(vf, *initial_values)
 
     tmp = fx
@@ -151,7 +144,7 @@ def make_runge_kutta_starter_fn(*, dt=1e-6, atol=1e-12, rtol=1e-10):
 # atol and rtol must be static bc. of jax.odeint...
 @functools.partial(jax.jit, static_argnames=["vector_field", "num", "atol", "rtol"])
 def _runge_kutta_starter_fn(
-    *, vector_field, initial_values, num: int, t, parameters, dt0, atol, rtol
+    *, vector_field, initial_values, num: int, t, dt0, atol, rtol
 ):
     # todo [inaccuracy]: the initial-value uncertainty is discarded
     # todo [feature]: allow implementations other than IsoIBM?
@@ -166,19 +159,17 @@ def _runge_kutta_starter_fn(
         return initial_values
 
     if num == 1:
-        return (*initial_values, vector_field(*initial_values, t=t, p=parameters))
+        return *initial_values, vector_field(*initial_values, t=t)
 
     # Generate data
 
-    def func(y, t, *p):
-        return vector_field(y, t=t, p=p)
+    def func(y, t):
+        return vector_field(y, t=t)
 
     # todo: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
-    ys = jax.experimental.ode.odeint(
-        func, initial_values[0], ts, *parameters, atol=atol, rtol=rtol
-    )
+    ys = jax.experimental.ode.odeint(func, initial_values[0], ts, atol=atol, rtol=rtol)
 
     # Discretise the prior
     rv = impl.ssm_util.standard_normal(num + 1, 1.0)
@@ -204,7 +195,7 @@ def _runge_kutta_starter_fn(
 
 @functools.partial(jax.jit, static_argnames=["vector_field", "num"])
 def taylor_mode_doubling_fn(
-    *, vector_field: Callable, initial_values: Tuple, num: int, t, parameters
+    *, vector_field: Callable, initial_values: Tuple, num: int, t
 ):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
@@ -218,7 +209,7 @@ def taylor_mode_doubling_fn(
         JIT-compiling this function unrolls a loop of length `num`.
 
     """
-    vf = jax.tree_util.Partial(vector_field, t=t, p=parameters)
+    vf = jax.tree_util.Partial(vector_field, t=t)
     (u0,) = initial_values
     zeros = jnp.zeros_like(u0)
 

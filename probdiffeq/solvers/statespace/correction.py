@@ -21,7 +21,7 @@ class Correction(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def estimate_error(self, ssv, corr, /, vector_field, t, p):
+    def estimate_error(self, ssv, corr, /, vector_field, t):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -47,9 +47,9 @@ class ODEConstraintTaylor(Correction):
         obs_like = impl.ssm_util.prototype_qoi()
         return ssv, obs_like
 
-    def estimate_error(self, hidden_state, _corr, /, vector_field, t, p):
+    def estimate_error(self, hidden_state, _corr, /, vector_field, t):
         def f_wrapped(s):
-            return vector_field(*s, t=t, p=p)
+            return vector_field(*s, t=t)
 
         A, b = self.linearise(f_wrapped, hidden_state.mean)
         observed = impl.transform.marginalise(hidden_state, (A, b))
@@ -80,8 +80,8 @@ class ODEConstraintStatistical(Correction):
         obs_like = impl.ssm_util.prototype_qoi()
         return ssv, obs_like
 
-    def estimate_error(self, hidden_state, _corr, /, vector_field, t, p):
-        f_wrapped = functools.partial(vector_field, t=t, p=p)
+    def estimate_error(self, hidden_state, _corr, /, vector_field, t):
+        f_wrapped = functools.partial(vector_field, t=t)
         A, b = self.linearise(f_wrapped, hidden_state)
         observed = impl.conditional.marginalise(hidden_state, (A, b))
 

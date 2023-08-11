@@ -18,7 +18,6 @@ def solve_and_save_at(
     save_at,
     adaptive_solver,
     dt0,
-    parameters,
     interpolate,
 ):
     interpolate_fun, right_corner_fun = interpolate
@@ -31,7 +30,6 @@ def solve_and_save_at(
             t1=t_next,
             vector_field=vector_field,
             adaptive_solver=adaptive_solver,
-            parameters=parameters,
         )
 
         # Either interpolate (t > t_next) or "finalise" (t == t_next)
@@ -68,7 +66,6 @@ def _advance_ivp_solution_adaptively(
     vector_field,
     t1,
     adaptive_solver,
-    parameters,
 ):
     """Advance an IVP solution to the next state."""
 
@@ -79,7 +76,7 @@ def _advance_ivp_solution_adaptively(
     def body_fun(s):
         s0, _, c0 = s
         s1, c1 = adaptive_solver.rejection_loop(
-            s0, c0, vector_field=vector_field, t1=t1, parameters=parameters
+            s0, c0, vector_field=vector_field, t1=t1
         )
         return s1, s0, c1
 
@@ -102,7 +99,6 @@ def _solution_generator(
     dt0,
     t1,
     adaptive_solver,
-    parameters,
     interpolate,
 ):
     """Generate a probabilistic IVP solution iteratively."""
@@ -114,7 +110,7 @@ def _solution_generator(
     while accepted.t < t1:
         previous = accepted
         accepted, control = adaptive_solver.rejection_loop(
-            accepted, control, vector_field=vector_field, t1=t1, parameters=parameters
+            accepted, control, vector_field=vector_field, t1=t1
         )
 
         if accepted.t < t1:
@@ -132,9 +128,7 @@ def _solution_generator(
     yield sol_solver
 
 
-def solve_fixed_grid(
-    vector_field, posterior, output_scale, num_steps, *, grid, solver, parameters
-):
+def solve_fixed_grid(vector_field, posterior, output_scale, num_steps, *, grid, solver):
     t0 = grid[0]
     state0 = solver.init(t0, posterior, output_scale, num_steps)
 
@@ -145,7 +139,6 @@ def solve_fixed_grid(
             state=s,
             vector_field=vector_field,
             dt=dt,
-            parameters=parameters,
         )
         return (s_new, t_new), s_new
 

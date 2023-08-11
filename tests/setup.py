@@ -49,7 +49,7 @@ class _Setup:
         t1 = 0.75
 
         @jax.jit
-        def vf(x, *, t, p):  # noqa: ARG001
+        def vf(x, *, t):  # noqa: ARG001
             return f(x, *f_args)
 
         return vf, (u0,), (t0, t1)
@@ -60,7 +60,7 @@ class _Setup:
         t1 = 2.0  # Short time-intervals are sufficient for this test.
 
         @jax.jit
-        def vf(x, *, t, p):  # noqa: ARG001
+        def vf(x, *, t):  # noqa: ARG001
             return f(x, *f_args)
 
         return vf, (u0,), (t0, t1)
@@ -76,7 +76,7 @@ class _Setup:
         u0 = jnp.ones((2,))
 
         @jax.jit
-        def vf(x, *, t, p):  # noqa: ARG001
+        def vf(x, *, t):  # noqa: ARG001
             return 2 * x
 
         def solution(t):
@@ -90,7 +90,7 @@ class _Setup:
         u0 = 1.0
 
         @jax.jit
-        def vf(x, *, t, p):  # noqa: ARG001
+        def vf(x, *, t):  # noqa: ARG001
             return 2 * x
 
         def solution(t):

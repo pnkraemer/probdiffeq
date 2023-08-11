@@ -32,7 +32,7 @@ class Solver(abc.ABC, Generic[T]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step(self, state: T, *, vector_field, dt, parameters) -> T:
+    def step(self, state: T, *, vector_field, dt) -> T:
         raise NotImplementedError
 
     @abc.abstractmethod

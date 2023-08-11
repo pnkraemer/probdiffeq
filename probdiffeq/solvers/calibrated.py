@@ -20,12 +20,11 @@ def mle(strategy):
     )
 
 
-def _step_mle(state, /, dt, parameters, vector_field, *, strategy, calibration):
+def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
     output_scale_prior, _calibrated = calibration.extract(state.output_scale)
     error, _, state_strategy = strategy.predict_error(
         state.strategy,
         dt=dt,
-        parameters=parameters,
         vector_field=vector_field,
     )
 
@@ -56,11 +55,10 @@ def dynamic(strategy):
     )
 
 
-def _step_dynamic(state, /, dt, parameters, vector_field, *, strategy, calibration):
+def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
     error, observed, state_strategy = strategy.predict_error(
         state.strategy,
         dt=dt,
-        parameters=parameters,
         vector_field=vector_field,
     )
 
@@ -155,14 +153,11 @@ class CalibratedSolver(_solver.Solver[_common.State]):
             num_steps=num_steps,
         )
 
-    def step(
-        self, state: _common.State, *, vector_field, dt, parameters
-    ) -> _common.State:
+    def step(self, state: _common.State, *, vector_field, dt) -> _common.State:
         return self.impl_step(
             state,
             vector_field=vector_field,
             dt=dt,
-            parameters=parameters,
             strategy=self.strategy,
             calibration=self.calibration,
         )

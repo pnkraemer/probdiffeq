@@ -50,10 +50,10 @@ class Strategy(Generic[P]):
         rv, corr = self.correction.init(rv)
         return _common.State(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def predict_error(self, state: _common.State, /, *, dt, parameters, vector_field):
+    def predict_error(self, state: _common.State, /, *, dt, vector_field):
         hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         error, observed, corr = self.correction.estimate_error(
-            hidden, state.aux_corr, vector_field=vector_field, t=state.t, p=parameters
+            hidden, state.aux_corr, vector_field=vector_field, t=state.t
         )
         t = state.t + dt
         state = _common.State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)

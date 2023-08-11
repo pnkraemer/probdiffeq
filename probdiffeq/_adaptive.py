@@ -61,7 +61,7 @@ class AdaptiveIVPSolver:
         return state_solver, state_control
 
     @jax.jit
-    def rejection_loop(self, state0, control0, *, vector_field, t1, parameters):
+    def rejection_loop(self, state0, control0, *, vector_field, t1):
         def cond_fn(s):
             return s.error_norm_proposed > 1.0
 
@@ -70,7 +70,6 @@ class AdaptiveIVPSolver:
                 state=s,
                 vector_field=vector_field,
                 t1=t1,
-                parameters=parameters,
             )
 
         def init(s0, c0):
@@ -89,7 +88,7 @@ class AdaptiveIVPSolver:
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
 
-    def _attempt_step(self, *, state: _RejectionState, vector_field, t1, parameters):
+    def _attempt_step(self, *, state: _RejectionState, vector_field, t1):
         """Attempt a step.
 
         Perform a step with an IVP solver and
@@ -104,7 +103,6 @@ class AdaptiveIVPSolver:
             state=state.step_from,
             vector_field=vector_field,
             dt=self.control.extract(state_control),
-            parameters=parameters,
         )
         # Normalise the error and propose a new step.
         u_proposed = impl.random.qoi(state_proposed.strategy.hidden)

@@ -24,7 +24,7 @@ def fixture_python_loop_solution():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
-    dt0 = timestep.propose(lambda y: vf(y, t=t0, p=()), u0)
+    dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
 
     adaptive_kwargs = {
         "solver": solver,
@@ -44,8 +44,8 @@ def fixture_diffrax_solution():
 
     # Solve the IVP
     @jax.jit
-    def vf_diffrax(t, y, args):
-        return vf(y, t=t, p=args)
+    def vf_diffrax(t, y, _args):
+        return vf(y, t=t)
 
     term = diffrax.ODETerm(vf_diffrax)
     solver = diffrax.Dopri5()
