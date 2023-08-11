@@ -11,6 +11,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         # this is problematic for the isotropic model unless we explicitly broadcast.
         if jnp.ndim(x) == 1:
             x = x[None, :]
+        print(x.shape, A.shape, noise.mean.shape)
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)
 
     def marginalise(self, rv, conditional, /):

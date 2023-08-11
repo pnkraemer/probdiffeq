@@ -19,8 +19,8 @@ def make_runge_kutta_starter(*, dt=1e-6, atol=1e-12, rtol=1e-10):
 
 
 # atol and rtol must be static bc. of jax.odeint...
-@functools.partial(jax.jit, static_argnames=["vector_field", "num", "atol", "rtol"])
-def _runge_kutta_starter(*, vector_field, initial_values, num: int, t, dt0, atol, rtol):
+@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"])
+def _runge_kutta_starter(vector_field, initial_values, /, num: int, t, dt0, atol, rtol):
     # todo [inaccuracy]: the initial-value uncertainty is discarded
     # todo [feature]: allow implementations other than IsoIBM?
     # todo [feature]: higher-order ODEs
@@ -47,10 +47,10 @@ def _runge_kutta_starter(*, vector_field, initial_values, num: int, t, dt0, atol
     ys = jax.experimental.ode.odeint(func, initial_values[0], ts, atol=atol, rtol=rtol)
 
     # Discretise the prior
-    rv = impl.ssm_util.standard_normal(num + 1, 1.0)
-    cond_initial = impl.ssm_util.identity_conditional(num + 1)
-    discretise = impl.ssm_util.ibm_transitions(num)
-    cond, precon = jax.vmap(discretise)(jnp.diff(ts))
+    conditional_t0 = impl.ssm_util.identity_conditional(num + 1)
+    rv_t0 = impl.ssm_util.standard_normal(num + 1, 1.0)
+    discretise = impl.ssm_util.ibm_transitions(num, 1.0)
+    conditional, preconditioner = jax.vmap(discretise)(jnp.diff(ts))
 
     # Generate an observation-model for the QOI
     # (1e-7 observation noise for nuggets and for reusing existing code)
@@ -60,8 +60,8 @@ def _runge_kutta_starter(*, vector_field, initial_values, num: int, t, dt0, atol
     # Run the preconditioned fixedpoint smoother
     (corrected, conditional), _ = discrete.fixedpointsmoother_precon(
         ys,
-        init=(rv, cond_initial),
-        conditional=(cond, precon),
+        init=(rv_t0, conditional_t0),
+        conditional=(conditional, preconditioner),
         observation_model=models,
     )
     initial = impl.conditional.marginalise(corrected, conditional)

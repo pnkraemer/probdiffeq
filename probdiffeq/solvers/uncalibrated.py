@@ -25,13 +25,10 @@ class UncalibratedSolver(_solver.Solver[_common.State]):
             num_steps=num_steps,
         )
 
-    def step(
-        self, state: _common.State, *, vector_field, dt, parameters
-    ) -> _common.State:
+    def step(self, state: _common.State, *, vector_field, dt) -> _common.State:
         error, _observed, state_strategy = self.strategy.predict_error(
             state.strategy,
             dt=dt,
-            parameters=parameters,
             vector_field=vector_field,
         )
         state_strategy = self.strategy.complete(

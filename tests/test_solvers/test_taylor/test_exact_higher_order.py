@@ -21,20 +21,20 @@ def case_taylor_mode():
 def fixture_pb_with_solution():
     f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
 
-    def vf(u, du, *, t):  # noqa: ARG001
+    def vf(u, du, /):
         return f(u, du, *f_args)
 
     solution = jnp.load(
         "./tests/test_solvers/test_taylor/data/van_der_pol_second_solution.npy"
     )
-    return (vf, (u0, du0), t0, f_args), solution
+    return (vf, (u0, du0)), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
 @testing.parametrize("num", [1, 3])
 def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num):
-    (f, init, t0, params), solution = pb_with_solution
+    (f, init), solution = pb_with_solution
 
-    derivatives = taylor_fun(vector_field=f, initial_values=init, t=t0, num=num)
+    derivatives = taylor_fun(f, init, num=num)
     for dy, dy_ref in zip(derivatives, solution):
         assert jnp.allclose(dy, dy_ref)

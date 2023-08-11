@@ -26,20 +26,20 @@ def case_taylor_mode_doubling():
 def fixture_pb_with_solution():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
 
-    def vf(u, *, t):  # noqa: ARG001
+    def vf(u, /):
         return f(u, *f_args)
 
     solution = jnp.load(
         "./tests/test_solvers/test_taylor/data/three_body_first_solution.npy"
     )
-    return (vf, (u0,), t0), solution
+    return (vf, (u0,)), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
 @testing.parametrize("num", [1, 3])
 def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num):
-    (f, init, t0), solution = pb_with_solution
+    (f, init), solution = pb_with_solution
 
-    derivatives = taylor_fun(vector_field=f, initial_values=init, t=t0, num=num)
+    derivatives = taylor_fun(f, init, num=num)
     for dy, dy_ref in zip(derivatives, solution):
         assert jnp.allclose(dy, dy_ref)

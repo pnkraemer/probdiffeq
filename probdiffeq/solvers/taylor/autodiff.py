@@ -11,13 +11,11 @@ import jax.numpy as jnp
 # todo: split into subpackage
 
 
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def taylor_mode(*, vector_field: Callable, initial_values: Tuple, num: int, t):
+@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
+def taylor_mode(vf: Callable, initial_values: Tuple, /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
-
-    vf = jax.tree_util.Partial(vector_field, t=t)
 
     # Initial Taylor series (u_0, u_1, ..., u_k)
     primals = vf(*initial_values)
@@ -78,8 +76,8 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def forward_mode(*, vector_field: Callable, initial_values: Tuple, num: int, t):
+@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
+def forward_mode(vf: Callable, initial_values: Tuple, /, num: int):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -88,8 +86,6 @@ def forward_mode(*, vector_field: Callable, initial_values: Tuple, num: int, t):
 
 
     """
-    vf = jax.tree_util.Partial(vector_field, t=t)
-
     g_n, g_0 = vf, vf
     taylor_coeffs = [*initial_values, vf(*initial_values)]
     for _ in range(num - 1):
@@ -112,8 +108,8 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
-@functools.partial(jax.jit, static_argnames=["vector_field", "num"])
-def taylor_mode_doubling(*, vector_field: Callable, initial_values: Tuple, num: int, t):
+@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
+def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -126,7 +122,6 @@ def taylor_mode_doubling(*, vector_field: Callable, initial_values: Tuple, num: 
         JIT-compiling this function unrolls a loop of length `num`.
 
     """
-    vf = jax.tree_util.Partial(vector_field, t=t)
     (u0,) = initial_values
     zeros = jnp.zeros_like(u0)
 
