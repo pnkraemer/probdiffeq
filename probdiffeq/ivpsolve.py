@@ -312,19 +312,6 @@ def _userfriendly_output(*, posterior, posterior_t0):
     return marginals, posterior
 
 
-def propose_dt0(
-    vector_field, initial_values, /, t0, parameters, scale=0.01, nugget=1e-5
-):
-    """Propose an initial time-step."""
-    u0, *_ = initial_values
-    f0 = vector_field(*initial_values, t=t0, p=parameters)
-
-    norm_y0 = jnp.linalg.norm(u0)
-    norm_dy0 = jnp.linalg.norm(f0) + nugget
-
-    return scale * norm_y0 / norm_dy0
-
-
 def _assert_tuple(x, /):
     """Verify that the initial conditions are a tuple of arrays.
 

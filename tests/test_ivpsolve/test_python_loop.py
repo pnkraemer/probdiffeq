@@ -3,7 +3,7 @@ import diffrax
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
@@ -24,12 +24,14 @@ def fixture_python_loop_solution():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
+    dt0 = timestep.propose(lambda y: vf(y, t=t0, p=()), u0)
+
     adaptive_kwargs = {
         "solver": solver,
         "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
         "atol": 1e-2,
         "rtol": 1e-2,
-        "dt0": 0.1,
+        "dt0": dt0,
     }
     return ivpsolve.solve_with_python_while_loop(
         *problem_args, **problem_kwargs, **adaptive_kwargs
