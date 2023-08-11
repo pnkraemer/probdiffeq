@@ -29,7 +29,7 @@ def fixture_solver_kwargs():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     return {
         "solver": solver,
         "dt0": 0.1,

@@ -21,7 +21,7 @@ def fixture_approximation():
     strategy = smoothers.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
     return ivpsolve.solve_and_save_every_step(
         vf,

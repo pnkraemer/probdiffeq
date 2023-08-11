@@ -1,6 +1,13 @@
 import abc
 
-from probdiffeq.impl import _conditional, _linearise, _random, _ssm_util, _transform
+from probdiffeq.impl import (
+    _conditional,
+    _linearise,
+    _prototypes,
+    _random,
+    _ssm_util,
+    _transform,
+)
 
 
 class Factorisation(abc.ABC):
@@ -22,6 +29,10 @@ class Factorisation(abc.ABC):
 
     @abc.abstractmethod
     def ssm_util(self) -> _ssm_util.SSMUtilBackend:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def prototypes(self) -> _prototypes.PrototypeBackend:
         raise NotImplementedError
 
 

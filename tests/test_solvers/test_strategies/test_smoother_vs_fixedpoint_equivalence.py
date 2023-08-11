@@ -19,7 +19,7 @@ from tests.setup import setup
 def fixture_solver_setup():
     vf, (u0,), (t0, t1) = setup.ode()
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
     args = (vf, tcoeffs)
     kwargs = {"atol": 1e-3, "rtol": 1e-3, "output_scale": output_scale, "dt0": 0.1}

@@ -22,7 +22,7 @@ def fixture_approximate_solution():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=1)
     return ivpsolve.solve_and_save_every_step(
         vf,
@@ -74,7 +74,7 @@ def fixture_approximate_solution_batched():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
 
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
 

@@ -44,7 +44,7 @@ def fixture_sol(strategy_func):
         t1=t1,
         solver=solver,
         dt0=0.1,
-        output_scale=jnp.ones_like(impl.ssm_util.prototype_output_scale()),
+        output_scale=jnp.ones_like(impl.prototypes.output_scale()),
         atol=1e-2,
         rtol=1e-2,
     )

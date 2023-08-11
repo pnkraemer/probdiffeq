@@ -144,7 +144,7 @@ class CalibratedSolver(_solver.Solver[_common.State]):
 
     def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
         state_strategy = self.strategy.init(t, posterior)
-        error_estimate = impl.ssm_util.prototype_error_estimate()
+        error_estimate = impl.prototypes.error_estimate()
         calib_state = self.calibration.init(output_scale)
         return _common.State(
             error_estimate=error_estimate,
@@ -190,7 +190,7 @@ class CalibratedSolver(_solver.Solver[_common.State]):
     def _interp_make_state(
         self, state_strategy, *, reference: _common.State
     ) -> _common.State:
-        error_estimate = impl.ssm_util.prototype_error_estimate()
+        error_estimate = impl.prototypes.error_estimate()
         return _common.State(
             strategy=state_strategy,
             error_estimate=error_estimate,

@@ -44,7 +44,7 @@ class ODEConstraintTaylor(Correction):
         return self.string_repr
 
     def init(self, ssv, /):
-        obs_like = impl.ssm_util.prototype_observed()
+        obs_like = impl.prototypes.observed()
         return ssv, obs_like
 
     def estimate_error(self, hidden_state, _corr, /, vector_field, t):
@@ -77,7 +77,7 @@ class ODEConstraintStatistical(Correction):
         return self.string_repr
 
     def init(self, ssv, /):
-        obs_like = impl.ssm_util.prototype_observed()
+        obs_like = impl.prototypes.observed()
         return ssv, obs_like
 
     def estimate_error(self, hidden_state, _corr, /, vector_field, t):

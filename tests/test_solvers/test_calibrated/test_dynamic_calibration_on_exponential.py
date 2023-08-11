@@ -24,7 +24,7 @@ def test_exponential_approximated_well():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.dynamic(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     grid = jnp.linspace(t0, t1, num=20)
     solver_kwargs = {
         "grid": grid,

@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 
 def test_marginal_moments_are_correct(num_derivatives=2):
     """Solve a second-order, scalar, linear, separable BVP."""
-    output_scale = 10.0 * jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = 10.0 * jnp.ones_like(impl.prototypes.output_scale())
     t0, t1 = 0.0, 3.4123412
     grid = jnp.linspace(t0, t1, endpoint=True, num=20)
 

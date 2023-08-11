@@ -38,21 +38,3 @@ class SSMUtilBackend(abc.ABC):
     @abc.abstractmethod
     def conditional_to_derivative(self, i, standard_deviation):
         raise NotImplementedError
-
-    # todo: move to a prototype module?
-
-    @abc.abstractmethod
-    def prototype_qoi(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def prototype_observed(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def prototype_error_estimate(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def prototype_output_scale(self):
-        raise NotImplementedError

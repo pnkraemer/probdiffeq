@@ -21,7 +21,7 @@ def fixture_sol():
     strategy = smoothers.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
     return ivpsolve.solve_and_save_at(

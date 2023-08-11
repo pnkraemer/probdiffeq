@@ -3,6 +3,7 @@ from probdiffeq.impl import _factorisations
 from probdiffeq.impl.blockdiag import (
     _conditional,
     _linearise,
+    _prototypes,
     _random,
     _ssm_util,
     _transform,
@@ -30,3 +31,6 @@ class BlockDiagFactorisation(_factorisations.Factorisation):
 
     def transform(self):
         return _transform.TransformBackend(ode_shape=self.ode_shape)
+
+    def prototypes(self):
+        return _prototypes.PrototypeBackend(ode_shape=self.ode_shape)

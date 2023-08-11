@@ -19,7 +19,7 @@ def test_filter_marginals_close_only_to_left_boundary():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
 
     sol = ivpsolve.solve_fixed_grid(
         vf,
@@ -46,7 +46,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
     sol = ivpsolve.solve_fixed_grid(
         vf,

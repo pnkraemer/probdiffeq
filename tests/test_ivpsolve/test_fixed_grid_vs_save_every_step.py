@@ -28,7 +28,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
         "t1": t1,
         "dt0": 0.1,
         "solver": solver,
-        "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
+        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
         "atol": 1e-2,
         "rtol": 1e-2,
         # Any clipped controller will do.
@@ -40,7 +40,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     fixed_kwargs = {
         "grid": grid_adaptive,
         "solver": solver,
-        "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
+        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
     }
     solution_fixed = ivpsolve.solve_fixed_grid(*args, **fixed_kwargs)
     assert testing.tree_all_allclose(solution_adaptive, solution_fixed)

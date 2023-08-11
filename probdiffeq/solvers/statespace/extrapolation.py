@@ -248,7 +248,7 @@ jax.tree_util.register_pytree_node(
 
 
 def ibm_adaptive(num_derivatives) -> IBMExtrapolationFactory:
-    output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
     discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
     return IBMExtrapolationFactory(args=(discretise, num_derivatives))
 

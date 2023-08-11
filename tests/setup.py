@@ -104,7 +104,7 @@ class _Setup:
         def _random_like(x):  # issue:
             return jax.random.normal(key, shape=jnp.shape(x)) * x
 
-        output_scale = jnp.ones_like(impl.ssm_util.prototype_output_scale())
+        output_scale = jnp.ones_like(impl.prototypes.output_scale())
         discretise_func = impl.ssm_util.ibm_transitions(3, output_scale)
         (_matrix, rv), _pre = discretise_func(0.5)
         u = jax.tree_util.tree_map(_random_like, impl.random.mean(rv))

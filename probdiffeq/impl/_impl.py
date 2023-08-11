@@ -54,3 +54,9 @@ class Backend:
         if self._fact is None:
             raise ValueError("Select a factorisation first.")
         return self._fact.ssm_util()
+
+    @property
+    def prototypes(self) -> _ssm_util.SSMUtilBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
+        return self._fact.prototypes()

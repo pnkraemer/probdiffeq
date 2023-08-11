@@ -31,7 +31,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
         "dt0": 0.1,
         "atol": 1e-2,
         "rtol": 1e-2,
-        "output_scale": jnp.ones_like(impl.ssm_util.prototype_output_scale()),
+        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
     }
 
     # Compute an adaptive solution and interpolate
