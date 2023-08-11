@@ -20,7 +20,7 @@ def make_runge_kutta_starter(*, dt=1e-6, atol=1e-12, rtol=1e-10):
 
 # atol and rtol must be static bc. of jax.odeint...
 @functools.partial(jax.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"])
-def _runge_kutta_starter(vector_field, initial_values, /, num: int, t, dt0, atol, rtol):
+def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     # todo [inaccuracy]: the initial-value uncertainty is discarded
     # todo [feature]: allow implementations other than IsoIBM?
     # todo [feature]: higher-order ODEs
@@ -34,17 +34,14 @@ def _runge_kutta_starter(vector_field, initial_values, /, num: int, t, dt0, atol
         return initial_values
 
     if num == 1:
-        return *initial_values, vector_field(*initial_values, t=t)
+        return *initial_values, vf(*initial_values, t)
 
     # Generate data
-
-    def func(y, t):
-        return vector_field(y, t=t)
 
     # todo: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
-    ys = jax.experimental.ode.odeint(func, initial_values[0], ts, atol=atol, rtol=rtol)
+    ys = jax.experimental.ode.odeint(vf, initial_values[0], ts, atol=atol, rtol=rtol)
 
     # Discretise the prior
     conditional_t0 = impl.ssm_util.identity_conditional(num + 1)

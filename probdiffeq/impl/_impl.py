@@ -13,11 +13,17 @@ from probdiffeq.impl import (
 class Backend:
     def __init__(self):
         self._fact = None
+        self._fact_name = None
 
     def select(self, which, **kwargs):
         if self._fact is not None:
             raise ValueError(f"Factorisation {self._fact} has been selected already.")
         self._fact = _factorisations.choose(which, **kwargs)
+        self._fact_name = which
+
+    @property
+    def impl_name(self):
+        return self._fact_name
 
     @property
     def linearise(self) -> _linearise.LinearisationBackend:

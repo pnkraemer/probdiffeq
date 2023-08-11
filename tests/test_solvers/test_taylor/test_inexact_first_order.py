@@ -2,11 +2,14 @@
 import diffeqzoo.ivps
 
 from probdiffeq.backend import testing
+from probdiffeq.impl import impl
 from probdiffeq.solvers.taylor import autodiff, estim
 
 
 @testing.case()
 def case_runge_kutta_starter():
+    if impl.impl_name != "isotropic":
+        testing.skip(reason="Runge-Kutta starters currently require isotropic SSMs.")
     return estim.make_runge_kutta_starter()
 
 
