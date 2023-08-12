@@ -25,7 +25,7 @@ def fixture_setup(d):
 
 def test_logpdf():
     u, rv = setup.rv()
-    u_dense, (mean_dense, cov_dense) = impl.hidden_model.to_multivariate_normal(u, rv)
+    u_dense, (mean_dense, cov_dense) = impl.variable.to_multivariate_normal(u, rv)
     pdf1 = impl.stats.logpdf(u, rv)
     pdf2 = jax.scipy.stats.multivariate_normal.logpdf(u_dense, mean_dense, cov_dense)
     assert jnp.allclose(pdf1, pdf2)
