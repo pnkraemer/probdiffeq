@@ -2,11 +2,13 @@
 from probdiffeq.impl import _factorisations
 from probdiffeq.impl.dense import (
     _conditional,
+    _hidden_model,
     _linearise,
     _prototypes,
-    _random,
     _ssm_util,
+    _stats,
     _transform,
+    _variable,
 )
 
 
@@ -21,8 +23,14 @@ class DenseFactorisation(_factorisations.Factorisation):
     def linearise(self):
         return _linearise.LinearisationBackend(ode_shape=self.ode_shape)
 
-    def random(self):
-        return _random.RandomVariableBackend(ode_shape=self.ode_shape)
+    def hidden_model(self):
+        return _hidden_model.HiddenModelBackend(ode_shape=self.ode_shape)
+
+    def stats(self):
+        return _stats.StatsBackend(ode_shape=self.ode_shape)
+
+    def variable(self):
+        return _variable.VariableBackend(ode_shape=self.ode_shape)
 
     def conditional(self):
         return _conditional.ConditionalBackend()
