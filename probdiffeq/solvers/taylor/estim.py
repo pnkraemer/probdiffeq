@@ -51,7 +51,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
 
     # Generate an observation-model for the QOI
     # (1e-7 observation noise for nuggets and for reusing existing code)
-    model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
+    model_fun = jax.vmap(impl.hidden_model.conditional_to_derivative, in_axes=(None, 0))
     models = model_fun(0, 1e-7 * jnp.ones_like(ts))
 
     # Run the preconditioned fixedpoint smoother

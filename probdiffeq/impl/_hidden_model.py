@@ -13,3 +13,7 @@ class HiddenModelBackend(abc.ABC):
     @abc.abstractmethod
     def qoi_from_sample(self, sample, /):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def conditional_to_derivative(self, i, standard_deviation):
+        raise NotImplementedError

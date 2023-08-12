@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 from probdiffeq.impl import _hidden_model
 from probdiffeq.impl.blockdiag import _normal
-from probdiffeq.impl.util import cholesky_util
+from probdiffeq.impl.util import cholesky_util, cond_util, linop_util
 
 
 class HiddenModelBackend(_hidden_model.HiddenModelBackend):
@@ -29,3 +29,13 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[..., 0]
+
+    def conditional_to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[:, [i], ...]
+
+        bias = jnp.zeros((*self.ode_shape, 1))
+        eye = jnp.ones((*self.ode_shape, 1, 1)) * jnp.eye(1)[None, ...]
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return cond_util.Conditional(linop, noise)

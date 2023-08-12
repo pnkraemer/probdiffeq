@@ -1,12 +1,10 @@
 """State-space model utilities."""
-import functools
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.dense import _normal
-from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util, linop_util
+from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):
@@ -82,28 +80,3 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def update_mean(self, mean, x, /, num):
         return cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
-
-    # todo: move to linearise.py?
-    def conditional_to_derivative(self, i, standard_deviation):
-        a0 = functools.partial(self._select_dy, idx_or_slice=i)
-
-        (d,) = self.ode_shape
-        bias = jnp.zeros((d,))
-        eye = jnp.eye(d)
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
-        return cond_util.Conditional(linop, noise)
-
-    def _select_dy(self, x, idx_or_slice):
-        (d,) = self.ode_shape
-        x_reshaped = jnp.reshape(x, (-1, d), order="F")
-        return x_reshaped[idx_or_slice, ...]
-
-
-def _autobatch_linop(fun):
-    def fun_(x):
-        if jnp.ndim(x) > 1:
-            return jax.vmap(fun_, in_axes=1, out_axes=1)(x)
-        return fun(x)
-
-    return fun_

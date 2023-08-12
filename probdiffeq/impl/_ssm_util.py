@@ -34,7 +34,3 @@ class SSMUtilBackend(abc.ABC):
     @abc.abstractmethod
     def standard_normal(self, num_derivatives_per_ode_dimension, /, output_scale):
         raise NotImplementedError
-
-    @abc.abstractmethod
-    def conditional_to_derivative(self, i, standard_deviation):
-        raise NotImplementedError

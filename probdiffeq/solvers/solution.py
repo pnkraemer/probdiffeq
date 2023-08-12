@@ -105,7 +105,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         )
 
     # Generate an observation-model for the QOI
-    model = impl.ssm_util.conditional_to_derivative(0, standard_deviation)
+    model = impl.hidden_model.conditional_to_derivative(0, standard_deviation)
     rv = posterior.init if isinstance(posterior, markov.MarkovSeqRev) else posterior
 
     _corrected, logpdf = _condition_and_logpdf(rv, u, model)
@@ -163,7 +163,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         raise TypeError(msg1 + msg2)
 
     # Generate an observation-model for the QOI
-    model_fun = jax.vmap(impl.ssm_util.conditional_to_derivative, in_axes=(None, 0))
+    model_fun = jax.vmap(impl.hidden_model.conditional_to_derivative, in_axes=(None, 0))
     models = model_fun(0, standard_deviation)
 
     # Select the terminal variable

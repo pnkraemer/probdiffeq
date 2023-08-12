@@ -1,9 +1,11 @@
+import functools
+
 import jax
 import jax.numpy as jnp
 
 from probdiffeq.impl import _hidden_model
 from probdiffeq.impl.dense import _normal
-from probdiffeq.impl.util import cholesky_util
+from probdiffeq.impl.util import cholesky_util, cond_util, linop_util
 
 
 class HiddenModelBackend(_hidden_model.HiddenModelBackend):
@@ -25,12 +27,32 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         c = cholesky_util.triu_via_qr(c.T)
         return _normal.Normal(m, c.T)
 
-    def _select(self, x, /, i):
-        x_reshaped = jnp.reshape(x, (-1, *self.ode_shape), order="F")
-        if i > x_reshaped.shape[0]:
-            raise ValueError
-        return x_reshaped[i]
-
     def qoi_from_sample(self, sample, /):
         sample_reshaped = jnp.reshape(sample, (-1, *self.ode_shape), order="F")
         return sample_reshaped[0]
+
+    # todo: move to linearise.py?
+    def conditional_to_derivative(self, i, standard_deviation):
+        a0 = functools.partial(self._select, idx_or_slice=i)
+
+        (d,) = self.ode_shape
+        bias = jnp.zeros((d,))
+        eye = jnp.eye(d)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
+        return cond_util.Conditional(linop, noise)
+
+    def _select(self, x, /, idx_or_slice):
+        x_reshaped = jnp.reshape(x, (-1, *self.ode_shape), order="F")
+        if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
+            raise ValueError
+        return x_reshaped[idx_or_slice]
+
+
+def _autobatch_linop(fun):
+    def fun_(x):
+        if jnp.ndim(x) > 1:
+            return jax.vmap(fun_, in_axes=1, out_axes=1)(x)
+        return fun(x)
+
+    return fun_

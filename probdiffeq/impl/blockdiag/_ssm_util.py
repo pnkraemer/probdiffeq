@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.blockdiag import _normal
-from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util, linop_util
+from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):
@@ -68,13 +68,3 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
         sum_updated = cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)
-
-    def conditional_to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[:, [i], ...]
-
-        bias = jnp.zeros((*self.ode_shape, 1))
-        eye = jnp.ones((*self.ode_shape, 1, 1)) * jnp.eye(1)[None, ...]
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return cond_util.Conditional(linop, noise)
