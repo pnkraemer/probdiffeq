@@ -33,15 +33,15 @@ class Factorisation(abc.ABC):
     def prototypes(self) -> _prototypes.PrototypeBackend:
         raise NotImplementedError
 
-    @property
+    @abc.abstractmethod
     def variable(self) -> _variable.VariableBackend:
         raise NotImplementedError
 
-    @property
+    @abc.abstractmethod
     def hidden_model(self) -> _hidden_model.HiddenModelBackend:
         raise NotImplementedError
 
-    @property
+    @abc.abstractmethod
     def stats(self) -> _stats.StatsBackend:
         raise NotImplementedError
 

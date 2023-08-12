@@ -1,18 +1,13 @@
-"""Random variable implementation."""
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.impl import _random
+from probdiffeq.impl import _stats
 from probdiffeq.impl.isotropic import _normal
-from probdiffeq.impl.util import cholesky_util
 
 
-class RandomVariableBackend(_random.RandomVariableBackend):
+class StatsBackend(_stats.StatsBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
-
-    def variable(self, mean, cholesky):
-        return _normal.Normal(mean, cholesky)
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
@@ -43,9 +38,6 @@ class RandomVariableBackend(_random.RandomVariableBackend):
     def mean(self, rv):
         return rv.mean
 
-    def qoi(self, rv):
-        return rv.mean[..., 0, :]
-
     def cholesky(self, rv):
         return rv.cholesky
 
@@ -54,39 +46,10 @@ class RandomVariableBackend(_random.RandomVariableBackend):
             return jax.vmap(self.cov_dense)(rv)
         return rv.cholesky @ rv.cholesky.T
 
-    def rescale_cholesky(self, rv, factor, /):
-        cholesky = factor[..., None, None] * rv.cholesky
-        return _normal.Normal(rv.mean, cholesky)
-
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
             return jax.vmap(self.standard_deviation)(rv)
         return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
-    def marginal_nth_derivative(self, rv, i):
-        if jnp.ndim(rv.mean) > 2:
-            return jax.vmap(self.marginal_nth_derivative, in_axes=(0, None))(rv, i)
-
-        if i > jnp.shape(rv.mean)[0]:
-            raise ValueError
-
-        mean = rv.mean[i, :]
-        cholesky = cholesky_util.triu_via_qr((rv.cholesky[i, :])[:, None].T).T
-        return _normal.Normal(mean, cholesky)
-
-    def qoi_from_sample(self, sample, /):
-        return sample[0, :]
-
     def sample_shape(self, rv):
         return rv.mean.shape
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        return rv.mean + rv.cholesky @ unit_sample
-
-    def to_multivariate_normal(self, u, rv):
-        eye_d = jnp.eye(*self.ode_shape)
-        cov = rv.cholesky @ rv.cholesky.T
-        cov = jnp.kron(eye_d, cov)
-        mean = rv.mean.reshape((-1,), order="F")
-        u = u.reshape((-1,), order="F")
-        return u, (mean, cov)
