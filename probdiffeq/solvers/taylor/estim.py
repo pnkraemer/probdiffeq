@@ -62,4 +62,4 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
         observation_model=models,
     )
     initial = impl.conditional.marginalise(corrected, conditional)
-    return tuple(impl.random.mean(initial))
+    return tuple(impl.stats.mean(initial))

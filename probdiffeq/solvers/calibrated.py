@@ -97,7 +97,7 @@ class MostRecent(Calibration):
         return prior
 
     def update(self, _state, /, observed):
-        return impl.random.mahalanobis_norm_relative(0.0, observed)
+        return impl.stats.mahalanobis_norm_relative(0.0, observed)
 
     def extract(self, state, /):
         return state, state
@@ -113,7 +113,7 @@ class RunningMean(Calibration):
     def update(self, state, /, observed):
         prior, calibrated, num_data = state
 
-        new_term = impl.random.mahalanobis_norm_relative(0.0, observed)
+        new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
         calibrated = impl.ssm_util.update_mean(calibrated, new_term, num=num_data)
         return prior, calibrated, num_data + 1.0
 

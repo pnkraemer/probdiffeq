@@ -47,7 +47,7 @@ def _filter_offgrid_marginals(
         output_scale=output_scale,
     )
     t, posterior = extract(sol)
-    u = impl.random.qoi(posterior)
+    u = impl.hidden_model.qoi(posterior)
     return u, posterior
 
 

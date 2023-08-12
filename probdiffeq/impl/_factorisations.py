@@ -2,21 +2,19 @@ import abc
 
 from probdiffeq.impl import (
     _conditional,
+    _hidden_model,
     _linearise,
     _prototypes,
-    _random,
     _ssm_util,
+    _stats,
     _transform,
+    _variable,
 )
 
 
 class Factorisation(abc.ABC):
     @abc.abstractmethod
     def linearise(self) -> _linearise.LinearisationBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def random(self) -> _random.RandomVariableBackend:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -33,6 +31,18 @@ class Factorisation(abc.ABC):
 
     @abc.abstractmethod
     def prototypes(self) -> _prototypes.PrototypeBackend:
+        raise NotImplementedError
+
+    @property
+    def variable(self) -> _variable.VariableBackend:
+        raise NotImplementedError
+
+    @property
+    def hidden_model(self) -> _hidden_model.HiddenModelBackend:
+        raise NotImplementedError
+
+    @property
+    def stats(self) -> _stats.StatsBackend:
         raise NotImplementedError
 
 

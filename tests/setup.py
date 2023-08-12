@@ -107,7 +107,7 @@ class _Setup:
         output_scale = jnp.ones_like(impl.prototypes.output_scale())
         discretise_func = impl.ssm_util.ibm_transitions(3, output_scale)
         (_matrix, rv), _pre = discretise_func(0.5)
-        u = jax.tree_util.tree_map(_random_like, impl.random.mean(rv))
+        u = jax.tree_util.tree_map(_random_like, impl.stats.mean(rv))
         return u, rv
 
 

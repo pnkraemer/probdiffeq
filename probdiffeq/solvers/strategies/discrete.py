@@ -84,7 +84,7 @@ class _KalmanFilterState(containers.NamedTuple):
 def _kalman_reverse_initialise(rv, data, model):
     observed, conditional = impl.conditional.revert(rv, model)
     corrected = impl.conditional.apply(data, conditional)
-    logpdf = impl.random.logpdf(data, observed)
+    logpdf = impl.stats.logpdf(data, observed)
     return _KalmanFilterState(corrected, 1.0, logpdf)
 
 
@@ -98,7 +98,7 @@ def _kalman_reverse_step(state, cond_and_data_and_obs):
     corrected = impl.conditional.apply(data, reverse)
 
     # Update logpdf
-    logpdf_new = impl.random.logpdf(data, observed)
+    logpdf_new = impl.stats.logpdf(data, observed)
     logpdf_mean = impl.ssm_util.update_mean(logpdf, logpdf_new, num_data)
     state = _KalmanFilterState(corrected, num_data + 1.0, logpdf_mean)
 

@@ -2,11 +2,13 @@
 from probdiffeq.impl import _factorisations
 from probdiffeq.impl.scalar import (
     _conditional,
+    _hidden_model,
     _linearise,
     _prototypes,
-    _random,
     _ssm_util,
+    _stats,
     _transform,
+    _variable,
 )
 
 
@@ -15,9 +17,6 @@ class ScalarFactorisation(_factorisations.Factorisation):
 
     def linearise(self):
         return _linearise.LinearisationBackend()
-
-    def random(self):
-        return _random.RandomVariableBackend()
 
     def conditional(self):
         return _conditional.ConditionalBackend()
@@ -30,3 +29,12 @@ class ScalarFactorisation(_factorisations.Factorisation):
 
     def prototypes(self):
         return _prototypes.PrototypeBackend()
+
+    def hidden_model(self):
+        return _hidden_model.HiddenModelBackend()
+
+    def stats(self):
+        return _stats.StatsBackend()
+
+    def variable(self):
+        return _variable.VariableBackend()

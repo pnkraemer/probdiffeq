@@ -42,7 +42,7 @@ def test_sample_shape(approximation, shape):
     # todo: remove "u" from this output?
     u, samples = approximation.posterior.sample(key, shape=shape)
     assert u.shape == shape + approximation.u.shape
-    assert samples.shape == shape + impl.random.sample_shape(approximation.marginals)
+    assert samples.shape == shape + impl.stats.sample_shape(approximation.marginals)
 
     # Todo: test values of the samples by checking a chi2 statistic
     #  in terms of the joint posterior. But this requires a joint_posterior()

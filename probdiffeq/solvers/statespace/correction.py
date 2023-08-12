@@ -106,8 +106,8 @@ def _estimate_error(observed, /):
     #  for instance, they assume that they are called in exactly this error estimation
     #  context. Same for prototype_qoi etc.
     zero_data = jnp.zeros(())
-    output_scale = impl.random.mahalanobis_norm_relative(zero_data, rv=observed)
-    error_estimate_unscaled = jnp.squeeze(impl.random.standard_deviation(observed))
+    output_scale = impl.stats.mahalanobis_norm_relative(zero_data, rv=observed)
+    error_estimate_unscaled = jnp.squeeze(impl.stats.standard_deviation(observed))
     return output_scale * error_estimate_unscaled
 
 

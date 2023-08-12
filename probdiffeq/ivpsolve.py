@@ -50,14 +50,14 @@ def simulate_terminal_values(
         if isinstance(posterior, markov.MarkovSeqRev):
             posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
-            posterior = impl.random.rescale_cholesky(posterior, output_scale)
+            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, markov.MarkovSeqRev):
         marginals = posterior.init
     else:
         marginals = posterior
-    u = impl.random.qoi(marginals)
+    u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=t1,
         u=u,
@@ -112,14 +112,14 @@ def solve_and_save_at(
         if isinstance(posterior, markov.MarkovSeqRev):
             posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
-            posterior = impl.random.rescale_cholesky(posterior, output_scale)
+            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     _, posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.random.qoi(marginals)
+    u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=save_at,
         u=u,
@@ -172,14 +172,14 @@ def solve_and_save_every_step(
         if isinstance(posterior, markov.MarkovSeqRev):
             posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
-            posterior = impl.random.rescale_cholesky(posterior, output_scale)
+            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     _, posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.random.qoi(marginals)
+    u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=t,
         u=u,
@@ -217,14 +217,14 @@ def solve_fixed_grid(
         if isinstance(posterior, markov.MarkovSeqRev):
             posterior = markov.rescale_cholesky(posterior, output_scale)
         else:
-            posterior = impl.random.rescale_cholesky(posterior, output_scale)
+            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.random.qoi(marginals)
+    u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=grid,
         u=u,

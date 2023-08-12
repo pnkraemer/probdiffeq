@@ -25,14 +25,14 @@ def fixture_setup(d):
 
 def test_logpdf():
     u, rv = setup.rv()
-    u_dense, (mean_dense, cov_dense) = impl.random.to_multivariate_normal(u, rv)
-    pdf1 = impl.random.logpdf(u, rv)
+    u_dense, (mean_dense, cov_dense) = impl.hidden_model.to_multivariate_normal(u, rv)
+    pdf1 = impl.stats.logpdf(u, rv)
     pdf2 = jax.scipy.stats.multivariate_normal.logpdf(u_dense, mean_dense, cov_dense)
     assert jnp.allclose(pdf1, pdf2)
 
 
 def test_grad_not_none():
     u, rv = setup.rv()
-    pdf = jax.jacrev(impl.random.logpdf)(u, rv)
+    pdf = jax.jacrev(impl.stats.logpdf)(u, rv)
     assert not jnp.any(jnp.isinf(pdf))
     assert not jnp.any(jnp.isnan(pdf))

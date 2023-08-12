@@ -47,6 +47,6 @@ def _tree_allclose(tree1, tree2, **kwargs):
 
 
 def marginals_allclose(m1, m2, /):
-    mean_allclose = jnp.allclose(impl.random.mean(m1), impl.random.mean(m2))
-    cov_allclose = jnp.allclose(impl.random.cov_dense(m1), impl.random.cov_dense(m2))
+    mean_allclose = jnp.allclose(impl.stats.mean(m1), impl.stats.mean(m2))
+    cov_allclose = jnp.allclose(impl.stats.cov_dense(m1), impl.stats.cov_dense(m2))
     return mean_allclose and cov_allclose

@@ -115,7 +115,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
 def _condition_and_logpdf(rv, data, model):
     observed, conditional = impl.conditional.revert(rv, model)
     corrected = impl.conditional.apply(data, conditional)
-    logpdf = impl.random.logpdf(data, observed)
+    logpdf = impl.stats.logpdf(data, observed)
     return corrected, logpdf
 
 

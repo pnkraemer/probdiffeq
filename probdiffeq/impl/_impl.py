@@ -3,10 +3,13 @@
 from probdiffeq.impl import (
     _conditional,
     _factorisations,
+    _hidden_model,
     _linearise,
-    _random,
+    _prototypes,
     _ssm_util,
+    _stats,
     _transform,
+    _variable,
 )
 
 
@@ -32,12 +35,6 @@ class Backend:
         return self._fact.linearise()
 
     @property
-    def random(self) -> _random.RandomVariableBackend:
-        if self._fact is None:
-            raise ValueError("Select a factorisation first.")
-        return self._fact.random()
-
-    @property
     def conditional(self) -> _conditional.ConditionalBackend:
         if self._fact is None:
             raise ValueError("Select a factorisation first.")
@@ -56,7 +53,25 @@ class Backend:
         return self._fact.ssm_util()
 
     @property
-    def prototypes(self) -> _ssm_util.SSMUtilBackend:
+    def prototypes(self) -> _prototypes.PrototypeBackend:
         if self._fact is None:
             raise ValueError("Select a factorisation first.")
         return self._fact.prototypes()
+
+    @property
+    def variable(self) -> _variable.VariableBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
+        return self._fact.variable()
+
+    @property
+    def hidden_model(self) -> _hidden_model.HiddenModelBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
+        return self._fact.hidden_model()
+
+    @property
+    def stats(self) -> _stats.StatsBackend:
+        if self._fact is None:
+            raise ValueError("Select a factorisation first.")
+        return self._fact.stats()
