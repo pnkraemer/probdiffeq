@@ -102,7 +102,7 @@ class ODEConstraintStatistical(Correction):
 
 
 def _estimate_error(observed, /):
-    # todo: the functions involved in error estimation are still a bit patchy.
+    # TODO: the functions involved in error estimation are still a bit patchy.
     #  for instance, they assume that they are called in exactly this error estimation
     #  context. Same for prototype_qoi etc.
     zero_data = jnp.zeros(())

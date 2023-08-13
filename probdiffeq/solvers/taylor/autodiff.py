@@ -8,7 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-# todo: split into subpackage
+# TODO: split into subpackage
 
 
 @functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
@@ -147,7 +147,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         fx, jvp = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
-        # todo: can we jax.fori_loop() this loop?
+        # TODO: can we jax.fori_loop() this loop?
         #  the running variable (cs_padded) should have constant size
         cs = [(fx[deg - 1] / deg)]
         for k in range(deg, min(2 * deg, num)):

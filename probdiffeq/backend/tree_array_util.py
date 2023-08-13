@@ -24,7 +24,7 @@ def tree_concatenate(list_of_trees):
     )
 
 
-# todo: should this be public or not?
+# TODO: should this be public or not?
 def tree_stack(list_of_trees):
     """Apply  tree_transpose and jnp.stack() to a list of PyTrees."""
     tree_of_lists = _tree_transpose(list_of_trees)

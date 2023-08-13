@@ -17,7 +17,7 @@ class StatsBackend(_stats.StatsBackend):
 
     def logpdf(self, u, /, rv):
         # The cholesky factor is triangular, so we compute a cheap slogdet.
-        # todo: cache those?
+        # TODO: cache those?
         diagonal = jnp.diagonal(rv.cholesky, axis1=-1, axis2=-2)
         slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
 
@@ -41,11 +41,6 @@ class StatsBackend(_stats.StatsBackend):
 
     def cholesky(self, rv):
         return rv.cholesky
-
-    def cov_dense(self, rv):
-        if jnp.ndim(rv.cholesky) > 2:
-            return jax.vmap(self.cov_dense)(rv)
-        return rv.cholesky @ rv.cholesky.T
 
     def sample_shape(self, rv):
         return rv.mean.shape

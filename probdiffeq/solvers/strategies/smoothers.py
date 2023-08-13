@@ -68,7 +68,7 @@ def _smoother_offgrid_marginals(
     return u, marginals
 
 
-# todo: state_t0 and state_t1 variable names
+# TODO: state_t0 and state_t1 variable names
 def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
     """Interpolate.
 
@@ -113,7 +113,7 @@ def _smoother_interpolate(t, *, s0, s1, output_scale, extrapolation):
 
 def _fixedpoint_right_corner(state_at_t1, *, extrapolation):
     # See case_interpolate() for detailed explanation of why this works.
-    # Todo: this prepares _future_ steps, so shouldn't it happen
+    # TODO: this prepares _future_ steps, so shouldn't it happen
     #  at initialisation instead of at completion?
     ssv, extra = extrapolation.reset(state_at_t1.hidden, state_at_t1.aux_extra)
     acc = _common.State(

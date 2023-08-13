@@ -1,5 +1,5 @@
 """API for dense factorisations."""
-from probdiffeq.impl import _factorisations
+from probdiffeq.impl import _impl
 from probdiffeq.impl.dense import (
     _conditional,
     _hidden_model,
@@ -12,12 +12,12 @@ from probdiffeq.impl.dense import (
 )
 
 
-class DenseFactorisation(_factorisations.Factorisation):
+class Dense(_impl.FactorisedImpl):
     """Dense factorisation."""
 
     def __init__(self, ode_shape):
         """Construct a dense factorisation."""
-        # todo: add "order="F"" key
+        # TODO: add "order="F"" key
         self.ode_shape = ode_shape
 
     def linearise(self):

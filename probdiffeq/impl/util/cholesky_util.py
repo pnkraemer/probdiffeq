@@ -41,7 +41,7 @@ def revert_conditional_noisefree(R_X_F, R_X):
     gain = jax.scipy.linalg.cho_solve((r_marg.T, True), crosscov.T).T
     r_cor = R_X - R_X_F @ gain.T
 
-    # todo: only with this line is the output equivalent to the other function
+    # TODO: only with this line is the output equivalent to the other function
     #  I don't like the double-QR decomposition --
     #  it feels that we don't save any computation here...
     if r_cor.shape[0] != r_cor.shape[1]:
@@ -140,7 +140,7 @@ def sqrt_sum_square_scalar(*args):
 
 def triu_via_qr(R, /):
     """Upper-triangularise a matrix using a QR-decomposition."""
-    # todo: enforce positive diagonals?
+    # TODO: enforce positive diagonals?
     #  (or expose this option; some equivalence tests might fail
     #   if we always use a positive diagonal.)
     return jnp.linalg.qr(R, mode="r")

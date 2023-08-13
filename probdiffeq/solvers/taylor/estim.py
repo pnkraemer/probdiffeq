@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import discrete
 
-# todo: split into subpackage
+# TODO: split into subpackage
 
 
 def make_runge_kutta_starter(*, dt=1e-6, atol=1e-12, rtol=1e-10):
@@ -21,14 +21,15 @@ def make_runge_kutta_starter(*, dt=1e-6, atol=1e-12, rtol=1e-10):
 # atol and rtol must be static bc. of jax.odeint...
 @functools.partial(jax.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"])
 def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
-    # todo [inaccuracy]: the initial-value uncertainty is discarded
-    # todo [feature]: allow implementations other than IsoIBM?
-    # todo [feature]: higher-order ODEs
+    # TODO [inaccuracy]: the initial-value uncertainty is discarded
+    # TODO [feature]: allow implementations other than IsoIBM?
+    # TODO [feature]: higher-order ODEs
 
     # Assertions and early exits
 
     if len(initial_values) > 1:
-        raise ValueError("Higher-order ODEs are not supported at the moment.")
+        msg = "Higher-order ODEs are not supported at the moment."
+        raise ValueError(msg)
 
     if num == 0:
         return initial_values
@@ -38,7 +39,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
 
     # Generate data
 
-    # todo: allow flexible "solve" method?
+    # TODO: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = jnp.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
     ys = jax.experimental.ode.odeint(vf, initial_values[0], ts, atol=atol, rtol=rtol)

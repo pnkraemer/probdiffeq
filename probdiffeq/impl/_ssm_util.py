@@ -20,12 +20,12 @@ class SSMUtilBackend(abc.ABC):
     def ibm_transitions(self, num_derivatives, output_scale=None):
         raise NotImplementedError
 
-    # todo: rename to avoid confusion with conditionals?
+    # TODO: rename to avoid confusion with conditionals?
     @abc.abstractmethod
     def update_mean(self, mean, x, /, num):
         raise NotImplementedError
 
-    # todo: move those to random.py and cond.py instead?
+    # TODO: move those to random.py and cond.py instead?
 
     @abc.abstractmethod
     def identity_conditional(self, num_derivatives_per_ode_dimension, /):

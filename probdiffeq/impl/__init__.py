@@ -1,4 +1,4 @@
 """Implementations."""
 from probdiffeq.impl import _impl
 
-impl = _impl.Backend()
+impl = _impl.Impl()

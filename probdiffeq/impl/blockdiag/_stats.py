@@ -35,12 +35,6 @@ class StatsBackend(_stats.StatsBackend):
     def cholesky(self, rv):
         return rv.cholesky
 
-    def cov_dense(self, rv):
-        if rv.cholesky.ndim > 3:
-            return jax.vmap(self.cov_dense)(rv)
-        cholesky_T = jnp.transpose(rv.cholesky, axes=(0, 2, 1))
-        return jnp.einsum("ijk,ikl->ijl", rv.cholesky, cholesky_T)
-
     def sample_shape(self, rv):
         return rv.mean.shape
 

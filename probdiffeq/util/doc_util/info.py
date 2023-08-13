@@ -15,7 +15,7 @@ def print_info():
     print(f"Diffrax version:\n\t{diffrax.__version__}")
     print(f"SciPy version:\n\t{scipy.__version__}")
     print()
-    # todo: the probdiffeq version should suffice now, right?
+    # TODO: the probdiffeq version should suffice now, right?
     commit = _most_recent_commit(abbrev=6)
     print(f"Most recent ProbDiffEq commit:\n\t{commit}")
     print()

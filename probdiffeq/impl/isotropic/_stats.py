@@ -41,11 +41,6 @@ class StatsBackend(_stats.StatsBackend):
     def cholesky(self, rv):
         return rv.cholesky
 
-    def cov_dense(self, rv):
-        if rv.cholesky.ndim > 2:
-            return jax.vmap(self.cov_dense)(rv)
-        return rv.cholesky @ rv.cholesky.T
-
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
             return jax.vmap(self.standard_deviation)(rv)

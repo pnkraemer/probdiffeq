@@ -33,10 +33,5 @@ class StatsBackend(_stats.StatsBackend):
     def cholesky(self, rv):
         return rv.cholesky
 
-    def cov_dense(self, rv):
-        if rv.mean.ndim > 1:
-            return jax.vmap(self.cov_dense)(rv)
-        return rv.cholesky @ rv.cholesky.T
-
     def sample_shape(self, rv):
         return rv.mean.shape

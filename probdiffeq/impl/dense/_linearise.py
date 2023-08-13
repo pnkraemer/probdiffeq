@@ -19,7 +19,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
             if jnp.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
-                raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
+                msg = f"{jnp.shape(a0(mean))} != {expected_shape}"
+                raise ValueError(msg)
 
             fx = ts0(fun, a0(mean))
             linop = linop_util.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
@@ -33,7 +34,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
             if jnp.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
-                raise ValueError(f"{jnp.shape(a0(mean))} != {expected_shape}")
+                msg = f"{jnp.shape(a0(mean))} != {expected_shape}"
+                raise ValueError(msg)
 
             jvp, fx = ts1(fun, a0(mean))
 

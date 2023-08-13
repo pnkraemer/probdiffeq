@@ -11,7 +11,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 from probdiffeq.solvers.strategies import discrete
 
-# todo: the functions in here should only depend on posteriors / strategies!
+# TODO: the functions in here should only depend on posteriors / strategies!
 
 
 def offgrid_marginals_searchsorted(*, ts, solution, solver):
@@ -92,17 +92,13 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         Expected to correspond to a solution of an ODE with shape (d,).
     """
     if jnp.shape(standard_deviation) != ():
-        raise ValueError(
-            "Scalar observation noise expected. "
-            f"Shape {jnp.shape(standard_deviation)} received."
-        )
+        msg = f"Scalar observation noise expected. Shape {jnp.shape(standard_deviation)} received."
+        raise ValueError(msg)
 
     # not valid for scalar or matrix-valued solutions
     if jnp.ndim(u) > jnp.ndim(impl.prototypes.qoi()):
-        raise ValueError(
-            "Terminal-value solution (ndim=1, shape=(n,)) expected. "
-            f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
-        )
+        msg = f"Terminal-value solution (ndim=1, shape=(n,)) expected. ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
+        raise ValueError(msg)
 
     # Generate an observation-model for the QOI
     model = impl.hidden_model.conditional_to_derivative(0, standard_deviation)
@@ -140,22 +136,16 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         to compute the log-likelihood at the terminal values.
 
     """
-    # todo: complain if it is used with a filter, not a smoother?
-    # todo: allow option for log-posterior
+    # TODO: complain if it is used with a filter, not a smoother?
+    # TODO: allow option for log-posterior
 
     if jnp.shape(standard_deviation) != jnp.shape(u)[:1]:
-        raise ValueError(
-            f"Observation-noise shape {jnp.shape(standard_deviation)} does not match "
-            f"the observation shape {jnp.shape(u)}. "
-            f"Expected observation-noise shape: "
-            f"{(jnp.shape(u)[0],)} != {jnp.shape(standard_deviation)}. "
-        )
+        msg = f"Observation-noise shape {jnp.shape(standard_deviation)} does not match the observation shape {jnp.shape(u)}. Expected observation-noise shape: {jnp.shape(u)[0],} != {jnp.shape(standard_deviation)}. "
+        raise ValueError(msg)
 
     if jnp.ndim(u) < jnp.ndim(impl.prototypes.qoi()) + 1:
-        raise ValueError(
-            "Time-series solution (ndim=2, shape=(n, m)) expected. "
-            f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
-        )
+        msg = f"Time-series solution (ndim=2, shape=(n, m)) expected. ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
+        raise ValueError(msg)
 
     if not isinstance(posterior, markov.MarkovSeqRev):
         msg1 = "Time-series marginal likelihoods "

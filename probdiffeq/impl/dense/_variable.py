@@ -6,9 +6,6 @@ class VariableBackend(_variable.VariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def variable(self, mean, cholesky):
-        return _normal.Normal(mean, cholesky)
-
     def rescale_cholesky(self, rv, factor, /):
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)

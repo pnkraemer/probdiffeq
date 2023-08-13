@@ -12,7 +12,7 @@ from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
-# todo: make adaptive_solver and initial_condition arguments to the solver!
+# TODO: make adaptive_solver and initial_condition arguments to the solver!
 
 
 def simulate_terminal_values(
@@ -319,13 +319,15 @@ class Solution(Generic[R]):
     def __len__(self):
         """Evaluate the length of a solution."""
         if jnp.ndim(self.t) < 1:
-            raise ValueError("Solution object not batched :(")
+            msg = "Solution object not batched :("
+            raise ValueError(msg)
         return self.t.shape[0]
 
     def __getitem__(self, item):
         """Access a single item of the solution."""
         if jnp.ndim(self.t) < 1:
-            raise ValueError("Solution object not batched :(")
+            msg = "Solution object not batched :("
+            raise ValueError(msg)
 
         if jnp.ndim(self.t) == 1 and item != -1:
             msg = "Access to non-terminal states is not available."
@@ -336,7 +338,8 @@ class Solution(Generic[R]):
     def __iter__(self):
         """Iterate through the solution."""
         if jnp.ndim(self.t) <= 1:
-            raise ValueError("Solution object not batched :(")
+            msg = "Solution object not batched :("
+            raise ValueError(msg)
 
         for i in range(self.t.shape[0]):
             yield self[i]

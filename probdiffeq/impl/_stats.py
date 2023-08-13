@@ -23,9 +23,5 @@ class StatsBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cov_dense(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def sample_shape(self, rv):
         raise NotImplementedError

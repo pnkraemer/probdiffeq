@@ -108,7 +108,7 @@ class Strategy(Generic[P]):
         )
 
     def tree_flatten(self):
-        # todo: they should all be 'aux'?
+        # TODO: they should all be 'aux'?
         children = (self.correction,)
         aux = (
             # Content

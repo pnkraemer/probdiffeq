@@ -1,5 +1,5 @@
 """Scalar factorisation."""
-from probdiffeq.impl import _factorisations
+from probdiffeq.impl import _impl
 from probdiffeq.impl.scalar import (
     _conditional,
     _hidden_model,
@@ -12,7 +12,7 @@ from probdiffeq.impl.scalar import (
 )
 
 
-class ScalarFactorisation(_factorisations.Factorisation):
+class Scalar(_impl.FactorisedImpl):
     """Scalar factorisation."""
 
     def linearise(self):

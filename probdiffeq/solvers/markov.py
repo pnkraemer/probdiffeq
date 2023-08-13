@@ -14,7 +14,7 @@ R = TypeVar("R", bound=bool)
 """A (Boolean-bound) type-variable indicating the direction of the Markov sequence."""
 
 
-# todo: Unify the MarkovSeq* implementations (Naming, use of preconditioner, fwd/rev)
+# TODO: Unify the MarkovSeq* implementations (Naming, use of preconditioner, fwd/rev)
 
 
 @jax.tree_util.register_pytree_node_class

@@ -1,6 +1,6 @@
-"""Isotropic factorisation."""
-from probdiffeq.impl import _factorisations
-from probdiffeq.impl.isotropic import (
+"""Factorisations."""
+from probdiffeq.impl import _impl
+from probdiffeq.impl.blockdiag import (
     _conditional,
     _hidden_model,
     _linearise,
@@ -12,11 +12,11 @@ from probdiffeq.impl.isotropic import (
 )
 
 
-class IsotropicFactorisation(_factorisations.Factorisation):
-    """Isotropic factorisation."""
+class BlockDiag(_impl.FactorisedImpl):
+    """Block-diagonal factorisation."""
 
     def __init__(self, ode_shape):
-        """Construct an isotropic factorisation."""
+        """Construct a block-diagonal factorisation."""
         self.ode_shape = ode_shape
 
     def conditional(self):
@@ -31,14 +31,14 @@ class IsotropicFactorisation(_factorisations.Factorisation):
     def stats(self):
         return _stats.StatsBackend(ode_shape=self.ode_shape)
 
-    def variable(self) -> _variable.VariableBackend:
+    def variable(self):
         return _variable.VariableBackend(ode_shape=self.ode_shape)
 
     def ssm_util(self):
         return _ssm_util.SSMUtilBackend(ode_shape=self.ode_shape)
 
     def transform(self):
-        return _transform.TransformBackend()
+        return _transform.TransformBackend(ode_shape=self.ode_shape)
 
     def prototypes(self):
         return _prototypes.PrototypeBackend(ode_shape=self.ode_shape)

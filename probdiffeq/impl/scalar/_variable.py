@@ -7,9 +7,6 @@ from probdiffeq.impl.scalar import _normal
 
 
 class VariableBackend(_variable.VariableBackend):
-    def variable(self, mean, cholesky):
-        return _normal.Normal(mean, cholesky)
-
     def rescale_cholesky(self, rv, factor):
         if jnp.ndim(factor) > 0:
             return jax.vmap(self.rescale_cholesky)(rv, factor)

@@ -31,7 +31,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         sample_reshaped = jnp.reshape(sample, (-1, *self.ode_shape), order="F")
         return sample_reshaped[0]
 
-    # todo: move to linearise.py?
+    # TODO: move to linearise.py?
     def conditional_to_derivative(self, i, standard_deviation):
         a0 = functools.partial(self._select, idx_or_slice=i)
 

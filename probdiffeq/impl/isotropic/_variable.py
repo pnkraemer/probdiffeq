@@ -22,6 +22,3 @@ class VariableBackend(_variable.VariableBackend):
         mean = rv.mean.reshape((-1,), order="F")
         u = u.reshape((-1,), order="F")
         return u, (mean, cov)
-
-    def variable(self, mean, cholesky):
-        return _normal.Normal(mean, cholesky)

@@ -9,9 +9,6 @@ class VariableBackend(_variable.VariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def variable(self, mean, cholesky):
-        return _normal.Normal(mean, cholesky)
-
     def rescale_cholesky(self, rv, factor, /):
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
@@ -22,5 +19,10 @@ class VariableBackend(_variable.VariableBackend):
     def to_multivariate_normal(self, u, rv):
         mean = jnp.reshape(rv.mean.T, (-1,), order="F")
         u = jnp.reshape(u.T, (-1,), order="F")
-        cov = jax.scipy.linalg.block_diag(*self.cov_dense(rv))
+        cov = jax.scipy.linalg.block_diag(*self._cov_dense(rv.cholesky))
         return u, (mean, cov)
+
+    def _cov_dense(self, cholesky):
+        if cholesky.ndim > 2:
+            return jax.vmap(self._cov_dense)(cholesky)
+        return cholesky @ cholesky.T

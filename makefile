@@ -3,8 +3,6 @@
 
 format:
 	black --quiet .
-	isort --quiet .
-	nbqa isort --quiet docs/quickstart/ docs/examples_benchmarks/
 	jupytext --quiet --sync docs/quickstart/*.ipynb
 	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*.ipynb
 	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*.ipynb

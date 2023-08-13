@@ -201,7 +201,7 @@ class PreconFixedPoint(Extrapolation):
 
 # Register scalar extrapolations as pytrees because we want to vmap them
 # for block-diagonal models.
-# todo: this feels very temporary...
+# TODO: this feels very temporary...
 
 
 def _flatten(fi):
