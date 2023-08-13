@@ -79,16 +79,6 @@ select = [
     "RUF",
     # isort:
     "I",
-    # Pylint:
-    "PL",
-    # flake8-bandit:
-    "S",
-    # flake8-todos:
-    "TD",
-    # flake8-fixme:
-    "FIX",
-    # flake8-future-annotations,
-    "FA",
     # flake8-errormsg:
     "EM",
     # tryceratops:
