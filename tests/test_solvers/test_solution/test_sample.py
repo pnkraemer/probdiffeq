@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import uncalibrated
+from probdiffeq.solvers import markov, uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import smoothers
 from probdiffeq.solvers.taylor import autodiff
@@ -40,7 +40,7 @@ def fixture_approximation():
 def test_sample_shape(approximation, shape):
     key = jax.random.PRNGKey(seed=15)
     # todo: remove "u" from this output?
-    u, samples = approximation.posterior.sample(key, shape=shape)
+    u, samples = markov.sample(key, approximation.posterior, shape=shape)
     assert u.shape == shape + approximation.u.shape
     assert samples.shape == shape + impl.stats.sample_shape(approximation.marginals)
 

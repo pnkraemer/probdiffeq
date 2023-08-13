@@ -15,10 +15,9 @@ class VariableBackend(_variable.VariableBackend):
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + rv.cholesky @ unit_sample
 
-    def to_multivariate_normal(self, u, rv):
+    def to_multivariate_normal(self, rv):
         eye_d = jnp.eye(*self.ode_shape)
         cov = rv.cholesky @ rv.cholesky.T
         cov = jnp.kron(eye_d, cov)
         mean = rv.mean.reshape((-1,), order="F")
-        u = u.reshape((-1,), order="F")
-        return u, (mean, cov)
+        return (mean, cov)

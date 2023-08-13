@@ -17,13 +17,11 @@ class StatsBackend(_stats.StatsBackend):
 
     def logpdf(self, u, /, rv):
         # The cholesky factor is triangular, so we compute a cheap slogdet.
-        # TODO: cache those?
         diagonal = jnp.diagonal(rv.cholesky, axis1=-1, axis2=-2)
         slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
 
-        residual_white = jax.scipy.linalg.solve_triangular(
-            rv.cholesky, u - rv.mean, lower=True, trans="T"
-        )
+        dx = u - rv.mean
+        residual_white = jax.scipy.linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
         x1 = jnp.dot(residual_white, residual_white)
         x2 = 2.0 * slogdet
         x3 = u.size * jnp.log(jnp.pi * 2)
@@ -38,9 +36,6 @@ class StatsBackend(_stats.StatsBackend):
 
         diag = jnp.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
         return jnp.sqrt(diag)
-
-    def cholesky(self, rv):
-        return rv.cholesky
 
     def sample_shape(self, rv):
         return rv.mean.shape

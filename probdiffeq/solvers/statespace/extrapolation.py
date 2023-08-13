@@ -1,7 +1,6 @@
 """Extrapolation model interfaces."""
 
 import abc
-import functools
 
 import jax
 import jax.numpy as jnp
@@ -199,29 +198,6 @@ class PreconFixedPoint(Extrapolation):
         return ssv, cond
 
 
-# Register scalar extrapolations as pytrees because we want to vmap them
-# for block-diagonal models.
-# TODO: this feels very temporary...
-
-
-def _flatten(fi):
-    child = fi.a, fi.q_sqrtm_lower, fi.preconditioner
-    aux = ()
-    return child, aux
-
-
-def _unflatten(nodetype, _aux, children):
-    return nodetype(*children)
-
-
-for nodetype in [PreconFilter, PreconSmoother, PreconFixedPoint]:
-    jax.tree_util.register_pytree_node(
-        nodetype=nodetype,
-        flatten_func=_flatten,
-        unflatten_func=functools.partial(_unflatten, nodetype),
-    )
-
-
 class IBMExtrapolationFactory(ExtrapolationFactory):
     def __init__(self, args):
         self.args = args
@@ -238,13 +214,6 @@ class IBMExtrapolationFactory(ExtrapolationFactory):
 
     def save_at(self):
         return PreconFixedPoint(*self.args)
-
-
-jax.tree_util.register_pytree_node(
-    nodetype=IBMExtrapolationFactory,
-    flatten_func=lambda a: (a.args, ()),
-    unflatten_func=lambda _a, b: IBMExtrapolationFactory(b),
-)
 
 
 def ibm_adaptive(num_derivatives) -> IBMExtrapolationFactory:

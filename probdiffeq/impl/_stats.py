@@ -19,9 +19,5 @@ class StatsBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def cholesky(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def sample_shape(self, rv):
         raise NotImplementedError

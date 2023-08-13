@@ -18,7 +18,7 @@ class StatsBackend(_stats.StatsBackend):
     def logpdf(self, u, /, rv):
         def logpdf_scalar(x, r):
             dx = x - r.mean
-            w = jax.scipy.linalg.solve_triangular(r.cholesky, dx, lower=True, trans="T")
+            w = jax.scipy.linalg.solve_triangular(r.cholesky.T, dx, trans="T")
 
             maha_term = jnp.dot(w, w)
 
@@ -31,9 +31,6 @@ class StatsBackend(_stats.StatsBackend):
 
     def mean(self, rv):
         return rv.mean
-
-    def cholesky(self, rv):
-        return rv.cholesky
 
     def sample_shape(self, rv):
         return rv.mean.shape

@@ -88,5 +88,6 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     )
 
     # Compare QOI and marginals
+    marginals_allclose_func = jax.vmap(testing.marginals_allclose)
     assert testing.tree_all_allclose(u_fixedpoint, u_interp)
-    assert testing.marginals_allclose(marginals_fixedpoint, marginals_interp)
+    assert jnp.all(marginals_allclose_func(marginals_fixedpoint, marginals_interp))

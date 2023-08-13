@@ -16,11 +16,10 @@ class VariableBackend(_variable.VariableBackend):
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
 
-    def to_multivariate_normal(self, u, rv):
+    def to_multivariate_normal(self, rv):
         mean = jnp.reshape(rv.mean.T, (-1,), order="F")
-        u = jnp.reshape(u.T, (-1,), order="F")
         cov = jax.scipy.linalg.block_diag(*self._cov_dense(rv.cholesky))
-        return u, (mean, cov)
+        return (mean, cov)
 
     def _cov_dense(self, cholesky):
         if cholesky.ndim > 2:

@@ -15,5 +15,5 @@ class VariableBackend(_variable.VariableBackend):
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + rv.cholesky @ unit_sample
 
-    def to_multivariate_normal(self, u, rv):
-        return u, (rv.mean, rv.cholesky @ rv.cholesky.T)
+    def to_multivariate_normal(self, rv):
+        return rv.mean, rv.cholesky @ rv.cholesky.T

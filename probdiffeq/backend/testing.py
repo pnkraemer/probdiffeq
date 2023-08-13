@@ -47,6 +47,9 @@ def _tree_allclose(tree1, tree2, **kwargs):
 
 
 def marginals_allclose(m1, m2, /):
-    m1, c1 = impl.variable.to_multivariate_normal(None, m1)
-    m2, c2 = impl.variable.to_multivariate_normal(None, m2)
-    return jnp.allclose(m1, m2) and jnp.allclose(c1, c2)
+    m1, c1 = impl.variable.to_multivariate_normal(m1)
+    m2, c2 = impl.variable.to_multivariate_normal(m2)
+
+    means_allclose = jnp.allclose(m1, m2)
+    covs_allclose = jnp.allclose(c1, c2)
+    return jnp.logical_and(means_allclose, covs_allclose)
