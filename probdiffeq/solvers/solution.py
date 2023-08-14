@@ -48,7 +48,6 @@ def _offgrid_marginals(t, solution, solver):
     # In the smoothing context:
     # Extract the correct posterior.init (aka the filtering solutions)
     # The conditionals are incorrect, but we don't really care about this.
-    posterior = _extract(solution.posterior)
     posterior_previous = _extract_previous(solution.posterior)
 
     t0 = _extract_previous(solution.t)
@@ -56,25 +55,12 @@ def _offgrid_marginals(t, solution, solver):
     output_scale = _extract(solution.output_scale)
 
     return solver.strategy.offgrid_marginals(
-        marginals=marginals,
-        posterior=posterior,
-        posterior_previous=posterior_previous,
+        marginals_t1=marginals,
+        posterior_t0=posterior_previous,
         t=t,
         t0=t0,
         t1=t1,
         output_scale=output_scale,
-    )
-
-
-def _offgrid_marginals2(*, solution, t, solution_previous, solver):
-    return solver.strategy.offgrid_marginals(
-        marginals=solution.marginals,
-        posterior=solution.posterior,
-        posterior_previous=solution_previous.posterior,
-        t=t,
-        t0=solution_previous.t,
-        t1=solution.t,
-        output_scale=solution.output_scale,
     )
 
 

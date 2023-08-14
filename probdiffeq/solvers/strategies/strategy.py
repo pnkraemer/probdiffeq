@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
+from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import _common
 
 P = TypeVar("P")
@@ -23,9 +24,7 @@ class Strategy(Generic[P]):
         *,
         string_repr,
         is_suitable_for_save_at,
-        impl_interpolate,
-        impl_right_corner,  # use "default" for default-behaviour
-        impl_offgrid_marginals,  # use None if not available
+        is_suitable_for_offgrid_marginals,
     ):
         # Content
         self.extrapolation = extrapolation
@@ -34,11 +33,7 @@ class Strategy(Generic[P]):
         # Some meta-information
         self.string_repr = string_repr
         self.is_suitable_for_save_at = is_suitable_for_save_at
-
-        # Implementations of functionality that varies
-        self.impl_interpolate = impl_interpolate
-        self.impl_right_corner = impl_right_corner
-        self.impl_offgrid_marginals = impl_offgrid_marginals
+        self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
 
     def __repr__(self):
         return self.string_repr
@@ -72,27 +67,33 @@ class Strategy(Generic[P]):
         sol = self.extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
-    def case_right_corner(self, state_at_t1: _common.State) -> _interp.InterpRes:
-        # If specific choice is provided, use that.
-        if self.impl_right_corner != "default":
-            return self.impl_right_corner(state_at_t1, extrapolation=self.extrapolation)
+    def case_right_corner(self, state_t1: _common.State) -> _interp.InterpRes:
+        _tmp = self.extrapolation.right_corner(state_t1.hidden, state_t1.aux_extra)
+        step_from, solution, interp_from = _tmp
 
-        # Otherwise, apply default behaviour.
-        s1 = state_at_t1
-        return _interp.InterpRes(accepted=s1, solution=s1, previous=s1)
+        def _state(x):
+            t = state_t1.t
+            corr_like = jax.tree_util.tree_map(jnp.empty_like, state_t1.aux_corr)
+            return _common.State(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+
+        step_from = _state(step_from)
+        solution = _state(solution)
+        interp_from = _state(interp_from)
+        return _interp.InterpRes(step_from, solution, interp_from)
 
     def case_interpolate(
         self, t, *, s0: _common.State, s1: _common.State, output_scale
     ) -> _interp.InterpRes[_common.State]:
-        dt0 = t - s0.t
-        dt1 = s1.t - t
+        # Interpolate
         step_from, solution, interp_from = self.extrapolation.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
             marginal_t1=s1.hidden,
-            dt0=dt0,
-            dt1=dt1,
+            dt0=t - s0.t,
+            dt1=s1.t - t,
             output_scale=output_scale,
         )
+
+        # Turn outputs into valid states
 
         def _state(t_, x):
             corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
@@ -104,24 +105,25 @@ class Strategy(Generic[P]):
         return _interp.InterpRes(step_from, solution, interp_from)
 
     def offgrid_marginals(
-        self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
+        self, *, t, marginals_t1, posterior_t0: P, t0, t1, output_scale
     ):
-        # If implementation is not provided, then offgrid_marginals is impossible.
-        if self.impl_offgrid_marginals is None:
+        if not self.is_suitable_for_offgrid_marginals:
             raise NotImplementedError
 
-        return self.impl_offgrid_marginals(
-            t,
-            marginals=marginals,
+        dt0 = t - t0
+        dt1 = t1 - t
+        state_t0 = self.init(t0, posterior_t0)
+
+        _acc, (marginals, _aux), _prev = self.extrapolation.interpolate(
+            state_t0=(state_t0.hidden, state_t0.aux_extra),
+            marginal_t1=marginals_t1,
+            dt0=dt0,
+            dt1=dt1,
             output_scale=output_scale,
-            posterior=posterior,
-            posterior_previous=posterior_previous,
-            t0=t0,
-            t1=t1,
-            init=self.init,
-            interpolate=self.case_interpolate,
-            extract=self.extract,
         )
+
+        u = impl.hidden_model.qoi(marginals)
+        return u, marginals
 
     def tree_flatten(self):
         # TODO: they should all be 'aux'?
@@ -131,24 +133,19 @@ class Strategy(Generic[P]):
             self.extrapolation,
             # Meta-info
             self.string_repr,
+            self.is_suitable_for_offgrid_marginals,
             self.is_suitable_for_save_at,
-            # Implementations
-            self.impl_interpolate,
-            self.impl_right_corner,
-            self.impl_offgrid_marginals,
         )
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
         (corr,) = children
-        extra, string, suitable, interp, right_corner, offgrid = aux
+        extra, string, suitable_offgrid, suitable_saveat = aux
         return cls(
             extrapolation=extra,
             correction=corr,
             string_repr=string,
-            is_suitable_for_save_at=suitable,
-            impl_interpolate=interp,
-            impl_right_corner=right_corner,
-            impl_offgrid_marginals=offgrid,
+            is_suitable_for_save_at=suitable_saveat,
+            is_suitable_for_offgrid_marginals=suitable_offgrid,
         )

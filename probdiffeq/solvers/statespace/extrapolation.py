@@ -37,6 +37,10 @@ class Extrapolation(abc.ABC):
     def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def right_corner(self, rv, extra, /):
+        raise NotImplementedError
+
 
 # At the point of choosing the recipe
 # (aka selecting the desired state-space model factorisation),
@@ -115,6 +119,9 @@ class PreconFilter(Extrapolation):
         step_from = (marginal_t1, None)
         return _interp.InterpRes(accepted=step_from, solution=interp, previous=interp)
 
+    def right_corner(self, rv, extra, /):
+        return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
+
 
 class PreconSmoother(Extrapolation):
     def __init__(self, discretise, num_derivatives):
@@ -191,6 +198,9 @@ class PreconSmoother(Extrapolation):
     def _extrapolate(self, state, extra, /, dt, output_scale):
         begun = self.begin(state, extra, dt=dt)
         return self.complete(*begun, output_scale=output_scale)
+
+    def right_corner(self, rv, extra, /):
+        return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
 class PreconFixedPoint(Extrapolation):
@@ -299,6 +309,11 @@ class PreconFixedPoint(Extrapolation):
     def _extrapolate(self, state, extra, /, dt, output_scale):
         begun = self.begin(state, extra, dt=dt)
         return self.complete(*begun, output_scale=output_scale)
+
+    # todo: rename to prepare_future_steps?
+    def right_corner(self, rv, extra, /):
+        cond_identity = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
+        return _interp.InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
 class IBMExtrapolationFactory(ExtrapolationFactory):
