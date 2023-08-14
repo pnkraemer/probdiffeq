@@ -2,10 +2,12 @@
 
 Sequentially (and often, adaptively) constrain a random process to an ODE.
 """
+import functools
 
 import jax
 
-from probdiffeq.backend import control_flow, tree_array_util
+from probdiffeq import _advance
+from probdiffeq.backend import tree_array_util
 
 
 def solve_and_save_at(
@@ -22,29 +24,13 @@ def solve_and_save_at(
 ):
     interpolate_fun, right_corner_fun = interpolate
 
-    def advance(acc_prev_ctrl, t_next):
-        # Advance until accepted.t >= t_next.
-        # Note: This could already be the case and we may not loop (just interpolate)
-        accepted, previous, control = _advance_ivp_solution_adaptively(
-            *acc_prev_ctrl,
-            t1=t_next,
-            vector_field=vector_field,
-            adaptive_solver=adaptive_solver,
-        )
-
-        # Either interpolate (t > t_next) or "finalise" (t == t_next)
-        accepted, solution, previous = jax.lax.cond(
-            accepted.t > t_next,
-            interpolate_fun,
-            lambda _, *a: right_corner_fun(*a),
-            t_next,
-            previous,
-            accepted,
-        )
-
-        # Extract the solution
-        (_t, *sol_solver), _sol_ctrl = adaptive_solver.extract(solution, control)
-        return (accepted, previous, control), sol_solver
+    advance_func = functools.partial(
+        _advance.advance_and_interpolate,  # vs clip_and_advance?
+        vector_field=vector_field,
+        adaptive_solver=adaptive_solver,
+        interpolate_fun=interpolate_fun,
+        right_corner_fun=right_corner_fun,
+    )
 
     acc, ctrl = adaptive_solver.init(
         t=t,
@@ -54,34 +40,8 @@ def solve_and_save_at(
         dt0=dt0,
     )
     init = (acc, acc, ctrl)
-    _, solution = jax.lax.scan(f=advance, init=init, xs=save_at, reverse=False)
+    _, solution = jax.lax.scan(f=advance_func, init=init, xs=save_at, reverse=False)
     return solution
-
-
-def _advance_ivp_solution_adaptively(
-    acc0,
-    prev0,
-    ctrl0,
-    *,
-    vector_field,
-    t1,
-    adaptive_solver,
-):
-    """Advance an IVP solution to the next state."""
-
-    def cond_fun(s):
-        acc, _, ctrl = s
-        return acc.t < t1
-
-    def body_fun(s):
-        s0, _, c0 = s
-        s1, c1 = adaptive_solver.rejection_loop(
-            s0, c0, vector_field=vector_field, t1=t1
-        )
-        return s1, s0, c1
-
-    init = (acc0, prev0, ctrl0)
-    return control_flow.while_loop(cond_fun, body_fun, init=init)
 
 
 def solve_and_save_every_step(*args, **kwargs):

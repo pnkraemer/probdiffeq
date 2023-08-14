@@ -103,11 +103,13 @@ class _AdaptiveIVPSolver:
             vector_field=vector_field,
             dt=self.control.extract(state_control),
         )
-        # Normalise the error and propose a new step.
+        # Normalise the error
         u_proposed = impl.hidden_model.qoi(state_proposed.strategy.hidden)
         u_step_from = impl.hidden_model.qoi(state_proposed.strategy.hidden)
         u = jnp.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
         error_normalised = self._normalise_error(state_proposed.error_estimate, u=u)
+
+        # Propose a new step
         error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
         state_control = self.control.apply(
             state_control,
