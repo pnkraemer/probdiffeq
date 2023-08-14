@@ -7,7 +7,7 @@ from probdiffeq import controls, ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, filters, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -18,9 +18,9 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=2)
     args = (vf, tcoeffs)
 
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.filter_adaptive(ibm, ts0)
+    strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
     adaptive_kwargs = {
         "t0": t0,

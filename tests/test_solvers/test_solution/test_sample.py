@@ -6,7 +6,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, uncalibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, fixedpoint, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -15,9 +15,9 @@ from tests.setup import setup
 def fixture_approximation():
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.fixedpoint_adaptive(ibm, ts0)
+    strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())

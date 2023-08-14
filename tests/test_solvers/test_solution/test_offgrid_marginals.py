@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, filters, priors, smoothers
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -13,9 +13,9 @@ def test_filter_marginals_close_only_to_left_boundary():
     """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = extrapolation.ibm_adaptive(num_derivatives=1)
+    ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.filter_adaptive(ibm, ts0)
+    strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
@@ -40,9 +40,9 @@ def test_smoother_marginals_close_to_both_boundaries():
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = extrapolation.ibm_adaptive(num_derivatives=4)
+    ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.smoother_adaptive(ibm, ts0)
+    strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())

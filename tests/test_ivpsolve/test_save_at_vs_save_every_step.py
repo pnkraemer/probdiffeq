@@ -6,7 +6,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, filters, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -20,9 +20,9 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     problem_args = (vf, tcoeffs)
 
     # Generate a solver
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.filter_adaptive(ibm, ts0)
+    strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     adaptive_kwargs = {

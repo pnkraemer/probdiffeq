@@ -10,7 +10,7 @@ from probdiffeq import ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated, solution, uncalibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, filters, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -96,9 +96,9 @@ def case_simulate_terminal_values():
 @testing.fixture(name="uncalibrated_and_mle_solution")
 @testing.parametrize_with_cases("solver_to_solution", cases=".", prefix="case_")
 def fixture_uncalibrated_and_mle_solution(solver_to_solution):
-    ibm = extrapolation.ibm_adaptive(num_derivatives=4)
+    ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.filter_adaptive(ibm, ts0)
+    strategy = filters.filter_adaptive(ibm, ts0)
 
     uncalib = solver_to_solution(uncalibrated.solver(strategy))
     mle = solver_to_solution(calibrated.mle(strategy))

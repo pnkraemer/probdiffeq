@@ -1,13 +1,14 @@
 """Interface for estimation strategies."""
 
 import abc
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
+from probdiffeq.backend import containers
 from probdiffeq.impl import impl
-from probdiffeq.solvers.strategies import _common
 
 
 class ExtrapolationImpl(abc.ABC):
@@ -42,6 +43,13 @@ class ExtrapolationImpl(abc.ABC):
         raise NotImplementedError
 
 
+class _State(containers.NamedTuple):
+    t: Any
+    hidden: Any
+    aux_extra: Any
+    aux_corr: Any
+
+
 class Strategy:
     """Inference strategy interface."""
 
@@ -69,18 +77,18 @@ class Strategy:
     def solution_from_tcoeffs(self, taylor_coefficients, /):
         return self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
 
-    def init(self, t, posterior, /) -> _common.State:
+    def init(self, t, posterior, /) -> _State:
         rv, extra = self.extrapolation.init(posterior)
         rv, corr = self.correction.init(rv)
-        return _common.State(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+        return _State(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def predict_error(self, state: _common.State, /, *, dt, vector_field):
+    def predict_error(self, state: _State, /, *, dt, vector_field):
         hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         error, observed, corr = self.correction.estimate_error(
             hidden, state.aux_corr, vector_field=vector_field, t=state.t
         )
         t = state.t + dt
-        state = _common.State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
+        state = _State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
 
     def complete(self, state, /, *, output_scale):
@@ -88,21 +96,21 @@ class Strategy:
             state.hidden, state.aux_extra, output_scale=output_scale
         )
         hidden, corr = self.correction.complete(hidden, state.aux_corr)
-        return _common.State(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
+        return _State(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
-    def extract(self, state: _common.State, /):
+    def extract(self, state: _State, /):
         hidden = self.correction.extract(state.hidden, state.aux_corr)
         sol = self.extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
-    def case_right_corner(self, state_t1: _common.State) -> _interp.InterpRes:
+    def case_right_corner(self, state_t1: _State) -> _interp.InterpRes:
         _tmp = self.extrapolation.right_corner(state_t1.hidden, state_t1.aux_extra)
         step_from, solution, interp_from = _tmp
 
         def _state(x):
             t = state_t1.t
             corr_like = jax.tree_util.tree_map(jnp.empty_like, state_t1.aux_corr)
-            return _common.State(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+            return _State(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
         step_from = _state(step_from)
         solution = _state(solution)
@@ -110,8 +118,8 @@ class Strategy:
         return _interp.InterpRes(step_from, solution, interp_from)
 
     def case_interpolate(
-        self, t, *, s0: _common.State, s1: _common.State, output_scale
-    ) -> _interp.InterpRes[_common.State]:
+        self, t, *, s0: _State, s1: _State, output_scale
+    ) -> _interp.InterpRes[_State]:
         # Interpolate
         step_from, solution, interp_from = self.extrapolation.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
@@ -125,7 +133,7 @@ class Strategy:
 
         def _state(t_, x):
             corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
-            return _common.State(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+            return _State(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
         step_from = _state(s1.t, step_from)
         solution = _state(t, solution)

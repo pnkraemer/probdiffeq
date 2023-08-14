@@ -5,24 +5,30 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import (
+    correction,
+    filters,
+    fixedpoint,
+    priors,
+    smoothers,
+)
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.case()
 def case_strategy_filter():
-    return adaptive.filter_adaptive
+    return filters.filter_adaptive
 
 
 @testing.case()
 def case_strategy_smoother():
-    return adaptive.smoother_adaptive
+    return smoothers.smoother_adaptive
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return adaptive.fixedpoint_adaptive
+    return fixedpoint.fixedpoint_adaptive
 
 
 @testing.fixture(name="sol")
@@ -30,7 +36,7 @@ def case_strategy_fixedpoint():
 def fixture_sol(strategy_func):
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = extrapolation.ibm_adaptive(num_derivatives=4)
+    ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = correction.taylor_order_zero()
     strategy = strategy_func(ibm, ts0)
 

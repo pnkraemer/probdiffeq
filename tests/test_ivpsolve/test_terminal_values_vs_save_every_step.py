@@ -7,7 +7,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, filters, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -23,9 +23,9 @@ def fixture_problem_args_kwargs():
 @testing.fixture(name="solver_kwargs")
 def fixture_solver_kwargs():
     # Generate a solver
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.filter_adaptive(ibm, ts0)
+    strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())

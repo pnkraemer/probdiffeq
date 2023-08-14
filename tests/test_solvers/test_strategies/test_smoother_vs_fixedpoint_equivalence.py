@@ -9,7 +9,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
+from probdiffeq.solvers.strategies import correction, fixedpoint, priors, smoothers
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -27,9 +27,9 @@ def fixture_solver_setup():
 
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.smoother_adaptive(ibm, ts0)
+    strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     args, kwargs, (t0, t1) = solver_setup
@@ -40,9 +40,9 @@ def fixture_solution_smoother(solver_setup):
 
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
     """Test that with save_at=smoother_solution.t, the results should be identical."""
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.fixedpoint_adaptive(ibm, ts0)
+    strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     save_at = solution_smoother.t
@@ -59,9 +59,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     save_at = solution_smoother.t
 
     # Re-generate the smoothing solver
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.smoother_adaptive(ibm, ts0)
+    strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver_smoother = uncalibrated.solver(strategy)
 
     # Compute the offgrid-marginals
@@ -71,9 +71,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     )
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
-    ibm = extrapolation.ibm_adaptive(num_derivatives=2)
+    ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = adaptive.fixedpoint_adaptive(ibm, ts0)
+    strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver_fixedpoint = uncalibrated.solver(strategy)
     solution_fixedpoint = ivpsolve.solve_and_save_at(
         *args, save_at=ts, solver=solver_fixedpoint, **kwargs
