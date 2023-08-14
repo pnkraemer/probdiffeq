@@ -7,7 +7,7 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _adaptive, _collocate
+from probdiffeq import _adaptive, _ivpsolve_impl
 from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
@@ -32,7 +32,7 @@ def simulate_terminal_values(
     )
 
     save_at = jnp.asarray([t1])
-    posterior, output_scale, num_steps = _collocate.solve_and_save_at(
+    posterior, output_scale, num_steps = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         t0,
         *initial_condition,
@@ -91,7 +91,7 @@ def solve_and_save_at(
         taylor_coefficients, output_scale=output_scale
     )
 
-    posterior, output_scale, num_steps = _collocate.solve_and_save_at(
+    posterior, output_scale, num_steps = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         save_at[0],
         *initial_condition,
@@ -139,7 +139,7 @@ def solve_and_save_every_step(
         taylor_coefficients, output_scale=output_scale
     )
 
-    t, posterior, output_scale, num_steps = _collocate.solve_and_save_every_step(
+    t, posterior, output_scale, num_steps = _ivpsolve_impl.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
         t0,
         *initial_condition,
@@ -182,7 +182,7 @@ def solve_fixed_grid(
     )
 
     # Compute the solution
-    posterior, output_scale, num_steps = _collocate.solve_fixed_grid(
+    posterior, output_scale, num_steps = _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         *initial_condition,
         grid=grid,
