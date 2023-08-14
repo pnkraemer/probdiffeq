@@ -9,8 +9,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import correction, extrapolation
-from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
 from tests.setup import setup
 
 
@@ -21,7 +20,7 @@ def test_exponential_approximated_well():
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=1)
     ts0 = correction.taylor_order_zero()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = adaptive.filter_adaptive(ibm, ts0)
     solver = calibrated.dynamic(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())

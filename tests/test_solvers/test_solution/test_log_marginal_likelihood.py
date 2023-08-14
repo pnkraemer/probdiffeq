@@ -6,8 +6,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.strategies import correction, extrapolation
-from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -18,7 +17,7 @@ def fixture_sol():
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = smoothers.fixedpoint_adaptive(ibm, ts0)
+    strategy = adaptive.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
@@ -103,7 +102,7 @@ def test_raises_error_for_filter():
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = adaptive.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
     grid = jnp.linspace(t0, t1, num=3)

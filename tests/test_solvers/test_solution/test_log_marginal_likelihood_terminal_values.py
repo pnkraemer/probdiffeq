@@ -5,25 +5,24 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.strategies import correction, extrapolation
-from probdiffeq.solvers.strategies import filters, smoothers
+from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.case()
 def case_strategy_filter():
-    return filters.filter_adaptive
+    return adaptive.filter_adaptive
 
 
 @testing.case()
 def case_strategy_smoother():
-    return smoothers.smoother_adaptive
+    return adaptive.smoother_adaptive
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return smoothers.fixedpoint_adaptive
+    return adaptive.fixedpoint_adaptive
 
 
 @testing.fixture(name="sol")

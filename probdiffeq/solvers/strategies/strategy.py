@@ -1,6 +1,6 @@
 """Interface for estimation strategies."""
 
-from typing import Generic, TypeVar
+import abc
 
 import jax
 import jax.numpy as jnp
@@ -9,17 +9,45 @@ from probdiffeq import _interp
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import _common
 
-P = TypeVar("P")
-"""A type-variable to indicate solution ("posterior") types."""
+
+class ExtrapolationImpl(abc.ABC):
+    """Extrapolation model interface."""
+
+    @abc.abstractmethod
+    def solution_from_tcoeffs(self, taylor_coefficients, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def init(self, sol, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def begin(self, ssv, extra, /, dt):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def complete(self, ssv, extra, /, output_scale):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract(self, ssv, extra, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def right_corner(self, rv, extra, /):
+        raise NotImplementedError
 
 
-@jax.tree_util.register_pytree_node_class
-class Strategy(Generic[P]):
+class Strategy:
     """Inference strategy interface."""
 
     def __init__(
         self,
-        extrapolation,
+        extrapolation: ExtrapolationImpl,
         correction,
         *,
         string_repr,
@@ -104,9 +132,7 @@ class Strategy(Generic[P]):
         interp_from = _state(t, interp_from)
         return _interp.InterpRes(step_from, solution, interp_from)
 
-    def offgrid_marginals(
-        self, *, t, marginals_t1, posterior_t0: P, t0, t1, output_scale
-    ):
+    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
         if not self.is_suitable_for_offgrid_marginals:
             raise NotImplementedError
 
@@ -125,27 +151,31 @@ class Strategy(Generic[P]):
         u = impl.hidden_model.qoi(marginals)
         return u, marginals
 
-    def tree_flatten(self):
-        # TODO: they should all be 'aux'?
-        children = (self.correction,)
-        aux = (
-            # Content
-            self.extrapolation,
-            # Meta-info
-            self.string_repr,
-            self.is_suitable_for_offgrid_marginals,
-            self.is_suitable_for_save_at,
-        )
-        return children, aux
 
-    @classmethod
-    def tree_unflatten(cls, aux, children):
-        (corr,) = children
-        extra, string, suitable_offgrid, suitable_saveat = aux
-        return cls(
-            extrapolation=extra,
-            correction=corr,
-            string_repr=string,
-            is_suitable_for_save_at=suitable_saveat,
-            is_suitable_for_offgrid_marginals=suitable_offgrid,
-        )
+def _tree_flatten(strategy):
+    # TODO: they should all be 'aux'?
+    children = ()
+    aux = (
+        # Content
+        strategy.extrapolation,
+        strategy.correction,
+        # Meta-info
+        strategy.string_repr,
+        strategy.is_suitable_for_offgrid_marginals,
+        strategy.is_suitable_for_save_at,
+    )
+    return children, aux
+
+
+def _tree_unflatten(aux, _children):
+    extra, corr, string, suitable_offgrid, suitable_saveat = aux
+    return Strategy(
+        extrapolation=extra,
+        correction=corr,
+        string_repr=string,
+        is_suitable_for_save_at=suitable_saveat,
+        is_suitable_for_offgrid_marginals=suitable_offgrid,
+    )
+
+
+jax.tree_util.register_pytree_node(Strategy, _tree_flatten, _tree_unflatten)

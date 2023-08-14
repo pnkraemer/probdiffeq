@@ -7,8 +7,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import correction, cubature, extrapolation
-from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies import adaptive, correction, cubature, extrapolation
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -71,7 +70,7 @@ def fixture_solution(correction_impl):
         testing.skip(reason="This type of linearisation has not been implemented.")
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=2)
-    strategy = filters.filter_adaptive(ibm, correction_impl)
+    strategy = adaptive.filter_adaptive(ibm, correction_impl)
     solver = calibrated.mle(strategy)
 
     adaptive_kwargs = {

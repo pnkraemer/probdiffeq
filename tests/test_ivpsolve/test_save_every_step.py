@@ -7,8 +7,7 @@ from probdiffeq import ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import correction, extrapolation
-from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies import adaptive, correction, extrapolation
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -19,7 +18,7 @@ def fixture_python_loop_solution():
 
     ibm = extrapolation.ibm_adaptive(num_derivatives=4)
     ts0 = correction.taylor_order_zero()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = adaptive.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
     dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
