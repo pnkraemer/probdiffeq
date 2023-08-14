@@ -47,12 +47,6 @@ def simulate_terminal_values(
     output_scale = jax.tree_util.tree_map(squeeze_fun, output_scale)
     num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
 
-    if solver.requires_rescaling:
-        if isinstance(posterior, markov.MarkovSeqRev):
-            posterior = markov.rescale_cholesky(posterior, output_scale)
-        else:
-            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
-
     # I think the user expects marginals, so we compute them here
     if isinstance(posterior, markov.MarkovSeqRev):
         marginals = posterior.init
@@ -107,14 +101,6 @@ def solve_and_save_at(
         interpolate=(solver.interpolate, solver.right_corner),
     )
 
-    if solver.requires_rescaling:
-        if output_scale.ndim > 0:
-            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        if isinstance(posterior, markov.MarkovSeqRev):
-            posterior = markov.rescale_cholesky(posterior, output_scale)
-        else:
-            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
-
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
@@ -168,14 +154,6 @@ def solve_and_save_every_step(
     # (Even though t0 is not computed by this function)
     t = jnp.concatenate((jnp.atleast_1d(t0), t))
 
-    if solver.requires_rescaling:
-        if output_scale.ndim > 0:
-            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        if isinstance(posterior, markov.MarkovSeqRev):
-            posterior = markov.rescale_cholesky(posterior, output_scale)
-        else:
-            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
-
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
@@ -212,14 +190,6 @@ def solve_fixed_grid(
         grid=grid,
         solver=solver,
     )
-
-    if solver.requires_rescaling:
-        if output_scale.ndim > 0:
-            output_scale = output_scale[-1] * jnp.ones_like(output_scale)
-        if isinstance(posterior, markov.MarkovSeqRev):
-            posterior = markov.rescale_cholesky(posterior, output_scale)
-        else:
-            posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition

@@ -9,7 +9,11 @@ from probdiffeq.solvers import _common
 
 
 def mle(strategy):
-    """Create a solver that calibrates the output scale via maximum-likelihood."""
+    """Create a solver that calibrates the output scale via maximum-likelihood.
+
+    Warning: needs to be combined with a call to solution.calibrate()
+    after solving if the MLE-calibration shall be *used*.
+    """
     string_repr = f"<MLE-solver with {strategy}>"
     return CalibratedSolver(
         calibration=RunningMean(),

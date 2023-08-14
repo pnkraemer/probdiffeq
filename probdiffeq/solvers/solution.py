@@ -166,3 +166,11 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
 
     # Return only the logpdf
     return logpdf
+
+
+def calibrate(posterior, output_scale):
+    if jnp.ndim(output_scale) > jnp.ndim(impl.prototypes.output_scale()):
+        output_scale = output_scale[-1]
+    if isinstance(posterior, markov.MarkovSeqRev):
+        return markov.rescale_cholesky(posterior, output_scale)
+    return impl.variable.rescale_cholesky(posterior, output_scale)
