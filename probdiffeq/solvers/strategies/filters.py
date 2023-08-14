@@ -8,14 +8,14 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import _common, strategy
 
 
-def filter_adaptive(extrapolation_factory, corr, /):
+def filter_adaptive(extrapolation_factory, correction, /):
     """Create a filter strategy."""
     extrapolation = extrapolation_factory.forward()
     extrapolation_repr = extrapolation_factory.string_repr()
     return strategy.Strategy(
         extrapolation,
-        corr,
-        string_repr=f"<Filter with {extrapolation_repr}, {corr}>",
+        correction,
+        string_repr=f"<Filter with {extrapolation_repr}, {correction}>",
         is_suitable_for_save_at=True,
         # Right-corner: use default
         impl_right_corner="default",

@@ -61,10 +61,6 @@ class PreconFilter(Extrapolation):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
 
-    def __repr__(self):
-        args2 = f"num_derivatives={self.num_derivatives}"
-        return f"<IBM with {args2}>"
-
     def solution_from_tcoeffs(self, tcoeffs, /):
         return impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
 
@@ -103,10 +99,6 @@ class PreconSmoother(Extrapolation):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
-
-    def __repr__(self):
-        args2 = f"num_derivatives={self.num_derivatives}"
-        return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
@@ -149,10 +141,6 @@ class PreconFixedPoint(Extrapolation):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
-
-    def __repr__(self):
-        args2 = f"num_derivatives={self.num_derivatives}"
-        return f"<IBM with {args2}>"
 
     def solution_from_tcoeffs(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
