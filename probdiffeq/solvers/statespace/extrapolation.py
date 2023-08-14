@@ -113,7 +113,7 @@ class PreconFilter(Extrapolation):
         # Consistent state-types in interpolation result.
         interp = (hidden, extra)
         step_from = (marginal_t1, None)
-        return _interp.InterpRes(accepted=step_from, solution=interp, previous=state_t0)
+        return _interp.InterpRes(accepted=step_from, solution=interp, previous=interp)
 
 
 class PreconSmoother(Extrapolation):
@@ -156,6 +156,41 @@ class PreconSmoother(Extrapolation):
 
         # Gather and return
         return extrapolated, cond
+
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+        """Interpolate.
+
+        A smoother interpolates by_
+        * Extrapolating from t0 to t, which gives the "filtering" marginal
+          and the backward transition from t to t0.
+        * Extrapolating from t to t1, which gives another "filtering" marginal
+          and the backward transition from t1 to t.
+        * Applying the new t1-to-t backward transition to compute the interpolation.
+          This intermediate result is informed about its "right-hand side" datum.
+
+        Subsequent interpolations continue from the value at 't'.
+        Subsequent IVP solver steps continue from the value at 't1'.
+        """
+        # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
+        extrapolated_t = self._extrapolate(*state_t0, dt0, output_scale)
+        extrapolated_t1 = self._extrapolate(*extrapolated_t, dt1, output_scale)
+
+        # Marginalise from t1 to t to obtain the interpolated solution.
+        conditional_t1_to_t = extrapolated_t1[1]
+        rv_at_t = impl.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+        solution_at_t = (rv_at_t, extrapolated_t[1])
+
+        # The state at t1 gets a new backward model; it must remember how to
+        # get back to t, not to t0.
+        solution_at_t1 = (marginal_t1, conditional_t1_to_t)
+
+        return _interp.InterpRes(
+            accepted=solution_at_t1, solution=solution_at_t, previous=solution_at_t
+        )
+
+    def _extrapolate(self, state, extra, /, dt, output_scale):
+        begun = self.begin(state, extra, dt=dt)
+        return self.complete(*begun, output_scale=output_scale)
 
 
 class PreconFixedPoint(Extrapolation):
@@ -205,6 +240,65 @@ class PreconFixedPoint(Extrapolation):
     def reset(self, ssv, _extra, /):
         cond = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
         return ssv, cond
+
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+        """Interpolate.
+
+        A fixed-point smoother interpolates by
+
+        * Extrapolating from t0 to t, which gives the "filtering" marginal
+          and the backward transition from t to t0.
+        * Extrapolating from t to t1, which gives another "filtering" marginal
+          and the backward transition from t1 to t.
+        * Applying the t1-to-t backward transition to compute the interpolation result.
+          This intermediate result is informed about its "right-hand side" datum.
+
+        The difference to smoother-interpolation is quite subtle:
+
+        * The backward transition of the solution at 't' is merged with that at 't0'.
+          The reason is that the backward transition at 't0' knows
+          "how to get to the quantity of interest",
+          and this is precisely what we want to interpolate.
+        * Subsequent interpolations do not continue from the value at 't', but
+          from a very similar value where the backward transition
+          is replaced with an identity. The reason is that the interpolated solution
+          becomes the new quantity of interest, and subsequent interpolations
+          need to learn how to get here.
+        * Subsequent solver steps do not continue from the value at 't1',
+          but the value at 't1' where the backward model is replaced by
+          the 't1-to-t' backward model. The reason is similar to the above:
+          future steps need to know "how to get back to the quantity of interest",
+          which is the interpolated solution.
+
+        These distinctions are precisely why we need three fields
+        in every interpolation result:
+            the solution,
+            the continue-interpolation-from-here,
+            and the continue-stepping-from-here.
+        All three are different for fixed point smoothers.
+        (Really, I try removing one of them monthly and
+        then don't understand why tests fail.)
+        """
+        # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
+        extrapolated_t = self._extrapolate(*state_t0, dt0, output_scale)
+        conditional_id = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
+        previous_new = (extrapolated_t[0], conditional_id)
+        extrapolated_t1 = self._extrapolate(*previous_new, dt1, output_scale)
+
+        # Marginalise from t1 to t to obtain the interpolated solution.
+        conditional_t1_to_t = extrapolated_t1[1]
+        rv_at_t = impl.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+
+        # Return the right combination of marginals and conditionals.
+        return _interp.InterpRes(
+            accepted=(marginal_t1, conditional_t1_to_t),
+            solution=(rv_at_t, extrapolated_t[1]),
+            previous=previous_new,
+        )
+
+    def _extrapolate(self, state, extra, /, dt, output_scale):
+        begun = self.begin(state, extra, dt=dt)
+        return self.complete(*begun, output_scale=output_scale)
 
 
 class IBMExtrapolationFactory(ExtrapolationFactory):

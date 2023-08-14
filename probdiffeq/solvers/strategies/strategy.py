@@ -100,7 +100,7 @@ class Strategy(Generic[P]):
 
         step_from = _state(s1.t, step_from)
         solution = _state(t, solution)
-        interp_from = _state(s0.t, interp_from)
+        interp_from = _state(t, interp_from)
         return _interp.InterpRes(step_from, solution, interp_from)
 
     def offgrid_marginals(
