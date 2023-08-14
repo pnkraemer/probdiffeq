@@ -22,10 +22,10 @@ class Solver(abc.ABC, Generic[T]):
     def __repr__(self):
         return self.string_repr
 
-    def solution_from_tcoeffs(self, tcoeffs, /, t, output_scale, num_steps=1.0):
+    def solution_from_tcoeffs(self, tcoeffs, /, output_scale, num_steps=1.0):
         """Construct an initial `Solution` object."""
         posterior = self.strategy.solution_from_tcoeffs(tcoeffs)
-        return t, posterior, output_scale, num_steps
+        return posterior, output_scale, num_steps
 
     @abc.abstractmethod
     def init(self, t, posterior, /, output_scale, num_steps) -> T:

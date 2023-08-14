@@ -28,12 +28,13 @@ def simulate_terminal_values(
     """Simulate the terminal values of an initial value problem."""
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver, **adaptive_solver_options)
     initial_condition = solver.solution_from_tcoeffs(
-        taylor_coefficients, t=t0, output_scale=output_scale
+        taylor_coefficients, output_scale=output_scale
     )
 
     save_at = jnp.asarray([t1])
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
+        t0,
         *initial_condition,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
@@ -92,13 +93,13 @@ def solve_and_save_at(
 
     adaptive_solver = _adaptive.AdaptiveIVPSolver(solver, **adaptive_solver_options)
 
-    t0 = save_at[0]
     initial_condition = solver.solution_from_tcoeffs(
-        taylor_coefficients, t=t0, output_scale=output_scale
+        taylor_coefficients, output_scale=output_scale
     )
 
     posterior, output_scale, num_steps = _collocate.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
+        save_at[0],
         *initial_condition,
         save_at=save_at[1:],
         adaptive_solver=adaptive_solver,
@@ -115,7 +116,7 @@ def solve_and_save_at(
             posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
-    _, posterior_t0, *_ = initial_condition
+    posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
@@ -151,11 +152,12 @@ def solve_and_save_every_step(
         solver=solver, **adaptive_solver_options
     )
     initial_condition = solver.solution_from_tcoeffs(
-        taylor_coefficients, t=t0, output_scale=output_scale
+        taylor_coefficients, output_scale=output_scale
     )
 
     t, posterior, output_scale, num_steps = _collocate.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
+        t0,
         *initial_condition,
         t1=t1,
         adaptive_solver=adaptive_solver,
@@ -175,7 +177,7 @@ def solve_and_save_every_step(
             posterior = impl.variable.rescale_cholesky(posterior, output_scale)
 
     # I think the user expects marginals, so we compute them here
-    _, posterior_t0, *_ = initial_condition
+    posterior_t0, *_ = initial_condition
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
@@ -199,8 +201,8 @@ def solve_fixed_grid(
 ):
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Initialise the Taylor series
-    _, *initial_condition = solver.solution_from_tcoeffs(
-        taylor_coefficients, t=grid[0], output_scale=output_scale
+    initial_condition = solver.solution_from_tcoeffs(
+        taylor_coefficients, output_scale=output_scale
     )
 
     # Compute the solution
