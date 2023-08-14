@@ -9,6 +9,15 @@ from probdiffeq.backend import containers, control_flow
 from probdiffeq.impl import impl
 
 
+def adaptive(solver: _solver.Solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
+    if control is None:
+        control = controls.proportional_integral()
+
+    return _AdaptiveIVPSolver(
+        solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+    )
+
+
 class _RejectionState(containers.NamedTuple):
     """State for rejection loops.
 
@@ -22,20 +31,10 @@ class _RejectionState(containers.NamedTuple):
     step_from: Any
 
 
-class AdaptiveIVPSolver:
+class _AdaptiveIVPSolver:
     """Adaptive IVP solvers."""
 
-    def __init__(
-        self,
-        solver: _solver.Solver,
-        atol=1e-4,
-        rtol=1e-2,
-        control=None,
-        norm_ord=None,
-    ):
-        if control is None:
-            control = controls.proportional_integral()
-
+    def __init__(self, solver, atol, rtol, control, norm_ord):
         self.solver = solver
         self.atol = atol
         self.rtol = rtol
@@ -136,7 +135,7 @@ class AdaptiveIVPSolver:
 # Register outside of class to declutter the AdaptiveIVPSolver source code a bit
 
 
-def _asolver_flatten(asolver: AdaptiveIVPSolver):
+def _asolver_flatten(asolver):
     children = (asolver.solver, asolver.atol, asolver.rtol, asolver.control)
     aux = (asolver.norm_ord,)
     return children, aux
@@ -145,7 +144,7 @@ def _asolver_flatten(asolver: AdaptiveIVPSolver):
 def _asolver_unflatten(aux, children):
     solver, atol, rtol, control = children
     (norm_ord,) = aux
-    return AdaptiveIVPSolver(
+    return _AdaptiveIVPSolver(
         solver=solver,
         atol=atol,
         rtol=rtol,
@@ -155,7 +154,7 @@ def _asolver_unflatten(aux, children):
 
 
 jax.tree_util.register_pytree_node(
-    nodetype=AdaptiveIVPSolver,
+    nodetype=_AdaptiveIVPSolver,
     flatten_func=_asolver_flatten,
     unflatten_func=_asolver_unflatten,
 )
