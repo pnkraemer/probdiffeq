@@ -5,6 +5,7 @@ import abc
 import jax
 import jax.numpy as jnp
 
+from probdiffeq import _interp
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
@@ -30,6 +31,10 @@ class Extrapolation(abc.ABC):
 
     @abc.abstractmethod
     def extract(self, ssv, extra, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
         raise NotImplementedError
 
 
@@ -58,6 +63,8 @@ class ExtrapolationFactory(abc.ABC):
 
 class PreconFilter(Extrapolation):
     def __init__(self, discretise, num_derivatives):
+        # todo: move sol_from_tcoeffs out of this module
+        #  (and then we can ditch self.num_derivatives)
         self.discretise = discretise
         self.num_derivatives = num_derivatives
 
@@ -93,6 +100,20 @@ class PreconFilter(Extrapolation):
 
         # Gather and return
         return extrapolated, None
+
+    def interpolate(self, state_t0, marginal_t1, dt0, dt1, output_scale):
+        # todo: by ditching marginal_t1 and dt1, this function _extrapolates
+        #  (no *inter*polation happening)
+        del dt1
+
+        hidden, extra = state_t0
+        hidden, extra = self.begin(hidden, extra, dt=dt0)
+        hidden, extra = self.complete(hidden, extra, output_scale=output_scale)
+
+        # Consistent state-types in interpolation result.
+        interp = (hidden, extra)
+        step_from = (marginal_t1, None)
+        return _interp.InterpRes(accepted=step_from, solution=interp, previous=state_t0)
 
 
 class PreconSmoother(Extrapolation):

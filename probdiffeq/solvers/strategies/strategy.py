@@ -3,6 +3,7 @@
 from typing import Generic, TypeVar
 
 import jax
+import jax.numpy as jnp
 
 from probdiffeq import _interp
 from probdiffeq.solvers.strategies import _common
@@ -83,9 +84,24 @@ class Strategy(Generic[P]):
     def case_interpolate(
         self, t, *, s0: _common.State, s1: _common.State, output_scale
     ) -> _interp.InterpRes[_common.State]:
-        return self.impl_interpolate(
-            t, output_scale=output_scale, s0=s0, s1=s1, extrapolation=self.extrapolation
+        dt0 = t - s0.t
+        dt1 = s1.t - t
+        step_from, solution, interp_from = self.extrapolation.interpolate(
+            state_t0=(s0.hidden, s0.aux_extra),
+            marginal_t1=s1.hidden,
+            dt0=dt0,
+            dt1=dt1,
+            output_scale=output_scale,
         )
+
+        def _state(t_, x):
+            corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
+            return _common.State(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+
+        step_from = _state(s1.t, step_from)
+        solution = _state(t, solution)
+        interp_from = _state(s0.t, interp_from)
+        return _interp.InterpRes(step_from, solution, interp_from)
 
     def offgrid_marginals(
         self, *, t, marginals, posterior: P, posterior_previous: P, t0, t1, output_scale
