@@ -146,7 +146,8 @@ class CalibratedSolver(_solver.Solver[_common.State]):
         self.calibration = calibration
         self.impl_step = impl_step
 
-    def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
+    def init(self, t, initial_condition) -> _common.State:
+        posterior, output_scale, num_steps = initial_condition
         state_strategy = self.strategy.init(t, posterior)
         error_estimate = impl.prototypes.error_estimate()
         calib_state = self.calibration.init(output_scale)
@@ -169,7 +170,7 @@ class CalibratedSolver(_solver.Solver[_common.State]):
     def extract(self, state: _common.State, /):
         t, posterior = self.strategy.extract(state.strategy)
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
-        return t, posterior, output_scale, state.num_steps
+        return t, (posterior, output_scale, state.num_steps)
 
     def interpolate(
         self, t, s0: _common.State, s1: _common.State

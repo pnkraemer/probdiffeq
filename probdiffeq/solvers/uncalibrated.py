@@ -15,7 +15,8 @@ def solver(strategy, /):
 
 
 class UncalibratedSolver(_solver.Solver[_common.State]):
-    def init(self, t, posterior, /, output_scale, num_steps) -> _common.State:
+    def init(self, t, initial_condition) -> _common.State:
+        posterior, output_scale, num_steps = initial_condition
         state_strategy = self.strategy.init(t, posterior)
         error_estimate = impl.prototypes.error_estimate()
         return _common.State(
@@ -44,7 +45,7 @@ class UncalibratedSolver(_solver.Solver[_common.State]):
 
     def extract(self, state: _common.State, /):
         t, posterior = self.strategy.extract(state.strategy)
-        return t, posterior, state.output_scale, state.num_steps
+        return t, (posterior, state.output_scale, state.num_steps)
 
     def interpolate(
         self, t, s0: _common.State, s1: _common.State

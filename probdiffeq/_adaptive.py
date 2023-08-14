@@ -53,9 +53,9 @@ class _AdaptiveIVPSolver:
         )
 
     @jax.jit
-    def init(self, t, posterior, output_scale, num_steps, dt0):
+    def init(self, t, initial_condition, dt0):
         """Initialise the IVP solver state."""
-        state_solver = self.solver.init(t, posterior, output_scale, num_steps)
+        state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt0)
         return state_solver, state_control
 

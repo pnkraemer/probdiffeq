@@ -32,8 +32,8 @@ def advance_and_interpolate(
     )
 
     # Extract the solution
-    (_t, *sol_solver), _sol_ctrl = adaptive_solver.extract(solution, control)
-    return (accepted, previous, control), sol_solver
+    (_t, solution_solver), _sol_ctrl = adaptive_solver.extract(solution, control)
+    return (accepted, previous, control), solution_solver
 
 
 def _advance_ivp_solution_adaptively(

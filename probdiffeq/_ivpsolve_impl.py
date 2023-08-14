@@ -13,9 +13,7 @@ from probdiffeq.backend import tree_array_util
 def solve_and_save_at(
     vector_field,
     t,
-    posterior,
-    output_scale,
-    num_steps,
+    initial_condition,
     *,
     save_at,
     adaptive_solver,
@@ -32,13 +30,7 @@ def solve_and_save_at(
         right_corner_fun=right_corner_fun,
     )
 
-    acc, ctrl = adaptive_solver.init(
-        t=t,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=num_steps,
-        dt0=dt0,
-    )
+    acc, ctrl = adaptive_solver.init(t, initial_condition, dt0=dt0)
     init = (acc, acc, ctrl)
     _, solution = jax.lax.scan(f=advance_func, init=init, xs=save_at, reverse=False)
     return solution
@@ -52,9 +44,7 @@ def solve_and_save_every_step(*args, **kwargs):
 def _solution_generator(
     vector_field,
     t,
-    posterior,
-    output_scale,
-    num_steps,
+    initial_condition,
     *,
     dt0,
     t1,
@@ -63,10 +53,8 @@ def _solution_generator(
 ):
     """Generate a probabilistic IVP solution iteratively."""
     interpolate_fun, right_corner_fun = interpolate
+    accepted, control = adaptive_solver.init(t, initial_condition, dt0=dt0)
 
-    accepted, control = adaptive_solver.init(
-        t, posterior, output_scale, num_steps, dt0=dt0
-    )
     while accepted.t < t1:
         previous = accepted
         accepted, control = adaptive_solver.rejection_loop(
@@ -88,10 +76,7 @@ def _solution_generator(
     yield sol_solver
 
 
-def solve_fixed_grid(vector_field, posterior, output_scale, num_steps, *, grid, solver):
-    t0 = grid[0]
-    state0 = solver.init(t0, posterior, output_scale, num_steps)
-
+def solve_fixed_grid(vector_field, initial_condition, *, grid, solver):
     def body_fn(carry, t_new):
         s, t_old = carry
         dt = t_new - t_old
@@ -102,7 +87,9 @@ def solve_fixed_grid(vector_field, posterior, output_scale, num_steps, *, grid, 
         )
         return (s_new, t_new), s_new
 
+    t0 = grid[0]
+    state0 = solver.init(t0, initial_condition)
     _, result_state = jax.lax.scan(f=body_fn, init=(state0, t0), xs=grid[1:])
 
-    _t, posterior, output_scale, num_steps = solver.extract(result_state)
-    return posterior, output_scale, num_steps
+    _t, solution = solver.extract(result_state)
+    return solution

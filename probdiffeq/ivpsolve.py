@@ -32,10 +32,10 @@ def simulate_terminal_values(
     )
 
     save_at = jnp.asarray([t1])
-    posterior, output_scale, num_steps = _ivpsolve_impl.solve_and_save_at(
+    solution_save_at = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         t0,
-        *initial_condition,
+        initial_condition,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -43,15 +43,15 @@ def simulate_terminal_values(
     )
     # "squeeze"-type functionality (there is only a single state!)
     squeeze_fun = functools.partial(jnp.squeeze, axis=0)
-    posterior = jax.tree_util.tree_map(squeeze_fun, posterior)
-    output_scale = jax.tree_util.tree_map(squeeze_fun, output_scale)
-    num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
+    solution_save_at = jax.tree_util.tree_map(squeeze_fun, solution_save_at)
 
     # I think the user expects marginals, so we compute them here
+    posterior, output_scale, num_steps = solution_save_at
     if isinstance(posterior, markov.MarkovSeqRev):
         marginals = posterior.init
     else:
         marginals = posterior
+
     u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=t1,
@@ -86,26 +86,23 @@ def solve_and_save_at(
         warnings.warn(msg, stacklevel=1)
 
     adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)
-
-    initial_condition = solver.solution_from_tcoeffs(
-        taylor_coefficients, output_scale=output_scale
-    )
-
-    posterior, output_scale, num_steps = _ivpsolve_impl.solve_and_save_at(
+    initial_condition = solver.solution_from_tcoeffs(taylor_coefficients, output_scale)
+    solution_save_at = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         save_at[0],
-        *initial_condition,
+        initial_condition,
         save_at=save_at[1:],
         adaptive_solver=adaptive_solver,
         dt0=dt0,
         interpolate=(solver.interpolate, solver.right_corner),
     )
 
-    # I think the user expects marginals, so we compute them here
+    # I think the user expects the initial condition to be part of the state
+    # (as well as marginals), so we compute those things here
     posterior_t0, *_ = initial_condition
-    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
+    posterior_save_at, output_scale, num_steps = solution_save_at
+    _tmp = _userfriendly_output(posterior=posterior_save_at, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
-
     u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=save_at,
@@ -139,10 +136,10 @@ def solve_and_save_every_step(
         taylor_coefficients, output_scale=output_scale
     )
 
-    t, posterior, output_scale, num_steps = _ivpsolve_impl.solve_and_save_every_step(
+    t, solution_every_step = _ivpsolve_impl.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
         t0,
-        *initial_condition,
+        initial_condition,
         t1=t1,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
@@ -154,6 +151,7 @@ def solve_and_save_every_step(
 
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
+    posterior, output_scale, num_steps = solution_every_step
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
@@ -184,7 +182,7 @@ def solve_fixed_grid(
     # Compute the solution
     posterior, output_scale, num_steps = _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
-        *initial_condition,
+        initial_condition,
         grid=grid,
         solver=solver,
     )

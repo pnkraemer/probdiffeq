@@ -28,7 +28,7 @@ class Solver(abc.ABC, Generic[T]):
         return posterior, output_scale, num_steps
 
     @abc.abstractmethod
-    def init(self, t, posterior, /, output_scale, num_steps) -> T:
+    def init(self, t, initial_condition) -> T:
         raise NotImplementedError
 
     @abc.abstractmethod

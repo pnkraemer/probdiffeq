@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import calibrated, solution
+from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.statespace import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.taylor import autodiff
@@ -24,7 +24,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     ibm = extrapolation.ibm_adaptive(num_derivatives=2)
     ts0 = correction.taylor_order_zero()
     strategy = filters.filter_adaptive(ibm, ts0)
-    solver = calibrated.mle(strategy)
+    solver = uncalibrated.solver(strategy)
 
     adaptive_kwargs = {
         "solver": solver,
