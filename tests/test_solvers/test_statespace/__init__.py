@@ -1,1 +1,1 @@
-"""Tests for statespace components."""
+"""Tests for strategies components."""

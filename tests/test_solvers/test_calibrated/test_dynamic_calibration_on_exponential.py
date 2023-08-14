@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.statespace import correction, extrapolation
+from probdiffeq.solvers.strategies import correction, extrapolation
 from probdiffeq.solvers.strategies import filters
 from tests.setup import setup
 

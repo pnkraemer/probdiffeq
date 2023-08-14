@@ -3,7 +3,7 @@
 Place all tests that have no better place here.
 """
 from probdiffeq.backend import testing
-from probdiffeq.solvers.statespace import extrapolation
+from probdiffeq.solvers.strategies import extrapolation
 
 
 @testing.parametrize("incr", [1, -1])

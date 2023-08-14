@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.impl import impl
-from probdiffeq.solvers.statespace import cubature
+from probdiffeq.solvers.strategies import cubature
 
 
 class Correction(abc.ABC):

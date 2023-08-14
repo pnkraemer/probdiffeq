@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
-from probdiffeq.solvers.statespace import correction, extrapolation
+from probdiffeq.solvers.strategies import correction, extrapolation
 from probdiffeq.solvers.strategies import filters, smoothers
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
