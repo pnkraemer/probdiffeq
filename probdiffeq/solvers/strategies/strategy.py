@@ -1,7 +1,7 @@
 """Interface for estimation strategies."""
 
 import abc
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -10,28 +10,32 @@ from probdiffeq import _interp
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 
+T = TypeVar("T")
+R = TypeVar("R")
+S = TypeVar("S")
 
-class ExtrapolationImpl(abc.ABC):
+
+class ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
     """Extrapolation model interface."""
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
+    def solution_from_tcoeffs(self, tcoeffs, /) -> T:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def init(self, sol, /):
+    def init(self, solution: T, /) -> tuple[R, S]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def begin(self, ssv, extra, /, dt):
+    def begin(self, state: R, aux: S, /, dt) -> tuple[R, S]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def complete(self, ssv, extra, /, output_scale):
+    def complete(self, state: R, aux: S, /, output_scale) -> tuple[R, S]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract(self, ssv, extra, /):
+    def extract(self, state: R, aux: S, /) -> T:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -39,7 +43,7 @@ class ExtrapolationImpl(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def right_corner(self, rv, extra, /):
+    def right_corner(self, state: R, aux: S, /) -> _interp.InterpRes[tuple[R, S]]:
         raise NotImplementedError
 
 
@@ -51,7 +55,7 @@ class _State(containers.NamedTuple):
 
 
 class Strategy:
-    """Inference strategy interface."""
+    """Estimation strategy."""
 
     def __init__(
         self,

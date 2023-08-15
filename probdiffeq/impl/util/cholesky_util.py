@@ -80,7 +80,7 @@ def revert_conditional(R_X_F, R_X, R_YX):
     in the context of Rauch-Tung-Striebel smoothing, it is called the
     _smoothing gain_.
     """
-    if R_X.ndim != 2 or R_YX.ndim != 2 or R_X_F.ndim != 2:
+    if not _is_matrix(R_X) or not _is_matrix(R_YX) or not _is_matrix(R_X_F):
         msg = (
             "Unexpected tensor-dimension of the inputs."
             "\n\nExpected:\n\tR_X.shape=(n, n), "
@@ -111,6 +111,10 @@ def revert_conditional(R_X_F, R_X, R_YX):
     # ~R_{X \mid Y}
     R_XY = R[d_out:, d_out:]
     return R_Y, (R_XY, G)
+
+
+def _is_matrix(mat, matrix_ndim=2):
+    return jnp.ndim(mat) == matrix_ndim
 
 
 def sum_of_sqrtm_factors(R_stack: Tuple):

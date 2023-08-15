@@ -24,6 +24,7 @@ class Solver(abc.ABC, Generic[T]):
 
     def solution_from_tcoeffs(self, tcoeffs, /, output_scale, num_steps=1.0):
         """Construct an initial `Solution` object."""
+        # todo: initialise posterior with output scale
         posterior = self.strategy.solution_from_tcoeffs(tcoeffs)
         return posterior, output_scale, num_steps
 

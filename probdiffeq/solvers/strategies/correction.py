@@ -3,7 +3,6 @@
 import abc
 import functools
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq.impl import impl
@@ -111,25 +110,6 @@ def _estimate_error(observed, /):
     return output_scale * error_estimate_unscaled
 
 
-def _constraint_flatten(node):
-    children = ()
-    aux = node.ode_order, node.linearise, node.string_repr
-    return children, aux
-
-
-def _constraint_unflatten(aux, _children, *, nodetype):
-    ode_order, lin, string_repr = aux
-    return nodetype(ode_order=ode_order, linearise_fun=lin, string_repr=string_repr)
-
-
-for nodetype in [ODEConstraintTaylor, ODEConstraintStatistical]:
-    jax.tree_util.register_pytree_node(
-        nodetype=nodetype,
-        flatten_func=_constraint_flatten,
-        unflatten_func=functools.partial(_constraint_unflatten, nodetype=nodetype),
-    )
-
-
 def taylor_order_zero(*, ode_order=1) -> ODEConstraintTaylor:
     return ODEConstraintTaylor(
         ode_order=ode_order,
@@ -146,7 +126,8 @@ def taylor_order_one(*, ode_order=1) -> ODEConstraintTaylor:
     )
 
 
-def statistical_order_one(cubature_fun=cubature.third_order_spherical):
+def statistical_order_one(cubature_fun=None) -> ODEConstraintStatistical:
+    cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
     return ODEConstraintStatistical(
         ode_order=1,
@@ -155,7 +136,8 @@ def statistical_order_one(cubature_fun=cubature.third_order_spherical):
     )
 
 
-def statistical_order_zero(cubature_fun=cubature.third_order_spherical):
+def statistical_order_zero(cubature_fun=None) -> ODEConstraintStatistical:
+    cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
     return ODEConstraintStatistical(
         ode_order=1,

@@ -1,5 +1,6 @@
 """State-space model impl."""
 import abc
+from typing import Optional
 
 from probdiffeq.impl import (
     _conditional,
@@ -90,8 +91,8 @@ class Impl:
     and a "selection" functionality.
     """
 
-    def __init__(self):
-        self._fact: FactorisedImpl = None
+    def __init__(self) -> None:
+        self._fact: Optional[FactorisedImpl] = None
         self._fact_name: str = "None"
 
     def select(self, which, **kwargs):
