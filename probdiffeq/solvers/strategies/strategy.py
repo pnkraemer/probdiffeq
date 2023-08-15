@@ -19,7 +19,7 @@ class ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
     """Extrapolation model interface."""
 
     @abc.abstractmethod
-    def solution_from_tcoeffs(self, tcoeffs, /) -> T:
+    def initial_condition(self, tcoeffs, /) -> T:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -78,8 +78,8 @@ class Strategy:
     def __repr__(self):
         return self.string_repr
 
-    def solution_from_tcoeffs(self, taylor_coefficients, /):
-        return self.extrapolation.solution_from_tcoeffs(taylor_coefficients)
+    def initial_condition(self, taylor_coefficients, /):
+        return self.extrapolation.initial_condition(taylor_coefficients)
 
     def init(self, t, posterior, /) -> _State:
         rv, extra = self.extrapolation.init(posterior)

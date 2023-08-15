@@ -24,7 +24,7 @@ class PreconFilter(strategy.ExtrapolationImpl):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
 
-    def solution_from_tcoeffs(self, tcoeffs, /):
+    def initial_condition(self, tcoeffs, /):
         return impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
 
     def init(self, sol, /):

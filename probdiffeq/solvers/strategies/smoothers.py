@@ -23,7 +23,7 @@ class PreconSmoother(strategy.ExtrapolationImpl):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
 
-    def solution_from_tcoeffs(self, tcoeffs, /):
+    def initial_condition(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.ssm_util.identity_conditional(len(tcoeffs))
         return markov.MarkovSeqRev(init=rv, conditional=cond)

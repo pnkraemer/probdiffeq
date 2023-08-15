@@ -27,7 +27,7 @@ def simulate_terminal_values(
 ):
     """Simulate the terminal values of an initial value problem."""
     adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)
-    initial_condition = solver.solution_from_tcoeffs(
+    initial_condition = solver.initial_condition(
         taylor_coefficients, output_scale=output_scale
     )
 
@@ -86,7 +86,7 @@ def solve_and_save_at(
         warnings.warn(msg, stacklevel=1)
 
     adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)
-    initial_condition = solver.solution_from_tcoeffs(taylor_coefficients, output_scale)
+    initial_condition = solver.initial_condition(taylor_coefficients, output_scale)
     solution_save_at = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         save_at[0],
@@ -132,7 +132,7 @@ def solve_and_save_every_step(
         Not JITable, not reverse-mode-differentiable.
     """
     adaptive_solver = _adaptive.adaptive(solver=solver, **adaptive_solver_options)
-    initial_condition = solver.solution_from_tcoeffs(
+    initial_condition = solver.initial_condition(
         taylor_coefficients, output_scale=output_scale
     )
 
@@ -175,7 +175,7 @@ def solve_fixed_grid(
 ):
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Initialise the Taylor series
-    initial_condition = solver.solution_from_tcoeffs(
+    initial_condition = solver.initial_condition(
         taylor_coefficients, output_scale=output_scale
     )
 
