@@ -24,4 +24,4 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     save_at = fixedpoint.PreconFixedPoint(*prior)
     for impl in [fwd, dense, save_at]:
         with testing.raises(ValueError):
-            _ = impl.solution_from_tcoeffs(tcoeffs_wrong_length)
+            _ = impl.initial_condition(tcoeffs_wrong_length)
