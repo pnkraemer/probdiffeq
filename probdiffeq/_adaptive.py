@@ -4,12 +4,12 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _solver, controls
+from probdiffeq import controls
 from probdiffeq.backend import containers, control_flow
 from probdiffeq.impl import impl
 
 
-def adaptive(solver: _solver.Solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
+def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     if control is None:
         control = controls.proportional_integral()
 

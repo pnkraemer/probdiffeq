@@ -3,9 +3,9 @@ import abc
 
 import jax
 
-from probdiffeq import _interp, _solver
+from probdiffeq import _interp
 from probdiffeq.impl import impl
-from probdiffeq.solvers import _common
+from probdiffeq.solvers import _common, _solver
 
 
 def mle(strategy):
