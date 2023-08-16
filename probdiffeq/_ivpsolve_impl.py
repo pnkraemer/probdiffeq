@@ -5,9 +5,9 @@ Sequentially (and often, adaptively) constrain a random process to an ODE.
 import functools
 
 import jax
+import jax.numpy as jnp
 
-from probdiffeq import _advance
-from probdiffeq.backend import tree_array_util
+from probdiffeq.backend import control_flow, tree_array_util
 
 
 def solve_and_save_at(
@@ -20,15 +20,36 @@ def solve_and_save_at(
     dt0,
 ):
     advance_func = functools.partial(
-        _advance.advance_and_interpolate,
+        _advance_and_interpolate,
         vector_field=vector_field,
         adaptive_solver=adaptive_solver,
     )
 
     state = adaptive_solver.init(t, initial_condition, dt0=dt0, num_steps=0.0)
     _, solution = jax.lax.scan(f=advance_func, init=state, xs=save_at, reverse=False)
-    (sol_solver), _sol_ctrl, num_steps = solution
-    return sol_solver, num_steps
+    return solution
+
+
+def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
+    # Advance until accepted.t >= t_next.
+    # Note: This could already be the case and we may not loop (just interpolate)
+    def cond_fun(s):
+        return s.t < t_next
+
+    def body_fun(s):
+        return adaptive_solver.rejection_loop(s, vector_field=vector_field, t1=t_next)
+
+    state = control_flow.while_loop(cond_fun, body_fun, init=state)
+
+    # Either interpolate (t > t_next) or "finalise" (t == t_next)
+    state, solution = jax.lax.cond(
+        state.t > t_next,
+        adaptive_solver.interpolate_and_extract,
+        lambda s, _t: adaptive_solver.right_corner_and_extract(s),
+        state,
+        t_next,
+    )
+    return state, solution
 
 
 def solve_and_save_every_step(*args, **kwargs):
@@ -46,32 +67,24 @@ def _solution_generator(
         state = adaptive_solver.rejection_loop(state, vector_field=vector_field, t1=t1)
 
         if state.t < t1:
-            sol_solver, _sol_control, nstep = adaptive_solver.extract(state)
-            yield sol_solver, nstep
+            solution = adaptive_solver.extract(state)
+            yield solution
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     if state.t > t1:
-        _, (sol_solver, _, nstep) = adaptive_solver.interpolate_and_extract(state, t=t1)
+        _, solution = adaptive_solver.interpolate_and_extract(state, t=t1)
     else:
-        _, (sol_solver, _, nstep) = adaptive_solver.right_corner_and_extract(state)
+        _, solution = adaptive_solver.right_corner_and_extract(state)
 
-    yield sol_solver, nstep
+    yield solution
 
 
 def solve_fixed_grid(vector_field, initial_condition, *, grid, solver):
-    def body_fn(carry, t_new):
-        s, t_old = carry
-        dt = t_new - t_old
-        _, s_new = solver.step(
-            state=s,
-            vector_field=vector_field,
-            dt=dt,
-        )
-        return (s_new, t_new), s_new
+    def body_fn(s, dt):
+        _error, s_new = solver.step(state=s, vector_field=vector_field, dt=dt)
+        return s_new, s_new
 
     t0 = grid[0]
     state0 = solver.init(t0, initial_condition)
-    _, result_state = jax.lax.scan(f=body_fn, init=(state0, t0), xs=grid[1:])
-
-    _t, solution = solver.extract(result_state)
-    return solution
+    _, result_state = jax.lax.scan(f=body_fn, init=state0, xs=jnp.diff(grid))
+    return solver.extract(result_state)

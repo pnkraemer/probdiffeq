@@ -68,12 +68,8 @@ def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
     state_strategy = strategy.complete(state_strategy, output_scale=prior)
 
     # Return solution
-    return _common.State(
-        error_estimate=dt * error,
-        strategy=state_strategy,
-        output_scale=output_scale,
-        num_steps=state.num_steps + 1,
-    )
+    state = _common.State(strategy=state_strategy, output_scale=output_scale)
+    return dt * error, state
 
 
 class _Calibration(abc.ABC):

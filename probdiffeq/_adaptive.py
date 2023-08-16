@@ -141,10 +141,10 @@ class _AdaptiveIVPSolver:
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=self.norm_ord) / jnp.sqrt(dim)
 
-    def extract(self, state, /):
-        solver_extract = self.solver.extract(state.step_from)
-        control_extract = self.control.extract(state.control)
-        return solver_extract, control_extract, state.stats
+    def extract(self, state):
+        solution_solver = self.solver.extract(state.step_from)
+        solution_control = self.control.extract(state.control)
+        return solution_solver, solution_control, state.stats
 
     def right_corner_and_extract(self, state):
         interp = self.solver.right_corner(state.interp_from, state.step_from)

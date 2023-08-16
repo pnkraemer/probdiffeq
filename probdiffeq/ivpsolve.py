@@ -32,7 +32,7 @@ def simulate_terminal_values(
     )
 
     save_at = jnp.asarray([t1])
-    (_t, solution_save_at), num_steps = _ivpsolve_impl.solve_and_save_at(
+    (_t, solution_save_at), _, num_steps = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         t0,
         initial_condition,
@@ -87,7 +87,7 @@ def solve_and_save_at(
 
     adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)
     initial_condition = solver.initial_condition(taylor_coefficients, output_scale)
-    (_t, solution_save_at), num_steps = _ivpsolve_impl.solve_and_save_at(
+    (_t, solution_save_at), _, num_steps = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         save_at[0],
         initial_condition,
@@ -135,7 +135,7 @@ def solve_and_save_every_step(
         taylor_coefficients, output_scale=output_scale
     )
 
-    (t, solution_every_step), num_steps = _ivpsolve_impl.solve_and_save_every_step(
+    (t, solution_every_step), _dt, num_steps = _ivpsolve_impl.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
         t0,
         initial_condition,
@@ -178,7 +178,7 @@ def solve_fixed_grid(
     )
 
     # Compute the solution
-    posterior, output_scale = _ivpsolve_impl.solve_fixed_grid(
+    _t, (posterior, output_scale) = _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),
         initial_condition,
         grid=grid,
