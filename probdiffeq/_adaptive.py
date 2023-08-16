@@ -31,6 +31,17 @@ class _RejectionState(containers.NamedTuple):
     step_from: Any
 
 
+class _AdaptiveState(containers.NamedTuple):
+    step_from: Any
+    interp_from: Any
+    control: Any
+    stats: Any
+
+    @property
+    def t(self):
+        return self.step_from.t
+
+
 class _AdaptiveIVPSolver:
     """Adaptive IVP solvers."""
 
@@ -53,14 +64,14 @@ class _AdaptiveIVPSolver:
         )
 
     @jax.jit
-    def init(self, t, initial_condition, dt0):
+    def init(self, t, initial_condition, dt0, num_steps):
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt0)
-        return state_solver, state_control
+        return _AdaptiveState(state_solver, state_solver, state_control, num_steps)
 
     @jax.jit
-    def rejection_loop(self, state0, control0, *, vector_field, t1):
+    def rejection_loop(self, state0, *, vector_field, t1):
         def cond_fn(s):
             return s.error_norm_proposed > 1.0
 
@@ -71,19 +82,20 @@ class _AdaptiveIVPSolver:
                 t1=t1,
             )
 
-        def init(s0, c0):
+        def init(s0):
             larger_than_1 = 1.1
             return _RejectionState(
                 error_norm_proposed=larger_than_1,
-                control=c0,
-                proposed=_inf_like(s0),
-                step_from=s0,
+                control=s0.control,
+                proposed=_inf_like(s0.step_from),
+                step_from=s0.step_from,
             )
 
         def extract(s):
-            return s.proposed, s.control
+            num_steps = state0.stats + 1
+            return _AdaptiveState(s.proposed, s.step_from, s.control, num_steps)
 
-        init_val = init(state0, control0)
+        init_val = init(state0)
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
 
@@ -98,7 +110,8 @@ class _AdaptiveIVPSolver:
         state_control = self.control.clip(state.control, t=state.step_from.t, t1=t1)
 
         # Perform the actual step.
-        state_proposed = self.solver.step(
+        # todo: error estimate should be a tuple (abs, rel)
+        error_estimate, state_proposed = self.solver.step(
             state=state.step_from,
             vector_field=vector_field,
             dt=self.control.extract(state_control),
@@ -107,7 +120,7 @@ class _AdaptiveIVPSolver:
         u_proposed = impl.hidden_model.qoi(state_proposed.strategy.hidden)
         u_step_from = impl.hidden_model.qoi(state_proposed.strategy.hidden)
         u = jnp.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
-        error_normalised = self._normalise_error(state_proposed.error_estimate, u=u)
+        error_normalised = self._normalise_error(error_estimate, u=u)
 
         # Propose a new step
         error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
@@ -128,10 +141,29 @@ class _AdaptiveIVPSolver:
         dim = jnp.atleast_1d(u).size
         return jnp.linalg.norm(error_relative, ord=self.norm_ord) / jnp.sqrt(dim)
 
-    def extract(self, accepted, control, /):
-        solver_extract = self.solver.extract(accepted)
-        control_extract = self.control.extract(control)
-        return solver_extract, control_extract
+    def extract(self, state, /):
+        solver_extract = self.solver.extract(state.step_from)
+        control_extract = self.control.extract(state.control)
+        return solver_extract, control_extract, state.stats
+
+    def right_corner_and_extract(self, state):
+        interp = self.solver.right_corner(state.interp_from, state.step_from)
+        accepted, solution, previous = interp
+        state = _AdaptiveState(accepted, previous, state.control, state.stats)
+
+        solution_solver = self.solver.extract(solution)
+        solution_control = self.control.extract(state.control)
+        return state, (solution_solver, solution_control, state.stats)
+
+    def interpolate_and_extract(self, state, t):
+        interp = self.solver.interpolate(s1=state.step_from, s0=state.interp_from, t=t)
+
+        accepted, solution, previous = interp
+        state = _AdaptiveState(accepted, previous, state.control, state.stats)
+
+        solution_solver = self.solver.extract(solution)
+        solution_control = self.control.extract(state.control)
+        return state, (solution_solver, solution_control, state.stats)
 
 
 # Register outside of class to declutter the AdaptiveIVPSolver source code a bit

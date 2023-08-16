@@ -2,7 +2,6 @@
 import jax
 
 from probdiffeq import _interp
-from probdiffeq.impl import impl
 from probdiffeq.solvers import _common, _solver
 
 
@@ -16,17 +15,11 @@ def solver(strategy, /):
 
 class UncalibratedSolver(_solver.Solver[_common.State]):
     def init(self, t, initial_condition) -> _common.State:
-        posterior, output_scale, num_steps = initial_condition
+        posterior, output_scale = initial_condition
         state_strategy = self.strategy.init(t, posterior)
-        error_estimate = impl.prototypes.error_estimate()
-        return _common.State(
-            error_estimate=error_estimate,
-            strategy=state_strategy,
-            output_scale=output_scale,
-            num_steps=num_steps,
-        )
+        return _common.State(strategy=state_strategy, output_scale=output_scale)
 
-    def step(self, state: _common.State, *, vector_field, dt) -> _common.State:
+    def step(self, state: _common.State, *, vector_field, dt):
         error, _observed, state_strategy = self.strategy.predict_error(
             state.strategy,
             dt=dt,
@@ -36,16 +29,12 @@ class UncalibratedSolver(_solver.Solver[_common.State]):
             state_strategy, output_scale=state.output_scale
         )
         # Extract and return solution
-        return _common.State(
-            error_estimate=dt * error,
-            strategy=state_strategy,
-            output_scale=state.output_scale,
-            num_steps=state.num_steps + 1,
-        )
+        state = _common.State(strategy=state_strategy, output_scale=state.output_scale)
+        return dt * error, state
 
     def extract(self, state: _common.State, /):
         t, posterior = self.strategy.extract(state.strategy)
-        return t, (posterior, state.output_scale, state.num_steps)
+        return t, (posterior, state.output_scale)
 
     def interpolate(
         self, t, s0: _common.State, s1: _common.State
@@ -56,29 +45,18 @@ class UncalibratedSolver(_solver.Solver[_common.State]):
             s1=s1.strategy,
             output_scale=s1.output_scale,
         )
-        prev = self._interp_make_state(prev_p, reference=s0)
-        sol = self._interp_make_state(sol_p, reference=s1)
-        acc = self._interp_make_state(acc_p, reference=s1)
+        prev = _common.State(prev_p, output_scale=s0.output_scale)
+        sol = _common.State(sol_p, output_scale=s1.output_scale)
+        acc = _common.State(acc_p, output_scale=s1.output_scale)
         return _interp.InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def right_corner(self, state_at_t0, state_at_t1) -> _interp.InterpRes:
         acc_p, sol_p, prev_p = self.strategy.case_right_corner(state_at_t1.strategy)
 
-        prev = self._interp_make_state(prev_p, reference=state_at_t0)
-        sol = self._interp_make_state(sol_p, reference=state_at_t1)
-        acc = self._interp_make_state(acc_p, reference=state_at_t1)
+        prev = _common.State(prev_p, output_scale=state_at_t0.output_scale)
+        sol = _common.State(sol_p, output_scale=state_at_t1.output_scale)
+        acc = _common.State(acc_p, output_scale=state_at_t1.output_scale)
         return _interp.InterpRes(accepted=acc, solution=sol, previous=prev)
-
-    def _interp_make_state(
-        self, state_strategy, *, reference: _common.State
-    ) -> _common.State:
-        error_estimate = impl.prototypes.error_estimate()
-        return _common.State(
-            strategy=state_strategy,
-            error_estimate=error_estimate,
-            output_scale=reference.output_scale,
-            num_steps=reference.num_steps,
-        )
 
 
 def _solver_flatten(solver):

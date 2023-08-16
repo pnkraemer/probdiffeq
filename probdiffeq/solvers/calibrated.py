@@ -39,12 +39,8 @@ def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
     output_scale = calibration.update(state.output_scale, observed=observed)
 
     # Return
-    return _common.State(
-        error_estimate=dt * error,
-        strategy=state_strategy,
-        output_scale=output_scale,
-        num_steps=state.num_steps + 1,
-    )
+    state = _common.State(strategy=state_strategy, output_scale=output_scale)
+    return dt * error, state
 
 
 def dynamic(strategy):
@@ -139,7 +135,7 @@ for node in [_RunningMean, _MostRecent]:
     )
 
 
-class CalibratedSolver(_solver.Solver[_common.State]):
+class CalibratedSolver(_solver.Solver):
     def __init__(self, *, calibration: _Calibration, impl_step, **kwargs):
         super().__init__(**kwargs)
 
@@ -147,16 +143,10 @@ class CalibratedSolver(_solver.Solver[_common.State]):
         self.impl_step = impl_step
 
     def init(self, t, initial_condition) -> _common.State:
-        posterior, output_scale, num_steps = initial_condition
+        posterior, output_scale = initial_condition
         state_strategy = self.strategy.init(t, posterior)
-        error_estimate = impl.prototypes.error_estimate()
         calib_state = self.calibration.init(output_scale)
-        return _common.State(
-            error_estimate=error_estimate,
-            strategy=state_strategy,
-            output_scale=calib_state,
-            num_steps=num_steps,
-        )
+        return _common.State(strategy=state_strategy, output_scale=calib_state)
 
     def step(self, state: _common.State, *, vector_field, dt) -> _common.State:
         return self.impl_step(
@@ -170,7 +160,7 @@ class CalibratedSolver(_solver.Solver[_common.State]):
     def extract(self, state: _common.State, /):
         t, posterior = self.strategy.extract(state.strategy)
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
-        return t, (posterior, output_scale, state.num_steps)
+        return t, (posterior, output_scale)
 
     def interpolate(
         self, t, s0: _common.State, s1: _common.State
@@ -195,13 +185,7 @@ class CalibratedSolver(_solver.Solver[_common.State]):
     def _interp_make_state(
         self, state_strategy, *, reference: _common.State
     ) -> _common.State:
-        error_estimate = impl.prototypes.error_estimate()
-        return _common.State(
-            strategy=state_strategy,
-            error_estimate=error_estimate,
-            output_scale=reference.output_scale,
-            num_steps=reference.num_steps,
-        )
+        return _common.State(state_strategy, output_scale=reference.output_scale)
 
 
 def _solver_flatten(solver):
