@@ -37,7 +37,7 @@ def fixture_sol(strategy_func):
     vf, (u0,), (t0, t1) = setup.ode()
 
     ibm = priors.ibm_adaptive(num_derivatives=4)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = strategy_func(ibm, ts0)
 
     solver = uncalibrated.solver(strategy)

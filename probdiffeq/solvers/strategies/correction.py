@@ -110,7 +110,7 @@ def _estimate_error(observed, /):
     return output_scale * error_estimate_unscaled
 
 
-def taylor_order_zero(*, ode_order=1) -> ODEConstraintTaylor:
+def ts0(*, ode_order=1) -> ODEConstraintTaylor:
     return ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_0th(ode_order=ode_order),
@@ -118,7 +118,7 @@ def taylor_order_zero(*, ode_order=1) -> ODEConstraintTaylor:
     )
 
 
-def taylor_order_one(*, ode_order=1) -> ODEConstraintTaylor:
+def ts1(*, ode_order=1) -> ODEConstraintTaylor:
     return ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_1st(ode_order=ode_order),
@@ -126,7 +126,7 @@ def taylor_order_one(*, ode_order=1) -> ODEConstraintTaylor:
     )
 
 
-def statistical_order_one(cubature_fun=None) -> ODEConstraintStatistical:
+def slr0(cubature_fun=None) -> ODEConstraintStatistical:
     cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
     return ODEConstraintStatistical(
@@ -136,7 +136,7 @@ def statistical_order_one(cubature_fun=None) -> ODEConstraintStatistical:
     )
 
 
-def statistical_order_zero(cubature_fun=None) -> ODEConstraintStatistical:
+def slr1(cubature_fun=None) -> ODEConstraintStatistical:
     cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
     return ODEConstraintStatistical(

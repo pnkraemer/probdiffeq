@@ -14,7 +14,7 @@ def test_filter_marginals_close_only_to_left_boundary():
     vf, (u0,), (t0, t1) = setup.ode()
 
     ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
@@ -41,7 +41,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     vf, (u0,), (t0, t1) = setup.ode()
 
     ibm = priors.ibm_adaptive(num_derivatives=4)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 

@@ -16,7 +16,7 @@ def fixture_approximation():
     vf, (u0,), (t0, t1) = setup.ode()
 
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 

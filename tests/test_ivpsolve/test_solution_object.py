@@ -17,7 +17,7 @@ def fixture_approximate_solution():
 
     # Generate a solver
     ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 
@@ -69,7 +69,7 @@ def fixture_approximate_solution_batched():
 
     # Generate a solver
     ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 

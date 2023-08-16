@@ -15,7 +15,7 @@ from tests.setup import setup
 @testing.case()
 def case_ts0():
     try:
-        return correction.taylor_order_zero()
+        return correction.ts0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -24,7 +24,7 @@ def case_ts0():
 @testing.case()
 def case_ts1():
     try:
-        return correction.taylor_order_one()
+        return correction.ts1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -33,7 +33,7 @@ def case_ts1():
 @testing.case()
 def case_slr0():
     try:
-        return correction.statistical_order_zero()
+        return correction.slr0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -42,7 +42,7 @@ def case_slr0():
 @testing.case()
 def case_slr1():
     try:
-        return correction.statistical_order_one()
+        return correction.slr1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -51,7 +51,7 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return correction.statistical_order_one(cubature_fun=cubature.gauss_hermite)
+        return correction.slr1(cubature_fun=cubature.gauss_hermite)
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError

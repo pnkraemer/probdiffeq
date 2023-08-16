@@ -21,7 +21,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Generate a solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 

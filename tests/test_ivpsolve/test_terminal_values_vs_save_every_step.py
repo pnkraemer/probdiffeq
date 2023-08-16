@@ -24,7 +24,7 @@ def fixture_problem_args_kwargs():
 def fixture_solver_kwargs():
     # Generate a solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
 

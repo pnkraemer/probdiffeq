@@ -97,7 +97,7 @@ def case_simulate_terminal_values():
 @testing.parametrize_with_cases("solver_to_solution", cases=".", prefix="case_")
 def fixture_uncalibrated_and_mle_solution(solver_to_solution):
     ibm = priors.ibm_adaptive(num_derivatives=4)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
 
     uncalib = solver_to_solution(uncalibrated.solver(strategy))

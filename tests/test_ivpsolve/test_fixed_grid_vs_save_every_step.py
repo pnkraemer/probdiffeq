@@ -19,7 +19,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     args = (vf, tcoeffs)
 
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
     adaptive_kwargs = {

@@ -19,7 +19,7 @@ def test_exponential_approximated_well():
     problem_args = (vf, (*u0, vf(*u0, t=t0)))
 
     ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = correction.taylor_order_zero()
+    ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.dynamic(strategy)
 
