@@ -16,7 +16,7 @@ def mle(strategy):
     """
     string_repr = f"<MLE-solver with {strategy}>"
     return CalibratedSolver(
-        calibration=RunningMean(),
+        calibration=_RunningMean(),
         impl_step=_step_mle,
         strategy=strategy,
         string_repr=string_repr,
@@ -52,7 +52,7 @@ def dynamic(strategy):
     string_repr = f"<Dynamic solver with {strategy}>"
     return CalibratedSolver(
         strategy=strategy,
-        calibration=MostRecent(),
+        calibration=_MostRecent(),
         string_repr=string_repr,
         impl_step=_step_dynamic,
         requires_rescaling=False,
@@ -80,7 +80,7 @@ def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
     )
 
 
-class Calibration(abc.ABC):
+class _Calibration(abc.ABC):
     """Calibration implementation."""
 
     @abc.abstractmethod
@@ -96,7 +96,7 @@ class Calibration(abc.ABC):
         raise NotImplementedError
 
 
-class MostRecent(Calibration):
+class _MostRecent(_Calibration):
     def init(self, prior):
         return prior
 
@@ -109,8 +109,8 @@ class MostRecent(Calibration):
 
 # TODO: if we pass the mahalanobis_relative term to the update() function,
 #  it reduces to a generic stats() module that can also be used for e.g.
-#  marginal likelihoods. In this case, the MostRecent() stuff becomes void.
-class RunningMean(Calibration):
+#  marginal likelihoods. In this case, the _MostRecent() stuff becomes void.
+class _RunningMean(_Calibration):
     def init(self, prior):
         return prior, prior, 0.0
 
@@ -131,7 +131,7 @@ def _unflatten_func(nodetype):
 
 
 # Register objects as (empty) pytrees. todo: temporary?!
-for node in [RunningMean, MostRecent]:
+for node in [_RunningMean, _MostRecent]:
     jax.tree_util.register_pytree_node(
         nodetype=node,
         flatten_func=lambda _: ((), ()),
@@ -140,7 +140,7 @@ for node in [RunningMean, MostRecent]:
 
 
 class CalibratedSolver(_solver.Solver[_common.State]):
-    def __init__(self, *, calibration: Calibration, impl_step, **kwargs):
+    def __init__(self, *, calibration: _Calibration, impl_step, **kwargs):
         super().__init__(**kwargs)
 
         self.calibration = calibration
