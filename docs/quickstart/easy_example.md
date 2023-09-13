@@ -8,8 +8,8 @@ from jax.config import config
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
-from probdiffeq.solvers.statespace import correction, extrapolation
-from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies import smoothers, correction, priors
+from probdiffeq.solvers.taylor import autodiff
 
 config.update("jax_platform_name", "cpu")
 ```
@@ -18,8 +18,8 @@ Create a problem:
 
 ```python
 @jax.jit
-def vf(y, *, t, p):
-    return p * y * (1 - y)
+def vf(y, *, t):
+    return y * (1 - y)
 
 
 u0 = jnp.asarray([0.1])
@@ -30,7 +30,7 @@ t0, t1 = 0.0, 1.0
 Create a solver.
 
 
-ProbDiffEq consists of three levels:
+ProbDiffEq contains three levels of implementations:
 
 **Low:** Implementations of random-variable-arithmetic (marginalisation, conditioning, etc.)
 
@@ -40,7 +40,7 @@ ProbDiffEq consists of three levels:
 
 
 There are several random-variable implementations which model different correlations between variables.
-Since the implementations power almost everything, we choose one (and only one) of them and call it the "impl(ementation)".
+Since the implementations power almost everything, we choose one (and only one) of them, assign it to a global variable, and call it the "impl(ementation)".
 
 <!-- #endregion -->
 
@@ -48,34 +48,45 @@ Since the implementations power almost everything, we choose one (and only one) 
 impl.select("isotropic", ode_shape=(1,))
 ```
 
-Configuring a probabilistic IVP solver amounts to choosing an extrapolation model and a correction scheme, putting it together as a filter or smoother, and wrapping everything into a solver. 
+Configuring a probabilistic IVP solver is a little more involved than configuring your favourite Runge-Kutta method:
+we must choose a prior distribution and a correction scheme, then we put them together as a filter or smoother and wrapping everything into a solver.
 
 ```python
-ibm = extrapolation.ibm_adaptive(num_derivatives=4)
-ts0 = correction.taylor_order_zero(ode_order=1)
+ibm = priors.ibm_adaptive(num_derivatives=4)
+ts0 = correction.ts0(ode_order=1)
 
 strategy = smoothers.smoother_adaptive(ibm, ts0)
 solver = uncalibrated.solver(strategy)
 ```
 
-The rest is standard ODE-solver machinery.
+Finally, we must prepare one last component before we can solve the differential equation.
+
+The probabilistic IVP solvers in ProbDiffEq implement state-space-model-based IVP solvers; this means that as an initial condition we must provide a $\nu$-th order Taylor approximation of the IVP solution.
+
+Initial conditions can be turned into Taylor series as follows:
 
 ```python
-solution = ivpsolve.solve_with_python_while_loop(
+tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+```
+
+Other software packages that implement probabilistic IVP solvers do a lot of this work implicitly; probdiffeq enforces that the user makes these decisions, not only because it simplifies the solver implementations quite a lot, but it also shows how easily we can build a custom solver for our favourite problem (consult the other tutorials for examples).
+
+
+From here on, the rest is standard ODE-solver machinery.
+
+```python
+solution = ivpsolve.solve_and_save_every_step(
     vf,
-    initial_values=(u0,),
+    tcoeffs,
     t0=t0,
     t1=t1,
     solver=solver,
+    dt0=0.1,
     output_scale=1.0,
-    parameters=0.5,
 )
 
 
 # Look at the solution
-print("u =", solution.u)
-```
-
-```python
-
+print("u =", solution.u, "\n")
+print("solution =", solution)
 ```
