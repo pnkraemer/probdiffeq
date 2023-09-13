@@ -94,7 +94,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
 
     # Generate an observation-model for the QOI
     model = impl.hidden_model.conditional_to_derivative(0, standard_deviation)
-    rv = posterior.init if isinstance(posterior, markov.MarkovSeqRev) else posterior
+    rv = posterior.init if isinstance(posterior, markov.MarkovSeq) else posterior
 
     _corrected, logpdf = _condition_and_logpdf(rv, u, model)
     return logpdf
@@ -147,7 +147,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         )
         raise ValueError(msg)
 
-    if not isinstance(posterior, markov.MarkovSeqRev):
+    if not isinstance(posterior, markov.MarkovSeq):
         msg1 = "Time-series marginal likelihoods "
         msg2 = "cannot be computed with a filtering solution."
         raise TypeError(msg1 + msg2)
@@ -171,6 +171,6 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
 def calibrate(posterior, output_scale):
     if jnp.ndim(output_scale) > jnp.ndim(impl.prototypes.output_scale()):
         output_scale = output_scale[-1]
-    if isinstance(posterior, markov.MarkovSeqRev):
+    if isinstance(posterior, markov.MarkovSeq):
         return markov.rescale_cholesky(posterior, output_scale)
     return impl.variable.rescale_cholesky(posterior, output_scale)

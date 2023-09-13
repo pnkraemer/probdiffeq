@@ -26,13 +26,13 @@ class PreconSmoother(strategy.ExtrapolationImpl):
     def initial_condition(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.ssm_util.identity_conditional(len(tcoeffs))
-        return markov.MarkovSeqRev(init=rv, conditional=cond)
+        return markov.MarkovSeq(init=rv, conditional=cond)
 
-    def init(self, sol: markov.MarkovSeqRev, /):
+    def init(self, sol: markov.MarkovSeq, /):
         return sol.init, sol.conditional
 
     def extract(self, hidden_state, extra, /):
-        return markov.MarkovSeqRev(init=hidden_state, conditional=extra)
+        return markov.MarkovSeq(init=hidden_state, conditional=extra)
 
     def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)

@@ -9,19 +9,20 @@ from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 
 
-class MarkovSeqRev(containers.NamedTuple):
+class MarkovSeq(containers.NamedTuple):
     init: Any
     conditional: Any
 
 
-def sample(key, markov_seq: MarkovSeqRev, *, shape):
+def sample(key, markov_seq: MarkovSeq, *, shape, reverse):
+    _assert_filtering_solution_removed(markov_seq)
     # A smoother samples on the grid by sampling i.i.d values
     # from the terminal RV x_N and the backward noises z_(1:N)
     # and then combining them backwards as
     # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
     markov_seq_shape = _sample_shape(markov_seq)
     base_samples = jax.random.normal(key=key, shape=shape + markov_seq_shape)
-    return _transform_unit_sample(markov_seq, base_samples)
+    return _transform_unit_sample(markov_seq, base_samples, reverse=reverse)
 
 
 def _sample_shape(markov_seq):
@@ -31,10 +32,10 @@ def _sample_shape(markov_seq):
     return n + 1, *tuple(shape_single_sample)
 
 
-def _transform_unit_sample(markov_seq, base_sample, /):
+def _transform_unit_sample(markov_seq, base_sample, /, reverse):
     if base_sample.ndim > len(_sample_shape(markov_seq)):
-        transform_vmap = jax.vmap(_transform_unit_sample, in_axes=(None, 0))
-        return transform_vmap(markov_seq, base_sample)
+        transform_vmap = jax.vmap(_transform_unit_sample, in_axes=(None, 0, None))
+        return transform_vmap(markov_seq, base_sample, reverse)
 
     # Compute a single unit sample.
 
@@ -47,39 +48,46 @@ def _transform_unit_sample(markov_seq, base_sample, /):
         qoi = impl.hidden_model.qoi_from_sample(sample)
         return (qoi, sample), (qoi, sample)
 
+    base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
+
     # Compute a sample at the terminal value
-    init = jax.tree_util.tree_map(lambda s: s[-1, ...], markov_seq.init)
-    init_sample = impl.variable.transform_unit_sample(base_sample[-1], init)
+    init_sample = impl.variable.transform_unit_sample(base_sample_init, markov_seq.init)
     init_qoi = impl.hidden_model.qoi_from_sample(init_sample)
     init_val = (init_qoi, init_sample)
 
     # Loop over backward models and the remaining base samples
-    xs = (markov_seq.conditional, base_sample[:-1])
+    xs = (markov_seq.conditional, base_sample_body)
     _, (qois, samples) = jax.lax.scan(f=body_fun, init=init_val, xs=xs, reverse=True)
     qois_full = jnp.concatenate((qois, init_qoi[None, ...]))
     samples_full = jnp.concatenate((samples, init_sample[None, ...]))
     return qois_full, samples_full
 
 
-def rescale_cholesky(markov_seq: MarkovSeqRev, factor) -> MarkovSeqRev:
+def rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     init = impl.variable.rescale_cholesky(markov_seq.init, factor)
     A, noise = markov_seq.conditional
     noise = impl.variable.rescale_cholesky(noise, factor)
-    return MarkovSeqRev(init=init, conditional=(A, noise))
+    return MarkovSeq(init=init, conditional=(A, noise))
 
 
-def marginals(markov_seq: MarkovSeqRev):
+def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
+    init = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
+    return MarkovSeq(init, markov_seq.conditional)
+
+
+def marginals(markov_seq: MarkovSeq, *, reverse):
+    _assert_filtering_solution_removed(markov_seq)
+
     def step(x, cond):
         extrapolated = impl.conditional.marginalise(x, cond)
         return extrapolated, extrapolated
 
-    # If we hold many 'init's, choose the terminal one.
-    # todo: should we let the user do this?
-    _, noise = markov_seq.conditional
-    if noise.mean.shape == markov_seq.init.mean.shape:
-        init = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
-    else:
-        init = markov_seq.init
-
-    _, marg = jax.lax.scan(step, init=init, xs=markov_seq.conditional, reverse=True)
+    init, xs = markov_seq.init, markov_seq.conditional
+    _, marg = jax.lax.scan(step, init=init, xs=xs, reverse=reverse)
     return marg
+
+
+def _assert_filtering_solution_removed(markov_seq):
+    if markov_seq.init.mean.ndim == markov_seq.conditional.noise.mean.ndim:
+        msg = "Did you forget to call markov.select_terminal() before?"
+        raise ValueError(msg)

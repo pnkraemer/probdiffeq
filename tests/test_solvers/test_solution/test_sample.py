@@ -38,12 +38,7 @@ def fixture_approximation():
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_sample_shape(approximation, shape):
     key = jax.random.PRNGKey(seed=15)
-    # todo: remove "u" from this output?
-    u, samples = markov.sample(key, approximation.posterior, shape=shape)
+    posterior = markov.select_terminal(approximation.posterior)
+    u, samples = markov.sample(key, posterior, shape=shape, reverse=True)
     assert u.shape == shape + approximation.u.shape
     assert samples.shape == shape + impl.stats.sample_shape(approximation.marginals)
-
-    # Todo: test values of the samples by checking a chi2 statistic
-    #  in terms of the joint posterior. But this requires a joint_posterior()
-    #  method, which is only future work I guess. So far we use the eye-test
-    #  in the notebooks, which looks good.

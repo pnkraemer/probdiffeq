@@ -47,11 +47,7 @@ def simulate_terminal_values(
 
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
-    if isinstance(posterior, markov.MarkovSeqRev):
-        marginals = posterior.init
-    else:
-        marginals = posterior
-
+    marginals = posterior.init if isinstance(posterior, markov.markovSeq) else posterior
     u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=t1,
@@ -202,17 +198,19 @@ def solve_fixed_grid(
 
 
 def _userfriendly_output(*, posterior, posterior_t0):
-    if isinstance(posterior, markov.MarkovSeqRev):
-        marginals = markov.marginals(posterior)
+    if isinstance(posterior, markov.MarkovSeq):
+        # Compute marginals
+        posterior_no_filter_marginals = markov.select_terminal(posterior)
+        marginals = markov.marginals(posterior_no_filter_marginals, reverse=True)
 
+        # Prepend the marginal at t1 to the computed marginals
         marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = tree_array_util.tree_append(marginals, marginal_t1)
 
-        # We need to include the initial filtering solution (as an init)
-        # Otherwise, information is lost, and we cannot, e.g., interpolate correctly.
+        # Prepend the marginal at t1 to the inits
         init_t0 = posterior_t0.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
-        posterior = markov.MarkovSeqRev(init=init, conditional=posterior.conditional)
+        posterior = markov.MarkovSeq(init=init, conditional=posterior.conditional)
     else:
         posterior = tree_array_util.tree_prepend(posterior_t0, posterior)
         marginals = posterior
