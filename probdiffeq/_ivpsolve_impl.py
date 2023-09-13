@@ -34,7 +34,11 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
     # Advance until accepted.t >= t_next.
     # Note: This could already be the case and we may not loop (just interpolate)
     def cond_fun(s):
-        return s.t < t_next
+        # Terminate the loop if
+        # the difference from s.t to t_next is smaller than a constant factor
+        # (which is a "small" multiple of the current machine precision)
+        # or if s.t > t_next holds.
+        return s.t + 10 * jnp.finfo(float).eps < t_next
 
     def body_fun(s):
         return adaptive_solver.rejection_loop(s, vector_field=vector_field, t1=t_next)

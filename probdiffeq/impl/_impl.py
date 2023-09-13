@@ -80,8 +80,9 @@ def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
         import probdiffeq.impl.blockdiag.factorised_impl
 
         return probdiffeq.impl.blockdiag.factorised_impl.BlockDiag(ode_shape=ode_shape)
-
-    raise ValueError
+    msg1 = f"Implementation '{which}' unknown. "
+    msg2 = "Choose an implementation out of {scalar, dense, isotropic, blockdiag}."
+    raise ValueError(msg1 + msg2)
 
 
 class Impl:

@@ -35,11 +35,11 @@ def fixture(name=None, scope="module"):
 
 
 def tree_all_allclose(tree1, tree2, **kwargs):
-    trees_is_allclose = _tree_allclose(tree1, tree2, **kwargs)
+    trees_is_allclose = tree_allclose(tree1, tree2, **kwargs)
     return jax.tree_util.tree_all(trees_is_allclose)
 
 
-def _tree_allclose(tree1, tree2, **kwargs):
+def tree_allclose(tree1, tree2, **kwargs):
     def allclose_partial(*args):
         return jnp.allclose(*args, **kwargs)
 
