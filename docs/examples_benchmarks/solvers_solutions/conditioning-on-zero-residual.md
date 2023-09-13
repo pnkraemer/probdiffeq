@@ -15,7 +15,7 @@ jupyter:
 
 # Probabilistic solvers as collocation methods
 
-Probabilistic solvers condition a prior distribution on satisfying an ODE on a specified grid.
+Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-residual on a specified grid.
 
 
 ```python
@@ -25,64 +25,169 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import controls, ivpsolve, solution
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters, smoothers
+from probdiffeq import controls, ivpsolve
+from probdiffeq.impl import impl
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import uncalibrated, solution
+from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.solvers.strategies import filters, smoothers, priors, correction
+
+from tueplots import bundles
 ```
 
 ```python
 plt.rcParams.update(notebook.plot_config())
+plt.rcParams.update(bundles.neurips2022(nrows=3, ncols=3, family="sans-serif"))
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
 config.update("jax_platform_name", "cpu")
+
+# Make a solver
+impl.select("dense", ode_shape=(1,))
 ```
 
 ```python
 # Make a problem
-f, u0, (t0, t1), f_args = ivps.affine_independent()
-f_vect = jax.vmap(f, in_axes=(0, None, None))
+f, u0, (t0, t1), f_args = ivps.logistic()
+t1 = 5.0
 
 
 @jax.jit
-def vector_field(y, *, t, p):
-    return f(y, *p)
+def vector_field(y, t):
+    return f(y, *f_args)
+```
+
+```python
+NUM_DERIVATIVES = 2
+ts = jnp.linspace(t0, t1, endpoint=True)
+init_raw, transitions = priors.ibm_discretised(ts, num_derivatives=NUM_DERIVATIVES)
+
+tcoeffs = autodiff.taylor_mode(
+    lambda y: vector_field(y, t=t0), (u0[None],), num=NUM_DERIVATIVES
+)
+init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(
+    tcoeffs, num_derivatives=NUM_DERIVATIVES
+)
 
 
-# Make a solver
-impl = recipes.slr1_dense(ode_shape=(1,), num_derivatives=1)
-solver = calibrated.mle(*smoothers.smoother(*impl))
+def step(x, cond_and_pre):
+    cond, (p, p_inv) = cond_and_pre
+    x = impl.ssm_util.preconditioner_apply(x, p_inv)
+    extrapolated = impl.conditional.marginalise(x, cond)
+    extrapolated = impl.ssm_util.preconditioner_apply(extrapolated, p)
+    return extrapolated, extrapolated
+
+
+_, marg_raw = jax.lax.scan(step, init=init_raw, xs=transitions, reverse=False)
+_, marg_tcoeffs = jax.lax.scan(step, init=init_tcoeffs, xs=transitions, reverse=False)
+```
+
+```python
+slr1 = correction.ts1()
+ibm = priors.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
+solver = uncalibrated.solver(smoothers.smoother_adaptive(ibm, slr1))
+sol = ivpsolve.solve_and_save_every_step(
+    vector_field,
+    tcoeffs,
+    t0=t0,
+    t1=t1,
+    rtol=1e-1,
+    dt0=0.1,
+    output_scale=1.0,
+    solver=solver,
+)
+```
+
+```python
+eps = 1e-4
+mesh = jnp.linspace(t0 + eps, t1 - eps, num=500, endpoint=True)
+_, marginals = solution.offgrid_marginals_searchsorted(
+    ts=mesh, solution=sol, solver=solver
+)
+```
+
+```python
+f_vect = jax.vmap(f)
+fig, (ax_sol, ax_res, ax_mag) = plt.subplots(
+    ncols=3, nrows=3, sharex=True, sharey="row"
+)
+
+sol_raw0 = impl.hidden_model.marginal_nth_derivative(marg_raw, 0)
+sol_tcoeffs0 = impl.hidden_model.marginal_nth_derivative(marg_tcoeffs, 0)
+sol_full0 = impl.hidden_model.marginal_nth_derivative(marginals, 0)
+
+sol_raw1 = impl.hidden_model.marginal_nth_derivative(marg_raw, 1)
+sol_tcoeffs1 = impl.hidden_model.marginal_nth_derivative(marg_tcoeffs, 1)
+sol_full1 = impl.hidden_model.marginal_nth_derivative(marginals, 1)
+
+# ax_sol[0].set_title("Prior")
+# ax_sol[0].set_xlim((ts[1], ts[-1]))
+# for sol_raw in (sol_raw0, sol_raw1):
+#     m, s = jnp.squeeze(sol_raw.mean), jnp.abs(jnp.squeeze(sol_raw.cholesky))
+#     ax_sol[0].plot(ts[1:], m, marker="None")
+#     ax_sol[0].fill_between(ts[1:], m - s,m + s, alpha=0.125)
+
+ax_sol[0].set_title(r"Prior + initial condition")
+ax_sol[0].set_xlim((ts[1], ts[-1]))
+for sol_tcoeffs in (sol_tcoeffs0, sol_tcoeffs1):
+    m, s = jnp.squeeze(sol_tcoeffs.mean), jnp.abs(jnp.squeeze(sol_tcoeffs.cholesky))
+    ax_sol[0].plot(ts[1:], m, marker="None")
+    ax_sol[0].fill_between(ts[1:], m - s, m + s, alpha=0.125)
+
+
+ax_sol[1].set_title("Conditional")
+ax_sol[1].set_xlim((ts[1], ts[-1]))
+for sol_full in (sol_full0, sol_full1):
+    m, s = jnp.squeeze(sol_full.mean), jnp.abs(jnp.squeeze(sol_full.cholesky))
+    ax_sol[1].plot(mesh, m, marker="None")
+    ax_sol[1].fill_between(mesh, m - s, m + s, alpha=0.125)
+
+ax_sol[0].set_ylabel("State, derivative")
+ax_res[0].set_ylabel("Residual")
+
+
+# ax_res[0].semilogy(ts[1:], jnp.abs(sol_raw1.mean - jax.vmap(vector_field)(sol_raw0.mean, ts[1:]))+1e-10, marker="None")
+ax_res[0].semilogy(
+    ts[1:],
+    jnp.abs(sol_tcoeffs1.mean - jax.vmap(vector_field)(sol_tcoeffs0.mean, ts[1:]))
+    + 1e-10,
+    marker="None",
+)
+ax_res[1].semilogy(
+    mesh,
+    jnp.abs(sol_full1.mean - jax.vmap(vector_field)(sol_full0.mean, mesh)) + 1e-10,
+    marker="None",
+)
+ax_res[1].semilogy(
+    mesh,
+    jnp.abs(sol_full1.mean - jax.vmap(vector_field)(sol_full0.mean, mesh)) + 1e-10,
+    marker="None",
+)
+
+fig.align_ylabels()
+plt.savefig("collocation.pdf")
+```
+
+```python
+assert False
+```
+
+```python
+
 ```
 
 ```python
 # Solve the ODE with low precision
-sol = ivpsolve.solve_with_python_while_loop(
-    vector_field,
-    initial_values=(u0[None],),
-    t0=t0,
-    t1=t1,
-    rtol=1e-2,
-    output_scale=1.0,
-    solver=solver,
-    parameters=f_args,
-    control=controls.integral_clipped(),
-)
 ```
 
 ```python
 # Evalate the posterior on a dense grid
 
-eps = 1e-4
-mesh = jnp.linspace(t0 + eps, t1 - eps, num=50, endpoint=True)
-_, marginals = solution.offgrid_marginals_searchsorted(
-    ts=mesh, solution=sol, solver=solver
-)
 
-posterior_u = marginals.marginal_nth_derivative(0).mean
-posterior_du = marginals.marginal_nth_derivative(1).mean
+posterior_u = impl.hidden_model.marginal_nth_derivative(marginals, 0).mean
+posterior_du = impl.hidden_model.marginal_nth_derivative(marginals, 1).mean
 ```
 
 ```python
