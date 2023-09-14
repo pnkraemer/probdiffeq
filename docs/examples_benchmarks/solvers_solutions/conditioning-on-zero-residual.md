@@ -40,10 +40,11 @@ from probdiffeq.solvers.strategies import (
 ```
 
 ```python
-from tueplots import bundles
+from tueplots import bundles, axes
 
 plt.rcParams.update(notebook.plot_config())
-plt.rcParams.update(bundles.neurips2022(nrows=3, ncols=3, family="sans-serif"))
+plt.rcParams.update(bundles.neurips2022(nrows=3, ncols=3, family="serif"))
+plt.rcParams.update(axes.lines(base_width=0.5))
 ```
 
 ```python
@@ -120,7 +121,7 @@ margs_posterior = markov.marginals(markov_seq_posterior, reverse=True)
 
 ```python
 num_samples = 5
-key = jax.random.PRNGKey(seed=2)
+key = jax.random.PRNGKey(seed=1)
 (_qoi, samples_prior), _ = markov.sample(
     key, markov_seq_prior, shape=(num_samples,), reverse=False
 )
@@ -140,7 +141,13 @@ axes[0].set_title("Prior")
 axes[1].set_title("w/ Initial condition")
 axes[2].set_title("Posterior")
 
-style = {"marker": "None", "alpha": 0.99}
+sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
+mean_style = {
+    "marker": "None",
+    "color": "black",
+    "linestyle": "dashed",
+    "linewidth": 0.99,
+}
 
 
 def log_residual(*args):
@@ -152,96 +159,96 @@ def residual(x, t):
 
 
 for i in range(num_samples):
-    axes[0].plot(ts[1:], samples_prior[i, ..., 0], **style, color="C0")
-    axes[1].plot(ts[1:], samples_tcoeffs[i, ..., 0], **style, color="C1")
-    axes[2].plot(ts[:-1], samples_posterior[i, ..., 0], **style, color="C2")
+    axes[0].plot(ts[1:], samples_prior[i, ..., 0], **sample_style, color="C0")
+    axes[1].plot(ts[1:], samples_tcoeffs[i, ..., 0], **sample_style, color="C1")
+    axes[2].plot(ts[:-1], samples_posterior[i, ..., 0], **sample_style, color="C2")
 
     axes_magnitude[0].plot(
         ts[:-1],
         residual(samples_prior[i, ...], ts[:-1]),
-        **style,
+        **sample_style,
         color="C0",
     )
     axes_magnitude[1].plot(
         ts[:-1],
         residual(samples_tcoeffs[i, ...], ts[:-1]),
-        **style,
+        **sample_style,
         color="C1",
     )
     axes_magnitude[2].plot(
         ts[:-1],
         residual(samples_posterior[i, ...], ts[:-1]),
-        **style,
+        **sample_style,
         color="C2",
     )
 
     axes_log[0].plot(
         ts[:-1],
         log_residual(samples_prior[i, ...], ts[:-1]),
-        **style,
+        **sample_style,
         color="C0",
     )
     axes_log[1].plot(
         ts[:-1],
         log_residual(samples_tcoeffs[i, ...], ts[:-1]),
-        **style,
+        **sample_style,
         color="C1",
     )
     axes_log[2].plot(
         ts[:-1],
         log_residual(samples_posterior[i, ...], ts[:-1]),
-        **style,
+        **sample_style,
         color="C2",
     )
 
-axes[0].plot(ts[1:], margs_prior.mean[..., 0], color="black", **style)
-axes[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], color="black", **style)
-axes[2].plot(ts[:-1], margs_posterior.mean[..., 0], color="black", **style)
+axes[0].plot(ts[1:], margs_prior.mean[..., 0], **mean_style)
+axes[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], **mean_style)
+axes[2].plot(ts[:-1], margs_posterior.mean[..., 0], **mean_style)
 
 axes_magnitude[0].plot(
     ts[:-1],
     residual(margs_prior.mean, ts[:-1]),
-    **style,
-    color="black",
+    **mean_style,
 )
 axes_magnitude[1].plot(
     ts[:-1],
     residual(margs_tcoeffs.mean, ts[:-1]),
-    **style,
-    color="black",
+    **mean_style,
 )
 axes_magnitude[2].plot(
     ts[:-1],
     residual(margs_posterior.mean, ts[:-1]),
-    **style,
-    color="black",
+    **mean_style,
 )
 
 
 axes_log[0].plot(
     ts[:-1],
     log_residual(margs_prior.mean, ts[:-1]),
-    **style,
-    color="black",
+    **mean_style,
 )
 axes_log[1].plot(
     ts[:-1],
     log_residual(margs_tcoeffs.mean, ts[:-1]),
-    **style,
-    color="black",
+    **mean_style,
 )
 axes_log[2].plot(
     ts[:-1],
     log_residual(margs_posterior.mean, ts[:-1]),
-    **style,
-    color="black",
+    **mean_style,
 )
 
 axes[0].set_xticks((t0, (t0 + t1) / 2, t1))
 axes[0].set_xlim((t0, t1))
-axes[0].set_ylim((-1.0, 2.5))
-axes_magnitude[0].set_ylim((-5.0, 10))
-axes_log[0].set_ylim((-8, 4))
+
+axes[0].set_ylim((-1, 3))
+axes[0].set_yticks((-1, 1, 3))
+
+axes_magnitude[0].set_ylim((-10.0, 20))
+axes_magnitude[0].set_yticks((-10.0, 5, 20))
+
+axes_log[0].set_ylim((-6, 4))
+axes_log[0].set_yticks((-6, -1, 4))
 
 axes[0].set_ylabel("Solution")
 axes_magnitude[0].set_ylabel("Residual")
