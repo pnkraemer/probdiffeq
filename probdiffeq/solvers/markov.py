@@ -3,7 +3,6 @@
 from typing import Any
 
 import jax
-import jax.numpy as jnp
 
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl

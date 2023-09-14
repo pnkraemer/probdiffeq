@@ -12,7 +12,6 @@ from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
-
 warnings.warn(
     "TODO: make adaptive_solver and initial_condition arguments to the solver! Then, fix the notebooks for good, and merge into main ASAP"
 )

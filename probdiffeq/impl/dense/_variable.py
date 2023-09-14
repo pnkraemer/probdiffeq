@@ -1,6 +1,5 @@
 from probdiffeq.impl import _variable
 from probdiffeq.impl.dense import _normal
-
 from probdiffeq.impl.util import cond_util
 
 
