@@ -57,17 +57,14 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
 
     # Loop over backward models and the remaining base samples
     xs = (markov_seq.conditional, base_sample_body)
-    _, (qois, samples) = jax.lax.scan(f=body_fun, init=init_val, xs=xs, reverse=True)
-    qois_full = jnp.concatenate((qois, init_qoi[None, ...]))
-    samples_full = jnp.concatenate((samples, init_sample[None, ...]))
-    return qois_full, samples_full
+    _, (qois, samples) = jax.lax.scan(f=body_fun, init=init_val, xs=xs, reverse=reverse)
+    return (qois, samples), (init_qoi, init_sample)
 
 
 def rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     init = impl.variable.rescale_cholesky(markov_seq.init, factor)
-    A, noise = markov_seq.conditional
-    noise = impl.variable.rescale_cholesky(noise, factor)
-    return MarkovSeq(init=init, conditional=(A, noise))
+    cond = impl.variable.rescale_cholesky_conditional(markov_seq.conditional, factor)
+    return MarkovSeq(init=init, conditional=cond)
 
 
 def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:

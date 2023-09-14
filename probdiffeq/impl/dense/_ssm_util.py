@@ -79,4 +79,6 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        return cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
+        return cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x) / jnp.sqrt(
+            num + 1
+        )

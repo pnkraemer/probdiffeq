@@ -47,7 +47,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     state, solution = jax.lax.cond(
-        state.t > t_next,
+        state.t > t_next + 10 * jnp.finfo(float).eps,
         adaptive_solver.interpolate_and_extract,
         lambda s, _t: adaptive_solver.right_corner_and_extract(s),
         state,

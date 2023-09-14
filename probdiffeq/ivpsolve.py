@@ -12,7 +12,10 @@ from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
-# TODO: make adaptive_solver and initial_condition arguments to the solver!
+
+warnings.warn(
+    "TODO: make adaptive_solver and initial_condition arguments to the solver! Then, fix the notebooks for good, and merge into main ASAP"
+)
 
 
 def simulate_terminal_values(
@@ -78,7 +81,7 @@ def solve_and_save_at(
 
     """
     if not solver.strategy.is_suitable_for_save_at:
-        msg = "Strategy {solver.strategy} cannot be used in save_at mode. "
+        msg = "Strategy {solver.strategy} should not be used in save_at mode. "
         warnings.warn(msg, stacklevel=1)
 
     adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)

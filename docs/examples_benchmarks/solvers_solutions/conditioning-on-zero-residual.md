@@ -25,85 +25,244 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import controls, ivpsolve
+from probdiffeq import controls, ivpsolve, timestep
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import uncalibrated, solution
+from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
 from probdiffeq.solvers.taylor import autodiff
-from probdiffeq.solvers.strategies import filters, smoothers, priors, correction
+from probdiffeq.solvers.strategies import (
+    filters,
+    smoothers,
+    fixedpoint,
+    priors,
+    correction,
+)
 
 from tueplots import bundles
+import tqdm
 ```
 
 ```python
 plt.rcParams.update(notebook.plot_config())
-plt.rcParams.update(bundles.neurips2022(nrows=3, ncols=3, family="sans-serif"))
+plt.rcParams.update(bundles.neurips2022(nrows=1, ncols=3, family="sans-serif"))
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
 config.update("jax_platform_name", "cpu")
+config.update("jax_enable_x64", True)
 
 # Make a solver
 impl.select("dense", ode_shape=(1,))
 ```
 
 ```python
-# Make a problem
-f, u0, (t0, t1), f_args = ivps.logistic()
-t1 = 5.0
+# f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
 def vector_field(y, t):
-    return f(y, *f_args)
+    return 10.0 * y * (2.0 - y)
+
+
+t0, t1 = 0.0, 0.5
+u0 = jnp.asarray([0.1])
 ```
 
 ```python
 NUM_DERIVATIVES = 2
-ts = jnp.linspace(t0, t1, endpoint=True)
-init_raw, transitions = priors.ibm_discretised(ts, num_derivatives=NUM_DERIVATIVES)
+ts = jnp.linspace(t0, t1, num=200, endpoint=True)
+init_raw, transitions = priors.ibm_discretised(
+    ts, num_derivatives=NUM_DERIVATIVES, output_scale=100.0
+)
+
+markov_seq_prior = markov.MarkovSeq(init_raw, transitions)
+
 
 tcoeffs = autodiff.taylor_mode(
-    lambda y: vector_field(y, t=t0), (u0[None],), num=NUM_DERIVATIVES
+    lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
 init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(
     tcoeffs, num_derivatives=NUM_DERIVATIVES
 )
+markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
+```
 
+```python
 
-def step(x, cond_and_pre):
-    cond, (p, p_inv) = cond_and_pre
-    x = impl.ssm_util.preconditioner_apply(x, p_inv)
-    extrapolated = impl.conditional.marginalise(x, cond)
-    extrapolated = impl.ssm_util.preconditioner_apply(extrapolated, p)
-    return extrapolated, extrapolated
-
-
-_, marg_raw = jax.lax.scan(step, init=init_raw, xs=transitions, reverse=False)
-_, marg_tcoeffs = jax.lax.scan(step, init=init_tcoeffs, xs=transitions, reverse=False)
 ```
 
 ```python
 slr1 = correction.ts1()
 ibm = priors.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
-solver = uncalibrated.solver(smoothers.smoother_adaptive(ibm, slr1))
-sol = ivpsolve.solve_and_save_every_step(
+solver = uncalibrated.solver(fixedpoint.fixedpoint_adaptive(ibm, slr1))
+dt0 = timestep.propose(lambda y: vector_field(y, t=t0), (u0,))
+sol = ivpsolve.solve_and_save_at(
     vector_field,
     tcoeffs,
-    t0=t0,
-    t1=t1,
-    rtol=1e-1,
-    dt0=0.1,
+    save_at=ts,
+    rtol=1e-2,
+    atol=1e-2,
+    dt0=dt0,
     output_scale=1.0,
     solver=solver,
 )
+# posterior = solution.calibrate(sol.posterior, sol.output_scale)
+markov_seq_posterior = markov.select_terminal(sol.posterior)
+```
+
+```python
+margs_prior = markov.marginals(markov_seq_prior, reverse=False)
+margs_tcoeffs = markov.marginals(markov_seq_tcoeffs, reverse=False)
+margs_posterior = markov.marginals(markov_seq_posterior, reverse=True)
+```
+
+```python
+num_samples = 10
+key = jax.random.PRNGKey(seed=2)
+(_qoi, samples_prior), _ = markov.sample(
+    key, markov_seq_prior, shape=(num_samples,), reverse=False
+)
+(_qoi, samples_tcoeffs), _ = markov.sample(
+    key, markov_seq_tcoeffs, shape=(num_samples,), reverse=False
+)
+(_qoi, samples_posterior), _ = markov.sample(
+    key, markov_seq_posterior, shape=(num_samples,), reverse=True
+)
+```
+
+```python
+fig, (axes, axes_magnitude) = plt.subplots(
+    nrows=2, ncols=3, sharex=True, figsize=(8, 3), sharey=True
+)
+axes[0].set_title("Prior")
+axes[1].set_title("w/ Initial condition")
+axes[2].set_title("Posterior")
+
+for i in tqdm.tqdm(range(num_samples)):
+    axes[0].plot(ts[1:], samples_prior[i, ..., 0], marker="None", alpha=0.8, color="C0")
+    axes[1].plot(
+        ts[1:], samples_tcoeffs[i, ..., 0], marker="None", alpha=0.8, color="C1"
+    )
+    axes[2].plot(
+        ts[:-1], samples_posterior[i, ..., 0], marker="None", alpha=0.8, color="C2"
+    )
+
+    axes_magnitude[0].plot(
+        ts[:-1],
+        samples_prior[i, ..., 1]
+        - jax.vmap(vector_field)(samples_prior[i, ..., 0], ts[:-1]),
+        marker="None",
+        alpha=0.8,
+        color="C2",
+    )
+    axes_magnitude[1].plot(
+        ts[:-1],
+        samples_tcoeffs[i, ..., 1]
+        - jax.vmap(vector_field)(samples_tcoeffs[i, ..., 0], ts[:-1]),
+        marker="None",
+        alpha=0.8,
+        color="C2",
+    )
+    axes_magnitude[2].plot(
+        ts[:-1],
+        samples_posterior[i, ..., 1]
+        - jax.vmap(vector_field)(samples_posterior[i, ..., 0], ts[:-1]),
+        marker="None",
+        alpha=0.8,
+        color="C2",
+    )
+
+
+axes[0].plot(ts[1:], margs_prior.mean[..., 0], color="black", marker="None")
+axes[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], color="black", marker="None")
+axes[2].plot(ts[:-1], margs_posterior.mean[..., 0], color="black", marker="None")
+
+axes_magnitude[0].plot(
+    ts[:-1],
+    margs_prior.mean[..., 1]
+    - jax.vmap(vector_field)(margs_prior.mean[..., 0], ts[:-1]),
+    marker="None",
+    alpha=0.8,
+    color="black",
+)
+axes_magnitude[1].plot(
+    ts[:-1],
+    margs_tcoeffs.mean[..., 1]
+    - jax.vmap(vector_field)(margs_tcoeffs.mean[..., 0], ts[:-1]),
+    marker="None",
+    alpha=0.8,
+    color="black",
+)
+axes_magnitude[2].plot(
+    ts[:-1],
+    margs_posterior.mean[..., 1]
+    - jax.vmap(vector_field)(margs_posterior.mean[..., 0], ts[:-1]),
+    marker="None",
+    alpha=0.8,
+    color="black",
+)
+
+axes[0].set_xlim((t0, t1))
+axes[0].set_ylim((-1.0, 2.5))
+
+
+plt.show()
+```
+
+```python
+m, s = impl.hidden_model.marginal_nth_derivative(margs_posterior, -1)
+
+plt.subplots(figsize=(3, 2), dpi=200)
+print(m.shape, s.shape)
+plt.semilogy(ts[1:], jnp.sqrt(s[..., -1, 0].squeeze() ** 2), marker="None")
+plt.show()
+```
+
+```python
+samples_tcoeffs[..., 0]
+```
+
+```python
+sol.num_steps
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+assert False
 ```
 
 ```python
 eps = 1e-4
 mesh = jnp.linspace(t0 + eps, t1 - eps, num=500, endpoint=True)
-_, marginals = solution.offgrid_marginals_searchsorted(
+_, margs_posterior = solution.offgrid_marginals_searchsorted(
     ts=mesh, solution=sol, solver=solver
 )
 ```

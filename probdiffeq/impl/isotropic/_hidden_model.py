@@ -21,7 +21,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
             raise ValueError
 
         mean = rv.mean[i, :]
-        cholesky = cholesky_util.triu_via_qr((rv.cholesky[i, :])[:, None].T).T
+        cholesky = cholesky_util.triu_via_qr(rv.cholesky[[i], :].T).T
         return _normal.Normal(mean, cholesky)
 
     def qoi_from_sample(self, sample, /):

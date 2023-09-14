@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax.config import config
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, timestep
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import smoothers, correction, priors
@@ -19,7 +19,7 @@ Create a problem:
 ```python
 @jax.jit
 def vf(y, *, t):
-    return y * (1 - y)
+    return 0.5 * y * (1 - y)
 
 
 u0 = jnp.asarray([0.1])
@@ -45,7 +45,7 @@ Since the implementations power almost everything, we choose one (and only one) 
 <!-- #endregion -->
 
 ```python
-impl.select("isotropic", ode_shape=(1,))
+impl.select("dense", ode_shape=(1,))
 ```
 
 Configuring a probabilistic IVP solver is a little more involved than configuring your favourite Runge-Kutta method:
@@ -53,7 +53,7 @@ we must choose a prior distribution and a correction scheme, then we put them to
 
 ```python
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts0(ode_order=1)
+ts0 = correction.ts1(ode_order=1)
 
 strategy = smoothers.smoother_adaptive(ibm, ts0)
 solver = uncalibrated.solver(strategy)
@@ -75,13 +75,14 @@ Other software packages that implement probabilistic IVP solvers do a lot of thi
 From here on, the rest is standard ODE-solver machinery.
 
 ```python
+dt0 = timestep.propose(lambda y: vf(y, t=t0), (u0,))  # or use e.g. dt0=0.1
 solution = ivpsolve.solve_and_save_every_step(
     vf,
     tcoeffs,
     t0=t0,
     t1=t1,
     solver=solver,
-    dt0=0.1,
+    dt0=dt0,
     output_scale=1.0,
 )
 
