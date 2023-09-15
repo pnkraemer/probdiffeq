@@ -30,10 +30,19 @@ from diffeqzoo import backend, ivps
 from jax.config import config
 
 from probdiffeq import ivpsolve
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters
+from probdiffeq.impl import impl
+from probdiffeq.solvers.taylor import affine
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.strategies import priors, correction, filters
+```
+
+```python
+from tueplots import bundles, axes
+
+plt.rcParams.update(bundles.neurips2022(nrows=2, ncols=2, family="sans-serif"))
+plt.rcParams.update(axes.lines(base_width=0.5))
+plt.rcParams.update(axes.legend())
 ```
 
 ```python
@@ -47,22 +56,26 @@ config.update("jax_platform_name", "cpu")
 ```
 
 ```python
+impl.select("dense", ode_shape=(1,))
+```
+
+```python
 f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
 
 
 @jax.jit
-def vf(*ys, t, p):
-    return f(*ys, *p)
+def vf(*ys, t):
+    return f(*ys, *f_args)
 ```
 
 ```python
 num_derivatives = 1
 
-implementation = recipes.ts1_dense(ode_shape=(1,), num_derivatives=num_derivatives)
-strategy = filters.filter(*implementation)
-
-dynamic = calibrated.dynamic(*strategy)
-mle = calibrated.mle(*strategy)
+ibm = priors.ibm_adaptive(num_derivatives=1)
+ts1 = correction.ts1()
+strategy = filters.filter_adaptive(ibm, ts1)
+dynamic = calibrated.dynamic(strategy)
+mle = calibrated.mle(strategy)
 ```
 
 ```python
@@ -72,43 +85,90 @@ num_pts = 200
 ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 solution_dynamic = ivpsolve.solve_fixed_grid(
     vf,
-    initial_values=(u0,),
+    taylor_coefficients=(u0, vf(u0, t=t0)),
     grid=ts,
     output_scale=1.0,
     solver=dynamic,
-    parameters=f_args,
 )
 solution_mle = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=ts, output_scale=1.0, solver=mle, parameters=f_args
+    vf,
+    taylor_coefficients=(u0, vf(u0, t=t0)),
+    grid=ts,
+    output_scale=1.0,
+    solver=mle,
 )
 ```
 
 Plot the solution.
 
 ```python
-fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8, 5))
+fig, (axes_linear, axes_log) = plt.subplots(ncols=2, nrows=2, sharex=True, sharey="row")
 
-ax[0][0].plot(ts, solution_dynamic.u, label="Approximation", marker="None")
-ax[1][0].plot(ts[1:], solution_dynamic.output_scale, marker="None")
-ax[0][1].plot(ts, solution_mle.u, label="Approximation", marker="None")
-ax[1][1].plot(ts[1:], solution_mle.output_scale, marker="None")
 
-ax[0][0].plot(
-    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
-)
-ax[0][1].plot(
-    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
-)
+u_dynamic = solution_dynamic.u
+u_mle = solution_mle.u
+scale_dynamic = solution_dynamic.output_scale
+scale_mle = jnp.ones_like(solution_mle.output_scale) * solution_mle.output_scale[-1]
 
-ax[0][0].legend()
-ax[0][1].legend()
+style_target = {
+    "marker": "None",
+    "label": "Target",
+    "color": "black",
+    "linewidth": 0.5,
+    "alpha": 1,
+    "linestyle": "dashed",
+}
+style_approx = {
+    "marker": "None",
+    "label": "Posterior mean",
+    "color": "C0",
+    "linewidth": 1.5,
+    "alpha": 0.75,
+}
+style_scale = {
+    "marker": "None",
+    "color": "C3",
+    "linestyle": "solid",
+    "label": "Output scale",
+    "linewidth": 1.5,
+    "alpha": 0.75,
+}
 
-ax[0][0].set_title(f"dynamic(nu={num_derivatives})")
-ax[0][1].set_title(f"mle(nu={num_derivatives})")
-ax[0][0].set_ylabel("Solution")
-ax[1][0].set_ylabel("Output-scale")
-ax[1][0].set_xlabel("Time t")
-ax[1][1].set_xlabel("Time t")
+axes_linear[0].set_title("Time-varying model")
+axes_linear[0].plot(ts, jnp.exp(ts * 2), **style_target)
+axes_linear[0].plot(ts, u_dynamic, **style_approx)
+axes_linear[0].plot(ts[1:], scale_dynamic, **style_scale)
+axes_linear[0].legend()
+
+axes_linear[1].set_title("Constant model")
+axes_linear[1].plot(ts, jnp.exp(ts * 2), **style_target)
+axes_linear[1].plot(ts, u_mle, **style_approx)
+axes_linear[1].plot(ts[1:], scale_mle, **style_scale)
+axes_linear[1].legend()
+
+axes_linear[0].set_ylabel("Linear scale")
+
+axes_linear[0].set_xlim((t0, t1))
+
+
+axes_log[0].semilogy(ts, jnp.exp(ts * 2), **style_target)
+axes_log[0].semilogy(ts, u_dynamic, **style_approx)
+axes_log[0].semilogy(ts[1:], scale_dynamic, **style_scale)
+axes_log[0].legend()
+
+axes_log[1].semilogy(ts, jnp.exp(ts * 2), **style_target)
+axes_log[1].semilogy(ts, u_mle, **style_approx)
+axes_log[1].semilogy(ts[1:], scale_mle, **style_scale)
+axes_log[1].legend()
+
+axes_log[0].set_ylabel("Logarithmic scale")
+axes_log[0].set_xlabel("Time t")
+axes_log[1].set_xlabel("Time t")
+
+axes_log[0].set_xlim((t0, t1))
+
+fig.align_ylabels()
+plt.savefig("output_scale_variation.pdf", dpi=200)
 plt.show()
 ```
 
@@ -116,53 +176,3 @@ The dynamic solver adapts the output-scale so that both the solution and the out
 The ODE-solution fits the truth well.
 
 The solver_mle does not have this tool, and the ODE solution is not able to follow the exponential: it drifts back to the origin. (This is expected, we are basically trying to fit an exponential with a piecewise polynomial.)
-
-The whole issue gets more pronounced if we increase the time-span. (Careful! We plot in log-scale now.)
-
-
-```python
-t1_long = t1 * 7
-num_pts = num_pts * 7
-ts = jnp.linspace(t0, t1_long, num=num_pts, endpoint=True)
-
-solution_dynamic = ivpsolve.solve_fixed_grid(
-    vf,
-    initial_values=(u0,),
-    grid=ts,
-    output_scale=1.0,
-    solver=dynamic,
-    parameters=f_args,
-)
-solution_mle = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=ts, output_scale=1.0, solver=mle, parameters=f_args
-)
-```
-
-```python
-fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True, figsize=(8, 5))
-
-ax[0][0].semilogy(ts, solution_dynamic.u, label="Approximation", marker="None")
-ax[1][0].semilogy(ts[1:], solution_dynamic.output_scale, marker="None")
-ax[0][1].semilogy(ts, solution_mle.u, label="Approximation", marker="None")
-ax[1][1].semilogy(ts[1:], solution_mle.output_scale, marker="None")
-
-ax[0][0].semilogy(
-    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
-)
-ax[0][1].semilogy(
-    ts, jnp.exp(ts * 2), alpha=0.5, linestyle="dashed", label="exp(At)y0", marker="None"
-)
-
-ax[0][0].legend()
-ax[0][1].legend()
-
-ax[0][0].set_title(f"dynamic(nu={num_derivatives})")
-ax[0][1].set_title(f"mle(nu={num_derivatives})")
-ax[0][0].set_ylabel("Solution (log-scale)")
-ax[1][0].set_ylabel("Output-scale (log-scale)")
-ax[1][0].set_xlabel("Time t")
-ax[1][1].set_xlabel("Time t")
-plt.show()
-```
-
-The dynamic solver follows the exponential growth by rescaling the output-scale appropriately; the MLE solveris hopelessly lost.
