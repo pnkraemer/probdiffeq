@@ -40,14 +40,6 @@ from probdiffeq.solvers.strategies import (
 ```
 
 ```python
-from tueplots import bundles, axes
-
-plt.rcParams.update(notebook.plot_config())
-plt.rcParams.update(bundles.neurips2022(nrows=3, ncols=3, family="serif"))
-plt.rcParams.update(axes.lines(base_width=0.5))
-```
-
-```python
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
@@ -59,7 +51,7 @@ impl.select("dense", ode_shape=(1,))
 ```
 
 ```python
-# f, u0, (t0, t1), f_args = ivps.lotka_volterra()
+# Create an ODE problem
 
 
 @jax.jit
@@ -72,6 +64,8 @@ u0 = jnp.asarray([0.1])
 ```
 
 ```python
+# Assemble the discretised prior (with and without the correct Taylor coefficients)
+
 NUM_DERIVATIVES = 2
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 init_raw, transitions = priors.ibm_discretised(
@@ -91,10 +85,8 @@ markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
 ```
 
 ```python
+# Compute the posterior
 
-```
-
-```python
 slr1 = correction.ts1()
 ibm = priors.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
 solver = uncalibrated.solver(fixedpoint.fixedpoint_adaptive(ibm, slr1))
@@ -114,12 +106,16 @@ markov_seq_posterior = markov.select_terminal(sol.posterior)
 ```
 
 ```python
+# Compute marginals
+
 margs_prior = markov.marginals(markov_seq_prior, reverse=False)
 margs_tcoeffs = markov.marginals(markov_seq_tcoeffs, reverse=False)
 margs_posterior = markov.marginals(markov_seq_posterior, reverse=True)
 ```
 
 ```python
+# Compute samples
+
 num_samples = 5
 key = jax.random.PRNGKey(seed=1)
 (_qoi, samples_prior), _ = markov.sample(
@@ -134,8 +130,10 @@ key = jax.random.PRNGKey(seed=1)
 ```
 
 ```python
+# Plot the results
+
 fig, (axes, axes_magnitude, axes_log) = plt.subplots(
-    nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True
+    nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True, figsize=(8, 5)
 )
 axes[0].set_title("Prior")
 axes[1].set_title("w/ Initial condition")
@@ -262,12 +260,4 @@ fig.align_ylabels()
 
 plt.savefig("collocation_new.pdf", dpi=200)
 plt.show()
-```
-
-```python
-
-```
-
-```python
-
 ```
