@@ -132,12 +132,12 @@ key = jax.random.PRNGKey(seed=1)
 ```python
 # Plot the results
 
-fig, (axes, axes_magnitude, axes_log) = plt.subplots(
+fig, (axes_state, axes_residual, axes_log_abs) = plt.subplots(
     nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True, figsize=(8, 5)
 )
-axes[0].set_title("Prior")
-axes[1].set_title("w/ Initial condition")
-axes[2].set_title("Posterior")
+axes_state[0].set_title("Prior")
+axes_state[1].set_title("w/ Initial condition")
+axes_state[2].set_title("Posterior")
 
 sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
 mean_style = {
@@ -157,107 +157,114 @@ def residual(x, t):
 
 
 for i in range(num_samples):
-    axes[0].plot(ts[1:], samples_prior[i, ..., 0], **sample_style, color="C0")
-    axes[1].plot(ts[1:], samples_tcoeffs[i, ..., 0], **sample_style, color="C1")
-    axes[2].plot(ts[:-1], samples_posterior[i, ..., 0], **sample_style, color="C2")
+    # Plot all state-samples
+    axes_state[0].plot(ts[1:], samples_prior[i, ..., 0], **sample_style, color="C0")
+    axes_state[1].plot(ts[1:], samples_tcoeffs[i, ..., 0], **sample_style, color="C1")
+    axes_state[2].plot(
+        ts[:-1], samples_posterior[i, ..., 0], **sample_style, color="C2"
+    )
 
-    axes_magnitude[0].plot(
+    # Plot all residual-samples
+    axes_residual[0].plot(
         ts[:-1],
         residual(samples_prior[i, ...], ts[:-1]),
         **sample_style,
         color="C0",
     )
-    axes_magnitude[1].plot(
+    axes_residual[1].plot(
         ts[:-1],
         residual(samples_tcoeffs[i, ...], ts[:-1]),
         **sample_style,
         color="C1",
     )
-    axes_magnitude[2].plot(
+    axes_residual[2].plot(
         ts[:-1],
         residual(samples_posterior[i, ...], ts[:-1]),
         **sample_style,
         color="C2",
     )
 
-    axes_log[0].plot(
+    # Plot all log-residual samples
+    axes_log_abs[0].plot(
         ts[:-1],
         log_residual(samples_prior[i, ...], ts[:-1]),
         **sample_style,
         color="C0",
     )
-    axes_log[1].plot(
+    axes_log_abs[1].plot(
         ts[:-1],
         log_residual(samples_tcoeffs[i, ...], ts[:-1]),
         **sample_style,
         color="C1",
     )
-    axes_log[2].plot(
+    axes_log_abs[2].plot(
         ts[:-1],
         log_residual(samples_posterior[i, ...], ts[:-1]),
         **sample_style,
         color="C2",
     )
 
-axes[0].plot(ts[1:], margs_prior.mean[..., 0], **mean_style)
-axes[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], **mean_style)
-axes[2].plot(ts[:-1], margs_posterior.mean[..., 0], **mean_style)
+# Plot state means
+axes_state[0].plot(ts[1:], margs_prior.mean[..., 0], **mean_style)
+axes_state[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], **mean_style)
+axes_state[2].plot(ts[:-1], margs_posterior.mean[..., 0], **mean_style)
 
-axes_magnitude[0].plot(
+# Plot residual means
+axes_residual[0].plot(
     ts[:-1],
     residual(margs_prior.mean, ts[:-1]),
     **mean_style,
 )
-axes_magnitude[1].plot(
+axes_residual[1].plot(
     ts[:-1],
     residual(margs_tcoeffs.mean, ts[:-1]),
     **mean_style,
 )
-axes_magnitude[2].plot(
+axes_residual[2].plot(
     ts[:-1],
     residual(margs_posterior.mean, ts[:-1]),
     **mean_style,
 )
 
-
-axes_log[0].plot(
+# Plot residual log-magnitudes
+axes_log_abs[0].plot(
     ts[:-1],
     log_residual(margs_prior.mean, ts[:-1]),
     **mean_style,
 )
-axes_log[1].plot(
+axes_log_abs[1].plot(
     ts[:-1],
     log_residual(margs_tcoeffs.mean, ts[:-1]),
     **mean_style,
 )
-axes_log[2].plot(
+axes_log_abs[2].plot(
     ts[:-1],
     log_residual(margs_posterior.mean, ts[:-1]),
     **mean_style,
 )
 
-axes[0].set_xticks((t0, (t0 + t1) / 2, t1))
-axes[0].set_xlim((t0, t1))
+# Set the x- and y-ticks/limits
+axes_state[0].set_xticks((t0, (t0 + t1) / 2, t1))
+axes_state[0].set_xlim((t0, t1))
 
-axes[0].set_ylim((-1, 3))
-axes[0].set_yticks((-1, 1, 3))
+axes_state[0].set_ylim((-1, 3))
+axes_state[0].set_yticks((-1, 1, 3))
 
-axes_magnitude[0].set_ylim((-10.0, 20))
-axes_magnitude[0].set_yticks((-10.0, 5, 20))
+axes_residual[0].set_ylim((-10.0, 20))
+axes_residual[0].set_yticks((-10.0, 5, 20))
 
-axes_log[0].set_ylim((-6, 4))
-axes_log[0].set_yticks((-6, -1, 4))
+axes_log_abs[0].set_ylim((-6, 4))
+axes_log_abs[0].set_yticks((-6, -1, 4))
 
-axes[0].set_ylabel("Solution")
-axes_magnitude[0].set_ylabel("Residual")
-axes_log[0].set_ylabel(r"Log-residual")
+# Label the x- and y-axes
+axes_state[0].set_ylabel("Solution")
+axes_residual[0].set_ylabel("Residual")
+axes_log_abs[0].set_ylabel(r"Log-residual")
+axes_log_abs[0].set_xlabel("Time $t$")
+axes_log_abs[1].set_xlabel("Time $t$")
+axes_log_abs[2].set_xlabel("Time $t$")
 
-axes_log[0].set_xlabel("Time $t$")
-axes_log[1].set_xlabel("Time $t$")
-axes_log[2].set_xlabel("Time $t$")
-
+# Show the result
 fig.align_ylabels()
-
-plt.savefig("collocation_new.pdf", dpi=200)
 plt.show()
 ```
