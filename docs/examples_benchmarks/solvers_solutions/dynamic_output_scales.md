@@ -38,14 +38,6 @@ from probdiffeq.solvers.strategies import priors, correction, filters
 ```
 
 ```python
-from tueplots import bundles, axes
-
-plt.rcParams.update(bundles.neurips2022(nrows=2, ncols=2, family="sans-serif"))
-plt.rcParams.update(axes.lines(base_width=0.5))
-plt.rcParams.update(axes.legend())
-```
-
-```python
 plt.rcParams.update(notebook.plot_config())
 
 if not backend.has_been_selected:
@@ -168,7 +160,6 @@ axes_log[1].set_xlabel("Time t")
 axes_log[0].set_xlim((t0, t1))
 
 fig.align_ylabels()
-plt.savefig("output_scale_variation.pdf", dpi=200)
 plt.show()
 ```
 
