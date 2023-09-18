@@ -12,6 +12,11 @@ from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
+# todo: change the Solution object to a simple
+#  named tuple containing (t, full_estimate, u_and_marginals, stats).
+#  No need to pre/append the initial condition to the solution anymore,
+#  since the user knows it already.
+
 
 def simulate_terminal_values(
     vector_field,
