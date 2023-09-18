@@ -7,32 +7,21 @@ from typing import Generic, TypeVar
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import _adaptive, _ivpsolve_impl
+from probdiffeq import _ivpsolve_impl
 from probdiffeq.backend import tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
-warnings.warn(
-    "TODO: make adaptive_solver and initial_condition arguments to the solver! Then, fix the notebooks for good, and merge into main ASAP"
-)
-
 
 def simulate_terminal_values(
     vector_field,
-    taylor_coefficients,
+    initial_condition,
     t0,
     t1,
-    solver,
-    output_scale,
+    adaptive_solver,
     dt0,
-    **adaptive_solver_options,
 ):
     """Simulate the terminal values of an initial value problem."""
-    adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)
-    initial_condition = solver.initial_condition(
-        taylor_coefficients, output_scale=output_scale
-    )
-
     save_at = jnp.asarray([t1])
     (_t, solution_save_at), _, num_steps = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
@@ -49,7 +38,7 @@ def simulate_terminal_values(
 
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
-    marginals = posterior.init if isinstance(posterior, markov.markovSeq) else posterior
+    marginals = posterior.init if isinstance(posterior, markov.MarkovSeq) else posterior
     u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=t1,
@@ -61,15 +50,7 @@ def simulate_terminal_values(
     )
 
 
-def solve_and_save_at(
-    vector_field,
-    taylor_coefficients,
-    save_at,
-    solver,
-    output_scale,
-    dt0,
-    **adaptive_solver_options,
-):
+def solve_and_save_at(vector_field, initial_condition, save_at, adaptive_solver, dt0):
     """Solve an initial value problem and return the solution at a pre-determined grid.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -79,12 +60,10 @@ def solve_and_save_at(
         and without any deprecation policy.
 
     """
-    if not solver.strategy.is_suitable_for_save_at:
+    if not adaptive_solver.solver.strategy.is_suitable_for_save_at:
         msg = "Strategy {solver.strategy} should not be used in save_at mode. "
         warnings.warn(msg, stacklevel=1)
 
-    adaptive_solver = _adaptive.adaptive(solver, **adaptive_solver_options)
-    initial_condition = solver.initial_condition(taylor_coefficients, output_scale)
     (_t, solution_save_at), _, num_steps = _ivpsolve_impl.solve_and_save_at(
         jax.tree_util.Partial(vector_field),
         save_at[0],
@@ -112,14 +91,7 @@ def solve_and_save_at(
 
 
 def solve_and_save_every_step(
-    vector_field,
-    taylor_coefficients,
-    t0,
-    t1,
-    solver,
-    output_scale,
-    dt0,
-    **adaptive_solver_options,
+    vector_field, initial_condition, t0, t1, adaptive_solver, dt0
 ):
     """Solve an initial value problem and save every step.
 
@@ -128,11 +100,6 @@ def solve_and_save_every_step(
     !!! warning
         Not JITable, not reverse-mode-differentiable.
     """
-    adaptive_solver = _adaptive.adaptive(solver=solver, **adaptive_solver_options)
-    initial_condition = solver.initial_condition(
-        taylor_coefficients, output_scale=output_scale
-    )
-
     (t, solution_every_step), _dt, num_steps = _ivpsolve_impl.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
         t0,
@@ -162,19 +129,8 @@ def solve_and_save_every_step(
     )
 
 
-def solve_fixed_grid(
-    vector_field,
-    taylor_coefficients,
-    grid,
-    solver,
-    output_scale,
-):
+def solve_fixed_grid(vector_field, initial_condition, grid, solver):
     """Solve an initial value problem on a fixed, pre-determined grid."""
-    # Initialise the Taylor series
-    initial_condition = solver.initial_condition(
-        taylor_coefficients, output_scale=output_scale
-    )
-
     # Compute the solution
     _t, (posterior, output_scale) = _ivpsolve_impl.solve_fixed_grid(
         jax.tree_util.Partial(vector_field),

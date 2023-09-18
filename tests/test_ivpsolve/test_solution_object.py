@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
@@ -20,19 +20,14 @@ def fixture_approximate_solution():
     ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=1)
+    init = solver.initial_condition(tcoeffs, output_scale)
+
     return ivpsolve.solve_and_save_every_step(
-        vf,
-        tcoeffs,
-        t0=t0,
-        t1=t1,
-        dt0=0.1,
-        solver=solver,
-        output_scale=output_scale,
-        atol=1e-2,
-        rtol=1e-2,
+        vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver
     )
 
 
@@ -72,22 +67,17 @@ def fixture_approximate_solution_batched():
     ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
-
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
 
     @jax.vmap
     def solve(init):
+        tcoeffs = (init, vf(init, t=None))
+        initcond = solver.initial_condition(tcoeffs, output_scale=output_scale)
         return ivpsolve.solve_and_save_at(
-            vf,
-            (init, vf(init, t=None)),
-            save_at=save_at,
-            solver=solver,
-            dt0=0.1,
-            output_scale=output_scale,
-            atol=1e-2,
-            rtol=1e-2,
+            vf, initcond, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
         )
 
     return solve(jnp.stack((u0, u0 + 0.1, u0 + 0.2)))

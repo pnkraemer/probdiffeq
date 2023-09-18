@@ -3,7 +3,7 @@ import diffrax
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, timestep
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
@@ -20,20 +20,16 @@ def fixture_python_loop_solution():
     ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
 
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
-    args = (vf, tcoeffs)
-    kwargs = {
-        "t0": t0,
-        "t1": t1,
-        "solver": solver,
-        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
-        "atol": 1e-2,
-        "rtol": 1e-2,
-        "dt0": dt0,
-    }
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    init = solver.initial_condition(tcoeffs, output_scale=output_scale)
+
+    args = (vf, init)
+    kwargs = {"t0": t0, "t1": t1, "adaptive_solver": adaptive_solver, "dt0": dt0}
     return ivpsolve.solve_and_save_every_step(*args, **kwargs)
 
 
