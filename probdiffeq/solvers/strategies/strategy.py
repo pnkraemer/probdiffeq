@@ -10,6 +10,8 @@ from probdiffeq import _interp
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 
+__all__ = ["ExtrapolationImpl"]
+
 T = TypeVar("T")
 R = TypeVar("R")
 S = TypeVar("S")
