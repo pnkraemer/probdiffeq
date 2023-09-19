@@ -6,7 +6,8 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, uncalibrated
-from probdiffeq.solvers.strategies import correction, priors, smoothers
+from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies.components import correction, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 

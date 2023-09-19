@@ -7,7 +7,8 @@ from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import correction, filters, priors
+from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies.components import correction, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 

@@ -3,7 +3,8 @@
 Place all tests that have no better place here.
 """
 from probdiffeq.backend import testing
-from probdiffeq.solvers.strategies import filters, fixedpoint, priors, smoothers
+from probdiffeq.solvers.strategies import filters, fixedpoint, smoothers
+from probdiffeq.solvers.strategies.components import priors
 
 
 @testing.parametrize("incr", [1, -1])
