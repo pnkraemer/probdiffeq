@@ -6,6 +6,7 @@ import jax
 
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
+from probdiffeq.impl.util import cond_util
 
 
 class MarkovSeq(containers.NamedTuple):
@@ -62,7 +63,7 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
 
 def rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     init = impl.variable.rescale_cholesky(markov_seq.init, factor)
-    cond = impl.variable.rescale_cholesky_conditional(markov_seq.conditional, factor)
+    cond = cond_util.rescale_cholesky_conditional(markov_seq.conditional, factor)
     return MarkovSeq(init=init, conditional=cond)
 
 

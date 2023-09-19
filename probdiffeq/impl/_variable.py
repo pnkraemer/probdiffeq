@@ -11,9 +11,5 @@ class VariableBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def rescale_cholesky_conditional(self, conditional, factor, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def transform_unit_sample(self, unit_sample, /, rv):
         raise NotImplementedError

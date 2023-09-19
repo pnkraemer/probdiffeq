@@ -10,7 +10,7 @@ from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated, solution, uncalibrated
-from probdiffeq.solvers.strategies import correction, filters, priors
+from probdiffeq.solvers.strategies import correction, filters, fixedpoint, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -85,16 +85,22 @@ def case_simulate_terminal_values():
 
 @testing.fixture(name="uncalibrated_and_mle_solution")
 @testing.parametrize_with_cases("solver_to_solution", cases=".", prefix="case_")
-def fixture_uncalibrated_and_mle_solution(solver_to_solution):
+@testing.parametrize(
+    "strategy_fun", [filters.filter_adaptive, fixedpoint.fixedpoint_adaptive]
+)
+def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = correction.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategy_fun(ibm, ts0)
 
     uncalib = solver_to_solution(uncalibrated.solver(strategy))
     mle = solver_to_solution(calibrated.mle(strategy))
     return uncalib, mle
 
 
+# fixedpoint-solver in save_every_step gives nonsensical results
+# (which raises a warning), but the test remains valid!
+@testing.filterwarnings("ignore")
 def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     uncalibrated_solution, mle_solution = uncalibrated_and_mle_solution
 
