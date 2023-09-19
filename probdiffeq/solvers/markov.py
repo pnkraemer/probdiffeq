@@ -63,8 +63,13 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
 
 def rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     init = impl.variable.rescale_cholesky(markov_seq.init, factor)
-    cond = cond_util.rescale_cholesky_conditional(markov_seq.conditional, factor)
+    cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
     return MarkovSeq(init=init, conditional=cond)
+
+
+def _rescale_cholesky_conditional(conditional, factor, /):
+    noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
+    return cond_util.Conditional(conditional.matmul, noise_new)
 
 
 def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
