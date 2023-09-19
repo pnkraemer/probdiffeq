@@ -119,9 +119,6 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     posterior
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
-    strategy
-        Strategy (that has been used to compute the solution).
-        Expected to correspond to a solution of an ODE with shape (d,).
 
     !!! note
         Use `log_marginal_likelihood_terminal_values`

@@ -107,45 +107,28 @@ nav:
               - examples_benchmarks/benchmarks/hires/external.ipynb
   - API Documentation:
       - ivpsolve: api_docs/ivpsolve.md
-      - ivpsolvers:
-          - solver: api_docs/ivpsolvers/solver.md
-          - calibrated: api_docs/ivpsolvers/calibrated.md
-          - uncalibrated: api_docs/ivpsolvers/uncalibrated.md
-      - strategies:
-          - strategy: api_docs/strategies/strategy.md
-          - filters: api_docs/strategies/filters.md
-          - smoothers: api_docs/strategies/smoothers.md
-      - statespace:
-          - recipes: api_docs/statespace/recipes.md
-          - cubature: api_docs/statespace/cubature.md
-          - variables: api_docs/statespace/variables.md
-          - calib: api_docs/statespace/calib.md
-          - extra: api_docs/statespace/extra.md
-          - corr: api_docs/statespace/corr.md
-          - dense:
-              - extra: api_docs/statespace/dense/extra.md
-              - linearise: api_docs/statespace/dense/linearise.md
-              - corr: api_docs/statespace/dense/corr.md
-              - variables: api_docs/statespace/dense/variables.md
-              - calib: api_docs/statespace/dense/calib.md
-          - iso:
-              - extra: api_docs/statespace/iso/extra.md
-              - corr: api_docs/statespace/iso/corr.md
-              - variables: api_docs/statespace/iso/variables.md
-              - calib: api_docs/statespace/iso/calib.md
-          - blockdiag:
-              - extra: api_docs/statespace/blockdiag/extra.md
-              - corr: api_docs/statespace/blockdiag/corr.md
-              - calib: api_docs/statespace/blockdiag/calib.md
-          - scalar:
-              - extra: api_docs/statespace/scalar/extra.md
-              - corr: api_docs/statespace/scalar/corr.md
-              - variables: api_docs/statespace/scalar/variables.md
-              - calib: api_docs/statespace/scalar/calib.md
-      - solution: api_docs/solution.md
-      - taylor: api_docs/taylor.md
+      - adaptive: api_docs/adaptive.md
       - controls: api_docs/controls.md
-      - bvpsolve (experimental): api_docs/bvpsolve.md
+      - timestep: api_docs/timestep.md
+      - solvers:
+          - strategies:
+              - components:
+                  - priors: api_docs/solvers/strategies/components/priors.md
+                  - correction: api_docs/solvers/strategies/components/correction.md
+                  - cubature: api_docs/solvers/strategies/components/cubature.md
+              - strategy: api_docs/solvers/strategies/strategy.md
+              - filters: api_docs/solvers/strategies/filters.md
+              - smoothers: api_docs/solvers/strategies/smoothers.md
+              - fixedpoint: api_docs/solvers/strategies/fixedpoint.md
+              - discrete: api_docs/solvers/strategies/discrete.md
+          - taylor:
+              - affine: api_docs/solvers/taylor/affine.md
+              - autodiff: api_docs/solvers/taylor/autodiff.md
+              - estim: api_docs/solvers/taylor/estim.md
+          - calibrated: api_docs/solvers/calibrated.md
+          - uncalibrated: api_docs/solvers/uncalibrated.md
+          - solution: api_docs/solvers/solution.md
+          - markov: api_docs/solvers/markov.md
   - Developer Documentation:
       - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md
