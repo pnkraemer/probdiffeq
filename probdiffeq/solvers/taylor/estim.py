@@ -10,8 +10,6 @@ import jax.numpy as jnp
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import discrete
 
-# TODO: split into subpackage
-
 
 def make_runge_kutta_starter(*, dt=1e-6, atol=1e-12, rtol=1e-10):
     """Create an estimator that uses a Runge-Kutta starter."""
