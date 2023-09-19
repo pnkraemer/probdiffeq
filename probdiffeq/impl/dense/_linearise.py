@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from probdiffeq.impl import _linearise
 from probdiffeq.impl.dense import _normal
-from probdiffeq.impl.util import cholesky_util, linop_util
+from probdiffeq.util import cholesky_util, linop_util
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):

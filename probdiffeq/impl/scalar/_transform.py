@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 from probdiffeq.impl import _transform
 from probdiffeq.impl.scalar import _normal
-from probdiffeq.impl.util import cholesky_util, cond_util
+from probdiffeq.util import cholesky_util, cond_util
 
 
 class TransformBackend(_transform.TransformBackend):

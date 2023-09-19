@@ -6,7 +6,7 @@ import jax
 
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
-from probdiffeq.impl.util import cond_util
+from probdiffeq.util import cond_util
 
 
 class MarkovSeq(containers.NamedTuple):

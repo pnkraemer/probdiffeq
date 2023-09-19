@@ -7,7 +7,7 @@ from math import prod
 import jax.numpy as jnp
 
 from probdiffeq.backend import testing
-from probdiffeq.impl.util import cholesky_util
+from probdiffeq.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 

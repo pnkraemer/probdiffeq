@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq.impl import _hidden_model
 from probdiffeq.impl.dense import _normal
-from probdiffeq.impl.util import cholesky_util, cond_util, linop_util
+from probdiffeq.util import cholesky_util, cond_util, linop_util
 
 
 class HiddenModelBackend(_hidden_model.HiddenModelBackend):

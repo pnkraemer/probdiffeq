@@ -1,6 +1,6 @@
 """Linearisation."""
 from probdiffeq.impl import _linearise
-from probdiffeq.impl.util import linop_util
+from probdiffeq.util import linop_util
 
 
 class LinearisationBackend(_linearise.LinearisationBackend):

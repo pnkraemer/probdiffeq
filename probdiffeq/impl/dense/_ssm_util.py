@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.dense import _normal
-from probdiffeq.impl.util import cholesky_util, cond_util, ibm_util
+from probdiffeq.util import cholesky_util, cond_util, ibm_util
 
 
 class SSMUtilBackend(_ssm_util.SSMUtilBackend):

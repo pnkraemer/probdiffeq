@@ -1,1 +1,1 @@
-"""IVP solvers."""
+"""Initial value problem solvers."""
