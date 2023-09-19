@@ -5,7 +5,7 @@ That is, when called with correct adaptive- and checkpoint-setups.
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
@@ -19,10 +19,15 @@ def fixture_solver_setup():
     vf, (u0,), (t0, t1) = setup.ode()
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
+
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
-    args = (vf, tcoeffs)
-    kwargs = {"atol": 1e-3, "rtol": 1e-3, "output_scale": output_scale, "dt0": 0.1}
-    return args, kwargs, (t0, t1)
+    return {
+        "vf": vf,
+        "tcoeffs": tcoeffs,
+        "t0": t0,
+        "t1": t1,
+        "output_scale": output_scale,
+    }
 
 
 @testing.fixture(name="solution_smoother")
@@ -31,10 +36,17 @@ def fixture_solution_smoother(solver_setup):
     ts0 = correction.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
 
-    args, kwargs, (t0, t1) = solver_setup
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_and_save_every_step(
-        *args, t0=t0, t1=t1, solver=solver, **kwargs
+        solver_setup["vf"],
+        init,
+        t0=solver_setup["t0"],
+        t1=solver_setup["t1"],
+        dt0=0.1,
+        adaptive_solver=adaptive_solver,
     )
 
 
@@ -44,18 +56,25 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = correction.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     save_at = solution_smoother.t
-    args, kwargs, _ = solver_setup
+
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    init = solver.initial_condition(tcoeffs, output_scale)
+
     solution_fixedpoint = ivpsolve.solve_and_save_at(
-        *args, save_at=save_at, solver=solver, **kwargs
+        solver_setup["vf"],
+        init,
+        save_at=save_at,
+        adaptive_solver=adaptive_solver,
+        dt0=0.1,
     )
     assert testing.tree_all_allclose(solution_fixedpoint, solution_smoother)
 
 
 def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_smoother):
     """Test that the interpolated smoother result equals the save_at result."""
-    args, kwargs, _ = solver_setup
     save_at = solution_smoother.t
 
     # Re-generate the smoothing solver
@@ -74,9 +93,17 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = correction.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
-    solver_fixedpoint = uncalibrated.solver(strategy)
+    solver = uncalibrated.solver(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    init = solver.initial_condition(tcoeffs, output_scale)
+
     solution_fixedpoint = ivpsolve.solve_and_save_at(
-        *args, save_at=ts, solver=solver_fixedpoint, **kwargs
+        solver_setup["vf"],
+        init,
+        save_at=ts,
+        adaptive_solver=adaptive_solver,
+        dt0=0.1,
     )
 
     # Extract the interior points of the save_at solution

@@ -66,7 +66,10 @@ def solve_and_save_at(vector_field, initial_condition, save_at, adaptive_solver,
 
     """
     if not adaptive_solver.solver.strategy.is_suitable_for_save_at:
-        msg = "Strategy {solver.strategy} should not be used in save_at mode. "
+        msg = (
+            f"Strategy {adaptive_solver.solver.strategy} should not "
+            f"be used in solve_and_save_at. "
+        )
         warnings.warn(msg, stacklevel=1)
 
     (_t, solution_save_at), _, num_steps = _ivpsolve_impl.solve_and_save_at(
@@ -105,6 +108,13 @@ def solve_and_save_every_step(
     !!! warning
         Not JITable, not reverse-mode-differentiable.
     """
+    if not adaptive_solver.solver.strategy.is_suitable_for_save_every_step:
+        msg = (
+            f"Strategy {adaptive_solver.solver.strategy} should not "
+            f"be used in solve_and_save_every_step."
+        )
+        warnings.warn(msg, stacklevel=1)
+
     (t, solution_every_step), _dt, num_steps = _ivpsolve_impl.solve_and_save_every_step(
         jax.tree_util.Partial(vector_field),
         t0,

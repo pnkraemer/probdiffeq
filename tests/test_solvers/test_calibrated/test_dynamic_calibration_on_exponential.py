@@ -16,22 +16,18 @@ from tests.setup import setup
 def test_exponential_approximated_well():
     vf, u0, (t0, t1), solution = setup.ode_affine()
 
-    problem_args = (vf, (*u0, vf(*u0, t=t0)))
-
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = correction.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.dynamic(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    init = solver.initial_condition((*u0, vf(*u0, t=t0)), output_scale=output_scale)
+
+    problem_args = (vf, init)
     grid = jnp.linspace(t0, t1, num=20)
-    solver_kwargs = {
-        "grid": grid,
-        "solver": solver,
-        "output_scale": output_scale,
-    }
+    solver_kwargs = {"grid": grid, "solver": solver}
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
-    print(approximation, solution)
 
     rmse = _rmse(approximation.u[-1], solution(t1))
     assert rmse < 0.1

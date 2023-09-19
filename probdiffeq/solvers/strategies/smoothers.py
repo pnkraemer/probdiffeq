@@ -13,6 +13,7 @@ def smoother_adaptive(prior, correction, /) -> strategy.Strategy:
         extrapolation_impl,
         correction,
         is_suitable_for_save_at=False,
+        is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
         string_repr=f"<Smoother with {extrapolation_impl}, {correction}>",
     )

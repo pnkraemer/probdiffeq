@@ -19,14 +19,10 @@ def test_filter_marginals_close_only_to_left_boundary():
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
-
-    sol = ivpsolve.solve_fixed_grid(
-        vf,
-        (u0, vf(u0, t=t0)),
-        grid=jnp.linspace(t0, t1, endpoint=True, num=5),
-        solver=solver,
-        output_scale=output_scale,
-    )
+    tcoeffs = (u0, vf(u0, t=t0))
+    init = solver.initial_condition(tcoeffs, output_scale)
+    grid = jnp.linspace(t0, t1, endpoint=True, num=5)
+    sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
@@ -47,13 +43,9 @@ def test_smoother_marginals_close_to_both_boundaries():
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
-    sol = ivpsolve.solve_fixed_grid(
-        vf,
-        tcoeffs,
-        grid=jnp.linspace(t0, t1, endpoint=True, num=5),
-        solver=solver,
-        output_scale=output_scale,
-    )
+    init = solver.initial_condition(tcoeffs, output_scale)
+    grid = jnp.linspace(t0, t1, endpoint=True, num=5)
+    sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
     ts = jnp.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)

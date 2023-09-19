@@ -13,8 +13,9 @@ def fixedpoint_adaptive(prior, correction, /) -> strategy.Strategy:
         extrapolation_impl,
         correction,
         is_suitable_for_save_at=True,
+        is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
-        string_repr=f"<Fixed-point smoother with {extrapolation_impl}, {correction}>",
+        string_repr=f"<Fixedpoint smoother with {extrapolation_impl}, {correction}>",
     )
 
 

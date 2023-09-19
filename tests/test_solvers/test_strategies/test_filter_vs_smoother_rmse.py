@@ -19,10 +19,7 @@ def fixture_solver_setup():
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     grid = jnp.linspace(t0, t1, endpoint=True, num=12)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
-    problem_args = (vf, tcoeffs)
-    problem_kwargs = {"grid": grid, "output_scale": output_scale}
-
-    return problem_args, problem_kwargs
+    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
 
 
 @testing.fixture(name="filter_solution")
@@ -32,8 +29,11 @@ def fixture_filter_solution(solver_setup):
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    args, kwargs = solver_setup
-    return ivpsolve.solve_fixed_grid(*args, solver=solver, **kwargs)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    init = solver.initial_condition(tcoeffs, output_scale)
+    return ivpsolve.solve_fixed_grid(
+        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver
+    )
 
 
 @testing.fixture(name="smoother_solution")
@@ -43,8 +43,11 @@ def fixture_smoother_solution(solver_setup):
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    args, kwargs = solver_setup
-    return ivpsolve.solve_fixed_grid(*args, solver=solver, **kwargs)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    init = solver.initial_condition(tcoeffs, output_scale)
+    return ivpsolve.solve_fixed_grid(
+        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver
+    )
 
 
 @testing.fixture(name="diffrax_solution")

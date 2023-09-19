@@ -2,7 +2,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
@@ -19,19 +19,15 @@ def fixture_sol():
     ts0 = correction.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
-    save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    init = solver.initial_condition(tcoeffs, output_scale)
+
+    save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
     return ivpsolve.solve_and_save_at(
-        vf,
-        tcoeffs,
-        save_at=save_at,
-        solver=solver,
-        atol=1e-2,
-        rtol=1e-2,
-        dt0=0.1,
-        output_scale=output_scale,
+        vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
     )
 
 
@@ -107,13 +103,9 @@ def test_raises_error_for_filter():
 
     grid = jnp.linspace(t0, t1, num=3)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
-    sol = ivpsolve.solve_fixed_grid(
-        vf,
-        tcoeffs,
-        grid=grid,
-        solver=solver,
-        output_scale=1.0,
-    )
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    init = solver.initial_condition(tcoeffs, output_scale)
+    sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)
 
     data = sol.u + 0.1
     std = jnp.ones((sol.u.shape[0],))  # values irrelevant

@@ -1,7 +1,7 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
@@ -39,19 +39,14 @@ def fixture_sol(strategy_func):
     ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = correction.ts0()
     strategy = strategy_func(ibm, ts0)
-
     solver = uncalibrated.solver(strategy)
+    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.simulate_terminal_values(
-        vf,
-        tcoeffs,
-        t0=t0,
-        t1=t1,
-        solver=solver,
-        dt0=0.1,
-        output_scale=jnp.ones_like(impl.prototypes.output_scale()),
-        atol=1e-2,
-        rtol=1e-2,
+        vf, init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1
     )
 
 

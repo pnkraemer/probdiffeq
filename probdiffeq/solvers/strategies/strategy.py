@@ -64,6 +64,7 @@ class Strategy:
         *,
         string_repr,
         is_suitable_for_save_at,
+        is_suitable_for_save_every_step,
         is_suitable_for_offgrid_marginals,
     ):
         # Content
@@ -73,6 +74,7 @@ class Strategy:
         # Some meta-information
         self.string_repr = string_repr
         self.is_suitable_for_save_at = is_suitable_for_save_at
+        self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
         self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
 
     def __repr__(self):
@@ -174,18 +176,20 @@ def _tree_flatten(strategy):
         # Meta-info
         strategy.string_repr,
         strategy.is_suitable_for_offgrid_marginals,
+        strategy.is_suitable_for_save_every_step,
         strategy.is_suitable_for_save_at,
     )
     return children, aux
 
 
 def _tree_unflatten(aux, _children):
-    extra, corr, string, suitable_offgrid, suitable_saveat = aux
+    extra, corr, string, suitable_offgrid, suitable_every, suitable_saveat = aux
     return Strategy(
         extrapolation=extra,
         correction=corr,
         string_repr=string,
         is_suitable_for_save_at=suitable_saveat,
+        is_suitable_for_save_every_step=suitable_every,
         is_suitable_for_offgrid_marginals=suitable_offgrid,
     )
 

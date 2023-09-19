@@ -6,7 +6,7 @@ After applying solution.calibrate(), the posterior is different.
 """
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, timestep
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated, solution, uncalibrated
@@ -19,14 +19,12 @@ from tests.setup import setup
 def case_solve_fixed_grid():
     vf, u0, (t0, t1) = setup.ode()
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
-    args = (vf, tcoeffs)
-    kwargs = {
-        "grid": jnp.linspace(t0, t1, endpoint=True, num=5),
-        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
-    }
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    kwargs = {"grid": jnp.linspace(t0, t1, endpoint=True, num=5)}
 
     def solver_to_solution(solver):
-        return ivpsolve.solve_fixed_grid(*args, solver=solver, **kwargs)
+        init = solver.initial_condition(tcoeffs, output_scale)
+        return ivpsolve.solve_fixed_grid(vf, init, solver=solver, **kwargs)
 
     return solver_to_solution
 
@@ -36,17 +34,15 @@ def case_solve_and_save_at():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
-    args = (vf, tcoeffs)
-    kwargs = {
-        "save_at": jnp.linspace(t0, t1, endpoint=True, num=5),
-        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
-        "atol": 1e-2,
-        "rtol": 1e-2,
-        "dt0": dt0,
-    }
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    kwargs = {"save_at": jnp.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
 
     def solver_to_solution(solver):
-        return ivpsolve.solve_and_save_at(*args, solver=solver, **kwargs)
+        init = solver.initial_condition(tcoeffs, output_scale)
+        adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+        return ivpsolve.solve_and_save_at(
+            vf, init, adaptive_solver=adaptive_solver, **kwargs
+        )
 
     return solver_to_solution
 
@@ -56,18 +52,15 @@ def case_solve_and_save_every_step():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
-    args = (vf, tcoeffs)
-    kwargs = {
-        "t0": t0,
-        "t1": t1,
-        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
-        "atol": 1e-2,
-        "rtol": 1e-2,
-        "dt0": dt0,
-    }
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
 
     def solver_to_solution(solver):
-        return ivpsolve.solve_and_save_every_step(*args, solver=solver, **kwargs)
+        init = solver.initial_condition(tcoeffs, output_scale)
+        adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+        return ivpsolve.solve_and_save_every_step(
+            vf, init, adaptive_solver=adaptive_solver, **kwargs
+        )
 
     return solver_to_solution
 
@@ -77,18 +70,15 @@ def case_simulate_terminal_values():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
-    args = (vf, tcoeffs)
-    kwargs = {
-        "t0": t0,
-        "t1": t1,
-        "output_scale": jnp.ones_like(impl.prototypes.output_scale()),
-        "atol": 1e-2,
-        "rtol": 1e-2,
-        "dt0": dt0,
-    }
+    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
 
     def solver_to_solution(solver):
-        return ivpsolve.simulate_terminal_values(*args, solver=solver, **kwargs)
+        init = solver.initial_condition(tcoeffs, output_scale)
+        adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+        return ivpsolve.simulate_terminal_values(
+            vf, init, adaptive_solver=adaptive_solver, **kwargs
+        )
 
     return solver_to_solution
 
@@ -105,7 +95,7 @@ def fixture_uncalibrated_and_mle_solution(solver_to_solution):
     return uncalib, mle
 
 
-def test_python_loop_output_matches_diffrax(uncalibrated_and_mle_solution):
+def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     uncalibrated_solution, mle_solution = uncalibrated_and_mle_solution
 
     posterior_uncalibrated = uncalibrated_solution.posterior

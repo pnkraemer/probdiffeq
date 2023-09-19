@@ -43,9 +43,9 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
         conditional, base = conditionals_and_base_samples
 
         rv = impl.conditional.apply(samp_prev, conditional)
-        sample = impl.variable.transform_unit_sample(base, rv)
-        qoi = impl.hidden_model.qoi_from_sample(sample)
-        return (qoi, sample), (qoi, sample)
+        smp = impl.variable.transform_unit_sample(base, rv)
+        qoi = impl.hidden_model.qoi_from_sample(smp)
+        return (qoi, smp), (qoi, smp)
 
     base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
 

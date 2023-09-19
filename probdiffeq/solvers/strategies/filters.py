@@ -14,6 +14,7 @@ def filter_adaptive(prior, correction, /) -> strategy.Strategy:
         string_repr=f"<Filter with {extrapolation_impl}, {correction}>",
         is_suitable_for_save_at=True,
         is_suitable_for_offgrid_marginals=True,
+        is_suitable_for_save_every_step=True,
     )
 
 
