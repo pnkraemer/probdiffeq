@@ -25,11 +25,13 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solution
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import uncalibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import smoothers
+from probdiffeq import ivpsolve
+from probdiffeq.impl import impl
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import uncalibrated, solution
+from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies import smoothers
 ```
 
 ```python
@@ -45,6 +47,10 @@ config.update("jax_debug_nans", True)
 config.update("jax_platform_name", "cpu")
 ```
 
+```python
+impl.select("isotropic", ode_shape=(1,))
+```
+
 To keep the problem nice and small, assume that the data set is a trigonometric function (which solve differential equations).
 
 ```python
@@ -57,27 +63,28 @@ plt.show()
 ```
 
 ```python
-def build_loss_fn(vf, initial_values, obs_stdev=1e-2):
+def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
     """Build a loss function from an ODE problem."""
 
     @jax.jit
     def loss_fn(parameters):
+        tcoeffs = initial_values + (vf(*initial_values, t=t0, p=parameters),)
+        init = solver.initial_condition(tcoeffs, output_scale=1.0)
+
         sol = ivpsolve.solve_fixed_grid(
-            vf,
-            initial_values=initial_values,
+            lambda *a, **kw: vf(*a, **kw, p=parameters),
+            init,
             grid=grid,
             solver=solver,
-            parameters=parameters,
-            output_scale=1.0,
         )
 
-        observation_std = jnp.ones_like(grid) * obs_stdev
-        return -1.0 * solution.log_marginal_likelihood(
-            observation_std=observation_std,
-            u=data[:, None],
+        observation_std = jnp.ones_like(grid) * standard_deviation
+        marginal_likelihood = solution.log_marginal_likelihood(
+            data[:, None],
+            standard_deviation=observation_std,
             posterior=sol.posterior,
-            strategy=solver.strategy,
         )
+        return -1 * marginal_likelihood
 
     return loss_fn
 ```
@@ -110,19 +117,18 @@ def vf(y, *, t, p):
 
 
 # Make a solver
-impl = recipes.ts0_iso(num_derivatives=1)
-strategy = smoothers.smoother(*impl)
-solver = uncalibrated.solver(*strategy)
+ibm = priors.ibm_adaptive(num_derivatives=1)
+ts0 = correction.ts0()
+strategy = smoothers.smoother_adaptive(ibm, ts0)
+solver_ts0 = uncalibrated.solver(strategy)
 ```
 
 ```python
+tcoeffs = (u0, vf(u0, t=t0, p=f_args))
+init = solver_ts0.initial_condition(tcoeffs, output_scale=1.0)
+
 sol = ivpsolve.solve_fixed_grid(
-    vf,
-    initial_values=(u0,),
-    grid=grid,
-    solver=solver,
-    output_scale=1.0,
-    parameters=f_args,
+    lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0
 )
 
 plt.plot(sol.t, sol.u, ".-", label="Initial estimate")
@@ -136,7 +142,7 @@ plt.show()
 Like in the other tutorials, we use [Optax](https://optax.readthedocs.io/en/latest/index.html).
 
 ```python
-loss_fn = build_loss_fn(vf=vf, initial_values=(u0,))
+loss_fn = build_loss_fn(vf=vf, initial_values=(u0,), solver=solver_ts0)
 optim = optax.adam(learning_rate=2e-2)
 update_fn = build_update_fn(optimizer=optim, loss_fn=loss_fn)
 ```
@@ -149,27 +155,28 @@ for i in range(chunk_size):
     for _ in range(chunk_size**2):
         p, state = update_fn(p, state)
     print(
-        f"Neg. log-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:",
+        f"Negative log-marginal-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:",
         loss_fn(p),
     )
 ```
 
 ```python
 plt.plot(sol.t, data, "-", linewidth=5, alpha=0.5, label="Data")
-
+tcoeffs = (u0, vf(u0, t=t0, p=p))
+init = solver_ts0.initial_condition(tcoeffs, output_scale=1.0)
 
 sol = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=grid, solver=solver, output_scale=1.0, parameters=p
+    lambda *a, **kw: vf(*a, **kw, p=p), init, grid=grid, solver=solver_ts0
 )
+
+
 plt.plot(sol.t, sol.u, ".-", label="Final guess")
 
+tcoeffs = (u0, vf(u0, t=t0, p=f_args))
+init = solver_ts0.initial_condition(tcoeffs, output_scale=1.0)
+
 sol = ivpsolve.solve_fixed_grid(
-    vf,
-    initial_values=(u0,),
-    grid=grid,
-    solver=solver,
-    output_scale=1.0,
-    parameters=f_args,
+    lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0
 )
 plt.plot(sol.t, sol.u, ".-", label="Initial guess")
 

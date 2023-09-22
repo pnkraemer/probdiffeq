@@ -91,7 +91,6 @@ nav:
           - examples_benchmarks/solvers_solutions/posterior_uncertainties.ipynb
           - examples_benchmarks/solvers_solutions/second_order_problems.ipynb
           - examples_benchmarks/solvers_solutions/smoothing.ipynb
-          - examples_benchmarks/solvers_solutions/solution_object.ipynb
           - examples_benchmarks/solvers_solutions/dynamic_output_scales.ipynb
           - examples_benchmarks/solvers_solutions/conditioning-on-zero-residual.ipynb
       - Parameter estimation:

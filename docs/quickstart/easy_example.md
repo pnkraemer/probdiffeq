@@ -8,7 +8,8 @@ from jax.config import config
 from probdiffeq import ivpsolve, timestep, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
-from probdiffeq.solvers.strategies import smoothers, correction, priors
+from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies.components import correction, priors
 from probdiffeq.solvers.taylor import autodiff
 
 config.update("jax_platform_name", "cpu")

@@ -99,7 +99,7 @@ def _kalman_reverse_step(state, cond_and_data_and_obs):
 
     # Update logpdf
     logpdf_new = impl.stats.logpdf(data, observed)
-    logpdf_mean = impl.ssm_util.update_mean(logpdf, logpdf_new, num_data)
+    logpdf_mean = (logpdf * num_data + logpdf_new) / (num_data + 1)
     state = _KalmanFilterState(corrected, num_data + 1.0, logpdf_mean)
 
     # Scan-compatible output
