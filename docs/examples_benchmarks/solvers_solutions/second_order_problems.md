@@ -22,10 +22,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters
+from probdiffeq.impl import impl
+from probdiffeq import adaptive, ivpsolve
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies import filters
 ```
 
 ```python
@@ -40,35 +43,39 @@ config.update("jax_platform_name", "cpu")
 Quick refresher: first-order ODEs
 
 ```python
+impl.select("isotropic", ode_shape=(4,))
 f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
-def vf_1(y, t, p):
-    return f(y, *p)
+def vf_1(y, t):
+    return f(y, *f_args)
 
 
-ts0_1 = calibrated.mle(*filters.filter(*recipes.ts0_iso()))
-ts = jnp.linspace(t0, t1, endpoint=True, num=500)
+ibm = priors.ibm_adaptive(num_derivatives=4)
+ts0 = correction.ts0()
+solver_1st = calibrated.mle(filters.filter_adaptive(ibm, ts0))
+adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
+
+
+tcoeffs = autodiff.taylor_mode(lambda y: vf_1(y, t=t0), (u0,), num=4)
+init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 ```
 
 ```python
-%%time
-
-solution = ivpsolve.solve_and_save_at(
+solution = ivpsolve.solve_and_save_every_step(
     vf_1,
-    initial_values=(u0,),
-    save_at=ts,
-    solver=ts0_1,
-    atol=1e-5,
-    rtol=1e-5,
-    output_scale=1.0,
-    parameters=f_args,
+    init,
+    t0=t0,
+    t1=t1,
+    dt0=0.1,
+    adaptive_solver=adaptive_solver_1st,
 )
 ```
 
 ```python
-plt.title((solution.u.shape, jnp.linalg.norm(solution.u[-1, ...] - u0)))
+norm = jnp.linalg.norm((solution.u[-1, ...] - u0) / jnp.abs(1.0 + u0))
+plt.title((solution.u.shape, norm))
 plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
 plt.show()
 ```
@@ -77,37 +84,40 @@ The default configuration assumes that the ODE to be solved is of first order.
 Now, the same game with a second-order ODE
 
 ```python
+impl.select("isotropic", ode_shape=(2,))
 f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
 
 @jax.jit
-def vf_2(y, dy, t, p):
-    return f(y, dy, *p)
+def vf_2(y, dy, t):
+    return f(y, dy, *f_args)
 
 
 # One derivative more than above because we don't transform to first order
-implementation = recipes.ts0_iso(ode_order=2, num_derivatives=5)
-ts0_2 = calibrated.mle(*filters.filter(*implementation))
-ts = jnp.linspace(t0, t1, endpoint=True, num=500)
+ibm = priors.ibm_adaptive(num_derivatives=4)
+ts0 = correction.ts0(ode_order=2)
+solver_2nd = calibrated.mle(filters.filter_adaptive(ibm, ts0))
+adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
+
+
+tcoeffs = autodiff.taylor_mode(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 ```
 
 ```python
-%%time
-
-solution = ivpsolve.solve_and_save_at(
+solution = ivpsolve.solve_and_save_every_step(
     vf_2,
-    initial_values=(u0, du0),
-    save_at=ts,
-    solver=ts0_2,
-    atol=1e-5,
-    rtol=1e-5,
-    output_scale=1.0,
-    parameters=f_args,
+    init,
+    t0=t0,
+    t1=t1,
+    dt0=0.1,
+    adaptive_solver=adaptive_solver_2nd,
 )
 ```
 
 ```python
-plt.title((solution.u.shape, jnp.linalg.norm(solution.u[-1, ...] - u0)))
+norm = jnp.linalg.norm((solution.u[-1, ...] - u0) / jnp.abs(1.0 + u0))
+plt.title((solution.u.shape, norm))
 plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
 plt.show()
 ```

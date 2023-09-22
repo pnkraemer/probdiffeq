@@ -75,6 +75,9 @@ plugins:
         - examples_benchmarks/benchmarks/pleiades/external.md
         - examples_benchmarks/benchmarks/stiff_van_der_pol/external.md
         - examples_benchmarks/benchmarks/hires/external.md
+        - quickstart/.ipynb_checkpoints/*
+        - examples_benchmarks/parameter_estimation/.ipynb_checkpoints/*
+        - examples_benchmarks/solvers_solutions/.ipynb_checkpoints/*
   - mkdocs-jupyter
 nav:
   - Getting started:

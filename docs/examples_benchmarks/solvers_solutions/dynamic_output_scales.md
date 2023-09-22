@@ -34,7 +34,8 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers.taylor import affine
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.strategies import priors, correction, filters
+from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies.components import priors, correction
 ```
 
 ```python
@@ -75,18 +76,21 @@ t0, t1 = 0.0, 3.0
 num_pts = 200
 
 ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
+
+
+tcoeffs = (u0, vf(u0, t=t0))
+init_mle = mle.initial_condition(tcoeffs, output_scale=1.0)
+init_dynamic = dynamic.initial_condition(tcoeffs, output_scale=1.0)
 solution_dynamic = ivpsolve.solve_fixed_grid(
     vf,
-    taylor_coefficients=(u0, vf(u0, t=t0)),
+    init_mle,
     grid=ts,
-    output_scale=1.0,
     solver=dynamic,
 )
 solution_mle = ivpsolve.solve_fixed_grid(
     vf,
-    taylor_coefficients=(u0, vf(u0, t=t0)),
+    init_dynamic,
     grid=ts,
-    output_scale=1.0,
     solver=mle,
 )
 ```

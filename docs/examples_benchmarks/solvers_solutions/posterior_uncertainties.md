@@ -22,11 +22,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters, smoothers
+from probdiffeq import ivpsolve, adaptive, timestep
+from probdiffeq.impl import impl
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import calibrated, solution, markov
+from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
+from probdiffeq.solvers.strategies.components import priors, correction
 ```
 
 ```python
@@ -39,6 +41,10 @@ config.update("jax_enable_x64", True)
 config.update("jax_platform_name", "cpu")
 ```
 
+```python
+impl.select("isotropic", ode_shape=(2,))
+```
+
 Set an example problem.
 
 Solve the problem on a low resolution and short time-span to achieve large uncertainty.
@@ -48,36 +54,37 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(*ys, t, p):
-    return f(*ys, *p)
+def vf(*ys, t):
+    return f(*ys, *f_args)
 ```
 
 ## Filter
 
 ```python
-ts0 = calibrated.mle(*filters.filter(*recipes.ts0_iso()))
+ibm = priors.ibm_adaptive(num_derivatives=4)
+ts0 = correction.ts0()
+solver = calibrated.mle(filters.filter_adaptive(ibm, ts0))
+adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
-# %#%time
+dt0 = timestep.propose(lambda y: vf(y, t=t0), (u0,))
 
+tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(
-    vf,
-    initial_values=(u0,),
-    save_at=ts,
-    solver=ts0,
-    rtol=1e-2,
-    atol=1e-2,
-    output_scale=1.0,
-    parameters=f_args,
+    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver
 )
+
+marginals = solution.calibrate(sol.marginals, output_scale=sol.output_scale)
 ```
 
 Plot the solution
 
 ```python
-_, num_derivatives, _ = sol.marginals.mean.shape
+_, num_derivatives, _ = marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -89,8 +96,8 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = sol.marginals.mean[:, i, :]
-    ls = sol.marginals.cov_sqrtm_lower[:, i, :]
+    ms = marginals.mean[:, i, :]
+    ls = marginals.cholesky[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
@@ -114,32 +121,32 @@ plt.show()
 ## Smoother
 
 ```python
-ts0 = calibrated.mle(*smoothers.smoother_fixedpoint(*recipes.ts0_iso()))
+ibm = priors.ibm_adaptive(num_derivatives=4)
+ts0 = correction.ts0()
+solver = calibrated.mle(fixedpoint.fixedpoint_adaptive(ibm, ts0))
+adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
-# %#%time
-
+init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(
-    vf,
-    initial_values=(u0,),
-    save_at=ts,
-    solver=ts0,
-    rtol=1e-2,
-    atol=1e-2,
-    output_scale=1.0,
-    parameters=f_args,
+    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver
 )
+
+marginals = solution.calibrate(sol.marginals, output_scale=sol.output_scale)
+posterior = solution.calibrate(sol.posterior, output_scale=sol.output_scale)
+posterior = markov.select_terminal(posterior)
 ```
 
 ```python
 key = jax.random.PRNGKey(seed=1)
-u, samples = sol.posterior.sample(key, shape=(2,))
+(qoi, samples), _init = markov.sample(key, posterior, shape=(2,), reverse=True)
 ```
 
 ```python
-_, num_derivatives, _ = sol.marginals.mean.shape
+_, num_derivatives, _ = marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
@@ -151,9 +158,9 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = sol.marginals.mean[:, i, :]
+    ms = marginals.mean[:, i, :]
     samps = samples[..., i, :]
-    ls = sol.marginals.cov_sqrtm_lower[:, i, :]
+    ls = marginals.cholesky[:, i, :]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
@@ -167,8 +174,12 @@ for i, axes_cols in enumerate(axes_all.T):
 
     axes_cols[0].plot(sol.t, ms, marker="None")
     for s in samps:
-        axes_cols[0].plot(sol.t, s[..., 0], color="C0", linewidth=0.35, marker="None")
-        axes_cols[0].plot(sol.t, s[..., 1], color="C1", linewidth=0.35, marker="None")
+        axes_cols[0].plot(
+            sol.t[:-1], s[..., 0], color="C0", linewidth=0.35, marker="None"
+        )
+        axes_cols[0].plot(
+            sol.t[:-1], s[..., 1], color="C1", linewidth=0.35, marker="None"
+        )
     for m in ms.T:
         axes_cols[0].fill_between(sol.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
 

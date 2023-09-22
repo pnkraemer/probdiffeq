@@ -25,18 +25,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import controls, ivpsolve, timestep
+from probdiffeq import controls, ivpsolve, timestep, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
 from probdiffeq.solvers.taylor import autodiff
-from probdiffeq.solvers.strategies import (
-    filters,
-    smoothers,
-    fixedpoint,
-    priors,
-    correction,
-)
+from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
+from probdiffeq.solvers.strategies.components import priors, correction
 ```
 
 ```python
@@ -90,16 +85,17 @@ markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
 slr1 = correction.ts1()
 ibm = priors.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
 solver = uncalibrated.solver(fixedpoint.fixedpoint_adaptive(ibm, slr1))
+adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)
+
 dt0 = timestep.propose(lambda y: vector_field(y, t=t0), (u0,))
+
+init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(
     vector_field,
-    tcoeffs,
+    init,
     save_at=ts,
-    rtol=1e-1,
-    atol=1e-2,
     dt0=1.0,
-    output_scale=1.0,
-    solver=solver,
+    adaptive_solver=adaptive_solver,
 )
 # posterior = solution.calibrate(sol.posterior, sol.output_scale)
 markov_seq_posterior = markov.select_terminal(sol.posterior)

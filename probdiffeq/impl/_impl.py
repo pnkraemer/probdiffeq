@@ -1,5 +1,6 @@
 """State-space model impl."""
 import abc
+import warnings
 from typing import Optional
 
 from probdiffeq.impl import (
@@ -98,8 +99,8 @@ class Impl:
 
     def select(self, which, **kwargs):
         if self._fact is not None:
-            msg = f"FactorisedImpl {self._fact} has been selected already."
-            raise ValueError(msg)
+            msg = f"An implementation has already been selected: '{self._fact_name}'."
+            warnings.warn(msg, stacklevel=None)
         self._fact = choose(which, **kwargs)
         self._fact_name = which
 

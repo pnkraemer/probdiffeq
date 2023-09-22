@@ -17,5 +17,5 @@ def plot_config():
             color=np.tile(colors, 10)[:15],
         ),
         **markers.with_edge(),
-        **{"figure.dpi": 200},
+        **{"figure.dpi": 100},
     }
