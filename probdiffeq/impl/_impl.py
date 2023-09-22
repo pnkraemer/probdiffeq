@@ -100,7 +100,7 @@ class Impl:
     def select(self, which, **kwargs):
         if self._fact is not None:
             msg = f"An implementation has already been selected: '{self._fact_name}'."
-            warnings.warn(msg, stacklevel=None)
+            warnings.warn(msg, stacklevel=1)
         self._fact = choose(which, **kwargs)
         self._fact_name = which
 

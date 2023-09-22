@@ -26,11 +26,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solution
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters, smoothers
+from probdiffeq import ivpsolve, adaptive
+from probdiffeq.impl import impl
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import calibrated, solution
+from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
 ```
 
 ```python
@@ -43,12 +45,19 @@ config.update("jax_platform_name", "cpu")
 ```
 
 ```python
+impl.select("isotropic", ode_shape=(2,))
+```
+
+```python
 f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 10.0))
 
 
 @jax.jit
-def vf(*ys, t, p):
-    return f(*ys, *p)
+def vf(*ys, t):
+    return f(*ys, *f_args)
+
+
+tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
 ```
 
 ## Terminal-value simulation
@@ -57,15 +66,18 @@ If you are interested in the terminal value of the ODE solution, you can use fil
 But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient here.
 
 ```python
-ekf0 = calibrated.mle(*filters.filter(*recipes.ts0_iso()))
+ibm = priors.ibm_adaptive(num_derivatives=4)
+ts0 = correction.ts0()
+
+ekf0 = calibrated.mle(filters.filter_adaptive(ibm, ts0))
+init = ekf0.initial_condition(tcoeffs, output_scale=1.0)
 ekf0sol = ivpsolve.simulate_terminal_values(
     vf,
-    initial_values=(u0,),
+    init,
     t0=t0,
     t1=t1,
-    solver=ekf0,
-    output_scale=1.0,
-    parameters=f_args,
+    dt0=0.1,
+    adaptive_solver=adaptive.adaptive(ekf0),
 )
 print(ekf0sol.t, ekf0sol.u)
 ```
@@ -75,15 +87,15 @@ print(ekf0sol.t, ekf0sol.u)
 If you are used to calling traditional solve() methods, use one a conventional smoother (i.e. not the fixed-point smoother).
 
 ```python
-eks0 = calibrated.mle(*smoothers.smoother(*recipes.ts0_iso()))
-eks0sol = ivpsolve.solve_with_python_while_loop(
+eks0 = calibrated.mle(smoothers.smoother_adaptive(ibm, ts0))
+init = eks0.initial_condition(tcoeffs, output_scale=1.0)
+eks0sol = ivpsolve.solve_and_save_every_step(
     vf,
-    initial_values=(u0,),
+    init,
     t0=t0,
     t1=t1,
-    solver=eks0,
-    output_scale=1.0,
-    parameters=f_args,
+    dt0=0.1,
+    adaptive_solver=adaptive.adaptive(eks0),
 )
 
 plt.subplots(figsize=(5, 3))
@@ -130,14 +142,14 @@ use the solve_and_save_at function together with a fixed-point smoother.
 
 
 ```python
-eks0_fixpt = calibrated.mle(*smoothers.smoother_fixedpoint(*recipes.ts0_iso()))
+ekfp0 = calibrated.mle(fixedpoint.fixedpoint_adaptive(ibm, ts0))
+init = eks0.initial_condition(tcoeffs, output_scale=1.0)
 fixptsol = ivpsolve.solve_and_save_at(
     vf,
-    initial_values=(u0,),
+    init,
     save_at=ts_dense,  # reuse from above
-    solver=eks0_fixpt,
-    output_scale=1.0,
-    parameters=f_args,
+    dt0=0.1,
+    adaptive_solver=adaptive.adaptive(ekfp0),
 )
 
 plt.subplots(figsize=(5, 3))
