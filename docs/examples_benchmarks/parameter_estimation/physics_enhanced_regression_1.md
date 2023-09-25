@@ -34,11 +34,12 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solution
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import uncalibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import smoothers
+from probdiffeq.impl import impl
+from probdiffeq import ivpsolve
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import uncalibrated, solution
+from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies import smoothers
 ```
 
 ```python
@@ -51,7 +52,34 @@ config.update("jax_enable_x64", True)
 config.update("jax_platform_name", "cpu")
 ```
 
+```python
+impl.select("isotropic", ode_shape=(2,))
+```
+
 Create a problem and some fake-data:
+
+```python
+@jax.jit
+def vf(y, t, *, p):
+    return f(y, *p)
+
+
+def solve(p):
+    ibm = priors.ibm_adaptive(num_derivatives=1)
+    ts0 = correction.ts0()
+    strategy = smoothers.smoother_adaptive(ibm, ts0)
+    solver = uncalibrated.solver(strategy)
+
+    tcoeffs = (u0, vf(u0, t0, p=p))
+    output_scale = 10.0
+    init = solver.initial_condition(tcoeffs, output_scale)
+    return ivpsolve.solve_fixed_grid(
+        lambda y, t: vf(y, t, p=p),
+        init,
+        grid=ts,
+        solver=solver,
+    )
+```
 
 ```python
 f, u0, (t0, t1), f_args = ivps.lotka_volterra()
@@ -61,26 +89,8 @@ parameter_true = f_args + 0.05
 parameter_guess = f_args
 
 
-@jax.jit
-def vf(y, t, p):
-    return f(y, *p)
-
-
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
-
-impl = recipes.ts0_iso(num_derivatives=1)
-strategy = smoothers.smoother(*impl)
-solver = uncalibrated.solver(*strategy)
-
-
-solution_true = ivpsolve.solve_fixed_grid(
-    vf,
-    initial_values=(u0,),
-    grid=ts,
-    solver=solver,
-    parameters=parameter_true,
-    output_scale=10.0,
-)
+solution_true = solve(parameter_true)
 data = solution_true.u
 plt.plot(ts, data, "P-")
 plt.show()
@@ -89,14 +99,7 @@ plt.show()
 We make an initial guess, but it does not lead to a good data fit:
 
 ```python
-solution_guess = ivpsolve.solve_fixed_grid(
-    vf,
-    initial_values=(u0,),
-    grid=ts,
-    solver=solver,
-    parameters=parameter_guess,
-    output_scale=10.0,
-)
+solution_guess = solve(parameter_guess)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_guess.u)
 plt.show()
@@ -107,30 +110,15 @@ Use the probdiffeq functionality to compute a parameter-to-data fit function.
 This incorporates the likelihood of the data under the distribution induced by the probabilistic ODE solution (which was generated with the current parameter guess).
 
 ```python
-def param_to_log_likelihood(parameters_, u0_, ts_, solver_, vf_, data_, obs_stdev=1e-1):
-    sol_ = ivpsolve.solve_fixed_grid(
-        vf_,
-        initial_values=(u0_,),
-        grid=ts_,
-        solver=solver_,
-        parameters=parameters_,
-        output_scale=10.0,
-    )
-
-    observation_std = jnp.ones_like(ts_) * obs_stdev
+@jax.jit
+def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
+    sol_ = solve(parameters_)
     return -1.0 * solution.log_marginal_likelihood(
-        observation_std=observation_std,
-        u=data_,
+        data,
+        standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
         posterior=sol_.posterior,
-        strategy=solver_.strategy,
     )
 
-
-parameter_to_data_fit = jax.jit(
-    functools.partial(
-        param_to_log_likelihood, solver_=solver, ts_=ts, vf_=vf, u0_=u0, data_=data
-    )
-)
 
 sensitivities = jax.jit(jax.grad(parameter_to_data_fit))
 ```
@@ -177,10 +165,8 @@ for i in range(chunk_size):
 The solution looks much better:
 
 ```python
-solution_wrong = ivpsolve.solve_fixed_grid(
-    vf, initial_values=(u0,), grid=ts, solver=solver, parameters=p, output_scale=1.0
-)
+solution_better = solve(p)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
-plt.plot(ts, solution_wrong.u)
+plt.plot(ts, solution_better.u)
 plt.show()
 ```
