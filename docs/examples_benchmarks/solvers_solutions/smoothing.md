@@ -31,7 +31,7 @@ from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, solution
 from probdiffeq.solvers.taylor import autodiff
-from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
 ```
 
@@ -67,7 +67,7 @@ But be aware that a smoother computes more intermediate values than a filter, so
 
 ```python
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts0()
+ts0 = corrections.ts0()
 
 ekf0 = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 init = ekf0.initial_condition(tcoeffs, output_scale=1.0)

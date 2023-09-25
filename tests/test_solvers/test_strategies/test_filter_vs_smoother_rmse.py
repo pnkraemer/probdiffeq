@@ -8,7 +8,7 @@ from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import filters, smoothers
-from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -26,7 +26,7 @@ def fixture_solver_setup():
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
@@ -40,7 +40,7 @@ def fixture_filter_solution(solver_setup):
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 

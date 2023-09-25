@@ -10,7 +10,7 @@ from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import fixedpoint, smoothers
-from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -34,7 +34,7 @@ def fixture_solver_setup():
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
@@ -54,7 +54,7 @@ def fixture_solution_smoother(solver_setup):
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
@@ -80,7 +80,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Re-generate the smoothing solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver_smoother = uncalibrated.solver(strategy)
 
@@ -92,7 +92,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)

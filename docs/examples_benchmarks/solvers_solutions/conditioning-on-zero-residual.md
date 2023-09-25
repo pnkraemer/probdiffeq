@@ -31,7 +31,7 @@ from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
 from probdiffeq.solvers.taylor import autodiff
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
-from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies.components import corrections, priors
 ```
 
 ```python
@@ -82,7 +82,7 @@ markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
 ```python
 # Compute the posterior
 
-slr1 = correction.ts1()
+slr1 = corrections.ts1()
 ibm = priors.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
 solver = uncalibrated.solver(fixedpoint.fixedpoint_adaptive(ibm, slr1))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)

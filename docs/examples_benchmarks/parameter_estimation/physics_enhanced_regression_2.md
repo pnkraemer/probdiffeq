@@ -102,7 +102,7 @@ from probdiffeq import ivpsolve, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.taylor import autodiff
 ```
@@ -156,7 +156,7 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 def solve_fixed(theta, *, ts):
     # Create a probabilistic solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
@@ -172,7 +172,7 @@ def solve_fixed(theta, *, ts):
 def solve_adaptive(theta, *, save_at):
     # Create a probabilistic solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)

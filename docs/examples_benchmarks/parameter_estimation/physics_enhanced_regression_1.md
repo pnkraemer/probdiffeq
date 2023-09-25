@@ -38,7 +38,7 @@ from probdiffeq.impl import impl
 from probdiffeq import ivpsolve
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import smoothers
 ```
 
@@ -66,7 +66,7 @@ def vf(y, t, *, p):
 
 def solve(p):
     ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 

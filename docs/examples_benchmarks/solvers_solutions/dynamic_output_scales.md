@@ -35,7 +35,7 @@ from probdiffeq.solvers.taylor import affine
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies.components import corrections, priors
 ```
 
 ```python
@@ -65,7 +65,7 @@ def vf(*ys, t):
 num_derivatives = 1
 
 ibm = priors.ibm_adaptive(num_derivatives=1)
-ts1 = correction.ts1()
+ts1 = corrections.ts1()
 strategy = filters.filter_adaptive(ibm, ts1)
 dynamic = calibrated.dynamic(strategy)
 mle = calibrated.mle(strategy)

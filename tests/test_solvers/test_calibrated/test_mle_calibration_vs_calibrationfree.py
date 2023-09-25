@@ -11,7 +11,7 @@ from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated, solution, uncalibrated
 from probdiffeq.solvers.strategies import filters, fixedpoint
-from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -91,7 +91,7 @@ def case_simulate_terminal_values():
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     ibm = priors.ibm_adaptive(num_derivatives=4)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = strategy_fun(ibm, ts0)
 
     uncalib = solver_to_solution(uncalibrated.solver(strategy))

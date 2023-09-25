@@ -9,7 +9,7 @@ from probdiffeq import ivpsolve, timestep, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import smoothers
-from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.taylor import autodiff
 
 config.update("jax_platform_name", "cpu")
@@ -55,7 +55,7 @@ we must choose a prior distribution and a correction scheme, then we put them to
 
 ```python
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts1(ode_order=1)
+ts0 = corrections.ts1(ode_order=1)
 
 strategy = smoothers.smoother_adaptive(ibm, ts0)
 solver = uncalibrated.solver(strategy)

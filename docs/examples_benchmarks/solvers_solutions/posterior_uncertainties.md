@@ -28,7 +28,7 @@ from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, solution, markov
 from probdiffeq.solvers.taylor import autodiff
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
-from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies.components import corrections, priors
 ```
 
 ```python
@@ -62,7 +62,7 @@ def vf(*ys, t):
 
 ```python
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts0()
+ts0 = corrections.ts0()
 solver = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
@@ -122,7 +122,7 @@ plt.show()
 
 ```python
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts0()
+ts0 = corrections.ts0()
 solver = calibrated.mle(fixedpoint.fixedpoint_adaptive(ibm, ts0))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 

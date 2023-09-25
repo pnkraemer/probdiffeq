@@ -10,7 +10,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies.components import corrections, priors
 from tests.setup import setup
 
 
@@ -18,7 +18,7 @@ def test_exponential_approximated_well():
     vf, u0, (t0, t1), solution = setup.ode_affine()
 
     ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = correction.ts0()
+    ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.dynamic(strategy)
 

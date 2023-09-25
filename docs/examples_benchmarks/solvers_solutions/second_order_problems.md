@@ -27,7 +27,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.taylor import autodiff
-from probdiffeq.solvers.strategies.components import priors, correction
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters
 ```
 
@@ -53,7 +53,7 @@ def vf_1(y, t):
 
 
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts0()
+ts0 = corrections.ts0()
 solver_1st = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
@@ -95,7 +95,7 @@ def vf_2(y, dy, t):
 
 # One derivative more than above because we don't transform to first order
 ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = correction.ts0(ode_order=2)
+ts0 = corrections.ts0(ode_order=2)
 solver_2nd = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 

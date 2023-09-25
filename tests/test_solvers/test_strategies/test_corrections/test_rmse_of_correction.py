@@ -8,7 +8,7 @@ from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import correction, cubature, priors
+from probdiffeq.solvers.strategies.components import corrections, cubature, priors
 from probdiffeq.solvers.taylor import autodiff
 from tests.setup import setup
 
@@ -16,7 +16,7 @@ from tests.setup import setup
 @testing.case()
 def case_ts0():
     try:
-        return correction.ts0()
+        return corrections.ts0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -25,7 +25,7 @@ def case_ts0():
 @testing.case()
 def case_ts1():
     try:
-        return correction.ts1()
+        return corrections.ts1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -34,7 +34,7 @@ def case_ts1():
 @testing.case()
 def case_slr0():
     try:
-        return correction.slr0()
+        return corrections.slr0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -43,7 +43,7 @@ def case_slr0():
 @testing.case()
 def case_slr1():
     try:
-        return correction.slr1()
+        return corrections.slr1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -52,7 +52,7 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return correction.slr1(cubature_fun=cubature.gauss_hermite)
+        return corrections.slr1(cubature_fun=cubature.gauss_hermite)
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
