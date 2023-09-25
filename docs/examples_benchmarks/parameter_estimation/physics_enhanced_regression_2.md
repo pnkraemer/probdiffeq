@@ -98,11 +98,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, solution
-from probdiffeq.doc_util import notebook
-from probdiffeq.ivpsolvers import uncalibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters
+from probdiffeq import ivpsolve, adaptive
+from probdiffeq.impl import impl
+from probdiffeq.util.doc_util import notebook
+from probdiffeq.solvers import uncalibrated, solution
+from probdiffeq.solvers.strategies.components import correction, priors
+from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.taylor import autodiff
 ```
 
 ```python
@@ -120,6 +122,10 @@ if not backend.has_been_selected:
 plt.rcParams.update(notebook.plot_config())
 ```
 
+```python
+impl.select("isotropic", ode_shape=(2,))
+```
+
 ## Problem setting
 
 First, we set up an IVP and create some artificial data by simulating the system with "incorrect" initial conditions.
@@ -129,17 +135,12 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(y, *, t, p=()):
+def vf(y, *, t):
     return f(y, *f_args)
 
 
 theta_true = u0 + 0.5 * jnp.flip(u0)
 theta_guess = u0  # initial guess
-
-# Create a probabilistic solver
-impl = recipes.ts0_iso(num_derivatives=2)
-strategy = filters.filter(*impl)
-solver = uncalibrated.solver(*strategy)
 ```
 
 ```python
@@ -152,9 +153,35 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 
 
 @jax.jit
+def solve_fixed(theta, *, ts):
+    # Create a probabilistic solver
+    ibm = priors.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.ts0()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = uncalibrated.solver(strategy)
+
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (theta,), num=2)
+    output_scale = 10.0
+    init = solver.initial_condition(tcoeffs, output_scale)
+
+    sol = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver)
+    return sol[-1]
+
+
+@jax.jit
 def solve_adaptive(theta, *, save_at):
+    # Create a probabilistic solver
+    ibm = priors.ibm_adaptive(num_derivatives=2)
+    ts0 = correction.ts0()
+    strategy = filters.filter_adaptive(ibm, ts0)
+    solver = uncalibrated.solver(strategy)
+    adaptive_solver = adaptive.adaptive(solver)
+
+    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (theta,), num=2)
+    output_scale = 10.0
+    init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_and_save_at(
-        vf, initial_values=(theta,), save_at=save_at, solver=solver, output_scale=10.0
+        vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
     )
 
 
@@ -165,7 +192,7 @@ solve_save_at = functools.partial(solve_adaptive, save_at=save_at)
 ```python
 # Visualise the initial guess and the data
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(5, 3))
 
 data_kwargs = {"alpha": 0.5, "color": "gray"}
 ax.annotate("Data", (13.0, 30.0), **data_kwargs)
@@ -189,13 +216,12 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 
 
 @jax.jit
-def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
-    y_T = solve_fixed(theta, ts=ts, solver=solver)
+def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
+    y_T = solve_fixed(theta, ts=ts)
     logpdf_data = solution.log_marginal_likelihood_terminal_values(
-        u=data,
+        data,
+        standard_deviation=obs_stdev,
         posterior=y_T.posterior,
-        strategy=solver.strategy,
-        observation_std=obs_stdev,
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
@@ -204,18 +230,10 @@ def logposterior_fn(theta, *, data, ts, solver, obs_stdev=0.1):
 # Fixed steps for reverse-mode differentiability:
 
 
-@jax.jit
-def solve_fixed(theta, *, ts, solver):
-    sol = ivpsolve.solve_fixed_grid(
-        vf, initial_values=(theta,), grid=ts, solver=solver, output_scale=10.0
-    )
-    return sol[-1]
-
-
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
-data = solve_fixed(theta_true, ts=ts, solver=solver).u
+data = solve_fixed(theta_true, ts=ts).u
 
-log_M = functools.partial(logposterior_fn, data=data, ts=ts, solver=solver)
+log_M = functools.partial(logposterior_fn, data=data, ts=ts)
 ```
 
 ```python
@@ -311,11 +329,11 @@ plt.show()
 Let's add the value of $M$ to the plot to see whether the sampler covers the entire region of interest.
 
 ```python
-xlim = 18, jnp.amax(states.position[:, 0]) + 0.5
-ylim = 18, jnp.amax(states.position[:, 1]) + 0.5
+xlim = 17, jnp.amax(states.position[:, 0]) + 0.5
+ylim = 17, jnp.amax(states.position[:, 1]) + 0.5
 
-xs = jnp.linspace(*xlim, num=300)
-ys = jnp.linspace(*ylim, num=300)
+xs = jnp.linspace(*xlim, endpoint=True, num=300)
+ys = jnp.linspace(*ylim, endpoint=True, num=300)
 Xs, Ys = jnp.meshgrid(xs, ys)
 
 Thetas = jnp.stack((Xs, Ys))
@@ -325,7 +343,7 @@ Zs = log_M_vmapped(Thetas)
 ```
 
 ```python
-fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True)
+fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
 ax_samples, ax_heatmap = ax
 
