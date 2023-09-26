@@ -60,7 +60,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     print(ys)
 
     # Run the preconditioned fixedpoint smoother
-    (corrected, conditional), _ = discrete.estimate_forward(
+    (corrected, conditional), _ = discrete.estimate_fwd(
         ys,
         init=init,
         prior_transitions=ibm_transitions,

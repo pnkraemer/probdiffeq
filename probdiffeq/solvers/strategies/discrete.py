@@ -10,8 +10,8 @@ from probdiffeq.impl import impl
 
 # TODO: fixedpointsmoother and kalmanfilter should be estimate()
 #  with two different methods. This saves a lot of code.
-def estimate_forward(data, /, init, prior_transitions, observation_model, *, estimator):
-    """Fixedpoint smoothing with a preconditioned prior."""
+def estimate_fwd(data, /, init, prior_transitions, observation_model, *, estimator):
+    """Estimate forward-in-time."""
     initialise, step = estimator
 
     # Incorporate final data point
@@ -25,8 +25,22 @@ def estimate_forward(data, /, init, prior_transitions, observation_model, *, est
     return jax.lax.scan(f=step, init=init, xs=xs, reverse=False)
 
 
+def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimator):
+    """Estimate reverse-in-time."""
+    initialise, step = estimator
+
+    # Incorporate final data point
+    information_terminal = _select((data, observation_model), idx_or_slice=-1)
+    init = initialise(init, *information_terminal)
+
+    # Scan over the remaining data points
+    information = _select((data, observation_model), idx_or_slice=slice(0, -1, 1))
+    xs = (prior_transitions, *information)
+    return jax.lax.scan(f=step, init=init, xs=xs, reverse=True)
+
+
 def fixedpointsmoother_precon():
-    """Discrete, preconditioned fixedpoint-smoother."""
+    """Construct a discrete, preconditioned fixedpoint-smoother."""
 
     class _FPState(containers.NamedTuple):
         rv: Any
@@ -62,52 +76,39 @@ def fixedpointsmoother_precon():
     return _initialise, _step
 
 
-def kalmanfilter_reverse(data, /, init, conditional, observation_model):
-    """Reverse-time Kalman filter."""
-    # Incorporate final data point
-    information_terminal = _select((data, observation_model), idx_or_slice=-1)
-    init = _kalman_reverse_initialise(init, *information_terminal)
-
-    # Scan over the remaining data points
-    information = _select((data, observation_model), idx_or_slice=slice(0, -1, 1))
-    return jax.lax.scan(
-        f=_kalman_reverse_step,
-        init=init,
-        xs=(conditional, *information),
-        reverse=True,
-    )
-
-
 def _select(tree, idx_or_slice):
     return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
 
 
-class _KalmanFilterState(containers.NamedTuple):
-    rv: Any
-    num_data_points: int
-    logpdf: float
+def kalmanfilter_with_marginal_likelihood():
+    """Construct a Kalman-filter-implementation of computing the marginal likelihood."""
 
+    class _KFState(containers.NamedTuple):
+        rv: Any
+        num_data_points: float
+        logpdf: float
 
-def _kalman_reverse_initialise(rv, data, model):
-    observed, conditional = impl.conditional.revert(rv, model)
-    corrected = impl.conditional.apply(data, conditional)
-    logpdf = impl.stats.logpdf(data, observed)
-    return _KalmanFilterState(corrected, 1.0, logpdf)
+    def _initialise(rv, data, model) -> _KFState:
+        observed, conditional = impl.conditional.revert(rv, model)
+        corrected = impl.conditional.apply(data, conditional)
+        logpdf = impl.stats.logpdf(data, observed)
+        return _KFState(corrected, 1.0, logpdf)
 
+    def _step(state: _KFState, cond_and_data_and_obs) -> tuple[_KFState, _KFState]:
+        conditional, data, observation = cond_and_data_and_obs
+        rv, num_data, logpdf = state
 
-def _kalman_reverse_step(state, cond_and_data_and_obs):
-    conditional, data, observation = cond_and_data_and_obs
-    rv, num_data, logpdf = state
+        # Extrapolate-correct
+        rv = impl.conditional.marginalise(rv, conditional)
+        observed, reverse = impl.conditional.revert(rv, observation)
+        corrected = impl.conditional.apply(data, reverse)
 
-    # Extrapolate-correct
-    rv = impl.conditional.marginalise(rv, conditional)
-    observed, reverse = impl.conditional.revert(rv, observation)
-    corrected = impl.conditional.apply(data, reverse)
+        # Update logpdf
+        logpdf_new = impl.stats.logpdf(data, observed)
+        logpdf_mean = (logpdf * num_data + logpdf_new) / (num_data + 1)
+        state = _KFState(corrected, num_data + 1.0, logpdf_mean)
 
-    # Update logpdf
-    logpdf_new = impl.stats.logpdf(data, observed)
-    logpdf_mean = (logpdf * num_data + logpdf_new) / (num_data + 1)
-    state = _KalmanFilterState(corrected, num_data + 1.0, logpdf_mean)
+        # Scan-compatible output
+        return state, state
 
-    # Scan-compatible output
-    return state, state
+    return _initialise, _step

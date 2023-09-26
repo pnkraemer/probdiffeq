@@ -157,8 +157,13 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     rv = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
 
     # Run the reverse Kalman filter
-    (_corrected, _num_data, logpdf), _ = discrete.kalmanfilter_reverse(
-        u, init=rv, conditional=posterior.conditional, observation_model=models
+    estimator = discrete.kalmanfilter_with_marginal_likelihood()
+    (_corrected, _num_data, logpdf), _ = discrete.estimate_rev(
+        u,
+        init=rv,
+        prior_transitions=posterior.conditional,
+        observation_model=models,
+        estimator=estimator,
     )
 
     # Return only the logpdf
