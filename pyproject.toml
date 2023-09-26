@@ -95,8 +95,8 @@ ignore = [
     "D101",
     "D102",
     "D103",
+    # Magic methods don't need a docstring:
     "D105",
-    "D107",
 ]
 
 [tool.ruff.pydocstyle]
