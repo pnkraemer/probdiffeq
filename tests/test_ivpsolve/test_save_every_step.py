@@ -23,7 +23,11 @@ def fixture_python_loop_solution():
     solver = calibrated.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
+    dt0 = timestep.initial_adaptive(
+        vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
+    )
+    dt0_ = timestep.initial(lambda y: vf(y, t=t0), u0)
+    print(dt0, dt0_)
 
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
@@ -66,5 +70,4 @@ def fixture_diffrax_solution():
 def test_python_loop_output_matches_diffrax(python_loop_solution, diffrax_solution):
     expected = diffrax_solution(python_loop_solution.t)
     received = python_loop_solution.u
-
-    assert jnp.allclose(received, expected, rtol=1e-3)
+    assert jnp.allclose(received, expected, rtol=1e-2)

@@ -33,7 +33,7 @@ def case_solve_fixed_grid():
 @testing.case()
 def case_solve_and_save_at():
     vf, u0, (t0, t1) = setup.ode()
-    dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
+    dt0 = timestep.initial(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     kwargs = {"save_at": jnp.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
@@ -51,7 +51,7 @@ def case_solve_and_save_at():
 @testing.case()
 def case_solve_and_save_every_step():
     vf, u0, (t0, t1) = setup.ode()
-    dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
+    dt0 = timestep.initial(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
@@ -69,7 +69,7 @@ def case_solve_and_save_every_step():
 @testing.case()
 def case_simulate_terminal_values():
     vf, u0, (t0, t1) = setup.ode()
-    dt0 = timestep.propose(lambda y: vf(y, t=t0), u0)
+    dt0 = timestep.initial(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
