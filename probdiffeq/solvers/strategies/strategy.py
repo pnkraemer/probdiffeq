@@ -22,30 +22,37 @@ class ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
 
     @abc.abstractmethod
     def initial_condition(self, tcoeffs, /) -> T:
+        """Compute an initial condition from a set of Taylor coefficients."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def init(self, solution: T, /) -> tuple[R, S]:
+        """Initialise a state from a solution."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def begin(self, state: R, aux: S, /, dt) -> tuple[R, S]:
+        """Begin the extrapolation."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete(self, state: R, aux: S, /, output_scale) -> tuple[R, S]:
+        """Complete the extrapolation."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def extract(self, state: R, aux: S, /) -> T:
+        """Extract a solution from a state."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+        """Interpolate."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def right_corner(self, state: R, aux: S, /) -> _interp.InterpRes[tuple[R, S]]:
+        """Process the state at checkpoint t=t_n."""
         raise NotImplementedError
 
 

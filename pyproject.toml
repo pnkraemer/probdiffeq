@@ -92,11 +92,16 @@ ignore = [
     # zip(..., strict=True/False) is not supported on Python < 3.10
     "B905",
     # Too early to enforce most docstring-errors:
-    "D102",
+#    "D102",
     "D103",
     # Magic methods don't need a docstring:
     "D105",
 ]
+
+
+[tool.ruff.per-file-ignores]
+"probdiffeq/util/*" = ["D102"]
+"probdiffeq/impl/*" = ["D102"]
 
 [tool.ruff.pydocstyle]
 convention = "numpy"

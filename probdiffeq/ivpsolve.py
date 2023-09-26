@@ -17,7 +17,6 @@ from probdiffeq.solvers import markov
 #  since the user knows it already.
 
 
-@jax.tree_util.register_pytree_node_class
 class Solution:
     """Estimated initial value problem solution."""
 
@@ -51,30 +50,6 @@ class Solution:
             ")"
         )
 
-    def tree_flatten(self):
-        children = (
-            self.t,
-            self.u,
-            self.marginals,
-            self.posterior,
-            self.output_scale,
-            self.num_steps,
-        )
-        aux = ()
-        return children, aux
-
-    @classmethod
-    def tree_unflatten(cls, _aux, children):
-        t, u, marginals, posterior, output_scale, n = children
-        return cls(
-            t=t,
-            u=u,
-            marginals=marginals,
-            posterior=posterior,
-            output_scale=output_scale,
-            num_steps=n,
-        )
-
     def __len__(self):
         """Evaluate the length of a solution."""
         if jnp.ndim(self.t) < 1:
@@ -102,6 +77,34 @@ class Solution:
 
         for i in range(self.t.shape[0]):
             yield self[i]
+
+
+def _sol_flatten(sol):
+    children = (
+        sol.t,
+        sol.u,
+        sol.marginals,
+        sol.posterior,
+        sol.output_scale,
+        sol.num_steps,
+    )
+    aux = ()
+    return children, aux
+
+
+def _sol_unflatten(_aux, children):
+    t, u, marginals, posterior, output_scale, n = children
+    return Solution(
+        t=t,
+        u=u,
+        marginals=marginals,
+        posterior=posterior,
+        output_scale=output_scale,
+        num_steps=n,
+    )
+
+
+jax.tree_util.register_pytree_node(Solution, _sol_flatten, _sol_unflatten)
 
 
 def simulate_terminal_values(

@@ -17,18 +17,22 @@ class Correction(abc.ABC):
 
     @abc.abstractmethod
     def init(self, x, /):
+        """Initialise the state from the solution."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def estimate_error(self, ssv, corr, /, vector_field, t):
+        """Perform all elements of the correction until the error estimate."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def complete(self, ssv, corr, /):
+        """Complete what has been left out by `estimate_error`."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def extract(self, ssv, corr, /):
+        """Extract the solution from the state."""
         raise NotImplementedError
 
 
@@ -111,6 +115,7 @@ def _estimate_error(observed, /):
 
 
 def ts0(*, ode_order=1) -> _ODEConstraintTaylor:
+    """Zeroth-order Taylor linearisation."""
     return _ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_0th(ode_order=ode_order),
@@ -119,6 +124,7 @@ def ts0(*, ode_order=1) -> _ODEConstraintTaylor:
 
 
 def ts1(*, ode_order=1) -> _ODEConstraintTaylor:
+    """First-order Taylor linearisation."""
     return _ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_1st(ode_order=ode_order),
@@ -127,6 +133,7 @@ def ts1(*, ode_order=1) -> _ODEConstraintTaylor:
 
 
 def slr0(cubature_fun=None) -> _ODEConstraintStatistical:
+    """Zeroth-order statistical linear regression."""
     cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
     return _ODEConstraintStatistical(
@@ -137,6 +144,7 @@ def slr0(cubature_fun=None) -> _ODEConstraintStatistical:
 
 
 def slr1(cubature_fun=None) -> _ODEConstraintStatistical:
+    """First-order statistical linear regression."""
     cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
     return _ODEConstraintStatistical(

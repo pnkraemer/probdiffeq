@@ -116,7 +116,7 @@ nav:
           - strategies:
               - components:
                   - priors: api_docs/solvers/strategies/components/priors.md
-                  - correction: api_docs/solvers/strategies/components/corrections.md
+                  - corrections: api_docs/solvers/strategies/components/corrections.md
                   - cubature: api_docs/solvers/strategies/components/cubature.md
               - strategy: api_docs/solvers/strategies/strategy.md
               - filters: api_docs/solvers/strategies/filters.md
