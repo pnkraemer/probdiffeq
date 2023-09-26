@@ -2,27 +2,48 @@
 
 Good solvers are problem-dependent. Nevertheless, some guidelines exist:
 
+## State-space model factorisation
 
-* If your problem is high-dimensional, use an implementation based on Kronecker-factorisation 
-  or block-diagonal covariances. 
-  Kronecker-factorisation underlies all `Iso*()` methods, e.g. `IsoTS0`.
-  Block-diagonal covariances correspond to `BlockDiag*()` methods, e.g. `BlockDiagTS0()`.
-  The complexity of those two scales as O(d) 
-  for d-dimensional problems (per step). 
-  `DenseTS1()` and `DenseSLR1()` cost O(d^3) per step.
-* Use `IsoTS0()` or `BlockDiagTS0()` instead of `DenseTS0()`. They do the same, but are cheaper.
-  At the moment, and in the way it is implemented, `DenseTS0()` is essentially a legacy algorithm.
-* If your problem is stiff, use a solver with first-order linearisation (for instance `DenseTS1` or `DenseSLR1`)
-  instead of one with zeroth-order linearisation. Try to avoid too extreme state-space model factorisations (e.g. `Iso*` or `BlockDiag*`)
-* Almost always, use a `Filter` strategy for `simulate_terminal_values()`, 
-  a smoother strategy for `solve_with_native_python_loop()`, 
-  and a `FixedPointSmoother` strategy for `solve_and_save_at()`. 
-  Counterexamples do exist, but are for experienced users.
-* Use `solver_dynamic()` if you expect that the output scale of your IVP solution varies greatly. 
-  Otherwise, choose an `solver_mle()`. Try a `solver_calibrationfree()` for parameter-estimation problems.
-* If you are solving a scalar differential equation (e.g. the initial values have `shape=()`), choose `Scalar*()` solvers,
-  e.g. `ScalarTS0()`. These methods are designed for this simple use-case and independent of any multi-dimensional state-space model concerns.
-  If you wish to use the other solvers, transform the problem into one of `shape=(1,)`.
+* If your problem is scalar-valued (`shape=()`), use a `scalar` implementation. Of course, you are always welcome to transform your problem into one with shape `(1,)`.
+* If your problem is vector-valued, be aware that different implementation choices imply different modelling choices.
+
+If you don't care about modelling choices:
+
+* If your problem is high-dimensional, use a `blockdiag` or `isotropic` implementation.
+* If your problem is medium-dimensional, use any of the implementations. 
+  `isotropic` factorisations tend to be the fastest with the worst UQ and worst stability, 
+  `dense` factorisations tend to be the slowest with the best UQ and best stability, 
+  `blockdiag` factorisations are in between.
+
+
+## Stiffness
+
+If your problem is stiff, use a a `dense` implementation in combination with a
+correction scheme that employs first-order linearisation; 
+for instance, `ts1` or `slr1`.
+Zeroth-order approximation and too-aggressive state-space model factorisation 
+will likely fail.
+
+If your problem is stiff and high-dimensional: try first-order linearisation with a block-diagonal factorisation. 
+If that does not work: good luck (let me know what you come up with).
+
+## Filters vs smoothers
+
+Almost always, use a `filters.filter_adaptive` strategy for `simulate_terminal_values`, 
+a `smoothers.smoother_adaptive` strategy for `solve_and_save_every_step`,
+and a `fixedpoint.fixedpoint_adaptive` strategy for `solve_and_save_at`.
+Use either a filter (if you must) or a smoother (recommended) for `solve_fixed_step`.
+Other combinations are possible, but rather rare 
+(and require some understanding of the underlying statistical concepts).
+
+## Calibration?
+Use a `calibrated.dynamic` solver if you expect that the output scale of your IVP solution varies greatly.
+Otherwise, use an `calibrated.mle` solver.
+Try a `uncalibrated.solver` for parameter-estimation.
+
+## Miscellaneous
+If you use a `ts0`, choose an `isotropic` factorisation instead of a `dense` factorisation.
+They do the same, but the `isotropic` factorisation is cheaper.
 
 
 These guidelines are a work in progress and may change soon. If you have any input, let us know!

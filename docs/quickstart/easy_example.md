@@ -70,14 +70,12 @@ Why so many layers?
 * Calibration schemes affect the behaviour of the solver
 * Not all solution routines expect adaptive solvers.
 
-All of these decisions must be made for every use case; there is not much the solution routines can do.
 
-
-Finally, we must prepare one last component before we can solve the differential equation.
+Finally, we must prepare one last component before we can solve the differential equation:
 
 The probabilistic IVP solvers in ProbDiffEq implement state-space-model-based IVP solvers; this means that as an initial condition, we must provide a data structure that represents the initial state in this model.
 For all current solvers, this amounts to computing a $\nu$-th order Taylor approximation of the IVP solution
-and wrap this into a state-space-model variable.
+and to wrapping this approximation into a state-space-model variable.
 
 Use the following functions:
 
@@ -90,7 +88,7 @@ init = solver.initial_condition(tcoeffs, output_scale)
 Other software packages that implement probabilistic IVP solvers do a lot of this work implicitly; probdiffeq enforces that the user makes these decisions, not only because it simplifies the solver implementations quite a lot, but it also shows how easily we can build a custom solver for our favourite problem (consult the other tutorials for examples).
 
 
-From here on, the rest is standard ODE-solver machinery.
+From here on, the rest is standard ODE-solver machinery:
 
 ```python
 dt0 = timestep.propose(lambda y: vf(y, t=t0), (u0,))  # or use e.g. dt0=0.1
