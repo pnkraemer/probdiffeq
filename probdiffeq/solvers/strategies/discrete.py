@@ -10,49 +10,56 @@ from probdiffeq.impl import impl
 
 # TODO: fixedpointsmoother and kalmanfilter should be estimate()
 #  with two different methods. This saves a lot of code.
-def fixedpointsmoother_precon(data, /, init, conditional, observation_model):
+def estimate_forward(data, /, init, prior_transitions, observation_model, *, estimator):
     """Fixedpoint smoothing with a preconditioned prior."""
+    initialise, step = estimator
+
     # Incorporate final data point
-    information_terminal = _select((data, observation_model), idx_or_slice=-1)
-    init = _fixedpoint_precon_initialise(init, *information_terminal)
+    information_terminal = _select((data, observation_model), idx_or_slice=0)
+    init = initialise(init, *information_terminal)
 
     # Scan over the remaining data points
-    information = _select((data, observation_model), idx_or_slice=slice(0, -1, 1))
-    return jax.lax.scan(
-        f=_fixedpoint_precon_step,
-        init=init,
-        xs=(conditional, *information),
-        reverse=True,
-    )
+    idx_or_slice = slice(1, len(data), 1)
+    information = _select((data, observation_model), idx_or_slice=idx_or_slice)
+    xs = (prior_transitions, *information)
+    return jax.lax.scan(f=step, init=init, xs=xs, reverse=False)
 
 
-class _FixedPointState(containers.NamedTuple):
-    rv: Any
-    conditional: Any
+def fixedpointsmoother_precon():
+    """Discrete, preconditioned fixedpoint-smoother."""
 
+    class _FPState(containers.NamedTuple):
+        rv: Any
+        conditional: Any
 
-def _fixedpoint_precon_initialise(init, data, model):
-    rv, cond = init
-    _observed, conditional = impl.conditional.revert(rv, model)
-    corrected = impl.conditional.apply(data, conditional)
-    return _FixedPointState(corrected, cond)
+    def _initialise(init, data, observation_model) -> _FPState:
+        rv, cond = init
+        _observed, conditional = impl.conditional.revert(rv, observation_model)
+        corrected = impl.conditional.apply(data, conditional)
+        return _FPState(corrected, cond)
 
+    def _step(state: _FPState, cond_and_data_and_obs) -> tuple[_FPState, _FPState]:
+        (conditional, (p, p_inv)), data, observation = cond_and_data_and_obs
+        rv, conditional_rev = state
 
-def _fixedpoint_precon_step(state, cond_and_data_and_obs):
-    conditional, data, observation = cond_and_data_and_obs
-    rv, conditional = state
+        # Extrapolate
+        rv = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv, conditional_new = impl.conditional.revert(rv, conditional)
+        rv = impl.ssm_util.preconditioner_apply(rv, p)
+        conditional_new = impl.ssm_util.preconditioner_apply_cond(
+            conditional_new, p, p_inv
+        )
+        conditional_rev_new = impl.conditional.merge(conditional_rev, conditional_new)
 
-    # Extrapolate
-    rv, conditional_new = impl.conditional.revert(rv, conditional)
-    conditional = impl.conditional.merge(conditional, conditional_new)
+        # Correct
+        _observed, reverse = impl.conditional.revert(rv, observation)
+        corrected = impl.conditional.apply(data, reverse)
 
-    # Correct
-    observed, reverse = impl.conditional.revert(rv, observation)
-    corrected = impl.conditional.apply(data, reverse)
+        # Scan-compatible output
+        state = _FPState(corrected, conditional_rev_new)
+        return state, state
 
-    # Scan-compatible output
-    state = _FixedPointState(corrected, conditional)
-    return state, state
+    return _initialise, _step
 
 
 def kalmanfilter_reverse(data, /, init, conditional, observation_model):
