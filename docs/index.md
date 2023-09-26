@@ -51,6 +51,7 @@ To install ProbDiffEq with `jax[cpu]`, run
 pip install probdiffeq[cpu]
 ```
 
+**WARNING:** This repository is experimental. Functionality may change frequently and without deprecation policies.
 
 ## What's next?
 
