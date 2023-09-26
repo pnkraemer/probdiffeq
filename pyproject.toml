@@ -91,17 +91,17 @@ ignore = [
     "D213",
     # zip(..., strict=True/False) is not supported on Python < 3.10
     "B905",
-    # Too early to enforce most docstring-errors:
-#    "D102",
-    "D103",
     # Magic methods don't need a docstring:
     "D105",
 ]
 
 
 [tool.ruff.per-file-ignores]
-"probdiffeq/util/*" = ["D102"]
+# Auxiliary functions and tests don't need docstring-enforcement:
+"probdiffeq/util/*" = ["D102", "D103"]
 "probdiffeq/impl/*" = ["D102"]
+"probdiffeq/backend/*" = ["D103"]
+"tests/*" = ["D103"]
 
 [tool.ruff.pydocstyle]
 convention = "numpy"

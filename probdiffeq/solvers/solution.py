@@ -171,6 +171,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
 
 
 def calibrate(x, /, output_scale):
+    """Calibrated a posterior distribution of an IVP solution."""
     if jnp.ndim(output_scale) > jnp.ndim(impl.prototypes.output_scale()):
         output_scale = output_scale[-1]
     if isinstance(x, markov.MarkovSeq):

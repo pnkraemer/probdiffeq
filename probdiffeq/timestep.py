@@ -15,6 +15,7 @@ def initial(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
 
 
 def initial_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, atol):
+    """Propose an initial time-step as a function of the tolerances."""
     # Algorithm from:
     # E. Hairer, S. P. Norsett G. Wanner,
     # Solving Ordinary Differential Equations I: Nonstiff Problems, Sec. II.4.

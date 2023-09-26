@@ -17,6 +17,7 @@ class MarkovSeq(containers.NamedTuple):
 
 
 def sample(key, markov_seq: MarkovSeq, *, shape, reverse):
+    """Sample from a Markov sequence."""
     _assert_filtering_solution_removed(markov_seq)
     # A smoother samples on the grid by sampling i.i.d values
     # from the terminal RV x_N and the backward noises z_(1:N)
@@ -64,6 +65,7 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
 
 
 def rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
+    """Rescale the Cholesky factor of the covariance of a Markov sequence."""
     init = impl.variable.rescale_cholesky(markov_seq.init, factor)
     cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
     return MarkovSeq(init=init, conditional=cond)
@@ -75,11 +77,17 @@ def _rescale_cholesky_conditional(conditional, factor, /):
 
 
 def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
+    """Discard all intermediate filtering solutions from a Markov sequence.
+
+    This function is useful to convert a smoothing-solution into a Markov sequence
+    that is compatible with sampling or marginalisation.
+    """
     init = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
     return MarkovSeq(init, markov_seq.conditional)
 
 
 def marginals(markov_seq: MarkovSeq, *, reverse):
+    """Extract the (time-)marginals from a Markov sequence."""
     _assert_filtering_solution_removed(markov_seq)
 
     def step(x, cond):

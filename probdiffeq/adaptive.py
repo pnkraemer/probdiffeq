@@ -10,6 +10,7 @@ from probdiffeq.impl import impl
 
 
 def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
+    """Make an IVP solver adaptive."""
     if control is None:
         control = controls.proportional_integral()
 
