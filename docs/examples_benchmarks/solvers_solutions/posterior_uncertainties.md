@@ -70,7 +70,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```
 
 ```python
-dt0 = timestep.propose(lambda y: vf(y, t=t0), (u0,))
+dt0 = timestep.initial(lambda y: vf(y, t=t0), (u0,))
 
 tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
 init = solver.initial_condition(tcoeffs, output_scale=1.0)
