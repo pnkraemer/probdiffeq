@@ -24,7 +24,7 @@ Before starting, credit is due: ProbDiffEq draws much inspiration from those cod
 It has been used, for instance, to solve [million-dimensional](https://arxiv.org/abs/2110.11812) differential equations.
 
 ProbDiffEq is (more or less) a successor of Tornadox: it can do almost everything that Tornadox can do, but is generally faster (compiling entire solver loops instead of only single steps), offers more solvers, and provides more features built ``around'' IVP solutions: e.g. dense output or posterior sampling.
-ProbDiffEq is also more thoroughly tested and has a few example notebooks that are not yet (that is, at the time of writing this document) implemented in Tornadox.
+ProbDiffEq is also more thoroughly tested and documented, and has a few features that are not yet (that is, at the time of writing this document) implemented in Tornadox.
 
 ProbDiffEq can reproduce most of the implementations in Tornadox:
 
@@ -135,13 +135,13 @@ The main API differences between the packages are the following:
 * To build a solver in Diffrax, it usually suffices to call, e.g. `diffrax.Tsit5()`. 
   In ProbDiffEq, constructing a solver is more involved (which is not necessarily a drawback; check the quickstart). 
 * The vector fields in Diffrax are `diffrax.ODETerm()`s (presumably, because of the joint treatment of ODEs/SDEs); 
-  in ProbDiffEq, we pass plain functions with a signature `(*ys, t).
+  in ProbDiffEq, we pass plain functions with signature `(*ys, t)`.
 * Diffrax offers multiple modes of differentiating the IVP solver. For probabilistic solvers, all but what JAX natively provides is a work in progress.
 
 
 To roughly translate the Diffrax IVP solvers to ProbDiffEq solvers, consider the following selection of solvers:
 
-| If you use the following solvers in Diffrax:              | Try the following solvers in ProbDiffEq:                                                                                | Comments                                                                               | 
+| If you use the following solvers in Diffrax:              | You might like the following solvers in ProbDiffEq:                                                                     | Comments                                                                               | 
 |-----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
 | `Heun()`, `Midpoint()`, `Ralston()`, `LeapfrogMidpoint()` | e.g. `ibm_adaptive(num_derivatives=1)`, `ts0()` with an `isotropic` or `blockdiag` implementation                       | Use a block-diagonal factorisation if the ODE dimensions have greatly different scales |
 | `Bosh3()`                                                 | increase `num_derivatives` to `num_derivatives=2` in the above                                                          | See above.                                                                             |

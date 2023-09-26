@@ -83,7 +83,7 @@ nav:
   - Getting started:
       - Getting started: index.md
       - An easy example: quickstart/easy_example.ipynb
-      - Transitioning: quickstart/transitioning_from_other_packages.md
+      - Transitioning from other packages: quickstart/transitioning_from_other_packages.md
       - Choosing a solver: quickstart/choosing_a_solver.md
       - Troubleshooting: quickstart/troubleshooting.md
   - Examples & Benchmarks:

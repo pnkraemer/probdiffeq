@@ -1,5 +1,7 @@
 # An easy example
 
+Let's have a look at an easy example.
+
 ```python
 import jax
 import jax.numpy as jnp
@@ -28,8 +30,6 @@ t0, t1 = 0.0, 1.0
 ```
 
 <!-- #region -->
-Create a solver.
-
 
 ProbDiffEq contains three levels of implementations:
 
@@ -40,8 +40,9 @@ ProbDiffEq contains three levels of implementations:
 **High:** ODE-solving routines.
 
 
-There are several random-variable implementations which model different correlations between variables.
-Since the implementations power almost everything, we choose one (and only one) of them, assign it to a global variable, and call it the "impl(ementation)".
+There are several random-variable implementations (read: state-space model factorisations) which model different correlations between variables.
+All factorisations can be used interchangeably; they have different speed, stability, and uncertainty-quantification properties.
+Since the chosen implementation powers almost everything, we choose one (and only one) of them, assign it to a global variable, and call it the "impl(ementation)".
 
 <!-- #endregion -->
 
@@ -70,6 +71,7 @@ Why so many layers?
 * Calibration schemes affect the behaviour of the solver
 * Not all solution routines expect adaptive solvers.
 
+The granularity of construction a solver is an asset, not a drawback.
 
 Finally, we must prepare one last component before we can solve the differential equation:
 
