@@ -1,4 +1,4 @@
-"""Adaptive estimators."""
+"""Adaptive(/continuous-time) filter implementations."""
 
 from probdiffeq import _interp
 from probdiffeq.impl import impl
@@ -6,7 +6,7 @@ from probdiffeq.solvers.strategies import strategy
 
 
 def filter_adaptive(prior, correction, /) -> strategy.Strategy:
-    """Create a filter strategy."""
+    """Construct a filter."""
     extrapolation_impl = _PreconFilter(*prior)
     return strategy.Strategy(
         extrapolation_impl,

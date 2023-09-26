@@ -10,8 +10,6 @@ from probdiffeq import _interp
 from probdiffeq.backend import containers
 from probdiffeq.impl import impl
 
-__all__ = ["ExtrapolationImpl"]
-
 T = TypeVar("T")
 R = TypeVar("R")
 S = TypeVar("S")
@@ -90,14 +88,17 @@ class Strategy:
         return self.string_repr
 
     def initial_condition(self, taylor_coefficients, /):
+        """Construct an initial condition from a set of Taylor coefficients."""
         return self.extrapolation.initial_condition(taylor_coefficients)
 
     def init(self, t, posterior, /) -> _State:
+        """Initialise a state from a posterior."""
         rv, extra = self.extrapolation.init(posterior)
         rv, corr = self.correction.init(rv)
         return _State(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
     def predict_error(self, state: _State, /, *, dt, vector_field):
+        """Predict the error of an upcoming step."""
         hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         error, observed, corr = self.correction.estimate_error(
             hidden, state.aux_corr, vector_field=vector_field, t=state.t
@@ -107,6 +108,7 @@ class Strategy:
         return error, observed, state
 
     def complete(self, state, /, *, output_scale):
+        """Complete the step after the error has been predicted."""
         hidden, extra = self.extrapolation.complete(
             state.hidden, state.aux_extra, output_scale=output_scale
         )
@@ -114,11 +116,13 @@ class Strategy:
         return _State(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
     def extract(self, state: _State, /):
+        """Extract the solution from a state."""
         hidden = self.correction.extract(state.hidden, state.aux_corr)
         sol = self.extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
     def case_right_corner(self, state_t1: _State) -> _interp.InterpRes:
+        """Process the solution in case t=t_n."""
         _tmp = self.extrapolation.right_corner(state_t1.hidden, state_t1.aux_extra)
         step_from, solution, interp_from = _tmp
 
@@ -135,6 +139,7 @@ class Strategy:
     def case_interpolate(
         self, t, *, s0: _State, s1: _State, output_scale
     ) -> _interp.InterpRes[_State]:
+        """Process the solution in case t>t_n."""
         # Interpolate
         step_from, solution, interp_from = self.extrapolation.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
@@ -156,6 +161,7 @@ class Strategy:
         return _interp.InterpRes(step_from, solution, interp_from)
 
     def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
+        """Compute offgrid_marginals."""
         if not self.is_suitable_for_offgrid_marginals:
             raise NotImplementedError
 
@@ -176,7 +182,6 @@ class Strategy:
 
 
 def _tree_flatten(strategy):
-    # TODO: they should all be 'aux'?
     children = ()
     aux = (
         # Content

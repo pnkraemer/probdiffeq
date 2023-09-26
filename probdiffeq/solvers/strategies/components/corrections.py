@@ -1,4 +1,4 @@
-"""Correction-model API."""
+"""Correction models."""
 
 import abc
 import functools

@@ -1,4 +1,4 @@
-"""Adaptive estimators."""
+"""Adaptive(/continuous-time) fixedpoint-smoother implementations."""
 
 from probdiffeq import _interp
 from probdiffeq.impl import impl
@@ -7,7 +7,7 @@ from probdiffeq.solvers.strategies import strategy
 
 
 def fixedpoint_adaptive(prior, correction, /) -> strategy.Strategy:
-    """Create a fixedpoint-smoother strategy."""
+    """Construct a fixedpoint-smoother."""
     extrapolation_impl = _PreconFixedPoint(*prior)
     return strategy.Strategy(
         extrapolation_impl,

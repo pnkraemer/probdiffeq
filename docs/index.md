@@ -1,7 +1,7 @@
 # probdiffeq
 
 
-[![PyPi Version](https://img.shields.io/pypi/v/probdiffeq.svg?style=flat-square)](https://pypi.org/project/probdiffeq/)
+[![PyPi Version](https://img.shields.io/pypi/v/probdiffeq.svg?style=flat-square&color=purple)](https://pypi.org/project/probdiffeq/)
 [![gh-actions](https://img.shields.io/github/actions/workflow/status/pnkraemer/probdiffeq/ci.yaml?branch=main&style=flat-square)](https://github.com/pnkraemer/probdiffeq/actions?query=workflow%3Aci)
 <a href="https://github.com/pnkraemer/probdiffeq/blob/master/LICENSE"><img src="https://img.shields.io/github/license/pnkraemer/probdiffeq?style=flat-square&color=2b9348" alt="License Badge"/></a>
 [![GitHub stars](https://img.shields.io/github/stars/pnkraemer/probdiffeq.svg?style=flat-square&logo=github&label=Stars&logoColor=white)](https://github.com/pnkraemer/probdiffeq)

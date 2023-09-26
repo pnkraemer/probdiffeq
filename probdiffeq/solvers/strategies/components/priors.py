@@ -1,4 +1,4 @@
-"""Extrapolation model interfaces."""
+"""Prior models."""
 
 
 import jax
@@ -9,7 +9,7 @@ from probdiffeq.solvers import markov
 
 
 def ibm_adaptive(num_derivatives, output_scale=None):
-    """Construct an adaptive multiply-integrated Wiener process."""
+    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     output_scale = output_scale or jnp.ones_like(impl.prototypes.output_scale())
     discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
     return discretise, num_derivatives

@@ -1,4 +1,4 @@
-"""Adaptive estimators."""
+"""Adaptive(/continuous-time) filter implementations."""
 
 from probdiffeq import _interp
 from probdiffeq.impl import impl
@@ -7,7 +7,7 @@ from probdiffeq.solvers.strategies import strategy
 
 
 def smoother_adaptive(prior, correction, /) -> strategy.Strategy:
-    """Create a smoother strategy."""
+    """Construct a smoother."""
     extrapolation_impl = _PreconSmoother(*prior)
     return strategy.Strategy(
         extrapolation_impl,
