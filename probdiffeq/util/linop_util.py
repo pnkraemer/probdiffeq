@@ -11,6 +11,8 @@ def parametrised_linop(func, /, params=None):
 
 @dataclasses.dataclass(frozen=True)
 class CallableLinOp:
+    """Matrix-free linear operator."""
+
     func: Callable
     params: Any
 

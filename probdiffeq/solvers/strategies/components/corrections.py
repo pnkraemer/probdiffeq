@@ -32,7 +32,7 @@ class Correction(abc.ABC):
         raise NotImplementedError
 
 
-class ODEConstraintTaylor(Correction):
+class _ODEConstraintTaylor(Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
@@ -65,7 +65,7 @@ class ODEConstraintTaylor(Correction):
         return ssv
 
 
-class ODEConstraintStatistical(Correction):
+class _ODEConstraintStatistical(Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
@@ -110,36 +110,36 @@ def _estimate_error(observed, /):
     return output_scale * error_estimate_unscaled
 
 
-def ts0(*, ode_order=1) -> ODEConstraintTaylor:
-    return ODEConstraintTaylor(
+def ts0(*, ode_order=1) -> _ODEConstraintTaylor:
+    return _ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_0th(ode_order=ode_order),
         string_repr=f"<TS0 with ode_order={ode_order}>",
     )
 
 
-def ts1(*, ode_order=1) -> ODEConstraintTaylor:
-    return ODEConstraintTaylor(
+def ts1(*, ode_order=1) -> _ODEConstraintTaylor:
+    return _ODEConstraintTaylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_1st(ode_order=ode_order),
         string_repr=f"<TS1 with ode_order={ode_order}>",
     )
 
 
-def slr0(cubature_fun=None) -> ODEConstraintStatistical:
+def slr0(cubature_fun=None) -> _ODEConstraintStatistical:
     cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
-    return ODEConstraintStatistical(
+    return _ODEConstraintStatistical(
         ode_order=1,
         linearise_fun=linearise_fun,
         string_repr=f"<SLR1 with ode_order={1}>",
     )
 
 
-def slr1(cubature_fun=None) -> ODEConstraintStatistical:
+def slr1(cubature_fun=None) -> _ODEConstraintStatistical:
     cubature_fun = cubature_fun or cubature.third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
-    return ODEConstraintStatistical(
+    return _ODEConstraintStatistical(
         ode_order=1,
         linearise_fun=linearise_fun,
         string_repr=f"<SLR0 with ode_order={1}>",

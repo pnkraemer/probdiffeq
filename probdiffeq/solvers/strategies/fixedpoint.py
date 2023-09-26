@@ -8,7 +8,7 @@ from probdiffeq.solvers.strategies import strategy
 
 def fixedpoint_adaptive(prior, correction, /) -> strategy.Strategy:
     """Create a fixedpoint-smoother strategy."""
-    extrapolation_impl = PreconFixedPoint(*prior)
+    extrapolation_impl = _PreconFixedPoint(*prior)
     return strategy.Strategy(
         extrapolation_impl,
         correction,
@@ -19,7 +19,7 @@ def fixedpoint_adaptive(prior, correction, /) -> strategy.Strategy:
     )
 
 
-class PreconFixedPoint(strategy.ExtrapolationImpl):
+class _PreconFixedPoint(strategy.ExtrapolationImpl):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives

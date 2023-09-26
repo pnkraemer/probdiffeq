@@ -10,6 +10,8 @@ from probdiffeq.util import cond_util
 
 
 class MarkovSeq(containers.NamedTuple):
+    """Markov sequence."""
+
     init: Any
     conditional: Any
 

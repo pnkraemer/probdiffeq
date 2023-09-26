@@ -8,12 +8,12 @@ from probdiffeq.solvers import _common, _solver
 def solver(strategy, /):
     """Create a solver that does not calibrate the output scale automatically."""
     string_repr = f"<Uncalibrated solver with {strategy}>"
-    return UncalibratedSolver(
+    return _UncalibratedSolver(
         strategy=strategy, string_repr=string_repr, requires_rescaling=False
     )
 
 
-class UncalibratedSolver(_solver.Solver[_common.State]):
+class _UncalibratedSolver(_solver.Solver[_common.State]):
     def init(self, t, initial_condition) -> _common.State:
         posterior, output_scale = initial_condition
         state_strategy = self.strategy.init(t, posterior)
@@ -68,13 +68,13 @@ def _solver_flatten(solver):
 def _solver_unflatten(aux, children):
     (strategy,) = children
     rescaling, string_repr = aux
-    return UncalibratedSolver(
+    return _UncalibratedSolver(
         strategy=strategy, requires_rescaling=rescaling, string_repr=string_repr
     )
 
 
 jax.tree_util.register_pytree_node(
-    nodetype=UncalibratedSolver,
+    nodetype=_UncalibratedSolver,
     flatten_func=_solver_flatten,
     unflatten_func=_solver_unflatten,
 )

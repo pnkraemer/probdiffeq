@@ -9,5 +9,7 @@ from probdiffeq.backend import containers
 
 
 class Conditional(containers.NamedTuple):
+    """Conditional distributions."""
+
     matmul: jax.Array  # or anything with a __matmul__ implementation
     noise: Any  # Usually a random-variable type

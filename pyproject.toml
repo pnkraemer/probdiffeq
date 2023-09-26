@@ -92,7 +92,6 @@ ignore = [
     # zip(..., strict=True/False) is not supported on Python < 3.10
     "B905",
     # Too early to enforce most docstring-errors:
-    "D101",
     "D102",
     "D103",
     # Magic methods don't need a docstring:

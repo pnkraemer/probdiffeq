@@ -8,7 +8,7 @@ from probdiffeq.solvers.strategies import strategy
 
 def smoother_adaptive(prior, correction, /) -> strategy.Strategy:
     """Create a smoother strategy."""
-    extrapolation_impl = PreconSmoother(*prior)
+    extrapolation_impl = _PreconSmoother(*prior)
     return strategy.Strategy(
         extrapolation_impl,
         correction,
@@ -19,7 +19,7 @@ def smoother_adaptive(prior, correction, /) -> strategy.Strategy:
     )
 
 
-class PreconSmoother(strategy.ExtrapolationImpl):
+class _PreconSmoother(strategy.ExtrapolationImpl):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives

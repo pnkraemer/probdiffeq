@@ -15,7 +15,7 @@ def mle(strategy):
     after solving if the MLE-calibration shall be *used*.
     """
     string_repr = f"<MLE-solver with {strategy}>"
-    return CalibratedSolver(
+    return _CalibratedSolver(
         calibration=_RunningMean(),
         impl_step=_step_mle,
         strategy=strategy,
@@ -46,7 +46,7 @@ def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
 def dynamic(strategy):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
-    return CalibratedSolver(
+    return _CalibratedSolver(
         strategy=strategy,
         calibration=_MostRecent(),
         string_repr=string_repr,
@@ -131,7 +131,7 @@ for node in [_RunningMean, _MostRecent]:
     )
 
 
-class CalibratedSolver(_solver.Solver):
+class _CalibratedSolver(_solver.Solver):
     def __init__(self, *, calibration: _Calibration, impl_step, **kwargs):
         super().__init__(**kwargs)
 
@@ -184,16 +184,16 @@ class CalibratedSolver(_solver.Solver):
         return _common.State(state_strategy, output_scale=reference.output_scale)
 
 
-def _solver_flatten(solver):
+def _slvr_flatten(solver):
     children = (solver.strategy, solver.calibration)
     aux = (solver.impl_step, solver.requires_rescaling, solver.string_repr)
     return children, aux
 
 
-def _solver_unflatten(aux, children):
+def _slvr_unflatten(aux, children):
     strategy, calibration = children
     impl_step, rescaling, string_repr = aux
-    return CalibratedSolver(
+    return _CalibratedSolver(
         strategy=strategy,
         calibration=calibration,
         impl_step=impl_step,
@@ -202,4 +202,4 @@ def _solver_unflatten(aux, children):
     )
 
 
-jax.tree_util.register_pytree_node(CalibratedSolver, _solver_flatten, _solver_unflatten)
+jax.tree_util.register_pytree_node(_CalibratedSolver, _slvr_flatten, _slvr_unflatten)

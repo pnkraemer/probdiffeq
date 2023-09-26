@@ -7,7 +7,7 @@ from probdiffeq.solvers.strategies import strategy
 
 def filter_adaptive(prior, correction, /) -> strategy.Strategy:
     """Create a filter strategy."""
-    extrapolation_impl = PreconFilter(*prior)
+    extrapolation_impl = _PreconFilter(*prior)
     return strategy.Strategy(
         extrapolation_impl,
         correction,
@@ -18,7 +18,7 @@ def filter_adaptive(prior, correction, /) -> strategy.Strategy:
     )
 
 
-class PreconFilter(strategy.ExtrapolationImpl):
+class _PreconFilter(strategy.ExtrapolationImpl):
     def __init__(self, discretise, num_derivatives):
         # todo: move sol_from_tcoeffs out of this module
         #  (and then we can ditch self.num_derivatives)
