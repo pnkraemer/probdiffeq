@@ -41,7 +41,7 @@ ProbDiffEq contains three levels of implementations:
 
 
 There are several random-variable implementations (read: state-space model factorisations) which model different correlations between variables.
-All factorisations can be used interchangeably; they have different speed, stability, and uncertainty-quantification properties.
+All factorisations can be used interchangeably, but they have different speed, stability, and uncertainty-quantification properties.
 Since the chosen implementation powers almost everything, we choose one (and only one) of them, assign it to a global variable, and call it the "impl(ementation)".
 
 <!-- #endregion -->
@@ -49,6 +49,11 @@ Since the chosen implementation powers almost everything, we choose one (and onl
 ```python
 impl.select("dense", ode_shape=(1,))
 ```
+But don't worry, this configuration does not make the library any less light-weight.
+It merely affects the shapes of the arrays describing means and covariances of Gaussian 
+random variables, and assigns functions that know how to manipulate those parameters.
+
+
 
 Configuring a probabilistic IVP solver is a little more involved than configuring your favourite Runge-Kutta method:
 we must choose a prior distribution and a correction scheme, then we put them together as a filter or smoother, wrap everything into a solver, and (finally) make the solver adaptive.
@@ -83,11 +88,15 @@ Use the following functions:
 
 ```python
 tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
-output_scale = jnp.ones(())  # or any other value with the same shape
+output_scale = 1.0  # or any other value with the same shape
 init = solver.initial_condition(tcoeffs, output_scale)
 ```
 
-Other software packages that implement probabilistic IVP solvers do a lot of this work implicitly; probdiffeq enforces that the user makes these decisions, not only because it simplifies the solver implementations quite a lot, but it also shows how easily we can build a custom solver for our favourite problem (consult the other tutorials for examples).
+Other software packages that implement probabilistic IVP solvers do a lot of this work 
+implicitly; probdiffeq enforces that the user makes these decisions, not only because 
+it simplifies the solver implementations (quite a lot, actually), 
+but it also shows how easily we can build a custom solver for our favourite problem 
+(consult the other tutorials for examples).
 
 
 From here on, the rest is standard ODE-solver machinery:
