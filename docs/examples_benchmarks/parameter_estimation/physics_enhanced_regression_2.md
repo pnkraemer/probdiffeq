@@ -251,7 +251,7 @@ Set up a sampler.
 @functools.partial(jax.jit, static_argnames=["kernel", "num_samples"])
 def inference_loop(rng_key, kernel, initial_state, num_samples):
     def one_step(state, rng_key):
-        state, _ = kernel(rng_key, state)
+        state, _ = kernel.step(rng_key, state)
         return state, state
 
     keys = jax.random.split(rng_key, num_samples)
@@ -269,10 +269,18 @@ rng_key = jax.random.PRNGKey(0)
 
 ```python
 # WARMUP
-warmup = blackjax.window_adaptation(
-    algorithm=blackjax.nuts, logprob_fn=log_M, num_steps=200, progress_bar=True
+warmup = blackjax.window_adaptation(blackjax.nuts, log_M, progress_bar=True)
+
+warmup_results, _ = warmup.run(rng_key, initial_position, num_steps=200)
+
+initial_state = warmup_results.state
+step_size = warmup_results.parameters["step_size"]
+inverse_mass_matrix = warmup_results.parameters["inverse_mass_matrix"]
+nuts_kernel = blackjax.nuts(
+    logdensity_fn=log_M,
+    step_size=step_size,
+    inverse_mass_matrix=inverse_mass_matrix,
 )
-initial_state, nuts_kernel, _ = warmup.run(rng_key, initial_position)
 ```
 
 ```python
