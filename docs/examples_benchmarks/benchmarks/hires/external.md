@@ -26,10 +26,11 @@ import scipy.integrate
 from diffeqzoo import backend, ivps
 from jax import config
 
-from probdiffeq.doc_util import benchmark, info, notebook, workprecision
-from probdiffeq.ivpsolvers import calibrated
-from probdiffeq.statespace import recipes
-from probdiffeq.strategies import filters
+from probdiffeq.impl import impl
+from probdiffeq.util.doc_util import benchmark, info, notebook, workprecision
+from probdiffeq.solvers import calibrated
+from probdiffeq.solvers.strategies.components import priors, corrections
+from probdiffeq.solvers.strategies import filters
 ```
 
 ```python
@@ -51,17 +52,22 @@ info.print_info()
 ```
 
 ```python
+impl.select("dense", ode_shape=(2,))
+```
+
+```python
 f, u0, (t0, t1), f_args = ivps.hires()
 
 
 @jax.jit
-def vf(x, *, t, p):
+def vf(x, *, t):
     return f(x, *f_args)
 
 
 problem = benchmark.FirstOrderIVP(vector_field=vf, initial_values=(u0,), t0=t0, t1=t1)
 
 problem_scipy = problem.to_scipy(t_eval=[t0, t1])
+print(problem_scipy)
 problem_diffrax = problem.to_diffrax()
 problems = {
     "probdiffeq": problem,
@@ -120,12 +126,13 @@ plt.show()
 # Some helper functions
 
 
-def impl_to_method_config(impl, *, label):
-    return strategy_to_method_config(filters.filter(*impl), label=label)
+def impl_to_method_config(prior, correction, *, label):
+    strategy = filters.filter_adaptive(prior, correction)
+    return strategy_to_method_config(strategy, label=label)
 
 
 def strategy_to_method_config(strategy, *, label):
-    solver = calibrated.dynamic(*strategy)
+    solver = calibrated.dynamic(strategy)
     return workprecision.MethodConfig(
         method={"solver": solver, "output_scale": 1.0},
         label="ProbDiffEq: " + label,
@@ -159,17 +166,20 @@ def scipy_method_config(method):
 num_derivatives_low = 3
 num_derivatives = 5
 
-ts1_low = recipes.ts1_dense(ode_shape=u0.shape, num_derivatives=num_derivatives_low)
-ts1 = recipes.ts1_dense(ode_shape=u0.shape, num_derivatives=num_derivatives)
+prior_low = priors.ibm_adaptive(num_derivatives=num_derivatives_low)
+prior = priors.ibm_adaptive(num_derivatives=num_derivatives)
+
+ts1 = corrections.ts1()
+
 
 # Methods
 methods = [
+    impl_to_method_config(prior_low, ts1, label=f"DenseTS1({num_derivatives_low})"),
+    impl_to_method_config(prior, ts1, label=f"DenseTS1({num_derivatives})"),
     diffrax_method_config(solver=diffrax.Kvaerno3(), label="Kvaerno3()"),
     diffrax_method_config(solver=diffrax.Kvaerno5(), label="Kvaerno5()"),
     scipy_method_config(method="LSODA"),
     scipy_method_config(method="Radau"),
-    impl_to_method_config(ts1_low, label=f"DenseTS1({num_derivatives_low})"),
-    impl_to_method_config(ts1, label=f"DenseTS1({num_derivatives})"),
 ]
 ```
 
@@ -187,4 +197,8 @@ fig, ax = workprecision.plot(
     xlabel_unit=problem_config.error_unit,
 )
 plt.show()
+```
+
+```python
+
 ```
