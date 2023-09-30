@@ -6,10 +6,7 @@ format:
 	jupytext --quiet --sync docs/quickstart/*.ipynb
 	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*.ipynb
 	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
 
 lint:
 	pre-commit run --all-files
@@ -29,26 +26,14 @@ example:
 	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
 	jupytext --quiet --execute docs/examples_benchmarks/parameter_estimation/*
 	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
-	# No --execute for advanced examples and benchmarks (takes too long)
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
 
 run-benchmarks:
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/pleiades/external.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/hires/external.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
+	time python docs/benchmarks/hires/run.py --start 1 --stop 10 --repeats 10  --save True
+	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
+
+dry-run-benchmarks:
+	time python docs/benchmarks/hires/run.py --start 1 --stop 3 --repeats 2  --save False
 
 clean:
 	pre-commit clean
@@ -63,8 +48,9 @@ clean:
 	rm -rf docs/examples_benchmarks/benchmarks/pleiades/.ipynb_checkpoints
 	rm -rf docs/examples_benchmarks/benchmarks/stiff_van_der_pol/__pycache__
 	rm -rf docs/examples_benchmarks/benchmarks/stiff_van_der_pol/.ipynb_checkpoints
-	rm -rf docs/examples_benchmarks/benchmarks/hires/__pycache__
-	rm -rf docs/examples_benchmarks/benchmarks/hires/.ipynb_checkpoints
+	rm -rf docs/benchmarks/hires/__pycache__
+	rm -rf docs/benchmarks/hires/.ipynb_checkpoints
+	rm docs/benchmarks/hires/*.npy
 
 doc:
 	mkdocs build

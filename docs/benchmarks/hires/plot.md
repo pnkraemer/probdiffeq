@@ -1,15 +1,35 @@
-"""Plot the results from the HIRES benchmark."""
+---
+jupyter:
+  jupytext:
+    formats: ipynb,md
+    text_representation:
+      extension: .md
+      format_name: markdown
+      format_version: '1.3'
+      jupytext_version: 1.15.0
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+# High Irradiance Response (HIRES)
+
+The HIRES problem is a common stiff differential equation.
+
+```python
 import os
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from probdiffeq.util.doc_util import notebook
+```
 
-
+```python
 def load_results():
     """Load the results from a file."""
-    return jnp.load(os.path.dirname(__file__) + "/results.npy", allow_pickle=True)[()]
+    return jnp.load("./results.npy", allow_pickle=True)[()]
 
 
 def choose_style(label):
@@ -38,15 +58,20 @@ def plot_results(axis, results):
     axis.legend()
     axis.grid()
     return axis
+```
 
+```python
+plt.rcParams.update(notebook.plot_config())
 
-if __name__ == "__main__":
-    plt.rcParams.update(notebook.plot_config())
+fig, axis = plt.subplots(figsize=(5, 3), dpi=100, constrained_layout=True)
+fig.suptitle("High irradiance(HIRES)")
 
-    fig, axis = plt.subplots(figsize=(5, 3), dpi=200, constrained_layout=True)
-    fig.suptitle("High irradiance(HIRES)")
+results = load_results()
+axis = plot_results(axis, results)
 
-    results = load_results()
-    axis = plot_results(axis, results)
+plt.show()
+```
 
-    plt.show()
+```python
+
+```

@@ -56,9 +56,11 @@ def print_library_info() -> None:
 def parse_arguments() -> argparse.Namespace:
     """Parse the arguments from the command line."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--start", type=int)
-    parser.add_argument("--stop", type=int)
-    parser.add_argument("--repeats", type=int)
+    parser.add_argument("--start", type=int, default=1)
+    parser.add_argument("--stop", type=int, default=3)
+    parser.add_argument("--repeats", type=int, default=10)
+    parser.add_argument("--save", type=bool, default=True)
+
     return parser.parse_args()
 
 
@@ -216,4 +218,8 @@ if __name__ == "__main__":
         results[label] = param_to_wp(tolerances)
 
     # Save results
-    jnp.save(os.path.dirname(__file__) + "/results.npy", results)
+    if args.save is True:
+        jnp.save(os.path.dirname(__file__) + "/results.npy", results)
+        print("Saving successful.")
+    else:
+        print("Skipped saving.")
