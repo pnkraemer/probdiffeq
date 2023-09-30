@@ -12,22 +12,26 @@ def load_results():
     return jnp.load(os.path.dirname(__file__) + "/results.npy", allow_pickle=True)[()]
 
 
+def choose_style(label):
+    """Choose a plotting style for a given algorithm."""
+    if "SciPy" in label:
+        return {"color": "C0"}
+    if "TS" in label:
+        return {"color": "C1"}
+    return None
+
+
 def plot_results(axis, results):
     """Plot the results."""
     for label, wp in results.items():
-        if "SciPy" in label:
-            color = "C0"
-        if "TS" in label:
-            color = "C1"
-        precision, work_mean, work_std = (
-            wp["precision"],
-            wp["work_mean"],
-            wp["work_std"],
-        )
-        axis.loglog(precision, work_mean, label=label, color=color)
+        style = choose_style(label)
+
+        precision = wp["precision"]
+        work_mean, work_std = (wp["work_mean"], wp["work_std"])
+        axis.loglog(precision, work_mean, label=label, **style)
 
         range_lower, range_upper = work_mean - work_std, work_mean + work_std
-        axis.fill_between(precision, range_lower, range_upper, alpha=0.3, color=color)
+        axis.fill_between(precision, range_lower, range_upper, alpha=0.3, **style)
 
     axis.set_xlabel("Precision")
     axis.set_ylabel("Work")

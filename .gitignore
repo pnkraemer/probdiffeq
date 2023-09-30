@@ -1,6 +1,9 @@
 # version number
 probdiffeq/_version.py
 
+
+# Data
+docs/benchmarks/*.npy
 # IDE stuff
 .idea/
 .vscode/

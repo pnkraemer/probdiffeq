@@ -9,6 +9,7 @@ import functools
 import os
 import statistics
 import timeit
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
@@ -19,6 +20,7 @@ from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq import adaptive, ivpsolve, timestep
+from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -27,8 +29,8 @@ from probdiffeq.solvers.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
-def set_config():
-    """Set up the configuration."""
+def set_jax_config() -> None:
+    """Set JAX and other external libraries up."""
     # x64 precision
     config.update("jax_enable_x64", True)
 
@@ -40,23 +42,41 @@ def set_config():
         backend.select("jax")
 
 
-def print_info():
+def set_probdiffeq_config() -> None:
+    """Set probdiffeq up."""
+    impl.select("dense", ode_shape=(8,))
+
+
+def print_library_info() -> None:
     """Print the environment info for this benchmark."""
-    # Which version of each software are we using?
     info.print_info()
     print("\n------------------------------------------\n")
 
 
-def argparse_tolerances():
-    """Parse the tolerance from the command line."""
+def parse_arguments() -> argparse.Namespace:
+    """Parse the arguments from the command line."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("arange_start", type=int)
-    parser.add_argument("arange_stop", type=int)
-    args = parser.parse_args()
-    return 0.1 ** jnp.arange(args.arange_start, args.arange_stop, step=1.0)
+    parser.add_argument("--start", type=int)
+    parser.add_argument("--stop", type=int)
+    parser.add_argument("--repeats", type=int)
+    return parser.parse_args()
 
 
-def make_ivp():
+def tolerances_from_args(arguments: argparse.Namespace, /) -> jax.Array:
+    """Choose vector of tolerances from the command-line arguments."""
+    return 0.1 ** jnp.arange(arguments.start, arguments.stop, step=1.0)
+
+
+def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
+    """Construct a timeit-function from the command-line arguments."""
+
+    def timer(fun, /):
+        return list(timeit.repeat(fun, number=1, repeat=arguments.repeats))
+
+    return timer
+
+
+def ivp_hires() -> tuple[Callable, jax.Array, float, float]:
     """Create the IVP test-problem."""
     f, u0, (t0, t1), f_args = ivps.hires()
 
@@ -67,8 +87,8 @@ def make_ivp():
     return vf, u0, t0, t1
 
 
-def probdiffeq_setup(vf, u0, t0, t1, /, *, num_derivatives):
-    """Set the solve() function for ProbDiffEq up."""
+def solver_probdiffeq(vf, u0, t0, t1, /, *, num_derivatives: int) -> Callable:
+    """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
     def param_to_solution(tol):
@@ -96,8 +116,9 @@ def probdiffeq_setup(vf, u0, t0, t1, /, *, num_derivatives):
     return param_to_solution
 
 
-def scipy_setup(vf, u0, t0, t1, /, *, method):
-    """Set the solve() function for SciPy up."""
+def solver_scipy(vf, u0, t0, t1, /, *, method: str) -> Callable:
+    """Construct a solver that wraps SciPy's solution routines."""
+    # todo: should the whole problem be transformed into a numpy array?
 
     def vf_scipy(t, u):
         return vf(u, t=t)
@@ -120,7 +141,7 @@ def scipy_setup(vf, u0, t0, t1, /, *, method):
     return param_to_solution
 
 
-def rmse_relative(expected, *, nugget=1e-5):
+def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
     """Compute the relative RMSE."""
     expected = jnp.asarray(expected)
 
@@ -133,7 +154,7 @@ def rmse_relative(expected, *, nugget=1e-5):
     return rmse
 
 
-def param_to_workprecision(fun, precision):
+def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
     """Turn a parameter-to-solution function to a parameter-to-workprecision function.
 
     Turn a function param->solution into a function
@@ -143,16 +164,15 @@ def param_to_workprecision(fun, precision):
     where workprecisionX is a dictionary with keys "work" and "precision".
     """
 
-    def param_to_wp(list_of_args):
+    def parameter_list_to_workprecision(list_of_args, /):
         works_mean = []
         works_std = []
         precisions = []
-        for args in list_of_args:
-            precisions.append(precision(fun(args)))
+        for arg in list_of_args:
+            precision = precision_fun(fun(arg))
+            times = timeit_fun(lambda: fun(arg))  # noqa: B023
 
-            times = timeit.repeat(lambda: fun(args), number=1, repeat=10)  # noqa: B023
-
-            times = list(times)
+            precisions.append(precision)
             works_mean.append(statistics.mean(times))
             works_std.append(statistics.stdev(times))
         return {
@@ -161,31 +181,39 @@ def param_to_workprecision(fun, precision):
             "precision": jnp.asarray(precisions),
         }
 
-    return param_to_wp
+    return parameter_list_to_workprecision
 
 
 if __name__ == "__main__":
-    set_config()
+    # Set up all the configs
+    set_jax_config()
+    set_probdiffeq_config()
+    print_library_info()
+
+    # Read configuration from command line
+    args = parse_arguments()
+    tolerances = tolerances_from_args(args)
+    timeit_fun = timeit_fun_from_args(args)
 
     # Assemble algorithms
-    ivp = make_ivp()
-    impl.select("dense", ode_shape=(8,))
+    hires = ivp_hires()
     algorithms = {
-        "TS1(n=3)": probdiffeq_setup(*ivp, num_derivatives=3),
-        "TS1(n=5)": probdiffeq_setup(*ivp, num_derivatives=5),
-        "SciPy (LSODA)": scipy_setup(*ivp, method="LSODA"),
-        "SciPy (Radau)": scipy_setup(*ivp, method="Radau"),
+        r"TS1($\nu=3$)": solver_probdiffeq(*hires, num_derivatives=3),
+        r"TS1($\nu=5$)": solver_probdiffeq(*hires, num_derivatives=5),
+        "SciPy (LSODA)": solver_scipy(*hires, method="LSODA"),
+        "SciPy (Radau)": solver_scipy(*hires, method="Radau"),
     }
 
-    # Compute a reference solution
-    reference = algorithms["SciPy (Radau)"](1e-12)
+    # Compute a reference solution (assert that warning is raise because
+    with testing.warns():
+        reference = algorithms["SciPy (LSODA)"](1e-15)
     precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams
-    tolerances = argparse_tolerances()
     results = {}
     for label, algo in tqdm.tqdm(algorithms.items()):
-        param_to_wp = param_to_workprecision(algo, precision=precision_fun)
+        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
+    # Save results
     jnp.save(os.path.dirname(__file__) + "/results.npy", results)
