@@ -77,14 +77,14 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
     # fmt: off
     u0 = jnp.asarray(
         [
-            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,  # noqa: E241
-            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,  # noqa: E241
+            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
+            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
         ]
     )
     du0 = jnp.asarray(
         [
-            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,  # noqa: E241
-            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,  # noqa: E241
+            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
+            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
         ]
     )
     # fmt: on
@@ -133,49 +133,56 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
     return param_to_solution
 
 
-#
-# def solver_diffrax(*, solver) -> Callable:
-#     """Construct a solver that wraps Diffrax' solution routines."""
-#
-#     @diffrax.ODETerm
-#     @jax.jit
-#     def vf_diffrax(_t, u, _args):
-#         """High irradiance response."""
-#         du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
-#         du2 = 1.71 * u[0] - 8.75 * u[1]
-#         du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
-#         du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
-#         du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
-#         du6 = (
-#             -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
-#         )
-#         du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
-#         du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
-#         return jnp.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
-#
-#     u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
-#     t0, t1 = jnp.asarray([0.0, 321.8122])
-#
-#     @jax.jit
-#     def param_to_solution(tol):
-#         controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
-#         saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
-#         solution = diffrax.diffeqsolve(
-#             vf_diffrax,
-#             y0=u0,
-#             t0=t0,
-#             t1=t1,
-#             saveat=saveat,
-#             stepsize_controller=controller,
-#             dt0=None,
-#             max_steps=10_000,
-#             solver=solver,
-#         )
-#         return jax.block_until_ready(solution.ys[0, :])
-#
-#     return param_to_solution
-#
-#
+def solver_diffrax(*, solver) -> Callable:
+    """Construct a solver that wraps Diffrax' solution routines."""
+
+    # fmt: off
+    u0 = jnp.asarray(
+        [
+            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
+            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
+            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
+            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
+        ]
+    )
+    # fmt: on
+
+    @diffrax.ODETerm
+    @jax.jit
+    def vf_diffrax(_t, u, _args):
+        """Pleiades problem."""
+        x = u[0:7]  # x
+        y = u[7:14]  # y
+        xi, xj = x[:, None], x[None, :]
+        yi, yj = y[:, None], y[None, :]
+        rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
+        mj = jnp.arange(1, 8)[None, :]
+        ddx = jnp.sum(jnp.nan_to_num(mj * (xj - xi) / rij), axis=1)
+        ddy = jnp.sum(jnp.nan_to_num(mj * (yj - yi) / rij), axis=1)
+        return jnp.concatenate((u[14:21], u[21:28], ddx, ddy))
+
+    t0, t1 = 0.0, 3.0
+
+    @jax.jit
+    def param_to_solution(tol):
+        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
+        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
+        solution = diffrax.diffeqsolve(
+            vf_diffrax,
+            y0=u0,
+            t0=t0,
+            t1=t1,
+            saveat=saveat,
+            stepsize_controller=controller,
+            dt0=None,
+            max_steps=10_000,
+            solver=solver,
+        )
+        return jax.block_until_ready(solution.ys[0, :14])
+
+    return param_to_solution
+
+
 # def solver_scipy(*, method: str) -> Callable:
 #     """Construct a solver that wraps SciPy's solution routines."""
 #
@@ -266,6 +273,8 @@ if __name__ == "__main__":
 
     # Assemble algorithms
     algorithms = {
+        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
             num_derivatives=5, correction_fun=corrections.ts0
         ),
