@@ -17,7 +17,6 @@ import jax.numpy as jnp
 import numpy as np
 import scipy.integrate
 import tqdm
-from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq import adaptive, ivpsolve, timestep
@@ -37,10 +36,6 @@ def set_jax_config() -> None:
 
     # CPU
     config.update("jax_platform_name", "cpu")
-
-    # IVP examples in JAX
-    if not backend.has_been_selected:
-        backend.select("jax")
 
 
 def set_probdiffeq_config() -> None:
@@ -79,19 +74,26 @@ def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
     return timer
 
 
-def ivp_hires() -> tuple[Callable, jax.Array, float, float]:
-    """Create the IVP test-problem."""
-    f, u0, (t0, t1), f_args = ivps.hires()
+def solver_probdiffeq(*, num_derivatives: int) -> Callable:
+    """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
-    def vf(x, *, t):  # noqa: ARG001
-        return f(x, *f_args)
+    def vf_probdiffeq(u, *, t):  # noqa: ARG001
+        """High irradiance response."""
+        du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
+        du2 = 1.71 * u[0] - 8.75 * u[1]
+        du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
+        du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
+        du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
+        du6 = (
+            -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
+        )
+        du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
+        du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
+        return jnp.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
 
-    return vf, u0, t0, t1
-
-
-def solver_probdiffeq(vf, u0, t0, t1, /, *, num_derivatives: int) -> Callable:
-    """Construct a solver that wraps ProbDiffEq's solution routines."""
+    u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
+    t0, t1 = jnp.asarray([0.0, 321.8122])
 
     @jax.jit
     def param_to_solution(tol):
@@ -103,14 +105,14 @@ def solver_probdiffeq(vf, u0, t0, t1, /, *, num_derivatives: int) -> Callable:
         adaptive_solver = adaptive.adaptive(solver, atol=1e-3 * tol, rtol=tol)
 
         # Initial state
-        vf_auto = functools.partial(vf, t=t0)
+        vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = autodiff.taylor_mode(vf_auto, (u0,), num=num_derivatives)
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         # Solve
         dt0 = timestep.initial(vf_auto, (u0,))
         solution = ivpsolve.simulate_terminal_values(
-            vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
+            vf_probdiffeq, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
         )
 
         # Return the terminal value
@@ -119,20 +121,34 @@ def solver_probdiffeq(vf, u0, t0, t1, /, *, num_derivatives: int) -> Callable:
     return param_to_solution
 
 
-def solver_diffrax(vf, u0, t0, t1, /, *, solver) -> Callable:
+def solver_diffrax(*, solver) -> Callable:
     """Construct a solver that wraps Diffrax' solution routines."""
 
     @diffrax.ODETerm
     @jax.jit
-    def f(t, y, _args):
-        return vf(y, t=t)
+    def vf_diffrax(_t, u, _args):
+        """High irradiance response."""
+        du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
+        du2 = 1.71 * u[0] - 8.75 * u[1]
+        du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
+        du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
+        du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
+        du6 = (
+            -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
+        )
+        du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
+        du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
+        return jnp.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
+
+    u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
+    t0, t1 = jnp.asarray([0.0, 321.8122])
 
     @jax.jit
     def param_to_solution(tol):
         controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
         saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
         solution = diffrax.diffeqsolve(
-            f,
+            vf_diffrax,
             y0=u0,
             t0=t0,
             t1=t1,
@@ -142,20 +158,30 @@ def solver_diffrax(vf, u0, t0, t1, /, *, solver) -> Callable:
             max_steps=10_000,
             solver=solver,
         )
-        return solution.ys[0, :]
+        return jax.block_until_ready(solution.ys[0, :])
 
     return param_to_solution
 
 
-def solver_scipy(vf, u0, t0, t1, /, *, method: str) -> Callable:
+def solver_scipy(*, method: str) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
-    # todo: should the whole problem be transformed into a numpy array?
 
-    def vf_scipy(t, u):
-        return vf(u, t=t)
+    def vf_scipy(_t, u):
+        """High irradiance response."""
+        du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
+        du2 = 1.71 * u[0] - 8.75 * u[1]
+        du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
+        du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
+        du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
+        du6 = (
+            -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
+        )
+        du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
+        du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
+        return np.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
 
-    u0 = np.asarray(u0)
-    time_span = np.asarray([np.asarray(t0), np.asarray(t1)])
+    u0 = np.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
+    time_span = np.asarray([0.0, 321.8122])
 
     def param_to_solution(tol):
         solution = scipy.integrate.solve_ivp(
@@ -227,19 +253,18 @@ if __name__ == "__main__":
     timeit_fun = timeit_fun_from_args(args)
 
     # Assemble algorithms
-    hires = ivp_hires()
     algorithms = {
-        "Diffrax: Kvaerno3()": solver_diffrax(*hires, solver=diffrax.Kvaerno3()),
-        "Diffrax: Kvaerno5()": solver_diffrax(*hires, solver=diffrax.Kvaerno5()),
-        r"ProbDiffEq: TS1($3$)": solver_probdiffeq(*hires, num_derivatives=3),
-        r"ProbDiffEq: TS1($5$)": solver_probdiffeq(*hires, num_derivatives=5),
-        "SciPy: 'LSODA'": solver_scipy(*hires, method="LSODA"),
-        "SciPy: 'Radau'": solver_scipy(*hires, method="Radau"),
+        r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
+        r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
+        "Diffrax: Kvaerno3()": solver_diffrax(solver=diffrax.Kvaerno3()),
+        "Diffrax: Kvaerno5()": solver_diffrax(solver=diffrax.Kvaerno5()),
+        "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
+        "SciPy: 'Radau'": solver_scipy(method="Radau"),
     }
 
     # Compute a reference solution (assert that warning is raise because
     with testing.warns():
-        reference = solver_scipy(*hires, method="Radau")(1e-15)
+        reference = solver_scipy(method="BDF")(1e-15)
     precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams

@@ -28,7 +28,7 @@ example:
 	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
 
 run-benchmarks:
-	time python docs/benchmarks/hires/run.py --start 1 --stop 10 --repeats 10  --save True
+	time python docs/benchmarks/hires/run.py --start 1 --stop 10 --repeats 15  --save True
 	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
