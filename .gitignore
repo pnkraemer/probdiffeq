@@ -3,6 +3,8 @@ probdiffeq/_version.py
 
 # Data
 docs/benchmarks/hires/*.npy
+docs/benchmarks/pleiades/*.npy
+docs/benchmarks/vanderpol/*.npy
 
 # IDE stuff
 .idea/

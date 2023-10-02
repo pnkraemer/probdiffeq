@@ -12,7 +12,6 @@ from typing import Callable
 import diffrax
 import jax
 import jax.numpy as jnp
-import numba
 import numpy as np
 import scipy.integrate
 import tqdm
@@ -119,7 +118,7 @@ def solver_diffrax(*, solver) -> Callable:
     @diffrax.ODETerm
     @jax.jit
     def vf_diffrax(_t, u, _args):
-        """Van-der-Pol dynamics as a second-order differential equation."""
+        """Van-der-Pol dynamics as a first-order differential equation."""
         return jnp.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
 
     t0, t1 = 0.0, 3.0
@@ -146,54 +145,29 @@ def solver_diffrax(*, solver) -> Callable:
     return param_to_solution
 
 
-#
-# def solver_scipy(*, method: str, use_numba: bool) -> Callable:
-#     """Construct a solver that wraps SciPy's solution routines."""
-#     # fmt: off
-#     u0 = np.asarray(
-#         [
-#             3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
-#             3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
-#             0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
-#             0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
-#         ]
-#     )
-#     # fmt: on
-#
-#     def vf_scipy(_t, u):
-#         """Pleiades problem."""
-#         x = u[0:7]  # x
-#         y = u[7:14]  # y
-#         xi, xj = x[:, None], x[None, :]
-#         yi, yj = y[:, None], y[None, :]
-#         rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
-#         mj = np.arange(1, 8)[None, :]
-#
-#         # Explicitly avoid dividing by zero for scipy's solver
-#         # The JAX solvers divide by zero and turn the NaNs to zeros.
-#         rij = np.where(rij == 0.0, 1.0, rij)
-#         ddx = np.sum((mj * (xj - xi) / rij), axis=1)
-#         ddy = np.sum((mj * (yj - yi) / rij), axis=1)
-#         return np.concatenate((u[14:21], u[21:28], ddx, ddy))
-#
-#     if use_numba:
-#         vf_scipy = numba.jit(nopython=True)(vf_scipy)
-#
-#     time_span = np.asarray([0.0, 3.0])
-#
-#     def param_to_solution(tol):
-#         solution = scipy.integrate.solve_ivp(
-#             vf_scipy,
-#             y0=u0,
-#             t_span=time_span,
-#             t_eval=time_span,
-#             atol=1e-3 * tol,
-#             rtol=tol,
-#             method=method,
-#         )
-#         return solution.y[:14, -1]
-#
-#     return param_to_solution
+def solver_scipy(method: str) -> Callable:
+    """Construct a solver that wraps SciPy's solution routines."""
+
+    def vf_scipy(_t, u):
+        """Van-der-Pol dynamics as a first-order differential equation."""
+        return np.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
+
+    u0 = np.concatenate((np.atleast_1d(2.0), np.atleast_1d(0.0)))
+    time_span = np.asarray((0.0, 6.3))
+
+    def param_to_solution(tol):
+        solution = scipy.integrate.solve_ivp(
+            vf_scipy,
+            y0=u0,
+            t_span=time_span,
+            t_eval=time_span,
+            atol=1e-3 * tol,
+            rtol=tol,
+            method=method,
+        )
+        return solution.y[0, -1]
+
+    return param_to_solution
 
 
 def rmse_absolute(expected: jax.Array) -> Callable:
@@ -251,13 +225,13 @@ if __name__ == "__main__":
 
     # Assemble algorithms
     algorithms = {
-        # "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
-        # "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
-        # "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
-        # "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
+        "SciPy: 'Radau'": solver_scipy(method="Radau"),
+        "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
         "Diffrax: Kvaerno5()": solver_diffrax(solver=diffrax.Kvaerno5()),
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
+        r"ProbDiffEq: TS1($4$)": solver_probdiffeq(num_derivatives=4),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
+        r"ProbDiffEq: TS1($6$)": solver_probdiffeq(num_derivatives=6),
     }
 
     # Compute a reference solution
