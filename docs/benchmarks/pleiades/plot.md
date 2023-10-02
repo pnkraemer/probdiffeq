@@ -59,7 +59,7 @@ def plot_results(axis, results):
         range_lower, range_upper = work_mean - work_std, work_mean + work_std
         axis.fill_between(precision, range_lower, range_upper, alpha=0.3, **style)
 
-    axis.set_xlabel("Precision [relative RMSE]")
+    axis.set_xlabel("Precision [absolute RMSE]")
     axis.set_ylabel("Work [wall time, s]")
     axis.legend()
     axis.grid()

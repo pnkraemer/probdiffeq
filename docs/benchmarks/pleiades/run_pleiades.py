@@ -73,7 +73,6 @@ def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
 
 def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
-
     # fmt: off
     u0 = jnp.asarray(
         [
@@ -135,7 +134,6 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
 
 def solver_diffrax(*, solver) -> Callable:
     """Construct a solver that wraps Diffrax' solution routines."""
-
     # fmt: off
     u0 = jnp.asarray(
         [
@@ -183,39 +181,50 @@ def solver_diffrax(*, solver) -> Callable:
     return param_to_solution
 
 
-# def solver_scipy(*, method: str) -> Callable:
-#     """Construct a solver that wraps SciPy's solution routines."""
-#
-#     def vf_scipy(_t, u):
-#         """High irradiance response."""
-#         du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
-#         du2 = 1.71 * u[0] - 8.75 * u[1]
-#         du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
-#         du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
-#         du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
-#         du6 = (
-#             -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
-#         )
-#         du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
-#         du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
-#         return np.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
-#
-#     u0 = np.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
-#     time_span = np.asarray([0.0, 321.8122])
-#
-#     def param_to_solution(tol):
-#         solution = scipy.integrate.solve_ivp(
-#             vf_scipy,
-#             y0=u0,
-#             t_span=time_span,
-#             t_eval=time_span,
-#             atol=1e-3 * tol,
-#             rtol=tol,
-#             method=method,
-#         )
-#         return solution.y[:, -1]
-#
-#     return param_to_solution
+def solver_scipy(*, method: str) -> Callable:
+    """Construct a solver that wraps SciPy's solution routines."""
+    # fmt: off
+    u0 = np.asarray(
+        [
+            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
+            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
+            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
+            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
+        ]
+    )
+    # fmt: on
+
+    def vf_scipy(_t, u):
+        """Pleiades problem."""
+        x = u[0:7]  # x
+        y = u[7:14]  # y
+        xi, xj = x[:, None], x[None, :]
+        yi, yj = y[:, None], y[None, :]
+        rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
+        mj = np.arange(1, 8)[None, :]
+
+        # Explicitly avoid dividing by zero for scipy's solver
+        # The JAX solvers divide by zero and turn the NaNs to zeros.
+        rij = jnp.where(rij == 0.0, 1.0, rij)
+        ddx = np.sum((mj * (xj - xi) / rij), axis=1)
+        ddy = np.sum((mj * (yj - yi) / rij), axis=1)
+        return np.concatenate((u[14:21], u[21:28], ddx, ddy))
+
+    time_span = np.asarray([0.0, 3.0])
+
+    def param_to_solution(tol):
+        solution = scipy.integrate.solve_ivp(
+            vf_scipy,
+            y0=u0,
+            t_span=time_span,
+            t_eval=time_span,
+            atol=1e-3 * tol,
+            rtol=tol,
+            method=method,
+        )
+        return solution.y[:14, -1]
+
+    return param_to_solution
 
 
 def rmse_absolute(expected: jax.Array) -> Callable:
@@ -273,6 +282,8 @@ if __name__ == "__main__":
 
     # Assemble algorithms
     algorithms = {
+        "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        "SciPy: 'DOP853'": solver_scipy(method="DOP853"),
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
         "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
@@ -284,10 +295,7 @@ if __name__ == "__main__":
     }
 
     # Compute a reference solution
-    reference_solver = solver_probdiffeq(
-        num_derivatives=7, correction_fun=corrections.ts0
-    )
-    reference = reference_solver(1e-13)
+    reference = solver_scipy(method="LSODA")(1e-14)
     precision_fun = rmse_absolute(reference)
 
     # Compute all work-precision diagrams
