@@ -1,8 +1,6 @@
 """HIRES benchmark.
 
-Run with "python run_benchmark.py 1 10" for thorough marks
-and with "python run_benchmark.py 1 1" for a dry-run.
-
+See makefile for instructions.
 """
 import argparse
 import functools

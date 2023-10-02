@@ -28,12 +28,16 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
-	time python docs/benchmarks/hires/run.py --start 1 --stop 9 --repeats 10  --save True
+	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 11 --repeats 10  --save True
+	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/pleiades/*.ipynb
+	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 9 --repeats 10  --save True
 	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
 dry-run-benchmarks:
-	time python docs/benchmarks/hires/run.py --start 1 --stop 3 --repeats 2  --save False
+	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --save False
+	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 3 --repeats 2  --save False
 
 clean:
 	pre-commit clean
