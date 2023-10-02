@@ -113,55 +113,39 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     return param_to_solution
 
 
-#
-# def solver_diffrax(*, solver) -> Callable:
-#     """Construct a solver that wraps Diffrax' solution routines."""
-#     # fmt: off
-#     u0 = jnp.asarray(
-#         [
-#             3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
-#             3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
-#             0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
-#             0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
-#         ]
-#     )
-#     # fmt: on
-#
-#     @diffrax.ODETerm
-#     @jax.jit
-#     def vf_diffrax(_t, u, _args):
-#         """Pleiades problem."""
-#         x = u[0:7]  # x
-#         y = u[7:14]  # y
-#         xi, xj = x[:, None], x[None, :]
-#         yi, yj = y[:, None], y[None, :]
-#         rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
-#         mj = jnp.arange(1, 8)[None, :]
-#         ddx = jnp.sum(jnp.nan_to_num(mj * (xj - xi) / rij), axis=1)
-#         ddy = jnp.sum(jnp.nan_to_num(mj * (yj - yi) / rij), axis=1)
-#         return jnp.concatenate((u[14:21], u[21:28], ddx, ddy))
-#
-#     t0, t1 = 0.0, 3.0
-#
-#     @jax.jit
-#     def param_to_solution(tol):
-#         controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
-#         saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
-#         solution = diffrax.diffeqsolve(
-#             vf_diffrax,
-#             y0=u0,
-#             t0=t0,
-#             t1=t1,
-#             saveat=saveat,
-#             stepsize_controller=controller,
-#             dt0=None,
-#             max_steps=10_000,
-#             solver=solver,
-#         )
-#         return jax.block_until_ready(solution.ys[0, :14])
-#
-#     return param_to_solution
-#
+def solver_diffrax(*, solver) -> Callable:
+    """Construct a solver that wraps Diffrax' solution routines."""
+
+    @diffrax.ODETerm
+    @jax.jit
+    def vf_diffrax(_t, u, _args):
+        """Van-der-Pol dynamics as a second-order differential equation."""
+        return jnp.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
+
+    t0, t1 = 0.0, 3.0
+    u0 = jnp.concatenate((jnp.atleast_1d(2.0), jnp.atleast_1d(0.0)))
+    t0, t1 = (0.0, 6.3)
+
+    @jax.jit
+    def param_to_solution(tol):
+        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
+        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
+        solution = diffrax.diffeqsolve(
+            vf_diffrax,
+            y0=u0,
+            t0=t0,
+            t1=t1,
+            saveat=saveat,
+            stepsize_controller=controller,
+            dt0=None,
+            max_steps=10_000,
+            solver=solver,
+        )
+        return jax.block_until_ready(solution.ys[0, 0])
+
+    return param_to_solution
+
+
 #
 # def solver_scipy(*, method: str, use_numba: bool) -> Callable:
 #     """Construct a solver that wraps SciPy's solution routines."""
@@ -271,8 +255,7 @@ if __name__ == "__main__":
         # "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
         # "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
         # "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
-        # "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        # "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
+        "Diffrax: Kvaerno5()": solver_diffrax(solver=diffrax.Kvaerno5()),
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
     }
