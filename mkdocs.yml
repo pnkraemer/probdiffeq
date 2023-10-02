@@ -68,16 +68,14 @@ plugins:
   - exclude:
       glob:
         - quickstart/easy_example.md
-        - examples_benchmarks/solvers_solutions/*.md
-        - examples_benchmarks/parameter_estimation/*.md
-        - examples_benchmarks/benchmarks/lotka_volterra/internal.md
-        - examples_benchmarks/benchmarks/lotka_volterra/external.md
-        - examples_benchmarks/benchmarks/pleiades/external.md
-        - examples_benchmarks/benchmarks/stiff_van_der_pol/external.md
-        - examples_benchmarks/benchmarks/hires/external.md
         - quickstart/.ipynb_checkpoints/*
-        - examples_benchmarks/parameter_estimation/.ipynb_checkpoints/*
-        - examples_benchmarks/solvers_solutions/.ipynb_checkpoints/*
+        - examples_solver_config/*.md
+        - examples_solver_config/.ipynb_checkpoints/*
+        - examples_parameter_estimation/*.md
+        - examples_parameter_estimation/.ipynb_checkpoints/*
+        - benchmarks/hires/*.md
+        - benchmarks/hires/*.py
+        - benchmarks/hires/.ipynb_checkpoints/*
   - mkdocs-jupyter
 nav:
   - Getting started:
@@ -86,27 +84,18 @@ nav:
       - Transitioning from other packages: quickstart/transitioning_from_other_packages.md
       - Choosing a solver: quickstart/choosing_a_solver.md
       - Troubleshooting: quickstart/troubleshooting.md
-  - Examples & Benchmarks:
-      - Solvers & Solutions:
-          - examples_benchmarks/solvers_solutions/posterior_uncertainties.ipynb
-          - examples_benchmarks/solvers_solutions/second_order_problems.ipynb
-          - examples_benchmarks/solvers_solutions/smoothing.ipynb
-          - examples_benchmarks/solvers_solutions/dynamic_output_scales.ipynb
-          - examples_benchmarks/solvers_solutions/conditioning-on-zero-residual.ipynb
-      - Parameter estimation:
-          - Parameter estimation with Optax: examples_benchmarks/parameter_estimation/physics_enhanced_regression_1.ipynb
-          - Parameter estimation with BlackJAX: examples_benchmarks/parameter_estimation/physics_enhanced_regression_2.ipynb
-          - Neural ODEs with Optax: examples_benchmarks/parameter_estimation/neural_ode.ipynb
-      - Benchmarks:
-          - Lotka-Volterra:
-              - examples_benchmarks/benchmarks/lotka_volterra/insights.md
-              - examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
-              - examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
-          - Pleiades: [examples_benchmarks/benchmarks/pleiades/external.ipynb]
-          - Stiff Van der Pol:
-              - examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
-          - High irradiance response (HIRES):
-              - examples_benchmarks/benchmarks/hires/external.ipynb
+  - Examples for solver configurations:
+      - examples_solver_config/posterior_uncertainties.ipynb
+      - examples_solver_config/second_order_problems.ipynb
+      - examples_solver_config/smoothing.ipynb
+      - examples_solver_config/dynamic_output_scales.ipynb
+      - examples_solver_config/conditioning-on-zero-residual.ipynb
+  - Examples for parameter estimation:
+      - Parameter estimation with Optax: examples_parameter_estimation/physics_enhanced_regression_1.ipynb
+      - Parameter estimation with BlackJAX: examples_parameter_estimation/physics_enhanced_regression_2.ipynb
+      - Neural ODEs with Optax: examples_parameter_estimation/neural_ode.ipynb
+  - Benchmarks:
+      - Hires: benchmarks/hires/plot.ipynb
   - API Documentation:
       - ivpsolve: api_docs/ivpsolve.md
       - adaptive: api_docs/adaptive.md

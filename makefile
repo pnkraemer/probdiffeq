@@ -4,8 +4,8 @@
 format:
 	black --quiet .
 	jupytext --quiet --sync docs/quickstart/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*.ipynb
+	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
+	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
 
 lint:
@@ -20,12 +20,12 @@ test:
 example:
 	jupytext --quiet --sync docs/quickstart/*.ipynb
 	jupytext --quiet --execute docs/quickstart/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --quiet --execute docs/examples_benchmarks/solvers_solutions/*
-	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
-	jupytext --quiet --execute docs/examples_benchmarks/parameter_estimation/*
-	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
+	jupytext --quiet --sync docs/examples_solver_config/*
+	jupytext --quiet --execute docs/examples_solver_config/*
+	jupytext --quiet --sync docs/examples_solver_config/*
+	jupytext --quiet --sync docs/examples_parameter_estimation/*
+	jupytext --quiet --execute docs/examples_parameter_estimation/*
+	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
 	time python docs/benchmarks/hires/run.py --start 1 --stop 9 --repeats 10  --save True
