@@ -12,6 +12,7 @@ from typing import Callable
 import diffrax
 import jax
 import jax.numpy as jnp
+import numba
 import numpy as np
 import scipy.integrate
 import tqdm
@@ -181,7 +182,7 @@ def solver_diffrax(*, solver) -> Callable:
     return param_to_solution
 
 
-def solver_scipy(*, method: str) -> Callable:
+def solver_scipy(*, method: str, use_numba: bool) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
     # fmt: off
     u0 = np.asarray(
@@ -205,10 +206,13 @@ def solver_scipy(*, method: str) -> Callable:
 
         # Explicitly avoid dividing by zero for scipy's solver
         # The JAX solvers divide by zero and turn the NaNs to zeros.
-        rij = jnp.where(rij == 0.0, 1.0, rij)
+        rij = np.where(rij == 0.0, 1.0, rij)
         ddx = np.sum((mj * (xj - xi) / rij), axis=1)
         ddy = np.sum((mj * (yj - yi) / rij), axis=1)
         return np.concatenate((u[14:21], u[21:28], ddx, ddy))
+
+    if use_numba:
+        vf_scipy = numba.jit(nopython=True)(vf_scipy)
 
     time_span = np.asarray([0.0, 3.0])
 
@@ -282,8 +286,10 @@ if __name__ == "__main__":
 
     # Assemble algorithms
     algorithms = {
-        "SciPy: 'RK45'": solver_scipy(method="RK45"),
-        "SciPy: 'DOP853'": solver_scipy(method="DOP853"),
+        "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
+        "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
+        "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
+        "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
         "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
@@ -295,7 +301,7 @@ if __name__ == "__main__":
     }
 
     # Compute a reference solution
-    reference = solver_scipy(method="LSODA")(1e-14)
+    reference = solver_scipy(method="LSODA", use_numba=False)(1e-14)
     precision_fun = rmse_absolute(reference)
 
     # Compute all work-precision diagrams

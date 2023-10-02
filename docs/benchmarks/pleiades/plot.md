@@ -37,11 +37,13 @@ def load_results():
 
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
-    if "TS" in label:
+    if "probdiffeq" in label.lower():
         return {"color": "C0", "linestyle": "solid"}
-    if "SciPy" in label:
+    if "numba" in label.lower():
+        return {"color": "C4", "linestyle": "dashed"}
+    if "scipy" in label.lower():
         return {"color": "C2", "linestyle": "dashed"}
-    if "iffrax" in label:
+    if "diffrax" in label.lower():
         return {"color": "C3", "linestyle": "dotted"}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
@@ -61,7 +63,6 @@ def plot_results(axis, results):
 
     axis.set_xlabel("Precision [absolute RMSE]")
     axis.set_ylabel("Work [wall time, s]")
-    axis.legend()
     axis.grid()
     return axis
 ```
@@ -69,11 +70,12 @@ def plot_results(axis, results):
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, axis = plt.subplots(figsize=(6, 4), dpi=150, constrained_layout=True)
+fig, axis = plt.subplots(dpi=150)
 fig.suptitle("Pleiades problem, terminal-value simulation")
 
 results = load_results()
 axis = plot_results(axis, results)
+axis.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 plt.show()
 ```
 
