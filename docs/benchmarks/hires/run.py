@@ -19,8 +19,7 @@ import scipy.integrate
 import tqdm
 from jax import config
 
-from probdiffeq import adaptive, ivpsolve, timestep
-from probdiffeq.backend import testing
+from probdiffeq import adaptive, controls, ivpsolve, timestep
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -102,7 +101,10 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         ts1 = corrections.ts1()
         strategy = filters.filter_adaptive(ibm, ts1)
         solver = calibrated.dynamic(strategy)
-        adaptive_solver = adaptive.adaptive(solver, atol=1e-3 * tol, rtol=tol)
+        control = controls.proportional_integral_clipped()
+        adaptive_solver = adaptive.adaptive(
+            solver, atol=1e-2 * tol, rtol=tol, control=control
+        )
 
         # Initial state
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
@@ -205,7 +207,7 @@ def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
     def rmse(received):
         received = jnp.asarray(received)
         error_absolute = jnp.abs(expected - received)
-        error_relative = error_absolute / jnp.abs(nugget + received)
+        error_relative = error_absolute / jnp.abs(nugget + expected)
         return jnp.linalg.norm(error_relative) / jnp.sqrt(error_relative.size)
 
     return rmse
@@ -262,9 +264,8 @@ if __name__ == "__main__":
         "SciPy: 'Radau'": solver_scipy(method="Radau"),
     }
 
-    # Compute a reference solution (assert that warning is raise because
-    with testing.warns():
-        reference = solver_scipy(method="BDF")(1e-15)
+    # Compute a reference solution
+    reference = solver_scipy(method="BDF")(1e-13)
     precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams

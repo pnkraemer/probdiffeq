@@ -38,11 +38,11 @@ def load_results():
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "TS" in label:
-        return {"color": "C1", "linestyle": "solid"}
+        return {"color": "C0", "linestyle": "solid"}
     if "SciPy" in label:
-        return {"color": "C0", "linestyle": "dashed"}
+        return {"color": "C2", "linestyle": "dashed"}
     if "iffrax" in label:
-        return {"color": "C2", "linestyle": "dotted"}
+        return {"color": "C3", "linestyle": "dotted"}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
@@ -63,7 +63,7 @@ def plot_results(axis, results):
     axis.set_ylabel("Work [wall time, s]")
     axis.legend()
     axis.grid()
-    axis.axis("equal")
+    axis.set_ylim((1e-4, 1e-0))
     return axis
 ```
 
