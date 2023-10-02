@@ -28,6 +28,9 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
+	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 9 --repeats 3  --save True
+	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/vanderpol/*.ipynb
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 11 --repeats 3  --save True
 	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/pleiades/*.ipynb
@@ -36,6 +39,7 @@ run-benchmarks:
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
 dry-run-benchmarks:
+	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 3 --repeats 2  --save False
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --save False
 	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 3 --repeats 2  --save False
 
