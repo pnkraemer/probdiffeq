@@ -11,6 +11,7 @@ import statistics
 import timeit
 from typing import Callable
 
+import diffrax
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -118,6 +119,34 @@ def solver_probdiffeq(vf, u0, t0, t1, /, *, num_derivatives: int) -> Callable:
     return param_to_solution
 
 
+def solver_diffrax(vf, u0, t0, t1, /, *, solver) -> Callable:
+    """Construct a solver that wraps Diffrax' solution routines."""
+
+    @diffrax.ODETerm
+    @jax.jit
+    def f(t, y, _args):
+        return vf(y, t=t)
+
+    @jax.jit
+    def param_to_solution(tol):
+        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
+        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
+        solution = diffrax.diffeqsolve(
+            f,
+            y0=u0,
+            t0=t0,
+            t1=t1,
+            saveat=saveat,
+            stepsize_controller=controller,
+            dt0=None,
+            max_steps=10_000,
+            solver=solver,
+        )
+        return solution.ys[0, :]
+
+    return param_to_solution
+
+
 def solver_scipy(vf, u0, t0, t1, /, *, method: str) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
     # todo: should the whole problem be transformed into a numpy array?
@@ -200,15 +229,17 @@ if __name__ == "__main__":
     # Assemble algorithms
     hires = ivp_hires()
     algorithms = {
-        r"TS1($\nu=3$)": solver_probdiffeq(*hires, num_derivatives=3),
-        r"TS1($\nu=5$)": solver_probdiffeq(*hires, num_derivatives=5),
-        "SciPy (LSODA)": solver_scipy(*hires, method="LSODA"),
-        "SciPy (Radau)": solver_scipy(*hires, method="Radau"),
+        "Diffrax: Kvaerno3()": solver_diffrax(*hires, solver=diffrax.Kvaerno3()),
+        "Diffrax: Kvaerno5()": solver_diffrax(*hires, solver=diffrax.Kvaerno5()),
+        r"ProbDiffEq: TS1($3$)": solver_probdiffeq(*hires, num_derivatives=3),
+        r"ProbDiffEq: TS1($5$)": solver_probdiffeq(*hires, num_derivatives=5),
+        "SciPy: 'LSODA'": solver_scipy(*hires, method="LSODA"),
+        "SciPy: 'Radau'": solver_scipy(*hires, method="Radau"),
     }
 
     # Compute a reference solution (assert that warning is raise because
     with testing.warns():
-        reference = algorithms["SciPy (LSODA)"](1e-15)
+        reference = solver_scipy(*hires, method="Radau")(1e-15)
     precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams
@@ -220,6 +251,6 @@ if __name__ == "__main__":
     # Save results
     if args.save is True:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)
-        print("Saving successful.")
+        print("\nSaving successful.\n")
     else:
-        print("Skipped saving.")
+        print("\nSkipped saving.\n")

@@ -18,12 +18,15 @@ jupyter:
 The HIRES problem is a common stiff differential equation.
 
 ```python
-import os
+"""Benchmark all solvers on the HIRES problem."""
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from jax.config import config
 
 from probdiffeq.util.doc_util import notebook
+
+config.update("jax_platform_name", "cpu")
 ```
 
 ```python
@@ -34,11 +37,14 @@ def load_results():
 
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
-    if "SciPy" in label:
-        return {"color": "C0"}
     if "TS" in label:
-        return {"color": "C1"}
-    return None
+        return {"color": "C1", "linestyle": "solid"}
+    if "SciPy" in label:
+        return {"color": "C0", "linestyle": "dashed"}
+    if "iffrax" in label:
+        return {"color": "C2", "linestyle": "dotted"}
+    msg = f"Label {label} unknown."
+    raise ValueError(msg)
 
 
 def plot_results(axis, results):
@@ -53,22 +59,22 @@ def plot_results(axis, results):
         range_lower, range_upper = work_mean - work_std, work_mean + work_std
         axis.fill_between(precision, range_lower, range_upper, alpha=0.3, **style)
 
-    axis.set_xlabel("Precision")
-    axis.set_ylabel("Work")
+    axis.set_xlabel("Precision [relative RMSE]")
+    axis.set_ylabel("Work [wall time, s]")
     axis.legend()
     axis.grid()
+    axis.axis("equal")
     return axis
 ```
 
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, axis = plt.subplots(figsize=(5, 3), dpi=100, constrained_layout=True)
-fig.suptitle("High irradiance(HIRES)")
+fig, axis = plt.subplots(figsize=(6, 4), dpi=150, constrained_layout=True)
+fig.suptitle("Hires problem, terminal-value simulation")
 
 results = load_results()
 axis = plot_results(axis, results)
-
 plt.show()
 ```
 
