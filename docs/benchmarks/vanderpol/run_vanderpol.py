@@ -52,8 +52,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--start", type=int, default=1)
     parser.add_argument("--stop", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=10)
-    parser.add_argument("--save", type=bool, default=True)
-
+    parser.add_argument("--save", action=argparse.BooleanOptionalAction)
     return parser.parse_args()
 
 
@@ -245,7 +244,7 @@ if __name__ == "__main__":
         results[label] = param_to_wp(tolerances)
 
     # Save results
-    if args.save is True:
+    if args.save:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)
         print("\nSaving successful.\n")
     else:
