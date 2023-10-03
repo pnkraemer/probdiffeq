@@ -151,7 +151,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         #  the running variable (cs_padded) should have constant size
         cs = [(fx[deg - 1] / deg)]
         cs_padded = cs + [zeros] * (deg - 1)
-        for k in range(deg, min(2 * deg, num)):
+        for i, fx_i in enumerate(fx[deg : 2 * deg]):
             # The Jacobian of the embedded jet is block-banded,
             # i.e., of the form (for j=3)
             # (A0, 0, 0; A1, A0, 0; A2, A1, A0; *, *, *; *, *, *; *, *, *)
@@ -162,16 +162,16 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
             # Bettencourt et al. (2019;
             # "Taylor-mode autodiff for higher-order derivatives in JAX")
             # explain details.
-            linear_combination = jvp(*cs_padded)[k - deg]
-            cs_ = cs_padded[: (k + 1 - deg)]
-            cs_ += [(fx[k] + linear_combination) / (k + 1)]
-            cs_padded = cs_ + [zeros] * (2 * deg - k - 2)
+            # i = k - deg
+            linear_combination = jvp(*cs_padded)[i]
+            cs_ = cs_padded[: (i + 1)]
+            cs_ += [(fx_i + linear_combination) / (i + deg + 1)]
+            cs_padded = cs_ + [zeros] * (deg - i - 2)
 
-            print(k)
         # Store all new coefficients
-        taylor_coefficients.extend(cs)
+        taylor_coefficients.extend(cs_padded)
 
-    return _unnormalise(*taylor_coefficients)
+    return _unnormalise(*taylor_coefficients)[: 1 + num]
 
 
 def _normalise(primals, *series):
