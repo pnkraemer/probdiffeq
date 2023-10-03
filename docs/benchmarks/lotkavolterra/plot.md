@@ -63,7 +63,6 @@ def plot_results(axis, results):
     axis.set_ylabel("Work [wall time, s]")
     axis.legend()
     axis.grid()
-    axis.set_ylim((1e-4, 1e-0))
     return axis
 ```
 

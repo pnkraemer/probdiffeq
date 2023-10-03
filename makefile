@@ -31,7 +31,7 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
-	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 1 --stop 9 --repeats 3  --save True
+	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 20  --save True
 	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/lotkavolterra/*.ipynb
 	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 9 --repeats 3  --save True

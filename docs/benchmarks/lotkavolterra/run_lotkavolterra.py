@@ -77,9 +77,9 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
     @jax.jit
     def vf_probdiffeq(y, *, t):  # noqa: ARG001
         """Lotka--Volterra dynamics."""
-        return jnp.asarray(
-            [0.5 * y[0] - 0.05 * y[0] * y[1], -0.5 * y[1] + 0.05 * y[0] * y[1]]
-        )
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return jnp.asarray([dy1, dy2])
 
     u0 = jnp.asarray((20.0, 20.0))
     t0, t1 = (0.0, 20.0)
@@ -88,10 +88,10 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         ibm = priors.ibm_adaptive(num_derivatives=num_derivatives)
-        ts1 = corrections.ts0()
-        strategy = filters.filter_adaptive(ibm, ts1)
+        ts0 = corrections.ts0()
+        strategy = filters.filter_adaptive(ibm, ts0)
         solver = calibrated.mle(strategy)
-        control = controls.proportional_integral_clipped()
+        control = controls.proportional_integral()
         adaptive_solver = adaptive.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control
         )
@@ -113,83 +113,65 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
     return param_to_solution
 
 
-#
-#
-# def solver_diffrax(*, solver) -> Callable:
-#     """Construct a solver that wraps Diffrax' solution routines."""
-#
-#     @diffrax.ODETerm
-#     @jax.jit
-#     def vf_diffrax(_t, u, _args):
-#         """High irradiance response."""
-#         du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
-#         du2 = 1.71 * u[0] - 8.75 * u[1]
-#         du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
-#         du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
-#         du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
-#         du6 = (
-#             -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
-#         )
-#         du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
-#         du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
-#         return jnp.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
-#
-#     u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
-#     t0, t1 = jnp.asarray([0.0, 321.8122])
-#
-#     @jax.jit
-#     def param_to_solution(tol):
-#         controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
-#         saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
-#         solution = diffrax.diffeqsolve(
-#             vf_diffrax,
-#             y0=u0,
-#             t0=t0,
-#             t1=t1,
-#             saveat=saveat,
-#             stepsize_controller=controller,
-#             dt0=None,
-#             max_steps=10_000,
-#             solver=solver,
-#         )
-#         return jax.block_until_ready(solution.ys[0, :])
-#
-#     return param_to_solution
-#
-#
-# def solver_scipy(*, method: str) -> Callable:
-#     """Construct a solver that wraps SciPy's solution routines."""
-#
-#     def vf_scipy(_t, u):
-#         """High irradiance response."""
-#         du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
-#         du2 = 1.71 * u[0] - 8.75 * u[1]
-#         du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
-#         du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
-#         du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
-#         du6 = (
-#             -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
-#         )
-#         du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
-#         du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
-#         return np.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
-#
-#     u0 = np.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
-#     time_span = np.asarray([0.0, 321.8122])
-#
-#     def param_to_solution(tol):
-#         solution = scipy.integrate.solve_ivp(
-#             vf_scipy,
-#             y0=u0,
-#             t_span=time_span,
-#             t_eval=time_span,
-#             atol=1e-3 * tol,
-#             rtol=tol,
-#             method=method,
-#         )
-#         return solution.y[:, -1]
-#
-#     return param_to_solution
+def solver_diffrax(*, solver) -> Callable:
+    """Construct a solver that wraps Diffrax' solution routines."""
+
+    @diffrax.ODETerm
+    @jax.jit
+    def vf_diffrax(_t, y, _args):
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return jnp.asarray([dy1, dy2])
+
+    u0 = jnp.asarray((20.0, 20.0))
+    t0, t1 = (0.0, 20.0)
+
+    @jax.jit
+    def param_to_solution(tol):
+        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
+        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
+        solution = diffrax.diffeqsolve(
+            vf_diffrax,
+            y0=u0,
+            t0=t0,
+            t1=t1,
+            saveat=saveat,
+            stepsize_controller=controller,
+            dt0=None,
+            max_steps=10_000,
+            solver=solver,
+        )
+        return jax.block_until_ready(solution.ys[0, :])
+
+    return param_to_solution
+
+
+def solver_scipy(*, method: str) -> Callable:
+    """Construct a solver that wraps SciPy's solution routines."""
+
+    def vf_scipy(_t, y):
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return np.asarray([dy1, dy2])
+
+    u0 = jnp.asarray((20.0, 20.0))
+    time_span = np.asarray([0.0, 20.0])
+
+    def param_to_solution(tol):
+        solution = scipy.integrate.solve_ivp(
+            vf_scipy,
+            y0=u0,
+            t_span=time_span,
+            t_eval=time_span,
+            atol=1e-3 * tol,
+            rtol=tol,
+            method=method,
+        )
+        return solution.y[:, -1]
+
+    return param_to_solution
 
 
 def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
@@ -248,12 +230,9 @@ if __name__ == "__main__":
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS0($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(num_derivatives=5),
-        # "Diffrax: Kvaerno3()": solver_diffrax(solver=diffrax.Kvaerno3()),
-        # "Diffrax: Kvaerno5()": solver_diffrax(solver=diffrax.Kvaerno5()),
-        # "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
-        # "SciPy: 'Radau'": solver_scipy(method="Radau"),
+        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "SciPy: 'RK45'": solver_scipy(method="RK45"),
     }
 
     # Compute a reference solution
