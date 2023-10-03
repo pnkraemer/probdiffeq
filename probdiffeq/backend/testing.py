@@ -13,14 +13,19 @@ import jax.numpy as jnp
 import pytest
 import pytest_cases
 
+from probdiffeq.impl import impl
+
 case = pytest_cases.case
 filterwarnings = pytest.mark.filterwarnings
 parametrize = pytest.mark.parametrize
 parametrize_with_cases = pytest_cases.parametrize_with_cases
 raises = pytest.raises
 warns = pytest.warns
-skip = pytest.skip
 xfail = pytest.xfail
+
+
+def skip(reason):
+    return pytest.skip(reason=reason)
 
 
 def fixture(name=None, scope="module"):
@@ -30,11 +35,11 @@ def fixture(name=None, scope="module"):
 
 
 def tree_all_allclose(tree1, tree2, **kwargs):
-    trees_is_allclose = _tree_allclose(tree1, tree2, **kwargs)
+    trees_is_allclose = tree_allclose(tree1, tree2, **kwargs)
     return jax.tree_util.tree_all(trees_is_allclose)
 
 
-def _tree_allclose(tree1, tree2, **kwargs):
+def tree_allclose(tree1, tree2, **kwargs):
     def allclose_partial(*args):
         return jnp.allclose(*args, **kwargs)
 
@@ -42,12 +47,9 @@ def _tree_allclose(tree1, tree2, **kwargs):
 
 
 def marginals_allclose(m1, m2, /):
-    mean_allclose = jnp.allclose(m1.mean, m2.mean)
+    m1, c1 = impl.variable.to_multivariate_normal(m1)
+    m2, c2 = impl.variable.to_multivariate_normal(m2)
 
-    def square(x):
-        if jnp.ndim(x) > 2:
-            return jax.vmap(square)(x)
-        return x @ x.T
-
-    cov_allclose = jnp.allclose(square(m1.cov_sqrtm_lower), square(m2.cov_sqrtm_lower))
-    return mean_allclose and cov_allclose
+    means_allclose = jnp.allclose(m1, m2)
+    covs_allclose = jnp.allclose(c1, c2)
+    return jnp.logical_and(means_allclose, covs_allclose)

@@ -8,6 +8,9 @@ import jax
 T = TypeVar("T")
 """A type-variable corresponding to the posterior-type used in interpolation."""
 
+# todo: rename to: solution, step_from, interpolate_from?
+#  in general, this object should not be necessary...
+
 
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass

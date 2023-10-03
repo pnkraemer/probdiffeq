@@ -44,3 +44,64 @@ exclude_also = [
     "def tree_flatten",
     "def tree_unflatten",
     ]
+
+
+[tool.ruff]
+include = ["*.py", "**/pyproject.toml", "*.ipynb"]
+# See: https://beta.ruff.rs/docs/rules/
+select = [
+    # pycodestyle (warning, error)
+    "W",
+    "E",
+    # Pyflakes:
+    "F",
+    # pydocstyle:
+    "D",
+    # pyupgrade:
+    "UP",
+    # flake8-bugbear:
+    "B",
+    # flake8-builtins:
+    "A",
+    # flake8-import-conventions:
+    "ICN",
+    # flake8-pytest-style:
+    "PT",
+    # flake8-quotes:
+    "Q",
+    # flake8-return:
+    "RET",
+    # flake8-simplify:
+    "SIM",
+    # flake8-unused-arguments:
+    "ARG",
+    # Ruff-specific rules:
+    "RUF",
+    # isort:
+    "I",
+    # flake8-errormsg:
+    "EM",
+    # tryceratops:
+    "TRY",
+]
+ignore = [
+    # warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible.
+    "D203",
+    # warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible.
+    "D213",
+    # zip(..., strict=True/False) is not supported on Python < 3.10
+    "B905",
+    # Magic methods don't need a docstring:
+    "D105",
+]
+
+
+[tool.ruff.per-file-ignores]
+# Auxiliary functions and tests don't need docstring-enforcement:
+"probdiffeq/util/*" = ["D102", "D103"]
+"probdiffeq/impl/*" = ["D102"]
+"probdiffeq/backend/*" = ["D103"]
+"tests/*" = ["D103"]
+
+[tool.ruff.pydocstyle]
+convention = "numpy"

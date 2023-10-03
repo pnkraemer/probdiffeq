@@ -10,42 +10,24 @@ repos:
   - repo: https://github.com/psf/black
     rev: 23.7.0
     hooks:
-      - id: black
+      - id: black-jupyter
         language_version: python3
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.284
     hooks:
-      - id: isort
-        name: isort
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-      - id: flake8
-        additional_dependencies: [flake8-docstrings]
+      - id: ruff
   - repo: https://github.com/mwouts/jupytext
-    rev: v1.14.7
+    rev: v1.15.0
     hooks:
       - id: jupytext
         files: (docs/).+
         args: [--sync]
-  - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.7.0
-    hooks:
-      - id: nbqa-black
-        files: (docs/).+
-        additional_dependencies: [black]
-      - id: nbqa-isort
-        files: (docs/).+
-        additional_dependencies: [isort]
-      - id: nbqa-flake8
-        files: (docs/).+
-        additional_dependencies: [flake8]
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.4.1
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]
   - repo: https://github.com/lyz-code/yamlfix/
-    rev: 1.12.0
+    rev: 1.13.0
     hooks:
       - id: yamlfix

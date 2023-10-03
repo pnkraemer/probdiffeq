@@ -2,54 +2,53 @@
 .PHONY: format lint test doc example run-benchmarks clean
 
 format:
-	isort --quiet .
 	black --quiet .
-	nbqa black --quiet docs/quickstart/ docs/examples_benchmarks/
-	nbqa isort --quiet docs/quickstart/ docs/examples_benchmarks/
 	jupytext --quiet --sync docs/quickstart/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
+	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
+	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
 
 lint:
 	pre-commit run --all-files
 
 test:
-	python -m doctest probdiffeq/*.py
-	pytest -n auto -v # parallelise, verbose output
+	IMPL=dense pytest -n auto -v # parallelise, verbose output
+	IMPL=isotropic pytest -n auto -v # parallelise, verbose output
+	IMPL=blockdiag pytest -n auto -v # parallelise, verbose output
+	IMPL=scalar pytest -n auto -v # parallelise, verbose output
 
 example:
 	jupytext --quiet --sync docs/quickstart/*.ipynb
 	jupytext --quiet --execute docs/quickstart/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --quiet --execute docs/examples_benchmarks/solvers_solutions/*
-	jupytext --quiet --sync docs/examples_benchmarks/solvers_solutions/*
-	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
-	jupytext --quiet --execute docs/examples_benchmarks/parameter_estimation/*
-	jupytext --quiet --sync docs/examples_benchmarks/parameter_estimation/*
-	# No --execute for advanced examples and benchmarks (takes too long)
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*
+	jupytext --quiet --sync docs/examples_solver_config/*
+	jupytext --quiet --execute docs/examples_solver_config/*
+	jupytext --quiet --sync docs/examples_solver_config/*
+	jupytext --quiet --sync docs/examples_parameter_estimation/*
+	jupytext --quiet --execute docs/examples_parameter_estimation/*
+	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/internal.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/lotka_volterra/external.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/pleiades/external.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/stiff_van_der_pol/external.ipynb
-	jupytext --quiet --execute docs/examples_benchmarks/benchmarks/hires/external.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/lotka_volterra/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/stiff_van_der_pol/*.ipynb
-	jupytext --quiet --sync docs/examples_benchmarks/benchmarks/hires/*.ipynb
+	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 20  --save
+	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/lotkavolterra/*.ipynb
+	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 9 --repeats 3  --save
+	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/vanderpol/*.ipynb
+	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 11 --repeats 3  --save
+	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/pleiades/*.ipynb
+	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 9 --repeats 10  --save
+	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
+
+dry-run-benchmarks:
+	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 5 --repeats 2 --no-save
+	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 3 --repeats 2  --no-save
+	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --no-save
+	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 3 --repeats 2  --no-save
 
 clean:
 	pre-commit clean
@@ -64,8 +63,9 @@ clean:
 	rm -rf docs/examples_benchmarks/benchmarks/pleiades/.ipynb_checkpoints
 	rm -rf docs/examples_benchmarks/benchmarks/stiff_van_der_pol/__pycache__
 	rm -rf docs/examples_benchmarks/benchmarks/stiff_van_der_pol/.ipynb_checkpoints
-	rm -rf docs/examples_benchmarks/benchmarks/hires/__pycache__
-	rm -rf docs/examples_benchmarks/benchmarks/hires/.ipynb_checkpoints
+	rm -rf docs/benchmarks/hires/__pycache__
+	rm -rf docs/benchmarks/hires/.ipynb_checkpoints
+	rm docs/benchmarks/hires/*.npy
 
 doc:
 	mkdocs build

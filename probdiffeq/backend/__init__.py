@@ -1,4 +1,4 @@
-"""Backend functionality.
+"""Backend.
 
-This includes, for example, utility functions or dependency-wrappers.
+Wrap critical imports.
 """
