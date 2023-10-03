@@ -170,5 +170,3 @@ if __name__ == "__main__":
         print("\nSaving successful.\n")
     else:
         print("\nSkipped saving.\n")
-
-    print("add things to the makefile, and get other initialisers into it.")
