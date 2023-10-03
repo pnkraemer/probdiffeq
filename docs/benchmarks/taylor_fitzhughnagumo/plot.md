@@ -37,12 +37,12 @@ def load_results():
 
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
+    if "doubling" in label.lower():
+        return {"color": "C2", "linestyle": "dotted"}
     if "taylor" in label.lower():
         return {"color": "C0", "linestyle": "solid"}
     if "forward" in label.lower():
         return {"color": "C1", "linestyle": "dashed"}
-    if "doubling" in label.lower():
-        return {"color": "C2", "linestyle": "dotted"}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
@@ -56,9 +56,10 @@ def plot_results(axis_compile, axis_perform, results):
         work_mean = wp["work_compile"]
         axis_compile.semilogy(inputs, work_mean, label=label, **style)
 
-        work_mean, work_std = (wp["work_mean"], wp["work_std"])
-        range_lower, range_upper = work_mean - work_std, work_mean + work_std
-        axis_perform.semilogy(inputs, work_mean, label=label, **style)
+        work_median = wp["work_median"]
+        work_min, work_max = (wp["work_min"], wp["work_max"])
+        range_lower, range_upper = work_min, work_max
+        axis_perform.semilogy(inputs, work_median, label=label, **style)
         axis_perform.fill_between(inputs, range_lower, range_upper, alpha=0.3, **style)
 
     return axis_compile, axis_perform

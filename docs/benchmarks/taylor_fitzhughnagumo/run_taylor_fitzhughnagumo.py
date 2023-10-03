@@ -111,6 +111,9 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
     work_compile = []
     work_mean = []
     work_std = []
+    work_min = []
+    work_median = []
+    work_max = []
     arguments = []
 
     t0 = time.perf_counter()
@@ -128,10 +131,17 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
         work_compile.append(time_compile)
         work_mean.append(statistics.mean(time_execute))
         work_std.append(statistics.stdev(time_execute))
+        work_min.append(min(time_execute))
+        work_median.append(statistics.median(time_execute))
+        work_max.append(max(time_execute))
         arg += 1
+    print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
     return {
+        "work_median": jnp.asarray(work_median),
         "work_mean": jnp.asarray(work_mean),
         "work_std": jnp.asarray(work_std),
+        "work_min": jnp.asarray(work_min),
+        "work_max": jnp.asarray(work_max),
         "work_compile": jnp.asarray(work_compile),
         "arguments": jnp.asarray(arguments),
     }
