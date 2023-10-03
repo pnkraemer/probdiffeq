@@ -150,6 +150,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         # TODO: can we jax.fori_loop() this loop?
         #  the running variable (cs_padded) should have constant size
         cs = [(fx[deg - 1] / deg)]
+        cs_padded = cs + [zeros] * (deg - 1)
         for k in range(deg, min(2 * deg, num)):
             # The Jacobian of the embedded jet is block-banded,
             # i.e., of the form (for j=3)
@@ -161,9 +162,9 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
             # Bettencourt et al. (2019;
             # "Taylor-mode autodiff for higher-order derivatives in JAX")
             # explain details.
-            cs_padded = cs + [zeros] * (2 * deg - k - 1)
             linear_combination = jvp(*cs_padded)[k - deg]
             cs += [(fx[k] + linear_combination) / (k + 1)]
+            cs_padded = cs + [zeros] * (2 * deg - k - 2)
 
         # Store all new coefficients
         taylor_coefficients.extend(cs)
