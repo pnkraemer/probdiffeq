@@ -45,7 +45,7 @@ run-benchmarks:
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
 dry-run-benchmarks:
-	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 1 --stop 3 --repeats 2  --save False
+	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 5 --repeats 2  --save False
 	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 3 --repeats 2  --save False
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --save False
 	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 3 --repeats 2  --save False

@@ -238,7 +238,9 @@ if __name__ == "__main__":
         r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
         r"ProbDiffEq: TS1($8$, dense)": ts1_dense,
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        "SciPy: 'DOP853'": solver_scipy(method="DOP853"),
     }
 
     # Compute a reference solution

@@ -61,7 +61,6 @@ def plot_results(axis, results):
 
     axis.set_xlabel("Precision [relative RMSE]")
     axis.set_ylabel("Work [wall time, s]")
-    axis.legend()
     axis.grid()
     return axis
 ```
@@ -69,11 +68,12 @@ def plot_results(axis, results):
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, axis = plt.subplots(figsize=(6, 4), dpi=150, constrained_layout=True)
+fig, axis = plt.subplots(dpi=150, constrained_layout=True)
 fig.suptitle("Lotka-Volterra problem, terminal-value simulation")
 
 results = load_results()
 axis = plot_results(axis, results)
+axis.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 plt.show()
 ```
 
