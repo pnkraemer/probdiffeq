@@ -1,27 +1,18 @@
 # Private and public API
 
-All public functions and class-creators in the following modules and packages are considered public API:
+All public functions and classes that are in the online documnetation 
+are considered public API.
+At the moment, this affects the following:
 
-* `ivpsolvers.py`
 * `ivpsolve.py`
-* `solution.py`
-* `taylor.py`
 * `controls.py`
-* `strategies.filters.py`
-* `strategies.smoothers.py`
-* `statespace.recipes.py`
-* `statespace.cubature.py`
+* `adaptive.py`
+* `timestep.py`
+* `solvers/*`
+* `impl.impl.select()`
 
-Exceptions of this rule are all functions and class-creators that are 
-marked as `warning: highly experimental`, e.g., `taylor.taylor_mode_doubling_fn`.
+Exceptions to this rule are all functions and class that are 
+marked as `warning: highly experimental`, e.g., `taylor.autodiff.taylor_mode_doubling`.
 
 
-Breaking changes in these public modules are officially considered breaking changes.
-This means that the minor version number is increased according the the rules of semantic versioning
-(there has not been a major version yet).
-It also means that an entry in the  changelog is warranted, and if deprecation policies are introduced in the future, it would apply to these module.
-
-Everything else is either considered private or experimental.
-For example, `statespace.dense.*` is accessible from the standard namespace, but not considered public API.
-Changes to this code are treated as bugfixes, breaking or not: 
-patch-version increases, changelog entries are optional, and deprecation policy is not considered necessary.
+Everything else (`backend`, `util`, `impl`) is not public and breaking changes here will not necessarily increase the version.

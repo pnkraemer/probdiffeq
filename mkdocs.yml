@@ -2,11 +2,12 @@
 theme:
   name: material
   features:
-    - navigation.tabs
-    - navigation.tabs.sticky
+#    - navigation.tabs
+#    - navigation.tabs.sticky
+    - navigation.sections
     - navigation.path
     - navigation.indexes
-    - toc.follow
+#    - toc.follow
     - search.suggest
     - search.highlight
   palette:
@@ -24,7 +25,7 @@ theme:
   icon:
     repo: fontawesome/brands/github
   font:
-    text: Nunito
+    text: Fira Sans
 site_name: probdiffeq
 site_description: The documentation for the probdiffeq software library.
 site_author: Nicholas Krämer
@@ -87,28 +88,23 @@ plugins:
         - benchmarks/lotkavolterra/.ipynb_checkpoints/*
   - mkdocs-jupyter
 nav:
-  - Getting started:
-      - Getting started: index.md
+  - Quickstart: index.md
+  - GETTING STARTED:
       - An easy example: quickstart/easy_example.ipynb
       - Transitioning from other packages: quickstart/transitioning_from_other_packages.md
       - Choosing a solver: quickstart/choosing_a_solver.md
       - Troubleshooting: quickstart/troubleshooting.md
-  - Examples for solver configurations:
-      - examples_solver_config/posterior_uncertainties.ipynb
-      - examples_solver_config/second_order_problems.ipynb
-      - examples_solver_config/smoothing.ipynb
-      - examples_solver_config/dynamic_output_scales.ipynb
+  - SOLVER CONFIGURATION:
       - examples_solver_config/conditioning-on-zero-residual.ipynb
-  - Examples for parameter estimation:
+      - examples_solver_config/posterior_uncertainties.ipynb
+      - examples_solver_config/dynamic_output_scales.ipynb
+      - examples_solver_config/smoothing.ipynb
+      - examples_solver_config/second_order_problems.ipynb
+  - PARAMETER ESTIMATION:
       - Parameter estimation with Optax: examples_parameter_estimation/physics_enhanced_regression_1.ipynb
       - Parameter estimation with BlackJAX: examples_parameter_estimation/physics_enhanced_regression_2.ipynb
       - Neural ODEs with Optax: examples_parameter_estimation/neural_ode.ipynb
-  - Benchmarks:
-      - Lotka-Volterra: benchmarks/lotkavolterra/plot.ipynb
-      - Van-der-Pol: benchmarks/vanderpol/plot.ipynb
-      - Pleiades: benchmarks/pleiades/plot.ipynb
-      - Hires: benchmarks/hires/plot.ipynb
-  - API Documentation:
+  - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - adaptive: api_docs/adaptive.md
       - controls: api_docs/controls.md
@@ -133,8 +129,13 @@ nav:
           - uncalibrated: api_docs/solvers/uncalibrated.md
           - solution: api_docs/solvers/solution.md
           - markov: api_docs/solvers/markov.md
-  - Developer Documentation:
+  - DEVELOPER DOCUMENTATION:
       - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md
+  - Benchmarks:
+      - Lotka-Volterra: benchmarks/lotkavolterra/plot.ipynb
+      - Van-der-Pol: benchmarks/vanderpol/plot.ipynb
+      - Pleiades: benchmarks/pleiades/plot.ipynb
+      - Hires: benchmarks/hires/plot.ipynb
