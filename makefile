@@ -33,6 +33,9 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
+	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 5 --repeats 5 --save
+	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
 	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 15 --repeats 5 --save
 	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/taylor_pleiades/*.ipynb
@@ -50,6 +53,7 @@ run-benchmarks:
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
 dry-run-benchmarks:
+	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 0.5 --repeats 2 --no-save
 	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 0.5 --repeats 2 --no-save
 	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 0.5 --repeats 2 --no-save
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 5 --repeats 2 --no-save
@@ -74,7 +78,8 @@ clean:
 	rm -rf docs/benchmarks/vanderpol/.ipynb_checkpoints
 	rm -rf docs/benchmarks/taylor_pleiades/__pycache__
 	rm -rf docs/benchmarks/taylor_pleiades/.ipynb_checkpoints
-	rm docs/benchmarks/hires/*.npy
+	rm -rf docs/benchmarks/taylor_fitzhughnagumo/__pycache__
+	rm -rf docs/benchmarks/taylor_fitzhughnagumo/.ipynb_checkpoints
 
 doc:
 	mkdocs build
