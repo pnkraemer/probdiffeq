@@ -163,9 +163,11 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
             # "Taylor-mode autodiff for higher-order derivatives in JAX")
             # explain details.
             linear_combination = jvp(*cs_padded)[k - deg]
-            cs += [(fx[k] + linear_combination) / (k + 1)]
-            cs_padded = cs + [zeros] * (2 * deg - k - 2)
+            cs_ = cs_padded[: (k + 1 - deg)]
+            cs_ += [(fx[k] + linear_combination) / (k + 1)]
+            cs_padded = cs_ + [zeros] * (2 * deg - k - 2)
 
+            print(k)
         # Store all new coefficients
         taylor_coefficients.extend(cs)
 
