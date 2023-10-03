@@ -7,6 +7,8 @@ format:
 	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
 	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
 
 lint:
 	pre-commit run --all-files
