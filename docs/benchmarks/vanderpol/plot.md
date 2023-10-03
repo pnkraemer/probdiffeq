@@ -71,7 +71,7 @@ def plot_results(axis, results):
 plt.rcParams.update(notebook.plot_config())
 
 fig, axis = plt.subplots(dpi=150)
-fig.suptitle("Van der Pol problem, terminal-value simulation")
+fig.suptitle("Stiff Van-der-Pol problem ($10^5$)")
 
 results = load_results()
 axis = plot_results(axis, results)
