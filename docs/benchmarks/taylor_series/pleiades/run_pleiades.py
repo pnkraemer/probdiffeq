@@ -58,7 +58,30 @@ def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
 
 
 def taylor_mode() -> Callable:
-    """Construct a solver that wraps ProbDiffEq's solution routines."""
+    """Taylor-mode estimation."""
+    vf_auto, (u0, du0) = _pleiades()
+
+    @functools.partial(jax.jit, static_argnames=["num"])
+    def estimate(num):
+        tcoeffs = autodiff.taylor_mode(vf_auto, (u0, du0), num=num)
+        return jax.block_until_ready(tcoeffs)
+
+    return estimate
+
+
+def forward_mode() -> Callable:
+    """Forward-mode estimation."""
+    vf_auto, (u0, du0) = _pleiades()
+
+    @functools.partial(jax.jit, static_argnames=["num"])
+    def estimate(num):
+        tcoeffs = autodiff.forward_mode(vf_auto, (u0, du0), num=num)
+        return jax.block_until_ready(tcoeffs)
+
+    return estimate
+
+
+def _pleiades():
     # fmt: off
     u0 = jnp.asarray(
         [
@@ -73,9 +96,10 @@ def taylor_mode() -> Callable:
         ]
     )
     # fmt: on
+    t0 = 0.0
 
     @jax.jit
-    def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
+    def vf_probdiffeq(u, du, *, t=t0):  # noqa: ARG001
         """Pleiades problem."""
         x = u[0:7]  # x
         y = u[7:14]  # y
@@ -87,62 +111,44 @@ def taylor_mode() -> Callable:
         ddy = jnp.sum(jnp.nan_to_num(mj * (yj - yi) / rij), axis=1)
         return jnp.concatenate((ddx, ddy))
 
-    t0 = 0.0
-
-    @functools.partial(jax.jit, static_argnames=["num"])
-    def estimate(num):
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = autodiff.taylor_mode(vf_auto, (u0, du0), num=num - 1)
-        return jax.block_until_ready(tcoeffs)
-
-    return estimate
+    return vf_probdiffeq, (u0, du0)
 
 
-def workprec(fun, *, timeit_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function to a parameter-to-workprecision function.
+def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
+    """Benchmark a function iteratively until a max-time threshold is exceeded."""
+    work_compile = []
+    work_mean = []
+    work_std = []
+    arguments = []
 
-    Turn a function param->solution into a function
-
-    (param1, param2, ...)->(workprecision1, workprecision2, ...)
-
-    where workprecisionX is a dictionary with keys "work" and "precision".
-    """
-
-    def parameter_list_to_workprecision(max_time=1.0, /):
-        work_compile = []
-        work_mean = []
-        work_std = []
-        arguments = []
-
+    t0 = time.perf_counter()
+    arg = 1
+    while (elapsed := time.perf_counter() - t0) < max_time:
+        print(arg, elapsed)
         t0 = time.perf_counter()
-        arg = 1
-        while (elapsed := time.perf_counter() - t0) < max_time:
-            print(arg, elapsed)
-            t0 = time.perf_counter()
-            _ = fun(arg)
-            t1 = time.perf_counter()
-            time_compile = t1 - t0
+        _ = fun(arg)
+        t1 = time.perf_counter()
+        time_compile = t1 - t0
 
-            time_execute = timeit_fun(lambda: fun(arg))  # noqa: B023
+        time_execute = timeit_fun(lambda: fun(arg))  # noqa: B023
 
-            arguments.append(arg)
-            work_compile.append(time_compile)
-            work_mean.append(statistics.mean(time_execute))
-            work_std.append(statistics.stdev(time_execute))
-            arg += 1
-        return {
-            "work_mean": jnp.asarray(work_mean),
-            "work_std": jnp.asarray(work_std),
-            "work_compile": jnp.asarray(work_compile),
-            "arguments": jnp.asarray(arguments),
-        }
-
-    return parameter_list_to_workprecision
+        arguments.append(arg + 1)  # plus one, because second-order problem
+        work_compile.append(time_compile)
+        work_mean.append(statistics.mean(time_execute))
+        work_std.append(statistics.stdev(time_execute))
+        arg += 1
+    return {
+        "work_mean": jnp.asarray(work_mean),
+        "work_std": jnp.asarray(work_std),
+        "work_compile": jnp.asarray(work_compile),
+        "arguments": jnp.asarray(arguments),
+    }
 
 
 if __name__ == "__main__":
     set_jax_config()
     algorithms = {
+        r"Forward-mode": forward_mode(),
         r"Taylor-mode": taylor_mode(),
     }
 
@@ -153,9 +159,10 @@ if __name__ == "__main__":
     # Compute all work-precision diagrams
     results = {}
     for label, algo in algorithms.items():
-        param_to_wp = workprec(algo, timeit_fun=timeit_fun)
-        results[label] = param_to_wp(args.max_time_per_method)
-
+        print("\n", label)
+        results[label] = adaptive_benchmark(
+            algo, timeit_fun=timeit_fun, max_time=args.max_time_per_method
+        )
     # Save results
     if args.save:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)

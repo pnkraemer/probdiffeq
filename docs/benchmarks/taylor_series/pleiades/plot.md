@@ -39,6 +39,8 @@ def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "taylor" in label.lower():
         return {"color": "C0", "linestyle": "solid"}
+    if "forward" in label.lower():
+        return {"color": "C1", "linestyle": "dashed"}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
