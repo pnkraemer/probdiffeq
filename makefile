@@ -11,6 +11,7 @@ format:
 	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
 
 lint:
 	pre-commit run --all-files

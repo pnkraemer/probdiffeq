@@ -13,12 +13,12 @@ jupyter:
     name: python3
 ---
 
-# Taylor-series: Pleiades
+# Taylor-series: FitzHugh-Nagumo
 
-The Pleiades problem is a common non-stiff differential equation.
+The FHN problem is a common non-stiff differential equation.
 
 ```python
-"""Benchmark all Taylor-series estimators on the Pleiades problem."""
+"""Benchmark all Taylor-series estimators on the Fitzhugh-Nagumo problem."""
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -41,6 +41,8 @@ def choose_style(label):
         return {"color": "C0", "linestyle": "solid"}
     if "forward" in label.lower():
         return {"color": "C1", "linestyle": "dashed"}
+    if "doubling" in label.lower():
+        return {"color": "C2", "linestyle": "dotted"}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
@@ -68,7 +70,7 @@ plt.rcParams.update(notebook.plot_config())
 fig, (axis_perform, axis_compile) = plt.subplots(
     ncols=2, dpi=150, figsize=(8, 3), sharex=True, tight_layout=True
 )
-fig.suptitle("Pleiades problem, Taylor-series estimation")
+fig.suptitle("FitzHugh-Nagumo problem, Taylor-series estimation")
 
 results = load_results()
 axis_compile, axis_perform = plot_results(axis_compile, axis_perform, results)
