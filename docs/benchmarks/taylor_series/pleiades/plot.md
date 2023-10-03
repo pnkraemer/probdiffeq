@@ -65,8 +65,8 @@ def plot_results(axis_compile, axis_perform, results):
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, (axis_compile, axis_perform) = plt.subplots(
-    ncols=2, dpi=150, figsize=(8, 3), sharey=True, sharex=True, tight_layout=True
+fig, (axis_perform, axis_compile) = plt.subplots(
+    ncols=2, dpi=150, figsize=(8, 3), sharex=True, tight_layout=True
 )
 fig.suptitle("Pleiades problem, Taylor-series estimation")
 
