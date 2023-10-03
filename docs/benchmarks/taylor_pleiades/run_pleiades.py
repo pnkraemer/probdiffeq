@@ -42,7 +42,7 @@ def print_library_info() -> None:
 def parse_arguments() -> argparse.Namespace:
     """Parse the arguments from the command line."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max_time_per_method", type=float, default=1.0)
+    parser.add_argument("--max_time", type=float)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--save", action=argparse.BooleanOptionalAction)
     return parser.parse_args()
@@ -124,7 +124,7 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
     t0 = time.perf_counter()
     arg = 1
     while (elapsed := time.perf_counter() - t0) < max_time:
-        print(arg, elapsed)
+        print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
         t0 = time.perf_counter()
         _ = fun(arg)
         t1 = time.perf_counter()
@@ -159,9 +159,10 @@ if __name__ == "__main__":
     # Compute all work-precision diagrams
     results = {}
     for label, algo in algorithms.items():
-        print("\n", label)
+        print("\n")
+        print(label)
         results[label] = adaptive_benchmark(
-            algo, timeit_fun=timeit_fun, max_time=args.max_time_per_method
+            algo, timeit_fun=timeit_fun, max_time=args.max_time
         )
     # Save results
     if args.save:

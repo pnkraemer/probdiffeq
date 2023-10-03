@@ -32,6 +32,9 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
+	time python docs/benchmarks/taylor_pleiades/run_pleiades.py --max_time 10 --repeats 3 --save
+	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/taylor_pleiades/*.ipynb
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 20  --save
 	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/lotkavolterra/*.ipynb
@@ -46,6 +49,9 @@ run-benchmarks:
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
 dry-run-benchmarks:
+	time python docs/benchmarks/taylor_pleiades/run_pleiades.py --max_time 0.5 --repeats 2 --no-save
+	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/taylor_pleiades/*.ipynb
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 5 --repeats 2 --no-save
 	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 3 --repeats 2  --no-save
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --no-save
@@ -58,14 +64,16 @@ clean:
 	rm -rf *.egg-info
 	rm -rf dist site build
 	rm -rf *.ipynb_checkpoints
-	rm -rf docs/examples_benchmarks/benchmarks/lotka_volterra/__pycache__
-	rm -rf docs/examples_benchmarks/benchmarks/lotka_volterra/.ipynb_checkpoints
-	rm -rf docs/examples_benchmarks/benchmarks/pleiades/__pycache__
-	rm -rf docs/examples_benchmarks/benchmarks/pleiades/.ipynb_checkpoints
-	rm -rf docs/examples_benchmarks/benchmarks/stiff_van_der_pol/__pycache__
-	rm -rf docs/examples_benchmarks/benchmarks/stiff_van_der_pol/.ipynb_checkpoints
 	rm -rf docs/benchmarks/hires/__pycache__
 	rm -rf docs/benchmarks/hires/.ipynb_checkpoints
+	rm -rf docs/benchmarks/pleiades/__pycache__
+	rm -rf docs/benchmarks/pleiades/.ipynb_checkpoints
+	rm -rf docs/benchmarks/lotkavolterra/__pycache__
+	rm -rf docs/benchmarks/lotkavolterra/.ipynb_checkpoints
+	rm -rf docs/benchmarks/vanderpol/__pycache__
+	rm -rf docs/benchmarks/vanderpol/.ipynb_checkpoints
+	rm -rf docs/benchmarks/taylor_pleiades/__pycache__
+	rm -rf docs/benchmarks/taylor_pleiades/.ipynb_checkpoints
 	rm docs/benchmarks/hires/*.npy
 
 doc:
