@@ -10,7 +10,7 @@ format:
 	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/taylor_series/pleiades/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
 
 lint:
 	pre-commit run --all-files
