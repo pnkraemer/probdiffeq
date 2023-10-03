@@ -37,7 +37,7 @@ def load_results():
 
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
-    if "TS" in label:
+    if "ProbDiffEq" in label:
         return {"color": "C0", "linestyle": "solid"}
     if "SciPy" in label:
         return {"color": "C2", "linestyle": "dashed"}

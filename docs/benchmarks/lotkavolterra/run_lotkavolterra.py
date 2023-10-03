@@ -7,6 +7,7 @@ import functools
 import os
 import statistics
 import timeit
+import warnings
 from typing import Callable
 
 import diffrax
@@ -33,11 +34,6 @@ def set_jax_config() -> None:
 
     # CPU
     config.update("jax_platform_name", "cpu")
-
-
-def set_probdiffeq_config() -> None:
-    """Set probdiffeq up."""
-    impl.select("isotropic", ode_shape=(2,))
 
 
 def print_library_info() -> None:
@@ -71,7 +67,7 @@ def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
     return timer
 
 
-def solver_probdiffeq(num_derivatives: int) -> Callable:
+def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
@@ -82,14 +78,14 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         return jnp.asarray([dy1, dy2])
 
     u0 = jnp.asarray((20.0, 20.0))
-    t0, t1 = (0.0, 20.0)
+    t0, t1 = (0.0, 50.0)
 
     @jax.jit
     def param_to_solution(tol):
+        impl.select(implementation, ode_shape=(2,))
         # Build a solver
         ibm = priors.ibm_adaptive(num_derivatives=num_derivatives)
-        ts0 = corrections.ts0()
-        strategy = filters.filter_adaptive(ibm, ts0)
+        strategy = filters.filter_adaptive(ibm, correction())
         solver = calibrated.mle(strategy)
         control = controls.proportional_integral()
         adaptive_solver = adaptive.adaptive(
@@ -99,7 +95,8 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         # Initial state
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = autodiff.taylor_mode(vf_auto, (u0,), num=num_derivatives)
-        init = solver.initial_condition(tcoeffs, output_scale=1.0)
+        output_scale = 1.0 * jnp.ones((2,)) if implementation == "blockdiag" else 1.0
+        init = solver.initial_condition(tcoeffs, output_scale=output_scale)
 
         # Solve
         dt0 = timestep.initial(vf_auto, (u0,))
@@ -125,7 +122,7 @@ def solver_diffrax(*, solver) -> Callable:
         return jnp.asarray([dy1, dy2])
 
     u0 = jnp.asarray((20.0, 20.0))
-    t0, t1 = (0.0, 20.0)
+    t0, t1 = (0.0, 50.0)
 
     @jax.jit
     def param_to_solution(tol):
@@ -157,7 +154,7 @@ def solver_scipy(*, method: str) -> Callable:
         return np.asarray([dy1, dy2])
 
     u0 = jnp.asarray((20.0, 20.0))
-    time_span = np.asarray([0.0, 20.0])
+    time_span = np.asarray([0.0, 50.0])
 
     def param_to_solution(tol):
         solution = scipy.integrate.solve_ivp(
@@ -220,8 +217,11 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
 if __name__ == "__main__":
     # Set up all the configs
     set_jax_config()
-    set_probdiffeq_config()
     print_library_info()
+
+    # If we change the probdiffeq-impl halfway through a script, a warning is raised.
+    # But for this benchmark, such a change is on purpose.
+    warnings.filterwarnings("ignore")
 
     # Read configuration from command line
     args = parse_arguments()
@@ -229,14 +229,20 @@ if __name__ == "__main__":
     timeit_fun = timeit_fun_from_args(args)
 
     # Assemble algorithms
+    ts0, ts1 = corrections.ts0, corrections.ts1
+    ts0_iso = solver_probdiffeq(5, correction=ts0, implementation="isotropic")
+    ts0_bd = solver_probdiffeq(5, correction=ts0, implementation="blockdiag")
+    ts1_dense = solver_probdiffeq(8, correction=ts1, implementation="dense")
     algorithms = {
-        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(num_derivatives=5),
+        r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
+        r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
+        r"ProbDiffEq: TS1($8$, dense)": ts1_dense,
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
         "SciPy: 'RK45'": solver_scipy(method="RK45"),
     }
 
     # Compute a reference solution
-    reference = solver_probdiffeq(7)(1e-13)
+    reference = solver_scipy(method="LSODA")(1e-15)
     precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams
