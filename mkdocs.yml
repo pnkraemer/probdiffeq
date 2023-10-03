@@ -76,6 +76,15 @@ plugins:
         - benchmarks/hires/*.md
         - benchmarks/hires/*.py
         - benchmarks/hires/.ipynb_checkpoints/*
+        - benchmarks/pleiades/*.md
+        - benchmarks/pleiades/*.py
+        - benchmarks/pleiades/.ipynb_checkpoints/*
+        - benchmarks/vanderpol/*.md
+        - benchmarks/vanderpol/*.py
+        - benchmarks/vanderpol/.ipynb_checkpoints/*
+        - benchmarks/lotkavolterra/*.md
+        - benchmarks/lotkavolterra/*.py
+        - benchmarks/lotkavolterra/.ipynb_checkpoints/*
   - mkdocs-jupyter
 nav:
   - Getting started:
@@ -95,6 +104,9 @@ nav:
       - Parameter estimation with BlackJAX: examples_parameter_estimation/physics_enhanced_regression_2.ipynb
       - Neural ODEs with Optax: examples_parameter_estimation/neural_ode.ipynb
   - Benchmarks:
+      - Lotka-Volterra: benchmarks/lotkavolterra/plot.ipynb
+      - Van-der-Pol: benchmarks/vanderpol/plot.ipynb
+      - Pleiades: benchmarks/pleiades/plot.ipynb
       - Hires: benchmarks/hires/plot.ipynb
   - API Documentation:
       - ivpsolve: api_docs/ivpsolve.md

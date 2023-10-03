@@ -18,7 +18,7 @@ jupyter:
 The van der Pol problem is a common stiff differential equation.
 
 ```python
-"""Benchmark all solvers on the Pleiades problem."""
+"""Benchmark all solvers on the Van-der-Pol problem."""
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
