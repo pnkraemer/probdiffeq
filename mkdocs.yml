@@ -93,6 +93,9 @@ plugins:
         - benchmarks/lotkavolterra/*.md
         - benchmarks/lotkavolterra/*.py
         - benchmarks/lotkavolterra/.ipynb_checkpoints/*
+        - benchmarks/taylor_pleiades/*.md
+        - benchmarks/taylor_pleiades/*.py
+        - benchmarks/taylor_pleiades/.ipynb_checkpoints/*
   - mkdocs-jupyter
 extra:
   social:
@@ -120,7 +123,7 @@ nav:
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - adaptive: api_docs/adaptive.md
-      - api_docs/controls.md
+      - controls: api_docs/controls.md
       - timestep: api_docs/timestep.md
       - impl: api_docs/impl.md
       - solvers:
@@ -147,8 +150,9 @@ nav:
       - dev_docs/public_api.md
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md
-  - Benchmarks:
-      - Lotka-Volterra: benchmarks/lotkavolterra/plot.ipynb
-      - Van-der-Pol: benchmarks/vanderpol/plot.ipynb
-      - Pleiades: benchmarks/pleiades/plot.ipynb
-      - Hires: benchmarks/hires/plot.ipynb
+  - BENCHMARKS:
+      - benchmarks/lotkavolterra/plot.ipynb
+      - benchmarks/vanderpol/plot.ipynb
+      - benchmarks/pleiades/plot.ipynb
+      - benchmarks/hires/plot.ipynb
+      - benchmarks/taylor_pleiades/plot.ipynb

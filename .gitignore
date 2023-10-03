@@ -6,6 +6,7 @@ docs/benchmarks/hires/*.npy
 docs/benchmarks/pleiades/*.npy
 docs/benchmarks/vanderpol/*.npy
 docs/benchmarks/lotkavolterra/*.npy
+docs/benchmarks/taylor_pleiades/*.npy
 
 # IDE stuff
 .idea/
