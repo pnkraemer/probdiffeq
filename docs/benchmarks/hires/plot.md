@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# High Irradiance Response (HIRES)
+# Hires
 
 The HIRES problem is a common stiff differential equation.
 

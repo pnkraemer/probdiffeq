@@ -78,7 +78,7 @@ axis_perform.set_title("Evaluation time")
 axis_perform.legend()
 axis_compile.set_xlabel("Number of Derivatives")
 axis_perform.set_xlabel("Number of Derivatives")
-axis_compile.set_ylabel("Wall time (sec)")
+axis_perform.set_ylabel("Wall time (sec)")
 axis_perform.grid()
 axis_compile.grid()
 

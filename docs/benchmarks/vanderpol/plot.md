@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# Van der Pol
+# Stiff Van-der-Pol
 
 The van der Pol problem is a common stiff differential equation.
 
