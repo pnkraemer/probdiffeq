@@ -66,7 +66,7 @@ def plot_results(axis_compile, axis_perform, results):
             work_compile = _adaptive_repeat(work_compile, num_repeats)
             work_mean = _adaptive_repeat(work_mean, num_repeats)
             work_std = _adaptive_repeat(work_std, num_repeats)
-            axis_perform.set_xticks(inputs[::2])
+            # axis_perform.set_xticks(inputs[::2])
 
         axis_compile.semilogy(inputs, work_compile, label=label, **style, **style_curve)
 
@@ -76,7 +76,7 @@ def plot_results(axis_compile, axis_perform, results):
             inputs, range_lower, range_upper, **style, **style_area
         )
 
-    # axis_compile.set_xlim((1, 17))
+    axis_compile.set_xlim((1, 17))
     # axis_perform.set_yticks((1e-6, 1e-5, 1e-4))
     # axis_perform.set_ylim((7e-7, 1.5e-4))
     return axis_compile, axis_perform
@@ -111,4 +111,8 @@ axis_perform.grid()
 axis_compile.grid()
 
 plt.show()
+```
+
+```python
+
 ```

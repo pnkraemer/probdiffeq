@@ -12,6 +12,7 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
+from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq.impl import impl
@@ -59,7 +60,7 @@ def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
 
 def taylor_mode() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _lorenz()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -71,7 +72,7 @@ def taylor_mode() -> Callable:
 
 def taylor_mode_unroll() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _lorenz()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -83,7 +84,7 @@ def taylor_mode_unroll() -> Callable:
 
 def taylor_mode_doubling() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _lorenz()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -95,7 +96,7 @@ def taylor_mode_doubling() -> Callable:
 
 def forward_mode() -> Callable:
     """Forward-mode estimation."""
-    vf_auto, (u0,) = _lorenz()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -105,10 +106,20 @@ def forward_mode() -> Callable:
     return estimate
 
 
-def _lorenz():
-    N = 10_000
-    M = 10
-    num_layers = 3
+def _lorenz96():
+    f, u0, _, args = ivps.lorenz96(num_variables=1_000)
+
+    @jax.jit
+    def vf(u):
+        return f(u, *args)
+
+    return vf, (u0,)
+
+
+def _node():
+    N = 100
+    M = 100
+    num_layers = 2
 
     key = jax.random.PRNGKey(seed=1)
     key1, key2, key3, key4 = jax.random.split(key, num=4)
@@ -164,6 +175,7 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 
 if __name__ == "__main__":
     set_jax_config()
+    backend.select("jax")
     algorithms = {
         r"Forward-mode": forward_mode(),
         r"Taylor-mode (scan)": taylor_mode(),
