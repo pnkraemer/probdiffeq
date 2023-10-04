@@ -17,11 +17,6 @@ def case_taylor_mode():
     return autodiff.taylor_mode
 
 
-@testing.case()
-def case_taylor_mode_doubling():
-    return autodiff.taylor_mode_doubling
-
-
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
@@ -41,5 +36,17 @@ def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num)
     (f, init), solution = pb_with_solution
 
     derivatives = taylor_fun(f, init, num=num)
+    assert len(derivatives) == num + 1
+    for dy, dy_ref in zip(derivatives, solution):
+        assert jnp.allclose(dy, dy_ref)
+
+
+@testing.parametrize("num_doublings", [1, 2])
+def test_approximation_identical_to_reference_doubling(pb_with_solution, num_doublings):
+    """Separately test the doubling-function, because its API is different."""
+    (f, init), solution = pb_with_solution
+
+    derivatives = autodiff.taylor_mode_doubling(f, init, num_doublings=num_doublings)
+    assert len(derivatives) == jnp.sum(2 ** jnp.arange(num_doublings + 1))
     for dy, dy_ref in zip(derivatives, solution):
         assert jnp.allclose(dy, dy_ref)

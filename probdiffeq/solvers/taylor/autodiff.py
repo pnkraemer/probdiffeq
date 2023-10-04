@@ -1,6 +1,6 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-import functools
+import itertools
 from typing import Callable, Tuple
 
 import jax
@@ -8,10 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-# TODO: split into subpackage
 
-
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
 def taylor_mode(vf: Callable, initial_values: Tuple, /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
@@ -76,7 +73,6 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
 def forward_mode(vf: Callable, initial_values: Tuple, /, num: int):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
@@ -108,8 +104,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
-def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
+def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num_doublings: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -142,7 +137,8 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         return _normalise(p_new, *s_new)
 
     taylor_coefficients = [u0]
-    while (deg := len(taylor_coefficients)) < num + 1:
+    degrees = list(itertools.accumulate(map(lambda s: 2**s, range(num_doublings))))
+    for deg in degrees:
         jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
         fx, jvp = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
@@ -171,7 +167,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         # Store all new coefficients
         taylor_coefficients.extend(cs_padded)
 
-    return _unnormalise(*taylor_coefficients)[: 1 + num]
+    return _unnormalise(*taylor_coefficients)
 
 
 def _normalise(primals, *series):
