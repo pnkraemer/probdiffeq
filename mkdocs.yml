@@ -12,15 +12,19 @@ theme:
     - search.highlight
   palette:
     # Palette toggle for light mode
-    - scheme: probdiffeq-light
+    - scheme: default
+      primary: white
+      accent: amber
       toggle:
-        icon: material/brightness-7
+        icon: material/eye
         name: Switch to dark mode
 
     # Palette toggle for dark mode
-    - scheme: probdiffeq-dark
+    - scheme: slate
+      primary: black
+      accent: amber
       toggle:
-        icon: material/brightness-4
+        icon: material/eye-outline
         name: Switch to light mode
   icon:
     repo: fontawesome/brands/github
