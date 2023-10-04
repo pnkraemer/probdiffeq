@@ -1,4 +1,4 @@
-# Change log
+# Changelog
 
 ## v0.2.3
 
@@ -7,10 +7,9 @@
 * A new function `taylor_mode_unroll` implements Taylor-series estimation without a `scan`.
 
 
-
 ## v0.2.2
 
-This release was mostly due to changes in the publishing workflow.
+This release was due to issues in the publishing workflow.
 
 ## v0.2.1
 
@@ -18,11 +17,6 @@ This release was mostly due to changes in the publishing workflow.
 
 * The input-argument to `taylor_mode_doubling` is `num_doublings` instead of `num`.
   This argument behaves differently to e.g., `taylor_mode(..., num)`.
-
-
-**New features:**
-
-* A new function `taylor_mode_unroll` implements Taylor-series estimation without `scan`.
 
 
 ## v0.2.0
