@@ -1,7 +1,8 @@
 """Interpolation utilities."""
 
 import dataclasses
-from typing import Generic, Iterator, TypeVar
+from collections.abc import Iterator
+from typing import Generic, TypeVar
 
 import jax
 

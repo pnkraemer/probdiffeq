@@ -1,7 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 import itertools
-from typing import Callable, Tuple
+from typing import Callable
 
 import jax
 import jax.experimental.jet
@@ -9,7 +9,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 
-def taylor_mode(vf: Callable, initial_values: Tuple, /, num: int):
+def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
     num_arguments = len(initial_values)
@@ -73,7 +73,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode(vf: Callable, initial_values: Tuple, /, num: int):
+def forward_mode(vf: Callable, initial_values: tuple, /, num: int):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -104,7 +104,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
-def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num_doublings: int):
+def taylor_mode_doubling(vf: Callable, initial_values: tuple, /, num_doublings: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
