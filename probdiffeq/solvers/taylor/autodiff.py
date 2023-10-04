@@ -66,6 +66,10 @@ def taylor_mode_unroll(vf: Callable, initial_values: tuple, /, num: int):
 
     The differences should be small.
     Consult the benchmarks if performance is critical.
+
+    !!! warning "Compilation time"
+        JIT-compiling this function unrolls a loop.
+
     """
     # Number of positional arguments in f
     num_arguments = len(initial_values)
@@ -111,9 +115,7 @@ def forward_mode(vf: Callable, initial_values: tuple, /, num: int):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`.
-
-
+        JIT-compiling this function unrolls a loop.
 
     """
     g_n, g_0 = vf, vf
