@@ -114,7 +114,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num_doublings: 
         and without any deprecation policy.
 
     !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`.
+        JIT-compiling this function unrolls a loop.
 
     """
     (u0,) = initial_values
