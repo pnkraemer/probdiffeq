@@ -12,7 +12,6 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
-from diffeqzoo import backend, ivps
 from jax import config
 
 from probdiffeq.impl import impl
@@ -107,13 +106,28 @@ def forward_mode() -> Callable:
 
 
 def _lorenz():
-    f, u0, (t0, t1), args = ivps.lorenz96(num_variables=10_000)
+    N = 10_000
+    M = 10
+    num_layers = 3
+
+    key = jax.random.PRNGKey(seed=1)
+    key1, key2, key3, key4 = jax.random.split(key, num=4)
+
+    u0 = jax.random.uniform(key1, shape=(N,))
+
+    weights = jax.random.normal(key2, shape=(num_layers, 2, M, N))
+    biases1 = jax.random.normal(key3, shape=(num_layers, M))
+    biases2 = jax.random.normal(key4, shape=(num_layers, N))
+
+    fun = jnp.tanh
 
     @jax.jit
-    def vf_probdiffeq(u):
-        return f(u, *args)
+    def vf(x):
+        for (w1, w2), b1, b2 in zip(weights, biases1, biases2):
+            x = fun(w2.T @ fun(w1 @ x + b1) + b2)
+        return x
 
-    return vf_probdiffeq, (u0,)
+    return vf, (u0,)
 
 
 def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
@@ -132,7 +146,6 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
         t1 = time.perf_counter()
         time_compile = t1 - t0
 
-        print(jnp.asarray(tcoeffs).shape)
         time_execute = timeit_fun(lambda: fun(arg))  # noqa: B023
 
         arguments.append(len(tcoeffs))
@@ -151,7 +164,6 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 
 if __name__ == "__main__":
     set_jax_config()
-    backend.select("jax")
     algorithms = {
         r"Forward-mode": forward_mode(),
         r"Taylor-mode (scan)": taylor_mode(),

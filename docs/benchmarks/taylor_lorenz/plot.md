@@ -13,9 +13,9 @@ jupyter:
     name: python3
 ---
 
-# Taylor-series: FitzHugh-Nagumo
+# Taylor-series: Lorenz96 problem
 
-The FHN problem is a common non-stiff differential equation.
+The Lorenz96 problem is a common differential equation.
 
 ```python
 """Benchmark all Taylor-series estimators on the Fitzhugh-Nagumo problem."""
@@ -76,9 +76,9 @@ def plot_results(axis_compile, axis_perform, results):
             inputs, range_lower, range_upper, **style, **style_area
         )
 
-    axis_compile.set_xlim((1, 17))
-    axis_perform.set_yticks((1e-6, 1e-5, 1e-4))
-    axis_perform.set_ylim((7e-7, 1.5e-4))
+    # axis_compile.set_xlim((1, 17))
+    # axis_perform.set_yticks((1e-6, 1e-5, 1e-4))
+    # axis_perform.set_ylim((7e-7, 1.5e-4))
     return axis_compile, axis_perform
 
 
@@ -96,14 +96,14 @@ plt.rcParams.update(notebook.plot_config())
 fig, (axis_perform, axis_compile) = plt.subplots(
     ncols=2, dpi=150, figsize=(8, 3), sharex=True, constrained_layout=True
 )
-fig.suptitle("FitzHugh-Nagumo problem, Taylor-series estimation")
+fig.suptitle("Lorenz problem, Taylor-series estimation")
 
 results = load_results()
 axis_compile, axis_perform = plot_results(axis_compile, axis_perform, results)
 
 axis_compile.set_title("Compile time")
 axis_perform.set_title("Evaluation time")
-axis_perform.legend(loc="lower right")
+axis_compile.legend(loc="lower right")
 axis_compile.set_xlabel("Number of Derivatives")
 axis_perform.set_xlabel("Number of Derivatives")
 axis_perform.set_ylabel("Wall time (sec)")

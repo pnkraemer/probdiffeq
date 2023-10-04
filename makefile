@@ -13,6 +13,7 @@ format:
 	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/taylor_lorenz/*.ipynb
 
 lint:
 	pre-commit run --all-files
@@ -34,6 +35,9 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
+	time python docs/benchmarks/taylor_lorenz/run_taylor_lorenz.py --max_time 15 --repeats 3 --save
+	jupytext --quiet --sync docs/benchmarks/taylor_lorenz/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/taylor_lorenz/*.ipynb
 	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 15 --repeats 5 --save
 	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/taylor_pleiades/*.ipynb
@@ -82,6 +86,8 @@ clean:
 	rm -rf docs/benchmarks/taylor_pleiades/.ipynb_checkpoints
 	rm -rf docs/benchmarks/taylor_fitzhughnagumo/__pycache__
 	rm -rf docs/benchmarks/taylor_fitzhughnagumo/.ipynb_checkpoints
+	rm -rf docs/benchmarks/taylor_lorenz/__pycache__
+	rm -rf docs/benchmarks/taylor_lorenz/.ipynb_checkpoints
 
 doc:
 	mkdocs build
