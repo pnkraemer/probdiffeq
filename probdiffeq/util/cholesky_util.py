@@ -19,7 +19,6 @@ manipulation of square root matrices.
     is more natural.
 
 """
-from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -117,7 +116,7 @@ def _is_matrix(mat, matrix_ndim=2):
     return jnp.ndim(mat) == matrix_ndim
 
 
-def sum_of_sqrtm_factors(R_stack: Tuple):
+def sum_of_sqrtm_factors(R_stack: tuple):
     r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
     R = jnp.concatenate(R_stack)
     uppertri = triu_via_qr(R)

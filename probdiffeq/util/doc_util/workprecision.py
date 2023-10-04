@@ -2,7 +2,7 @@
 
 import statistics
 import timeit
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -172,7 +172,7 @@ def _evaluate_method_and_tolerance(*, error_fn, fn, atol, rtol, repeat):
 
 def plot(
     *,
-    results: Dict[Any, Tuple[Results, MethodConfig]],
+    results: dict[Any, tuple[Results, MethodConfig]],
     fig,
     ax,
     title,

@@ -2,7 +2,7 @@
 
 import dataclasses
 import functools
-from typing import Callable, Generic, Tuple, TypeVar
+from typing import Callable, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -28,7 +28,7 @@ class Controller(Generic[T]):
     """Extract the time-step from the controller state."""
 
 
-def proportional_integral(**options) -> Controller[Tuple[float, float]]:
+def proportional_integral(**options) -> Controller[tuple[float, float]]:
     """Construct a proportional-integral-controller."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
@@ -36,7 +36,7 @@ def proportional_integral(**options) -> Controller[Tuple[float, float]]:
     return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def proportional_integral_clipped(**options) -> Controller[Tuple[float, float]]:
+def proportional_integral_clipped(**options) -> Controller[tuple[float, float]]:
     """Construct a proportional-integral-controller with time-clipping."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
@@ -46,7 +46,7 @@ def proportional_integral_clipped(**options) -> Controller[Tuple[float, float]]:
 
 
 def _proportional_integral_apply(
-    state: Tuple[float, float],
+    state: tuple[float, float],
     /,
     error_normalised,
     *,
@@ -56,7 +56,7 @@ def _proportional_integral_apply(
     factor_max=10.0,
     power_integral_unscaled=0.3,
     power_proportional_unscaled=0.4,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     dt_proposed, error_norm_previously_accepted = state
     n1 = power_integral_unscaled / error_contraction_rate
     n2 = power_proportional_unscaled / error_contraction_rate
@@ -82,15 +82,15 @@ def _proportional_integral_init(dt0, /):
 
 
 def _proportional_integral_clip(
-    state: Tuple[float, float], /, t, t1
-) -> Tuple[float, float]:
+    state: tuple[float, float], /, t, t1
+) -> tuple[float, float]:
     dt_proposed, error_norm_previously_accepted = state
     dt = dt_proposed
     dt_clipped = jnp.minimum(dt, t1 - t)
     return dt_clipped, error_norm_previously_accepted
 
 
-def _proportional_integral_extract(state: Tuple[float, float], /):
+def _proportional_integral_extract(state: tuple[float, float], /):
     dt_proposed, _error_norm_previously_accepted = state
     return dt_proposed
 
