@@ -3,6 +3,7 @@
 
 format:
 	black --quiet .
+	isort --quiet .
 	jupytext --quiet --sync docs/quickstart/*.ipynb
 	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
 	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb
