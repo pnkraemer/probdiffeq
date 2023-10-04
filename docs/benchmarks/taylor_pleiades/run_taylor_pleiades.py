@@ -69,6 +69,18 @@ def taylor_mode() -> Callable:
     return estimate
 
 
+def taylor_mode_unroll() -> Callable:
+    """Taylor-mode estimation."""
+    vf_auto, (u0, du0) = _pleiades()
+
+    @functools.partial(jax.jit, static_argnames=["num"])
+    def estimate(num):
+        tcoeffs = autodiff.taylor_mode_unroll(vf_auto, (u0, du0), num=num)
+        return jax.block_until_ready(tcoeffs)
+
+    return estimate
+
+
 def forward_mode() -> Callable:
     """Forward-mode estimation."""
     vf_auto, (u0, du0) = _pleiades()
@@ -137,6 +149,7 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
         work_mean.append(statistics.mean(time_execute))
         work_std.append(statistics.stdev(time_execute))
         arg += 1
+    print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
     return {
         "work_mean": jnp.asarray(work_mean),
         "work_std": jnp.asarray(work_std),
@@ -149,7 +162,8 @@ if __name__ == "__main__":
     set_jax_config()
     algorithms = {
         r"Forward-mode": forward_mode(),
-        r"Taylor-mode": taylor_mode(),
+        r"Taylor-mode (scan)": taylor_mode(),
+        r"Taylor-mode (unroll)": taylor_mode_unroll(),
     }
 
     # Compute a reference solution

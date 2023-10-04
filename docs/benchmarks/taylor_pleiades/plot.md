@@ -37,6 +37,8 @@ def load_results():
 
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
+    if "unroll" in label.lower():
+        return {"color": "C2", "linestyle": "dashdot"}
     if "taylor" in label.lower():
         return {"color": "C0", "linestyle": "solid"}
     if "forward" in label.lower():

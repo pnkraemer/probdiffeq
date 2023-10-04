@@ -34,12 +34,12 @@ example:
 	jupytext --quiet --sync docs/examples_parameter_estimation/*
 
 run-benchmarks:
-	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 15 --repeats 15 --save
-	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
-	jupytext --quiet --execute docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
 	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 15 --repeats 5 --save
 	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/taylor_pleiades/*.ipynb
+	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 15 --repeats 15 --save
+	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
+	jupytext --quiet --execute docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 20  --save
 	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
 	jupytext --quiet --execute docs/benchmarks/lotkavolterra/*.ipynb
