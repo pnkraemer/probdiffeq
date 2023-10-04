@@ -1,12 +1,25 @@
 # Change log
 
+## v0.2.1
+
+**Breaking changes:**
+
+* The input-argument to `taylor_mode_doubling` is `num_doublings` instead of `num`.
+  This argument behaves differently to e.g., `taylor_mode(..., num)`.
+  Since doubling is experimental, the version is not bumped to `v0.3.0`.
+
+
+**New features:**
+
+**Notable bug-fixes:**
+
 ## v0.2.0
 
 This version overhauls large parts of the API. 
 Consider the quickstart for an introduction about the "new" way of doing things.
 From now on, this change log will be used properly.
 
-Notable bug fixes:
+**Notable bug-fixes:**
 
 * The log-pdf behaviour of Gaussian random variables has been corrected (previously, the returned values were slightly incorrect).
   This means that the behaviour of, e.g., parameter estimation scripts will change slightly.

@@ -1,6 +1,6 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-import functools
+import itertools
 from typing import Callable, Tuple
 
 import jax
@@ -8,10 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-# TODO: split into subpackage
 
-
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
 def taylor_mode(vf: Callable, initial_values: Tuple, /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
     # Number of positional arguments in f
@@ -76,7 +73,6 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
 def forward_mode(vf: Callable, initial_values: Tuple, /, num: int):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
@@ -108,8 +104,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
-def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
+def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num_doublings: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -119,7 +114,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         and without any deprecation policy.
 
     !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`.
+        JIT-compiling this function unrolls a loop.
 
     """
     (u0,) = initial_values
@@ -142,7 +137,8 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         return _normalise(p_new, *s_new)
 
     taylor_coefficients = [u0]
-    while (deg := len(taylor_coefficients)) < num + 1:
+    degrees = list(itertools.accumulate(map(lambda s: 2**s, range(num_doublings))))
+    for deg in degrees:
         jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
         fx, jvp = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
@@ -150,7 +146,8 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
         # TODO: can we jax.fori_loop() this loop?
         #  the running variable (cs_padded) should have constant size
         cs = [(fx[deg - 1] / deg)]
-        for k in range(deg, min(2 * deg, num)):
+        cs_padded = cs + [zeros] * (deg - 1)
+        for i, fx_i in enumerate(fx[deg : 2 * deg]):
             # The Jacobian of the embedded jet is block-banded,
             # i.e., of the form (for j=3)
             # (A0, 0, 0; A1, A0, 0; A2, A1, A0; *, *, *; *, *, *; *, *, *)
@@ -161,12 +158,14 @@ def taylor_mode_doubling(vf: Callable, initial_values: Tuple, /, num: int):
             # Bettencourt et al. (2019;
             # "Taylor-mode autodiff for higher-order derivatives in JAX")
             # explain details.
-            cs_padded = cs + [zeros] * (2 * deg - k - 1)
-            linear_combination = jvp(*cs_padded)[k - deg]
-            cs += [(fx[k] + linear_combination) / (k + 1)]
+            # i = k - deg
+            linear_combination = jvp(*cs_padded)[i]
+            cs_ = cs_padded[: (i + 1)]
+            cs_ += [(fx_i + linear_combination) / (i + deg + 1)]
+            cs_padded = cs_ + [zeros] * (deg - i - 2)
 
         # Store all new coefficients
-        taylor_coefficients.extend(cs)
+        taylor_coefficients.extend(cs_padded)
 
     return _unnormalise(*taylor_coefficients)
 
