@@ -17,6 +17,11 @@ def case_taylor_mode():
     return autodiff.taylor_mode
 
 
+@testing.case()
+def case_taylor_mode_unroll():
+    return autodiff.taylor_mode_unroll
+
+
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()

@@ -69,6 +69,18 @@ def taylor_mode() -> Callable:
     return estimate
 
 
+def taylor_mode_unroll() -> Callable:
+    """Taylor-mode estimation."""
+    vf_auto, (u0,) = _fitzhugh_nagumo()
+
+    @functools.partial(jax.jit, static_argnames=["num"])
+    def estimate(num):
+        tcoeffs = autodiff.taylor_mode_unroll(vf_auto, (u0,), num=num)
+        return jax.block_until_ready(tcoeffs)
+
+    return estimate
+
+
 def taylor_mode_doubling() -> Callable:
     """Taylor-mode estimation."""
     vf_auto, (u0,) = _fitzhugh_nagumo()
@@ -142,7 +154,8 @@ if __name__ == "__main__":
     set_jax_config()
     algorithms = {
         r"Forward-mode": forward_mode(),
-        r"Taylor-mode": taylor_mode(),
+        r"Taylor-mode (scan)": taylor_mode(),
+        r"Taylor-mode (unroll)": taylor_mode_unroll(),
         r"Taylor-mode (doubling)": taylor_mode_doubling(),
     }
 

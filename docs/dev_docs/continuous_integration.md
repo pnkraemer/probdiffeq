@@ -8,7 +8,6 @@ pip install probdiffeq[format]  # black, isort, ...
 pip install probdiffeq[lint]  # flake8, ...
 pip install probdiffeq[example]  # tueplots, diffrax, blackjax, ...
 pip install probdiffeq[doc]  # mkdocs, ...
-pip install probdiffeq[full]  # all of the above
 ```
 
 Run the checks with a makefile, use either of the below
@@ -33,4 +32,8 @@ pre-commit install
 You may verify the installation by running
 ```commandline
 pre-commit run
+```
+which is equivalent to 
+```commandline
+make lint
 ```
