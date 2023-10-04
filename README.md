@@ -28,13 +28,13 @@ and many more.
 
 
 
-* **QUICKSTART:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/quickstart/)
-* **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples/posterior_uncertainties/)
-* **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/quickstart/choosing_a_solver/)
-* **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/solution_routines/)
+* **AN EASY EXAMPLE:** [LINK](https://pnkraemer.github.io/probdiffeq/getting_started/easy_example/)
+* **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_solver_config/posterior_uncertainties/)
+* **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/getting_started/choosing_a_solver/)
+* **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/ivpsolve/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
-* **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/benchmarks/pleiades/external/)
-* **CHANGELOG:** [LINK](https://github.com/pnkraemer/probdiffeq/blob/main/docs/changelog.md)
+* **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/benchmarks/lotkavolterra/plot/)
+* **CHANGELOG:** [LINK](https://pnkraemer.github.io/probdiffeq/dev_docs/changelog/)
 
 
 ## Installation
