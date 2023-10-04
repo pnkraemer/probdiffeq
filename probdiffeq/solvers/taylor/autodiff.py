@@ -10,7 +10,16 @@ import jax.numpy as jnp
 
 
 def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
-    """Taylor-expand the solution of an IVP with Taylor-mode differentiation."""
+    """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
+
+    Other than `taylor_mode_unroll()`, this function implements the loop via a scan,
+    which comes at the price of padding the loop variable with zeros as appropriate.
+    It is expected to compile more quickly than `taylor_mode_unroll()`, but may
+    execute more slowly.
+
+    The differences should be small.
+    Consult the benchmarks if performance is critical.
+    """
     # Number of positional arguments in f
     num_arguments = len(initial_values)
 
@@ -44,6 +53,31 @@ def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
 
     # Compute all coefficients with scan().
     taylor_coeffs, _ = jax.lax.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
+    return taylor_coeffs
+
+
+def taylor_mode_unroll(vf: Callable, initial_values: tuple, /, num: int):
+    """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
+
+    Other than `taylor_mode()`, this function does not depend on zero-padding
+    the coefficients at the price of unrolling a loop of length `num-1`.
+    It is expected to compile more slowly than `taylor_mode()`,
+    but execute more quickly.
+
+    The differences should be small.
+    Consult the benchmarks if performance is critical.
+    """
+    # Number of positional arguments in f
+    num_arguments = len(initial_values)
+
+    # Initial Taylor series (u_0, u_1, ..., u_k)
+    primals = vf(*initial_values)
+    taylor_coeffs = [*initial_values, primals]
+
+    for _ in range(num - 1):
+        series = _subsets(taylor_coeffs[1:], num_arguments)  # for high-order ODEs
+        p, s_new = jax.experimental.jet.jet(vf, primals=initial_values, series=series)
+        taylor_coeffs = [*initial_values, p, *s_new]
     return taylor_coeffs
 
 
