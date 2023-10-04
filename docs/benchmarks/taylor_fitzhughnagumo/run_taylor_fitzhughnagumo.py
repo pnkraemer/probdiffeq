@@ -75,7 +75,7 @@ def taylor_mode_doubling() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_doubling(vf_auto, (u0,), num=num)
+        tcoeffs = autodiff.taylor_mode_doubling(vf_auto, (u0,), num_doublings=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -111,9 +111,6 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
     work_compile = []
     work_mean = []
     work_std = []
-    work_min = []
-    work_median = []
-    work_max = []
     arguments = []
 
     t0 = time.perf_counter()
@@ -121,27 +118,21 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
     while (elapsed := time.perf_counter() - t0) < max_time:
         print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
         t0 = time.perf_counter()
-        _ = fun(arg)
+        tcoeffs = fun(arg)
         t1 = time.perf_counter()
         time_compile = t1 - t0
 
         time_execute = timeit_fun(lambda: fun(arg))  # noqa: B023
 
-        arguments.append(arg + 1)  # plus one, because second-order problem
+        arguments.append(len(tcoeffs))
         work_compile.append(time_compile)
         work_mean.append(statistics.mean(time_execute))
         work_std.append(statistics.stdev(time_execute))
-        work_min.append(min(time_execute))
-        work_median.append(statistics.median(time_execute))
-        work_max.append(max(time_execute))
         arg += 1
     print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
     return {
-        "work_median": jnp.asarray(work_median),
         "work_mean": jnp.asarray(work_mean),
         "work_std": jnp.asarray(work_std),
-        "work_min": jnp.asarray(work_min),
-        "work_max": jnp.asarray(work_max),
         "work_compile": jnp.asarray(work_compile),
         "arguments": jnp.asarray(arguments),
     }

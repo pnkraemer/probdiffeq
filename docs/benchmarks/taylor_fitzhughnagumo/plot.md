@@ -57,7 +57,6 @@ def plot_results(axis_compile, axis_perform, results):
         axis_compile.semilogy(inputs, work_mean, label=label, **style)
 
         work_mean, work_std = wp["work_mean"], wp["work_std"]
-        work_min, work_max = (wp["work_min"], wp["work_max"])
         range_lower, range_upper = work_mean - work_std, work_mean + work_std
         axis_perform.semilogy(inputs, work_mean, label=label, **style)
         axis_perform.fill_between(inputs, range_lower, range_upper, alpha=0.3, **style)
