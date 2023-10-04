@@ -54,6 +54,7 @@ run-benchmarks:
 	jupytext --quiet --execute docs/benchmarks/hires/*.ipynb
 
 dry-run-benchmarks:
+	time python docs/benchmarks/taylor_lorenz/run_taylor_lorenz.py --max_time 0.5 --repeats 2 --no-save
 	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 0.5 --repeats 2 --no-save
 	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 0.5 --repeats 2 --no-save
 	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 0.5 --repeats 2 --no-save
