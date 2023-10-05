@@ -37,7 +37,7 @@ def fixture_sol(strategy_func):
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.simulate_terminal_values(

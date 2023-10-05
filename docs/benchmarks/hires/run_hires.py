@@ -105,7 +105,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
 
         # Initial state
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = autodiff.taylor_mode(vf_auto, (u0,), num=num_derivatives)
+        tcoeffs = autodiff.taylor_mode_scan(vf_auto, (u0,), num=num_derivatives)
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         # Solve

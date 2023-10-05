@@ -87,7 +87,7 @@ and to wrapping this approximation into a state-space-model variable.
 Use the following functions:
 
 ```python
-tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 output_scale = 1.0  # or any other value with the same shape
 init = solver.initial_condition(tcoeffs, output_scale)
 ```

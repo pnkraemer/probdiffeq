@@ -30,5 +30,5 @@ def _affine_problem(n):
 
     init = (jnp.arange(9.0, 11.0),)
 
-    solution = autodiff.taylor_mode(vf, init, num=n)
+    solution = autodiff.taylor_mode_scan(vf, init, num=n)
     return vf, init, solution

@@ -70,7 +70,7 @@ init_raw, transitions = priors.ibm_discretised(
 markov_seq_prior = markov.MarkovSeq(init_raw, transitions)
 
 
-tcoeffs = autodiff.taylor_mode(
+tcoeffs = autodiff.taylor_mode_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
 init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(

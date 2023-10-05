@@ -13,8 +13,8 @@ def case_forward_mode():
 
 
 @testing.case()
-def case_taylor_mode():
-    return autodiff.taylor_mode
+def case_taylor_mode_scan():
+    return autodiff.taylor_mode_scan
 
 
 @testing.fixture(name="pb_with_solution")

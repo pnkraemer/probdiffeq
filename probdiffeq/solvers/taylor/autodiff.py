@@ -9,7 +9,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 
-def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
+def taylor_mode_scan(vf: Callable, initial_values: tuple, /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `taylor_mode_unroll()`, this function implements the loop via a scan,
@@ -59,9 +59,9 @@ def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
 def taylor_mode_unroll(vf: Callable, initial_values: tuple, /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
-    Other than `taylor_mode()`, this function does not depend on zero-padding
+    Other than `taylor_mode_scan()`, this function does not depend on zero-padding
     the coefficients at the price of unrolling a loop of length `num-1`.
-    It is expected to compile more slowly than `taylor_mode()`,
+    It is expected to compile more slowly than `taylor_mode_scan()`,
     but execute more quickly.
 
     The differences should be small.

@@ -24,7 +24,7 @@ def fixture_approximate_solution():
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=1)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=1)
     init = solver.initial_condition(tcoeffs, output_scale)
 
     return ivpsolve.solve_and_save_every_step(

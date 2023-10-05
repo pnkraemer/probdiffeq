@@ -24,7 +24,7 @@ def fixture_problem_args_kwargs():
     solver = calibrated.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
 

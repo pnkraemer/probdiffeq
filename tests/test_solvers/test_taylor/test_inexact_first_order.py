@@ -21,7 +21,7 @@ def fixture_pb_with_solution():
     def vf(u, /):
         return f(u, *f_args)
 
-    solution = autodiff.taylor_mode(vf, (u0,), num=3)
+    solution = autodiff.taylor_mode_scan(vf, (u0,), num=3)
     return (vf, (u0,), t0), solution
 
 

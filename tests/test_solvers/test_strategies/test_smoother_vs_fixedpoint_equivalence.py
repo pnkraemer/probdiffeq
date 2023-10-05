@@ -21,7 +21,7 @@ def fixture_solver_setup():
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
 
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {
         "vf": vf,
         "tcoeffs": tcoeffs,

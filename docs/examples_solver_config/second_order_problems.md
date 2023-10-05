@@ -58,7 +58,7 @@ solver_1st = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = autodiff.taylor_mode(lambda y: vf_1(y, t=t0), (u0,), num=4)
+tcoeffs = autodiff.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 ```
 
@@ -100,7 +100,7 @@ solver_2nd = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = autodiff.taylor_mode(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+tcoeffs = autodiff.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 ```
 

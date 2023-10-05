@@ -43,7 +43,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     solver = uncalibrated.solver(strategy)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init = solver.initial_condition(tcoeffs, output_scale)
     grid = jnp.linspace(t0, t1, endpoint=True, num=5)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)
