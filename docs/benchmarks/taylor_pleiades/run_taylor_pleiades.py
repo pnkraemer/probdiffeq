@@ -15,7 +15,7 @@ import jax.numpy as jnp
 from jax import config
 
 from probdiffeq.impl import impl
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
@@ -57,13 +57,13 @@ def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
     return timer
 
 
-def taylor_mode() -> Callable:
+def taylor_mode_scan() -> Callable:
     """Taylor-mode estimation."""
     vf_auto, (u0, du0) = _pleiades()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode(vf_auto, (u0, du0), num=num)
+        tcoeffs = autodiff.taylor_mode_scan(vf_auto, (u0, du0), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -81,13 +81,13 @@ def taylor_mode_unroll() -> Callable:
     return estimate
 
 
-def forward_mode() -> Callable:
+def forward_mode_recursive() -> Callable:
     """Forward-mode estimation."""
     vf_auto, (u0, du0) = _pleiades()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.forward_mode(vf_auto, (u0, du0), num=num)
+        tcoeffs = autodiff.forward_mode_recursive(vf_auto, (u0, du0), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -161,8 +161,8 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 if __name__ == "__main__":
     set_jax_config()
     algorithms = {
-        r"Forward-mode": forward_mode(),
-        r"Taylor-mode (scan)": taylor_mode(),
+        r"Forward-mode": forward_mode_recursive(),
+        r"Taylor-mode (scan)": taylor_mode_scan(),
         r"Taylor-mode (unroll)": taylor_mode_unroll(),
     }
 

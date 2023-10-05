@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -30,7 +30,7 @@ from probdiffeq import ivpsolve, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, solution
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
 ```
@@ -57,7 +57,7 @@ def vf(*ys, t):
     return f(*ys, *f_args)
 
 
-tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 ```
 
 ## Terminal-value simulation

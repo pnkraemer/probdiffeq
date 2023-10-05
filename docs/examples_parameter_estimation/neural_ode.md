@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -29,7 +29,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import smoothers
 ```

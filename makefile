@@ -4,7 +4,7 @@
 format:
 	black --quiet .
 	isort --quiet .
-	jupytext --quiet --sync docs/quickstart/*.ipynb
+	jupytext --quiet --sync docs/getting_started/*.ipynb
 	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
 	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb
 	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
@@ -25,8 +25,8 @@ test:
 	IMPL=scalar pytest -n auto -v # parallelise, verbose output
 
 example:
-	jupytext --quiet --sync docs/quickstart/*.ipynb
-	jupytext --quiet --execute docs/quickstart/*.ipynb
+	jupytext --quiet --sync docs/getting_started/*.ipynb
+	jupytext --quiet --execute docs/getting_started/*.ipynb
 	jupytext --quiet --sync docs/examples_solver_config/*
 	jupytext --quiet --execute docs/examples_solver_config/*
 	jupytext --quiet --sync docs/examples_solver_config/*

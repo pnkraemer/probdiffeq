@@ -39,7 +39,7 @@ ProbDiffEq can reproduce most of the implementations in Tornadox:
 | `solver.solve()`                      | `solve_and_save_every_step()`                     | Try `solve_and_save_at()` instead.                                                                                                                               |
 | `solver.simulate_final_state()`       | `simulate_terminal_values()`                      | ProbDiffEq compiles the whole loop; it will be much faster.                                                                                                      |
 | `solver.solution_generator()`         | Work in progress.                                 |                                                                                                                                                                  |
-| `init.TaylorMode()`                   | `taylor.autodiff.taylor_mode`                     | Consider `taylor.autodiff.forward_mode()` for low numbers of derivatives and `taylor.autodiff.taylor_mode_doubling()` for (absurdly) high numbers of derivatives |
+| `init.TaylorMode()`                   | `taylor.autodiff.taylor_mode`                     | Consider `taylor.autodiff.forward_mode_recursive()` for low numbers of derivatives and `taylor.autodiff.taylor_mode_doubling()` for (absurdly) high numbers of derivatives |
 | `init.RungeKutta()`                   | `taylor.estim.make_runge_kutta_starter()`         |                                                                                                                                                                  |
 
 

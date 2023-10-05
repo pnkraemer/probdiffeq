@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -104,7 +104,7 @@ from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import uncalibrated, solution
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 ```
 
 ```python
@@ -160,7 +160,7 @@ def solve_fixed(theta, *, ts):
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (theta,), num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
 
@@ -177,7 +177,7 @@ def solve_adaptive(theta, *, save_at):
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)
 
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (theta,), num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_and_save_at(

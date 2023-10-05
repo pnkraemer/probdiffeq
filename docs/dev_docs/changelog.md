@@ -1,10 +1,16 @@
 # Changelog
 
-## v0.2.3
+## v0.3.0
 
 **New features:**
 
 * A new function `taylor_mode_unroll` implements Taylor-series estimation without a `scan`.
+
+**Breaking changes:**
+
+* What was formerly `taylor_mode()`, is now `taylor_mode_scan()` and stands in contrast to the new `taylor_mode_unroll()`.
+* What was formerly `forward_mode()`, is now `forward_mode_recursive()`.
+* The entire `taylor` subpackage moved to top-level. Instead of `from probdiffeq.solvers.taylor import ...`, use `from probdiffeq.taylor import ...`. 
 
 
 ## v0.2.2
@@ -16,7 +22,7 @@ This release was due to issues in the publishing workflow.
 **Breaking changes:**
 
 * The input-argument to `taylor_mode_doubling` is `num_doublings` instead of `num`.
-  This argument behaves differently to e.g., `taylor_mode(..., num)`.
+  This argument behaves differently to e.g., `taylor_mode_scan(..., num)`.
 
 
 ## v0.2.0

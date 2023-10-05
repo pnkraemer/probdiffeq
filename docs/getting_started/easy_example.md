@@ -12,7 +12,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 
 config.update("jax_platform_name", "cpu")
 ```
@@ -87,7 +87,7 @@ and to wrapping this approximation into a state-space-model variable.
 Use the following functions:
 
 ```python
-tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 output_scale = 1.0  # or any other value with the same shape
 init = solver.initial_condition(tcoeffs, output_scale)
 ```

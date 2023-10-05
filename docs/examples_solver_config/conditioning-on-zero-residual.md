@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -29,7 +29,7 @@ from probdiffeq import controls, ivpsolve, timestep, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 ```
@@ -70,7 +70,7 @@ init_raw, transitions = priors.ibm_discretised(
 markov_seq_prior = markov.MarkovSeq(init_raw, transitions)
 
 
-tcoeffs = autodiff.taylor_mode(
+tcoeffs = autodiff.taylor_mode_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
 init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(

@@ -1,6 +1,5 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-import functools
 from typing import Callable
 
 import jax
@@ -8,8 +7,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 
 
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num"])
-def affine_recursion(vf: Callable, initial_values: tuple, /, num: int):
+def affine_recursion(vf: Callable, initial_values: tuple[jax.Array, ...], /, num: int):
     """Evaluate the Taylor series of an affine differential equation.
 
     !!! warning "Compilation time"

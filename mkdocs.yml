@@ -63,20 +63,8 @@ plugins:
       handlers:
         python:
           options:
-            show_root_heading: true
-            show_root_toc_entry: true
-            show_root_full_path: true
-            show_root_members_full_path: true
-            show_object_full_path: false
-            show_category_heading: true
             docstring_style: numpy
-            show_if_no_docstring: true
-            members_order: alphabetical
-            annotations_path: brief
-            show_signature: true
             show_signature_annotations: true
-            separate_signature: false
-            docstring_section_style: list
   - exclude:
       glob:
         - getting_started/easy_example.md
@@ -147,14 +135,14 @@ nav:
               - smoothers: api_docs/solvers/strategies/smoothers.md
               - fixedpoint: api_docs/solvers/strategies/fixedpoint.md
               - discrete: api_docs/solvers/strategies/discrete.md
-          - taylor:
-              - affine: api_docs/solvers/taylor/affine.md
-              - autodiff: api_docs/solvers/taylor/autodiff.md
-              - estim: api_docs/solvers/taylor/estim.md
           - calibrated: api_docs/solvers/calibrated.md
           - uncalibrated: api_docs/solvers/uncalibrated.md
           - solution: api_docs/solvers/solution.md
           - markov: api_docs/solvers/markov.md
+      - taylor:
+          - affine: api_docs/taylor/affine.md
+          - autodiff: api_docs/taylor/autodiff.md
+          - estim: api_docs/taylor/estim.md
   - DEVELOPER DOCUMENTATION:
       - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md

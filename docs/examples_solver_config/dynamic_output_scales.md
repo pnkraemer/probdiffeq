@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -31,7 +31,7 @@ from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers.taylor import affine
+from probdiffeq.taylor import affine
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters

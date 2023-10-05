@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -23,7 +23,7 @@ def fixture_sol():
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
 
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
@@ -103,7 +103,7 @@ def test_raises_error_for_filter():
     solver = uncalibrated.solver(strategy)
 
     grid = jnp.linspace(t0, t1, num=3)
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)

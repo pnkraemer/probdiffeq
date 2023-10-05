@@ -23,7 +23,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
@@ -93,7 +93,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
 
         # Initial state
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = autodiff.taylor_mode(vf_auto, (u0,), num=num_derivatives)
+        tcoeffs = autodiff.taylor_mode_scan(vf_auto, (u0,), num=num_derivatives)
         output_scale = 1.0 * jnp.ones((2,)) if implementation == "blockdiag" else 1.0
         init = solver.initial_condition(tcoeffs, output_scale=output_scale)
 

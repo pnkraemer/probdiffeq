@@ -22,7 +22,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
@@ -96,7 +96,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
 
         # Initial state
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = autodiff.taylor_mode(vf_auto, (u0, du0), num=num_derivatives - 1)
+        tcoeffs = autodiff.taylor_mode_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         # Solve

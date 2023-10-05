@@ -4,17 +4,17 @@ import diffeqzoo.ivps
 import jax.numpy as jnp
 
 from probdiffeq.backend import testing
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 
 
 @testing.case()
-def case_forward_mode():
-    return autodiff.forward_mode
+def case_forward_mode_recursive():
+    return autodiff.forward_mode_recursive
 
 
 @testing.case()
-def case_taylor_mode():
-    return autodiff.taylor_mode
+def case_taylor_mode_scan():
+    return autodiff.taylor_mode_scan
 
 
 @testing.case()
@@ -29,9 +29,7 @@ def fixture_pb_with_solution():
     def vf(u, /):
         return f(u, *f_args)
 
-    solution = jnp.load(
-        "./tests/test_solvers/test_taylor/data/three_body_first_solution.npy"
-    )
+    solution = jnp.load("./tests/test_taylor/data/three_body_first_solution.npy")
     return (vf, (u0,)), solution
 
 

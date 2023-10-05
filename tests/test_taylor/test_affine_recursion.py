@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import testing
-from probdiffeq.solvers.taylor import affine, autodiff
+from probdiffeq.taylor import affine, autodiff
 
 
 @testing.parametrize("num", [1, 2, 4])
@@ -30,5 +30,5 @@ def _affine_problem(n):
 
     init = (jnp.arange(9.0, 11.0),)
 
-    solution = autodiff.taylor_mode(vf, init, num=n)
+    solution = autodiff.taylor_mode_scan(vf, init, num=n)
     return vf, init, solution

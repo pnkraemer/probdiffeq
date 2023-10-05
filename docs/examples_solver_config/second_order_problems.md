@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -26,7 +26,7 @@ from probdiffeq.impl import impl
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters
 ```
@@ -58,7 +58,7 @@ solver_1st = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = autodiff.taylor_mode(lambda y: vf_1(y, t=t0), (u0,), num=4)
+tcoeffs = autodiff.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 ```
 
@@ -100,7 +100,7 @@ solver_2nd = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = autodiff.taylor_mode(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+tcoeffs = autodiff.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 ```
 

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from diffeqzoo import backend
 from jax.config import config
 
-from probdiffeq.solvers import taylor
+from probdiffeq.taylor import autodiff
 
 
 def set_environment():
@@ -29,7 +29,7 @@ def three_body_first(num_derivatives_max=6):
     def vf(u, *, t, p):  # noqa: ARG001
         return f(u, *p)
 
-    return taylor.taylor_mode_fn(
+    return autodiff.taylor_mode_unroll(
         vector_field=vf,
         initial_values=(u0,),
         num=num_derivatives_max,
@@ -44,7 +44,7 @@ def van_der_pol_second(num_derivatives_max=6):
     def vf(u, du, *, t, p):  # noqa: ARG001
         return f(u, du, *p)
 
-    return taylor.taylor_mode_fn(
+    return autodiff.taylor_mode_unroll(
         vector_field=vf,
         initial_values=(u0, du0),
         num=num_derivatives_max,
@@ -58,13 +58,11 @@ if __name__ == "__main__":
     set_environment()
 
     solution1 = three_body_first()
-    jnp.save(
-        "./tests/test_solvers/test_taylor/data/three_body_first_solution.npy", solution1
-    )
+    jnp.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
 
     solution2 = van_der_pol_second()
     jnp.save(
-        "./tests/test_solvers/test_taylor/data/van_der_pol_second_solution.npy",
+        "./tests/test_taylor/data/van_der_pol_second_solution.npy",
         solution2,
     )
 

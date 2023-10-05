@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.0
+      jupytext_version: 1.15.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -26,7 +26,7 @@ from probdiffeq import ivpsolve, adaptive, timestep
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, solution, markov
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 ```
@@ -72,7 +72,7 @@ ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 ```python
 dt0 = timestep.initial(lambda y: vf(y, t=t0), (u0,))
 
-tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=4)
+tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(
     vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver

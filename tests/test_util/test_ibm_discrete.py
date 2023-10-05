@@ -39,7 +39,6 @@ def _marginal_moments(init, transitions):
 
     _, rvs = jax.lax.scan(step, init=init, xs=transitions, reverse=False)
     means = impl.stats.mean(rvs)
-    print(jax.tree_util.tree_map(jnp.shape, rvs))
     # todo: does this conflict with error estimation?
     stds = impl.stats.standard_deviation(rvs)
 

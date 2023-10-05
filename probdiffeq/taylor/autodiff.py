@@ -9,7 +9,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 
-def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
+def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `taylor_mode_unroll()`, this function implements the loop via a scan,
@@ -21,11 +21,11 @@ def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
     Consult the benchmarks if performance is critical.
     """
     # Number of positional arguments in f
-    num_arguments = len(initial_values)
+    num_arguments = len(inits)
 
     # Initial Taylor series (u_0, u_1, ..., u_k)
-    primals = vf(*initial_values)
-    taylor_coeffs = [*initial_values, primals]
+    primals = vf(*inits)
+    taylor_coeffs = [*inits, primals]
 
     def body(tcoeffs, _):
         # Pad the Taylor coefficients in zeros, call jet, and return the solution.
@@ -33,12 +33,12 @@ def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
         # is independent of the $i+j$th input coefficient
         # (see also the explanation in taylor_mode_doubling)
         series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
-        p, s_new = jax.experimental.jet.jet(vf, primals=initial_values, series=series)
+        p, s_new = jax.experimental.jet.jet(vf, primals=inits, series=series)
 
         # The final values in s_new are nonsensical
         # (well, they are not; but we don't care about them)
         # so we remove them
-        tcoeffs = [*initial_values, p, *s_new[:-1]]
+        tcoeffs = [*inits, p, *s_new[:-1]]
         return tcoeffs, None
 
     # Pad the initial Taylor series with zeros
@@ -56,12 +56,12 @@ def taylor_mode(vf: Callable, initial_values: tuple, /, num: int):
     return taylor_coeffs
 
 
-def taylor_mode_unroll(vf: Callable, initial_values: tuple, /, num: int):
+def taylor_mode_unroll(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
-    Other than `taylor_mode()`, this function does not depend on zero-padding
+    Other than `taylor_mode_scan()`, this function does not depend on zero-padding
     the coefficients at the price of unrolling a loop of length `num-1`.
-    It is expected to compile more slowly than `taylor_mode()`,
+    It is expected to compile more slowly than `taylor_mode_scan()`,
     but execute more quickly.
 
     The differences should be small.
@@ -72,16 +72,16 @@ def taylor_mode_unroll(vf: Callable, initial_values: tuple, /, num: int):
 
     """
     # Number of positional arguments in f
-    num_arguments = len(initial_values)
+    num_arguments = len(inits)
 
     # Initial Taylor series (u_0, u_1, ..., u_k)
-    primals = vf(*initial_values)
-    taylor_coeffs = [*initial_values, primals]
+    primals = vf(*inits)
+    taylor_coeffs = [*inits, primals]
 
     for _ in range(num - 1):
         series = _subsets(taylor_coeffs[1:], num_arguments)  # for high-order ODEs
-        p, s_new = jax.experimental.jet.jet(vf, primals=initial_values, series=series)
-        taylor_coeffs = [*initial_values, p, *s_new]
+        p, s_new = jax.experimental.jet.jet(vf, primals=inits, series=series)
+        taylor_coeffs = [*inits, p, *s_new]
     return taylor_coeffs
 
 
@@ -111,18 +111,18 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode(vf: Callable, initial_values: tuple, /, num: int):
-    """Taylor-expand the solution of an IVP with forward-mode differentiation.
+def forward_mode_recursive(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
+    """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
         JIT-compiling this function unrolls a loop.
 
     """
     g_n, g_0 = vf, vf
-    taylor_coeffs = [*initial_values, vf(*initial_values)]
+    taylor_coeffs = [*inits, vf(*inits)]
     for _ in range(num - 1):
         g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-        taylor_coeffs = [*taylor_coeffs, g_n(*initial_values)]
+        taylor_coeffs = [*taylor_coeffs, g_n(*inits)]
     return taylor_coeffs
 
 
@@ -140,7 +140,9 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return jax.tree_util.Partial(df)
 
 
-def taylor_mode_doubling(vf: Callable, initial_values: tuple, /, num_doublings: int):
+def taylor_mode_doubling(
+    vf: Callable, inits: tuple[jax.Array, ...], /, num_doublings: int
+):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -153,7 +155,7 @@ def taylor_mode_doubling(vf: Callable, initial_values: tuple, /, num_doublings: 
         JIT-compiling this function unrolls a loop.
 
     """
-    (u0,) = initial_values
+    (u0,) = inits
     zeros = jnp.zeros_like(u0)
 
     def jet_embedded(*c, degree):

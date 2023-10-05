@@ -9,7 +9,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import filters, smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -19,7 +19,7 @@ def fixture_solver_setup():
 
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     grid = jnp.linspace(t0, t1, endpoint=True, num=12)
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
 
 

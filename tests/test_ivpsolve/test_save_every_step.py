@@ -9,7 +9,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -26,10 +26,8 @@ def fixture_python_loop_solution():
     dt0 = timestep.initial_adaptive(
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
     )
-    dt0_ = timestep.initial(lambda y: vf(y, t=t0), u0)
-    print(dt0, dt0_)
 
-    tcoeffs = autodiff.taylor_mode(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
 
