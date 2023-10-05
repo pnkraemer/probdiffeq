@@ -164,3 +164,4 @@ nav:
       - benchmarks/hires/plot.ipynb
       - benchmarks/taylor_pleiades/plot.ipynb
       - benchmarks/taylor_fitzhughnagumo/plot.ipynb
+      - benchmarks/taylor_node/plot.ipynb

@@ -13,12 +13,10 @@ jupyter:
     name: python3
 ---
 
-# Taylor-series: Lorenz96 problem
-
-The Lorenz96 problem is a common differential equation.
+# Taylor-series: Neural ODE problem
 
 ```python
-"""Benchmark all Taylor-series estimators on the Fitzhugh-Nagumo problem."""
+"""Benchmark all Taylor-series estimators on a Neural ODE."""
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -38,20 +36,20 @@ def load_results():
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "doubling" in label.lower():
-        return {"color": "C3", "linestyle": "dotted"}
+        return {"color": "C3", "linestyle": "dotted", "label": "Taylor mode (doubling)"}
     if "unroll" in label.lower():
-        return {"color": "C2", "linestyle": "dashdot"}
+        return {"color": "C2", "linestyle": "dashdot", "label": "Taylor-mode"}
     if "taylor" in label.lower():
         return {"color": "C0", "linestyle": "solid"}
     if "forward" in label.lower():
-        return {"color": "C1", "linestyle": "dashed"}
+        return {"color": "C1", "linestyle": "dashed", "label": "Forward-mode"}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
 
 def plot_results(axis_compile, axis_perform, results):
     """Plot the results."""
-    style_curve = {"alpha": 0.85, "markersize": 5}
+    style_curve = {"alpha": 0.85}
     style_area = {"alpha": 0.15}
     for label, wp in results.items():
         style = choose_style(label)
@@ -68,15 +66,17 @@ def plot_results(axis_compile, axis_perform, results):
             work_std = _adaptive_repeat(work_std, num_repeats)
             # axis_perform.set_xticks(inputs[::2])
 
-        axis_compile.semilogy(inputs, work_compile, label=label, **style, **style_curve)
+        axis_compile.semilogy(inputs, work_compile, **style, **style_curve)
 
         range_lower, range_upper = work_mean - work_std, work_mean + work_std
-        axis_perform.semilogy(inputs, work_mean, label=label, **style, **style_curve)
+        axis_perform.semilogy(inputs, work_mean, **style, **style_curve)
         axis_perform.fill_between(
             inputs, range_lower, range_upper, **style, **style_area
         )
 
-    axis_compile.set_xlim((1, 17))
+    axis_compile.set_xticks(range(1, 15))
+    # axis_compile.set_xlim((1, 17))
+    axis_compile.set_ylim((1e-3, 1e2))
     # axis_perform.set_yticks((1e-6, 1e-5, 1e-4))
     # axis_perform.set_ylim((7e-7, 1.5e-4))
     return axis_compile, axis_perform
@@ -93,15 +93,14 @@ def _adaptive_repeat(xs, ys):
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, (axis_perform, axis_compile) = plt.subplots(
-    ncols=2, dpi=150, figsize=(8, 3), sharex=True, constrained_layout=True
-)
-fig.suptitle("Lorenz problem, Taylor-series estimation")
+fig, (axis_perform, axis_compile) = plt.subplots(ncols=2, dpi=150, sharex=True)
+# fig.suptitle("100-dimensional Neural ODE, Taylor series estimation")
 
 results = load_results()
+results.pop("Taylor-mode (scan)")
 axis_compile, axis_perform = plot_results(axis_compile, axis_perform, results)
 
-axis_compile.set_title("Compile time")
+axis_compile.set_title("Compilation time")
 axis_perform.set_title("Evaluation time")
 axis_compile.legend(loc="lower right")
 axis_compile.set_xlabel("Number of Derivatives")
@@ -109,6 +108,8 @@ axis_perform.set_xlabel("Number of Derivatives")
 axis_perform.set_ylabel("Wall time (sec)")
 axis_perform.grid()
 axis_compile.grid()
+
+plt.savefig("taylor_node.pdf", dpi=250)
 
 plt.show()
 ```

@@ -8,6 +8,7 @@ docs/benchmarks/vanderpol/*.npy
 docs/benchmarks/lotkavolterra/*.npy
 docs/benchmarks/taylor_pleiades/*.npy
 docs/benchmarks/taylor_fitzhughnagumo/*.npy
+docs/benchmarks/taylor_node/*.npy
 
 # IDE stuff
 .idea/

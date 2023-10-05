@@ -1,4 +1,4 @@
-"""Benchmark the initialisation methods on the FitzHugh-Nagumo problem.
+"""Benchmark the initialisation methods on a Neural ODE.
 
 See makefile for instructions.
 """
@@ -12,7 +12,7 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
-from diffeqzoo import backend, ivps
+from diffeqzoo import backend
 from jax import config
 
 from probdiffeq.impl import impl
@@ -106,16 +106,6 @@ def forward_mode() -> Callable:
     return estimate
 
 
-def _lorenz96():
-    f, u0, _, args = ivps.lorenz96(num_variables=1_000)
-
-    @jax.jit
-    def vf(u):
-        return f(u, *args)
-
-    return vf, (u0,)
-
-
 def _node():
     N = 100
     M = 100
@@ -142,7 +132,7 @@ def _node():
 
 
 def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
-    """Benchmark a function iteratively until a max-time threshold is exceeded."""
+    """Call  repeatedly until a time-threshold is exceeded."""
     work_compile = []
     work_mean = []
     work_std = []
