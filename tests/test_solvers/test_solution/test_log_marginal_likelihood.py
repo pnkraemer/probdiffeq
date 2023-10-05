@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 

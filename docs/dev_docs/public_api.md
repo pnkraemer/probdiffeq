@@ -8,6 +8,7 @@ At the moment, this affects the following:
 * `controls.py`
 * `adaptive.py`
 * `timestep.py`
+* `taylor/*`
 * `solvers/*`
 * `impl.impl.select()`
 

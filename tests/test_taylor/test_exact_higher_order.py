@@ -4,7 +4,7 @@ import diffeqzoo.ivps
 import jax.numpy as jnp
 
 from probdiffeq.backend import testing
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 
 
 @testing.case()

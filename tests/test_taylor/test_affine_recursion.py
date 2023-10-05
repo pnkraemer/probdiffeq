@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import testing
-from probdiffeq.solvers.taylor import affine, autodiff
+from probdiffeq.taylor import affine, autodiff
 
 
 @testing.parametrize("num", [1, 2, 4])

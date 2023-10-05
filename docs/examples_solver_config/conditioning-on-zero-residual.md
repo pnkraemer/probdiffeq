@@ -29,7 +29,7 @@ from probdiffeq import controls, ivpsolve, timestep, adaptive
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 ```

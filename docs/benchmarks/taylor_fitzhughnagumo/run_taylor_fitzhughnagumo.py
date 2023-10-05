@@ -15,7 +15,7 @@ import jax.numpy as jnp
 from jax import config
 
 from probdiffeq.impl import impl
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 

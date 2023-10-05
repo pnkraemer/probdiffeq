@@ -29,7 +29,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import smoothers
 ```

@@ -22,7 +22,7 @@ from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.taylor import autodiff
+from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
