@@ -38,13 +38,13 @@ def load_results():
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "doubling" in label.lower():
-        return {"color": "C3", "linestyle": "dotted", "label": "Taylor mode (doubling)"}
+        return {"color": "C3", "linestyle": "dotted", "label": label}
     if "unroll" in label.lower():
-        return {"color": "C2", "linestyle": "dashdot", "label": "Taylor-mode"}
+        return {"color": "C2", "linestyle": "dashdot", "label": label}
     if "taylor" in label.lower():
-        return {"color": "C0", "linestyle": "solid"}
+        return {"color": "C0", "linestyle": "solid", "label": label}
     if "forward" in label.lower():
-        return {"color": "C1", "linestyle": "dashed", "label": "Forward-mode"}
+        return {"color": "C1", "linestyle": "dashed", "label": label}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
@@ -69,11 +69,12 @@ def plot_results(axis_compile, axis_perform, results):
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, (axis_perform, axis_compile) = plt.subplots(ncols=2, dpi=150, sharex=True)
-# fig.suptitle("Pleiades problem, Taylor-series estimation")
+fig, (axis_perform, axis_compile) = plt.subplots(
+    ncols=2, dpi=150, sharex=True, figsize=(8, 3)
+)
 
 results = load_results()
-results.pop("Taylor-mode (scan)")
+
 axis_compile, axis_perform = plot_results(axis_compile, axis_perform, results)
 
 axis_compile.set_title("Compilation time")
@@ -86,7 +87,6 @@ axis_perform.grid()
 axis_compile.grid()
 axis_perform.set_yticks((1e-5, 1e-4))
 
-plt.savefig("taylor_pleiades.pdf", dpi=250)
 
 plt.show()
 ```

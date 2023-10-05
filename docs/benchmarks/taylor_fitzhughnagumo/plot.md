@@ -38,13 +38,13 @@ def load_results():
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "doubling" in label.lower():
-        return {"color": "C3", "linestyle": "dotted", "label": "Taylor-mode (doubling)"}
+        return {"color": "C3", "linestyle": "dotted", "label": label}
     if "unroll" in label.lower():
-        return {"color": "C2", "linestyle": "dashdot", "label": "Taylor-mode"}
+        return {"color": "C2", "linestyle": "dashdot", "label": label}
     if "taylor" in label.lower():
-        return {"color": "C0", "linestyle": "solid"}
+        return {"color": "C0", "linestyle": "solid", "label": label}
     if "forward" in label.lower():
-        return {"color": "C1", "linestyle": "dashed", "label": "Forward-mode"}
+        return {"color": "C1", "linestyle": "dashed", "label": label}
     msg = f"Label {label} unknown."
     raise ValueError(msg)
 
@@ -79,7 +79,6 @@ def plot_results(axis_compile, axis_perform, results):
     axis_compile.set_xlim((1, 17))
     axis_compile.set_ylim((5e-3, 8e1))
     axis_perform.set_yticks((1e-5, 1e-4))
-    # axis_perform.set_ylim((7e-7, 1.5e-4))
     return axis_compile, axis_perform
 
 
@@ -94,10 +93,12 @@ def _adaptive_repeat(xs, ys):
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, (axis_perform, axis_compile) = plt.subplots(ncols=2, dpi=150, sharex=True)
+fig, (axis_perform, axis_compile) = plt.subplots(
+    ncols=2, figsize=(8, 3), dpi=150, sharex=True
+)
 
 results = load_results()
-results.pop("Taylor-mode (scan)")
+
 axis_compile, axis_perform = plot_results(axis_compile, axis_perform, results)
 
 axis_compile.set_title("Compilation time")
@@ -108,8 +109,6 @@ axis_perform.set_xlabel("Number of Derivatives")
 axis_perform.set_ylabel("Wall time (sec)")
 axis_perform.grid()
 axis_compile.grid()
-
-plt.savefig("taylor_fitzhughnagumo.pdf", dpi=250)
 
 plt.show()
 ```
