@@ -64,6 +64,7 @@ plugins:
         python:
           options:
             docstring_style: numpy
+            show_signature_annotations: true
   - exclude:
       glob:
         - getting_started/easy_example.md
