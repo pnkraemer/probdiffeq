@@ -112,7 +112,7 @@ def _subsets(x, /, n):
 
 
 def forward_mode_recursive(vf: Callable, initial_values: tuple, /, num: int):
-    """Taylor-expand the solution of an IVP with forward-mode differentiation.
+    """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
         JIT-compiling this function unrolls a loop.
