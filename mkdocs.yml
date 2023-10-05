@@ -134,14 +134,14 @@ nav:
               - smoothers: api_docs/solvers/strategies/smoothers.md
               - fixedpoint: api_docs/solvers/strategies/fixedpoint.md
               - discrete: api_docs/solvers/strategies/discrete.md
-          - taylor:
-              - affine: api_docs/solvers/taylor/affine.md
-              - autodiff: api_docs/solvers/taylor/autodiff.md
-              - estim: api_docs/solvers/taylor/estim.md
           - calibrated: api_docs/solvers/calibrated.md
           - uncalibrated: api_docs/solvers/uncalibrated.md
           - solution: api_docs/solvers/solution.md
           - markov: api_docs/solvers/markov.md
+      - taylor:
+          - affine: api_docs/taylor/affine.md
+          - autodiff: api_docs/taylor/autodiff.md
+          - estim: api_docs/taylor/estim.md
   - DEVELOPER DOCUMENTATION:
       - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md
