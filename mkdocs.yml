@@ -103,6 +103,9 @@ plugins:
         - benchmarks/taylor_fitzhughnagumo/*.md
         - benchmarks/taylor_fitzhughnagumo/*.py
         - benchmarks/taylor_fitzhughnagumo/.ipynb_checkpoints/*
+        - benchmarks/taylor_node/*.md
+        - benchmarks/taylor_node/*.py
+        - benchmarks/taylor_node/.ipynb_checkpoints/*
   - mkdocs-jupyter
 extra:
   social:
@@ -164,3 +167,4 @@ nav:
       - benchmarks/hires/plot.ipynb
       - benchmarks/taylor_pleiades/plot.ipynb
       - benchmarks/taylor_fitzhughnagumo/plot.ipynb
+      - benchmarks/taylor_node/plot.ipynb

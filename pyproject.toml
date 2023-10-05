@@ -174,4 +174,4 @@ use_parentheses = "true"
 line_length = "88"
 
 [tool.black]
-line-length = 88
+line-length = "88"
