@@ -58,13 +58,11 @@ if __name__ == "__main__":
     set_environment()
 
     solution1 = three_body_first()
-    jnp.save(
-        "./tests/test_solvers/test_taylor/data/three_body_first_solution.npy", solution1
-    )
+    jnp.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
 
     solution2 = van_der_pol_second()
     jnp.save(
-        "./tests/test_solvers/test_taylor/data/van_der_pol_second_solution.npy",
+        "./tests/test_taylor/data/van_der_pol_second_solution.npy",
         solution2,
     )
 

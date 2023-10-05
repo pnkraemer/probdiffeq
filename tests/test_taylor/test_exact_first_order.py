@@ -29,9 +29,7 @@ def fixture_pb_with_solution():
     def vf(u, /):
         return f(u, *f_args)
 
-    solution = jnp.load(
-        "./tests/test_solvers/test_taylor/data/three_body_first_solution.npy"
-    )
+    solution = jnp.load("./tests/test_taylor/data/three_body_first_solution.npy")
     return (vf, (u0,)), solution
 
 

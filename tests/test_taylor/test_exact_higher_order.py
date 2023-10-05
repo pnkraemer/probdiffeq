@@ -24,9 +24,7 @@ def fixture_pb_with_solution():
     def vf(u, du, /):
         return f(u, du, *f_args)
 
-    solution = jnp.load(
-        "./tests/test_solvers/test_taylor/data/van_der_pol_second_solution.npy"
-    )
+    solution = jnp.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")
     return (vf, (u0, du0)), solution
 
 
