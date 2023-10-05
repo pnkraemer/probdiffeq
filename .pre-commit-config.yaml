@@ -8,22 +8,22 @@ repos:
       - id: end-of-file-fixer
       - id: check-merge-conflict
   - repo: https://github.com/psf/black
-    rev: 23.7.0
+    rev: 23.9.1
     hooks:
       - id: black-jupyter
         language_version: python3
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.284
+    rev: v0.0.292
     hooks:
       - id: ruff
   - repo: https://github.com/mwouts/jupytext
-    rev: v1.15.0
+    rev: v1.15.2
     hooks:
       - id: jupytext
         files: (docs/).+
         args: [--sync]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.4.1
+    rev: v1.5.1
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]

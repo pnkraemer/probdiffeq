@@ -34,8 +34,8 @@ test =[
     "pytest-cases",
     "pytest-cov",
     "diffeqzoo",
-    "diffrax<0.4",
-    "equinox<0.10.7",
+    "diffrax",
+    "equinox",
 ]
 lint =[
     "pre-commit",
