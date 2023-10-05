@@ -1,19 +1,17 @@
 # probdiffeq
 
-
-[![PyPi Version](https://img.shields.io/pypi/v/probdiffeq.svg?style=flat-square&color=darkgray)](https://pypi.org/project/probdiffeq/)
-[![gh-actions](https://img.shields.io/github/actions/workflow/status/pnkraemer/probdiffeq/ci.yaml?branch=main&style=flat-square)](https://github.com/pnkraemer/probdiffeq/actions?query=workflow%3Aci)
-<a href="https://github.com/pnkraemer/probdiffeq/blob/master/LICENSE"><img src="https://img.shields.io/github/license/pnkraemer/probdiffeq?style=flat-square&color=2b9348" alt="License Badge"/></a>
-[![GitHub stars](https://img.shields.io/github/stars/pnkraemer/probdiffeq.svg?style=flat-square&logo=github&label=Stars&logoColor=white)](https://github.com/pnkraemer/probdiffeq)
-![Python](https://img.shields.io/badge/python-3.9+-black.svg?style=flat-square)
-
+[![Actions status](https://github.com/pnkraemer/probdiffeq/workflows/ci/badge.svg)](https://github.com/pnkraemer/probdiffeq/actions)
+[![image](https://img.shields.io/pypi/v/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
+[![image](https://img.shields.io/pypi/l/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
+[![image](https://img.shields.io/pypi/pyversions/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
 
 ## Probabilistic solvers for differential equations in JAX
 
 ProbDiffEq implements adaptive probabilistic numerical solvers for initial value problems.
 
 It inherits automatic differentiation, vectorisation, and GPU capability from JAX.
-Features include:
+
+**Features include:**
 
 * Stable implementation
 * Calibration, step-size adaptation, and checkpointing
@@ -25,8 +23,6 @@ Features include:
 * Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
 and many more.
-
-
 
 * **AN EASY EXAMPLE:** [LINK](https://pnkraemer.github.io/probdiffeq/getting_started/easy_example/)
 * **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_solver_config/posterior_uncertainties/)
