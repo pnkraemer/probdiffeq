@@ -8,8 +8,8 @@ from probdiffeq.solvers.taylor import autodiff
 
 
 @testing.case()
-def case_forward_mode():
-    return autodiff.forward_mode
+def case_forward_mode_recursive():
+    return autodiff.forward_mode_recursive
 
 
 @testing.case()

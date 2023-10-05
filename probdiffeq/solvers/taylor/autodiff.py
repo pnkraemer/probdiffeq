@@ -111,7 +111,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode(vf: Callable, initial_values: tuple, /, num: int):
+def forward_mode_recursive(vf: Callable, initial_values: tuple, /, num: int):
     """Taylor-expand the solution of an IVP with forward-mode differentiation.
 
     !!! warning "Compilation time"

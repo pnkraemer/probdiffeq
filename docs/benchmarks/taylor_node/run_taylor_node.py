@@ -94,13 +94,13 @@ def taylor_mode_doubling() -> Callable:
     return estimate
 
 
-def forward_mode() -> Callable:
+def forward_mode_recursive() -> Callable:
     """Forward-mode estimation."""
     vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.forward_mode(vf_auto, (u0,), num=num)
+        tcoeffs = autodiff.forward_mode_recursive(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     set_jax_config()
     backend.select("jax")
     algorithms = {
-        r"Forward-mode": forward_mode(),
+        r"Forward-mode": forward_mode_recursive(),
         r"Taylor-mode (scan)": taylor_mode_scan(),
         r"Taylor-mode (unroll)": taylor_mode_unroll(),
         r"Taylor-mode (doubling)": taylor_mode_doubling(),
