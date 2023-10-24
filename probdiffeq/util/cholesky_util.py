@@ -173,6 +173,6 @@ def triu_via_qr(R, /):
     return jax.lax.cond(
         matrix_is_already_triu,
         lambda s: s[:ncols, :ncols],
-        lambda s: jnp.linalg.qr(s, mode="R"),
+        lambda s: jnp.linalg.qr(s, mode="r"),
         R,
     )
