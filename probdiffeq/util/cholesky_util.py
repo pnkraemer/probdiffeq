@@ -48,7 +48,6 @@ def revert_conditional_noisefree(R_X_F, R_X):
     return r_marg, (r_cor, gain)
 
 
-# rename: reparametrise_conditional_correlation?
 def revert_conditional(R_X_F, R_X, R_YX):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
 
@@ -95,7 +94,11 @@ def revert_conditional(R_X_F, R_X, R_YX):
             [R_X_F, R_X],
         ]
     )
-    R = triu_via_qr(R)
+    # If R_X_F and R_X are zero, but R_YX is not zero, qr(R) can be implemented via
+    # qr(R_YX) and embedding the result in zeros. This is what we do here.
+    # Without this case distinction, reverse-mode derivatives are not defined.
+    cond = jnp.logical_and(jnp.linalg.norm(R_X_F) == 0.0, jnp.linalg.norm(R_X) == 0.0)
+    R = jax.lax.cond(cond, _triu_via_shortcut, lambda a, _b: triu_via_qr(a), R, R_YX)
 
     # ~R_{Y}
     d_out = R_YX.shape[1]
@@ -110,6 +113,20 @@ def revert_conditional(R_X_F, R_X, R_YX):
     # ~R_{X \mid Y}
     R_XY = R[d_out:, d_out:]
     return R_Y, (R_XY, G)
+
+
+def _triu_via_shortcut(R, R_YX):
+    """If R_X and R_X_F are zero, triu_via_qr(R) can be implemented cheaply.
+
+    Namely, by applying it only to R_YX and embedding the result in zeros.
+    This is not only more efficient because it requires fewer floating-point operations
+    than qr-decomposing the full matrix, but it also admits a well-defined
+    reverse-mode derivative!
+    """
+    R = jnp.zeros_like(R)
+    R_YX = triu_via_qr(R_YX)
+    n, m = jnp.shape(R_YX)
+    return R.at[:n, :m].set(R_YX)
 
 
 def _is_matrix(mat, matrix_ndim=2):
@@ -146,4 +163,16 @@ def triu_via_qr(R, /):
     # TODO: enforce positive diagonals?
     #  (or expose this option; some equivalence tests might fail
     #   if we always use a positive diagonal.)
-    return jnp.linalg.qr(R, mode="r")
+
+    # Only do something if R is not already triangular.
+    # This distinction may seem unnecessary but is important,
+    # because otherwise, reverse-mode derivatives are not defined!
+    matrix_is_already_triu = jnp.all(jnp.triu(R) == R)
+
+    _nrows, ncols = jnp.shape(R)
+    return jax.lax.cond(
+        matrix_is_already_triu,
+        lambda s: s[:ncols, :ncols],
+        lambda s: jnp.linalg.qr(s, mode="R"),
+        R,
+    )
