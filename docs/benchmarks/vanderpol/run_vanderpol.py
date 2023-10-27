@@ -184,7 +184,6 @@ def plot_ivp_solution():
         vf_scipy,
         y0=u0,
         t_span=time_span,
-        t_eval=time_span,
         atol=1e-3 * tol,
         rtol=tol,
         method="LSODA",
@@ -256,7 +255,6 @@ if __name__ == "__main__":
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS1($4$)": solver_probdiffeq(num_derivatives=4),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
-        r"ProbDiffEq: TS1($6$)": solver_probdiffeq(num_derivatives=6),
     }
 
     # Compute a reference solution

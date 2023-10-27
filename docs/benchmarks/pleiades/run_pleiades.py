@@ -266,7 +266,6 @@ def plot_ivp_solution():
         vf_scipy,
         y0=u0,
         t_span=time_span,
-        t_eval=time_span,
         atol=1e-3 * tol,
         rtol=tol,
         method="LSODA",

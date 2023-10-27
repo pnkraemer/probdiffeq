@@ -35,6 +35,13 @@ def load_results():
     return jnp.load("./results.npy", allow_pickle=True)[()]
 
 
+def load_solution():
+    """Load the solution-to-be-plotted from a file."""
+    ts = jnp.load("./plot_ts.npy")
+    ys = jnp.load("./plot_ys.npy")
+    return ts, ys
+
+
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "probdiffeq" in label.lower():
@@ -51,6 +58,7 @@ def choose_style(label):
 
 def plot_results(axis, results):
     """Plot the results."""
+    axis.set_title("Benchmark")
     for label, wp in results.items():
         style = choose_style(label)
 
@@ -63,19 +71,65 @@ def plot_results(axis, results):
 
     axis.set_xlabel("Precision [absolute RMSE]")
     axis.set_ylabel("Work [wall time, s]")
+    axis.legend(
+        loc="upper center",
+        ncols=3,
+        fontsize="x-small",
+        mode="expand",
+        facecolor="ghostwhite",
+    )
     axis.grid()
+    axis.set_ylim((1e-3, 3e1))
+    return axis
+
+
+def plot_solution(axis, ts, ys, yscale="linear"):
+    axis.set_title("Van-der-Pol (stiffness: $10^5$)")
+    kwargs = {"alpha": 0.85}
+
+    axis.plot(
+        ts,
+        ys[:, 0],
+        label="y",
+        linestyle="solid",
+        color="black",
+        marker="None",
+        **kwargs,
+    )
+    axis.plot(
+        ts,
+        ys[:, 1],
+        label="$\dot y$",
+        linestyle="dashed",
+        color="black",
+        marker="None",
+        **kwargs,
+    )
+
+    axis.legend()
+    axis.set_xlabel("Time $t$")
+    axis.set_ylabel("Solution $y$ [clipped]")
+    axis.set_yscale(yscale)
+    axis.set_ylim((-6, 6))
     return axis
 ```
 
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, axis = plt.subplots(dpi=150)
-fig.suptitle("Van-der-Pol problem (stiffness: $10^5$)")
+layout = [
+    ["solution", "benchmark", "benchmark"],
+    ["solution", "benchmark", "benchmark"],
+]
+fig, axes = plt.subplot_mosaic(layout, figsize=(8, 3), constrained_layout=True, dpi=300)
+
 
 results = load_results()
-axis = plot_results(axis, results)
-axis.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+ts, ys = load_solution()
+
+_ = plot_results(axes["benchmark"], results)
+_ = plot_solution(axes["solution"], ts, ys)
+
 plt.show()
 ```
 
