@@ -1,7 +1,7 @@
 """Benchmark utils."""
 
 import numpy as np
-from tueplots import axes, cycler, markers
+from tueplots import axes, cycler, fontsizes, markers
 
 
 def plot_config():
@@ -10,8 +10,10 @@ def plot_config():
     return {
         **axes.color(base="black"),
         **axes.lines(base_width=0.5),
+        **axes.tick_direction(x="inout", y="inout"),
         **axes.legend(),
         **axes.grid(),
+        **fontsizes.beamer_moml(),
         **cycler.cycler(
             marker=np.tile(markers_, 9)[:15],
             color=np.tile(colors, 10)[:15],

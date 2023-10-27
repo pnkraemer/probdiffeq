@@ -197,6 +197,38 @@ def solver_scipy(*, method: str) -> Callable:
     return param_to_solution
 
 
+def plot_ivp_solution():
+    """Compute plotting-values for the IVP."""
+
+    def vf_scipy(_t, u):
+        """High irradiance response."""
+        du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
+        du2 = 1.71 * u[0] - 8.75 * u[1]
+        du3 = -10.03 * u[2] + 0.43 * u[3] + 0.035 * u[4]
+        du4 = 8.32 * u[1] + 1.71 * u[2] - 1.12 * u[3]
+        du5 = -1.745 * u[4] + 0.43 * u[5] + 0.43 * u[6]
+        du6 = (
+            -280.0 * u[5] * u[7] + 0.69 * u[3] + 1.71 * u[4] - 0.43 * u[5] + 0.69 * u[6]
+        )
+        du7 = 280.0 * u[5] * u[7] - 1.81 * u[6]
+        du8 = -280.0 * u[5] * u[7] + 1.81 * u[6]
+        return np.asarray([du1, du2, du3, du4, du5, du6, du7, du8])
+
+    u0 = np.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
+    time_span = np.asarray([0.0, 321.8122])
+
+    tol = 1e-12
+    solution = scipy.integrate.solve_ivp(
+        vf_scipy,
+        y0=u0,
+        t_span=time_span,
+        atol=1e-3 * tol,
+        rtol=tol,
+        method="LSODA",
+    )
+    return solution.t, solution.y.T
+
+
 def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
     """Compute the relative RMSE."""
     expected = jnp.asarray(expected)
@@ -246,6 +278,9 @@ if __name__ == "__main__":
     set_probdiffeq_config()
     print_library_info()
 
+    # Simulate once to get plotting code
+    ts, ys = plot_ivp_solution()
+
     # Read configuration from command line
     args = parse_arguments()
     tolerances = tolerances_from_args(args)
@@ -274,6 +309,8 @@ if __name__ == "__main__":
     # Save results
     if args.save:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)
+        jnp.save(os.path.dirname(__file__) + "/plot_ts.npy", ts)
+        jnp.save(os.path.dirname(__file__) + "/plot_ys.npy", ys)
         print("\nSaving successful.\n")
     else:
         print("\nSkipped saving.\n")
