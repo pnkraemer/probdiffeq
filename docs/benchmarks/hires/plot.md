@@ -36,7 +36,7 @@ def load_results():
 
 
 def load_solution():
-    """Load the results from a file."""
+    """Load the solution-to-be-plotted from a file."""
     ts = jnp.load("./plot_ts.npy")
     ys = jnp.load("./plot_ys.npy")
     return ts, ys
@@ -70,12 +70,9 @@ def plot_results(axis, results):
     axis.set_xlabel("Precision [relative RMSE]")
     axis.set_ylabel("Work [wall time, s]")
     axis.grid()
-    axis.set_ylim((1e-4, 1e-0))
+    axis.set_ylim((1e-4, 4e0))
 
-    axis.legend(loc="upper center", ncols=3, mode="expand", facecolor="ivory")
-
-    # axis.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
-    #                   ncols=3, mode="expand", borderaxespad=0.)
+    axis.legend(loc="upper center", ncols=3, mode="expand", facecolor="ghostwhite")
     return axis
 
 
@@ -101,7 +98,7 @@ layout = [
     ["benchmark", "benchmark", "solution"],
     ["benchmark", "benchmark", "solution"],
 ]
-fig, axes = plt.subplot_mosaic(layout, figsize=(8, 3), constrained_layout=True, dpi=150)
+fig, axes = plt.subplot_mosaic(layout, figsize=(8, 3), constrained_layout=True, dpi=300)
 
 
 results = load_results()
@@ -110,6 +107,5 @@ ts, ys = load_solution()
 
 _ = plot_results(axes["benchmark"], results)
 _ = plot_solution(axes["solution"], ts, ys)
-
 plt.show()
 ```

@@ -12,7 +12,7 @@ def plot_config():
         **axes.lines(base_width=0.5),
         **axes.tick_direction(x="inout", y="inout"),
         **axes.legend(),
-        **axes.grid(),
+        **axes.grid(grid_linestyle="dotted"),
         **fontsizes.beamer_moml(),
         **cycler.cycler(
             marker=np.tile(markers_, 9)[:15],
