@@ -106,7 +106,7 @@ def plot_solution(axis, ts, ys, yscale="linear"):
         **kwargs,
     )
 
-    axis.legend()
+    axis.legend(facecolor="ghostwhite")
     axis.set_xlabel("Time $t$")
     axis.set_ylabel("Solution $y$ [clipped]")
     axis.set_yscale(yscale)

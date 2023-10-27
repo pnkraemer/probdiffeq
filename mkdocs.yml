@@ -150,9 +150,9 @@ nav:
       - dev_docs/continuous_integration.md
   - BENCHMARKS:
       - benchmarks/lotkavolterra/plot.ipynb
-      - benchmarks/vanderpol/plot.ipynb
       - benchmarks/pleiades/plot.ipynb
       - benchmarks/hires/plot.ipynb
+      - benchmarks/vanderpol/plot.ipynb
       - benchmarks/taylor_pleiades/plot.ipynb
       - benchmarks/taylor_fitzhughnagumo/plot.ipynb
       - benchmarks/taylor_node/plot.ipynb
