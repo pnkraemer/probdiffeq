@@ -230,6 +230,51 @@ def solver_scipy(*, method: str, use_numba: bool) -> Callable:
     return param_to_solution
 
 
+def plot_ivp_solution():
+    """Compute plotting-values for the IVP."""
+    # fmt: off
+    u0 = np.asarray(
+        [
+            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
+            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
+            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
+            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
+        ]
+    )
+    # fmt: on
+
+    def vf_scipy(_t, u):
+        """Pleiades problem."""
+        x = u[0:7]  # x
+        y = u[7:14]  # y
+        xi, xj = x[:, None], x[None, :]
+        yi, yj = y[:, None], y[None, :]
+        rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
+        mj = np.arange(1, 8)[None, :]
+
+        # Explicitly avoid dividing by zero for scipy's solver
+        # The JAX solvers divide by zero and turn the NaNs to zeros.
+        rij = np.where(rij == 0.0, 1.0, rij)
+        ddx = np.sum((mj * (xj - xi) / rij), axis=1)
+        ddy = np.sum((mj * (yj - yi) / rij), axis=1)
+        return np.concatenate((u[14:21], u[21:28], ddx, ddy))
+
+    time_span = np.asarray([0.0, 3.0])
+
+    tol = 1e-12
+    solution = scipy.integrate.solve_ivp(
+        vf_scipy,
+        y0=u0,
+        t_span=time_span,
+        t_eval=time_span,
+        atol=1e-3 * tol,
+        rtol=tol,
+        method="LSODA",
+    )
+
+    return solution.t, solution.y.T
+
+
 def rmse_absolute(expected: jax.Array) -> Callable:
     """Compute the relative RMSE."""
     expected = jnp.asarray(expected)
@@ -278,6 +323,9 @@ if __name__ == "__main__":
     set_probdiffeq_config()
     print_library_info()
 
+    # Simulate once to get plotting code
+    ts, ys = plot_ivp_solution()
+
     # Read configuration from command line
     args = parse_arguments()
     tolerances = tolerances_from_args(args)
@@ -312,6 +360,8 @@ if __name__ == "__main__":
     # Save results
     if args.save:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)
+        jnp.save(os.path.dirname(__file__) + "/plot_ts.npy", ts)
+        jnp.save(os.path.dirname(__file__) + "/plot_ys.npy", ys)
         print("\nSaving successful.\n")
     else:
         print("\nSkipped saving.\n")
