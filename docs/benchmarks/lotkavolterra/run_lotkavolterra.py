@@ -170,6 +170,30 @@ def solver_scipy(*, method: str) -> Callable:
     return param_to_solution
 
 
+def plot_ivp_solution():
+    """Compute plotting-values for the IVP."""
+
+    def vf_scipy(_t, y):
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return np.asarray([dy1, dy2])
+
+    u0 = jnp.asarray((20.0, 20.0))
+    time_span = np.asarray([0.0, 50.0])
+
+    tol = 1e-12
+    solution = scipy.integrate.solve_ivp(
+        vf_scipy,
+        y0=u0,
+        t_span=time_span,
+        atol=1e-3 * tol,
+        rtol=tol,
+        method="LSODA",
+    )
+    return solution.t, solution.y.T
+
+
 def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
     """Compute the relative RMSE."""
     expected = jnp.asarray(expected)
@@ -218,6 +242,9 @@ if __name__ == "__main__":
     set_jax_config()
     print_library_info()
 
+    # Simulate once to get plotting code
+    ts, ys = plot_ivp_solution()
+
     # If we change the probdiffeq-impl halfway through a script, a warning is raised.
     # But for this benchmark, such a change is on purpose.
     warnings.filterwarnings("ignore")
@@ -255,6 +282,8 @@ if __name__ == "__main__":
     # Save results
     if args.save:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)
+        jnp.save(os.path.dirname(__file__) + "/plot_ts.npy", ts)
+        jnp.save(os.path.dirname(__file__) + "/plot_ys.npy", ys)
         print("\nSaving successful.\n")
     else:
         print("\nSkipped saving.\n")

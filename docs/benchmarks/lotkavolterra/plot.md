@@ -35,6 +35,13 @@ def load_results():
     return jnp.load("./results.npy", allow_pickle=True)[()]
 
 
+def load_solution():
+    """Load the solution-to-be-plotted from a file."""
+    ts = jnp.load("./plot_ts.npy")
+    ys = jnp.load("./plot_ys.npy")
+    return ts, ys
+
+
 def choose_style(label):
     """Choose a plotting style for a given algorithm."""
     if "ProbDiffEq" in label:
@@ -49,6 +56,7 @@ def choose_style(label):
 
 def plot_results(axis, results):
     """Plot the results."""
+    axis.set_title("Benchmark")
     for label, wp in results.items():
         style = choose_style(label)
 
@@ -62,18 +70,48 @@ def plot_results(axis, results):
     axis.set_xlabel("Precision [relative RMSE]")
     axis.set_ylabel("Work [wall time, s]")
     axis.grid()
+    axis.legend(loc="upper center", ncols=3, mode="expand", facecolor="ghostwhite")
+    axis.set_ylim((1e-5, 1e1))
+    return axis
+
+
+def plot_solution(axis, ts, ys, yscale="linear"):
+    axis.set_title("Lotka-Volterra")
+    kwargs = {"color": "black", "alpha": 0.85}
+
+    axis.plot(
+        ts, ys[:, 0], linestyle="solid", marker="None", label="Predators", **kwargs
+    )
+    axis.plot(ts, ys[:, 1], linestyle="dashed", marker="None", label="Prey", **kwargs)
+    for y in ys.T:
+        axis.plot(ts[0], y[0], linestyle="None", marker=".", markersize=4, **kwargs)
+        axis.plot(ts[-1], y[-1], linestyle="None", marker=".", markersize=4, **kwargs)
+
+    axis.set_ylim((-1, 27))
+    axis.legend(facecolor="ghostwhite", ncols=2, loc="lower center", mode="expand")
+
+    axis.set_xlabel("Time $t$")
+    axis.set_ylabel("Solution $y$")
+    axis.set_yscale(yscale)
     return axis
 ```
 
 ```python
 plt.rcParams.update(notebook.plot_config())
 
-fig, axis = plt.subplots(dpi=150, constrained_layout=True)
-fig.suptitle("Lotka-Volterra problem, terminal-value simulation")
+layout = [
+    ["benchmark", "benchmark", "solution"],
+    ["benchmark", "benchmark", "solution"],
+]
+fig, axes = plt.subplot_mosaic(layout, figsize=(8, 3), constrained_layout=True, dpi=300)
+
 
 results = load_results()
-axis = plot_results(axis, results)
-axis.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+ts, ys = load_solution()
+
+_ = plot_results(axes["benchmark"], results)
+_ = plot_solution(axes["solution"], ts, ys)
+
 plt.show()
 ```
 

@@ -169,6 +169,28 @@ def solver_scipy(method: str) -> Callable:
     return param_to_solution
 
 
+def plot_ivp_solution():
+    """Compute plotting-values for the IVP."""
+
+    def vf_scipy(_t, u):
+        """Van-der-Pol dynamics as a first-order differential equation."""
+        return np.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
+
+    u0 = np.concatenate((np.atleast_1d(2.0), np.atleast_1d(0.0)))
+    time_span = np.asarray((0.0, 6.3))
+
+    tol = 1e-12
+    solution = scipy.integrate.solve_ivp(
+        vf_scipy,
+        y0=u0,
+        t_span=time_span,
+        atol=1e-3 * tol,
+        rtol=tol,
+        method="LSODA",
+    )
+    return solution.t, solution.y.T
+
+
 def rmse_absolute(expected: jax.Array) -> Callable:
     """Compute the relative RMSE."""
     expected = jnp.asarray(expected)
@@ -217,6 +239,9 @@ if __name__ == "__main__":
     set_probdiffeq_config()
     print_library_info()
 
+    # Simulate once to get plotting code
+    ts, ys = plot_ivp_solution()
+
     # Read configuration from command line
     args = parse_arguments()
     tolerances = tolerances_from_args(args)
@@ -230,7 +255,6 @@ if __name__ == "__main__":
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS1($4$)": solver_probdiffeq(num_derivatives=4),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
-        r"ProbDiffEq: TS1($6$)": solver_probdiffeq(num_derivatives=6),
     }
 
     # Compute a reference solution
@@ -246,6 +270,8 @@ if __name__ == "__main__":
     # Save results
     if args.save:
         jnp.save(os.path.dirname(__file__) + "/results.npy", results)
+        jnp.save(os.path.dirname(__file__) + "/plot_ts.npy", ts)
+        jnp.save(os.path.dirname(__file__) + "/plot_ys.npy", ys)
         print("\nSaving successful.\n")
     else:
         print("\nSkipped saving.\n")
