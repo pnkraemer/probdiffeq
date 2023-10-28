@@ -88,12 +88,7 @@ def revert_conditional(R_X_F, R_X, R_YX):
         )
         raise ValueError(msg)
 
-    R = jnp.block(
-        [
-            [R_YX, jnp.zeros((R_YX.shape[0], R_X.shape[1]))],
-            [R_X_F, R_X],
-        ]
-    )
+    R = jnp.block([[R_YX, jnp.zeros((R_YX.shape[0], R_X.shape[1]))], [R_X_F, R_X]])
     # If R_X_F and R_X are zero, but R_YX is not zero, qr(R) can be implemented via
     # qr(R_YX) and embedding the result in zeros. This is what we do here.
     # Without this case distinction, reverse-mode derivatives are not defined.

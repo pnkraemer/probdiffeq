@@ -2,8 +2,7 @@
 .PHONY: format lint test doc example run-benchmarks clean
 
 format:
-	black --quiet .
-	isort --quiet .
+	ruff format --quiet .
 	jupytext --quiet --sync docs/getting_started/*.ipynb
 	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
 	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb

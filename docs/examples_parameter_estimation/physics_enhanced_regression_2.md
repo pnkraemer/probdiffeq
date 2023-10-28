@@ -88,6 +88,8 @@ Here is how:
 <!-- #endregion -->
 
 ```python
+"""Estimate ODE paramaters with ProbDiffEq and BlackJAX."""
+
 import functools
 
 import blackjax
@@ -98,13 +100,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, adaptive
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -140,7 +142,8 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(y, *, t):
+def vf(y, *, t):  # noqa: ARG001
+    """Evaluate the Lotka-Volterra vector field."""
     return f(y, *f_args)
 
 
@@ -150,6 +153,7 @@ theta_guess = u0  # initial guess
 
 ```python
 def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
+    """Plot the IVP solution."""
     for d in [0, 1]:
         ax.plot(sol.t, sol.u[:, d], marker="None", **plotting_kwargs)
         ax.plot(sol.t[0], sol.u[0, d], marker=marker, **plotting_kwargs)
@@ -159,6 +163,7 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 
 @jax.jit
 def solve_fixed(theta, *, ts):
+    """Evaluate the parameter-to-solution map, solving on a fixed grid."""
     # Create a probabilistic solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
@@ -175,6 +180,7 @@ def solve_fixed(theta, *, ts):
 
 @jax.jit
 def solve_adaptive(theta, *, save_at):
+    """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
     # Create a probabilistic solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
@@ -222,11 +228,10 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 
 @jax.jit
 def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
+    """Evaluate the logposterior-function of the data."""
     y_T = solve_fixed(theta, ts=ts)
     logpdf_data = solution.log_marginal_likelihood_terminal_values(
-        data,
-        standard_deviation=obs_stdev,
-        posterior=y_T.posterior,
+        data, standard_deviation=obs_stdev, posterior=y_T.posterior
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
@@ -255,6 +260,8 @@ Set up a sampler.
 ```python
 @functools.partial(jax.jit, static_argnames=["kernel", "num_samples"])
 def inference_loop(rng_key, kernel, initial_state, num_samples):
+    """Run BlackJAX' inference loop."""
+
     def one_step(state, rng_key):
         state, _ = kernel.step(rng_key, state)
         return state, state
@@ -282,9 +289,7 @@ initial_state = warmup_results.state
 step_size = warmup_results.parameters["step_size"]
 inverse_mass_matrix = warmup_results.parameters["inverse_mass_matrix"]
 nuts_kernel = blackjax.nuts(
-    logdensity_fn=log_M,
-    step_size=step_size,
-    inverse_mass_matrix=inverse_mass_matrix,
+    logdensity_fn=log_M, step_size=step_size, inverse_mass_matrix=inverse_mass_matrix
 )
 ```
 

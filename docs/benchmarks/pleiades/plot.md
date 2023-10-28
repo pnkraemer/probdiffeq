@@ -83,7 +83,8 @@ def plot_results(axis, results):
     return axis
 
 
-def plot_solution(axis, ts, ys, yscale="linear"):
+def plot_solution(axis, ys, yscale="linear"):
+    """Plot the IVP solution."""
     axis.set_title("Pleiades")
     kwargs = {"color": "goldenrod", "alpha": 0.85}
 
@@ -115,10 +116,10 @@ fig, axes = plt.subplot_mosaic(layout, figsize=(8, 3), constrained_layout=True, 
 
 
 results = load_results()
-ts, ys = load_solution()
+_ts, ys = load_solution()
 
 _ = plot_results(axes["benchmark"], results)
-_ = plot_solution(axes["solution"], ts, ys)
+_ = plot_solution(axes["solution"], ys)
 
 plt.show()
 ```

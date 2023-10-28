@@ -20,15 +20,7 @@ from probdiffeq.solvers import markov
 class Solution:
     """Estimated initial value problem solution."""
 
-    def __init__(
-        self,
-        t,
-        u,
-        output_scale,
-        marginals,
-        posterior,
-        num_steps,
-    ):
+    def __init__(self, t, u, output_scale, marginals, posterior, num_steps):
         """Construct a solution object."""
         self.t = t
         self.u = u
@@ -234,10 +226,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
     _t, (posterior, output_scale) = _ivpsolve_impl.solve_fixed_grid(
-        jax.tree_util.Partial(vector_field),
-        initial_condition,
-        grid=grid,
-        solver=solver,
+        jax.tree_util.Partial(vector_field), initial_condition, grid=grid, solver=solver
     )
 
     # I think the user expects marginals, so we compute them here

@@ -25,7 +25,7 @@ Tronarp, Bosch, and Hennig call this "physics-enhanced regression" ([link to pap
 <!-- #endregion -->
 
 ```python
-import functools
+"""Estimate ODE parameters with ProbDiffEq and Optax."""
 
 import jax
 import jax.numpy as jnp
@@ -34,12 +34,12 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq.impl import impl
 from probdiffeq import ivpsolve
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.impl import impl
+from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -62,12 +62,18 @@ impl.select("isotropic", ode_shape=(2,))
 Create a problem and some fake-data:
 
 ```python
+f, u0, (t0, t1), f_args = ivps.lotka_volterra()
+f_args = jnp.asarray(f_args)
+
+
 @jax.jit
-def vf(y, t, *, p):
+def vf(y, t, *, p):  # noqa: ARG001
+    """Evaluate the Lotka-Volterra vector field."""
     return f(y, *p)
 
 
 def solve(p):
+    """Evaluate the parameter-to-solution map."""
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
@@ -77,16 +83,9 @@ def solve(p):
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_fixed_grid(
-        lambda y, t: vf(y, t, p=p),
-        init,
-        grid=ts,
-        solver=solver,
+        lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver
     )
-```
 
-```python
-f, u0, (t0, t1), f_args = ivps.lotka_volterra()
-f_args = jnp.asarray(f_args)
 
 parameter_true = f_args + 0.05
 parameter_guess = f_args
@@ -115,6 +114,7 @@ This incorporates the likelihood of the data under the distribution induced by t
 ```python
 @jax.jit
 def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
+    """Evaluate the data fit as a function of the parameters."""
     sol_ = solve(parameters_)
     return -1.0 * solution.log_marginal_likelihood(
         data,
@@ -141,6 +141,7 @@ def build_update_fn(*, optimizer, loss_fn):
 
     @jax.jit
     def update(params, opt_state):
+        """Update the optimiser state."""
         loss, grads = jax.value_and_grad(loss_fn)(params)
         updates, opt_state = optimizer.update(grads, opt_state)
         params = optax.apply_updates(params, updates)

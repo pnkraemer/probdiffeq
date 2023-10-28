@@ -18,6 +18,7 @@ jupyter:
 We can use the parameter estimation functionality to fit a neural ODE to a time series data set.
 
 ```python
+"""Train a neural ODE with ProbDiffEq and Optax."""
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -27,11 +28,10 @@ from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.taylor import autodiff
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -71,21 +71,17 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
 
     @jax.jit
     def loss_fn(parameters):
-        tcoeffs = initial_values + (vf(*initial_values, t=t0, p=parameters),)
+        """Loss function: log-marginal likelihood of the data."""
+        tcoeffs = (*initial_values, vf(*initial_values, t=t0, p=parameters))
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         sol = ivpsolve.solve_fixed_grid(
-            lambda *a, **kw: vf(*a, **kw, p=parameters),
-            init,
-            grid=grid,
-            solver=solver,
+            lambda *a, **kw: vf(*a, **kw, p=parameters), init, grid=grid, solver=solver
         )
 
         observation_std = jnp.ones_like(grid) * standard_deviation
         marginal_likelihood = solution.log_marginal_likelihood(
-            data[:, None],
-            standard_deviation=observation_std,
-            posterior=sol.posterior,
+            data[:, None], standard_deviation=observation_std, posterior=sol.posterior
         )
         return -1 * marginal_likelihood
 
@@ -98,6 +94,7 @@ def build_update_fn(*, optimizer, loss_fn):
 
     @jax.jit
     def update(params, opt_state):
+        """Update the optimiser state."""
         loss, grads = jax.value_and_grad(loss_fn)(params)
         updates, opt_state = optimizer.update(grads, opt_state)
         params = optax.apply_updates(params, updates)
@@ -116,6 +113,7 @@ f, u0, (t0, t1), f_args = ivps.neural_ode_mlp(layer_sizes=(2, 20, 1))
 
 @jax.jit
 def vf(y, *, t, p):
+    """Evaluate the MLP."""
     return f(y, t, *p)
 
 
@@ -158,7 +156,8 @@ for i in range(chunk_size):
     for _ in range(chunk_size**2):
         p, state = update_fn(p, state)
     print(
-        f"Negative log-marginal-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:",
+        "Negative log-marginal-likelihood after "
+        f"{(i+1)*chunk_size**2}/{chunk_size**3} steps:",
         loss_fn(p),
     )
 ```

@@ -100,11 +100,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     init = solver.initial_condition(tcoeffs, output_scale)
 
     solution_fixedpoint = ivpsolve.solve_and_save_at(
-        solver_setup["vf"],
-        init,
-        save_at=ts,
-        adaptive_solver=adaptive_solver,
-        dt0=0.1,
+        solver_setup["vf"], init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1
     )
 
     # Extract the interior points of the save_at solution

@@ -23,6 +23,8 @@ In short: choose a `solver_dynamic` if your ODE output-scale varies quite strong
 For example, consider the numerical solution of a linear ODE with fixed steps:
 
 ```python
+"""Display the behaviour of the solvers when the scale of the ODE varies."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -31,11 +33,10 @@ from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.taylor import affine
-from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -60,7 +61,8 @@ f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
 
 
 @jax.jit
-def vf(*ys, t):
+def vf(*ys, t):  # noqa: ARG001
+    """Evaluate the affine vector field."""
     return f(*ys, *f_args)
 ```
 
@@ -84,18 +86,8 @@ ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 tcoeffs = (u0, vf(u0, t=t0))
 init_mle = mle.initial_condition(tcoeffs, output_scale=1.0)
 init_dynamic = dynamic.initial_condition(tcoeffs, output_scale=1.0)
-solution_dynamic = ivpsolve.solve_fixed_grid(
-    vf,
-    init_mle,
-    grid=ts,
-    solver=dynamic,
-)
-solution_mle = ivpsolve.solve_fixed_grid(
-    vf,
-    init_dynamic,
-    grid=ts,
-    solver=mle,
-)
+solution_dynamic = ivpsolve.solve_fixed_grid(vf, init_mle, grid=ts, solver=dynamic)
+solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle)
 ```
 
 Plot the solution.

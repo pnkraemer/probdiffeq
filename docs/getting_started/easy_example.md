@@ -3,11 +3,13 @@
 Let's have a look at an easy example.
 
 ```python
+"""Solve the logistic equation."""
+
 import jax
 import jax.numpy as jnp
 from jax.config import config
 
-from probdiffeq import ivpsolve, timestep, adaptive
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import smoothers
@@ -21,7 +23,8 @@ Create a problem:
 
 ```python
 @jax.jit
-def vf(y, *, t):
+def vf(y, *, t):  # noqa: ARG001
+    """Evaluate the vector field."""
     return 0.5 * y * (1 - y)
 
 
@@ -104,12 +107,7 @@ From here on, the rest is standard ODE-solver machinery:
 ```python
 dt0 = timestep.initial(lambda y: vf(y, t=t0), (u0,))  # or use e.g. dt0=0.1
 solution = ivpsolve.solve_and_save_every_step(
-    vf,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=dt0,
-    adaptive_solver=adaptive_solver,
+    vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
 )
 
 

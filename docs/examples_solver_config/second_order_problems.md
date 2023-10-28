@@ -16,19 +16,21 @@ jupyter:
 # Simulate second-order systems
 
 ```python
+"""Demonstrate how to solve second-order IVPs without transforming them first."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq.impl import impl
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.util.doc_util import notebook
+from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
-from probdiffeq.taylor import autodiff
-from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.solvers.strategies import filters
+from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.taylor import autodiff
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -51,7 +53,8 @@ f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
-def vf_1(y, t):
+def vf_1(y, t):  # noqa: ARG001
+    """Evaluate the three-body problem as a first-order IVP."""
     return f(y, *f_args)
 
 
@@ -67,12 +70,7 @@ init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 
 ```python
 solution = ivpsolve.solve_and_save_every_step(
-    vf_1,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive_solver_1st,
+    vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st
 )
 ```
 
@@ -92,7 +90,8 @@ f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
 
 @jax.jit
-def vf_2(y, dy, t):
+def vf_2(y, dy, t):  # noqa: ARG001
+    """Evaluate the three-body problem as a second-order IVP."""
     return f(y, dy, *f_args)
 
 
@@ -109,12 +108,7 @@ init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 
 ```python
 solution = ivpsolve.solve_and_save_every_step(
-    vf_2,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive_solver_2nd,
+    vf_2, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_2nd
 )
 ```
 

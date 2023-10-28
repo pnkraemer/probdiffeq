@@ -77,11 +77,7 @@ class _AdaptiveIVPSolver:
             return s.error_norm_proposed > 1.0
 
         def body_fn(s):
-            return self._attempt_step(
-                state=s,
-                vector_field=vector_field,
-                t1=t1,
-            )
+            return self._attempt_step(state=s, vector_field=vector_field, t1=t1)
 
         def init(s0):
             larger_than_1 = 1.1
@@ -180,11 +176,7 @@ def _asolver_unflatten(aux, children):
     solver, atol, rtol, control = children
     (norm_ord,) = aux
     return _AdaptiveIVPSolver(
-        solver=solver,
-        atol=atol,
-        rtol=rtol,
-        control=control,
-        norm_ord=norm_ord,
+        solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
     )
 
 

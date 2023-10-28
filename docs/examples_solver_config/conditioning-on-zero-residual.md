@@ -19,19 +19,20 @@ Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-re
 
 
 ```python
+"""Demonstrate how probabilistic solvers work via conditioning on constraints."""
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from diffeqzoo import backend, ivps
+from diffeqzoo import backend
 from jax.config import config
 
-from probdiffeq import controls, ivpsolve, timestep, adaptive
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
-from probdiffeq.taylor import autodiff
-from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
+from probdiffeq.solvers import markov, uncalibrated
+from probdiffeq.solvers.strategies import fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.taylor import autodiff
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -55,7 +56,8 @@ impl.select("dense", ode_shape=(1,))
 
 
 @jax.jit
-def vector_field(y, t):
+def vector_field(y, t):  # noqa: ARG001
+    """Evaluate the logistic ODE vector field."""
     return 10.0 * y * (2.0 - y)
 
 
@@ -96,11 +98,7 @@ dt0 = timestep.initial(lambda y: vector_field(y, t=t0), (u0,))
 
 init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(
-    vector_field,
-    init,
-    save_at=ts,
-    dt0=1.0,
-    adaptive_solver=adaptive_solver,
+    vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver
 )
 # posterior = solution.calibrate(sol.posterior, sol.output_scale)
 markov_seq_posterior = markov.select_terminal(sol.posterior)
@@ -150,10 +148,12 @@ mean_style = {
 
 
 def log_residual(*args):
+    """Evaluate the log-ODE-residual."""
     return jnp.log10(jnp.abs(residual(*args)))
 
 
 def residual(x, t):
+    """Evaluate the ODE residual."""
     return x[..., 1] - jax.vmap(vector_field)(x[..., 0], t)
 
 
@@ -167,16 +167,10 @@ for i in range(num_samples):
 
     # Plot all residual-samples
     axes_residual[0].plot(
-        ts[:-1],
-        residual(samples_prior[i, ...], ts[:-1]),
-        **sample_style,
-        color="C0",
+        ts[:-1], residual(samples_prior[i, ...], ts[:-1]), **sample_style, color="C0"
     )
     axes_residual[1].plot(
-        ts[:-1],
-        residual(samples_tcoeffs[i, ...], ts[:-1]),
-        **sample_style,
-        color="C1",
+        ts[:-1], residual(samples_tcoeffs[i, ...], ts[:-1]), **sample_style, color="C1"
     )
     axes_residual[2].plot(
         ts[:-1],
@@ -211,38 +205,14 @@ axes_state[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], **mean_style)
 axes_state[2].plot(ts[:-1], margs_posterior.mean[..., 0], **mean_style)
 
 # Plot residual means
-axes_residual[0].plot(
-    ts[:-1],
-    residual(margs_prior.mean, ts[:-1]),
-    **mean_style,
-)
-axes_residual[1].plot(
-    ts[:-1],
-    residual(margs_tcoeffs.mean, ts[:-1]),
-    **mean_style,
-)
-axes_residual[2].plot(
-    ts[:-1],
-    residual(margs_posterior.mean, ts[:-1]),
-    **mean_style,
-)
+axes_residual[0].plot(ts[:-1], residual(margs_prior.mean, ts[:-1]), **mean_style)
+axes_residual[1].plot(ts[:-1], residual(margs_tcoeffs.mean, ts[:-1]), **mean_style)
+axes_residual[2].plot(ts[:-1], residual(margs_posterior.mean, ts[:-1]), **mean_style)
 
 # Plot residual log-magnitudes
-axes_log_abs[0].plot(
-    ts[:-1],
-    log_residual(margs_prior.mean, ts[:-1]),
-    **mean_style,
-)
-axes_log_abs[1].plot(
-    ts[:-1],
-    log_residual(margs_tcoeffs.mean, ts[:-1]),
-    **mean_style,
-)
-axes_log_abs[2].plot(
-    ts[:-1],
-    log_residual(margs_posterior.mean, ts[:-1]),
-    **mean_style,
-)
+axes_log_abs[0].plot(ts[:-1], log_residual(margs_prior.mean, ts[:-1]), **mean_style)
+axes_log_abs[1].plot(ts[:-1], log_residual(margs_tcoeffs.mean, ts[:-1]), **mean_style)
+axes_log_abs[2].plot(ts[:-1], log_residual(margs_posterior.mean, ts[:-1]), **mean_style)
 
 # Set the x- and y-ticks/limits
 axes_state[0].set_xticks((t0, (t0 + t1) / 2, t1))

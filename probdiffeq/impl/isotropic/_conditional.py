@@ -39,9 +39,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         matrix, noise = conditional
 
         r_ext_p, (r_bw_p, gain) = cholesky_util.revert_conditional(
-            R_X_F=(matrix @ rv.cholesky).T,
-            R_X=rv.cholesky.T,
-            R_YX=noise.cholesky.T,
+            R_X_F=(matrix @ rv.cholesky).T, R_X=rv.cholesky.T, R_YX=noise.cholesky.T
         )
         extrapolated_cholesky = r_ext_p.T
         corrected_cholesky = r_bw_p.T

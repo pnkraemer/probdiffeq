@@ -19,9 +19,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         matrix, noise = conditional
 
         r_ext, (r_bw_p, g_bw_p) = cholesky_util.revert_conditional(
-            R_X_F=(matrix @ rv.cholesky).T,
-            R_X=rv.cholesky.T,
-            R_YX=noise.cholesky.T,
+            R_X_F=(matrix @ rv.cholesky).T, R_X=rv.cholesky.T, R_YX=noise.cholesky.T
         )
         m_ext = matrix @ rv.mean + noise.mean
         m_cond = rv.mean - g_bw_p @ m_ext

@@ -16,19 +16,21 @@ jupyter:
 # Posterior uncertainties
 
 ```python
+"""Display the marginal uncertainties of filters and smoothers."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, adaptive, timestep
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import calibrated, solution, markov
-from probdiffeq.taylor import autodiff
-from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
+from probdiffeq.solvers import calibrated, markov, solution
+from probdiffeq.solvers.strategies import filters, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.taylor import autodiff
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python
@@ -57,7 +59,8 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(*ys, t):
+def vf(*ys, t):  # noqa: ARG001
+    """Evaluate the Lotka-Volterra vector field."""
     return f(*ys, *f_args)
 ```
 
@@ -91,11 +94,7 @@ _, num_derivatives, _ = marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
-    nrows=2,
-    ncols=num_derivatives,
-    sharex=True,
-    tight_layout=True,
-    figsize=(8, 3),
+    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
 )
 
 for i, axes_cols in enumerate(axes_all.T):
@@ -153,11 +152,7 @@ _, num_derivatives, _ = marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
-    nrows=2,
-    ncols=num_derivatives,
-    sharex=True,
-    tight_layout=True,
-    figsize=(8, 3),
+    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
 )
 
 for i, axes_cols in enumerate(axes_all.T):
