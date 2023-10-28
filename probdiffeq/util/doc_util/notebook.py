@@ -4,7 +4,7 @@ import numpy as np
 from tueplots import axes, cycler, fontsizes, markers
 
 
-def plot_config():
+def plot_style():
     colors = ["cornflowerblue", "salmon", "mediumseagreen", "crimson", "darkorchid"]
     markers_ = ["o", "v", "P", "^", "X", "d"]
     return {
@@ -13,7 +13,6 @@ def plot_config():
         **axes.tick_direction(x="inout", y="inout"),
         **axes.legend(),
         **axes.grid(grid_linestyle="dotted"),
-        **fontsizes.beamer_moml(),
         **cycler.cycler(
             marker=np.tile(markers_, 9)[:15],
             color=np.tile(colors, 10)[:15],
@@ -21,3 +20,7 @@ def plot_config():
         **markers.with_edge(),
         **{"figure.dpi": 100},
     }
+
+
+def plot_sizes():
+    return fontsizes.beamer_moml()
