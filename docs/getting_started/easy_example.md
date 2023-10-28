@@ -3,6 +3,8 @@
 Let's have a look at an easy example.
 
 ```python
+"""Solve the logistic equation."""
+
 import jax
 import jax.numpy as jnp
 from jax.config import config
@@ -21,7 +23,8 @@ Create a problem:
 
 ```python
 @jax.jit
-def vf(y, *, t):
+def vf(y, *, t):  # noqa: ARG001
+    """Evaluate the vector field."""
     return 0.5 * y * (1 - y)
 
 
