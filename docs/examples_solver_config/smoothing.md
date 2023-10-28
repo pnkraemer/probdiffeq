@@ -26,13 +26,13 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq import ivpsolve, adaptive
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated, solution
-from probdiffeq.taylor import autodiff
+from probdiffeq.solvers.strategies import filters, fixedpoint, smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
-from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
+from probdiffeq.taylor import autodiff
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python

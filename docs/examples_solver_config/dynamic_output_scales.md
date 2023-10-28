@@ -31,11 +31,10 @@ from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.taylor import affine
-from probdiffeq.util.doc_util import notebook
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python

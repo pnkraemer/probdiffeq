@@ -25,8 +25,6 @@ Tronarp, Bosch, and Hennig call this "physics-enhanced regression" ([link to pap
 <!-- #endregion -->
 
 ```python
-import functools
-
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -34,12 +32,12 @@ import optax
 from diffeqzoo import backend, ivps
 from jax.config import config
 
-from probdiffeq.impl import impl
 from probdiffeq import ivpsolve
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.impl import impl
+from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python

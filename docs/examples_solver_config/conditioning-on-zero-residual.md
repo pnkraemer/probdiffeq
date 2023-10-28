@@ -22,16 +22,16 @@ Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-re
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from diffeqzoo import backend, ivps
+from diffeqzoo import backend
 from jax.config import config
 
-from probdiffeq import controls, ivpsolve, timestep, adaptive
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import calibrated, uncalibrated, solution, markov
-from probdiffeq.taylor import autodiff
-from probdiffeq.solvers.strategies import filters, smoothers, fixedpoint
+from probdiffeq.solvers import markov, uncalibrated
+from probdiffeq.solvers.strategies import fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.taylor import autodiff
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python

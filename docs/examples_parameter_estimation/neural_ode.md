@@ -27,11 +27,10 @@ from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.util.doc_util import notebook
-from probdiffeq.solvers import uncalibrated, solution
-from probdiffeq.taylor import autodiff
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import smoothers
+from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.util.doc_util import notebook
 ```
 
 ```python

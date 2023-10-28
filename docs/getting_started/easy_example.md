@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 from jax.config import config
 
-from probdiffeq import ivpsolve, timestep, adaptive
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import smoothers

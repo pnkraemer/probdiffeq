@@ -99,7 +99,7 @@ def plot_solution(axis, ts, ys, yscale="linear"):
     axis.plot(
         ts,
         ys[:, 1],
-        label="$\dot y$",
+        label=r"$\dot y$",
         linestyle="dashed",
         color="black",
         marker="None",
