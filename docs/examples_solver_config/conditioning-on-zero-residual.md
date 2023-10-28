@@ -19,6 +19,7 @@ Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-re
 
 
 ```python
+"""Demonstrate how probabilistic solvers work via conditioning on constraints."""
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -55,7 +56,8 @@ impl.select("dense", ode_shape=(1,))
 
 
 @jax.jit
-def vector_field(y, t):
+def vector_field(y, t):  # noqa: ARG001
+    """Evaluate the logistic ODE vector field."""
     return 10.0 * y * (2.0 - y)
 
 
@@ -150,10 +152,12 @@ mean_style = {
 
 
 def log_residual(*args):
+    """Evaluate the log-ODE-residual."""
     return jnp.log10(jnp.abs(residual(*args)))
 
 
 def residual(x, t):
+    """Evaluate the ODE residual."""
     return x[..., 1] - jax.vmap(vector_field)(x[..., 0], t)
 
 

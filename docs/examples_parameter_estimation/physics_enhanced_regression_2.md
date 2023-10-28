@@ -263,6 +263,7 @@ Set up a sampler.
 @functools.partial(jax.jit, static_argnames=["kernel", "num_samples"])
 def inference_loop(rng_key, kernel, initial_state, num_samples):
     """Run BlackJAX' inference loop."""
+
     def one_step(state, rng_key):
         state, _ = kernel.step(rng_key, state)
         return state, state
