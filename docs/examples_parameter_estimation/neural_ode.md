@@ -121,6 +121,7 @@ f, u0, (t0, t1), f_args = ivps.neural_ode_mlp(layer_sizes=(2, 20, 1))
 
 @jax.jit
 def vf(y, *, t, p):
+    """Evaluate the MLP."""
     return f(y, t, *p)
 
 
