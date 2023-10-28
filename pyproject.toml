@@ -40,9 +40,7 @@ lint =[
     "pre-commit",
 ]
 format =[
-    "isort",
-    "black",
-    "nbqa",
+    "ruff",
     "jupytext",
 ]
 example = [
@@ -68,8 +66,10 @@ doc = [
 
 
 [tool.setuptools.packages.find]
-where = ["."]  # list of folders that contain the packages (["."] by default)
-include = ["probdiffeq*"]  # package names should match these glob patterns (["*"] by default)
+# list of folders that contain the packages (["."] by default)
+where = ["."]
+# package names should match these glob patterns (["*"] by default)
+include = ["probdiffeq*"]
 
 
 [tool.setuptools_scm]
@@ -109,7 +109,8 @@ exclude_also = [
 
 
 [tool.ruff]
-include = ["*.py", "**/pyproject.toml", "*.ipynb"]
+include = ["**.py", "**/pyproject.toml"]
+extend-include = ["**.ipynb"]
 # See: https://beta.ruff.rs/docs/rules/
 select = [
     # pycodestyle (warning, error)
@@ -167,14 +168,3 @@ ignore = [
 
 [tool.ruff.pydocstyle]
 convention = "numpy"
-
-
-[tool.isort]
-multi_line_output = "3"
-include_trailing_comma = "true"
-force_grid_wrap = "0"
-use_parentheses = "true"
-line_length = "88"
-
-[tool.black]
-line-length = "88"
