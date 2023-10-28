@@ -26,6 +26,7 @@ Tronarp, Bosch, and Hennig call this "physics-enhanced regression" ([link to pap
 
 ```python
 """Estimate ODE parameters with ProbDiffEq and Optax."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
