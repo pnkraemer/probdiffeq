@@ -109,8 +109,7 @@ exclude_also = [
 
 
 [tool.ruff]
-include = ["**.py", "**/pyproject.toml"]
-extend-include = ["**.ipynb"]
+include = ["**.py", "**/pyproject.toml", "**.ipynb"]
 # See: https://beta.ruff.rs/docs/rules/
 select = [
     # pycodestyle (warning, error)

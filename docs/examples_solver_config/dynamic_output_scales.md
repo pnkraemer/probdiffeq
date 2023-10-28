@@ -23,6 +23,8 @@ In short: choose a `solver_dynamic` if your ODE output-scale varies quite strong
 For example, consider the numerical solution of a linear ODE with fixed steps:
 
 ```python
+"""Display the behaviour of the solvers when the scale of the ODE varies."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -59,7 +61,8 @@ f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
 
 
 @jax.jit
-def vf(*ys, t):
+def vf(*ys, t):  # noqa: ARG001
+    """Evaluate the affine vector field."""
     return f(*ys, *f_args)
 ```
 

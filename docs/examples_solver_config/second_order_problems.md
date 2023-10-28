@@ -16,6 +16,8 @@ jupyter:
 # Simulate second-order systems
 
 ```python
+"""Demonstrate how to solve second-order IVPs without transforming them first."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -51,7 +53,8 @@ f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
-def vf_1(y, t):
+def vf_1(y, t):  # noqa: ARG001
+    """Evaluate the three-body problem as a first-order IVP."""
     return f(y, *f_args)
 
 
@@ -92,7 +95,8 @@ f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
 
 @jax.jit
-def vf_2(y, dy, t):
+def vf_2(y, dy, t):  # noqa: ARG001
+    """Evaluate the three-body problem as a second-order IVP."""
     return f(y, dy, *f_args)
 
 

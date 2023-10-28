@@ -20,6 +20,8 @@ Here is how.
 
 
 ```python
+"""Demonstrate different options for implementing an IVP-solver via smoothing."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -56,7 +58,8 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra(time_span=(0.0, 10.0))
 
 
 @jax.jit
-def vf(*ys, t):
+def vf(*ys, t):  # noqa: ARG001
+    """Evaluate the Lotka-Volterra IVP."""
     return f(*ys, *f_args)
 
 

@@ -16,6 +16,8 @@ jupyter:
 # Posterior uncertainties
 
 ```python
+"""Display the marginal uncertainties of filters and smoothers."""
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -57,7 +59,8 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(*ys, t):
+def vf(*ys, t):  # noqa: ARG001
+    """Evaluate the Lotka-Volterra vector field."""
     return f(*ys, *f_args)
 ```
 
