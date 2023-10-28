@@ -35,6 +35,11 @@ from probdiffeq.solvers.strategies.components import corrections, priors
 ```
 
 ```python
+plt.rcParams.update(notebook.plot_style())
+plt.rcParams.update(notebook.plot_sizes())
+```
+
+```python
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 

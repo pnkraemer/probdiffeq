@@ -119,7 +119,12 @@ if not backend.has_been_selected:
     backend.select("jax")
 
 # Nice-looking plots
-plt.rcParams.update(notebook.plot_config())
+plt.rcParams.update(notebook.plot_style())
+plt.rcParams.update(notebook.plot_sizes())
+```
+
+```python
+
 ```
 
 ```python

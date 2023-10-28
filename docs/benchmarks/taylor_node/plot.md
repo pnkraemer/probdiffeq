@@ -88,8 +88,11 @@ def _adaptive_repeat(xs, ys):
 ```
 
 ```python
-plt.rcParams.update(notebook.plot_config())
+plt.rcParams.update(notebook.plot_style())
+plt.rcParams.update(notebook.plot_sizes())
+```
 
+```python
 fig, (axis_perform, axis_compile) = plt.subplots(
     ncols=2, figsize=(8, 3), dpi=150, sharex=True
 )

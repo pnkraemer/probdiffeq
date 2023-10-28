@@ -67,8 +67,11 @@ def plot_results(axis_compile, axis_perform, results):
 ```
 
 ```python
-plt.rcParams.update(notebook.plot_config())
+plt.rcParams.update(notebook.plot_style())
+plt.rcParams.update(notebook.plot_sizes())
+```
 
+```python
 fig, (axis_perform, axis_compile) = plt.subplots(
     ncols=2, dpi=150, sharex=True, figsize=(8, 3)
 )

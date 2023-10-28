@@ -102,8 +102,11 @@ def plot_solution(axis, ts, ys, yscale="linear"):
 ```
 
 ```python
-plt.rcParams.update(notebook.plot_config())
+plt.rcParams.update(notebook.plot_style())
+plt.rcParams.update(notebook.plot_sizes())
+```
 
+```python
 layout = [
     ["solution", "benchmark", "benchmark"],
     ["solution", "benchmark", "benchmark"],
