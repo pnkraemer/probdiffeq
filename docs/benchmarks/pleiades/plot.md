@@ -84,6 +84,7 @@ def plot_results(axis, results):
 
 
 def plot_solution(axis, ts, ys, yscale="linear"):
+    """Plot the IVP solution."""
     axis.set_title("Pleiades")
     kwargs = {"color": "goldenrod", "alpha": 0.85}
 

@@ -84,6 +84,7 @@ def plot_results(axis, results):
 
 
 def plot_solution(axis, ts, ys, yscale="linear"):
+    """Plot the IVP solution."""
     axis.set_title("Van-der-Pol (stiffness: $10^5$)")
     kwargs = {"alpha": 0.85}
 

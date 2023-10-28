@@ -17,6 +17,7 @@ repos:
       - id: ruff
         args: [--quiet, .]
       - id: ruff-format
+        args: [--quiet, --check, .]
   - repo: https://github.com/mwouts/jupytext
     rev: v1.15.2
     hooks:
