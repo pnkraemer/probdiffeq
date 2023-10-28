@@ -18,6 +18,7 @@ jupyter:
 We can use the parameter estimation functionality to fit a neural ODE to a time series data set.
 
 ```python
+"""Train a neural ODE with ProbDiffEq and Optax."""
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -70,6 +71,7 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
 
     @jax.jit
     def loss_fn(parameters):
+        """Loss function: log-marginal likelihood of the data."""
         tcoeffs = initial_values + (vf(*initial_values, t=t0, p=parameters),)
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
