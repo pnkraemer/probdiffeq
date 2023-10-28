@@ -86,18 +86,8 @@ ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 tcoeffs = (u0, vf(u0, t=t0))
 init_mle = mle.initial_condition(tcoeffs, output_scale=1.0)
 init_dynamic = dynamic.initial_condition(tcoeffs, output_scale=1.0)
-solution_dynamic = ivpsolve.solve_fixed_grid(
-    vf,
-    init_mle,
-    grid=ts,
-    solver=dynamic,
-)
-solution_mle = ivpsolve.solve_fixed_grid(
-    vf,
-    init_dynamic,
-    grid=ts,
-    solver=mle,
-)
+solution_dynamic = ivpsolve.solve_fixed_grid(vf, init_mle, grid=ts, solver=dynamic)
+solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle)
 ```
 
 Plot the solution.

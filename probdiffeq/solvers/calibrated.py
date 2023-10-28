@@ -27,9 +27,7 @@ def mle(strategy):
 def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
     output_scale_prior, _calibrated = calibration.extract(state.output_scale)
     error, _, state_strategy = strategy.predict_error(
-        state.strategy,
-        dt=dt,
-        vector_field=vector_field,
+        state.strategy, dt=dt, vector_field=vector_field
     )
 
     state_strategy = strategy.complete(state_strategy, output_scale=output_scale_prior)
@@ -57,9 +55,7 @@ def dynamic(strategy):
 
 def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
     error, observed, state_strategy = strategy.predict_error(
-        state.strategy,
-        dt=dt,
-        vector_field=vector_field,
+        state.strategy, dt=dt, vector_field=vector_field
     )
 
     output_scale = calibration.update(state.output_scale, observed=observed)

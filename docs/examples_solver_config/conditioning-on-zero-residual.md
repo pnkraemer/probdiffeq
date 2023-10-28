@@ -98,11 +98,7 @@ dt0 = timestep.initial(lambda y: vector_field(y, t=t0), (u0,))
 
 init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(
-    vector_field,
-    init,
-    save_at=ts,
-    dt0=1.0,
-    adaptive_solver=adaptive_solver,
+    vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver
 )
 # posterior = solution.calibrate(sol.posterior, sol.output_scale)
 markov_seq_posterior = markov.select_terminal(sol.posterior)
@@ -171,16 +167,10 @@ for i in range(num_samples):
 
     # Plot all residual-samples
     axes_residual[0].plot(
-        ts[:-1],
-        residual(samples_prior[i, ...], ts[:-1]),
-        **sample_style,
-        color="C0",
+        ts[:-1], residual(samples_prior[i, ...], ts[:-1]), **sample_style, color="C0"
     )
     axes_residual[1].plot(
-        ts[:-1],
-        residual(samples_tcoeffs[i, ...], ts[:-1]),
-        **sample_style,
-        color="C1",
+        ts[:-1], residual(samples_tcoeffs[i, ...], ts[:-1]), **sample_style, color="C1"
     )
     axes_residual[2].plot(
         ts[:-1],
@@ -215,38 +205,14 @@ axes_state[1].plot(ts[1:], margs_tcoeffs.mean[..., 0], **mean_style)
 axes_state[2].plot(ts[:-1], margs_posterior.mean[..., 0], **mean_style)
 
 # Plot residual means
-axes_residual[0].plot(
-    ts[:-1],
-    residual(margs_prior.mean, ts[:-1]),
-    **mean_style,
-)
-axes_residual[1].plot(
-    ts[:-1],
-    residual(margs_tcoeffs.mean, ts[:-1]),
-    **mean_style,
-)
-axes_residual[2].plot(
-    ts[:-1],
-    residual(margs_posterior.mean, ts[:-1]),
-    **mean_style,
-)
+axes_residual[0].plot(ts[:-1], residual(margs_prior.mean, ts[:-1]), **mean_style)
+axes_residual[1].plot(ts[:-1], residual(margs_tcoeffs.mean, ts[:-1]), **mean_style)
+axes_residual[2].plot(ts[:-1], residual(margs_posterior.mean, ts[:-1]), **mean_style)
 
 # Plot residual log-magnitudes
-axes_log_abs[0].plot(
-    ts[:-1],
-    log_residual(margs_prior.mean, ts[:-1]),
-    **mean_style,
-)
-axes_log_abs[1].plot(
-    ts[:-1],
-    log_residual(margs_tcoeffs.mean, ts[:-1]),
-    **mean_style,
-)
-axes_log_abs[2].plot(
-    ts[:-1],
-    log_residual(margs_posterior.mean, ts[:-1]),
-    **mean_style,
-)
+axes_log_abs[0].plot(ts[:-1], log_residual(margs_prior.mean, ts[:-1]), **mean_style)
+axes_log_abs[1].plot(ts[:-1], log_residual(margs_tcoeffs.mean, ts[:-1]), **mean_style)
+axes_log_abs[2].plot(ts[:-1], log_residual(margs_posterior.mean, ts[:-1]), **mean_style)
 
 # Set the x- and y-ticks/limits
 axes_state[0].set_xticks((t0, (t0 + t1) / 2, t1))

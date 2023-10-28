@@ -78,12 +78,7 @@ ts0 = corrections.ts0()
 ekf0 = calibrated.mle(filters.filter_adaptive(ibm, ts0))
 init = ekf0.initial_condition(tcoeffs, output_scale=1.0)
 ekf0sol = ivpsolve.simulate_terminal_values(
-    vf,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive.adaptive(ekf0),
+    vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive.adaptive(ekf0)
 )
 print(ekf0sol.t, ekf0sol.u)
 ```
@@ -96,12 +91,7 @@ If you are used to calling traditional solve() methods, use one a conventional s
 eks0 = calibrated.mle(smoothers.smoother_adaptive(ibm, ts0))
 init = eks0.initial_condition(tcoeffs, output_scale=1.0)
 eks0sol = ivpsolve.solve_and_save_every_step(
-    vf,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive.adaptive(eks0),
+    vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive.adaptive(eks0)
 )
 
 plt.subplots(figsize=(5, 3))

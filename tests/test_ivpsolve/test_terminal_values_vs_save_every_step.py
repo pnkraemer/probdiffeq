@@ -29,12 +29,7 @@ def fixture_problem_args_kwargs():
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
 
     args = (vf, init)
-    kwargs = {
-        "t0": t0,
-        "t1": t1,
-        "adaptive_solver": adaptive_solver,
-        "dt0": 0.1,
-    }
+    kwargs = {"t0": t0, "t1": t1, "adaptive_solver": adaptive_solver, "dt0": 0.1}
     return args, kwargs
 
 

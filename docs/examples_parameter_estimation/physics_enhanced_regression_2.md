@@ -231,9 +231,7 @@ def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     """Evaluate the logposterior-function of the data."""
     y_T = solve_fixed(theta, ts=ts)
     logpdf_data = solution.log_marginal_likelihood_terminal_values(
-        data,
-        standard_deviation=obs_stdev,
-        posterior=y_T.posterior,
+        data, standard_deviation=obs_stdev, posterior=y_T.posterior
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
@@ -291,9 +289,7 @@ initial_state = warmup_results.state
 step_size = warmup_results.parameters["step_size"]
 inverse_mass_matrix = warmup_results.parameters["inverse_mass_matrix"]
 nuts_kernel = blackjax.nuts(
-    logdensity_fn=log_M,
-    step_size=step_size,
-    inverse_mass_matrix=inverse_mass_matrix,
+    logdensity_fn=log_M, step_size=step_size, inverse_mass_matrix=inverse_mass_matrix
 )
 ```
 

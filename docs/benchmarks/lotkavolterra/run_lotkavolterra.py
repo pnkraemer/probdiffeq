@@ -184,12 +184,7 @@ def plot_ivp_solution():
 
     tol = 1e-12
     solution = scipy.integrate.solve_ivp(
-        vf_scipy,
-        y0=u0,
-        t_span=time_span,
-        atol=1e-3 * tol,
-        rtol=tol,
-        method="LSODA",
+        vf_scipy, y0=u0, t_span=time_span, atol=1e-3 * tol, rtol=tol, method="LSODA"
     )
     return solution.t, solution.y.T
 

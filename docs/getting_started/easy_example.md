@@ -107,12 +107,7 @@ From here on, the rest is standard ODE-solver machinery:
 ```python
 dt0 = timestep.initial(lambda y: vf(y, t=t0), (u0,))  # or use e.g. dt0=0.1
 solution = ivpsolve.solve_and_save_every_step(
-    vf,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=dt0,
-    adaptive_solver=adaptive_solver,
+    vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
 )
 
 

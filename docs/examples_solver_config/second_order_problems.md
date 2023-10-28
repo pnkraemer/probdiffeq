@@ -70,12 +70,7 @@ init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 
 ```python
 solution = ivpsolve.solve_and_save_every_step(
-    vf_1,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive_solver_1st,
+    vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st
 )
 ```
 
@@ -113,12 +108,7 @@ init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 
 ```python
 solution = ivpsolve.solve_and_save_every_step(
-    vf_2,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive_solver_2nd,
+    vf_2, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_2nd
 )
 ```
 

@@ -68,9 +68,7 @@ def _proportional_integral_apply(
     scale_factor_clipped_min = jnp.minimum(scale_factor_unclipped, factor_max)
     scale_factor = jnp.maximum(factor_min, scale_factor_clipped_min)
     error_norm_previously_accepted = jnp.where(
-        error_normalised <= 1.0,
-        error_normalised,
-        error_norm_previously_accepted,
+        error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
     )
 
     dt_proposed = scale_factor * dt_proposed

@@ -35,9 +35,7 @@ def fixture_sol():
 def test_output_is_a_scalar_and_not_nan_and_not_inf(sol):
     data = sol.u + 0.005
     lml = solution.log_marginal_likelihood(
-        data,
-        standard_deviation=jnp.ones_like(sol.t),
-        posterior=sol.posterior,
+        data, standard_deviation=jnp.ones_like(sol.t), posterior=sol.posterior
     )
     assert lml.shape == ()
     assert not jnp.isnan(lml)
@@ -54,9 +52,7 @@ def test_that_function_raises_error_for_wrong_std_shape_too_many(sol):
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            data,
-            standard_deviation=jnp.ones((k + 1,)),
-            posterior=sol.posterior,
+            data, standard_deviation=jnp.ones((k + 1,)), posterior=sol.posterior
         )
 
 
@@ -70,9 +66,7 @@ def test_that_function_raises_error_for_wrong_std_shape_wrong_ndim(sol):
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            data,
-            standard_deviation=jnp.ones((k, 1)),
-            posterior=sol.posterior,
+            data, standard_deviation=jnp.ones((k, 1)), posterior=sol.posterior
         )
 
 
@@ -87,9 +81,7 @@ def test_raises_error_for_terminal_values(sol):
     posterior_t1 = jax.tree_util.tree_map(lambda s: s[-1], sol)
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
-            data[-1],
-            standard_deviation=jnp.ones_like(data[-1]),
-            posterior=posterior_t1,
+            data[-1], standard_deviation=jnp.ones_like(data[-1]), posterior=posterior_t1
         )
 
 

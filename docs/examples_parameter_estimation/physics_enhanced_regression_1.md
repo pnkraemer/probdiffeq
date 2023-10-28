@@ -83,10 +83,7 @@ def solve(p):
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_fixed_grid(
-        lambda y, t: vf(y, t, p=p),
-        init,
-        grid=ts,
-        solver=solver,
+        lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver
     )
 
 

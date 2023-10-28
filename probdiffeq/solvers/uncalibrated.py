@@ -21,9 +21,7 @@ class _UncalibratedSolver(_solver.Solver[_common.State]):
 
     def step(self, state: _common.State, *, vector_field, dt):
         error, _observed, state_strategy = self.strategy.predict_error(
-            state.strategy,
-            dt=dt,
-            vector_field=vector_field,
+            state.strategy, dt=dt, vector_field=vector_field
         )
         state_strategy = self.strategy.complete(
             state_strategy, output_scale=state.output_scale
@@ -40,10 +38,7 @@ class _UncalibratedSolver(_solver.Solver[_common.State]):
         self, t, s0: _common.State, s1: _common.State
     ) -> _interp.InterpRes[_common.State]:
         acc_p, sol_p, prev_p = self.strategy.case_interpolate(
-            t,
-            s0=s0.strategy,
-            s1=s1.strategy,
-            output_scale=s1.output_scale,
+            t, s0=s0.strategy, s1=s1.strategy, output_scale=s1.output_scale
         )
         prev = _common.State(prev_p, output_scale=s0.output_scale)
         sol = _common.State(sol_p, output_scale=s1.output_scale)

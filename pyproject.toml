@@ -156,7 +156,19 @@ ignore = [
     # Magic methods don't need a docstring:
     "D105",
 ]
+# Same as Black.
+line-length = 88
+indent-width = 4
 
+[tool.ruff.format]
+# Use `\n` line endings for all files
+line-ending = "lf"
+# Prefer single quotes over double quotes.
+quote-style = "double"
+skip-magic-trailing-comma = true
+
+[tool.ruff.isort]
+split-on-trailing-comma = false
 
 [tool.ruff.per-file-ignores]
 # Auxiliary functions and tests don't need docstring-enforcement:

@@ -11,13 +11,7 @@ from probdiffeq.backend import control_flow, tree_array_util
 
 
 def solve_and_save_at(
-    vector_field,
-    t,
-    initial_condition,
-    *,
-    save_at,
-    adaptive_solver,
-    dt0,
+    vector_field, t, initial_condition, *, save_at, adaptive_solver, dt0
 ):
     advance_func = functools.partial(
         _advance_and_interpolate,

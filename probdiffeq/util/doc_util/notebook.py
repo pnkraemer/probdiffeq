@@ -14,8 +14,7 @@ def plot_style():
         **axes.legend(),
         **axes.grid(grid_linestyle="dotted"),
         **cycler.cycler(
-            marker=np.tile(markers_, 9)[:15],
-            color=np.tile(colors, 10)[:15],
+            marker=np.tile(markers_, 9)[:15], color=np.tile(colors, 10)[:15]
         ),
         **markers.with_edge(),
         **{"figure.dpi": 100},

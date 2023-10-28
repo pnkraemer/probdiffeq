@@ -52,9 +52,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(sol):
     """
     data = sol.u + 0.1
     mll = solution.log_marginal_likelihood_terminal_values(
-        data,
-        standard_deviation=jnp.asarray(1e-2),
-        posterior=sol.posterior,
+        data, standard_deviation=jnp.asarray(1e-2), posterior=sol.posterior
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)
@@ -67,15 +65,11 @@ def test_terminal_values_error_for_wrong_shapes(sol):
     # Non-scalar observation std
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
-            data,
-            standard_deviation=jnp.ones((1,)),
-            posterior=sol.posterior,
+            data, standard_deviation=jnp.ones((1,)), posterior=sol.posterior
         )
 
     # Data does not match u
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood_terminal_values(
-            data[None, ...],
-            standard_deviation=jnp.ones(()),
-            posterior=sol.posterior,
+            data[None, ...], standard_deviation=jnp.ones(()), posterior=sol.posterior
         )

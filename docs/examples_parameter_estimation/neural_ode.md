@@ -72,24 +72,16 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
     @jax.jit
     def loss_fn(parameters):
         """Loss function: log-marginal likelihood of the data."""
-        tcoeffs = (
-            *initial_values,
-            vf(*initial_values, t=t0, p=parameters),
-        )
+        tcoeffs = (*initial_values, vf(*initial_values, t=t0, p=parameters))
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         sol = ivpsolve.solve_fixed_grid(
-            lambda *a, **kw: vf(*a, **kw, p=parameters),
-            init,
-            grid=grid,
-            solver=solver,
+            lambda *a, **kw: vf(*a, **kw, p=parameters), init, grid=grid, solver=solver
         )
 
         observation_std = jnp.ones_like(grid) * standard_deviation
         marginal_likelihood = solution.log_marginal_likelihood(
-            data[:, None],
-            standard_deviation=observation_std,
-            posterior=sol.posterior,
+            data[:, None], standard_deviation=observation_std, posterior=sol.posterior
         )
         return -1 * marginal_likelihood
 

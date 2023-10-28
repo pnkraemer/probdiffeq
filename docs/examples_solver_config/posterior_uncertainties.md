@@ -94,11 +94,7 @@ _, num_derivatives, _ = marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
-    nrows=2,
-    ncols=num_derivatives,
-    sharex=True,
-    tight_layout=True,
-    figsize=(8, 3),
+    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
 )
 
 for i, axes_cols in enumerate(axes_all.T):
@@ -156,11 +152,7 @@ _, num_derivatives, _ = marginals.mean.shape
 
 
 fig, axes_all = plt.subplots(
-    nrows=2,
-    ncols=num_derivatives,
-    sharex=True,
-    tight_layout=True,
-    figsize=(8, 3),
+    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
 )
 
 for i, axes_cols in enumerate(axes_all.T):

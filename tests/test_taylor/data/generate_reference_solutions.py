@@ -61,9 +61,6 @@ if __name__ == "__main__":
     jnp.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
 
     solution2 = van_der_pol_second()
-    jnp.save(
-        "./tests/test_taylor/data/van_der_pol_second_solution.npy",
-        solution2,
-    )
+    jnp.save("./tests/test_taylor/data/van_der_pol_second_solution.npy", solution2)
 
     print("Saving successful.")
