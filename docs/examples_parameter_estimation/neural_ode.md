@@ -72,7 +72,10 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
     @jax.jit
     def loss_fn(parameters):
         """Loss function: log-marginal likelihood of the data."""
-        tcoeffs = initial_values + (vf(*initial_values, t=t0, p=parameters),)
+        tcoeffs = (
+            *initial_values,
+            vf(*initial_values, t=t0, p=parameters),
+        )
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         sol = ivpsolve.solve_fixed_grid(
@@ -159,7 +162,8 @@ for i in range(chunk_size):
     for _ in range(chunk_size**2):
         p, state = update_fn(p, state)
     print(
-        f"Negative log-marginal-likelihood after {(i+1)*chunk_size**2}/{chunk_size**3} steps:",
+        "Negative log-marginal-likelihood after "
+        f"{(i+1)*chunk_size**2}/{chunk_size**3} steps:",
         loss_fn(p),
     )
 ```
