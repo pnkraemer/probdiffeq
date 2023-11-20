@@ -100,10 +100,10 @@ class Strategy:
     def predict_error(self, state: _State, /, *, dt, vector_field):
         """Predict the error of an upcoming step."""
         hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
-        error, observed, corr = self.correction.estimate_error(
-            hidden, state.aux_corr, vector_field=vector_field, t=state.t
-        )
         t = state.t + dt
+        error, observed, corr = self.correction.estimate_error(
+            hidden, state.aux_corr, vector_field=vector_field, t=t
+        )
         state = _State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
 
