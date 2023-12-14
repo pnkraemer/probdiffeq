@@ -1,18 +1,9 @@
 
-.PHONY: format lint test doc example run-benchmarks clean
-
 format:
 	ruff format --quiet .
-	jupytext --quiet --sync docs/getting_started/*
-	jupytext --quiet --sync docs/examples_solver_config/*
-	jupytext --quiet --sync docs/examples_parameter_estimation/*
-	jupytext --quiet --sync docs/benchmarks/hires/*
-	jupytext --quiet --sync docs/benchmarks/pleiades/*
-	jupytext --quiet --sync docs/benchmarks/vanderpol/*
-	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*
-	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*
-	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*
-	jupytext --quiet --sync docs/benchmarks/taylor_node/*
+	jupytext --quiet --sync docs/getting_started/*.ipynb
+	jupytext --quiet --sync docs/examples*/*
+	jupytext --quiet --sync docs/benchmarks/**/*.md
 
 lint:
 	pre-commit run --all-files
