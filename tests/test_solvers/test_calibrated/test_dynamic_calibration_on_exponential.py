@@ -7,6 +7,7 @@ but not for the dynamic solver.
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
+from probdiffeq.backend import linalg
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -35,4 +36,4 @@ def test_exponential_approximated_well():
 
 
 def _rmse(a, b):
-    return jnp.linalg.norm((a - b) / b) / jnp.sqrt(b.size)
+    return linalg.vector_norm((a - b) / b) / jnp.sqrt(b.size)
