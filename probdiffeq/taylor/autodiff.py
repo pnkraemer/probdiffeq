@@ -8,6 +8,8 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
+from probdiffeq.backend import control_flow
+
 
 def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
@@ -52,7 +54,9 @@ def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
         return taylor_coeffs
 
     # Compute all coefficients with scan().
-    taylor_coeffs, _ = jax.lax.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
+    taylor_coeffs, _ = control_flow.scan(
+        body, init=taylor_coeffs, xs=None, length=num - 1
+    )
     return taylor_coeffs
 
 

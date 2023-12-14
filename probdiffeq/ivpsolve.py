@@ -185,7 +185,7 @@ def _solve_and_save_at(
     )
 
     state = adaptive_solver.init(t, initial_condition, dt0=dt0, num_steps=0.0)
-    _, solution = jax.lax.scan(f=advance_func, init=state, xs=save_at, reverse=False)
+    _, solution = control_flow.scan(advance_func, init=state, xs=save_at, reverse=False)
     return solution
 
 
@@ -297,7 +297,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
 
     t0 = grid[0]
     state0 = solver.init(t0, initial_condition)
-    _, result_state = jax.lax.scan(f=body_fn, init=state0, xs=jnp.diff(grid))
+    _, result_state = control_flow.scan(body_fn, init=state0, xs=jnp.diff(grid))
     _t, (posterior, output_scale) = solver.extract(result_state)
 
     # I think the user expects marginals, so we compute them here
