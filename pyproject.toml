@@ -36,14 +36,11 @@ test =[
     "diffrax",
     "equinox",
 ]
-lint =[
+format-and-lint =[
     "pre-commit",
 ]
-format =[
-    "ruff",
-    "jupytext",
-]
 example = [
+    "jupytext",
     "jupyter",
     "matplotlib",
     "jupytext",
