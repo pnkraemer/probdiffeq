@@ -18,7 +18,9 @@ def make_runge_kutta_starter(dt, *, atol=1e-12, rtol=1e-10):
 
 
 # atol and rtol must be static bc. of jax.odeint...
-@functools.partial(jax.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"])
+@functools.partial(
+    functools.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"]
+)
 def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     # TODO [inaccuracy]: the initial-value uncertainty is discarded
     # TODO [feature]: allow implementations other than IsoIBM?

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls
-from probdiffeq.backend import containers, control_flow
+from probdiffeq.backend import containers, control_flow, functools
 from probdiffeq.impl import impl
 
 
@@ -64,14 +64,14 @@ class _AdaptiveIVPSolver:
             "\n)"
         )
 
-    @jax.jit
+    @functools.jit
     def init(self, t, initial_condition, dt0, num_steps):
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt0)
         return _AdaptiveState(state_solver, state_solver, state_control, num_steps)
 
-    @jax.jit
+    @functools.jit
     def rejection_loop(self, state0, *, vector_field, t1):
         def cond_fn(s):
             return s.error_norm_proposed > 1.0

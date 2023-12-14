@@ -4,11 +4,11 @@ import warnings
 
 import diffeqzoo
 import diffeqzoo.ivps
-import jax
 import jax.numpy as jnp
 from diffeqzoo import backend
 from jax.config import config
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import impl
 
 # ODE examples must be in JAX
@@ -48,7 +48,7 @@ class _Setup:
         f, u0, (t0, _), f_args = diffeqzoo.ivps.logistic()
         t1 = 0.75
 
-        @jax.jit
+        @functools.jit
         def vf(x, *, t):  # noqa: ARG001
             return f(x, *f_args)
 
@@ -59,7 +59,7 @@ class _Setup:
         f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
         t1 = 2.0  # Short time-intervals are sufficient for this test.
 
-        @jax.jit
+        @functools.jit
         def vf(x, *, t):  # noqa: ARG001
             return f(x, *f_args)
 
@@ -75,7 +75,7 @@ class _Setup:
         t0, t1 = 0.0, 2.0
         u0 = jnp.ones((2,))
 
-        @jax.jit
+        @functools.jit
         def vf(x, *, t):  # noqa: ARG001
             return 2 * x
 
@@ -89,7 +89,7 @@ class _Setup:
         t0, t1 = 0.0, 2.0
         u0 = 1.0
 
-        @jax.jit
+        @functools.jit
         def vf(x, *, t):  # noqa: ARG001
             return 2 * x
 
