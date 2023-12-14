@@ -22,5 +22,4 @@ To create a new example notebook and include it in the documentation, follow the
 2. Create the benchmark script. Usually, the execution is in a python script and the plotting in a jupyter notebook.
 3. Link the (plotting-)notebook to a markdown file (for better version control). 
 4. Include the (plotting-)notebook into the docs via `mkdocs.yml`. Mention the markdown and python script in the same folder under `mkdocs.yml -> exclude`
-5. Mention the new benchmark in the makefile (`clean`, `format`, `run-benchmarks`, `dry-run-benchmarks`). A dry-run is for checking that the code functions properly. The benchmark run itself should not take less than a minute, otherwise the whole benchmark suite grows out of hand.
-6. Mention the juypter caches and potential data-storage in the `.gitignore`
+5. Mention the new benchmark in the makefile (`benchmarks-run`, `benchmarks-dry-run`). A dry-run is for checking that the code functions properly. The benchmark run itself should not take less than a minute, otherwise the whole benchmark suite grows out of hand.

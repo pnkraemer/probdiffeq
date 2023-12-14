@@ -78,7 +78,7 @@ pip install .[example,test]
 and then either open Jupyter and go to `docs/benchmarks`
 or execute all benchmarks via
 ```commandline
-make run-benchmarks
+make benchmarks-run
 ```
 Be patient, it might take a while. 
 Afterwards, open Jupyter to look at the result or build the documentation via
