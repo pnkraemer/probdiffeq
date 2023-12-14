@@ -2,7 +2,7 @@
 name: ci
 # We test as follows:
 # - Execute tests on Python 3.9, 3.10, 3.11
-# - Lint, execute examples, build docs on Python 3.10.
+# - Lint, dry-run benchmarks, build docs on Python 3.10.
 #     Why on Python 3.10?
 #     Because I currently work with 3.10 and this causes the least friction.
 on:
@@ -52,25 +52,6 @@ jobs:
         run: pip install --upgrade pip pip install .[cpu,test]
       - name: Run tests
         run: make test
-  example:
-    name: Execute examples with ${{ matrix.python-version }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.10']
-        os: [ubuntu-latest]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: pip install --upgrade pip pip install .[cpu,example]
-      - name: Sync and execute notebooks
-        run: make example
   dry-run-benchmarks:
     name: Dry-run benchmarks with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -87,13 +68,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: pip install --upgrade pip pip install .[cpu,example]
+        run: pip install --upgrade pip pip install .[cpu,doc]
       - name: Sync and execute notebooks
         run: make benchmarks-dry-run
   doc:
     name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -109,6 +90,6 @@ jobs:
         run: |
           sudo apt-get install pandoc
           pip install --upgrade pip
-          pip install .[cpu,doc,example]
+          pip install .[cpu,doc]
       - name: Build the HTML docs
         run: make doc

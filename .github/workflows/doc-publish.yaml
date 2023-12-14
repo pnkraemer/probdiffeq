@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get install pandoc
           pip install --upgrade pip
-          pip install .[cpu,doc,example]
+          pip install .[cpu,doc]
       - name: Build the HTML docs
         run: make doc
       - name: Publish the HTML docs
