@@ -1,6 +1,5 @@
 """Assert that solve_with_python_loop is accurate."""
 import diffrax
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve, timestep
@@ -41,7 +40,7 @@ def fixture_diffrax_solution():
     vf, (u0,), (t0, t1) = setup.ode()
 
     # Solve the IVP
-    @jax.jit
+    @functools.jit
     def vf_diffrax(t, y, _args):
         return vf(y, t=t)
 

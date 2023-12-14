@@ -1,6 +1,5 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 import diffrax
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
@@ -56,7 +55,7 @@ def fixture_diffrax_solution():
     vf, (u0,), (t0, t1) = setup.ode()
 
     # Solve the IVP
-    @jax.jit
+    @functools.jit
     def vf_diffrax(t, y, args):  # noqa: ARG001
         return vf(y, t=t)
 

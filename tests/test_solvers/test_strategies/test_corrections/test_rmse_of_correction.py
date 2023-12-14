@@ -1,10 +1,9 @@
 """Assert that every recipe yields a decent ODE approximation."""
 import diffrax
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import functools, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -84,7 +83,7 @@ def fixture_diffrax_solution():
     vf, (u0,), (t0, t1) = setup.ode()
 
     # Solve the IVP
-    @jax.jit
+    @functools.jit
     def vf_diffrax(t, y, args):  # noqa: ARG001
         return vf(y, t=t)
 
