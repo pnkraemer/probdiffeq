@@ -4,7 +4,7 @@ from typing import Any
 
 import jax
 
-from probdiffeq.backend import containers
+from probdiffeq.backend import containers, control_flow
 from probdiffeq.impl import impl
 from probdiffeq.util import cond_util
 
@@ -60,7 +60,9 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
 
     # Loop over backward models and the remaining base samples
     xs = (markov_seq.conditional, base_sample_body)
-    _, (qois, samples) = jax.lax.scan(f=body_fun, init=init_val, xs=xs, reverse=reverse)
+    _, (qois, samples) = control_flow.scan(
+        f=body_fun, init=init_val, xs=xs, reverse=reverse
+    )
     return (qois, samples), (init_qoi, init_sample)
 
 
@@ -95,7 +97,7 @@ def marginals(markov_seq: MarkovSeq, *, reverse):
         return extrapolated, extrapolated
 
     init, xs = markov_seq.init, markov_seq.conditional
-    _, marg = jax.lax.scan(step, init=init, xs=xs, reverse=reverse)
+    _, marg = control_flow.scan(step, init=init, xs=xs, reverse=reverse)
     return marg
 
 
