@@ -23,6 +23,8 @@ manipulation of square root matrices.
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import control_flow
+
 
 def revert_conditional_noisefree(R_X_F, R_X):
     """Like revert_conditional, but without observation noise."""
@@ -93,7 +95,9 @@ def revert_conditional(R_X_F, R_X, R_YX):
     # qr(R_YX) and embedding the result in zeros. This is what we do here.
     # Without this case distinction, reverse-mode derivatives are not defined.
     cond = jnp.logical_and(jnp.linalg.norm(R_X_F) == 0.0, jnp.linalg.norm(R_X) == 0.0)
-    R = jax.lax.cond(cond, _triu_via_shortcut, lambda a, _b: triu_via_qr(a), R, R_YX)
+    R = control_flow.cond(
+        cond, _triu_via_shortcut, lambda a, _b: triu_via_qr(a), R, R_YX
+    )
 
     # ~R_{Y}
     d_out = R_YX.shape[1]
@@ -165,7 +169,7 @@ def triu_via_qr(R, /):
     matrix_is_already_triu = jnp.all(jnp.triu(R) == R)
 
     _nrows, ncols = jnp.shape(R)
-    return jax.lax.cond(
+    return control_flow.cond(
         matrix_is_already_triu,
         lambda s: s[:ncols, :ncols],
         lambda s: jnp.linalg.qr(s, mode="r"),
