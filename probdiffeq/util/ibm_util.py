@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, linalg
 from probdiffeq.backend import numpy as np
 
 
@@ -13,7 +13,7 @@ def system_matrices_1d(num_derivatives, output_scale):
 
     A_1d = jnp.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
     Q_1d = jnp.flip(_hilbert(x))
-    return A_1d, output_scale * jnp.linalg.cholesky(Q_1d)
+    return A_1d, output_scale * linalg.cholesky_lower(Q_1d)
 
 
 def preconditioner_diagonal(dt, *, scales, powers):
