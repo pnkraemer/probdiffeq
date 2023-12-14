@@ -61,7 +61,7 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
     # Loop over backward models and the remaining base samples
     xs = (markov_seq.conditional, base_sample_body)
     _, (qois, samples) = control_flow.scan(
-        f=body_fun, init=init_val, xs=xs, reverse=reverse
+        body_fun, init=init_val, xs=xs, reverse=reverse
     )
     return (qois, samples), (init_qoi, init_sample)
 
