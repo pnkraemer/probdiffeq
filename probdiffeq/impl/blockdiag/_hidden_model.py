@@ -1,6 +1,6 @@
-import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _hidden_model
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util, linop_util
@@ -15,13 +15,15 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
 
     def marginal_nth_derivative(self, rv, i):
         if jnp.ndim(rv.mean) > 2:
-            return jax.vmap(self.marginal_nth_derivative, in_axes=(0, None))(rv, i)
+            return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
+                rv, i
+            )
 
         if i > jnp.shape(rv.mean)[0]:
             raise ValueError
 
         mean = rv.mean[:, i]
-        cholesky = jax.vmap(cholesky_util.triu_via_qr)(
+        cholesky = functools.vmap(cholesky_util.triu_via_qr)(
             (rv.cholesky[:, i, :])[..., None]
         )
         cholesky = jnp.transpose(cholesky, axes=(0, 2, 1))

@@ -3,6 +3,8 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
+
 
 def system_matrices_1d(num_derivatives, output_scale):
     """Construct the IBM system matrices."""
@@ -37,8 +39,8 @@ def _pascal(a, /):
 
 
 def _batch_gram(k, /):
-    k_vmapped_x = jax.vmap(k, in_axes=(0, None), out_axes=-1)
-    return jax.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+    k_vmapped_x = functools.vmap(k, in_axes=(0, None), out_axes=-1)
+    return functools.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
 
 
 def _binom(n, k):

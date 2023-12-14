@@ -2,6 +2,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _stats
 
 
@@ -23,7 +24,7 @@ class StatsBackend(_stats.StatsBackend):
 
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
-            return jax.vmap(self.standard_deviation)(rv)
+            return functools.vmap(self.standard_deviation)(rv)
 
         return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 

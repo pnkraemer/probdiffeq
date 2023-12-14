@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import functools, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import fixedpoint, smoothers
@@ -111,6 +111,6 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     )
 
     # Compare QOI and marginals
-    marginals_allclose_func = jax.vmap(testing.marginals_allclose)
+    marginals_allclose_func = functools.vmap(testing.marginals_allclose)
     assert testing.tree_all_allclose(u_fixedpoint, u_interp)
     assert jnp.all(marginals_allclose_func(marginals_fixedpoint, marginals_interp))

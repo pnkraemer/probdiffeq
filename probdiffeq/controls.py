@@ -1,11 +1,12 @@
 """Step-size control algorithms."""
 
 import dataclasses
-import functools
 from typing import Callable, Generic, TypeVar
 
 import jax
 import jax.numpy as jnp
+
+from probdiffeq.backend import functools
 
 T = TypeVar("T")
 """A type-variable to indicate the controller's state."""

@@ -1,9 +1,9 @@
 """Linearisation."""
-import functools
 
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _linearise
 from probdiffeq.impl.dense import _normal
 from probdiffeq.util import cholesky_util, linop_util
@@ -110,7 +110,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 def _autobatch_linop(fun):
     def fun_(x):
         if jnp.ndim(x) > 1:
-            return jax.vmap(fun_, in_axes=1, out_axes=1)(x)
+            return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
         return fun(x)
 
     return fun_
@@ -133,7 +133,7 @@ def slr1(fn, x, *, cubature_rule):
     pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
 
     # Evaluate the nonlinear function
-    fx = jax.vmap(fn)(pts)
+    fx = functools.vmap(fn)(pts)
     fx_mean = cubature_rule.weights_sqrtm**2 @ fx
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
@@ -162,7 +162,7 @@ def slr0(fn, x, *, cubature_rule):
     pts = x.mean[None, :] + pts_centered
 
     # Evaluate the nonlinear function
-    fx = jax.vmap(fn)(pts)
+    fx = functools.vmap(fn)(pts)
     fx_mean = cubature_rule.weights_sqrtm**2 @ fx
     fx_centered = fx - fx_mean[None, :]
     fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]

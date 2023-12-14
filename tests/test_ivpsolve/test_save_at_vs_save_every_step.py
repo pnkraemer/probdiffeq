@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import functools, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters
@@ -50,6 +50,6 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     )
 
     # Assert similarity
-    marginals_allclose_func = jax.vmap(testing.marginals_allclose)
+    marginals_allclose_func = functools.vmap(testing.marginals_allclose)
     assert jnp.allclose(u_interp, u_save_at)
     assert jnp.all(marginals_allclose_func(marginals_interp, marginals_save_at))

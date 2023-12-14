@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _stats
 
 
@@ -27,7 +28,7 @@ class StatsBackend(_stats.StatsBackend):
             logdet_term = 2.0 * slogdet
             return -0.5 * (logdet_term + maha_term + x.size * jnp.log(jnp.pi * 2))
 
-        return jnp.sum(jax.vmap(logpdf_scalar)(u, rv))
+        return jnp.sum(functools.vmap(logpdf_scalar)(u, rv))
 
     def mean(self, rv):
         return rv.mean
@@ -37,6 +38,6 @@ class StatsBackend(_stats.StatsBackend):
 
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
-            return jax.vmap(self.standard_deviation)(rv)
+            return functools.vmap(self.standard_deviation)(rv)
 
         return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))

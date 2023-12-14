@@ -1,7 +1,7 @@
 """Random-variable transformation."""
-import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _transform
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util
@@ -16,7 +16,7 @@ class TransformBackend(_transform.TransformBackend):
         mean, cholesky = rv.mean, rv.cholesky
 
         A_cholesky = A @ cholesky
-        cholesky = jax.vmap(cholesky_util.triu_via_qr)(_transpose(A_cholesky))
+        cholesky = functools.vmap(cholesky_util.triu_via_qr)(_transpose(A_cholesky))
         mean = A @ mean + b
         return _normal.Normal(mean, cholesky)
 
@@ -25,7 +25,7 @@ class TransformBackend(_transform.TransformBackend):
         cholesky_upper = jnp.transpose(rv.cholesky, axes=(0, -1, -2))
         A_cholesky_upper = _transpose(A @ rv.cholesky)
 
-        revert_fun = jax.vmap(cholesky_util.revert_conditional_noisefree)
+        revert_fun = functools.vmap(cholesky_util.revert_conditional_noisefree)
         r_obs, (r_cor, gain) = revert_fun(A_cholesky_upper, cholesky_upper)
         cholesky_obs = _transpose(r_obs)
         cholesky_cor = _transpose(r_cor)

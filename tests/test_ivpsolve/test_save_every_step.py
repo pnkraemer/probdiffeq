@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve, timestep
-from probdiffeq.backend import testing
+from probdiffeq.backend import functools, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -58,7 +58,7 @@ def fixture_diffrax_solution():
         stepsize_controller=diffrax.PIDController(atol=1e-10, rtol=1e-10),
     )
 
-    @jax.vmap
+    @functools.vmap
     def solution(t):
         return solution_object.evaluate(t)
 

@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _stats
 from probdiffeq.impl.isotropic import _normal
 
@@ -33,14 +34,14 @@ class StatsBackend(_stats.StatsBackend):
 
         # Batch in the "mean" dimension and sum the results.
         rv_batch = _normal.Normal(1, None)
-        return jnp.sum(jax.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
+        return jnp.sum(functools.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
 
     def mean(self, rv):
         return rv.mean
 
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
-            return jax.vmap(self.standard_deviation)(rv)
+            return functools.vmap(self.standard_deviation)(rv)
         return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def sample_shape(self, rv):
