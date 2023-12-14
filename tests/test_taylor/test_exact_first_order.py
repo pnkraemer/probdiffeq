@@ -3,6 +3,7 @@
 import diffeqzoo.ivps
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.taylor import autodiff
 
@@ -50,6 +51,6 @@ def test_approximation_identical_to_reference_doubling(pb_with_solution, num_dou
     (f, init), solution = pb_with_solution
 
     derivatives = autodiff.taylor_mode_doubling(f, init, num_doublings=num_doublings)
-    assert len(derivatives) == jnp.sum(2 ** jnp.arange(num_doublings + 1))
+    assert len(derivatives) == jnp.sum(2 ** np.arange(0, num_doublings + 1))
     for dy, dy_ref in zip(derivatives, solution):
         assert jnp.allclose(dy, dy_ref)

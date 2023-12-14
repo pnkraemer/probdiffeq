@@ -9,7 +9,7 @@ from probdiffeq.backend import numpy as np
 
 def system_matrices_1d(num_derivatives, output_scale):
     """Construct the IBM system matrices."""
-    x = jnp.arange(num_derivatives + 1)
+    x = np.arange(0, num_derivatives + 1)
 
     A_1d = jnp.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
     Q_1d = jnp.flip(_hilbert(x))
@@ -25,7 +25,7 @@ def preconditioner_diagonal(dt, *, scales, powers):
 
 
 def preconditioner_prepare(*, num_derivatives):
-    powers = jnp.arange(num_derivatives, -1.0, -1.0)
+    powers = np.arange(num_derivatives, -1.0, step=-1.0)
     scales = np.factorial(powers)
     powers = powers + 0.5
     return jax.tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
