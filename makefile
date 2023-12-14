@@ -43,6 +43,8 @@ clean:
 	git clean -xdf
 
 doc:
+	# The readme is the landing page of the docs:
+	cp README.md docs/index.md
 	# Execute the examples manually and not via mkdocs-jupyter
 	# to gain clear error messages.
 	make example
