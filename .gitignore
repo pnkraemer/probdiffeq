@@ -3,7 +3,7 @@ probdiffeq/_version.py
 
 # Data
 docs/benchmarks/**.npy
-docs/**.ipynb
+docs/**/*.ipynb
 
 # IDE stuff
 .idea/
