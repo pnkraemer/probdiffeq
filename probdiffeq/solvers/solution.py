@@ -7,6 +7,7 @@ or to evaluate marginal likelihoods of observations of the solutions.
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 from probdiffeq.solvers.strategies import discrete
@@ -28,7 +29,7 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
         with the interval boundaries.
         At the moment, we do not check this.
     """
-    offgrid_marginals_vmap = jax.vmap(_offgrid_marginals, in_axes=(0, None, None))
+    offgrid_marginals_vmap = functools.vmap(_offgrid_marginals, in_axes=(0, None, None))
     return offgrid_marginals_vmap(ts, solution, solver)
 
 
@@ -150,7 +151,9 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         raise TypeError(msg1 + msg2)
 
     # Generate an observation-model for the QOI
-    model_fun = jax.vmap(impl.hidden_model.conditional_to_derivative, in_axes=(None, 0))
+    model_fun = functools.vmap(
+        impl.hidden_model.conditional_to_derivative, in_axes=(None, 0)
+    )
     models = model_fun(0, standard_deviation)
 
     # Select the terminal variable

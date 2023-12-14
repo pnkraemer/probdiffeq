@@ -1,7 +1,7 @@
 """Conditional implementation."""
-import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _conditional
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util
@@ -16,7 +16,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
             return _normal.Normal(m @ s + n.mean, n.cholesky)
 
         matrix, noise = conditional
-        return jax.vmap(apply_unbatch)(matrix, x, noise)
+        return functools.vmap(apply_unbatch)(matrix, x, noise)
 
     def marginalise(self, rv, conditional, /):
         matrix, noise = conditional
@@ -27,7 +27,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         chol1 = _transpose(matrix @ rv.cholesky)
         chol2 = _transpose(noise.cholesky)
         R_stack = (chol1, chol2)
-        cholesky = jax.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
+        cholesky = functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
         return _normal.Normal(mean, _transpose(cholesky))
 
     def merge(self, cond1, cond2, /):
@@ -37,7 +37,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         g = A @ C
         xi = (A @ d.mean[..., None])[..., 0] + b.mean
         R_stack = (_transpose(A @ d.cholesky), _transpose(b.cholesky))
-        Xi = _transpose(jax.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack))
+        Xi = _transpose(functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack))
 
         noise = _normal.Normal(xi, Xi)
         return cond_util.Conditional(g, noise)
@@ -48,7 +48,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         noise_chol_upper = jnp.transpose(noise.cholesky, axes=(0, 2, 1))
         A_rv_chol_upper = jnp.transpose(A @ rv.cholesky, axes=(0, 2, 1))
 
-        revert = jax.vmap(cholesky_util.revert_conditional)
+        revert = functools.vmap(cholesky_util.revert_conditional)
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
 
         cholesky_obs = jnp.transpose(r_obs, axes=(0, 2, 1))

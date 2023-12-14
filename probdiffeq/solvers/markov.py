@@ -4,7 +4,7 @@ from typing import Any
 
 import jax
 
-from probdiffeq.backend import containers, control_flow
+from probdiffeq.backend import containers, control_flow, functools
 from probdiffeq.impl import impl
 from probdiffeq.util import cond_util
 
@@ -37,7 +37,7 @@ def _sample_shape(markov_seq):
 
 def _transform_unit_sample(markov_seq, base_sample, /, reverse):
     if base_sample.ndim > len(_sample_shape(markov_seq)):
-        transform_vmap = jax.vmap(_transform_unit_sample, in_axes=(None, 0, None))
+        transform_vmap = functools.vmap(_transform_unit_sample, in_axes=(None, 0, None))
         return transform_vmap(markov_seq, base_sample, reverse)
 
     # Compute a single unit sample.

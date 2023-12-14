@@ -1,10 +1,10 @@
 """Correction models."""
 
 import abc
-import functools
 
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies.components import cubature
 

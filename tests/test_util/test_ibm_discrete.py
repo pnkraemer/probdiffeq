@@ -1,9 +1,8 @@
 """Test the discrete IBM transitions."""
 
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow
+from probdiffeq.backend import control_flow, functools
 from probdiffeq.impl import impl
 
 
@@ -15,7 +14,7 @@ def test_marginal_moments_are_correct(num_derivatives=2):
 
     init = impl.ssm_util.standard_normal(num_derivatives + 1, output_scale)
     discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
-    transitions = jax.vmap(discretise)(jnp.diff(grid))
+    transitions = functools.vmap(discretise)(jnp.diff(grid))
 
     means, stds = _marginal_moments(init, transitions)
 

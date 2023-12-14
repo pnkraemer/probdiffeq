@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _stats
 
 
@@ -32,7 +33,7 @@ class StatsBackend(_stats.StatsBackend):
 
     def standard_deviation(self, rv):
         if rv.mean.ndim > 1:
-            return jax.vmap(self.standard_deviation)(rv)
+            return functools.vmap(self.standard_deviation)(rv)
 
         diag = jnp.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
         return jnp.sqrt(diag)

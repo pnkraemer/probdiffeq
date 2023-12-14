@@ -1,9 +1,8 @@
 """Tests for interaction with the solution object."""
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import functools, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -73,7 +72,7 @@ def fixture_approximate_solution_batched():
     output_scale = jnp.ones_like(impl.prototypes.output_scale())
     save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
 
-    @jax.vmap
+    @functools.vmap
     def solve(init):
         tcoeffs = (init, vf(init, t=None))
         initcond = solver.initial_condition(tcoeffs, output_scale=output_scale)

@@ -1,12 +1,11 @@
 """Routines for estimating solutions of initial value problems."""
 
-import functools
 import warnings
 
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow, tree_array_util
+from probdiffeq.backend import control_flow, functools, tree_array_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 

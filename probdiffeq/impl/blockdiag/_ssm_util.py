@@ -1,7 +1,7 @@
 """State-space model utilities."""
-import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util, ibm_util
@@ -12,7 +12,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         self.ode_shape = ode_shape
 
     def ibm_transitions(self, num_derivatives, output_scale):
-        system_matrices = jax.vmap(ibm_util.system_matrices_1d, in_axes=(None, 0))
+        system_matrices = functools.vmap(ibm_util.system_matrices_1d, in_axes=(None, 0))
         a, q_sqrtm = system_matrices(num_derivatives, output_scale)
 
         q0 = jnp.zeros((*self.ode_shape, num_derivatives + 1))
@@ -64,7 +64,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def update_mean(self, mean, x, /, num):
         if jnp.ndim(mean) > 0:
             assert jnp.shape(mean) == jnp.shape(x)
-            return jax.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
+            return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
 
         sum_updated = cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
         return sum_updated / jnp.sqrt(num + 1)

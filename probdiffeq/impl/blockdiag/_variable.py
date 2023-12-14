@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import functools
 from probdiffeq.impl import _variable
 from probdiffeq.impl.blockdiag import _normal
 
@@ -23,5 +24,5 @@ class VariableBackend(_variable.VariableBackend):
 
     def _cov_dense(self, cholesky):
         if cholesky.ndim > 2:
-            return jax.vmap(self._cov_dense)(cholesky)
+            return functools.vmap(self._cov_dense)(cholesky)
         return cholesky @ cholesky.T
