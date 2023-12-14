@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import random, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, uncalibrated
 from probdiffeq.solvers.strategies import smoothers
@@ -32,7 +32,7 @@ def fixture_approximation():
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_sample_shape(approximation, shape):
-    key = jax.random.PRNGKey(seed=15)
+    key = random.prng_key(seed=15)
     posterior = markov.select_terminal(approximation.posterior)
     (u, samples), (u_init, samples_init) = markov.sample(
         key, posterior, shape=shape, reverse=True

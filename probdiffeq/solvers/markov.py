@@ -4,7 +4,7 @@ from typing import Any
 
 import jax
 
-from probdiffeq.backend import containers, control_flow, functools
+from probdiffeq.backend import containers, control_flow, functools, random
 from probdiffeq.impl import impl
 from probdiffeq.util import cond_util
 
@@ -24,7 +24,7 @@ def sample(key, markov_seq: MarkovSeq, *, shape, reverse):
     # and then combining them backwards as
     # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
     markov_seq_shape = _sample_shape(markov_seq)
-    base_samples = jax.random.normal(key=key, shape=shape + markov_seq_shape)
+    base_samples = random.normal(key, shape=shape + markov_seq_shape)
     return _transform_unit_sample(markov_seq, base_samples, reverse=reverse)
 
 
