@@ -8,7 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow
+from probdiffeq.backend import control_flow, functools
 from probdiffeq.backend import numpy as np
 
 
@@ -36,7 +36,7 @@ def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
         # is independent of the $i+j$th input coefficient
         # (see also the explanation in taylor_mode_doubling)
         series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
-        p, s_new = jax.experimental.jet.jet(vf, primals=inits, series=series)
+        p, s_new = functools.jet(vf, primals=inits, series=series)
 
         # The final values in s_new are nonsensical
         # (well, they are not; but we don't care about them)
@@ -85,7 +85,7 @@ def taylor_mode_unroll(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
 
     for _ in range(num - 1):
         series = _subsets(taylor_coeffs[1:], num_arguments)  # for high-order ODEs
-        p, s_new = jax.experimental.jet.jet(vf, primals=inits, series=series)
+        p, s_new = functools.jet(vf, primals=inits, series=series)
         taylor_coeffs = [*inits, p, *s_new]
     return taylor_coeffs
 
@@ -176,7 +176,7 @@ def taylor_mode_doubling(
         """
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = _unnormalise(*coeffs_emb)
-        p_new, s_new = jax.experimental.jet.jet(vf, (p,), (s,))
+        p_new, s_new = functools.jet(vf, (p,), (s,))
         return _normalise(p_new, *s_new)
 
     taylor_coefficients = [u0]
