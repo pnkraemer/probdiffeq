@@ -67,33 +67,10 @@ plugins:
             show_signature_annotations: true
   - exclude:
       glob:
-        - getting_started/easy_example.md
-        - getting_started/.ipynb_checkpoints/*
-        - examples_solver_config/*.md
-        - examples_solver_config/.ipynb_checkpoints/*
-        - examples_parameter_estimation/*.md
-        - examples_parameter_estimation/.ipynb_checkpoints/*
-        - benchmarks/hires/*.md
-        - benchmarks/hires/*.py
-        - benchmarks/hires/.ipynb_checkpoints/*
-        - benchmarks/pleiades/*.md
-        - benchmarks/pleiades/*.py
-        - benchmarks/pleiades/.ipynb_checkpoints/*
-        - benchmarks/vanderpol/*.md
-        - benchmarks/vanderpol/*.py
-        - benchmarks/vanderpol/.ipynb_checkpoints/*
-        - benchmarks/lotkavolterra/*.md
-        - benchmarks/lotkavolterra/*.py
-        - benchmarks/lotkavolterra/.ipynb_checkpoints/*
-        - benchmarks/taylor_pleiades/*.md
-        - benchmarks/taylor_pleiades/*.py
-        - benchmarks/taylor_pleiades/.ipynb_checkpoints/*
-        - benchmarks/taylor_fitzhughnagumo/*.md
-        - benchmarks/taylor_fitzhughnagumo/*.py
-        - benchmarks/taylor_fitzhughnagumo/.ipynb_checkpoints/*
-        - benchmarks/taylor_node/*.md
-        - benchmarks/taylor_node/*.py
-        - benchmarks/taylor_node/.ipynb_checkpoints/*
+        - examples*/*.md
+        - examples*/*.ipynb_*
+        - benchmarks*/**/*.md
+        - benchmarks*/**/*.py
   - mkdocs-jupyter
 extra:
   social:
@@ -104,7 +81,7 @@ extra:
 nav:
   - Quickstart: index.md
   - GETTING STARTED:
-      - An easy example: getting_started/easy_example.ipynb
+      - An easy example: examples_quickstart/easy_example.ipynb
       - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
       - Choosing a solver: getting_started/choosing_a_solver.md
       - Troubleshooting: getting_started/troubleshooting.md
