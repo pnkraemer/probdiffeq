@@ -2,13 +2,8 @@
 probdiffeq/_version.py
 
 # Data
-docs/benchmarks/hires/*.npy
-docs/benchmarks/pleiades/*.npy
-docs/benchmarks/vanderpol/*.npy
-docs/benchmarks/lotkavolterra/*.npy
-docs/benchmarks/taylor_pleiades/*.npy
-docs/benchmarks/taylor_fitzhughnagumo/*.npy
-docs/benchmarks/taylor_node/*.npy
+docs/benchmarks/**.npy
+docs/examples_*/**.ipynb
 
 # IDE stuff
 .idea/
