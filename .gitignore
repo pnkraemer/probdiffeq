@@ -1,8 +1,13 @@
-# version number
+# Version number
 probdiffeq/_version.py
 
-# Data
+# Jupyter notebooks
 docs/**/*.ipynb
+
+# The landing page is automatically generated
+docs/index.md
+
+
 
 # IDE stuff
 .idea/
