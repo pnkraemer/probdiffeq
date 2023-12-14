@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, linalg
 from probdiffeq.impl import _stats
 
 
@@ -13,7 +13,7 @@ class StatsBackend(_stats.StatsBackend):
         residual_white = jax.scipy.linalg.solve_triangular(
             rv.cholesky.T, u - rv.mean, lower=False, trans="T"
         )
-        mahalanobis = jnp.linalg.qr(residual_white[:, None], mode="r")
+        mahalanobis = linalg.qr_r(residual_white[:, None])
         return jnp.reshape(jnp.abs(mahalanobis) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
