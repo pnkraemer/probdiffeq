@@ -89,7 +89,7 @@ jobs:
       - name: Install dependencies
         run: pip install --upgrade pip pip install .[cpu,example]
       - name: Sync and execute notebooks
-        run: make dry-run-benchmarks
+        run: make benchmarks-dry-run
   doc:
     name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
