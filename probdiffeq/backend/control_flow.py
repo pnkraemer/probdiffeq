@@ -9,3 +9,7 @@ def while_loop(cond_func, body_func, /, init):
 
 def scan(step_func, /, init, xs, *, reverse=False, length=None):
     return jax.lax.scan(step_func, init=init, xs=xs, reverse=reverse, length=length)
+
+
+def cond(use_true_func, true_func, false_func, *operands):
+    return jax.lax.cond(use_true_func, true_func, false_func, *operands)
