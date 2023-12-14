@@ -9,6 +9,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 from probdiffeq.backend import control_flow
+from probdiffeq.backend import numpy as np
 
 
 def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
@@ -214,15 +215,11 @@ def taylor_mode_doubling(
 
 def _normalise(primals, *series):
     """Un-normalised Taylor series to normalised Taylor series."""
-    series_new = [s / _fct(i + 1) for i, s in enumerate(series)]
+    series_new = [s / np.factorial(i + 1) for i, s in enumerate(series)]
     return primals, *series_new
 
 
 def _unnormalise(primals, *series):
     """Normalised Taylor series to un-normalised Taylor series."""
-    series_new = [s * _fct(i + 1) for i, s in enumerate(series)]
+    series_new = [s * np.factorial(i + 1) for i, s in enumerate(series)]
     return primals, *series_new
-
-
-def _fct(n, /):  # factorial
-    return jax.lax.exp(jax.lax.lgamma(n + 1.0))

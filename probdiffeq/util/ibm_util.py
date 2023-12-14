@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 
 
 def system_matrices_1d(num_derivatives, output_scale):
@@ -25,7 +26,7 @@ def preconditioner_diagonal(dt, *, scales, powers):
 
 def preconditioner_prepare(*, num_derivatives):
     powers = jnp.arange(num_derivatives, -1.0, -1.0)
-    scales = _factorial(powers)
+    scales = np.factorial(powers)
     powers = powers + 0.5
     return jax.tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
 
@@ -44,8 +45,4 @@ def _batch_gram(k, /):
 
 
 def _binom(n, k):
-    return _factorial(n) / (_factorial(n - k) * _factorial(k))
-
-
-def _factorial(n, /):
-    return jax.lax.exp(jax.lax.lgamma(n + 1.0))
+    return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
