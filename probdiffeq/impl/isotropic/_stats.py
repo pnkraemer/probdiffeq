@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, linalg
 from probdiffeq.impl import _stats
 from probdiffeq.impl.isotropic import _normal
 
@@ -12,7 +12,7 @@ class StatsBackend(_stats.StatsBackend):
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
-        residual_white_matrix = jnp.linalg.qr(residual_white.T, mode="r")
+        residual_white_matrix = linalg.qr_r(residual_white.T)
         return jnp.reshape(jnp.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):

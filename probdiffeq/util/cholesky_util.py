@@ -23,7 +23,7 @@ manipulation of square root matrices.
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow
+from probdiffeq.backend import control_flow, linalg
 
 
 def revert_conditional_noisefree(R_X_F, R_X):
@@ -170,8 +170,5 @@ def triu_via_qr(R, /):
 
     _nrows, ncols = jnp.shape(R)
     return control_flow.cond(
-        matrix_is_already_triu,
-        lambda s: s[:ncols, :ncols],
-        lambda s: jnp.linalg.qr(s, mode="r"),
-        R,
+        matrix_is_already_triu, lambda s: s[:ncols, :ncols], linalg.qr_r, R
     )
