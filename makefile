@@ -1,8 +1,4 @@
-
-format:
-	ruff format --quiet .
-
-lint:
+format-and-lint:
 	pre-commit run --all-files
 
 test:
