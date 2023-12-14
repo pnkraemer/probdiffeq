@@ -3,6 +3,7 @@
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import control_flow
 from probdiffeq.impl import impl
 
 
@@ -37,7 +38,7 @@ def _marginal_moments(init, transitions):
         rv = impl.ssm_util.preconditioner_apply(rv, p)
         return rv, rv
 
-    _, rvs = jax.lax.scan(step, init=init, xs=transitions, reverse=False)
+    _, rvs = control_flow.scan(step, init=init, xs=transitions, reverse=False)
     means = impl.stats.mean(rvs)
     # todo: does this conflict with error estimation?
     stds = impl.stats.standard_deviation(rvs)
