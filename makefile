@@ -1,7 +1,6 @@
 
 format:
 	ruff format --quiet .
-	jupytext --quiet --sync docs/getting_started/*.ipynb
 	jupytext --quiet --sync docs/examples*/*
 	jupytext --quiet --sync docs/benchmarks/**/*.md
 
