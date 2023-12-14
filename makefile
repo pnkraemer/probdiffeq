@@ -47,6 +47,8 @@ clean:
 	git clean -xdf
 
 doc:
+	# Execute the examples manually and not via mkdocs-jupyter
+	# to gain clear error messages.
 	make example
 	make plot-benchmarks
 	mkdocs build
