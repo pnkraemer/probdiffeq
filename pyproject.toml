@@ -39,7 +39,7 @@ test =[
 format-and-lint =[
     "pre-commit",
 ]
-example = [
+doc = [
     "jupytext",
     "jupyter",
     "matplotlib",
@@ -51,8 +51,6 @@ example = [
     "blackjax>=1.0.0",
     "diffrax",
     "numba",
-]
-doc = [
     "mkdocs",
     "mkdocs-material",
     "mkdocs-exclude",
