@@ -3,16 +3,16 @@
 
 format:
 	ruff format --quiet .
-	jupytext --quiet --sync docs/getting_started/*.ipynb
-	jupytext --quiet --sync docs/examples_solver_config/*.ipynb
-	jupytext --quiet --sync docs/examples_parameter_estimation/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/hires/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/pleiades/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/vanderpol/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*.ipynb
-	jupytext --quiet --sync docs/benchmarks/taylor_node/*.ipynb
+	jupytext --quiet --sync docs/getting_started/*
+	jupytext --quiet --sync docs/examples_solver_config/*
+	jupytext --quiet --sync docs/examples_parameter_estimation/*
+	jupytext --quiet --sync docs/benchmarks/hires/*
+	jupytext --quiet --sync docs/benchmarks/pleiades/*
+	jupytext --quiet --sync docs/benchmarks/vanderpol/*
+	jupytext --quiet --sync docs/benchmarks/lotkavolterra/*
+	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*
+	jupytext --quiet --sync docs/benchmarks/taylor_fitzhughnagumo/*
+	jupytext --quiet --sync docs/benchmarks/taylor_node/*
 
 lint:
 	pre-commit run --all-files
@@ -24,7 +24,7 @@ test:
 	IMPL=scalar pytest -n auto -v # parallelise, verbose output
 
 example:
-	jupytext --quiet --sync docs/getting_started/*.ipynb
+	jupytext --quiet --sync docs/getting_started/*
 	jupytext --quiet --execute docs/getting_started/*.ipynb
 	jupytext --quiet --sync docs/examples_solver_config/*
 	jupytext --quiet --execute docs/examples_solver_config/*
@@ -35,7 +35,7 @@ example:
 
 run-benchmarks:
 	time python docs/benchmarks/taylor_node/run_taylor_node.py --max_time 12 --repeats 3 --save
-	jupytext --quiet --sync docs/benchmarks/taylor_node/*.ipynb
+	jupytext --quiet --sync docs/benchmarks/taylor_node/*
 	jupytext --quiet --execute docs/benchmarks/taylor_node/*.ipynb
 	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 15 --repeats 5 --save
 	jupytext --quiet --sync docs/benchmarks/taylor_pleiades/*.ipynb
