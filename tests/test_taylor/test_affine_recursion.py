@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.taylor import affine, autodiff
 
@@ -22,13 +23,13 @@ def test_affine_recursion(num, num_derivatives_max=5):
 
 
 def _affine_problem(n):
-    A = jnp.eye(2) * jnp.arange(1.0, 5.0).reshape((2, 2))
-    b = jnp.arange(6.0, 8.0)
+    A = jnp.eye(2) * np.arange(1.0, 5.0).reshape((2, 2))
+    b = np.arange(6.0, 8.0)
 
     def vf(x, /):
         return A @ x + b
 
-    init = (jnp.arange(9.0, 11.0),)
+    init = (np.arange(9.0, 11.0),)
 
     solution = autodiff.taylor_mode_scan(vf, init, num=n)
     return vf, init, solution

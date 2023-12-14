@@ -7,6 +7,7 @@ from math import prod
 import jax
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.util import cholesky_util
 
@@ -57,7 +58,7 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
 
 
 def _some_array(shape):
-    return jnp.arange(1.0, 1.0 + prod(shape)).reshape(shape)
+    return np.arange(1.0, 1.0 + prod(shape)).reshape(shape)
 
 
 def test_sqrt_sum_square_scalar():

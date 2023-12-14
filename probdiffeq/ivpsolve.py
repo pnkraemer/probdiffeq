@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import control_flow, functools, tree_array_util
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
@@ -311,7 +312,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
-        num_steps=jnp.arange(1.0, len(grid)),
+        num_steps=np.arange(1.0, len(grid)),
     )
 
 
