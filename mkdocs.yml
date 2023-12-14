@@ -104,7 +104,7 @@ extra:
 nav:
   - Quickstart: index.md
   - GETTING STARTED:
-      - An easy example: getting_started/easy_example.ipynb
+      - An easy example: examples_quickstart/easy_example.ipynb
       - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
       - Choosing a solver: getting_started/choosing_a_solver.md
       - Troubleshooting: getting_started/troubleshooting.md

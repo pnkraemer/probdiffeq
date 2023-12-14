@@ -14,14 +14,7 @@ test:
 	IMPL=scalar pytest -n auto -v # parallelise, verbose output
 
 example:
-	jupytext --quiet --sync docs/getting_started/*
-	jupytext --quiet --execute docs/getting_started/*.ipynb
-	jupytext --quiet --sync docs/examples_solver_config/*
-	jupytext --quiet --execute docs/examples_solver_config/*
-	jupytext --quiet --sync docs/examples_solver_config/*
-	jupytext --quiet --sync docs/examples_parameter_estimation/*
-	jupytext --quiet --execute docs/examples_parameter_estimation/*
-	jupytext --quiet --sync docs/examples_parameter_estimation/*
+	jupytext --execute docs/examples*/*
 
 run-benchmarks:
 	time python docs/benchmarks/taylor_node/run_taylor_node.py --max_time 12 --repeats 3 --save
@@ -58,25 +51,8 @@ dry-run-benchmarks:
 
 clean:
 	pre-commit clean
-	rm -rf .pytest_cache
-	rm -rf .mypy_cache
-	rm -rf *.egg-info
-	rm -rf dist site build
-	rm -rf *.ipynb_checkpoints
-	rm -rf docs/benchmarks/hires/__pycache__
-	rm -rf docs/benchmarks/hires/.ipynb_checkpoints
-	rm -rf docs/benchmarks/pleiades/__pycache__
-	rm -rf docs/benchmarks/pleiades/.ipynb_checkpoints
-	rm -rf docs/benchmarks/lotkavolterra/__pycache__
-	rm -rf docs/benchmarks/lotkavolterra/.ipynb_checkpoints
-	rm -rf docs/benchmarks/vanderpol/__pycache__
-	rm -rf docs/benchmarks/vanderpol/.ipynb_checkpoints
-	rm -rf docs/benchmarks/taylor_pleiades/__pycache__
-	rm -rf docs/benchmarks/taylor_pleiades/.ipynb_checkpoints
-	rm -rf docs/benchmarks/taylor_fitzhughnagumo/__pycache__
-	rm -rf docs/benchmarks/taylor_fitzhughnagumo/.ipynb_checkpoints
-	rm -rf docs/benchmarks/taylor_node/__pycache__
-	rm -rf docs/benchmarks/taylor_node/.ipynb_checkpoints
+	git clean -xdf
 
 doc:
+	jupytext --execute docs/examples*/*
 	mkdocs build
