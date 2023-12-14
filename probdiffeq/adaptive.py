@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls
-from probdiffeq.backend import containers, control_flow, functools
+from probdiffeq.backend import containers, control_flow, functools, linalg
 from probdiffeq.impl import impl
 
 
@@ -136,7 +136,7 @@ class _AdaptiveIVPSolver:
     def _normalise_error(self, error_estimate, *, u):
         error_relative = error_estimate / (self.atol + self.rtol * jnp.abs(u))
         dim = jnp.atleast_1d(u).size
-        return jnp.linalg.norm(error_relative, ord=self.norm_ord) / jnp.sqrt(dim)
+        return linalg.vector_norm(error_relative, order=self.norm_ord) / jnp.sqrt(dim)
 
     def extract(self, state):
         solution_solver = self.solver.extract(state.step_from)

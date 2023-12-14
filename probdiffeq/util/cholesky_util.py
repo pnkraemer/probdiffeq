@@ -94,7 +94,9 @@ def revert_conditional(R_X_F, R_X, R_YX):
     # If R_X_F and R_X are zero, but R_YX is not zero, qr(R) can be implemented via
     # qr(R_YX) and embedding the result in zeros. This is what we do here.
     # Without this case distinction, reverse-mode derivatives are not defined.
-    cond = jnp.logical_and(jnp.linalg.norm(R_X_F) == 0.0, jnp.linalg.norm(R_X) == 0.0)
+    is_zero_r_x_f = linalg.matrix_norm(R_X_F) == 0.0
+    is_zero_r_x = linalg.matrix_norm(R_X) == 0.0
+    cond = jnp.logical_and(is_zero_r_x_f, is_zero_r_x)
     R = control_flow.cond(
         cond, _triu_via_shortcut, lambda a, _b: triu_via_qr(a), R, R_YX
     )

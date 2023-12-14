@@ -3,7 +3,7 @@ import diffrax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
-from probdiffeq.backend import functools, testing
+from probdiffeq.backend import functools, linalg, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import filters, smoothers
@@ -97,4 +97,4 @@ def test_compare_filter_smoother_rmse(
 
 
 def _rmse(a, b):
-    return jnp.linalg.norm((a - b) / b) / jnp.sqrt(b.size)
+    return linalg.vector_norm((a - b) / b) / jnp.sqrt(b.size)
