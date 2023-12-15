@@ -50,3 +50,7 @@ def squeeze(arr, /):
 
 def squeeze_along_axis(arr, /, *, axis):
     return jnp.squeeze(arr, axis=axis)
+
+
+def atleast_1d(arr, /):
+    return jnp.atleast_1d(arr)
