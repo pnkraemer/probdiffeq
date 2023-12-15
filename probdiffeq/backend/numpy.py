@@ -100,6 +100,10 @@ def block(list_of_arrays, /):
     return jnp.block(list_of_arrays)
 
 
+def block_diag(list_of_arrays, /):
+    return jax.scipy.linalg.block_diag(*list_of_arrays)
+
+
 def ones_like(arr, /):
     return jnp.ones_like(arr)
 
