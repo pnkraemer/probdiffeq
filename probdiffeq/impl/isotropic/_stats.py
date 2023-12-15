@@ -1,4 +1,3 @@
-import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools, linalg
@@ -24,7 +23,7 @@ class StatsBackend(_stats.StatsBackend):
 
         def logpdf_scalar(x, r):
             dx = x - r.mean
-            w = jax.scipy.linalg.solve_triangular(r.cholesky.T, dx, trans="T")
+            w = linalg.solve_triangular(r.cholesky.T, dx, trans="T")
 
             maha_term = jnp.dot(w, w)
 

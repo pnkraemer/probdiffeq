@@ -110,7 +110,7 @@ def revert_conditional(R_X_F, R_X, R_YX):
     R12 = R[:d_out, d_out:]
 
     # Implements G = R12.T @ jnp.linalg.inv(R_Y.T) in clever:
-    G = jax.scipy.linalg.solve_triangular(R_Y, R12, lower=False).T
+    G = linalg.solve_triangular(R_Y, R12, lower=False).T
 
     # ~R_{X \mid Y}
     R_XY = R[d_out:, d_out:]
