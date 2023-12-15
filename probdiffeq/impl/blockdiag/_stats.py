@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _stats
 
 
@@ -24,7 +25,7 @@ class StatsBackend(_stats.StatsBackend):
             maha_term = jnp.dot(w, w)
 
             diagonal = jnp.diagonal(r.cholesky, axis1=-1, axis2=-2)
-            slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+            slogdet = jnp.sum(jnp.log(np.abs(diagonal)))
             logdet_term = 2.0 * slogdet
             return -0.5 * (logdet_term + maha_term + x.size * jnp.log(jnp.pi * 2))
 

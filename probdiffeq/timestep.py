@@ -1,6 +1,5 @@
 """Time-stepping utilities."""
 
-import jax.numpy as jnp
 
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
@@ -32,7 +31,7 @@ def initial_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol,
     y0 = initial_values[0]
 
     f0 = vf(y0, t=t0)
-    scale = atol + jnp.abs(y0) * rtol
+    scale = atol + np.abs(y0) * rtol
     d0, d1 = linalg.vector_norm(y0), linalg.vector_norm(f0)
 
     dt0 = np.where((d0 < 1e-5) | (d1 < 1e-5), 1e-6, 0.01 * d0 / d1)
