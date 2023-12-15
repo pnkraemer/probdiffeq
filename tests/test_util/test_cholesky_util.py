@@ -18,7 +18,7 @@ _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 def test_revert_conditional(HCshape, Cshape, Xshape):
     HC = _some_array(HCshape) + 1.0
     C = _some_array(Cshape) + 2.0
-    X = _some_array(Xshape) + 3.0 + jnp.eye(*Xshape)
+    X = _some_array(Xshape) + 3.0 + np.eye(*Xshape)
 
     S = HC @ HC.T + X @ X.T
     K = C @ HC.T @ jnp.linalg.inv(S)
@@ -71,9 +71,9 @@ def test_sqrt_sum_square_scalar():
 
 
 def test_sqrt_sum_square_error():
-    a = 3.0 * jnp.eye(2)
-    b = 4.0 * jnp.eye(2)
-    c = 5.0 * jnp.eye(2)
+    a = 3.0 * np.eye(2)
+    b = 4.0 * np.eye(2)
+    c = 5.0 * np.eye(2)
     with testing.raises(ValueError, match="scalar"):
         _ = cholesky_util.sqrt_sum_square_scalar(a, b, c)
 
@@ -85,7 +85,7 @@ def test_reverse_conditional_jacrev_zero_matrix():
     """
     C = _some_array((3, 3)) * 0.0
     HC = _some_array((2, 3)) * 0.0
-    X = _some_array((2, 2)) + 3.0 + jnp.eye(2)
+    X = _some_array((2, 2)) + 3.0 + np.eye(2)
 
     result = jax.jacrev(cholesky_util.revert_conditional)(HC.T, C.T, X.T)
     is_not_nan = _tree_is_free_of_nans(result)
