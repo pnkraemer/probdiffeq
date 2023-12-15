@@ -5,10 +5,9 @@ These are so crucial and annoying to debug that they need their own test set.
 from math import prod
 
 import jax
-import jax.numpy as jnp
 
+from probdiffeq.backend import linalg, testing, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing, tree_util
 from probdiffeq.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
@@ -21,7 +20,7 @@ def test_revert_conditional(HCshape, Cshape, Xshape):
     X = _some_array(Xshape) + 3.0 + np.eye(Xshape[0])
 
     S = HC @ HC.T + X @ X.T
-    K = C @ HC.T @ jnp.linalg.inv(S)
+    K = C @ HC.T @ linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
     extra, (bw_noise, g) = cholesky_util.revert_conditional(
@@ -31,9 +30,9 @@ def test_revert_conditional(HCshape, Cshape, Xshape):
     def cov(x):
         return x.T @ x
 
-    assert jnp.allclose(cov(extra), S)
-    assert jnp.allclose(g, K)
-    assert jnp.allclose(cov(bw_noise), C1)
+    assert np.allclose(cov(extra), S)
+    assert np.allclose(g, K)
+    assert np.allclose(cov(bw_noise), C1)
 
 
 @testing.parametrize("Cshape, HCshape", ([(3, 3), (2, 3)],))
@@ -42,7 +41,7 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
     HC = _some_array(HCshape) + 2.0
 
     S = HC @ HC.T
-    K = C @ HC.T @ jnp.linalg.inv(S)
+    K = C @ HC.T @ linalg.inv(S)
     C1 = C @ C.T - K @ S @ K.T
 
     extra, (bw_noise, g) = cholesky_util.revert_conditional_noisefree(
@@ -52,9 +51,9 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
     def cov(x):
         return x.T @ x
 
-    assert jnp.allclose(cov(extra), S)
-    assert jnp.allclose(g, K)
-    assert jnp.allclose(cov(bw_noise), C1)
+    assert np.allclose(cov(extra), S)
+    assert np.allclose(g, K)
+    assert np.allclose(cov(bw_noise), C1)
 
 
 def _some_array(shape):
@@ -67,7 +66,7 @@ def test_sqrt_sum_square_scalar():
     c = 5.0
     expected = np.sqrt(a**2 + b**2 + c**2)
     received = cholesky_util.sqrt_sum_square_scalar(a, b, c)
-    assert jnp.allclose(expected, received)
+    assert np.allclose(expected, received)
 
 
 def test_sqrt_sum_square_error():
@@ -107,7 +106,7 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
 
 def _tree_is_free_of_nans(tree):
     def contains_no_nan(x):
-        return jnp.logical_not(jnp.any(jnp.isnan(x)))
+        return np.logical_not(np.any(np.isnan(x)))
 
     tree_contains_no_nan = tree_util.tree_map(contains_no_nan, tree)
     return tree_util.tree_all(tree_contains_no_nan)

@@ -1,6 +1,5 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 import diffrax
-import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import functools, linalg, testing
@@ -18,7 +17,7 @@ def fixture_solver_setup():
     vf, (u0,), (t0, t1) = setup.ode()
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    grid = jnp.linspace(t0, t1, endpoint=True, num=12)
+    grid = np.linspace(t0, t1, endpoint=True, num=12)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
 
@@ -83,7 +82,7 @@ def fixture_diffrax_solution():
 def test_compare_filter_smoother_rmse(
     filter_solution, smoother_solution, diffrax_solution
 ):
-    assert jnp.allclose(filter_solution.t, smoother_solution.t)  # sanity check
+    assert np.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = diffrax_solution(filter_solution.t)
     filter_rmse = _rmse(filter_solution.u, reference)
@@ -91,7 +90,7 @@ def test_compare_filter_smoother_rmse(
 
     # I would like to compare filter & smoother RMSE. but this test is too unreliable,
     # so we simply assert that both are "comparable".
-    assert jnp.allclose(filter_rmse, smoother_rmse, atol=0.0, rtol=1.0)
+    assert np.allclose(filter_rmse, smoother_rmse, atol=0.0, rtol=1.0)
 
     # The error should be small, otherwise the test makes little sense
     assert filter_rmse < 0.01

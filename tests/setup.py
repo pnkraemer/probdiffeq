@@ -4,7 +4,6 @@ import warnings
 
 import diffeqzoo
 import diffeqzoo.ivps
-import jax.numpy as jnp
 from diffeqzoo import backend
 from jax.config import config
 
@@ -74,14 +73,14 @@ class _Setup:
     @staticmethod
     def _ode_affine_multi_dimensional():
         t0, t1 = 0.0, 2.0
-        u0 = jnp.ones((2,))
+        u0 = np.ones((2,))
 
         @functools.jit
         def vf(x, *, t):  # noqa: ARG001
             return 2 * x
 
         def solution(t):
-            return jnp.exp(2 * t) * jnp.ones((2,))
+            return np.exp(2 * t) * np.ones((2,))
 
         return vf, (u0,), (t0, t1), solution
 
@@ -95,7 +94,7 @@ class _Setup:
             return 2 * x
 
         def solution(t):
-            return jnp.exp(2 * t)
+            return np.exp(2 * t)
 
         return vf, (u0,), (t0, t1), solution
 

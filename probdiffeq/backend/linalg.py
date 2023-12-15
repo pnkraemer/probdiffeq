@@ -32,3 +32,7 @@ def matrix_norm(arr, /, *, order=None):
 
 def solve_triangular(matrix, rhs, /, *, trans=0, lower=False):
     return jax.scipy.linalg.solve_triangular(matrix, rhs, trans=trans, lower=lower)
+
+
+def inv(matrix, /):
+    return jnp.linalg.inv(matrix)

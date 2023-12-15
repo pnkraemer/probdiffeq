@@ -1,7 +1,7 @@
 """Tests for inexact approximations for first-order problems."""
 import diffeqzoo.ivps
-import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff, estim
@@ -34,4 +34,4 @@ def test_initialised_correct_shape_and_values(pb_with_solution, taylor_fun, num)
     assert derivatives[0].shape == init[0].shape
     for expected, received in zip(derivatives, _solution):
         # demand at least ~10% accuracy to warn about the most obvious bugs
-        assert jnp.allclose(expected, received, rtol=1e-1), (expected, received)
+        assert np.allclose(expected, received, rtol=1e-1), (expected, received)

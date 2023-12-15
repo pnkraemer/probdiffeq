@@ -2,8 +2,6 @@
 
 That is, when called with correct adaptive- and checkpoint-setups.
 """
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
@@ -85,7 +83,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     solver_smoother = uncalibrated.solver(strategy)
 
     # Compute the offgrid-marginals
-    ts = jnp.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
+    ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
     u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
     )
@@ -113,4 +111,4 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     # Compare QOI and marginals
     marginals_allclose_func = functools.vmap(testing.marginals_allclose)
     assert testing.tree_all_allclose(u_fixedpoint, u_interp)
-    assert jnp.all(marginals_allclose_func(marginals_fixedpoint, marginals_interp))
+    assert np.all(marginals_allclose_func(marginals_fixedpoint, marginals_interp))

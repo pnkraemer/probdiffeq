@@ -1,7 +1,6 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 import diffeqzoo.ivps
-import jax.numpy as jnp
 
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
@@ -30,7 +29,7 @@ def fixture_pb_with_solution():
     def vf(u, /):
         return f(u, *f_args)
 
-    solution = jnp.load("./tests/test_taylor/data/three_body_first_solution.npy")
+    solution = np.load("./tests/test_taylor/data/three_body_first_solution.npy")
     return (vf, (u0,)), solution
 
 
@@ -42,7 +41,7 @@ def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num)
     derivatives = taylor_fun(f, init, num=num)
     assert len(derivatives) == num + 1
     for dy, dy_ref in zip(derivatives, solution):
-        assert jnp.allclose(dy, dy_ref)
+        assert np.allclose(dy, dy_ref)
 
 
 @testing.parametrize("num_doublings", [1, 2])
@@ -51,6 +50,6 @@ def test_approximation_identical_to_reference_doubling(pb_with_solution, num_dou
     (f, init), solution = pb_with_solution
 
     derivatives = autodiff.taylor_mode_doubling(f, init, num_doublings=num_doublings)
-    assert len(derivatives) == jnp.sum(2 ** np.arange(0, num_doublings + 1))
+    assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
     for dy, dy_ref in zip(derivatives, solution):
-        assert jnp.allclose(dy, dy_ref)
+        assert np.allclose(dy, dy_ref)

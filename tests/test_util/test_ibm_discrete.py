@@ -1,7 +1,5 @@
 """Test the discrete IBM transitions."""
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import control_flow, functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -11,11 +9,11 @@ def test_marginal_moments_are_correct(num_derivatives=2):
     """Solve a second-order, scalar, linear, separable BVP."""
     output_scale = 10.0 * np.ones_like(impl.prototypes.output_scale())
     t0, t1 = 0.0, 3.4123412
-    grid = jnp.linspace(t0, t1, endpoint=True, num=20)
+    grid = np.linspace(t0, t1, endpoint=True, num=20)
 
     init = impl.ssm_util.standard_normal(num_derivatives + 1, output_scale)
     discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
-    transitions = functools.vmap(discretise)(jnp.diff(grid))
+    transitions = functools.vmap(discretise)(np.diff(grid))
 
     means, stds = _marginal_moments(init, transitions)
 
@@ -47,15 +45,15 @@ def _marginal_moments(init, transitions):
 
 
 def _assert_zero_mean(means):
-    assert jnp.allclose(means, 0.0)
+    assert np.allclose(means, 0.0)
 
 
 def _assert_monotonously_increasing_std(stds):
-    diffs = jnp.diff(stds, axis=0)
-    assert jnp.all(diffs > 0), diffs
+    diffs = np.diff_along_axis(stds, axis=0)
+    assert np.all(diffs > 0), diffs
 
 
 def _assert_brownian_motion_std(std_final, std_init, t0, t1, *, output_scale):
     received = std_final**2 - std_init**2
     expected = output_scale**2 * (t1 - t0)
-    assert jnp.allclose(received, expected)
+    assert np.allclose(received, expected)

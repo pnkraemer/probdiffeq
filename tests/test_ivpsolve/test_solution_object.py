@@ -1,6 +1,4 @@
 """Tests for interaction with the solution object."""
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np
@@ -71,7 +69,7 @@ def fixture_approximate_solution_batched():
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
+    save_at = np.linspace(t0, t1, endpoint=True, num=4)
 
     @functools.vmap
     def solve(init):
@@ -81,7 +79,7 @@ def fixture_approximate_solution_batched():
             vf, initcond, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
         )
 
-    return solve(jnp.stack((u0, u0 + 0.1, u0 + 0.2)))
+    return solve(np.stack((u0, u0 + 0.1, u0 + 0.2)))
 
 
 def test_batched_getitem_possible(approximate_solution_batched):
@@ -89,16 +87,16 @@ def test_batched_getitem_possible(approximate_solution_batched):
     for idx in (0, 1, 2):
         approximate_solution = approximate_solution_batched[idx]
         assert isinstance(approximate_solution, solution_type)
-        assert jnp.allclose(approximate_solution.t, approximate_solution_batched.t[idx])
-        assert jnp.allclose(approximate_solution.u, approximate_solution_batched.u[idx])
+        assert np.allclose(approximate_solution.t, approximate_solution_batched.t[idx])
+        assert np.allclose(approximate_solution.u, approximate_solution_batched.u[idx])
 
 
 def test_batched_iter_possible(approximate_solution_batched):
     solution_type = type(approximate_solution_batched)
     for idx, approximate_solution in enumerate(approximate_solution_batched):
         assert isinstance(approximate_solution, solution_type)
-        assert jnp.allclose(approximate_solution.t, approximate_solution_batched.t[idx])
-        assert jnp.allclose(approximate_solution.u, approximate_solution_batched.u[idx])
+        assert np.allclose(approximate_solution.t, approximate_solution_batched.t[idx])
+        assert np.allclose(approximate_solution.u, approximate_solution_batched.u[idx])
 
 
 def test_marginal_nth_derivative_of_solution(approximate_solution):
