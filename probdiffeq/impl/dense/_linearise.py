@@ -1,6 +1,5 @@
 """Linearisation."""
 
-import jax
 
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
@@ -121,7 +120,7 @@ def ts0(fn, m):
 
 
 def ts1(fn, m):
-    b, jvp = jax.linearize(fn, m)
+    b, jvp = functools.linearize(fn, m)
     return jvp, b - jvp(m)
 
 

@@ -179,7 +179,7 @@ def taylor_mode_doubling(vf: Callable, inits: tuple[Array, ...], /, num_doubling
     degrees = list(itertools.accumulate(map(lambda s: 2**s, range(num_doublings))))
     for deg in degrees:
         jet_embedded_deg = tree_util.Partial(jet_embedded, degree=deg)
-        fx, jvp = jax.linearize(jet_embedded_deg, *taylor_coefficients)
+        fx, jvp = functools.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
         # TODO: can we jax.fori_loop() this loop?
