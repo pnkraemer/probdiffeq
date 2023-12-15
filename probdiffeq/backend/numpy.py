@@ -76,5 +76,5 @@ def sqrt(arr, /):
     return jnp.sqrt(arr)
 
 
-def eye(n, /):
-    return jnp.eye(n)
+def eye(n, m=None, /):
+    return jnp.eye(n, M=m)
