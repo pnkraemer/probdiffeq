@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters, smoothers
@@ -19,7 +20,7 @@ def test_filter_marginals_close_only_to_left_boundary():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = (u0, vf(u0, t=t0))
     init = solver.initial_condition(tcoeffs, output_scale)
     grid = jnp.linspace(t0, t1, endpoint=True, num=5)
@@ -42,7 +43,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     strategy = smoothers.smoother_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init = solver.initial_condition(tcoeffs, output_scale)
     grid = jnp.linspace(t0, t1, endpoint=True, num=5)

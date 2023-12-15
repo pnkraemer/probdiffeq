@@ -2,8 +2,8 @@
 
 Place all tests that have no better place here.
 """
-import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
@@ -32,7 +32,7 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
         fixedpoint.fixedpoint_adaptive,
     ]:
         solver = uncalibrated.solver(strategy(prior, ts0))
-        output_scale = jnp.ones_like(impl.prototypes.output_scale())
+        output_scale = np.ones_like(impl.prototypes.output_scale())
         with testing.raises(ValueError):
             _ = solver.initial_condition(
                 tcoeffs_wrong_length, output_scale=output_scale

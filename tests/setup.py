@@ -9,6 +9,7 @@ from diffeqzoo import backend
 from jax.config import config
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 
 # ODE examples must be in JAX
@@ -99,7 +100,7 @@ class _Setup:
         return vf, (u0,), (t0, t1), solution
 
     def rv(self):
-        output_scale = jnp.ones_like(impl.prototypes.output_scale())
+        output_scale = np.ones_like(impl.prototypes.output_scale())
         discretise_func = impl.ssm_util.ibm_transitions(3, output_scale)
         (_matrix, rv), _pre = discretise_func(0.5)
         return rv

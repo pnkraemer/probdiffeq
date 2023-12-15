@@ -4,6 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import functools, linalg, testing
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
 from probdiffeq.solvers.strategies import filters, smoothers
@@ -16,7 +17,7 @@ from tests.setup import setup
 def fixture_solver_setup():
     vf, (u0,), (t0, t1) = setup.ode()
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     grid = jnp.linspace(t0, t1, endpoint=True, num=12)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
@@ -97,4 +98,4 @@ def test_compare_filter_smoother_rmse(
 
 
 def _rmse(a, b):
-    return linalg.vector_norm((a - b) / b) / jnp.sqrt(b.size)
+    return linalg.vector_norm((a - b) / b) / np.sqrt(b.size)

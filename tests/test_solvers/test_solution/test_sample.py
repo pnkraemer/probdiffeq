@@ -1,7 +1,7 @@
 """Tests for sampling behaviour."""
-import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, uncalibrated
@@ -21,7 +21,7 @@ def fixture_approximation():
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_and_save_every_step(
