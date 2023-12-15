@@ -14,3 +14,7 @@ def arange(start, stop, *, step=1):
 
 def ndim(arr, /):
     return jnp.ndim(arr)
+
+
+def minimum(a, b, /):
+    return jnp.minimum(a, b)

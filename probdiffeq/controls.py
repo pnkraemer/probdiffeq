@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 
 T = TypeVar("T")
 """A type-variable to indicate the controller's state."""
@@ -66,7 +67,7 @@ def _proportional_integral_apply(
     a2 = (error_norm_previously_accepted / error_normalised) ** n2
     scale_factor_unclipped = safety * a1 * a2
 
-    scale_factor_clipped_min = jnp.minimum(scale_factor_unclipped, factor_max)
+    scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
     scale_factor = jnp.maximum(factor_min, scale_factor_clipped_min)
     error_norm_previously_accepted = jnp.where(
         error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
@@ -85,7 +86,7 @@ def _proportional_integral_clip(
 ) -> tuple[float, float]:
     dt_proposed, error_norm_previously_accepted = state
     dt = dt_proposed
-    dt_clipped = jnp.minimum(dt, t1 - t)
+    dt_clipped = np.minimum(dt, t1 - t)
     return dt_clipped, error_norm_previously_accepted
 
 
@@ -115,7 +116,7 @@ def _integral_init(dt0, /):
 
 
 def _integral_clip(dt, /, t, t1):
-    return jnp.minimum(dt, t1 - t)
+    return np.minimum(dt, t1 - t)
 
 
 def _no_clip(dt, /, *_args, **_kwargs):
@@ -135,7 +136,7 @@ def _integral_apply(
     error_power = error_normalised ** (-1.0 / error_contraction_rate)
     scale_factor_unclipped = safety * error_power
 
-    scale_factor_clipped_min = jnp.minimum(scale_factor_unclipped, factor_max)
+    scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
     scale_factor = jnp.maximum(factor_min, scale_factor_clipped_min)
     return scale_factor * dt
 
