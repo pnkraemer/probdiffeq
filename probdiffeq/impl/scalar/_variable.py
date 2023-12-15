@@ -1,14 +1,14 @@
 """Random variable implementation."""
-import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _variable
 from probdiffeq.impl.scalar import _normal
 
 
 class VariableBackend(_variable.VariableBackend):
     def rescale_cholesky(self, rv, factor):
-        if jnp.ndim(factor) > 0:
+        if np.ndim(factor) > 0:
             return functools.vmap(self.rescale_cholesky)(rv, factor)
         return _normal.Normal(rv.mean, factor * rv.cholesky)
 
