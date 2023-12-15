@@ -2,8 +2,6 @@
 
 import warnings
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import control_flow, functools, tree_array_util, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -245,7 +243,7 @@ def solve_and_save_every_step(
 
     # I think the user expects the initial time-point to be part of the grid
     # (Even though t0 is not computed by this function)
-    t = jnp.concatenate((jnp.atleast_1d(t0), t))
+    t = np.concatenate((np.atleast_1d(t0), t))
 
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition

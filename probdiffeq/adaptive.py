@@ -135,7 +135,7 @@ class _AdaptiveIVPSolver:
 
     def _normalise_error(self, error_estimate, *, u):
         error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
-        dim = jnp.atleast_1d(u).size
+        dim = np.atleast_1d(u).size
         return linalg.vector_norm(error_relative, order=self.norm_ord) / jnp.sqrt(dim)
 
     def extract(self, state):

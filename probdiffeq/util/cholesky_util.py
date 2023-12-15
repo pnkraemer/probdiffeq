@@ -136,7 +136,7 @@ def _is_matrix(mat, matrix_ndim=2):
 
 def sum_of_sqrtm_factors(R_stack: tuple):
     r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
-    R = jnp.concatenate(R_stack)
+    R = np.concatenate(R_stack)
     uppertri = triu_via_qr(R)
     if np.ndim(R_stack[0]) == 0:
         return jnp.reshape(uppertri, ())
