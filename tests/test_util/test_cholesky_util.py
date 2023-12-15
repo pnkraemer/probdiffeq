@@ -18,7 +18,7 @@ _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 def test_revert_conditional(HCshape, Cshape, Xshape):
     HC = _some_array(HCshape) + 1.0
     C = _some_array(Cshape) + 2.0
-    X = _some_array(Xshape) + 3.0 + np.eye(*Xshape)
+    X = _some_array(Xshape) + 3.0 + np.eye(Xshape[0])
 
     S = HC @ HC.T + X @ X.T
     K = C @ HC.T @ jnp.linalg.inv(S)
