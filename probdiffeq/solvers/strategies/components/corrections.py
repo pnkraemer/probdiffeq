@@ -5,6 +5,7 @@ import abc
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies.components import cubature
 
@@ -110,7 +111,7 @@ def _estimate_error(observed, /):
     #  context. Same for prototype_qoi etc.
     zero_data = jnp.zeros(())
     output_scale = impl.stats.mahalanobis_norm_relative(zero_data, rv=observed)
-    error_estimate_unscaled = jnp.squeeze(impl.stats.standard_deviation(observed))
+    error_estimate_unscaled = np.squeeze(impl.stats.standard_deviation(observed))
     return output_scale * error_estimate_unscaled
 
 

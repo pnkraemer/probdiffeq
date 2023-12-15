@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import scipy.special  # type: ignore
 
 from probdiffeq.backend import containers, tree_util
+from probdiffeq.backend import numpy as np
 
 
 class PositiveCubatureRule(containers.NamedTuple):
@@ -78,8 +79,8 @@ def gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
     weights = weights / sum_of_weights
 
     # Transform into jax arrays and take square root of weights
-    pts = jnp.asarray(pts)
-    weights_sqrtm = jnp.sqrt(jnp.asarray(weights))
+    pts = np.asarray(pts)
+    weights_sqrtm = jnp.sqrt(np.asarray(weights))
 
     # Build a tensor grid and return class
     tensor_pts = _tensor_points(pts, d=dim)
