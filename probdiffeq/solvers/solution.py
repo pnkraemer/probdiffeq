@@ -7,6 +7,7 @@ or to evaluate marginal likelihoods of observations of the solutions.
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools, tree_util
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 from probdiffeq.solvers.strategies import discrete
@@ -85,10 +86,10 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         raise ValueError(msg)
 
     # not valid for scalar or matrix-valued solutions
-    if jnp.ndim(u) > jnp.ndim(impl.prototypes.qoi()):
+    if np.ndim(u) > np.ndim(impl.prototypes.qoi()):
         msg = (
             f"Terminal-value solution (ndim=1, shape=(n,)) expected. "
-            f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
+            f"ndim={np.ndim(u)}, shape={jnp.shape(u)} received."
         )
         raise ValueError(msg)
 
@@ -137,10 +138,10 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         )
         raise ValueError(msg)
 
-    if jnp.ndim(u) < jnp.ndim(impl.prototypes.qoi()) + 1:
+    if np.ndim(u) < np.ndim(impl.prototypes.qoi()) + 1:
         msg = (
             f"Time-series solution (ndim=2, shape=(n, m)) expected. "
-            f"ndim={jnp.ndim(u)}, shape={jnp.shape(u)} received."
+            f"ndim={np.ndim(u)}, shape={jnp.shape(u)} received."
         )
         raise ValueError(msg)
 
@@ -174,7 +175,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
 
 def calibrate(x, /, output_scale):
     """Calibrated a posterior distribution of an IVP solution."""
-    if jnp.ndim(output_scale) > jnp.ndim(impl.prototypes.output_scale()):
+    if np.ndim(output_scale) > np.ndim(impl.prototypes.output_scale()):
         output_scale = output_scale[-1]
     if isinstance(x, markov.MarkovSeq):
         return markov.rescale_cholesky(x, output_scale)

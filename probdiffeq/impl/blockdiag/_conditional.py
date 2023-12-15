@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _conditional
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util
@@ -9,7 +10,7 @@ from probdiffeq.util import cholesky_util, cond_util
 
 class ConditionalBackend(_conditional.ConditionalBackend):
     def apply(self, x, conditional, /):
-        if jnp.ndim(x) == 1:
+        if np.ndim(x) == 1:
             x = x[..., None]
 
         def apply_unbatch(m, s, n):

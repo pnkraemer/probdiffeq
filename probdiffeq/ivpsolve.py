@@ -42,18 +42,18 @@ class Solution:
 
     def __len__(self):
         """Evaluate the length of a solution."""
-        if jnp.ndim(self.t) < 1:
+        if np.ndim(self.t) < 1:
             msg = "Solution object not batched :("
             raise ValueError(msg)
         return self.t.shape[0]
 
     def __getitem__(self, item):
         """Access a single item of the solution."""
-        if jnp.ndim(self.t) < 1:
+        if np.ndim(self.t) < 1:
             msg = "Solution object not batched :("
             raise ValueError(msg)
 
-        if jnp.ndim(self.t) == 1 and item != -1:
+        if np.ndim(self.t) == 1 and item != -1:
             msg = "Access to non-terminal states is not available."
             raise ValueError(msg)
 
@@ -61,7 +61,7 @@ class Solution:
 
     def __iter__(self):
         """Iterate through the solution."""
-        if jnp.ndim(self.t) <= 1:
+        if np.ndim(self.t) <= 1:
             msg = "Solution object not batched :("
             raise ValueError(msg)
 

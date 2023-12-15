@@ -1,5 +1,4 @@
-import jax.numpy as jnp
-
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _conditional
 from probdiffeq.impl.isotropic import _normal
 from probdiffeq.util import cholesky_util, cond_util
@@ -10,7 +9,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         A, noise = conditional
         # if the gain is qoi-to-hidden, the data is a (d,) array.
         # this is problematic for the isotropic model unless we explicitly broadcast.
-        if jnp.ndim(x) == 1:
+        if np.ndim(x) == 1:
             x = x[None, :]
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)
 

@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model
 from probdiffeq.impl.isotropic import _normal
 from probdiffeq.util import cholesky_util, cond_util, linop_util
@@ -14,7 +15,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         return rv.mean[..., 0, :]
 
     def marginal_nth_derivative(self, rv, i):
-        if jnp.ndim(rv.mean) > 2:
+        if np.ndim(rv.mean) > 2:
             return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
                 rv, i
             )

@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util, ibm_util
@@ -62,7 +63,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        if jnp.ndim(mean) > 0:
+        if np.ndim(mean) > 0:
             assert jnp.shape(mean) == jnp.shape(x)
             return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
 

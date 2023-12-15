@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools, linalg
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _stats
 from probdiffeq.impl.isotropic import _normal
 
@@ -18,7 +19,7 @@ class StatsBackend(_stats.StatsBackend):
     def logpdf(self, u, /, rv):
         # if the gain is qoi-to-hidden, the data is a (d,) array.
         # this is problematic for the isotropic model unless we explicitly broadcast.
-        if jnp.ndim(u) == 1:
+        if np.ndim(u) == 1:
             u = u[None, :]
 
         def logpdf_scalar(x, r):
