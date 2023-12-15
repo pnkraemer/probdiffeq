@@ -3,8 +3,6 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 from typing import Callable
 
 import jax
-import jax.experimental.jet
-import jax.experimental.ode
 
 from probdiffeq.backend.typing import Array
 

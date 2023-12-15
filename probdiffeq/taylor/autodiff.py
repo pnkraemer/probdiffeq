@@ -4,8 +4,6 @@ import itertools
 from typing import Callable
 
 import jax
-import jax.experimental.jet
-import jax.experimental.ode
 
 from probdiffeq.backend import control_flow, functools, tree_util
 from probdiffeq.backend import numpy as np
@@ -162,7 +160,7 @@ def taylor_mode_doubling(vf: Callable, inits: tuple[Array, ...], /, num_doubling
     zeros = np.zeros_like(u0)
 
     def jet_embedded(*c, degree):
-        """Call a modified jax.experimental.jet().
+        """Call a modified jet().
 
         The modifications include:
         * We merge "primals" and "series" into a single set of coefficients
