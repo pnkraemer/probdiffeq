@@ -8,8 +8,18 @@ def qr_r(arr, /):
     return jnp.linalg.qr(arr, mode="r")
 
 
-def cholesky_lower(arr, /):
+# All Cholesky factors are lower-triangular by default
+
+
+def cholesky_factor(arr, /):
     return jnp.linalg.cholesky(arr)
+
+
+# All Cholesky factors are lower-triangular by default
+
+
+def cholesky_solve(arr, rhs, /):
+    return jax.scipy.linalg.cho_solve((arr, True), rhs)
 
 
 def vector_norm(arr, /, *, order=None):

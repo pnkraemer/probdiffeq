@@ -20,7 +20,6 @@ manipulation of square root matrices.
 
 """
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import control_flow, linalg, tree_util
@@ -40,7 +39,7 @@ def revert_conditional_noisefree(R_X_F, R_X):
 
     r_marg = triu_via_qr(R_X_F)
     crosscov = R_X.T @ R_X_F
-    gain = jax.scipy.linalg.cho_solve((r_marg.T, True), crosscov.T).T
+    gain = linalg.cholesky_solve(r_marg.T, crosscov.T).T
     r_cor = R_X - R_X_F @ gain.T
 
     # TODO: only with this line is the output equivalent to the other function
