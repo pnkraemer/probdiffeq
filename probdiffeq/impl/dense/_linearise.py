@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _linearise
 from probdiffeq.impl.dense import _normal
 from probdiffeq.util import cholesky_util, linop_util
@@ -109,7 +110,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
 def _autobatch_linop(fun):
     def fun_(x):
-        if jnp.ndim(x) > 1:
+        if np.ndim(x) > 1:
             return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
         return fun(x)
 

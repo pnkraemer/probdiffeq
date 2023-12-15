@@ -24,6 +24,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import control_flow, linalg
+from probdiffeq.backend import numpy as np
 
 
 def revert_conditional_noisefree(R_X_F, R_X):
@@ -131,14 +132,14 @@ def _triu_via_shortcut(R, R_YX):
 
 
 def _is_matrix(mat, matrix_ndim=2):
-    return jnp.ndim(mat) == matrix_ndim
+    return np.ndim(mat) == matrix_ndim
 
 
 def sum_of_sqrtm_factors(R_stack: tuple):
     r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
     R = jnp.concatenate(R_stack)
     uppertri = triu_via_qr(R)
-    if jnp.ndim(R_stack[0]) == 0:
+    if np.ndim(R_stack[0]) == 0:
         return jnp.reshape(uppertri, ())
     return uppertri
 
@@ -146,7 +147,7 @@ def sum_of_sqrtm_factors(R_stack: tuple):
 # logsumexp but for squares
 def sqrt_sum_square_scalar(*args):
     """Compute sqrt(a**2 + b**2) without squaring a or b."""
-    args_are_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) == 0, args)
+    args_are_scalar = jax.tree_util.tree_map(lambda x: np.ndim(x) == 0, args)
     if not jax.tree_util.tree_all(args_are_scalar):
         args_shapes = jax.tree_util.tree_map(jnp.shape, args)
         msg1 = "'sqrt_sum_square_scalar' expects scalar arguments. "

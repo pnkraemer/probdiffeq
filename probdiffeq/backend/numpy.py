@@ -10,3 +10,7 @@ def factorial(n, /):
 
 def arange(start, stop, *, step=1):
     return jnp.arange(start, stop, step=step)
+
+
+def ndim(arr, /):
+    return jnp.ndim(arr)
