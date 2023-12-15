@@ -1,5 +1,3 @@
-import jax
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _variable
@@ -19,7 +17,7 @@ class VariableBackend(_variable.VariableBackend):
 
     def to_multivariate_normal(self, rv):
         mean = np.reshape(rv.mean.T, (-1,), order="F")
-        cov = jax.scipy.linalg.block_diag(*self._cov_dense(rv.cholesky))
+        cov = np.block_diag(self._cov_dense(rv.cholesky))
         return (mean, cov)
 
     def _cov_dense(self, cholesky):
