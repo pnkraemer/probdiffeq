@@ -35,13 +35,13 @@ def initial_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol,
     scale = atol + jnp.abs(y0) * rtol
     d0, d1 = linalg.vector_norm(y0), linalg.vector_norm(f0)
 
-    dt0 = jnp.where((d0 < 1e-5) | (d1 < 1e-5), 1e-6, 0.01 * d0 / d1)
+    dt0 = np.where((d0 < 1e-5) | (d1 < 1e-5), 1e-6, 0.01 * d0 / d1)
 
     y1 = y0 + dt0 * f0
     f1 = vf(y1, t=t0 + dt0)
     d2 = linalg.vector_norm((f1 - f0) / scale) / dt0
 
-    dt1 = jnp.where(
+    dt1 = np.where(
         (d1 <= 1e-15) & (d2 <= 1e-15),
         np.maximum(1e-6, dt0 * 1e-3),
         (0.01 / np.maximum(d1, d2)) ** (1.0 / (error_contraction_rate + 1.0)),
