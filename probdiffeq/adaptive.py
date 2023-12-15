@@ -5,6 +5,7 @@ import jax.numpy as jnp
 
 from probdiffeq import controls
 from probdiffeq.backend import containers, control_flow, functools, linalg, tree_util
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 
 
@@ -115,7 +116,7 @@ class _AdaptiveIVPSolver:
         # Normalise the error
         u_proposed = impl.hidden_model.qoi(state_proposed.strategy.hidden)
         u_step_from = impl.hidden_model.qoi(state_proposed.strategy.hidden)
-        u = jnp.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
+        u = np.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
         error_normalised = self._normalise_error(error_estimate, u=u)
 
         # Propose a new step

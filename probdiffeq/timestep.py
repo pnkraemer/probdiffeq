@@ -3,6 +3,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import linalg
+from probdiffeq.backend import numpy as np
 
 
 def initial(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
@@ -42,7 +43,7 @@ def initial_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol,
 
     dt1 = jnp.where(
         (d1 <= 1e-15) & (d2 <= 1e-15),
-        jnp.maximum(1e-6, dt0 * 1e-3),
-        (0.01 / jnp.maximum(d1, d2)) ** (1.0 / (error_contraction_rate + 1.0)),
+        np.maximum(1e-6, dt0 * 1e-3),
+        (0.01 / np.maximum(d1, d2)) ** (1.0 / (error_contraction_rate + 1.0)),
     )
-    return jnp.minimum(100.0 * dt0, dt1)
+    return np.minimum(100.0 * dt0, dt1)
