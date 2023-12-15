@@ -3,8 +3,6 @@
 import dataclasses
 from typing import Callable, Generic, TypeVar
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -68,7 +66,7 @@ def _proportional_integral_apply(
 
     scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
     scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-    error_norm_previously_accepted = jnp.where(
+    error_norm_previously_accepted = np.where(
         error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
     )
 

@@ -156,7 +156,7 @@ def sqrt_sum_square_scalar(*args):
 
     stack = jnp.stack(args)
     sqrt_mat = triu_via_qr(stack[:, None])
-    sqrt_mat_abs = jnp.abs(sqrt_mat)  # convention
+    sqrt_mat_abs = np.abs(sqrt_mat)  # convention
     return jnp.reshape(sqrt_mat_abs, ())
 
 

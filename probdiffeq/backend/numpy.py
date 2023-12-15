@@ -22,3 +22,11 @@ def minimum(a, b, /):
 
 def maximum(a, b, /):
     return jnp.maximum(a, b)
+
+
+def where(cond, /, if_true, if_false):
+    return jnp.where(cond, if_true, if_false)
+
+
+def abs(arr, /):  # noqa: A001
+    return jnp.abs(arr)
