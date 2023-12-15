@@ -62,3 +62,7 @@ def concatenate(list_of_arrays, /):
 
 def ones_like(arr, /):
     return jnp.ones_like(arr)
+
+
+def inf():
+    return jnp.inf
