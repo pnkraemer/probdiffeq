@@ -1,6 +1,7 @@
 """State-space model utilities."""
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.isotropic import _normal
 from probdiffeq.util import cholesky_util, cond_util, ibm_util
@@ -56,5 +57,5 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
-        return sum_updated / jnp.sqrt(num + 1)
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)

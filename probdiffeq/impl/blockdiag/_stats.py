@@ -14,7 +14,7 @@ class StatsBackend(_stats.StatsBackend):
         # return array of norms! See calibration
         mean = jnp.reshape(rv.mean, self.ode_shape)
         cholesky = jnp.reshape(rv.cholesky, self.ode_shape)
-        return (mean - u) / cholesky / jnp.sqrt(mean.size)
+        return (mean - u) / cholesky / np.sqrt(mean.size)
 
     def logpdf(self, u, /, rv):
         def logpdf_scalar(x, r):
@@ -40,4 +40,4 @@ class StatsBackend(_stats.StatsBackend):
         if rv.cholesky.ndim > 1:
             return functools.vmap(self.standard_deviation)(rv)
 
-        return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
+        return np.sqrt(jnp.dot(rv.cholesky, rv.cholesky))

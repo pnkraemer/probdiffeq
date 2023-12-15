@@ -8,6 +8,7 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve
 from probdiffeq.backend import linalg
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -23,7 +24,7 @@ def test_exponential_approximated_well():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.dynamic(strategy)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition((*u0, vf(*u0, t=t0)), output_scale=output_scale)
 
     problem_args = (vf, init)
@@ -36,4 +37,4 @@ def test_exponential_approximated_well():
 
 
 def _rmse(a, b):
-    return linalg.vector_norm((a - b) / b) / jnp.sqrt(b.size)
+    return linalg.vector_norm((a - b) / b) / np.sqrt(b.size)

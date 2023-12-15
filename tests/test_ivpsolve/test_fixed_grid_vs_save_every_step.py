@@ -1,9 +1,8 @@
 """Compare solve_fixed_grid to solve_and_save_every_step."""
 
 
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, controls, ivpsolve
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
@@ -24,7 +23,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2, control=control)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
     args = (vf, init)
 

@@ -65,7 +65,7 @@ def test_sqrt_sum_square_scalar():
     a = 3.0
     b = 4.0
     c = 5.0
-    expected = jnp.sqrt(a**2 + b**2 + c**2)
+    expected = np.sqrt(a**2 + b**2 + c**2)
     received = cholesky_util.sqrt_sum_square_scalar(a, b, c)
     assert jnp.allclose(expected, received)
 

@@ -58,3 +58,15 @@ def atleast_1d(arr, /):
 
 def concatenate(list_of_arrays, /):
     return jnp.concatenate(list_of_arrays)
+
+
+def ones_like(arr, /):
+    return jnp.ones_like(arr)
+
+
+def inf():
+    return jnp.inf
+
+
+def sqrt(arr, /):
+    return jnp.sqrt(arr)

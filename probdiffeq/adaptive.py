@@ -1,8 +1,6 @@
 """Adaptive solvers for initial value problems (IVPs)."""
 from typing import Any
 
-import jax.numpy as jnp
-
 from probdiffeq import controls
 from probdiffeq.backend import containers, control_flow, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
@@ -136,7 +134,7 @@ class _AdaptiveIVPSolver:
     def _normalise_error(self, error_estimate, *, u):
         error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
         dim = np.atleast_1d(u).size
-        return linalg.vector_norm(error_relative, order=self.norm_ord) / jnp.sqrt(dim)
+        return linalg.vector_norm(error_relative, order=self.norm_ord) / np.sqrt(dim)
 
     def extract(self, state):
         solution_solver = self.solver.extract(state.step_from)
@@ -186,4 +184,4 @@ tree_util.register_pytree_node(
 
 
 def _inf_like(tree):
-    return tree_util.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)
+    return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)

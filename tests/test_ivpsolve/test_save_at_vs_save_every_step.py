@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters
@@ -24,7 +25,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
     problem_args = (vf, init)
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}

@@ -4,6 +4,7 @@ import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -73,7 +74,7 @@ def fixture_solution(correction_impl):
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.simulate_terminal_values(vf, init, t0=t0, t1=t1, **adaptive_kwargs)
 

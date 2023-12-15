@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import uncalibrated
@@ -20,7 +21,7 @@ def test_warning_for_fixedpoint_in_save_every_step_mode():
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
 
@@ -39,7 +40,7 @@ def test_warning_for_smoother_in_save_at_mode():
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
 

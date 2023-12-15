@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
@@ -21,7 +22,7 @@ def fixture_sol():
     solver = uncalibrated.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
 
@@ -34,7 +35,7 @@ def fixture_sol():
 def test_output_is_a_scalar_and_not_nan_and_not_inf(sol):
     data = sol.u + 0.005
     lml = solution.log_marginal_likelihood(
-        data, standard_deviation=jnp.ones_like(sol.t), posterior=sol.posterior
+        data, standard_deviation=np.ones_like(sol.t), posterior=sol.posterior
     )
     assert lml.shape == ()
     assert not jnp.isnan(lml)
@@ -80,7 +81,7 @@ def test_raises_error_for_terminal_values(sol):
     posterior_t1 = tree_util.tree_map(lambda s: s[-1], sol)
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
-            data[-1], standard_deviation=jnp.ones_like(data[-1]), posterior=posterior_t1
+            data[-1], standard_deviation=np.ones_like(data[-1]), posterior=posterior_t1
         )
 
 
@@ -95,7 +96,7 @@ def test_raises_error_for_filter():
 
     grid = jnp.linspace(t0, t1, num=3)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    output_scale = jnp.ones_like(impl.prototypes.output_scale())
+    output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)
 

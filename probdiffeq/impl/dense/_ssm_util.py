@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.dense import _normal
 from probdiffeq.util import cholesky_util, cond_util, ibm_util
@@ -79,6 +80,6 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        return cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x) / jnp.sqrt(
+        return cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x) / np.sqrt(
             num + 1
         )

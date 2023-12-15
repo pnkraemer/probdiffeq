@@ -9,7 +9,7 @@ from probdiffeq.impl import _stats
 class StatsBackend(_stats.StatsBackend):
     def mahalanobis_norm_relative(self, u, /, rv):
         res_white = (u - rv.mean) / rv.cholesky
-        return np.abs(res_white) / jnp.sqrt(rv.mean.size)
+        return np.abs(res_white) / np.sqrt(rv.mean.size)
 
     def logpdf(self, u, /, rv):
         dx = u - rv.mean
@@ -26,7 +26,7 @@ class StatsBackend(_stats.StatsBackend):
         if rv.cholesky.ndim > 1:
             return functools.vmap(self.standard_deviation)(rv)
 
-        return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
+        return np.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def mean(self, rv):
         return rv.mean
