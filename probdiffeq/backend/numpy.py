@@ -34,3 +34,7 @@ def abs(arr, /):  # noqa: A001
 
 def finfo_eps(eltype, /):
     return jnp.finfo(eltype).eps
+
+
+def diff(arr, /):
+    return jnp.diff(arr)

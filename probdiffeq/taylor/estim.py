@@ -7,6 +7,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import discrete
 
@@ -53,7 +54,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
 
     # Discretised prior
     discretise = impl.ssm_util.ibm_transitions(num, 1.0)
-    ibm_transitions = functools.vmap(discretise)(jnp.diff(ts))
+    ibm_transitions = functools.vmap(discretise)(np.diff(ts))
 
     # Generate an observation-model for the QOI
     # (1e-7 observation noise for nuggets and for reusing existing code)

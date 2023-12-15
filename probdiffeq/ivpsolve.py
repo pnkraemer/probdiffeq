@@ -296,7 +296,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
 
     t0 = grid[0]
     state0 = solver.init(t0, initial_condition)
-    _, result_state = control_flow.scan(body_fn, init=state0, xs=jnp.diff(grid))
+    _, result_state = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
     _t, (posterior, output_scale) = solver.extract(result_state)
 
     # I think the user expects marginals, so we compute them here
