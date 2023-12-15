@@ -1,7 +1,6 @@
 """Adaptive solvers for initial value problems (IVPs)."""
 from typing import Any
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls
@@ -186,4 +185,4 @@ tree_util.register_pytree_node(
 
 
 def _inf_like(tree):
-    return jax.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)
+    return tree_util.tree_map(lambda x: jnp.inf * jnp.ones_like(x), tree)
