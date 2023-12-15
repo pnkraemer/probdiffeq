@@ -17,7 +17,7 @@ def system_matrices_1d(num_derivatives, output_scale):
 
 def preconditioner_diagonal(dt, *, scales, powers):
     """Construct the diagonal IBM preconditioner."""
-    dt_abs = jnp.abs(dt)
+    dt_abs = np.abs(dt)
     scaling_vector = jnp.power(dt_abs, powers) / scales
     scaling_vector_inv = jnp.power(dt_abs, -powers) * scales
     return scaling_vector, scaling_vector_inv

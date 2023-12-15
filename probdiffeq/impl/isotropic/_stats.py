@@ -13,7 +13,7 @@ class StatsBackend(_stats.StatsBackend):
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = linalg.qr_r(residual_white.T)
-        return jnp.reshape(jnp.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
+        return jnp.reshape(np.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # if the gain is qoi-to-hidden, the data is a (d,) array.
@@ -28,7 +28,7 @@ class StatsBackend(_stats.StatsBackend):
             maha_term = jnp.dot(w, w)
 
             diagonal = jnp.diagonal(r.cholesky, axis1=-1, axis2=-2)
-            slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+            slogdet = jnp.sum(jnp.log(np.abs(diagonal)))
             logdet_term = 2.0 * slogdet
             return -0.5 * (logdet_term + maha_term + x.size * jnp.log(jnp.pi * 2))
 

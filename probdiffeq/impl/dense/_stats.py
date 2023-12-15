@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools, linalg
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _stats
 
 
@@ -13,12 +14,12 @@ class StatsBackend(_stats.StatsBackend):
             rv.cholesky.T, u - rv.mean, lower=False, trans="T"
         )
         mahalanobis = linalg.qr_r(residual_white[:, None])
-        return jnp.reshape(jnp.abs(mahalanobis) / jnp.sqrt(rv.mean.size), ())
+        return jnp.reshape(np.abs(mahalanobis) / jnp.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # The cholesky factor is triangular, so we compute a cheap slogdet.
         diagonal = jnp.diagonal(rv.cholesky, axis1=-1, axis2=-2)
-        slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
+        slogdet = jnp.sum(jnp.log(np.abs(diagonal)))
 
         dx = u - rv.mean
         residual_white = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")

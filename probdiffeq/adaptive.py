@@ -116,7 +116,7 @@ class _AdaptiveIVPSolver:
         # Normalise the error
         u_proposed = impl.hidden_model.qoi(state_proposed.strategy.hidden)
         u_step_from = impl.hidden_model.qoi(state_proposed.strategy.hidden)
-        u = np.maximum(jnp.abs(u_proposed), jnp.abs(u_step_from))
+        u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
         error_normalised = self._normalise_error(error_estimate, u=u)
 
         # Propose a new step
@@ -134,7 +134,7 @@ class _AdaptiveIVPSolver:
         )
 
     def _normalise_error(self, error_estimate, *, u):
-        error_relative = error_estimate / (self.atol + self.rtol * jnp.abs(u))
+        error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
         dim = jnp.atleast_1d(u).size
         return linalg.vector_norm(error_relative, order=self.norm_ord) / jnp.sqrt(dim)
 
