@@ -18,3 +18,7 @@ def ndim(arr, /):
 
 def minimum(a, b, /):
     return jnp.minimum(a, b)
+
+
+def maximum(a, b, /):
+    return jnp.maximum(a, b)

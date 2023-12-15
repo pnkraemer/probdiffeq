@@ -68,7 +68,7 @@ def _proportional_integral_apply(
     scale_factor_unclipped = safety * a1 * a2
 
     scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-    scale_factor = jnp.maximum(factor_min, scale_factor_clipped_min)
+    scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
     error_norm_previously_accepted = jnp.where(
         error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
     )
@@ -137,7 +137,7 @@ def _integral_apply(
     scale_factor_unclipped = safety * error_power
 
     scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-    scale_factor = jnp.maximum(factor_min, scale_factor_clipped_min)
+    scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
     return scale_factor * dt
 
 
