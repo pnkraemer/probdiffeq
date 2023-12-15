@@ -1,9 +1,8 @@
 """Tests for sampling behaviour."""
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import random, testing
+from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, uncalibrated
 from probdiffeq.solvers.strategies import smoothers
@@ -37,10 +36,10 @@ def test_sample_shape(approximation, shape):
     (u, samples), (u_init, samples_init) = markov.sample(
         key, posterior, shape=shape, reverse=True
     )
-    margs = jax.tree_util.tree_map(lambda x: x[1:], approximation.marginals)
+    margs = tree_util.tree_map(lambda x: x[1:], approximation.marginals)
     assert u.shape == shape + approximation.u[1:].shape
     assert samples.shape == shape + impl.stats.sample_shape(margs)
 
-    margs = jax.tree_util.tree_map(lambda x: x[0], approximation.marginals)
+    margs = tree_util.tree_map(lambda x: x[0], approximation.marginals)
     assert u_init.shape == shape + approximation.u[0].shape
     assert samples_init.shape == shape + impl.stats.sample_shape(margs)

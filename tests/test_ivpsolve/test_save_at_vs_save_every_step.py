@@ -1,9 +1,8 @@
 """Assert that solve_and_save_at is consistent with solve_with_python_loop()."""
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import functools, testing
+from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters
@@ -45,7 +44,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     )
 
     u_save_at = solution_save_at.u[1:-1]
-    marginals_save_at = jax.tree_util.tree_map(
+    marginals_save_at = tree_util.tree_map(
         lambda s: s[1:-1], solution_save_at.marginals
     )
 

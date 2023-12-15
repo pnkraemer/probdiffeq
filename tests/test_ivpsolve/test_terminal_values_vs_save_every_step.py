@@ -1,10 +1,9 @@
 """Compare simulate_terminal_values to solve_and_save_every_step."""
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -48,6 +47,6 @@ def fixture_simulation_terminal_values(problem_args_kwargs):
 
 def test_terminal_values_identical(solution_python_loop, simulation_terminal_values):
     """The terminal values must be identical."""
-    expected = jax.tree_util.tree_map(lambda s: s[-1], solution_python_loop)
+    expected = tree_util.tree_map(lambda s: s[-1], solution_python_loop)
     received = simulation_terminal_values
     assert testing.tree_all_allclose(received, expected)
