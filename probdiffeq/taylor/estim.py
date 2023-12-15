@@ -61,7 +61,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     model_fun = functools.vmap(
         impl.hidden_model.conditional_to_derivative, in_axes=(None, 0)
     )
-    models = model_fun(0, 1e-7 * jnp.ones_like(ts))
+    models = model_fun(0, 1e-7 * np.ones_like(ts))
     print(ys)
 
     # Run the preconditioned fixedpoint smoother
