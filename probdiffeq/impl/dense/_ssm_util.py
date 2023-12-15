@@ -15,7 +15,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def ibm_transitions(self, num_derivatives, output_scale):
         a, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
         (d,) = self.ode_shape
-        eye_d = jnp.eye(d)
+        eye_d = np.eye(d)
         A = jnp.kron(eye_d, a)
         Q = jnp.kron(eye_d, q_sqrtm)
 
@@ -37,7 +37,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         (d,) = self.ode_shape
         n = ndim * d
 
-        A = jnp.eye(n)
+        A = np.eye(n)
         m = jnp.zeros((n,))
         C = jnp.zeros((n, n))
         return cond_util.Conditional(A, _normal.Normal(m, C))
@@ -73,8 +73,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return cond_util.Conditional(A, noise)
 
     def standard_normal(self, ndim, /, output_scale):
-        eye_n = jnp.eye(ndim)
-        eye_d = output_scale * jnp.eye(*self.ode_shape)
+        eye_n = np.eye(ndim)
+        eye_d = output_scale * np.eye(*self.ode_shape)
         cholesky = jnp.kron(eye_d, eye_n)
         mean = jnp.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
         return _normal.Normal(mean, cholesky)

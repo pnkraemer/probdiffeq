@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _variable
 from probdiffeq.impl.isotropic import _normal
 
@@ -16,7 +17,7 @@ class VariableBackend(_variable.VariableBackend):
         return rv.mean + rv.cholesky @ unit_sample
 
     def to_multivariate_normal(self, rv):
-        eye_d = jnp.eye(*self.ode_shape)
+        eye_d = np.eye(*self.ode_shape)
         cov = rv.cholesky @ rv.cholesky.T
         cov = jnp.kron(eye_d, cov)
         mean = rv.mean.reshape((-1,), order="F")

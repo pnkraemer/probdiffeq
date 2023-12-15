@@ -74,3 +74,7 @@ def inf():
 
 def sqrt(arr, /):
     return jnp.sqrt(arr)
+
+
+def eye(n, /):
+    return jnp.eye(n)
