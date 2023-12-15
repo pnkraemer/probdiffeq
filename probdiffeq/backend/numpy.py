@@ -152,6 +152,10 @@ def stack(list_of_arrays, /):
     return jnp.stack(list_of_arrays)
 
 
+def transpose(arr, /, *, axes):
+    return jnp.transpose(arr, axes=axes)
+
+
 def hstack(list_of_arrays, /):
     return jnp.hstack(list_of_arrays)
 
