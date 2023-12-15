@@ -1,6 +1,5 @@
 """Cubature rules."""
 
-import jax.numpy as jnp
 import scipy.special  # type: ignore
 
 from probdiffeq.backend import containers, tree_util
@@ -27,14 +26,14 @@ def third_order_spherical(input_shape) -> PositiveCubatureRule:
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
     (S, _) = points_mat.shape
-    points = jnp.reshape(points_mat, (S,))
+    points = np.reshape(points_mat, (S,))
     return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _third_order_spherical_params(*, d):
     eye_d = np.eye(d) * np.sqrt(d)
     pts = np.concatenate((eye_d, -1 * eye_d))
-    weights_sqrtm = jnp.ones((2 * d,)) / np.sqrt(2.0 * d)
+    weights_sqrtm = np.ones((2 * d,)) / np.sqrt(2.0 * d)
     return pts, weights_sqrtm
 
 
@@ -50,18 +49,18 @@ def unscented_transform(input_shape, r=1.0) -> PositiveCubatureRule:
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
     (S, _) = points_mat.shape
-    points = jnp.reshape(points_mat, (S,))
+    points = np.reshape(points_mat, (S,))
     return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _unscented_transform_params(d, *, r):
     eye_d = np.eye(d) * np.sqrt(d + r)
-    zeros = jnp.zeros((1, d))
+    zeros = np.zeros((1, d))
     pts = np.concatenate((eye_d, zeros, -1 * eye_d))
     _scale = d + r
-    weights_sqrtm1 = jnp.ones((d,)) / np.sqrt(2.0 * _scale)
+    weights_sqrtm1 = np.ones((d,)) / np.sqrt(2.0 * _scale)
     weights_sqrtm2 = np.sqrt(r / _scale)
-    weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
+    weights_sqrtm = np.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
     return pts, weights_sqrtm
 
 
@@ -94,10 +93,10 @@ def gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
 
 def _tensor_weights(*args, **kwargs):
     mesh = _tensor_points(*args, **kwargs)
-    return jnp.prod(mesh, axis=1)
+    return np.prod_along_axis(mesh, axis=1)
 
 
 def _tensor_points(x, /, *, d):
-    x_mesh = jnp.meshgrid(*([x] * d))
-    y_mesh = tree_util.tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
-    return jnp.stack(y_mesh).T
+    x_mesh = np.meshgrid(*([x] * d))
+    y_mesh = tree_util.tree_map(lambda s: np.reshape(s, (-1,)), x_mesh)
+    return np.stack(y_mesh).T

@@ -1,6 +1,4 @@
 """Some strategies don't work with all solution routines."""
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
@@ -48,7 +46,7 @@ def test_warning_for_smoother_in_save_at_mode():
         _ = ivpsolve.solve_and_save_at(
             vf,
             init,
-            save_at=jnp.linspace(t0, t1),
+            save_at=np.linspace(t0, t1),
             adaptive_solver=adaptive_solver,
             dt0=0.1,
         )

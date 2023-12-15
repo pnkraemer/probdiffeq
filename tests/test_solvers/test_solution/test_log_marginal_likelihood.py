@@ -1,6 +1,4 @@
 """Tests for log-marginal-likelihood functionality."""
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
@@ -26,7 +24,7 @@ def fixture_sol():
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
 
-    save_at = jnp.linspace(t0, t1, endpoint=True, num=4)
+    save_at = np.linspace(t0, t1, endpoint=True, num=4)
     return ivpsolve.solve_and_save_at(
         vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
     )
@@ -38,8 +36,8 @@ def test_output_is_a_scalar_and_not_nan_and_not_inf(sol):
         data, standard_deviation=np.ones_like(sol.t), posterior=sol.posterior
     )
     assert lml.shape == ()
-    assert not jnp.isnan(lml)
-    assert not jnp.isinf(lml)
+    assert not np.isnan(lml)
+    assert not np.isinf(lml)
 
 
 def test_that_function_raises_error_for_wrong_std_shape_too_many(sol):
@@ -52,7 +50,7 @@ def test_that_function_raises_error_for_wrong_std_shape_too_many(sol):
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            data, standard_deviation=jnp.ones((k + 1,)), posterior=sol.posterior
+            data, standard_deviation=np.ones((k + 1,)), posterior=sol.posterior
         )
 
 
@@ -66,7 +64,7 @@ def test_that_function_raises_error_for_wrong_std_shape_wrong_ndim(sol):
 
     with testing.raises(ValueError, match="does not match"):
         _ = solution.log_marginal_likelihood(
-            data, standard_deviation=jnp.ones((k, 1)), posterior=sol.posterior
+            data, standard_deviation=np.ones((k, 1)), posterior=sol.posterior
         )
 
 
@@ -94,14 +92,14 @@ def test_raises_error_for_filter():
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = uncalibrated.solver(strategy)
 
-    grid = jnp.linspace(t0, t1, num=3)
+    grid = np.linspace(t0, t1, num=3)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)
 
     data = sol.u + 0.1
-    std = jnp.ones((sol.u.shape[0],))  # values irrelevant
+    std = np.ones((sol.u.shape[0],))  # values irrelevant
     with testing.raises(TypeError, match="ilter"):
         _ = solution.log_marginal_likelihood(
             data, standard_deviation=std, posterior=sol.posterior

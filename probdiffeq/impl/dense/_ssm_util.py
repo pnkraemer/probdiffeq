@@ -1,7 +1,5 @@
 """State-space model utilities."""
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.dense import _normal
@@ -16,19 +14,19 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         a, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
         (d,) = self.ode_shape
         eye_d = np.eye(d)
-        A = jnp.kron(eye_d, a)
-        Q = jnp.kron(eye_d, q_sqrtm)
+        A = np.kron(eye_d, a)
+        Q = np.kron(eye_d, q_sqrtm)
 
         ndim = d * (num_derivatives + 1)
-        q0 = jnp.zeros((ndim,))
+        q0 = np.zeros((ndim,))
         noise = _normal.Normal(q0, Q)
 
         precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            p = jnp.tile(p, d)
-            p_inv = jnp.tile(p_inv, d)
+            p = np.tile(p, d)
+            p_inv = np.tile(p_inv, d)
             return cond_util.Conditional(A, noise), (p, p_inv)
 
         return discretise
@@ -38,8 +36,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         n = ndim * d
 
         A = np.eye(n)
-        m = jnp.zeros((n,))
-        C = jnp.zeros((n, n))
+        m = np.zeros((n,))
+        C = np.zeros((n, n))
         return cond_util.Conditional(A, _normal.Normal(m, C))
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
@@ -52,12 +50,12 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
 
-        m0_matrix = jnp.stack(tcoeffs)
-        m0_corrected = jnp.reshape(m0_matrix, (-1,), order="F")
+        m0_matrix = np.stack(tcoeffs)
+        m0_corrected = np.reshape(m0_matrix, (-1,), order="F")
 
         (ode_dim,) = self.ode_shape
         ndim = (num_derivatives + 1) * ode_dim
-        c_sqrtm0_corrected = jnp.zeros((ndim, ndim))
+        c_sqrtm0_corrected = np.zeros((ndim, ndim))
 
         return _normal.Normal(m0_corrected, c_sqrtm0_corrected)
 
@@ -75,8 +73,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
     def standard_normal(self, ndim, /, output_scale):
         eye_n = np.eye(ndim)
         eye_d = output_scale * np.eye(*self.ode_shape)
-        cholesky = jnp.kron(eye_d, eye_n)
-        mean = jnp.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
+        cholesky = np.kron(eye_d, eye_n)
+        mean = np.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):

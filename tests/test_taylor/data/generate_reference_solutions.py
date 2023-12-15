@@ -1,9 +1,9 @@
 """Precompute and save reference solutions. Accelerate testing."""
 import diffeqzoo.ivps
-import jax.numpy as jnp
 from diffeqzoo import backend
 from jax.config import config
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.taylor import autodiff
 
 
@@ -58,9 +58,9 @@ if __name__ == "__main__":
     set_environment()
 
     solution1 = three_body_first()
-    jnp.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
+    np.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
 
     solution2 = van_der_pol_second()
-    jnp.save("./tests/test_taylor/data/van_der_pol_second_solution.npy", solution2)
+    np.save("./tests/test_taylor/data/van_der_pol_second_solution.npy", solution2)
 
     print("Saving successful.")

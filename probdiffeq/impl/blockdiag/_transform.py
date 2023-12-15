@@ -1,7 +1,6 @@
 """Random-variable transformation."""
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _transform
 from probdiffeq.impl.blockdiag import _normal
 from probdiffeq.util import cholesky_util, cond_util
@@ -22,7 +21,7 @@ class TransformBackend(_transform.TransformBackend):
 
     def revert(self, rv, transformation, /):
         A, bias = transformation
-        cholesky_upper = jnp.transpose(rv.cholesky, axes=(0, -1, -2))
+        cholesky_upper = np.transpose(rv.cholesky, axes=(0, -1, -2))
         A_cholesky_upper = _transpose(A @ rv.cholesky)
 
         revert_fun = functools.vmap(cholesky_util.revert_conditional_noisefree)
@@ -39,4 +38,4 @@ class TransformBackend(_transform.TransformBackend):
 
 
 def _transpose(arr, /):
-    return jnp.transpose(arr, axes=(0, 2, 1))
+    return np.transpose(arr, axes=(0, 2, 1))

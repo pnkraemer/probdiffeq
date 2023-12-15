@@ -3,7 +3,6 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-import jax.numpy as jnp
 import jax.scipy.stats
 
 from probdiffeq.backend import numpy as np
@@ -20,7 +19,7 @@ def test_logpdf():
 
     pdf1 = impl.stats.logpdf(u, rv)
     pdf2 = jax.scipy.stats.multivariate_normal.logpdf(u_dense, mean_dense, cov_dense)
-    assert jnp.allclose(pdf1, pdf2)
+    assert np.allclose(pdf1, pdf2)
 
 
 def test_grad_not_none():
@@ -28,5 +27,5 @@ def test_grad_not_none():
     u = np.ones_like(impl.stats.mean(rv))
 
     pdf = jax.jacrev(impl.stats.logpdf)(u, rv)
-    assert not jnp.any(jnp.isinf(pdf))
-    assert not jnp.any(jnp.isnan(pdf))
+    assert not np.any(np.isinf(pdf))
+    assert not np.any(np.isnan(pdf))

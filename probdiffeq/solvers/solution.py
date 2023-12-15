@@ -4,8 +4,6 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -36,7 +34,7 @@ def offgrid_marginals_searchsorted(*, ts, solution, solver):
 def _offgrid_marginals(t, solution, solver):
     # side="left" and side="right" are equivalent
     # because we _assume_ that the point sets are disjoint.
-    index = jnp.searchsorted(solution.t, t)
+    index = np.searchsorted(solution.t, t)
 
     def _extract_previous(tree):
         return tree_util.tree_map(lambda s: s[index - 1, ...], tree)
@@ -78,10 +76,10 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
     """
-    if jnp.shape(standard_deviation) != ():
+    if np.shape(standard_deviation) != ():
         msg = (
             f"Scalar observation noise expected. "
-            f"Shape {jnp.shape(standard_deviation)} received."
+            f"Shape {np.shape(standard_deviation)} received."
         )
         raise ValueError(msg)
 
@@ -89,7 +87,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
     if np.ndim(u) > np.ndim(impl.prototypes.qoi()):
         msg = (
             f"Terminal-value solution (ndim=1, shape=(n,)) expected. "
-            f"ndim={np.ndim(u)}, shape={jnp.shape(u)} received."
+            f"ndim={np.ndim(u)}, shape={np.shape(u)} received."
         )
         raise ValueError(msg)
 
@@ -129,19 +127,19 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     # TODO: complain if it is used with a filter, not a smoother?
     # TODO: allow option for log-posterior
 
-    if jnp.shape(standard_deviation) != jnp.shape(u)[:1]:
+    if np.shape(standard_deviation) != np.shape(u)[:1]:
         msg = (
-            f"Observation-noise shape {jnp.shape(standard_deviation)} "
-            f"does not match the observation shape {jnp.shape(u)}. "
+            f"Observation-noise shape {np.shape(standard_deviation)} "
+            f"does not match the observation shape {np.shape(u)}. "
             f"Expected observation-noise shape: "
-            f"{jnp.shape(u)[0],} != {jnp.shape(standard_deviation)}. "
+            f"{np.shape(u)[0],} != {np.shape(standard_deviation)}. "
         )
         raise ValueError(msg)
 
     if np.ndim(u) < np.ndim(impl.prototypes.qoi()) + 1:
         msg = (
             f"Time-series solution (ndim=2, shape=(n, m)) expected. "
-            f"ndim={np.ndim(u)}, shape={jnp.shape(u)} received."
+            f"ndim={np.ndim(u)}, shape={np.shape(u)} received."
         )
         raise ValueError(msg)
 

@@ -32,3 +32,23 @@ def matrix_norm(arr, /, *, order=None):
 
 def solve_triangular(matrix, rhs, /, *, trans=0, lower=False):
     return jax.scipy.linalg.solve_triangular(matrix, rhs, trans=trans, lower=lower)
+
+
+def inv(matrix, /):
+    return jnp.linalg.inv(matrix)
+
+
+def vector_dot(a, b, /):
+    return jnp.dot(a, b)
+
+
+def diagonal_along_axis(arr, /, *, axis1, axis2):
+    return jnp.diagonal(arr, axis1=axis1, axis2=axis2)
+
+
+def diagonal(arr, /):
+    return jnp.diagonal(arr)
+
+
+def triu(arr, /):
+    return jnp.triu(arr)

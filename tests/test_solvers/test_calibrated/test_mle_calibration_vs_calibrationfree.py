@@ -4,8 +4,6 @@ The posterior of the MLE solver is the same as for the calibration-free solver.
 The output scale is different.
 After applying solution.calibrate(), the posterior is different.
 """
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
@@ -22,7 +20,7 @@ def case_solve_fixed_grid():
     vf, u0, (t0, t1) = setup.ode()
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    kwargs = {"grid": jnp.linspace(t0, t1, endpoint=True, num=5)}
+    kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5)}
 
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
@@ -37,7 +35,7 @@ def case_solve_and_save_at():
     dt0 = timestep.initial(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    kwargs = {"save_at": jnp.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
+    kwargs = {"save_at": np.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
 
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
@@ -114,7 +112,7 @@ def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
 
     # Without a call to calibrate(), the posteriors are the same.
     assert testing.tree_all_allclose(posterior_uncalibrated, posterior_mle)
-    assert not jnp.allclose(output_scale_uncalibrated, output_scale_mle)
+    assert not np.allclose(output_scale_uncalibrated, output_scale_mle)
 
     # With a call to calibrate(), the posteriors are different.
     posterior_calibrated = solution.calibrate(posterior_mle, output_scale_mle)

@@ -1,6 +1,5 @@
 """Assert that every recipe yields a decent ODE approximation."""
 import diffrax
-import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing
@@ -111,4 +110,4 @@ def test_terminal_value_simulation_matches_diffrax(solution, diffrax_solution):
     expected = diffrax_solution(solution.t)
     received = solution.u
 
-    assert jnp.allclose(received, expected, rtol=1e-2)
+    assert np.allclose(received, expected, rtol=1e-2)

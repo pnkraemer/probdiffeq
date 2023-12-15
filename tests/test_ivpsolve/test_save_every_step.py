@@ -1,6 +1,5 @@
 """Assert that solve_with_python_loop is accurate."""
 import diffrax
-import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import functools, testing
@@ -68,4 +67,4 @@ def fixture_diffrax_solution():
 def test_python_loop_output_matches_diffrax(python_loop_solution, diffrax_solution):
     expected = diffrax_solution(python_loop_solution.t)
     received = python_loop_solution.u
-    assert jnp.allclose(received, expected, rtol=1e-2)
+    assert np.allclose(received, expected, rtol=1e-2)

@@ -1,8 +1,8 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 import diffeqzoo.ivps
-import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.taylor import autodiff
 
@@ -24,7 +24,7 @@ def fixture_pb_with_solution():
     def vf(u, du, /):
         return f(u, du, *f_args)
 
-    solution = jnp.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")
+    solution = np.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")
     return (vf, (u0, du0)), solution
 
 
@@ -35,4 +35,4 @@ def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num)
 
     derivatives = taylor_fun(f, init, num=num)
     for dy, dy_ref in zip(derivatives, solution):
-        assert jnp.allclose(dy, dy_ref)
+        assert np.allclose(dy, dy_ref)

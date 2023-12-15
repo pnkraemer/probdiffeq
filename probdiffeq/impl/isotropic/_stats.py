@@ -1,5 +1,3 @@
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools, linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _stats
@@ -13,7 +11,7 @@ class StatsBackend(_stats.StatsBackend):
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = linalg.qr_r(residual_white.T)
-        return jnp.reshape(np.abs(residual_white_matrix) / np.sqrt(rv.mean.size), ())
+        return np.reshape(np.abs(residual_white_matrix) / np.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # if the gain is qoi-to-hidden, the data is a (d,) array.
@@ -25,16 +23,16 @@ class StatsBackend(_stats.StatsBackend):
             dx = x - r.mean
             w = linalg.solve_triangular(r.cholesky.T, dx, trans="T")
 
-            maha_term = jnp.dot(w, w)
+            maha_term = linalg.vector_dot(w, w)
 
-            diagonal = jnp.diagonal(r.cholesky, axis1=-1, axis2=-2)
-            slogdet = jnp.sum(jnp.log(np.abs(diagonal)))
+            diagonal = linalg.diagonal_along_axis(r.cholesky, axis1=-1, axis2=-2)
+            slogdet = np.sum(np.log(np.abs(diagonal)))
             logdet_term = 2.0 * slogdet
-            return -0.5 * (logdet_term + maha_term + x.size * jnp.log(jnp.pi * 2))
+            return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
 
         # Batch in the "mean" dimension and sum the results.
         rv_batch = _normal.Normal(1, None)
-        return jnp.sum(functools.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
+        return np.sum(functools.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
 
     def mean(self, rv):
         return rv.mean
@@ -42,7 +40,7 @@ class StatsBackend(_stats.StatsBackend):
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
             return functools.vmap(self.standard_deviation)(rv)
-        return np.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
+        return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
 
     def sample_shape(self, rv):
         return rv.mean.shape

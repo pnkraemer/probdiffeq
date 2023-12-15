@@ -1,6 +1,4 @@
 """Assert that solve_and_save_at is consistent with solve_with_python_loop()."""
-import jax.numpy as jnp
-
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
@@ -31,7 +29,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
 
     # Compute an adaptive solution and interpolate
-    ts = jnp.linspace(t0, t1, num=15, endpoint=True)
+    ts = np.linspace(t0, t1, num=15, endpoint=True)
     solution_adaptive = ivpsolve.solve_and_save_every_step(
         *problem_args, t0=t0, t1=t1, **adaptive_kwargs
     )
@@ -51,5 +49,5 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Assert similarity
     marginals_allclose_func = functools.vmap(testing.marginals_allclose)
-    assert jnp.allclose(u_interp, u_save_at)
-    assert jnp.all(marginals_allclose_func(marginals_interp, marginals_save_at))
+    assert np.allclose(u_interp, u_save_at)
+    assert np.all(marginals_allclose_func(marginals_interp, marginals_save_at))

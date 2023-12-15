@@ -1,6 +1,4 @@
 """Hidden state-space model implementation."""
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model
@@ -24,7 +22,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         m = rv.mean[i]
         c = rv.cholesky[[i], :]
         chol = cholesky_util.triu_via_qr(c.T)
-        return _normal.Normal(jnp.reshape(m, ()), jnp.reshape(chol, ()))
+        return _normal.Normal(np.reshape(m, ()), np.reshape(chol, ()))
 
     def qoi_from_sample(self, sample, /):
         return sample[0]
@@ -33,7 +31,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         def A(x):
             return x[[i], ...]
 
-        bias = jnp.zeros(())
+        bias = np.zeros(())
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))

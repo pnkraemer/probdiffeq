@@ -1,7 +1,5 @@
 """Tests for the affine recursion."""
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.taylor import affine, autodiff
@@ -19,7 +17,7 @@ def test_affine_recursion(num, num_derivatives_max=5):
 
     # check values
     for dy, dy_ref in zip(derivatives, solution):
-        assert jnp.allclose(dy, dy_ref)
+        assert np.allclose(dy, dy_ref)
 
 
 def _affine_problem(n):

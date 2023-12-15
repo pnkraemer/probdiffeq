@@ -1,5 +1,4 @@
-import jax.numpy as jnp
-
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _prototypes
 from probdiffeq.impl.blockdiag import _normal
 
@@ -9,15 +8,15 @@ class PrototypeBackend(_prototypes.PrototypeBackend):
         self.ode_shape = ode_shape
 
     def qoi(self):
-        return jnp.empty(self.ode_shape)
+        return np.empty(self.ode_shape)
 
     def observed(self):
-        mean = jnp.empty((*self.ode_shape, 1))
-        cholesky = jnp.empty((*self.ode_shape, 1, 1))
+        mean = np.empty((*self.ode_shape, 1))
+        cholesky = np.empty((*self.ode_shape, 1, 1))
         return _normal.Normal(mean, cholesky)
 
     def error_estimate(self):
-        return jnp.empty(self.ode_shape)
+        return np.empty(self.ode_shape)
 
     def output_scale(self):
-        return jnp.empty(self.ode_shape)
+        return np.empty(self.ode_shape)

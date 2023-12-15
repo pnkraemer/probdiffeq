@@ -1,5 +1,3 @@
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model
@@ -20,7 +18,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
                 rv, i
             )
 
-        if i > jnp.shape(rv.mean)[0]:
+        if i > np.shape(rv.mean)[0]:
             raise ValueError
 
         mean = rv.mean[i, :]
@@ -34,7 +32,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         def A(x):
             return x[[i], ...]
 
-        bias = jnp.zeros(self.ode_shape)
+        bias = np.zeros(self.ode_shape)
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))
