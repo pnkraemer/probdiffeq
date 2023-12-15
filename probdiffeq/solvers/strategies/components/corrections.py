@@ -2,8 +2,6 @@
 
 import abc
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -109,7 +107,7 @@ def _estimate_error(observed, /):
     # TODO: the functions involved in error estimation are still a bit patchy.
     #  for instance, they assume that they are called in exactly this error estimation
     #  context. Same for prototype_qoi etc.
-    zero_data = jnp.zeros(())
+    zero_data = np.zeros(())
     output_scale = impl.stats.mahalanobis_norm_relative(zero_data, rv=observed)
     error_estimate_unscaled = np.squeeze(impl.stats.standard_deviation(observed))
     return output_scale * error_estimate_unscaled

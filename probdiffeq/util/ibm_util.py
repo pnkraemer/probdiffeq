@@ -1,7 +1,5 @@
 """Integrated Brownian motion (IBM) utilities."""
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -10,16 +8,16 @@ def system_matrices_1d(num_derivatives, output_scale):
     """Construct the IBM system matrices."""
     x = np.arange(0, num_derivatives + 1)
 
-    A_1d = jnp.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
-    Q_1d = jnp.flip(_hilbert(x))
+    A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
+    Q_1d = np.flip(_hilbert(x))
     return A_1d, output_scale * linalg.cholesky_factor(Q_1d)
 
 
 def preconditioner_diagonal(dt, *, scales, powers):
     """Construct the diagonal IBM preconditioner."""
     dt_abs = np.abs(dt)
-    scaling_vector = jnp.power(dt_abs, powers) / scales
-    scaling_vector_inv = jnp.power(dt_abs, -powers) * scales
+    scaling_vector = np.power(dt_abs, powers) / scales
+    scaling_vector_inv = np.power(dt_abs, -powers) * scales
     return scaling_vector, scaling_vector_inv
 
 

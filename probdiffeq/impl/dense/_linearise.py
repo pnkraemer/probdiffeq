@@ -1,7 +1,6 @@
 """Linearisation."""
 
 import jax
-import jax.numpy as jnp
 
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
@@ -19,8 +18,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
-            if jnp.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
-                msg = f"{jnp.shape(a0(mean))} != {expected_shape}"
+            if np.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
+                msg = f"{np.shape(a0(mean))} != {expected_shape}"
                 raise ValueError(msg)
 
             fx = ts0(fun, a0(mean))
@@ -34,8 +33,8 @@ class LinearisationBackend(_linearise.LinearisationBackend):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
-            if jnp.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
-                msg = f"{jnp.shape(a0(mean))} != {expected_shape}"
+            if np.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
+                msg = f"{np.shape(a0(mean))} != {expected_shape}"
                 raise ValueError(msg)
 
             jvp, fx = ts1(fun, a0(mean))
@@ -104,7 +103,7 @@ class LinearisationBackend(_linearise.LinearisationBackend):
 
     def _select_dy(self, x, idx_or_slice):
         (d,) = self.ode_shape
-        x_reshaped = jnp.reshape(x, (-1, d), order="F")
+        x_reshaped = np.reshape(x, (-1, d), order="F")
         return x_reshaped[idx_or_slice, ...]
 
 

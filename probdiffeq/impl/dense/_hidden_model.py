@@ -1,5 +1,3 @@
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model
@@ -14,7 +12,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
     def qoi(self, rv):
         if np.ndim(rv.mean) > 1:
             return functools.vmap(self.qoi)(rv)
-        mean_reshaped = jnp.reshape(rv.mean, (-1, *self.ode_shape), order="F")
+        mean_reshaped = np.reshape(rv.mean, (-1, *self.ode_shape), order="F")
         return mean_reshaped[0]
 
     def marginal_nth_derivative(self, rv, i):
@@ -29,7 +27,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         return _normal.Normal(m, c.T)
 
     def qoi_from_sample(self, sample, /):
-        sample_reshaped = jnp.reshape(sample, (-1, *self.ode_shape), order="F")
+        sample_reshaped = np.reshape(sample, (-1, *self.ode_shape), order="F")
         return sample_reshaped[0]
 
     # TODO: move to linearise.py?
@@ -37,14 +35,14 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         a0 = functools.partial(self._select, idx_or_slice=i)
 
         (d,) = self.ode_shape
-        bias = jnp.zeros((d,))
+        bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
         return cond_util.Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
-        x_reshaped = jnp.reshape(x, (-1, *self.ode_shape), order="F")
+        x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
         if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
             raise ValueError
         return x_reshaped[idx_or_slice]

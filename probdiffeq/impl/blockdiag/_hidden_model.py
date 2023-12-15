@@ -1,5 +1,3 @@
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model
@@ -20,14 +18,14 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
                 rv, i
             )
 
-        if i > jnp.shape(rv.mean)[0]:
+        if i > np.shape(rv.mean)[0]:
             raise ValueError
 
         mean = rv.mean[:, i]
         cholesky = functools.vmap(cholesky_util.triu_via_qr)(
             (rv.cholesky[:, i, :])[..., None]
         )
-        cholesky = jnp.transpose(cholesky, axes=(0, 2, 1))
+        cholesky = np.transpose(cholesky, axes=(0, 2, 1))
         return _normal.Normal(mean, cholesky)
 
     def qoi_from_sample(self, sample, /):
@@ -37,8 +35,8 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
         def A(x):
             return x[:, [i], ...]
 
-        bias = jnp.zeros((*self.ode_shape, 1))
-        eye = jnp.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
+        bias = np.zeros((*self.ode_shape, 1))
+        eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))
         return cond_util.Conditional(linop, noise)

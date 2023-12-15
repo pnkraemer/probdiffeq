@@ -20,8 +20,6 @@ manipulation of square root matrices.
 
 """
 
-import jax.numpy as jnp
-
 from probdiffeq.backend import control_flow, linalg, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -90,13 +88,13 @@ def revert_conditional(R_X_F, R_X, R_YX):
         )
         raise ValueError(msg)
 
-    R = jnp.block([[R_YX, jnp.zeros((R_YX.shape[0], R_X.shape[1]))], [R_X_F, R_X]])
+    R = np.block([[R_YX, np.zeros((R_YX.shape[0], R_X.shape[1]))], [R_X_F, R_X]])
     # If R_X_F and R_X are zero, but R_YX is not zero, qr(R) can be implemented via
     # qr(R_YX) and embedding the result in zeros. This is what we do here.
     # Without this case distinction, reverse-mode derivatives are not defined.
     is_zero_r_x_f = linalg.matrix_norm(R_X_F) == 0.0
     is_zero_r_x = linalg.matrix_norm(R_X) == 0.0
-    cond = jnp.logical_and(is_zero_r_x_f, is_zero_r_x)
+    cond = np.logical_and(is_zero_r_x_f, is_zero_r_x)
     R = control_flow.cond(
         cond, _triu_via_shortcut, lambda a, _b: triu_via_qr(a), R, R_YX
     )
@@ -108,7 +106,7 @@ def revert_conditional(R_X_F, R_X, R_YX):
     # something like the cross-covariance
     R12 = R[:d_out, d_out:]
 
-    # Implements G = R12.T @ jnp.linalg.inv(R_Y.T) in clever:
+    # Implements G = R12.T @ np.linalg.inv(R_Y.T) in clever:
     G = linalg.solve_triangular(R_Y, R12, lower=False).T
 
     # ~R_{X \mid Y}
@@ -126,7 +124,7 @@ def _triu_via_shortcut(R, R_YX):
     """
     R = np.zeros_like(R)
     R_YX = triu_via_qr(R_YX)
-    n, m = jnp.shape(R_YX)
+    n, m = np.shape(R_YX)
     return R.at[:n, :m].set(R_YX)
 
 
@@ -139,7 +137,7 @@ def sum_of_sqrtm_factors(R_stack: tuple):
     R = np.concatenate(R_stack)
     uppertri = triu_via_qr(R)
     if np.ndim(R_stack[0]) == 0:
-        return jnp.reshape(uppertri, ())
+        return np.reshape(uppertri, ())
     return uppertri
 
 
@@ -148,15 +146,15 @@ def sqrt_sum_square_scalar(*args):
     """Compute sqrt(a**2 + b**2) without squaring a or b."""
     args_are_scalar = tree_util.tree_map(lambda x: np.ndim(x) == 0, args)
     if not tree_util.tree_all(args_are_scalar):
-        args_shapes = tree_util.tree_map(jnp.shape, args)
+        args_shapes = tree_util.tree_map(np.shape, args)
         msg1 = "'sqrt_sum_square_scalar' expects scalar arguments. "
         msg2 = f"PyTree with shapes {args_shapes} received."
         raise ValueError(msg1 + msg2)
 
-    stack = jnp.stack(args)
+    stack = np.stack(args)
     sqrt_mat = triu_via_qr(stack[:, None])
     sqrt_mat_abs = np.abs(sqrt_mat)  # convention
-    return jnp.reshape(sqrt_mat_abs, ())
+    return np.reshape(sqrt_mat_abs, ())
 
 
 def triu_via_qr(R, /):
@@ -168,9 +166,9 @@ def triu_via_qr(R, /):
     # Only do something if R is not already triangular.
     # This distinction may seem unnecessary but is important,
     # because otherwise, reverse-mode derivatives are not defined!
-    matrix_is_already_triu = jnp.all(jnp.triu(R) == R)
+    matrix_is_already_triu = np.all(linalg.triu(R) == R)
 
-    _nrows, ncols = jnp.shape(R)
+    _nrows, ncols = np.shape(R)
     return control_flow.cond(
         matrix_is_already_triu, lambda s: s[:ncols, :ncols], linalg.qr_r, R
     )

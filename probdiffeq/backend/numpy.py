@@ -16,6 +16,10 @@ def ndim(arr, /):
     return jnp.ndim(arr)
 
 
+def shape(arr, /):
+    return jnp.shape(arr)
+
+
 def minimum(a, b, /):
     return jnp.minimum(a, b)
 
@@ -44,6 +48,14 @@ def diff_along_axis(arr, /, *, axis):
     return jnp.diff(arr, axis=axis)
 
 
+def reshape(arr, /, new_shape, order="C"):
+    return jnp.reshape(arr, newshape=new_shape, order=order)
+
+
+def flip(arr, /):
+    return jnp.flip(arr)
+
+
 def asarray(x, /):
     return jnp.asarray(x)
 
@@ -68,6 +80,26 @@ def ones(shape, /):
     return jnp.ones(shape)
 
 
+def zeros(shape, /):
+    return jnp.zeros(shape)
+
+
+def empty(shape, /):
+    return jnp.empty(shape)
+
+
+def empty_like(arr, /):
+    return jnp.empty_like(arr)
+
+
+def searchsorted(a, b, /):
+    return jnp.searchsorted(a, b)
+
+
+def block(list_of_arrays, /):
+    return jnp.block(list_of_arrays)
+
+
 def ones_like(arr, /):
     return jnp.ones_like(arr)
 
@@ -80,8 +112,20 @@ def inf():
     return jnp.inf
 
 
+def pi():
+    return jnp.pi
+
+
 def sqrt(arr, /):
     return jnp.sqrt(arr)
+
+
+def log(arr, /):
+    return jnp.log(arr)
+
+
+def power(arr, powers):
+    return jnp.power(arr, powers)
 
 
 def exp(arr, /):
@@ -108,6 +152,10 @@ def stack(list_of_arrays, /):
     return jnp.stack(list_of_arrays)
 
 
+def hstack(list_of_arrays, /):
+    return jnp.hstack(list_of_arrays)
+
+
 def any(arr, /):  # noqa: A001
     return jnp.any(arr)
 
@@ -122,6 +170,10 @@ def sum(arr, /):  # noqa: A001
 
 def logical_not(a, /):
     return jnp.logical_not(a)
+
+
+def logical_and(a, b, /):
+    return jnp.logical_and(a, b)
 
 
 def isinf(arr, /):

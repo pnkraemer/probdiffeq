@@ -4,9 +4,8 @@
 import abc
 from typing import Generic, TypeVar
 
-import jax.numpy as jnp
-
 from probdiffeq import _interp
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 
 T = TypeVar("T")
@@ -27,10 +26,10 @@ class Solver(abc.ABC, Generic[T]):
 
     def initial_condition(self, tcoeffs, /, output_scale):
         """Construct an initial condition."""
-        if jnp.shape(output_scale) != jnp.shape(impl.prototypes.output_scale()):
+        if np.shape(output_scale) != np.shape(impl.prototypes.output_scale()):
             msg1 = "Argument 'output_scale' has the wrong shape. "
-            msg2 = f"Shape {jnp.shape(impl.prototypes.output_scale())} expected; "
-            msg3 = f"shape {jnp.shape(output_scale)} received."
+            msg2 = f"Shape {np.shape(impl.prototypes.output_scale())} expected; "
+            msg3 = f"shape {np.shape(output_scale)} received."
             raise ValueError(msg1 + msg2 + msg3)
         posterior = self.strategy.initial_condition(tcoeffs)
         return posterior, output_scale

@@ -1,6 +1,4 @@
 """State-space model utilities."""
-import jax.numpy as jnp
-
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.isotropic import _normal
@@ -13,7 +11,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def ibm_transitions(self, num_derivatives, output_scale):
         A, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
-        q0 = jnp.zeros((num_derivatives + 1, *self.ode_shape))
+        q0 = np.zeros((num_derivatives + 1, *self.ode_shape))
         noise = _normal.Normal(q0, q_sqrtm)
         precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
 
@@ -24,8 +22,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return discretise
 
     def identity_conditional(self, num_hidden_states_per_ode_dim, /):
-        m0 = jnp.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
-        c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
+        m0 = np.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
+        c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = np.eye(num_hidden_states_per_ode_dim)
         return cond_util.Conditional(matrix, noise)
@@ -36,8 +34,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
             msg2 = f"the number of derivatives {num_derivatives+1} in the solver."
             raise ValueError(msg1 + msg2)
 
-        c_sqrtm0_corrected = jnp.zeros((num_derivatives + 1, num_derivatives + 1))
-        m0_corrected = jnp.stack(tcoeffs)
+        c_sqrtm0_corrected = np.zeros((num_derivatives + 1, num_derivatives + 1))
+        m0_corrected = np.stack(tcoeffs)
         return _normal.Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
@@ -52,7 +50,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return cond_util.Conditional(A_new, noise)
 
     def standard_normal(self, num, /, output_scale):
-        mean = jnp.zeros((num, *self.ode_shape))
+        mean = np.zeros((num, *self.ode_shape))
         cholesky = output_scale * np.eye(num)
         return _normal.Normal(mean, cholesky)
 

@@ -1,6 +1,4 @@
 """State-space model utilities."""
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
@@ -16,7 +14,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         system_matrices = functools.vmap(ibm_util.system_matrices_1d, in_axes=(None, 0))
         a, q_sqrtm = system_matrices(num_derivatives, output_scale)
 
-        q0 = jnp.zeros((*self.ode_shape, num_derivatives + 1))
+        q0 = np.zeros((*self.ode_shape, num_derivatives + 1))
         noise = _normal.Normal(q0, q_sqrtm)
 
         precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
@@ -28,11 +26,11 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return discretise
 
     def identity_conditional(self, ndim, /):
-        m0 = jnp.zeros((*self.ode_shape, ndim))
-        c0 = jnp.zeros((*self.ode_shape, ndim, ndim))
+        m0 = np.zeros((*self.ode_shape, ndim))
+        c0 = np.zeros((*self.ode_shape, ndim, ndim))
         noise = _normal.Normal(m0, c0)
 
-        matrix = jnp.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return cond_util.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
@@ -42,8 +40,8 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
             raise ValueError(msg1 + msg2)
 
         cholesky_shape = (*self.ode_shape, num_derivatives + 1, num_derivatives + 1)
-        cholesky = jnp.zeros(cholesky_shape)
-        mean = jnp.stack(tcoeffs).T
+        cholesky = np.zeros(cholesky_shape)
+        mean = np.stack(tcoeffs).T
         return _normal.Normal(mean, cholesky)
 
     def preconditioner_apply(self, rv, p, /):
@@ -58,13 +56,13 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return cond_util.Conditional(A_new, noise)
 
     def standard_normal(self, ndim, output_scale):
-        mean = jnp.zeros((*self.ode_shape, ndim))
+        mean = np.zeros((*self.ode_shape, ndim))
         cholesky = output_scale[:, None, None] * np.eye(ndim)[None, ...]
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
         if np.ndim(mean) > 0:
-            assert jnp.shape(mean) == jnp.shape(x)
+            assert np.shape(mean) == np.shape(x)
             return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
 
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)

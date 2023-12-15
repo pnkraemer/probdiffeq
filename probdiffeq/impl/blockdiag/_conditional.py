@@ -1,6 +1,4 @@
 """Conditional implementation."""
-import jax.numpy as jnp
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _conditional
@@ -23,7 +21,7 @@ class ConditionalBackend(_conditional.ConditionalBackend):
         matrix, noise = conditional
         assert matrix.ndim == 3
 
-        mean = jnp.einsum("ijk,ik->ij", matrix, rv.mean) + noise.mean
+        mean = np.einsum("ijk,ik->ij", matrix, rv.mean) + noise.mean
 
         chol1 = _transpose(matrix @ rv.cholesky)
         chol2 = _transpose(noise.cholesky)
@@ -45,15 +43,15 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
     def revert(self, rv, conditional, /):
         A, noise = conditional
-        rv_chol_upper = jnp.transpose(rv.cholesky, axes=(0, 2, 1))
-        noise_chol_upper = jnp.transpose(noise.cholesky, axes=(0, 2, 1))
-        A_rv_chol_upper = jnp.transpose(A @ rv.cholesky, axes=(0, 2, 1))
+        rv_chol_upper = np.transpose(rv.cholesky, axes=(0, 2, 1))
+        noise_chol_upper = np.transpose(noise.cholesky, axes=(0, 2, 1))
+        A_rv_chol_upper = np.transpose(A @ rv.cholesky, axes=(0, 2, 1))
 
         revert = functools.vmap(cholesky_util.revert_conditional)
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
 
-        cholesky_obs = jnp.transpose(r_obs, axes=(0, 2, 1))
-        cholesky_cor = jnp.transpose(r_cor, axes=(0, 2, 1))
+        cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
+        cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
 
         # Gather terms and return
         mean_observed = (A @ rv.mean[..., None])[..., 0] + noise.mean
@@ -64,4 +62,4 @@ class ConditionalBackend(_conditional.ConditionalBackend):
 
 
 def _transpose(matrix):
-    return jnp.transpose(matrix, axes=(0, 2, 1))
+    return np.transpose(matrix, axes=(0, 2, 1))

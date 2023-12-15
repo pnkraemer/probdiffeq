@@ -1,6 +1,4 @@
 """Random variable transformations."""
-import jax.numpy as jnp
-
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _transform
 from probdiffeq.impl.scalar import _normal
@@ -12,7 +10,7 @@ class TransformBackend(_transform.TransformBackend):
         # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
         matmul, b = transformation
         cholesky_new = cholesky_util.triu_via_qr(matmul(rv.cholesky)[:, None])
-        cholesky_new_squeezed = jnp.reshape(cholesky_new, ())
+        cholesky_new_squeezed = np.reshape(cholesky_new, ())
         return _normal.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
 
     def revert(self, rv, transformation, /):
@@ -27,7 +25,7 @@ class TransformBackend(_transform.TransformBackend):
         r_obs, (r_cor, gain) = cholesky_util.revert_conditional_noisefree(
             R_X_F=A(rv.cholesky)[:, None], R_X=rv.cholesky.T
         )
-        cholesky_obs = jnp.reshape(r_obs, ())
+        cholesky_obs = np.reshape(r_obs, ())
         cholesky_cor = r_cor.T
         gain = np.squeeze_along_axis(gain, axis=-1)
 
