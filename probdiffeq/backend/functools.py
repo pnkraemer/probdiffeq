@@ -19,3 +19,7 @@ def jit(func, /, static_argnums=None, static_argnames=None):
 
 def jet(func, /, primals, series):
     return jax.experimental.jet.jet(func, primals=primals, series=series)
+
+
+def linearize(func, x, /):
+    return jax.linearize(func, x)

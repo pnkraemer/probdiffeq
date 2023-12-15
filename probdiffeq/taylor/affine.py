@@ -2,8 +2,7 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 from typing import Callable
 
-import jax
-
+from probdiffeq.backend import functools
 from probdiffeq.backend.typing import Array
 
 
@@ -17,7 +16,7 @@ def affine_recursion(vf: Callable, initial_values: tuple[Array, ...], /, num: in
     if num == 0:
         return initial_values
 
-    fx, jvp_fn = jax.linearize(vf, *initial_values)
+    fx, jvp_fn = functools.linearize(vf, *initial_values)
 
     tmp = fx
     fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
