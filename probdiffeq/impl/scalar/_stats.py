@@ -1,8 +1,7 @@
 """Random variable implementation."""
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, linalg
 from probdiffeq.impl import _stats
 
 
@@ -13,7 +12,7 @@ class StatsBackend(_stats.StatsBackend):
 
     def logpdf(self, u, /, rv):
         dx = u - rv.mean
-        w = jax.scipy.linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
+        w = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
 
         maha_term = jnp.dot(w, w)
 

@@ -1,4 +1,3 @@
-import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools, linalg
@@ -10,7 +9,7 @@ class StatsBackend(_stats.StatsBackend):
         self.ode_shape = ode_shape
 
     def mahalanobis_norm_relative(self, u, /, rv):
-        residual_white = jax.scipy.linalg.solve_triangular(
+        residual_white = linalg.solve_triangular(
             rv.cholesky.T, u - rv.mean, lower=False, trans="T"
         )
         mahalanobis = linalg.qr_r(residual_white[:, None])
@@ -22,7 +21,7 @@ class StatsBackend(_stats.StatsBackend):
         slogdet = jnp.sum(jnp.log(jnp.abs(diagonal)))
 
         dx = u - rv.mean
-        residual_white = jax.scipy.linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
+        residual_white = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
         x1 = jnp.dot(residual_white, residual_white)
         x2 = 2.0 * slogdet
         x3 = u.size * jnp.log(jnp.pi * 2)
