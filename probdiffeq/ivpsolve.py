@@ -196,7 +196,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
         # the difference from s.t to t_next is smaller than a constant factor
         # (which is a "small" multiple of the current machine precision)
         # or if s.t > t_next holds.
-        return s.t + 10 * jnp.finfo(float).eps < t_next
+        return s.t + 10 * np.finfo_eps(float) < t_next
 
     def body_fun(s):
         return adaptive_solver.rejection_loop(s, vector_field=vector_field, t1=t_next)
@@ -205,7 +205,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     state, solution = control_flow.cond(
-        state.t > t_next + 10 * jnp.finfo(float).eps,
+        state.t > t_next + 10 * np.finfo_eps(float),
         adaptive_solver.interpolate_and_extract,
         lambda s, _t: adaptive_solver.right_corner_and_extract(s),
         state,
@@ -296,7 +296,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
 
     t0 = grid[0]
     state0 = solver.init(t0, initial_condition)
-    _, result_state = control_flow.scan(body_fn, init=state0, xs=jnp.diff(grid))
+    _, result_state = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
     _t, (posterior, output_scale) = solver.extract(result_state)
 
     # I think the user expects marginals, so we compute them here

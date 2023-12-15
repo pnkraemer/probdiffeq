@@ -4,6 +4,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
 
@@ -18,7 +19,7 @@ def ibm_adaptive(num_derivatives, output_scale=None):
 def ibm_discretised(ts, *, num_derivatives, output_scale=None):
     """Compute a time-discretised, multiply-integrated Wiener process."""
     discretise, _ = ibm_adaptive(num_derivatives, output_scale=output_scale)
-    transitions, (p, p_inv) = functools.vmap(discretise)(jnp.diff(ts))
+    transitions, (p, p_inv) = functools.vmap(discretise)(np.diff(ts))
 
     preconditioner_apply_vmap = functools.vmap(impl.ssm_util.preconditioner_apply_cond)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)

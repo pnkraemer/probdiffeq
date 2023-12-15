@@ -30,3 +30,11 @@ def where(cond, /, if_true, if_false):
 
 def abs(arr, /):  # noqa: A001
     return jnp.abs(arr)
+
+
+def finfo_eps(eltype, /):
+    return jnp.finfo(eltype).eps
+
+
+def diff(arr, /):
+    return jnp.diff(arr)
