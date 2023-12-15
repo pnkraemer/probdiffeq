@@ -2,9 +2,7 @@
 
 from typing import Any
 
-import jax
-
-from probdiffeq.backend import containers, control_flow
+from probdiffeq.backend import containers, control_flow, tree_util
 from probdiffeq.impl import impl
 
 
@@ -77,7 +75,7 @@ def fixedpointsmoother_precon():
 
 
 def _select(tree, idx_or_slice):
-    return jax.tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
+    return tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
 
 
 def kalmanfilter_with_marginal_likelihood():

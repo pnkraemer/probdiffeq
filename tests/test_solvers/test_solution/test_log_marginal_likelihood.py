@@ -1,9 +1,8 @@
 """Tests for log-marginal-likelihood functionality."""
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import testing
+from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import filters, fixedpoint
@@ -78,7 +77,7 @@ def test_raises_error_for_terminal_values(sol):
     """
     data = sol.u + 0.005
 
-    posterior_t1 = jax.tree_util.tree_map(lambda s: s[-1], sol)
+    posterior_t1 = tree_util.tree_map(lambda s: s[-1], sol)
     with testing.raises(ValueError, match="expected"):
         _ = solution.log_marginal_likelihood(
             data[-1], standard_deviation=jnp.ones_like(data[-1]), posterior=posterior_t1

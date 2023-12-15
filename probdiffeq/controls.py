@@ -3,10 +3,9 @@
 import dataclasses
 from typing import Callable, Generic, TypeVar
 
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, tree_util
 from probdiffeq.backend import numpy as np
 
 T = TypeVar("T")
@@ -158,4 +157,4 @@ def _unflatten(aux, _children):
     return Controller(init=init, apply=apply, clip=clip, extract=extract)
 
 
-jax.tree_util.register_pytree_node(Controller, _flatten, _unflatten)
+tree_util.register_pytree_node(Controller, _flatten, _unflatten)

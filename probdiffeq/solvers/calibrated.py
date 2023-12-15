@@ -1,9 +1,8 @@
 """Calibrated IVP solvers."""
 import abc
 
-import jax
-
 from probdiffeq import _interp
+from probdiffeq.backend import tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import _common, _solver
 
@@ -120,10 +119,8 @@ def _unflatten_func(nodetype):
 
 # Register objects as (empty) pytrees. todo: temporary?!
 for node in [_RunningMean, _MostRecent]:
-    jax.tree_util.register_pytree_node(
-        nodetype=node,
-        flatten_func=lambda _: ((), ()),
-        unflatten_func=_unflatten_func(node),
+    tree_util.register_pytree_node(
+        node, flatten_func=lambda _: ((), ()), unflatten_func=_unflatten_func(node)
     )
 
 
@@ -198,4 +195,4 @@ def _slvr_unflatten(aux, children):
     )
 
 
-jax.tree_util.register_pytree_node(_CalibratedSolver, _slvr_flatten, _slvr_unflatten)
+tree_util.register_pytree_node(_CalibratedSolver, _slvr_flatten, _slvr_unflatten)

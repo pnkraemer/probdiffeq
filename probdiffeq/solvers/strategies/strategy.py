@@ -3,11 +3,10 @@
 import abc
 from typing import Any, Generic, TypeVar
 
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import _interp
-from probdiffeq.backend import containers
+from probdiffeq.backend import containers, tree_util
 from probdiffeq.impl import impl
 
 T = TypeVar("T")
@@ -128,7 +127,7 @@ class Strategy:
 
         def _state(x):
             t = state_t1.t
-            corr_like = jax.tree_util.tree_map(jnp.empty_like, state_t1.aux_corr)
+            corr_like = tree_util.tree_map(jnp.empty_like, state_t1.aux_corr)
             return _State(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
         step_from = _state(step_from)
@@ -152,7 +151,7 @@ class Strategy:
         # Turn outputs into valid states
 
         def _state(t_, x):
-            corr_like = jax.tree_util.tree_map(jnp.empty_like, s0.aux_corr)
+            corr_like = tree_util.tree_map(jnp.empty_like, s0.aux_corr)
             return _State(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
         step_from = _state(s1.t, step_from)
@@ -208,4 +207,4 @@ def _tree_unflatten(aux, _children):
     )
 
 
-jax.tree_util.register_pytree_node(Strategy, _tree_flatten, _tree_unflatten)
+tree_util.register_pytree_node(Strategy, _tree_flatten, _tree_unflatten)

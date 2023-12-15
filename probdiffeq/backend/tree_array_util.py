@@ -1,7 +1,7 @@
 """Pytree-array utility functions (e.g. tree_concatenate)."""
 
-import jax
 import jax.numpy as jnp
+import jax.tree_util
 
 
 def tree_prepend(y, X, /):

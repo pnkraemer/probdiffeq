@@ -8,7 +8,7 @@ import jax.experimental.jet
 import jax.experimental.ode
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow, functools
+from probdiffeq.backend import control_flow, functools, tree_util
 from probdiffeq.backend import numpy as np
 
 
@@ -142,7 +142,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         _, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
-    return jax.tree_util.Partial(df)
+    return tree_util.Partial(df)
 
 
 def taylor_mode_doubling(
@@ -182,7 +182,7 @@ def taylor_mode_doubling(
     taylor_coefficients = [u0]
     degrees = list(itertools.accumulate(map(lambda s: 2**s, range(num_doublings))))
     for deg in degrees:
-        jet_embedded_deg = jax.tree_util.Partial(jet_embedded, degree=deg)
+        jet_embedded_deg = tree_util.Partial(jet_embedded, degree=deg)
         fx, jvp = jax.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.

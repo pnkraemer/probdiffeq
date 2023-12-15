@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing
+from probdiffeq.backend import testing, tree_util
 from probdiffeq.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
@@ -109,5 +109,5 @@ def _tree_is_free_of_nans(tree):
     def contains_no_nan(x):
         return jnp.logical_not(jnp.any(jnp.isnan(x)))
 
-    tree_contains_no_nan = jax.tree_util.tree_map(contains_no_nan, tree)
-    return jax.tree_util.tree_all(tree_contains_no_nan)
+    tree_contains_no_nan = tree_util.tree_map(contains_no_nan, tree)
+    return tree_util.tree_all(tree_contains_no_nan)
