@@ -1,18 +1,18 @@
 """Cubature rules."""
 
-import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
 from probdiffeq.backend import containers, tree_util
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Array
 
 
 class PositiveCubatureRule(containers.NamedTuple):
     """Cubature rule with positive weights."""
 
-    points: jax.Array
-    weights_sqrtm: jax.Array
+    points: Array
+    weights_sqrtm: Array
 
 
 def third_order_spherical(input_shape) -> PositiveCubatureRule:

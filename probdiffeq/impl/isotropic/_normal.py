@@ -1,8 +1,7 @@
-import jax
-
 from probdiffeq.backend import containers
+from probdiffeq.backend.typing import Array
 
 
 class Normal(containers.NamedTuple):
-    mean: jax.Array
-    cholesky: jax.Array
+    mean: Array
+    cholesky: Array

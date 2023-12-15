@@ -10,9 +10,10 @@ import jax.numpy as jnp
 
 from probdiffeq.backend import control_flow, functools, tree_util
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Array
 
 
-def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
+def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `taylor_mode_unroll()`, this function implements the loop via a scan,
@@ -61,7 +62,7 @@ def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
     return taylor_coeffs
 
 
-def taylor_mode_unroll(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
+def taylor_mode_unroll(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `taylor_mode_scan()`, this function does not depend on zero-padding
@@ -116,7 +117,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode_recursive(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
+def forward_mode_recursive(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -145,9 +146,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree_util.Partial(df)
 
 
-def taylor_mode_doubling(
-    vf: Callable, inits: tuple[jax.Array, ...], /, num_doublings: int
-):
+def taylor_mode_doubling(vf: Callable, inits: tuple[Array, ...], /, num_doublings: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
