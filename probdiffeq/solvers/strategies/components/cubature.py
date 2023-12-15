@@ -32,9 +32,9 @@ def third_order_spherical(input_shape) -> PositiveCubatureRule:
 
 
 def _third_order_spherical_params(*, d):
-    eye_d = jnp.eye(d) * jnp.sqrt(d)
+    eye_d = jnp.eye(d) * np.sqrt(d)
     pts = np.concatenate((eye_d, -1 * eye_d))
-    weights_sqrtm = jnp.ones((2 * d,)) / jnp.sqrt(2.0 * d)
+    weights_sqrtm = jnp.ones((2 * d,)) / np.sqrt(2.0 * d)
     return pts, weights_sqrtm
 
 
@@ -55,12 +55,12 @@ def unscented_transform(input_shape, r=1.0) -> PositiveCubatureRule:
 
 
 def _unscented_transform_params(d, *, r):
-    eye_d = jnp.eye(d) * jnp.sqrt(d + r)
+    eye_d = jnp.eye(d) * np.sqrt(d + r)
     zeros = jnp.zeros((1, d))
     pts = np.concatenate((eye_d, zeros, -1 * eye_d))
     _scale = d + r
-    weights_sqrtm1 = jnp.ones((d,)) / jnp.sqrt(2.0 * _scale)
-    weights_sqrtm2 = jnp.sqrt(r / _scale)
+    weights_sqrtm1 = jnp.ones((d,)) / np.sqrt(2.0 * _scale)
+    weights_sqrtm2 = np.sqrt(r / _scale)
     weights_sqrtm = jnp.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
     return pts, weights_sqrtm
 
@@ -80,7 +80,7 @@ def gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
 
     # Transform into jax arrays and take square root of weights
     pts = np.asarray(pts)
-    weights_sqrtm = jnp.sqrt(np.asarray(weights))
+    weights_sqrtm = np.sqrt(np.asarray(weights))
 
     # Build a tensor grid and return class
     tensor_pts = _tensor_points(pts, d=dim)

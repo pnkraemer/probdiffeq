@@ -14,7 +14,7 @@ class StatsBackend(_stats.StatsBackend):
             rv.cholesky.T, u - rv.mean, lower=False, trans="T"
         )
         mahalanobis = linalg.qr_r(residual_white[:, None])
-        return jnp.reshape(np.abs(mahalanobis) / jnp.sqrt(rv.mean.size), ())
+        return jnp.reshape(np.abs(mahalanobis) / np.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # The cholesky factor is triangular, so we compute a cheap slogdet.
@@ -36,7 +36,7 @@ class StatsBackend(_stats.StatsBackend):
             return functools.vmap(self.standard_deviation)(rv)
 
         diag = jnp.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
-        return jnp.sqrt(diag)
+        return np.sqrt(diag)
 
     def sample_shape(self, rv):
         return rv.mean.shape

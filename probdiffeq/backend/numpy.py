@@ -66,3 +66,7 @@ def ones_like(arr, /):
 
 def inf():
     return jnp.inf
+
+
+def sqrt(arr, /):
+    return jnp.sqrt(arr)

@@ -67,5 +67,5 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
             assert jnp.shape(mean) == jnp.shape(x)
             return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
 
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(jnp.sqrt(num) * mean, x)
-        return sum_updated / jnp.sqrt(num + 1)
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)

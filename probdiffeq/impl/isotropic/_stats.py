@@ -13,7 +13,7 @@ class StatsBackend(_stats.StatsBackend):
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = linalg.qr_r(residual_white.T)
-        return jnp.reshape(np.abs(residual_white_matrix) / jnp.sqrt(rv.mean.size), ())
+        return jnp.reshape(np.abs(residual_white_matrix) / np.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
         # if the gain is qoi-to-hidden, the data is a (d,) array.
@@ -42,7 +42,7 @@ class StatsBackend(_stats.StatsBackend):
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
             return functools.vmap(self.standard_deviation)(rv)
-        return jnp.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
+        return np.sqrt(jnp.dot(rv.cholesky, rv.cholesky))
 
     def sample_shape(self, rv):
         return rv.mean.shape
