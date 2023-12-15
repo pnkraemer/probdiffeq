@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq.backend import functools
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model
 from probdiffeq.impl.scalar import _normal
 from probdiffeq.util import cholesky_util, cond_util, linop_util
@@ -33,7 +34,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
             return x[[i], ...]
 
         bias = jnp.zeros(())
-        eye = jnp.eye(1)
+        eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))
         return cond_util.Conditional(linop, noise)

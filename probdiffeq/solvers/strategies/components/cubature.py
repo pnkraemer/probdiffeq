@@ -32,7 +32,7 @@ def third_order_spherical(input_shape) -> PositiveCubatureRule:
 
 
 def _third_order_spherical_params(*, d):
-    eye_d = jnp.eye(d) * np.sqrt(d)
+    eye_d = np.eye(d) * np.sqrt(d)
     pts = np.concatenate((eye_d, -1 * eye_d))
     weights_sqrtm = jnp.ones((2 * d,)) / np.sqrt(2.0 * d)
     return pts, weights_sqrtm
@@ -55,7 +55,7 @@ def unscented_transform(input_shape, r=1.0) -> PositiveCubatureRule:
 
 
 def _unscented_transform_params(d, *, r):
-    eye_d = jnp.eye(d) * np.sqrt(d + r)
+    eye_d = np.eye(d) * np.sqrt(d + r)
     zeros = jnp.zeros((1, d))
     pts = np.concatenate((eye_d, zeros, -1 * eye_d))
     _scale = d + r

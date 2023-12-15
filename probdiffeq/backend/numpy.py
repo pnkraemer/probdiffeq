@@ -64,9 +64,17 @@ def ones_like(arr, /):
     return jnp.ones_like(arr)
 
 
+def zeros_like(arr, /):
+    return jnp.zeros_like(arr)
+
+
 def inf():
     return jnp.inf
 
 
 def sqrt(arr, /):
     return jnp.sqrt(arr)
+
+
+def eye(n, m=None, /):
+    return jnp.eye(n, M=m)

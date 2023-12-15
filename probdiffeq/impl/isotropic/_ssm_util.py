@@ -27,7 +27,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         m0 = jnp.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
         c0 = jnp.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
-        matrix = jnp.eye(num_hidden_states_per_ode_dim)
+        matrix = np.eye(num_hidden_states_per_ode_dim)
         return cond_util.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
@@ -53,7 +53,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def standard_normal(self, num, /, output_scale):
         mean = jnp.zeros((num, *self.ode_shape))
-        cholesky = output_scale * jnp.eye(num)
+        cholesky = output_scale * np.eye(num)
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):

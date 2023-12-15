@@ -41,7 +41,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
         return discretise
 
     def identity_conditional(self, ndim, /):
-        transition = jnp.eye(ndim)
+        transition = np.eye(ndim)
         mean = jnp.zeros((ndim,))
         cov_sqrtm = jnp.zeros((ndim, ndim))
         noise = _normal.Normal(mean, cov_sqrtm)
@@ -49,7 +49,7 @@ class SSMUtilBackend(_ssm_util.SSMUtilBackend):
 
     def standard_normal(self, ndim, /, output_scale):
         mean = jnp.zeros((ndim,))
-        cholesky = output_scale * jnp.eye(ndim)
+        cholesky = output_scale * np.eye(ndim)
         return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):

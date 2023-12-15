@@ -23,7 +23,7 @@ def test_affine_recursion(num, num_derivatives_max=5):
 
 
 def _affine_problem(n):
-    A = jnp.eye(2) * np.arange(1.0, 5.0).reshape((2, 2))
+    A = np.eye(2) * np.arange(1.0, 5.0).reshape((2, 2))
     b = np.arange(6.0, 8.0)
 
     def vf(x, /):

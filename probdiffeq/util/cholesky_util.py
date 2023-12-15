@@ -124,7 +124,7 @@ def _triu_via_shortcut(R, R_YX):
     than qr-decomposing the full matrix, but it also admits a well-defined
     reverse-mode derivative!
     """
-    R = jnp.zeros_like(R)
+    R = np.zeros_like(R)
     R_YX = triu_via_qr(R_YX)
     n, m = jnp.shape(R_YX)
     return R.at[:n, :m].set(R_YX)

@@ -38,7 +38,7 @@ class HiddenModelBackend(_hidden_model.HiddenModelBackend):
 
         (d,) = self.ode_shape
         bias = jnp.zeros((d,))
-        eye = jnp.eye(d)
+        eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
         return cond_util.Conditional(linop, noise)
