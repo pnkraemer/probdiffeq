@@ -2,6 +2,7 @@
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
@@ -52,7 +53,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(sol):
     """
     data = sol.u + 0.1
     mll = solution.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=jnp.asarray(1e-2), posterior=sol.posterior
+        data, standard_deviation=np.asarray(1e-2), posterior=sol.posterior
     )
     assert mll.shape == ()
     assert not jnp.isnan(mll)

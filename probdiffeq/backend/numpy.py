@@ -38,3 +38,7 @@ def finfo_eps(eltype, /):
 
 def diff(arr, /):
     return jnp.diff(arr)
+
+
+def asarray(x, /):
+    return jnp.asarray(x)

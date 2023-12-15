@@ -101,7 +101,7 @@ def simulate_terminal_values(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0
 ) -> Solution:
     """Simulate the terminal values of an initial value problem."""
-    save_at = jnp.asarray([t1])
+    save_at = np.asarray([t1])
     (_t, solution_save_at), _, num_steps = _solve_and_save_at(
         tree_util.Partial(vector_field),
         t0,
