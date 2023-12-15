@@ -2,10 +2,9 @@
 
 import warnings
 
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow, functools, tree_array_util
+from probdiffeq.backend import control_flow, functools, tree_array_util, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
@@ -58,7 +57,7 @@ class Solution:
             msg = "Access to non-terminal states is not available."
             raise ValueError(msg)
 
-        return jax.tree_util.tree_map(lambda s: s[item, ...], self)
+        return tree_util.tree_map(lambda s: s[item, ...], self)
 
     def __iter__(self):
         """Iterate through the solution."""
@@ -95,7 +94,7 @@ def _sol_unflatten(_aux, children):
     )
 
 
-jax.tree_util.register_pytree_node(Solution, _sol_flatten, _sol_unflatten)
+tree_util.register_pytree_node(Solution, _sol_flatten, _sol_unflatten)
 
 
 def simulate_terminal_values(
@@ -104,7 +103,7 @@ def simulate_terminal_values(
     """Simulate the terminal values of an initial value problem."""
     save_at = jnp.asarray([t1])
     (_t, solution_save_at), _, num_steps = _solve_and_save_at(
-        jax.tree_util.Partial(vector_field),
+        tree_util.Partial(vector_field),
         t0,
         initial_condition,
         save_at=save_at,
@@ -113,8 +112,8 @@ def simulate_terminal_values(
     )
     # "squeeze"-type functionality (there is only a single state!)
     squeeze_fun = functools.partial(jnp.squeeze, axis=0)
-    solution_save_at = jax.tree_util.tree_map(squeeze_fun, solution_save_at)
-    num_steps = jax.tree_util.tree_map(squeeze_fun, num_steps)
+    solution_save_at = tree_util.tree_map(squeeze_fun, solution_save_at)
+    num_steps = tree_util.tree_map(squeeze_fun, num_steps)
 
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
@@ -150,7 +149,7 @@ def solve_and_save_at(
         warnings.warn(msg, stacklevel=1)
 
     (_t, solution_save_at), _, num_steps = _solve_and_save_at(
-        jax.tree_util.Partial(vector_field),
+        tree_util.Partial(vector_field),
         save_at[0],
         initial_condition,
         save_at=save_at[1:],
@@ -233,7 +232,7 @@ def solve_and_save_every_step(
         warnings.warn(msg, stacklevel=1)
 
     generator = _solution_generator(
-        jax.tree_util.Partial(vector_field),
+        tree_util.Partial(vector_field),
         t0,
         initial_condition,
         t1=t1,
@@ -323,7 +322,7 @@ def _userfriendly_output(*, posterior, posterior_t0):
         marginals = markov.marginals(posterior_no_filter_marginals, reverse=True)
 
         # Prepend the marginal at t1 to the computed marginals
-        marginal_t1 = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+        marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
         marginals = tree_array_util.tree_append(marginals, marginal_t1)
 
         # Prepend the marginal at t1 to the inits

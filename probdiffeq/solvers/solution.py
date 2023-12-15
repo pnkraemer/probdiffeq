@@ -4,10 +4,9 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
@@ -40,10 +39,10 @@ def _offgrid_marginals(t, solution, solver):
     index = jnp.searchsorted(solution.t, t)
 
     def _extract_previous(tree):
-        return jax.tree_util.tree_map(lambda s: s[index - 1, ...], tree)
+        return tree_util.tree_map(lambda s: s[index - 1, ...], tree)
 
     def _extract(tree):
-        return jax.tree_util.tree_map(lambda s: s[index, ...], tree)
+        return tree_util.tree_map(lambda s: s[index, ...], tree)
 
     marginals = _extract(solution.marginals)
 
@@ -158,7 +157,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     models = model_fun(0, standard_deviation)
 
     # Select the terminal variable
-    rv = jax.tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+    rv = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
 
     # Run the reverse Kalman filter
     estimator = discrete.kalmanfilter_with_marginal_likelihood()

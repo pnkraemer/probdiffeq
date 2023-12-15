@@ -1,9 +1,8 @@
 """Integrated Brownian motion (IBM) utilities."""
 
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools, linalg
+from probdiffeq.backend import functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 
 
@@ -28,7 +27,7 @@ def preconditioner_prepare(*, num_derivatives):
     powers = np.arange(num_derivatives, -1.0, step=-1.0)
     scales = np.factorial(powers)
     powers = powers + 0.5
-    return jax.tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
+    return tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
 
 
 def _hilbert(a):

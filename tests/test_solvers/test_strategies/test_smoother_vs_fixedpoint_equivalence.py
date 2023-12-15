@@ -2,11 +2,10 @@
 
 That is, when called with correct adaptive- and checkpoint-setups.
 """
-import jax
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
-from probdiffeq.backend import functools, testing
+from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import solution, uncalibrated
 from probdiffeq.solvers.strategies import fixedpoint, smoothers
@@ -106,7 +105,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     # Extract the interior points of the save_at solution
     # (because only there is the interpolated solution defined)
     u_fixedpoint = solution_fixedpoint.u[1:-1]
-    marginals_fixedpoint = jax.tree_util.tree_map(
+    marginals_fixedpoint = tree_util.tree_map(
         lambda s: s[1:-1], solution_fixedpoint.marginals
     )
 

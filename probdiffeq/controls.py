@@ -3,10 +3,9 @@
 import dataclasses
 from typing import Callable, Generic, TypeVar
 
-import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, tree_util
 
 T = TypeVar("T")
 """A type-variable to indicate the controller's state."""
@@ -157,4 +156,4 @@ def _unflatten(aux, _children):
     return Controller(init=init, apply=apply, clip=clip, extract=extract)
 
 
-jax.tree_util.register_pytree_node(Controller, _flatten, _unflatten)
+tree_util.register_pytree_node(Controller, _flatten, _unflatten)

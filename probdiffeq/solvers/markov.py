@@ -2,9 +2,7 @@
 
 from typing import Any
 
-import jax
-
-from probdiffeq.backend import containers, control_flow, functools, random
+from probdiffeq.backend import containers, control_flow, functools, random, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.util import cond_util
 
@@ -84,7 +82,7 @@ def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
     This function is useful to convert a smoothing-solution into a Markov sequence
     that is compatible with sampling or marginalisation.
     """
-    init = jax.tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
+    init = tree_util.tree_map(lambda x: x[-1, ...], markov_seq.init)
     return MarkovSeq(init, markov_seq.conditional)
 
 

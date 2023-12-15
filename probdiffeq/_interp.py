@@ -4,7 +4,7 @@ import dataclasses
 from collections.abc import Iterator
 from typing import Generic, TypeVar
 
-import jax
+from probdiffeq.backend import tree_util
 
 T = TypeVar("T")
 """A type-variable corresponding to the posterior-type used in interpolation."""
@@ -13,7 +13,7 @@ T = TypeVar("T")
 #  in general, this object should not be necessary...
 
 
-@jax.tree_util.register_pytree_node_class
+@tree_util.register_pytree_node_class
 @dataclasses.dataclass
 class InterpRes(Generic[T]):
     accepted: T
