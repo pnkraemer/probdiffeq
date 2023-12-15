@@ -1,7 +1,6 @@
 """Interpolation utilities."""
 
 import dataclasses
-from collections.abc import Iterator
 from typing import Generic, TypeVar
 
 import jax
@@ -46,7 +45,7 @@ class InterpRes(Generic[T]):
     #  we cannot use normal named tuples because we want to use a type-variable
     #  and namedtuples don't support that.
     #  this is a bit ugly, but it does not really matter...
-    def __iter__(self) -> Iterator[T]:
+    def __iter__(self):
         return iter(dataclasses.astuple(self))
 
     def tree_flatten(self):
