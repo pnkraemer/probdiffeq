@@ -6,7 +6,6 @@ from typing import Callable
 import jax
 import jax.experimental.jet
 import jax.experimental.ode
-import jax.numpy as jnp
 
 from probdiffeq.backend import control_flow, functools, tree_util
 from probdiffeq.backend import numpy as np
@@ -46,7 +45,7 @@ def taylor_mode_scan(vf: Callable, inits: tuple[jax.Array, ...], /, num: int):
 
     # Pad the initial Taylor series with zeros
     num_outputs = num_arguments + num
-    zeros = jnp.zeros_like(primals)
+    zeros = np.zeros_like(primals)
     taylor_coeffs = _pad_to_length(taylor_coeffs, length=num_outputs, value=zeros)
 
     # Early exit for num=1.
@@ -161,7 +160,7 @@ def taylor_mode_doubling(
 
     """
     (u0,) = inits
-    zeros = jnp.zeros_like(u0)
+    zeros = np.zeros_like(u0)
 
     def jet_embedded(*c, degree):
         """Call a modified jax.experimental.jet().

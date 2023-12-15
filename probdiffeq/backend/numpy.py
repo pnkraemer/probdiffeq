@@ -64,6 +64,10 @@ def ones_like(arr, /):
     return jnp.ones_like(arr)
 
 
+def zeros_like(arr, /):
+    return jnp.zeros_like(arr)
+
+
 def inf():
     return jnp.inf
 
