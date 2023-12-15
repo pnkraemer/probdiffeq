@@ -6,8 +6,10 @@ import jax
 import jax.experimental.jet
 import jax.experimental.ode
 
+from probdiffeq.backend.typing import Array
 
-def affine_recursion(vf: Callable, initial_values: tuple[jax.Array, ...], /, num: int):
+
+def affine_recursion(vf: Callable, initial_values: tuple[Array, ...], /, num: int):
     """Evaluate the Taylor series of an affine differential equation.
 
     !!! warning "Compilation time"
