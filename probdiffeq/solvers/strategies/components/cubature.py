@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import scipy.special  # type: ignore
 
-from probdiffeq.backend import containers
+from probdiffeq.backend import containers, tree_util
 
 
 class PositiveCubatureRule(containers.NamedTuple):
@@ -98,5 +98,5 @@ def _tensor_weights(*args, **kwargs):
 
 def _tensor_points(x, /, *, d):
     x_mesh = jnp.meshgrid(*([x] * d))
-    y_mesh = jax.tree_util.tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
+    y_mesh = tree_util.tree_map(lambda s: jnp.reshape(s, (-1,)), x_mesh)
     return jnp.stack(y_mesh).T

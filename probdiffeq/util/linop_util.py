@@ -2,7 +2,7 @@
 import dataclasses
 from typing import Any, Callable
 
-import jax
+from probdiffeq.backend import tree_util
 
 
 def parametrised_linop(func, /, params=None):
@@ -32,4 +32,4 @@ def _linop_unflatten(aux, children):
     return parametrised_linop(func, params=params)
 
 
-jax.tree_util.register_pytree_node(CallableLinOp, _linop_flatten, _linop_unflatten)
+tree_util.register_pytree_node(CallableLinOp, _linop_flatten, _linop_unflatten)

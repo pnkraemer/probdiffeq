@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import controls
-from probdiffeq.backend import containers, control_flow, functools, linalg
+from probdiffeq.backend import containers, control_flow, functools, linalg, tree_util
 from probdiffeq.impl import impl
 
 
@@ -180,10 +180,8 @@ def _asolver_unflatten(aux, children):
     )
 
 
-jax.tree_util.register_pytree_node(
-    nodetype=_AdaptiveIVPSolver,
-    flatten_func=_asolver_flatten,
-    unflatten_func=_asolver_unflatten,
+tree_util.register_pytree_node(
+    _AdaptiveIVPSolver, flatten_func=_asolver_flatten, unflatten_func=_asolver_unflatten
 )
 
 

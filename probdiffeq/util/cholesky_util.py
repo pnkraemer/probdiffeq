@@ -23,7 +23,7 @@ manipulation of square root matrices.
 import jax
 import jax.numpy as jnp
 
-from probdiffeq.backend import control_flow, linalg
+from probdiffeq.backend import control_flow, linalg, tree_util
 
 
 def revert_conditional_noisefree(R_X_F, R_X):
@@ -146,9 +146,9 @@ def sum_of_sqrtm_factors(R_stack: tuple):
 # logsumexp but for squares
 def sqrt_sum_square_scalar(*args):
     """Compute sqrt(a**2 + b**2) without squaring a or b."""
-    args_are_scalar = jax.tree_util.tree_map(lambda x: jnp.ndim(x) == 0, args)
-    if not jax.tree_util.tree_all(args_are_scalar):
-        args_shapes = jax.tree_util.tree_map(jnp.shape, args)
+    args_are_scalar = tree_util.tree_map(lambda x: jnp.ndim(x) == 0, args)
+    if not tree_util.tree_all(args_are_scalar):
+        args_shapes = tree_util.tree_map(jnp.shape, args)
         msg1 = "'sqrt_sum_square_scalar' expects scalar arguments. "
         msg2 = f"PyTree with shapes {args_shapes} received."
         raise ValueError(msg1 + msg2)

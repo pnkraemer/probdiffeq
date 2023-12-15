@@ -1,4 +1,4 @@
-import jax
+from probdiffeq.backend import tree_util
 
 
 class Normal:
@@ -21,4 +21,4 @@ def _unflatten(_aux, children):
     return Normal(mean, cholesky)
 
 
-jax.tree_util.register_pytree_node(Normal, _flatten, _unflatten)
+tree_util.register_pytree_node(Normal, _flatten, _unflatten)

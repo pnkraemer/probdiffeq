@@ -1,7 +1,7 @@
 """Uncalibrated IVP solvers."""
-import jax
 
 from probdiffeq import _interp
+from probdiffeq.backend import tree_util
 from probdiffeq.solvers import _common, _solver
 
 
@@ -68,8 +68,6 @@ def _solver_unflatten(aux, children):
     )
 
 
-jax.tree_util.register_pytree_node(
-    nodetype=_UncalibratedSolver,
-    flatten_func=_solver_flatten,
-    unflatten_func=_solver_unflatten,
+tree_util.register_pytree_node(
+    _UncalibratedSolver, flatten_func=_solver_flatten, unflatten_func=_solver_unflatten
 )
