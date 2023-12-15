@@ -156,6 +156,26 @@ def hstack(list_of_arrays, /):
     return jnp.hstack(list_of_arrays)
 
 
+def kron(a, b, /):
+    return jnp.kron(a, b)
+
+
+def tile(a, num):
+    return jnp.tile(a, num)
+
+
+def prod_along_axis(arr, /, *, axis):
+    return jnp.prod(arr, axis=axis)
+
+
+def einsum(how, *operands):
+    return jnp.einsum(how, *operands)
+
+
+def meshgrid(*mesh):
+    return jnp.meshgrid(*mesh)
+
+
 def any(arr, /):  # noqa: A001
     return jnp.any(arr)
 

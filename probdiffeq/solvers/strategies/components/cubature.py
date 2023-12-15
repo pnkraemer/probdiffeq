@@ -93,7 +93,7 @@ def gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
 
 def _tensor_weights(*args, **kwargs):
     mesh = _tensor_points(*args, **kwargs)
-    return np.prod(mesh, axis=1)
+    return np.prod_along_axis(mesh, axis=1)
 
 
 def _tensor_points(x, /, *, d):
