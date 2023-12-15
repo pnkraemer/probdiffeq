@@ -111,7 +111,7 @@ def simulate_terminal_values(
         dt0=dt0,
     )
     # "squeeze"-type functionality (there is only a single state!)
-    squeeze_fun = functools.partial(jnp.squeeze, axis=0)
+    squeeze_fun = functools.partial(np.squeeze_along_axis, axis=0)
     solution_save_at = tree_util.tree_map(squeeze_fun, solution_save_at)
     num_steps = tree_util.tree_map(squeeze_fun, num_steps)
 

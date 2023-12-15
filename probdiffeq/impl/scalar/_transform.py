@@ -1,6 +1,7 @@
 """Random variable transformations."""
 import jax.numpy as jnp
 
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _transform
 from probdiffeq.impl.scalar import _normal
 from probdiffeq.util import cholesky_util, cond_util
@@ -28,7 +29,7 @@ class TransformBackend(_transform.TransformBackend):
         )
         cholesky_obs = jnp.reshape(r_obs, ())
         cholesky_cor = r_cor.T
-        gain = jnp.squeeze(gain, axis=-1)
+        gain = np.squeeze_along_axis(gain, axis=-1)
 
         # Gather terms and return
         m_cor = rv.mean - gain * (A(rv.mean) + b)

@@ -42,3 +42,11 @@ def diff(arr, /):
 
 def asarray(x, /):
     return jnp.asarray(x)
+
+
+def squeeze(arr, /):
+    return jnp.squeeze(arr)
+
+
+def squeeze_along_axis(arr, /, *, axis):
+    return jnp.squeeze(arr, axis=axis)
