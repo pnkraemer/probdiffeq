@@ -1,9 +1,8 @@
 """Adaptive solvers for initial value problems (IVPs)."""
-from typing import Any
-
 from probdiffeq import controls
 from probdiffeq.backend import containers, control_flow, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Any
 from probdiffeq.impl import impl
 
 

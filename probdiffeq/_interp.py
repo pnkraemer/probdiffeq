@@ -1,8 +1,7 @@
 """Interpolation utilities."""
 
-from typing import Generic, TypeVar
-
 from probdiffeq.backend import containers, tree_util
+from probdiffeq.backend.typing import Generic, TypeVar
 
 T = TypeVar("T")
 """A type-variable corresponding to the posterior-type used in interpolation."""

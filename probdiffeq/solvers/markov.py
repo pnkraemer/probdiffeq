@@ -1,8 +1,7 @@
 """Markov sequences and Markov processes."""
 
-from typing import Any
-
 from probdiffeq.backend import containers, control_flow, functools, random, tree_util
+from probdiffeq.backend.typing import Any
 from probdiffeq.impl import impl
 from probdiffeq.util import cond_util
 

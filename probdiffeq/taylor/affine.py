@@ -1,9 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-from typing import Callable
-
 from probdiffeq.backend import functools
-from probdiffeq.backend.typing import Array
+from probdiffeq.backend.typing import Array, Callable
 
 
 def affine_recursion(vf: Callable, initial_values: tuple[Array, ...], /, num: int):
