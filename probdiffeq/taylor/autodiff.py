@@ -1,8 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-import itertools
 
-from probdiffeq.backend import control_flow, functools, tree_util
+from probdiffeq.backend import control_flow, functools, itertools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array, Callable
 
