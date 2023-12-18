@@ -57,7 +57,6 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
         impl.hidden_model.conditional_to_derivative, in_axes=(None, 0)
     )
     models = model_fun(0, 1e-7 * np.ones_like(ts))
-    print(ys)
 
     # Run the preconditioned fixedpoint smoother
     (corrected, conditional), _ = discrete.estimate_fwd(
@@ -68,7 +67,4 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
         estimator=estimator,
     )
     initial = impl.conditional.marginalise(corrected, conditional)
-    print(corrected)
-    print(conditional)
-    print(initial)
     return tuple(impl.stats.mean(initial))
