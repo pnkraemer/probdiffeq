@@ -1,8 +1,6 @@
 """Correction models."""
 
-import abc
-
-from probdiffeq.backend import functools
+from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies.components import cubature

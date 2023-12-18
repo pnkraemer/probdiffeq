@@ -1,10 +1,9 @@
 """Interface for estimation strategies."""
 
-import abc
 from typing import Any, Generic, TypeVar
 
 from probdiffeq import _interp
-from probdiffeq.backend import containers, tree_util
+from probdiffeq.backend import abc, containers, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 

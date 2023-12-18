@@ -1,4 +1,4 @@
-import abc
+from probdiffeq.backend import abc
 
 
 class PrototypeBackend(abc.ABC):
