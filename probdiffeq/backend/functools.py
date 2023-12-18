@@ -23,3 +23,7 @@ def jet(func, /, primals, series):
 
 def linearize(func, *args):
     return jax.linearize(func, *args)
+
+
+def jvp(func, /, primals, tangents):
+    return jax.jvp(func, primals, tangents)
