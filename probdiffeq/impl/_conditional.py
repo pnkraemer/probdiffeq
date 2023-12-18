@@ -1,5 +1,5 @@
 """Conditionals."""
-import abc
+from probdiffeq.backend import abc
 
 
 class ConditionalBackend(abc.ABC):

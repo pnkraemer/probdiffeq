@@ -1,6 +1,6 @@
 """SSM utilities."""
 
-import abc
+from probdiffeq.backend import abc
 
 
 class SSMUtilBackend(abc.ABC):

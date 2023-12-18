@@ -1,8 +1,6 @@
 """Calibrated IVP solvers."""
-import abc
-
 from probdiffeq import _interp
-from probdiffeq.backend import tree_util
+from probdiffeq.backend import abc, tree_util
 from probdiffeq.impl import impl
 from probdiffeq.solvers import _common, _solver
 

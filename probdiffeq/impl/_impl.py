@@ -1,8 +1,8 @@
 """State-space model impl."""
-import abc
 import warnings
 from typing import Optional
 
+from probdiffeq.backend import abc
 from probdiffeq.impl import (
     _conditional,
     _hidden_model,
