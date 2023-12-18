@@ -1,8 +1,7 @@
 """Cubature rules."""
 
-import scipy.special  # type: ignore
 
-from probdiffeq.backend import containers, tree_util
+from probdiffeq.backend import containers, special, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 
@@ -73,7 +72,7 @@ def gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
     (dim,) = input_shape
 
     # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
-    _roots = scipy.special.roots_hermitenorm(n=degree, mu=True)
+    _roots = special.roots_hermitenorm(n=degree, mu=True)
     pts, weights, sum_of_weights = _roots
     weights = weights / sum_of_weights
 
