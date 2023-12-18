@@ -1,8 +1,12 @@
 """Routines for estimating solutions of initial value problems."""
 
-import warnings
-
-from probdiffeq.backend import control_flow, functools, tree_array_util, tree_util
+from probdiffeq.backend import (
+    control_flow,
+    functools,
+    tree_array_util,
+    tree_util,
+    warnings,
+)
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
