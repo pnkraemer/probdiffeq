@@ -3,8 +3,6 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 import itertools
 from typing import Callable
 
-import jax
-
 from probdiffeq.backend import control_flow, functools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
@@ -137,7 +135,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         vals = (*args, fun_0(*args))
         primals_in, tangents_in = vals[:-1], vals[1:]
 
-        _, tangents_out = jax.jvp(fun_n, primals_in, tangents_in)
+        _, tangents_out = functools.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
     return tree_util.Partial(df)
@@ -182,7 +180,7 @@ def taylor_mode_doubling(vf: Callable, inits: tuple[Array, ...], /, num_doubling
         fx, jvp = functools.linearize(jet_embedded_deg, *taylor_coefficients)
 
         # Compute the next set of coefficients.
-        # TODO: can we jax.fori_loop() this loop?
+        # TODO: can we fori_loop() this loop?
         #  the running variable (cs_padded) should have constant size
         cs = [(fx[deg - 1] / deg)]
         cs_padded = cs + [zeros] * (deg - 1)
