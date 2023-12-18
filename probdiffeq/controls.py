@@ -1,16 +1,15 @@
 """Step-size control algorithms."""
 
-import dataclasses
 from typing import Callable, Generic, TypeVar
 
-from probdiffeq.backend import functools, tree_util
+from probdiffeq.backend import containers, functools, tree_util
 from probdiffeq.backend import numpy as np
 
 T = TypeVar("T")
 """A type-variable to indicate the controller's state."""
 
 
-@dataclasses.dataclass
+@containers.dataclass
 class Controller(Generic[T]):
     """Control algorithm."""
 
