@@ -1,9 +1,8 @@
 """Interpolation utilities."""
 
-import dataclasses
 from typing import Generic, TypeVar
 
-from probdiffeq.backend import tree_util
+from probdiffeq.backend import containers, tree_util
 
 T = TypeVar("T")
 """A type-variable corresponding to the posterior-type used in interpolation."""
@@ -13,7 +12,7 @@ T = TypeVar("T")
 
 
 @tree_util.register_pytree_node_class
-@dataclasses.dataclass
+@containers.dataclass
 class InterpRes(Generic[T]):
     accepted: T
     """The new 'accepted' field.
@@ -46,7 +45,7 @@ class InterpRes(Generic[T]):
     #  and namedtuples don't support that.
     #  this is a bit ugly, but it does not really matter...
     def __iter__(self):
-        return iter(dataclasses.astuple(self))
+        return iter(containers.dataclass_astuple(self))
 
     def tree_flatten(self):
         aux = ()

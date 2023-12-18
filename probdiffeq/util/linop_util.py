@@ -1,15 +1,15 @@
 """Matrix-free API."""
-import dataclasses
+
 from typing import Any, Callable
 
-from probdiffeq.backend import tree_util
+from probdiffeq.backend import containers, tree_util
 
 
 def parametrised_linop(func, /, params=None):
     return CallableLinOp(func=func, params=params)
 
 
-@dataclasses.dataclass(frozen=True)
+@containers.dataclass
 class CallableLinOp:
     """Matrix-free linear operator."""
 
