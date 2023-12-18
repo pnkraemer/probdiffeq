@@ -1,9 +1,7 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 
-import jax.experimental.ode
-
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, ode
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers.strategies import discrete
@@ -41,7 +39,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     # TODO: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = np.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
-    ys = jax.experimental.ode.odeint(vf, initial_values[0], ts, atol=atol, rtol=rtol)
+    ys = ode.odeint(vf, initial_values[0], ts, atol=atol, rtol=rtol)
 
     # Initial condition
     estimator = discrete.fixedpointsmoother_precon()
