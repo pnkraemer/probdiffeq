@@ -1,8 +1,7 @@
 """Discrete filtering and smoothing."""
 
-from typing import Any
-
 from probdiffeq.backend import containers, control_flow, tree_util
+from probdiffeq.backend.typing import Any
 from probdiffeq.impl import impl
 
 

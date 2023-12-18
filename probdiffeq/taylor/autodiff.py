@@ -1,10 +1,9 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-from typing import Callable
 
 from probdiffeq.backend import control_flow, functools, itertools, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Array
+from probdiffeq.backend.typing import Array, Callable
 
 
 def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):

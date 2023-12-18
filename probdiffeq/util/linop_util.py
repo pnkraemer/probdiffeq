@@ -1,8 +1,7 @@
 """Matrix-free API."""
 
-from typing import Any, Callable
-
 from probdiffeq.backend import containers, tree_util
+from probdiffeq.backend.typing import Any, Callable
 
 
 def parametrised_linop(func, /, params=None):

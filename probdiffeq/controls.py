@@ -1,9 +1,8 @@
 """Step-size control algorithms."""
 
-from typing import Callable, Generic, TypeVar
-
 from probdiffeq.backend import containers, functools, tree_util
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Callable, Generic, TypeVar
 
 T = TypeVar("T")
 """A type-variable to indicate the controller's state."""

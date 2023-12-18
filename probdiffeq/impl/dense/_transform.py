@@ -1,8 +1,6 @@
 """Random variable transformations."""
-from typing import Callable
-
 from probdiffeq.backend import containers
-from probdiffeq.backend.typing import Array
+from probdiffeq.backend.typing import Array, Callable
 from probdiffeq.impl import _transform
 from probdiffeq.impl.dense import _normal
 from probdiffeq.util import cholesky_util, cond_util

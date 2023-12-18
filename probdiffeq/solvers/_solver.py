@@ -1,11 +1,10 @@
 """IVP-solver API."""
 
 
-from typing import Generic, TypeVar
-
 from probdiffeq import _interp
 from probdiffeq.backend import abc
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Generic, TypeVar
 from probdiffeq.impl import impl
 
 T = TypeVar("T")
