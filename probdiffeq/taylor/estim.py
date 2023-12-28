@@ -39,7 +39,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     # TODO: allow flexible "solve" method?
     k = num + 1  # important: k > num
     ts = np.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
-    ys = ode.odeint_and_save_at(vf, initial_values[0], save_at=ts, atol=atol, rtol=rtol)
+    ys = ode.odeint_and_save_at(vf, initial_values, save_at=ts, atol=atol, rtol=rtol)
 
     # Initial condition
     estimator = discrete.fixedpointsmoother_precon()

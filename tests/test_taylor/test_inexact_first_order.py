@@ -29,7 +29,7 @@ def fixture_pb_with_solution():
 @testing.parametrize("num", [1, 4])
 def test_initialised_correct_shape_and_values(pb_with_solution, taylor_fun, num):
     (f, init, t0), _solution = pb_with_solution
-    derivatives = taylor_fun(lambda y, _t: f(y), init, t=t0, num=num)
+    derivatives = taylor_fun(lambda y, t: f(y), init, t=t0, num=num)  # noqa: ARG005
     assert len(derivatives) == len(init) + num
     assert derivatives[0].shape == init[0].shape
     for expected, received in zip(derivatives, _solution):
