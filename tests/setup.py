@@ -4,8 +4,8 @@ import warnings
 
 import diffeqzoo
 import diffeqzoo.ivps
+import jax.config
 from diffeqzoo import backend
-from jax.config import config
 
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
@@ -18,11 +18,11 @@ backend.select("jax")
 warnings.filterwarnings("error")
 
 # Test on CPU.
-config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 
 # Double precision
 # Needed for equivalence tests for smoothers.
-config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", True)
 
 
 class _Setup:
