@@ -1,9 +1,8 @@
 """Assert that solve_with_python_loop is accurate."""
-import diffrax
 
 from probdiffeq import adaptive, ivpsolve, timestep
-from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -35,36 +34,13 @@ def fixture_python_loop_solution():
     return ivpsolve.solve_and_save_every_step(*args, **kwargs)
 
 
-@testing.fixture(name="diffrax_solution")
-def fixture_diffrax_solution():
+@testing.fixture(name="reference_solution")
+def fixture_reference_solution():
     vf, (u0,), (t0, t1) = setup.ode()
-
-    # Solve the IVP
-    @functools.jit
-    def vf_diffrax(t, y, _args):
-        return vf(y, t=t)
-
-    term = diffrax.ODETerm(vf_diffrax)
-    solver = diffrax.Dopri5()
-    solution_object = diffrax.diffeqsolve(
-        term,
-        solver,
-        t0=t0,
-        t1=t1,
-        dt0=0.1,
-        y0=u0,
-        saveat=diffrax.SaveAt(dense=True),
-        stepsize_controller=diffrax.PIDController(atol=1e-10, rtol=1e-10),
-    )
-
-    @functools.vmap
-    def solution(t):
-        return solution_object.evaluate(t)
-
-    return solution
+    return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
 
 
-def test_python_loop_output_matches_diffrax(python_loop_solution, diffrax_solution):
-    expected = diffrax_solution(python_loop_solution.t)
+def test_python_loop_output_matches_reference(python_loop_solution, reference_solution):
+    expected = reference_solution(python_loop_solution.t)
     received = python_loop_solution.u
     assert np.allclose(received, expected, rtol=1e-2)

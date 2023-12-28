@@ -1,11 +1,41 @@
 """ODE stuff."""
+import diffrax
+import jax
 import jax.experimental.ode
 
 
 def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
+    assert isinstance(y0, (tuple, list))
+    assert len(y0) == 1
+
     def vf_wrapped(y, t):
         return vf(y, t=t)
 
+    return jax.experimental.ode.odeint(vf_wrapped, *y0, save_at, atol=atol, rtol=rtol)
+
+
+def odeint_dense(vf, y0: tuple, /, t0, t1, *, atol, rtol):
     assert isinstance(y0, (tuple, list))
     assert len(y0) == 1
-    return jax.experimental.ode.odeint(vf_wrapped, *y0, save_at, atol=atol, rtol=rtol)
+
+    @diffrax.ODETerm
+    @jax.jit
+    def vf_wrapped(t, y, _args):
+        return vf(y, t=t)
+
+    solution_object = diffrax.diffeqsolve(
+        vf_wrapped,
+        diffrax.Dopri5(),
+        t0=t0,
+        t1=t1,
+        dt0=0.1,
+        y0=y0[0],
+        saveat=diffrax.SaveAt(dense=True),
+        stepsize_controller=diffrax.PIDController(atol=atol, rtol=rtol),
+    )
+
+    @jax.vmap
+    def solution(t):
+        return solution_object.evaluate(t)
+
+    return solution
