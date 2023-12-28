@@ -2,6 +2,7 @@
 
 from probdiffeq.backend import config, ode
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import ode
 from probdiffeq.taylor import autodiff
 
 

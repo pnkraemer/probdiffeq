@@ -3,6 +3,7 @@
 
 from probdiffeq.backend import config, ode, warnings
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import ode, warnings
 from probdiffeq.impl import impl
 
 # All warnings shall be errors
