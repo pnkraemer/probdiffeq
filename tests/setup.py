@@ -1,13 +1,11 @@
 """Test-setup."""
 
-import warnings
-
 import diffeqzoo
 import diffeqzoo.ivps
 import jax.config
 from diffeqzoo import backend
 
-from probdiffeq.backend import functools
+from probdiffeq.backend import functools, warnings
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 
