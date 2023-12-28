@@ -2,6 +2,7 @@
 import diffrax
 import jax
 import jax.experimental.ode
+import jax.numpy as jnp
 
 
 def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
@@ -34,8 +35,12 @@ def odeint_dense(vf, y0: tuple, /, t0, t1, *, atol, rtol):
         stepsize_controller=diffrax.PIDController(atol=atol, rtol=rtol),
     )
 
-    @jax.vmap
     def solution(t):
+        # Automatic batching
+        if jnp.ndim(t) > 0:
+            return jax.vmap(solution)(t)
+
+        # Interpolate
         return solution_object.evaluate(t)
 
     return solution
