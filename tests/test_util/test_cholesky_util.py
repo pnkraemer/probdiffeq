@@ -4,9 +4,7 @@ These are so crucial and annoying to debug that they need their own test set.
 """
 from math import prod
 
-import jax
-
-from probdiffeq.backend import linalg, testing, tree_util
+from probdiffeq.backend import functools, linalg, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.util import cholesky_util
 
@@ -86,7 +84,7 @@ def test_reverse_conditional_jacrev_zero_matrix():
     HC = _some_array((2, 3)) * 0.0
     X = _some_array((2, 2)) + 3.0 + np.eye(2)
 
-    result = jax.jacrev(cholesky_util.revert_conditional)(HC.T, C.T, X.T)
+    result = functools.jacrev(cholesky_util.revert_conditional)(HC.T, C.T, X.T)
     is_not_nan = _tree_is_free_of_nans(result)
     assert is_not_nan
 
@@ -99,7 +97,7 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
     C = _some_array((3, 3)) * 0.0
     HC = _some_array((3, 2))
 
-    result = jax.jacrev(cholesky_util.sum_of_sqrtm_factors)((C.T, HC.T))
+    result = functools.jacrev(cholesky_util.sum_of_sqrtm_factors)((C.T, HC.T))
     is_not_nan = _tree_is_free_of_nans(result)
     assert is_not_nan
 
