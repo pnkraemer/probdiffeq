@@ -1,20 +1,19 @@
 """Test-setup."""
 
-import jax.config
 
+from probdiffeq.backend import config, ode, warnings
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, warnings
 from probdiffeq.impl import impl
 
 # All warnings shall be errors
 warnings.filterwarnings("error")
 
 # Test on CPU.
-jax.config.update("jax_platform_name", "cpu")
+config.update("platform_name", "cpu")
 
 # Double precision
 # Needed for equivalence tests for smoothers.
-jax.config.update("jax_enable_x64", True)
+config.update("enable_x64", True)
 
 
 class _Setup:
