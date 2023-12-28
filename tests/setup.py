@@ -2,17 +2,11 @@
 
 import warnings
 
-import diffeqzoo
-import diffeqzoo.ivps
 import jax.config
-from diffeqzoo import backend
 
-from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import ode
 from probdiffeq.impl import impl
-
-# ODE examples must be in JAX
-backend.select("jax")
 
 # All warnings shall be errors
 warnings.filterwarnings("error")
@@ -39,64 +33,13 @@ class _Setup:
 
     def ode(self):
         if self._which == "scalar":
-            return self._ode_scalar()
-
-        return self._ode_multi_dimensional()
-
-    @staticmethod
-    def _ode_scalar():
-        f, u0, (t0, _), f_args = diffeqzoo.ivps.logistic()
-        t1 = 0.75
-
-        @functools.jit
-        def vf(x, *, t):  # noqa: ARG001
-            return f(x, *f_args)
-
-        return vf, (u0,), (t0, t1)
-
-    @staticmethod
-    def _ode_multi_dimensional():
-        f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
-        t1 = 2.0  # Short time-intervals are sufficient for this test.
-
-        @functools.jit
-        def vf(x, *, t):  # noqa: ARG001
-            return f(x, *f_args)
-
-        return vf, (u0,), (t0, t1)
+            return ode.ivp_logistic()
+        return ode.ivp_lotka_volterra()
 
     def ode_affine(self):
         if self._which == "scalar":
-            return self._ode_affine_scalar()
-        return self._ode_affine_multi_dimensional()
-
-    @staticmethod
-    def _ode_affine_multi_dimensional():
-        t0, t1 = 0.0, 2.0
-        u0 = np.ones((2,))
-
-        @functools.jit
-        def vf(x, *, t):  # noqa: ARG001
-            return 2 * x
-
-        def solution(t):
-            return np.exp(2 * t) * np.ones((2,))
-
-        return vf, (u0,), (t0, t1), solution
-
-    @staticmethod
-    def _ode_affine_scalar():
-        t0, t1 = 0.0, 2.0
-        u0 = 1.0
-
-        @functools.jit
-        def vf(x, *, t):  # noqa: ARG001
-            return 2 * x
-
-        def solution(t):
-            return np.exp(2 * t)
-
-        return vf, (u0,), (t0, t1), solution
+            return ode.ivp_affine_scalar()
+        return ode.ivp_affine_multi_dimensional()
 
     def rv(self):
         output_scale = np.ones_like(impl.prototypes.output_scale())
