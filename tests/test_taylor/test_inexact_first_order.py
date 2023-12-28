@@ -1,8 +1,7 @@
 """Tests for inexact approximations for first-order problems."""
-import diffeqzoo.ivps
 
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing
+from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff, estim
 
@@ -16,12 +15,9 @@ def case_runge_kutta_starter():
 
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.lotka_volterra()
+    vf, (u0,), (t0, _) = ode.ivp_lotka_volterra()
 
-    def vf(u, /):
-        return f(u, *f_args)
-
-    solution = autodiff.taylor_mode_scan(vf, (u0,), num=3)
+    solution = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=3)
     return (vf, (u0,), t0), solution
 
 
@@ -29,7 +25,7 @@ def fixture_pb_with_solution():
 @testing.parametrize("num", [1, 4])
 def test_initialised_correct_shape_and_values(pb_with_solution, taylor_fun, num):
     (f, init, t0), _solution = pb_with_solution
-    derivatives = taylor_fun(lambda y, t: f(y), init, t=t0, num=num)  # noqa: ARG005
+    derivatives = taylor_fun(lambda y, t: f(y, t=t), init, t=t0, num=num)
     assert len(derivatives) == len(init) + num
     assert derivatives[0].shape == init[0].shape
     for expected, received in zip(derivatives, _solution):

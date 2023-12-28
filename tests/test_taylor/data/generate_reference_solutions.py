@@ -1,9 +1,8 @@
 """Precompute and save reference solutions. Accelerate testing."""
-import diffeqzoo.ivps
 import jax.config
-from diffeqzoo import backend
 
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import ode
 from probdiffeq.taylor import autodiff
 
 
@@ -18,37 +17,20 @@ def set_environment():
     # Double precision
     jax.config.update("jax_enable_x64", True)
 
-    # IVPs in JAX
-    backend.select("jax")
-
 
 def three_body_first(num_derivatives_max=6):
-    f, u0, (t0, _), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
-
-    def vf(u, *, t, p):  # noqa: ARG001
-        return f(u, *p)
+    vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
 
     return autodiff.taylor_mode_unroll(
-        vector_field=vf,
-        initial_values=(u0,),
-        num=num_derivatives_max,
-        t=t0,
-        parameters=f_args,
+        lambda y: vf(y, t=t0), (u0,), num=num_derivatives_max
     )
 
 
 def van_der_pol_second(num_derivatives_max=6):
-    f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
-
-    def vf(u, du, *, t, p):  # noqa: ARG001
-        return f(u, du, *p)
+    vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
 
     return autodiff.taylor_mode_unroll(
-        vector_field=vf,
-        initial_values=(u0, du0),
-        num=num_derivatives_max,
-        t=t0,
-        parameters=f_args,
+        lambda *ys: vf(*ys, t=t0), (u0, du0), num=num_derivatives_max
     )
 
 
