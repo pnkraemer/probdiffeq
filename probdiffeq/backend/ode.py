@@ -99,3 +99,21 @@ def ivp_affine_scalar():
         return jnp.exp(2 * t)
 
     return vf, (u0,), (t0, t1), solution
+
+
+def ivp_three_body_1st():
+    f, u0, (t0, t1), f_args = diffeqzoo.ivps.three_body_restricted_first_order()
+
+    def vf(u, *, t):  # noqa: ARG001
+        return f(u, *f_args)
+
+    return vf, (u0,), (t0, t1)
+
+
+def ivp_van_der_pol_2nd():
+    f, (u0, du0), (t0, t1), f_args = diffeqzoo.ivps.van_der_pol()
+
+    def vf(u, du, *, t):  # noqa: ARG001
+        return f(u, du, *f_args)
+
+    return vf, (u0, du0), (t0, t1)
