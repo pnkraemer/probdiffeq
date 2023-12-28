@@ -1,7 +1,7 @@
 """Precompute and save reference solutions. Accelerate testing."""
 import diffeqzoo.ivps
+import jax.config
 from diffeqzoo import backend
-from jax.config import config
 
 from probdiffeq.backend import numpy as np
 from probdiffeq.taylor import autodiff
@@ -13,11 +13,10 @@ def set_environment():
     The setup used to precompute references should match that of the other tests.
     """
     # Test on CPU.
-    config.update("jax_platform_name", "cpu")
+    jax.config.update("jax_platform_name", "cpu")
 
     # Double precision
-    # Needed for equivalence tests for smoothers.
-    config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", True)
 
     # IVPs in JAX
     backend.select("jax")
