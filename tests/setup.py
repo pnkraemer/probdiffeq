@@ -1,11 +1,9 @@
 """Test-setup."""
 
-import warnings
-
 import jax.config
 
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode
+from probdiffeq.backend import functools, warnings, ode
 from probdiffeq.impl import impl
 
 # All warnings shall be errors
