@@ -1,9 +1,8 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
-import diffeqzoo.ivps
 
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing
+from probdiffeq.backend import ode, testing
 from probdiffeq.taylor import autodiff
 
 
@@ -19,13 +18,10 @@ def case_taylor_mode_scan():
 
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
-    f, (u0, du0), (t0, _), f_args = diffeqzoo.ivps.van_der_pol()
-
-    def vf(u, du, /):
-        return f(u, du, *f_args)
+    vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
 
     solution = np.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")
-    return (vf, (u0, du0)), solution
+    return (lambda *ys: vf(*ys, t=t0), (u0, du0)), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
