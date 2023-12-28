@@ -27,3 +27,7 @@ def linearize(func, *args):
 
 def jvp(func, /, primals, tangents):
     return jax.jvp(func, primals, tangents)
+
+
+def jacrev(func):
+    return jax.jacrev(func)
