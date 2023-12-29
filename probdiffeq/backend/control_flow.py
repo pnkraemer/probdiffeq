@@ -1,12 +1,15 @@
 """Control-flow wrappers."""
 
+import contextlib
+
 import jax
 
 _jax_scan = jax.lax.scan
 _jax_while_loop = jax.lax.while_loop
 
 
-def overwrite_scan_func(func, /) -> None:
+@contextlib.contextmanager
+def overwrite_scan_func(func, /):
     """Overwrite the scan() function.
 
     Parameters
@@ -15,14 +18,20 @@ def overwrite_scan_func(func, /) -> None:
         A function with the same signature as `jax.lax.scan`.
     """
     global _jax_scan
+    tmp = _jax_scan
+
     _jax_scan = func
+    yield _jax_scan
+
+    _jax_scan = tmp
 
 
 def scan(step_func, /, init, xs, *, reverse=False, length=None):
     return _jax_scan(step_func, init=init, xs=xs, reverse=reverse, length=length)
 
 
-def overwrite_while_loop_func(func, /) -> None:
+@contextlib.contextmanager
+def overwrite_while_loop_func(func, /):
     """Overwrite the while_loop() function.
 
     Parameters
@@ -31,7 +40,12 @@ def overwrite_while_loop_func(func, /) -> None:
         A function with the same signature as `jax.lax.while_loop`.
     """
     global _jax_while_loop
+    tmp = _jax_while_loop
+
     _jax_while_loop = func
+    yield _jax_while_loop
+
+    _jax_while_loop = tmp
 
 
 def while_loop(cond_func, body_func, /, init):

@@ -24,9 +24,8 @@ def test_overwrite_scan_func():
     def scan_that_adds_1(step, init, xs, reverse, length):
         return jax.lax.scan(step, init=init + 1, xs=xs, reverse=reverse, length=length)
 
-    control_flow.overwrite_scan_func(scan_that_adds_1)
-
-    final, outputs = control_flow.scan(cumsum_step, init=0.0, xs=xs)
+    with control_flow.overwrite_scan_func(scan_that_adds_1):
+        final, outputs = control_flow.scan(cumsum_step, init=0.0, xs=xs)
     assert np.allclose(final, sum_total + 1.0)
     assert np.allclose(outputs, cumsum_total + 1.0)
 
@@ -50,7 +49,9 @@ def test_overwrite_while_loop_func():
         init_new = (idx, val + 1.0)
         return jax.lax.while_loop(cond_fun, body_fun, init_new)
 
-    control_flow.overwrite_while_loop_func(while_loop_that_adds_1)
-    index, value = control_flow.while_loop(lambda s: s[0] < 10, counter_step, (0, 0.0))
+    with control_flow.overwrite_while_loop_func(while_loop_that_adds_1):
+        index, value = control_flow.while_loop(
+            lambda s: s[0] < 10, counter_step, (0, 0.0)
+        )
     assert np.allclose(index, 10)
     assert np.allclose(value, 1.0)  # instead of 0.
