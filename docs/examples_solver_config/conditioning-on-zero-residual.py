@@ -1,24 +1,23 @@
----
-jupyter:
-  jupytext:
-    formats: ipynb,md
-    text_representation:
-      extension: .md
-      format_name: markdown
-      format_version: '1.3'
-      jupytext_version: 1.15.2
-  kernelspec:
-    display_name: Python 3 (ipykernel)
-    language: python
-    name: python3
----
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.15.2
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
 
-# Probabilistic solvers as collocation methods
+# # Probabilistic solvers as collocation methods
+#
+# Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-residual on a specified grid.
+#
 
-Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-residual on a specified grid.
-
-
-```python
+# +
 """Demonstrate how probabilistic solvers work via conditioning on constraints."""
 import jax
 import jax.numpy as jnp
@@ -33,14 +32,13 @@ from probdiffeq.solvers.strategies import fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
-```
 
-```python
+# -
+
 plt.rcParams.update(notebook.plot_style())
 plt.rcParams.update(notebook.plot_sizes())
-```
 
-```python
+# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
@@ -49,9 +47,8 @@ config.update("jax_enable_x64", True)
 
 # Make a solver
 impl.select("dense", ode_shape=(1,))
-```
 
-```python
+# +
 # Create an ODE problem
 
 
@@ -63,9 +60,8 @@ def vector_field(y, t):  # noqa: ARG001
 
 t0, t1 = 0.0, 0.5
 u0 = jnp.asarray([0.1])
-```
 
-```python
+# +
 # Assemble the discretised prior (with and without the correct Taylor coefficients)
 
 NUM_DERIVATIVES = 2
@@ -84,9 +80,8 @@ init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(
     tcoeffs, num_derivatives=NUM_DERIVATIVES
 )
 markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
-```
 
-```python
+# +
 # Compute the posterior
 
 slr1 = corrections.ts1()
@@ -102,17 +97,15 @@ sol = ivpsolve.solve_and_save_at(
 )
 # posterior = solution.calibrate(sol.posterior, sol.output_scale)
 markov_seq_posterior = markov.select_terminal(sol.posterior)
-```
 
-```python
+# +
 # Compute marginals
 
 margs_prior = markov.marginals(markov_seq_prior, reverse=False)
 margs_tcoeffs = markov.marginals(markov_seq_tcoeffs, reverse=False)
 margs_posterior = markov.marginals(markov_seq_posterior, reverse=True)
-```
 
-```python
+# +
 # Compute samples
 
 num_samples = 5
@@ -126,9 +119,8 @@ key = jax.random.PRNGKey(seed=1)
 (_qoi, samples_posterior), _ = markov.sample(
     key, markov_seq_posterior, shape=(num_samples,), reverse=True
 )
-```
 
-```python
+# +
 # Plot the results
 
 fig, (axes_state, axes_residual, axes_log_abs) = plt.subplots(
@@ -238,4 +230,3 @@ axes_log_abs[2].set_xlabel("Time $t$")
 # Show the result
 fig.align_ylabels()
 plt.show()
-```
