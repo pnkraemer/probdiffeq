@@ -48,13 +48,11 @@ def while_loop_func(*a, **kw):
     return equinox.internal.while_loop(*a, **kw, kind="bounded", max_steps=100)
 
 
-context_rev_mode_differentiable = control_flow.overwrite_while_loop_func(
-    while_loop_func
-)
+context_compute_gradient = control_flow.overwrite_while_loop_func(while_loop_func)
 # -
 
 # The rest is the similar to the "easy example" in the quickstart,
-# with the exception of simulating adaptively and
+# except for simulating adaptively and
 # computing the value and the gradient
 # (which is impossible without the specialised while-loop implementation).
 
@@ -97,7 +95,7 @@ try:
 except ValueError as err:
     print(f"Caught error:\n\t {err}")
 
-with context_rev_mode_differentiable:
+with context_compute_gradient:
     # Construct the solution routine inside the context
     solve, x = solution_routine()
 
