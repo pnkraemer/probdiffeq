@@ -89,6 +89,8 @@ nav:
       - Parameter estimation with Optax: examples_parameter_estimation/physics_enhanced_regression_1.ipynb
       - Parameter estimation with BlackJAX: examples_parameter_estimation/physics_enhanced_regression_2.ipynb
       - Neural ODEs with Optax: examples_parameter_estimation/neural_ode.ipynb
+  - MISCELLANEOUS EXAMPLES:
+      - examples_misc/use_equinox_bounded_while_loop.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - adaptive: api_docs/adaptive.md
