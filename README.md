@@ -47,7 +47,18 @@ To install ProbDiffEq with `jax[cpu]`, run
 pip install probdiffeq[cpu]
 ```
 
-**WARNING:** This repository is experimental. Functionality may change frequently and without deprecation policies.
+
+**WARNING:**
+_**This is a research project. Expect rough edges and sudden API changes.**_
+
+**VERSIONING:**
+As long as Probdiffeq is in its initial development phase (version 0.MINOR.PATCH), version numbers are increased as follows:
+
+* Bugfixes and new features increase the PATCH version. 
+* Breaking changes increase the MINOR version.
+
+See also: [semantic versioning](https://semver.org/).
+
 
 ## What's next?
 
