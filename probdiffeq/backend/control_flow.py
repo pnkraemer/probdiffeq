@@ -9,7 +9,7 @@ _jax_while_loop = jax.lax.while_loop
 
 
 @contextlib.contextmanager
-def overwrite_scan_func(func, /):
+def context_overwrite_scan(func, /):
     """Overwrite the scan() function.
 
     Parameters
@@ -32,7 +32,7 @@ def scan(step_func, /, init, xs, *, reverse=False, length=None):
 
 
 @contextlib.contextmanager
-def overwrite_while_loop_func(func, /):
+def context_overwrite_while_loop(func, /):
     """Overwrite the while_loop() function.
 
     Parameters

@@ -48,7 +48,7 @@ def while_loop_func(*a, **kw):
     return equinox.internal.while_loop(*a, **kw, kind="bounded", max_steps=100)
 
 
-context_compute_gradient = control_flow.overwrite_while_loop_func(while_loop_func)
+context_compute_gradient = control_flow.context_overwrite_while_loop(while_loop_func)
 # -
 
 # The rest is the similar to the "easy example" in the quickstart,
