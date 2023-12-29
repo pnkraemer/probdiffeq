@@ -1,8 +1,7 @@
 """Precompute and save reference solutions. Accelerate testing."""
-import jax.config
 
+from probdiffeq.backend import config, ode
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode
 from probdiffeq.taylor import autodiff
 
 
@@ -12,10 +11,10 @@ def set_environment():
     The setup used to precompute references should match that of the other tests.
     """
     # Test on CPU.
-    jax.config.update("jax_platform_name", "cpu")
+    config.update("platform_name", "cpu")
 
     # Double precision
-    jax.config.update("jax_enable_x64", True)
+    config.update("enable_x64", True)
 
 
 def three_body_first(num_derivatives_max=6):
