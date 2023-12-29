@@ -2,24 +2,18 @@
 theme:
   name: material
   features:
-#    - navigation.tabs
-#    - navigation.tabs.sticky
     - navigation.sections
     - navigation.path
     - navigation.indexes
-#    - toc.follow
     - search.suggest
     - search.highlight
   palette:
-    # Palette toggle for light mode
     - scheme: default
       primary: white
       accent: amber
       toggle:
         icon: material/eye
         name: Switch to dark mode
-
-    # Palette toggle for dark mode
     - scheme: slate
       primary: black
       accent: amber
@@ -76,12 +70,12 @@ extra:
   social:
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/@pnkraemer
-      name: Nico
+      name: pnkraemer
   generator: false
 nav:
-  - Quickstart: index.md
-  - GETTING STARTED:
-      - An easy example: examples_quickstart/easy_example.ipynb
+  - Probabilistic solvers for differential equations in JAX: index.md
+  - An easy example: examples_quickstart/easy_example.ipynb
+  - 'FAQ: PROBDIFFEQ 101':
       - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
       - Choosing a solver: getting_started/choosing_a_solver.md
       - Troubleshooting: getting_started/troubleshooting.md
