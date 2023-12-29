@@ -21,8 +21,8 @@ def test_overwrite_scan_func():
     # Do not use probdiffeq.backend since otherwise we recurse
     import jax.lax
 
-    def scan_that_adds_1(step, init, xs):
-        return jax.lax.scan(step, init=init + 1, xs=xs)
+    def scan_that_adds_1(step, init, xs, reverse, length):
+        return jax.lax.scan(step, init=init + 1, xs=xs, reverse=reverse, length=length)
 
     control_flow.overwrite_scan_func(scan_that_adds_1)
 
@@ -43,10 +43,12 @@ def test_overwrite_while_loop_func():
     # Do not use probdiffeq.backend since otherwise we recurse
     import jax.lax
 
-    def while_loop_that_adds_1(cond, body, init):
-        idx, val = init
+    # mirror jax.lax.while_loop signature, which may differ
+    # from the backend.control_flow.while_loop signature
+    def while_loop_that_adds_1(cond_fun, body_fun, init_val):
+        idx, val = init_val
         init_new = (idx, val + 1.0)
-        return jax.lax.while_loop(cond, body, init_new)
+        return jax.lax.while_loop(cond_fun, body_fun, init_new)
 
     control_flow.overwrite_while_loop_func(while_loop_that_adds_1)
     index, value = control_flow.while_loop(lambda s: s[0] < 10, counter_step, (0, 0.0))
