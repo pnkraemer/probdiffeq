@@ -83,7 +83,6 @@ nav:
       - examples_solver_config/conditioning-on-zero-residual.ipynb
       - examples_solver_config/posterior_uncertainties.ipynb
       - examples_solver_config/dynamic_output_scales.ipynb
-      - examples_solver_config/smoothing.ipynb
       - examples_solver_config/second_order_problems.ipynb
   - PARAMETER ESTIMATION:
       - Parameter estimation with Optax: examples_parameter_estimation/physics_enhanced_regression_1.ipynb
