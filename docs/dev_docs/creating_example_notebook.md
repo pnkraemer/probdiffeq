@@ -11,7 +11,7 @@ To create a new example notebook and include it in the documentation, follow the
    if your notebook introduces an external dependency 
    (for example, an optimisation or sampling library), 
    do not place it next to the solver-configuration notebooks.
-2. Pair the notebook with a markdown/python version of the notebook via jupytext. This is important for version control, which ignores all files with `*.ipynb` ending.
+2. Pair the notebook with a `py:light` version of the notebook via jupytext. This is important for version control, which ignores all examples with `*.ipynb` or `*.md` ending.
 3. Include the notebook into the docs by mentioning it in the `nav` section of `mkdocs.yml`
 4. Enjoy.
 
