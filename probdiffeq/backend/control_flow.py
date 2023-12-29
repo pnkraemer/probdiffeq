@@ -15,6 +15,11 @@ def scan(step_func, /, init, xs, *, reverse=False, length=None):
     return jax.lax.scan(step_func, init=init, xs=xs, reverse=reverse, length=length)
 
 
-def overwrite_func_scan(func, /):
+def overwrite_scan_func(func, /):
     global scan
     scan = func
+
+
+def overwrite_while_loop_func(func, /):
+    global while_loop
+    while_loop = func
