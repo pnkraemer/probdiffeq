@@ -3,6 +3,7 @@ probdiffeq/_version.py
 
 # Jupyter notebooks
 docs/**/*.ipynb
+docs/examples_*/*.md
 
 # The landing page is automatically generated
 docs/index.md

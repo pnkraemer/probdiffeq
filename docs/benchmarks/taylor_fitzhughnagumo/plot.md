@@ -22,11 +22,11 @@ The FHN problem is a common non-stiff differential equation.
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from jax.config import config
+import jax.config
 
 from probdiffeq.util.doc_util import notebook
 
-config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 ```
 
 ```python

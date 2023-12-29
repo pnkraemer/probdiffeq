@@ -1,35 +1,44 @@
----
-jupyter:
-  jupytext:
-    formats: ipynb,md
-    text_representation:
-      extension: .md
-      format_name: markdown
-      format_version: '1.3'
-      jupytext_version: 1.15.2
-  kernelspec:
-    display_name: Python 3 (ipykernel)
-    language: python
-    name: python3
----
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.15.2
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
 
-# Dynamic and non-dynamic solvers
+# # Dynamic and non-dynamic solvers
+#
+# You can choose between a `ivpsolvers.solver_calibrationfree()`
+# (which does not calibrate the output-scale),
+# a `ivpsolvers.solver_mle()`
+# (which calibrates a global output scale via quasi-maximum-likelihood-estimation),
+# and a `ivpsolvers.solver_dynamic()`,
+# which calibrates a time-varying,
+# piecewise constant output-scale via
+# "local' quasi-maximum-likelihood estimation,
+# similar to how ODE solver estimate local errors.
+#
+# But are these good for?
+# In short: choose a `solver_dynamic`
+# if your ODE output-scale varies quite strongly,
+# and choose an `solver_mle` otherwise.
+#
+# For example, consider the numerical solution of a linear ODE with fixed steps:
 
-You can choose between a `ivpsolvers.solver_calibrationfree()` (which does not calibrate the output-scale), a `ivpsolvers.solver_mle()` (which calibrates a global output scale via quasi-maximum-likelihood-estimation), and a `ivpsolvers.solver_dynamic()`, which calibrates a time-varying, piecewise constant output-scale via "local' quasi-maximum-likelihood estimation, similar to how ODE solver estimate local errors.
-
-But are these good for?
-In short: choose a `solver_dynamic` if your ODE output-scale varies quite strongly, and choose an `solver_mle` otherwise.
-
-For example, consider the numerical solution of a linear ODE with fixed steps:
-
-```python
+# +
 """Display the behaviour of the solvers when the scale of the ODE varies."""
 
 import jax
+import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
-from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
@@ -37,26 +46,23 @@ from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.util.doc_util import notebook
-```
 
-```python
+# -
+
 plt.rcParams.update(notebook.plot_style())
 plt.rcParams.update(notebook.plot_sizes())
-```
 
-```python
+# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
 
-config.update("jax_platform_name", "cpu")
-```
+jax.config.update("jax_platform_name", "cpu")
+# -
 
-```python
 impl.select("dense", ode_shape=(1,))
-```
 
-```python
+# +
 f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
 
 
@@ -64,9 +70,9 @@ f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
 def vf(*ys, t):  # noqa: ARG001
     """Evaluate the affine vector field."""
     return f(*ys, *f_args)
-```
 
-```python
+
+# +
 num_derivatives = 1
 
 ibm = priors.ibm_adaptive(num_derivatives=1)
@@ -74,9 +80,8 @@ ts1 = corrections.ts1()
 strategy = filters.filter_adaptive(ibm, ts1)
 dynamic = calibrated.dynamic(strategy)
 mle = calibrated.mle(strategy)
-```
 
-```python
+# +
 t0, t1 = 0.0, 3.0
 num_pts = 200
 
@@ -88,11 +93,11 @@ init_mle = mle.initial_condition(tcoeffs, output_scale=1.0)
 init_dynamic = dynamic.initial_condition(tcoeffs, output_scale=1.0)
 solution_dynamic = ivpsolve.solve_fixed_grid(vf, init_mle, grid=ts, solver=dynamic)
 solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle)
-```
+# -
 
-Plot the solution.
+# Plot the solution.
 
-```python
+# +
 fig, (axes_linear, axes_log) = plt.subplots(ncols=2, nrows=2, sharex=True, sharey="row")
 
 
@@ -160,9 +165,16 @@ axes_log[0].set_xlim((t0, t1))
 
 fig.align_ylabels()
 plt.show()
-```
+# -
 
-The dynamic solver adapts the output-scale so that both the solution and the output-scale grow exponentially.
-The ODE-solution fits the truth well.
-
-The solver_mle does not have this tool, and the ODE solution is not able to follow the exponential: it drifts back to the origin. (This is expected, we are basically trying to fit an exponential with a piecewise polynomial.)
+# The dynamic solver adapts the output-scale so
+# that both the solution and the output-scale
+# grow exponentially.
+# The ODE-solution fits the truth well.
+#
+# The solver_mle does not have this tool, and
+# the ODE solution is not able to
+# follow the exponential: it drifts
+# back to the origin.
+# (This is expected, we are basically trying to
+# fit an exponential with a piecewise polynomial.)

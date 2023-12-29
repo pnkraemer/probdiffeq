@@ -16,7 +16,6 @@ import numba
 import numpy as np
 import scipy.integrate
 import tqdm
-from jax import config
 
 from probdiffeq import adaptive, controls, ivpsolve, timestep
 from probdiffeq.impl import impl
@@ -30,10 +29,10 @@ from probdiffeq.util.doc_util import info
 def set_jax_config() -> None:
     """Set JAX and other external libraries up."""
     # x64 precision
-    config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", True)
 
     # CPU
-    config.update("jax_platform_name", "cpu")
+    jax.config.update("jax_platform_name", "cpu")
 
 
 def set_probdiffeq_config() -> None:

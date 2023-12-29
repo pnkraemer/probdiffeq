@@ -61,7 +61,7 @@ plugins:
             show_signature_annotations: true
   - exclude:
       glob:
-        - examples*/*.md
+        - examples*/*.py
         - examples*/*.ipynb_*
         - benchmarks*/**/*.md
         - benchmarks*/**/*.py
