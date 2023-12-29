@@ -8,12 +8,12 @@ test:
 	IMPL=scalar pytest -n auto -v 		# parallelise, verbose output
 
 example:
-	jupytext --quiet --to ipynb --update docs/examples*/*.md
+	jupytext --quiet --to ipynb --update docs/examples*/*.py
 	jupytext --execute docs/examples*/*.ipynb
 
 
 benchmarks-plot-results:
-	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
+	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.py
 	jupytext --execute docs/benchmarks/**/*.ipynb
 
 benchmarks-run:

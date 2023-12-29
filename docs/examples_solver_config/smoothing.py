@@ -22,10 +22,10 @@
 """Demonstrate different options for implementing an IVP-solver via smoothing."""
 
 import jax
+import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
-from jax.config import config
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
@@ -44,7 +44,7 @@ plt.rcParams.update(notebook.plot_sizes())
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
-config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 # -
 
 impl.select("isotropic", ode_shape=(2,))

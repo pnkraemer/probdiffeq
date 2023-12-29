@@ -20,11 +20,11 @@
 # +
 """Train a neural ODE with ProbDiffEq and Optax."""
 import jax
+import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
 from diffeqzoo import backend, ivps
-from jax.config import config
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
@@ -44,9 +44,9 @@ if not backend.has_been_selected:
 
 # Catch NaN gradients in CI
 # Disable to improve speed
-config.update("jax_debug_nans", True)
+jax.config.update("jax_debug_nans", True)
 
-config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 # -
 
 impl.select("isotropic", ode_shape=(1,))

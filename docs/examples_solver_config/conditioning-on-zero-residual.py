@@ -21,10 +21,10 @@
 # +
 """Demonstrate how probabilistic solvers work via conditioning on constraints."""
 import jax
+import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend
-from jax.config import config
 
 from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
@@ -43,8 +43,8 @@ plt.rcParams.update(notebook.plot_sizes())
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
-config.update("jax_platform_name", "cpu")
-config.update("jax_enable_x64", True)
+jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_enable_x64", True)
 
 # Make a solver
 impl.select("dense", ode_shape=(1,))

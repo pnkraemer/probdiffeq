@@ -13,7 +13,6 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 from diffeqzoo import backend
-from jax import config
 
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff
@@ -23,10 +22,10 @@ from probdiffeq.util.doc_util import info
 def set_jax_config() -> None:
     """Set JAX and other external libraries up."""
     # x64 precision
-    config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", True)
 
     # CPU
-    config.update("jax_platform_name", "cpu")
+    jax.config.update("jax_platform_name", "cpu")
 
 
 def set_probdiffeq_config() -> None:

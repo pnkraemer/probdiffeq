@@ -20,8 +20,8 @@
 """Solve the logistic equation."""
 
 import jax
+import jax.config
 import jax.numpy as jnp
-from jax.config import config
 
 from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
@@ -30,7 +30,7 @@ from probdiffeq.solvers.strategies import smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
 
-config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 
 
 # -

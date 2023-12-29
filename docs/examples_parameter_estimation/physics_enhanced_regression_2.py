@@ -127,11 +127,11 @@ import functools
 
 import blackjax
 import jax
+import jax.config
 import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
-from jax.config import config
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
@@ -143,10 +143,10 @@ from probdiffeq.util.doc_util import notebook
 
 # +
 # x64 precision
-config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", True)
 
 # CPU
-config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 
 # IVP examples in JAX
 if not backend.has_been_selected:
