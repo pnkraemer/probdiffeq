@@ -22,7 +22,7 @@ def context_overwrite_scan(func, /):
 
     try:
         _jax_scan = func
-        yield _jax_scan
+        yield
     finally:
         _jax_scan = tmp
 
@@ -45,7 +45,7 @@ def context_overwrite_while_loop(func, /):
 
     try:
         _jax_while_loop = func
-        yield _jax_while_loop
+        yield
     finally:
         _jax_while_loop = tmp
 
