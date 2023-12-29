@@ -20,10 +20,11 @@ def overwrite_scan_func(func, /):
     global _jax_scan
     tmp = _jax_scan
 
-    _jax_scan = func
-    yield _jax_scan
-
-    _jax_scan = tmp
+    try:
+        _jax_scan = func
+        yield _jax_scan
+    finally:
+        _jax_scan = tmp
 
 
 def scan(step_func, /, init, xs, *, reverse=False, length=None):
@@ -42,10 +43,11 @@ def overwrite_while_loop_func(func, /):
     global _jax_while_loop
     tmp = _jax_while_loop
 
-    _jax_while_loop = func
-    yield _jax_while_loop
-
-    _jax_while_loop = tmp
+    try:
+        _jax_while_loop = func
+        yield _jax_while_loop
+    finally:
+        _jax_while_loop = tmp
 
 
 def while_loop(cond_func, body_func, /, init):
