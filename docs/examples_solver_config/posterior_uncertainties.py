@@ -48,7 +48,8 @@ impl.select("isotropic", ode_shape=(2,))
 
 # Set an example problem.
 #
-# Solve the problem on a low resolution and short time-span to achieve large uncertainty.
+# Solve the problem on a low resolution and
+# short time-span to achieve large uncertainty.
 
 # +
 f, u0, (t0, t1), f_args = ivps.lotka_volterra()
@@ -180,6 +181,9 @@ for i, axes_cols in enumerate(axes_all.T):
 plt.show()
 # -
 
-# The marginal standard deviations (bottom row) show how the filter is forward-only, whereas the smoother is a global estimate.
+# The marginal standard deviations (bottom row)
+# show how the filter is forward-only,
+# whereas the smoother is a global estimate.
 #
-# This is why you should use a filter for terminal-value simulation and a smoother if you want "global" solutions.
+# This is why you should use a filter for
+# terminal-value simulation and a smoother if you want "global" solutions.

@@ -109,6 +109,8 @@ plt.title((solution.u.shape, norm))
 plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
 plt.show()
 
-# The results are indistinguishable from the plot. While the runtimes of both solvers are similar, the error of the second-order solver is much lower.
+# The results are indistinguishable from the plot.
+# While the runtimes of both solvers are similar,
+# the error of the second-order solver is much lower.
 #
 # See the benchmarks for more quantitative versions of this statement.

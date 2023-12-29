@@ -14,7 +14,8 @@
 
 # # Train a Neural ODE with Optax
 #
-# We can use the parameter estimation functionality to fit a neural ODE to a time series data set.
+# We can use the parameter estimation functionality
+# to fit a neural ODE to a time series data set.
 
 # +
 """Train a neural ODE with ProbDiffEq and Optax."""
@@ -50,7 +51,8 @@ config.update("jax_platform_name", "cpu")
 
 impl.select("isotropic", ode_shape=(1,))
 
-# To keep the problem nice and small, assume that the data set is a trigonometric function (which solve differential equations).
+# To keep the problem nice and small, assume that the data set is a
+# trigonometric function (which solve differential equations).
 
 # +
 grid = jnp.linspace(0, 1, num=100)
@@ -102,7 +104,9 @@ def build_update_fn(*, optimizer, loss_fn):
 
 # ## Construct an MLP with tanh activation
 #
-# Let's start with the example given in the [implicit layers tutorial](http://implicit-layers-tutorial.org/neural_odes/). The vector field is provided by [DiffEqZoo](https://diffeqzoo.readthedocs.io/).
+# Let's start with the example given in the
+# [implicit layers tutorial](http://implicit-layers-tutorial.org/neural_odes/).
+# The vector field is provided by [DiffEqZoo](https://diffeqzoo.readthedocs.io/).
 
 # +
 f, u0, (t0, t1), f_args = ivps.neural_ode_mlp(layer_sizes=(2, 20, 1))
@@ -182,7 +186,11 @@ plt.show()
 # ## What's next
 #
 #
-# The same example can be constructed with deep learning libraries such as [Equinox](https://docs.kidger.site/equinox/), [Haiku](https://dm-haiku.readthedocs.io/en/latest/), or [Flax](https://flax.readthedocs.io/en/latest/getting_started.html).
-# To do so, define a corresponding vector field and a parameter set, build a new loss function and repeat.
+# The same example can be constructed with deep learning libraries
+# such as [Equinox](https://docs.kidger.site/equinox/),
+# [Haiku](https://dm-haiku.readthedocs.io/en/latest/), or
+# [Flax](https://flax.readthedocs.io/en/latest/getting_started.html).
+# To do so, define a corresponding vector field and a parameter set,
+# build a new loss function and repeat.
 #
 #

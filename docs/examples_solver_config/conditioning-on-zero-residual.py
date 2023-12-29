@@ -14,7 +14,8 @@
 
 # # Probabilistic solvers as collocation methods
 #
-# Probabilistic solvers condition a prior distribution on satisfying a zero-ODE-residual on a specified grid.
+# Probabilistic solvers condition a prior distribution
+# on satisfying a zero-ODE-residual on a specified grid.
 #
 
 # +

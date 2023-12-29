@@ -64,8 +64,10 @@ tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 
 # ## Terminal-value simulation
 #
-# If you are interested in the terminal value of the ODE solution, you can use filters and smoothers interchangeably.
-# But be aware that a smoother computes more intermediate values than a filter, so filters are more efficient here.
+# If you are interested in the terminal value of the ODE solution,
+# you can use filters and smoothers interchangeably.
+# But be aware that a smoother computes more
+# intermediate values than a filter, so filters are more efficient here.
 
 # +
 ibm = priors.ibm_adaptive(num_derivatives=4)
@@ -81,7 +83,8 @@ print(ekf0sol.t, ekf0sol.u)
 
 # ## Traditional simulation
 #
-# If you are used to calling traditional solve() methods, use one a conventional smoother (i.e. not the fixed-point smoother).
+# If you are used to calling traditional solve() methods,
+# use one a conventional smoother (i.e. not the fixed-point smoother).
 
 # +
 eks0 = calibrated.mle(smoothers.smoother_adaptive(ibm, ts0))
@@ -126,7 +129,8 @@ plt.show()
 
 # ## Checkpoint simulation
 #
-# If you know in advance that you like to have the solution at a pre-specified set of points only,
+# If you know in advance that you like
+# to have the solution at a pre-specified set of points only,
 # use the solve_and_save_at function together with a fixed-point smoother.
 #
 #

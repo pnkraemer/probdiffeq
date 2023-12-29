@@ -15,11 +15,17 @@
 # # Parameter estimation with BlackJAX
 #
 #
-# This tutorial explains how to estimate unknown parameters of initial value problems (IVPs) using Markov Chain Monte Carlo (MCMC) methods as provided by [BlackJAX](https://blackjax-devs.github.io/blackjax/).
+# This tutorial explains how to estimate unknown parameters of
+# initial value problems (IVPs) using Markov Chain Monte Carlo (MCMC)
+# methods as provided by [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 #
 # ## TL;DR
-# Compute log-posterior of IVP parameters given observations of the IVP solution with ProbDiffEq. Sample from this posterior using BlackJAX.
-# Evaluating the log-likelihood of the data is described [in this paper](https://arxiv.org/abs/2202.01287). Based on this log-likelihood, sampling from the log-posterior is as done [in this paper](https://arxiv.org/abs/2002.09301).
+# Compute log-posterior of IVP parameters given observations of the
+# IVP solution with ProbDiffEq. Sample from this posterior using BlackJAX.
+# Evaluating the log-likelihood of the data is described
+# [in this paper](https://arxiv.org/abs/2202.01287).
+# Based on this log-likelihood, sampling from the log-posterior is
+# as done [in this paper](https://arxiv.org/abs/2002.09301).
 #
 #
 # ## Technical setup
@@ -31,56 +37,86 @@
 # $$
 #
 # subject to an unknown initial condition $y(0) = \theta$.
-# Recall from the previous tutorials that the probabilistic IVP solution is an approximation of the posterior distribution
+# Recall from the previous tutorials that the probabilistic IVP solution
+# is an approximation of the posterior distribution
 #
 # $$
 # p\left(y ~|~ [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta\right)
 # $$
 #
-# for a Gaussian prior over $y$ and a pre-determined or adaptively selected grid $t_0, ..., t_N$.
+# for a Gaussian prior over $y$ and a pre-determined or
+# adaptively selected grid $t_0, ..., t_N$.
 #
-# We don't know the initial condition of the IVP, but assume that we have noisy observations of the IVP soution $y$ at the terminal time $T$ of the integration problem,
+# We don't know the initial condition of the IVP,
+# but assume that we have noisy observations of the IVP soution $y$
+# at the terminal time $T$ of the integration problem,
 #
 # $$
 # p(\text{data}~|~ y(T)) = N(y(T), \sigma^2 I)
 # $$
 #
 # for some $\sigma > 0$.
-# We can use these observations to reconstruct $\theta$, for example by sampling from $p(\text{data}~|~\theta)$ (which is a function of $\theta$).
+# We can use these observations to reconstruct $\theta$,
+# for example by sampling from $p(\text{data}~|~\theta)$
+# (which is a function of $\theta$).
 #
-# Now, one way of evaluating $p(\text{data} ~|~ \theta)$ is to use any numerical solver, for example a Runge-Kutta method, to approximate $y(T)$ from $\theta$ and evaluate $N(y(T), \sigma^2 I)$.
-# But this ignores a few crucial concepts (e.g., the numerical error of the approximation; we refer to the references linked above).
-# Instead, we can use a probabilistic solver instead of "any" numerical solver and build a more comprehensive model:
+# Now, one way of evaluating $p(\text{data} ~|~ \theta)$ is
+# to use any numerical solver, for example a Runge-Kutta method,
+# to approximate $y(T)$ from $\theta$ and evaluate $N(y(T), \sigma^2 I)$.
+# But this ignores a few crucial concepts
+# (e.g., the numerical error of the approximation;
+# we refer to the references linked above).
+# Instead, we can use a probabilistic solver instead of
+# "any" numerical solver and build a more comprehensive model:
 #
-# **We can combine probabilistic IVP solvers with MCMC methods to estimate $\theta$ from $\text{data}$ in a way that quantifies numerical approximation errors (and other model mismatches).**
-# To do so, we approximate the distribution of the IVP solution given the parameter $p(y(T) \mid \theta)$ and evaluate the marginal distribution of $N(y(T), \sigma^2I)$ given the probabilistic IVP solution.
+# **We can combine probabilistic IVP solvers with MCMC methods
+# to estimate $\theta$ from $\text{data}$ in a way that quantifies
+# numerical approximation errors (and other model mismatches).**
+# To do so, we approximate the distribution of the IVP solution
+# given the parameter $p(y(T) \mid \theta)$ and evaluate the
+# marginal distribution of $N(y(T), \sigma^2I)$ given the probabilistic IVP solution.
 # More formally, we use ProbDiffEq to evaluate the density of the unnormalised posterior
 #
 # $$
 # M(\theta) := p(\theta \mid \text{data})\propto p(\text{data} \mid \theta)p(\theta)
 # $$
 #
-# where "$\propto$" means "proportional to" and the likelihood stems from the IVP solution
+# where "$\propto$" means "proportional to" and the
+# likelihood stems from the IVP solution
 #
 # $$
-# p(\text{data} \mid \theta) = \int p(\text{data} \mid y(T)) p(y(T) \mid [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta), \theta) d y(T)
+# p(\text{data} \mid \theta) = \int p(\text{data} \mid y(T))
+# p(y(T) \mid [\dot y(t_n) = f(y(t_n))]_{n=0}^N, y(0) = \theta), \theta) d y(T)
 # $$
-# Loosely speaking, this distribution averages $N(y(T), \sigma^2I)$ over all IVP solutions $y(T)$ that are realistic given the differential equation, grid $t_0, ..., t_N$, and prior distribution $p(y)$.
-# This is useful, because if the approximation error is large, $M(\theta)$ "knows this". If the approximation error is ridiculously small, $M(\theta)$ "knows this" too and  we recover the procedure described for non-probabilistic solvers above.
-# **Interestingly, non-probabilistic solvers cannot do this** averaging because they do not yield a statistical description of estimated IVP solutions.
-# Non-probabilistic solvers would also fail if the observations were noise-free (i.e. $\sigma = 0$), but the present example notebook remains stable. (Try it yourself!)
+# Loosely speaking, this distribution averages $N(y(T), \sigma^2I)$
+# over all IVP solutions $y(T)$ that are realistic given the differential equation,
+# grid $t_0, ..., t_N$, and prior distribution $p(y)$.
+# This is useful, because if the approximation error is large, $M(\theta)$
+# "knows this". If the approximation error is ridiculously small,
+# $M(\theta)$ "knows this" too and  we recover the procedure described
+# for non-probabilistic solvers above.
+# **Interestingly, non-probabilistic solvers cannot do this** averaging
+# because they do not yield a statistical description of estimated IVP solutions.
+# Non-probabilistic solvers would also fail if the observations were
+# noise-free (i.e. $\sigma = 0$), but the present example notebook remains stable.
+# (Try it yourself!)
 #
 #
 #
-# To sample $\theta$ according to $M$ (respectively $\log M$), we evaluate $M(\theta)$ with ProbDiffEq, compute its gradient with JAX, and use this gradient to sample $\theta$ with BlackJAX:
+# To sample $\theta$ according to $M$ (respectively $\log M$),
+# we evaluate $M(\theta)$ with ProbDiffEq, compute its gradient with JAX,
+# and use this gradient to sample $\theta$ with BlackJAX:
 #
-# 1. ProbDiffEq: Compute the probabilistic IVP solution by approximating $p(y(T) ~|~ [\dot y(t_n) = f(y(t_n))]_n, y(0) = \theta)$
+# 1. ProbDiffEq: Compute the probabilistic IVP solution by approximating
+# $p(y(T) ~|~ [\dot y(t_n) = f(y(t_n))]_n, y(0) = \theta)$
 #
-# 2. ProbDiffEq: Evaluate  $M(\theta)$ by marginalising over the IVP solution computed in step 1.
+# 2. ProbDiffEq: Evaluate  $M(\theta)$ by marginalising over
+# the IVP solution computed in step 1.
 #
 # 3. JAX: Compute the gradient $\nabla_\theta M(\theta)$
 #
-# 4. BlackJAX: Sample from $\log M(\theta)$ using, for example, the No-U-Turn-Sampler (which requires $\nabla_\theta M(\theta))$.
+# 4. BlackJAX: Sample from $\log M(\theta)$ using, for example,
+# the No-U-Turn-Sampler (which requires $\nabla_\theta M(\theta))$.
 #
 # Here is how:
 
@@ -126,7 +162,8 @@ impl.select("isotropic", ode_shape=(2,))
 
 # ## Problem setting
 #
-# First, we set up an IVP and create some artificial data by simulating the system with "incorrect" initial conditions.
+# First, we set up an IVP and create some artificial data by
+# simulating the system with "incorrect" initial conditions.
 
 # +
 f, u0, (t0, t1), f_args = ivps.lotka_volterra()
@@ -209,7 +246,8 @@ plt.show()
 
 # ## Log-posterior densities via ProbDiffEq
 #
-# Set up a log-posterior density function that we can plug into BlackJAX. Choose a Gaussian prior centered at the initial guess with a large variance.
+# Set up a log-posterior density function that we can plug into BlackJAX.
+# Choose a Gaussian prior centered at the initial guess with a large variance.
 
 # +
 mean = theta_guess
@@ -313,7 +351,8 @@ ax = plot_solution(sol, ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs)
 plt.show()
 # -
 
-# The samples cover a perhaps surpringly large range of potential initial conditions, but lead to the "correct" data.
+# The samples cover a perhaps surpringly large range of
+# potential initial conditions, but lead to the "correct" data.
 #
 # In parameter space, this is what it looks like:
 
@@ -324,7 +363,8 @@ plt.plot(theta_guess[0], theta_guess[1], "P", label="Initial guess", markersize=
 plt.legend()
 plt.show()
 
-# Let's add the value of $M$ to the plot to see whether the sampler covers the entire region of interest.
+# Let's add the value of $M$ to the plot to see whether
+# the sampler covers the entire region of interest.
 
 # +
 xlim = 17, jnp.amax(states.position[:, 0]) + 0.5
@@ -362,15 +402,25 @@ plt.show()
 #
 # ## Conclusion
 #
-# In conclusion, a log-posterior density function can be provided by ProbDiffEq such that any of BlackJAX' samplers yield parameter estimates of IVPs.
+# In conclusion, a log-posterior density function can be provided by
+# ProbDiffEq such that any of BlackJAX' samplers yield parameter estimates of IVPs.
 #
 #
 # ## What's next
 #
-# Try to get a feeling for how the sampler reacts to changing observation noises, solver parameters, and so on.
-# We could extend the sampling problem from $\theta \mapsto \log M(\theta)$ to some $(\theta, \sigma) \mapsto \log \tilde M(\theta, \sigma)$, i.e., treat the observation noise as unknown and run Hamiltonian Monte Carlo in a higher-dimensional parameter space.
-# We could also add a more suitable prior distribution $p(\theta)$ to regularise the problem.
+# Try to get a feeling for how the sampler reacts to changing
+# observation noises, solver parameters, and so on.
+# We could extend the sampling problem from
+# $\theta \mapsto \log M(\theta)$ to some
+# $(\theta, \sigma) \mapsto \log \tilde M(\theta, \sigma)$,
+# i.e., treat the observation noise as unknown and
+# run Hamiltonian Monte Carlo in a higher-dimensional parameter space.
+# We could also add a more suitable prior distribution
+# $p(\theta)$ to regularise the problem.
 #
 #
 # A final side note:
-# We could also replace the sampler with an optimisation algorithm and use this procedure to solve boundary value problems (albeit this may not be very efficient; use [this](https://arxiv.org/abs/2106.07761) algorithm instead).
+# We could also replace the sampler with an optimisation algorithm
+# and use this procedure to solve boundary value problems
+# (albeit this may not be very efficient;
+# use [this](https://arxiv.org/abs/2106.07761) algorithm instead).

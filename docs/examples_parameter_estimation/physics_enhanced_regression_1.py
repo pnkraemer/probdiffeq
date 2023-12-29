@@ -16,10 +16,14 @@
 #
 # **Time-series data and optimization with ``optax``**
 #
-# We create some fake-observational data, compute the marginal likelihood of this fake data _under the ODE posterior_ (which is something you cannot do with non-probabilistic solvers!), and optimize the parameters with `optax`.
+# We create some fake-observational data,
+# compute the marginal likelihood of this fake data _under the ODE posterior_
+# (which is something you cannot do with non-probabilistic solvers!),
+# and optimize the parameters with `optax`.
 #
 #
-# Tronarp, Bosch, and Hennig call this "physics-enhanced regression" ([link to paper](https://arxiv.org/abs/2202.01287)).
+# Tronarp, Bosch, and Hennig call this "physics-enhanced regression"
+# ([link to paper](https://arxiv.org/abs/2202.01287)).
 
 # +
 """Estimate ODE parameters with ProbDiffEq and Optax."""
@@ -102,7 +106,9 @@ plt.show()
 
 # Use the probdiffeq functionality to compute a parameter-to-data fit function.
 #
-# This incorporates the likelihood of the data under the distribution induced by the probabilistic ODE solution (which was generated with the current parameter guess).
+# This incorporates the likelihood of the data under the distribution induced
+# by the probabilistic ODE solution
+# (which was generated with the current parameter guess).
 
 
 # +
@@ -120,13 +126,17 @@ def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
 sensitivities = jax.jit(jax.grad(parameter_to_data_fit))
 # -
 
-# We can differentiate the function forward- and reverse-mode (the latter is possible because we use fixed steps)
+# We can differentiate the function forward- and reverse-mode
+# (the latter is possible because we use fixed steps)
 
 parameter_to_data_fit(parameter_guess)
 sensitivities(parameter_guess)
 
 
-# Now, enter optax: build an optimizer, and optimise the parameter-to-model-fit function. The following is more or less taken from the [optax-documentation](https://optax.readthedocs.io/en/latest/optax-101.html).
+# Now, enter optax: build an optimizer,
+# and optimise the parameter-to-model-fit function.
+# The following is more or less taken from the
+# [optax-documentation](https://optax.readthedocs.io/en/latest/optax-101.html).
 
 
 # +

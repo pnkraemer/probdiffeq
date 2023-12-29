@@ -14,10 +14,20 @@
 
 # # Dynamic and non-dynamic solvers
 #
-# You can choose between a `ivpsolvers.solver_calibrationfree()` (which does not calibrate the output-scale), a `ivpsolvers.solver_mle()` (which calibrates a global output scale via quasi-maximum-likelihood-estimation), and a `ivpsolvers.solver_dynamic()`, which calibrates a time-varying, piecewise constant output-scale via "local' quasi-maximum-likelihood estimation, similar to how ODE solver estimate local errors.
+# You can choose between a `ivpsolvers.solver_calibrationfree()`
+# (which does not calibrate the output-scale),
+# a `ivpsolvers.solver_mle()`
+# (which calibrates a global output scale via quasi-maximum-likelihood-estimation),
+# and a `ivpsolvers.solver_dynamic()`,
+# which calibrates a time-varying,
+# piecewise constant output-scale via
+# "local' quasi-maximum-likelihood estimation,
+# similar to how ODE solver estimate local errors.
 #
 # But are these good for?
-# In short: choose a `solver_dynamic` if your ODE output-scale varies quite strongly, and choose an `solver_mle` otherwise.
+# In short: choose a `solver_dynamic`
+# if your ODE output-scale varies quite strongly,
+# and choose an `solver_mle` otherwise.
 #
 # For example, consider the numerical solution of a linear ODE with fixed steps:
 
@@ -157,7 +167,14 @@ fig.align_ylabels()
 plt.show()
 # -
 
-# The dynamic solver adapts the output-scale so that both the solution and the output-scale grow exponentially.
+# The dynamic solver adapts the output-scale so
+# that both the solution and the output-scale
+# grow exponentially.
 # The ODE-solution fits the truth well.
 #
-# The solver_mle does not have this tool, and the ODE solution is not able to follow the exponential: it drifts back to the origin. (This is expected, we are basically trying to fit an exponential with a piecewise polynomial.)
+# The solver_mle does not have this tool, and
+# the ODE solution is not able to
+# follow the exponential: it drifts
+# back to the origin.
+# (This is expected, we are basically trying to
+# fit an exponential with a piecewise polynomial.)
