@@ -13,7 +13,7 @@ example:
 
 
 benchmarks-plot-results:
-	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.py
+	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
 	jupytext --execute docs/benchmarks/**/*.ipynb
 
 benchmarks-run:
