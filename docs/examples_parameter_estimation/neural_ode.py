@@ -20,7 +20,6 @@
 # +
 """Train a neural ODE with ProbDiffEq and Optax."""
 import jax
-import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax

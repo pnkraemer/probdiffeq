@@ -49,4 +49,4 @@ doc:
 	# to gain clear error messages.
 	make example
 	make benchmarks-plot-results
-	mkdocs build
+	JUPYTER_PLATFORM_DIRS=1 mkdocs build

@@ -35,7 +35,6 @@
 """Display the behaviour of the solvers when the scale of the ODE varies."""
 
 import jax
-import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps

@@ -127,7 +127,6 @@ import functools
 
 import blackjax
 import jax
-import jax.config
 import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
