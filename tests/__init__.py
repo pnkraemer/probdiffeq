@@ -1,4 +1,5 @@
 """Tests."""
+
 import os
 
 from tests.setup import setup

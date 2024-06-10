@@ -1,6 +1,5 @@
 """Compare solve_fixed_grid to solve_and_save_every_step."""
 
-
 from probdiffeq import adaptive, controls, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing

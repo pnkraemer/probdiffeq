@@ -1,6 +1,5 @@
 """Time-stepping utilities."""
 
-
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
 

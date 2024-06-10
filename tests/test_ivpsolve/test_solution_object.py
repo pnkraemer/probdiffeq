@@ -1,4 +1,5 @@
 """Tests for interaction with the solution object."""
+
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np

@@ -8,6 +8,7 @@ and without bundling them here, choices between
 have been very inconsistent.
 This is not good for extendability of the test suite.
 """
+
 import jax.numpy as jnp
 import jax.tree_util
 import pytest

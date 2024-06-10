@@ -1,4 +1,5 @@
 """API for dense factorisations."""
+
 from probdiffeq.impl import _impl
 from probdiffeq.impl.dense import (
     _conditional,

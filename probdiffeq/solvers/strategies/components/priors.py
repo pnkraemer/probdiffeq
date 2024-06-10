@@ -1,6 +1,5 @@
 """Prior models."""
 
-
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl

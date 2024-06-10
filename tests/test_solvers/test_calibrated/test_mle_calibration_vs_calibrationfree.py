@@ -4,6 +4,7 @@ The posterior of the MLE solver is the same as for the calibration-free solver.
 The output scale is different.
 After applying solution.calibrate(), the posterior is different.
 """
+
 from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
