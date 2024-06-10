@@ -27,7 +27,7 @@ theme:
 site_name: probdiffeq documentation
 site_description: The documentation for the probdiffeq library.
 site_author: Nicholas Krämer
-strict: true
+strict: false
 repo_url: https://github.com/pnkraemer/probdiffeq
 repo_name: pnkraemer/probdiffeq
 
