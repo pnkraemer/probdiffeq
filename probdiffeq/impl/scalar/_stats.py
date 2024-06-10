@@ -1,4 +1,5 @@
 """Random variable implementation."""
+
 from probdiffeq.backend import functools, linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _stats

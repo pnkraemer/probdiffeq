@@ -1,4 +1,5 @@
 """State-space model impl."""
+
 import warnings
 
 from probdiffeq.backend import abc

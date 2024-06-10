@@ -1,6 +1,5 @@
 """Abstract base classes."""
 
-
 import abc
 
 

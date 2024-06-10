@@ -3,7 +3,6 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-
 from probdiffeq.backend import functools, stats
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl

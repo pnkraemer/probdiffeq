@@ -1,4 +1,5 @@
 """Isotropic factorisation."""
+
 from probdiffeq.impl import _impl
 from probdiffeq.impl.isotropic import (
     _conditional,

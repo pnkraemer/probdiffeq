@@ -1,6 +1,5 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
-
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.taylor import autodiff

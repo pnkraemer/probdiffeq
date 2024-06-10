@@ -1,4 +1,5 @@
 """Scalar factorisation."""
+
 from probdiffeq.impl import _impl
 from probdiffeq.impl.scalar import (
     _conditional,

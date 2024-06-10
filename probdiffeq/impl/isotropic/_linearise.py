@@ -1,4 +1,5 @@
 """Linearisation."""
+
 from probdiffeq.impl import _linearise
 from probdiffeq.util import linop_util
 

@@ -1,6 +1,5 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-
 from probdiffeq.backend import functools, ode
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl

@@ -1,4 +1,5 @@
 """State-space model utilities."""
+
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _ssm_util
 from probdiffeq.impl.isotropic import _normal

@@ -1,4 +1,5 @@
 """Test equivalences between cubature rules."""
+
 from probdiffeq.backend import numpy as np
 from probdiffeq.solvers.strategies.components import cubature
 

@@ -2,6 +2,7 @@
 
 See makefile for instructions.
 """
+
 import argparse
 import functools
 import os

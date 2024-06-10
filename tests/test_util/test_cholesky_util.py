@@ -2,6 +2,7 @@
 
 These are so crucial and annoying to debug that they need their own test set.
 """
+
 from math import prod
 
 from probdiffeq.backend import functools, linalg, testing, tree_util

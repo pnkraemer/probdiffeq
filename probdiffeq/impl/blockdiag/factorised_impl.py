@@ -1,4 +1,5 @@
 """Factorisations."""
+
 from probdiffeq.impl import _impl
 from probdiffeq.impl.blockdiag import (
     _conditional,

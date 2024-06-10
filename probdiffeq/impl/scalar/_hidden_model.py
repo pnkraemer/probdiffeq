@@ -1,4 +1,5 @@
 """Hidden state-space model implementation."""
+
 from probdiffeq.backend import functools
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _hidden_model

@@ -1,4 +1,5 @@
 """Linearisation."""
+
 from probdiffeq.impl import _linearise
 
 

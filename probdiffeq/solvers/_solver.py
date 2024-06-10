@@ -1,6 +1,5 @@
 """IVP-solver API."""
 
-
 from probdiffeq import _interp
 from probdiffeq.backend import abc
 from probdiffeq.backend import numpy as np

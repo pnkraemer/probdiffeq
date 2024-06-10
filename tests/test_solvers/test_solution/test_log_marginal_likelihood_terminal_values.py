@@ -1,4 +1,5 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
+
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing

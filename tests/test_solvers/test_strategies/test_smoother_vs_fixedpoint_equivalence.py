@@ -2,6 +2,7 @@
 
 That is, when called with correct adaptive- and checkpoint-setups.
 """
+
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np

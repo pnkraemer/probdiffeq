@@ -1,6 +1,5 @@
 """Cubature rules."""
 
-
 from probdiffeq.backend import containers, special, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array

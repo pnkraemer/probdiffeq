@@ -1,4 +1,5 @@
 """Random variable transformations."""
+
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _transform
 from probdiffeq.impl.scalar import _normal

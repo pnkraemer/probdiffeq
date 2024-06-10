@@ -1,6 +1,5 @@
 """Compare simulate_terminal_values to solve_and_save_every_step."""
 
-
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
