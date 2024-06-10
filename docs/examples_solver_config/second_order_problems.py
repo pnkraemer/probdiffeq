@@ -18,7 +18,6 @@
 """Demonstrate how to solve second-order IVPs without transforming them first."""
 
 import jax
-import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps

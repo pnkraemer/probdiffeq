@@ -18,7 +18,6 @@
 """Display the marginal uncertainties of filters and smoothers."""
 
 import jax
-import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
