@@ -21,7 +21,6 @@
 # +
 """Demonstrate how probabilistic solvers work via conditioning on constraints."""
 import jax
-import jax.config
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend

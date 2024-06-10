@@ -20,7 +20,6 @@
 """Solve the logistic equation."""
 
 import jax
-import jax.config
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve, timestep

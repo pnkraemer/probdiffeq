@@ -1,6 +1,6 @@
 """Configuration management."""
 
-import jax.config
+import jax
 
 
 def update(str_without_jax, value, /):

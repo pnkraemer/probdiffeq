@@ -22,7 +22,7 @@ The Lotka-Volterra problem is a common differential equation and relatively easy
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import jax.config
+import jax
 
 from probdiffeq.util.doc_util import notebook
 

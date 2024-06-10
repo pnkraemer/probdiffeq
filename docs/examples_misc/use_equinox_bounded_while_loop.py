@@ -22,7 +22,6 @@
 
 import equinox
 import jax
-import jax.config
 import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve

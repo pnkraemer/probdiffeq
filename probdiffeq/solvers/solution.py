@@ -109,6 +109,10 @@ def _condition_and_logpdf(rv, data, model):
 def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     """Compute the log-marginal-likelihood of observations of the IVP solution.
 
+    !!! note
+        Use `log_marginal_likelihood_terminal_values`
+        to compute the log-likelihood at the terminal values.
+
     Parameters
     ----------
     standard_deviation
@@ -118,11 +122,6 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     posterior
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
-
-    !!! note
-        Use `log_marginal_likelihood_terminal_values`
-        to compute the log-likelihood at the terminal values.
-
     """
     # TODO: complain if it is used with a filter, not a smoother?
     # TODO: allow option for log-posterior
