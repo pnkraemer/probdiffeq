@@ -4,42 +4,44 @@ from probdiffeq.backend import containers, functools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Callable, Generic, TypeVar
 
-T = TypeVar("T")
+_T = TypeVar("_T")
 """A type-variable to indicate the controller's state."""
 
 
 @containers.dataclass
-class Controller(Generic[T]):
+class _Controller(Generic[_T]):
     """Control algorithm."""
 
-    init: Callable[[float], T]
+    init: Callable[[float], _T]
     """Initialise the controller state."""
 
-    clip: Callable[[T, float, float], T]
+    clip: Callable[[_T, float, float], _T]
     """(Optionally) clip the current step to not exceed t1."""
 
-    apply: Callable[[T, float, float], T]
+    apply: Callable[[_T, float, float], _T]
     r"""Propose a time-step $\Delta t$."""
 
-    extract: Callable[[T], float]
+    extract: Callable[[_T], float]
     """Extract the time-step from the controller state."""
 
 
-def control_proportional_integral(**options) -> Controller[tuple[float, float]]:
+def control_proportional_integral(**options) -> _Controller[tuple[float, float]]:
     """Construct a proportional-integral-controller."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
     extract = _proportional_integral_extract
-    return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
+    return _Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def control_proportional_integral_clipped(**options) -> Controller[tuple[float, float]]:
+def control_proportional_integral_clipped(
+    **options,
+) -> _Controller[tuple[float, float]]:
     """Construct a proportional-integral-controller with time-clipping."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
     extract = _proportional_integral_extract
     clip = _proportional_integral_clip
-    return Controller(init=init, apply=apply, extract=extract, clip=clip)
+    return _Controller(init=init, apply=apply, extract=extract, clip=clip)
 
 
 def _proportional_integral_apply(
@@ -90,20 +92,20 @@ def _proportional_integral_extract(state: tuple[float, float], /):
     return dt_proposed
 
 
-def control_integral(**options) -> Controller[float]:
+def control_integral(**options) -> _Controller[float]:
     """Construct an integral-controller."""
     init = functools.partial(_integral_init, **options)
     apply = functools.partial(_integral_apply, **options)
     extract = functools.partial(_integral_extract, **options)
-    return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
+    return _Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def control_integral_clipped(**options) -> Controller[float]:
+def control_integral_clipped(**options) -> _Controller[float]:
     """Construct an integral-controller with time-clipping."""
     init = functools.partial(_integral_init)
     apply = functools.partial(_integral_apply, **options)
     extract = functools.partial(_integral_extract)
-    return Controller(init=init, apply=apply, extract=extract, clip=_integral_clip)
+    return _Controller(init=init, apply=apply, extract=extract, clip=_integral_clip)
 
 
 def _integral_init(dt0, /):
@@ -150,7 +152,7 @@ def _flatten(ctrl):
 
 def _unflatten(aux, _children):
     init, apply, clip, extract = aux
-    return Controller(init=init, apply=apply, clip=clip, extract=extract)
+    return _Controller(init=init, apply=apply, clip=clip, extract=extract)
 
 
-tree_util.register_pytree_node(Controller, _flatten, _unflatten)
+tree_util.register_pytree_node(_Controller, _flatten, _unflatten)
