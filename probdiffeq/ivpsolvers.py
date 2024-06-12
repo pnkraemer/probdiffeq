@@ -1,1 +1,0 @@
-"""Step-size control algorithms."""
