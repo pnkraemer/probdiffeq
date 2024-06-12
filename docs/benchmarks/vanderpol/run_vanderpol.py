@@ -17,7 +17,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import adaptive, ivpsolve, ivpsolvers, timestep
+from probdiffeq import adaptive, ivpsolve, timestep
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -89,7 +89,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         ts0_or_ts1 = corrections.ts1(ode_order=2)
         strategy = filters.filter_adaptive(ibm, ts0_or_ts1)
         solver = calibrated.dynamic(strategy)
-        control = ivpsolvers.control_proportional_integral_clipped()
+        control = adaptive.control_proportional_integral_clipped()
         adaptive_solver = adaptive.adaptive(
             solver, atol=1e-3 * tol, rtol=tol, control=control
         )

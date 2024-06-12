@@ -1,6 +1,6 @@
 """Compare solve_fixed_grid to solve_and_save_every_step."""
 
-from probdiffeq import adaptive, ivpsolve, ivpsolvers
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
@@ -18,7 +18,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
     solver = calibrated.mle(strategy)
-    control = ivpsolvers.control_integral_clipped()  # Any clipped controller will do.
+    control = adaptive.control_integral_clipped()  # Any clipped controller will do.
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2, control=control)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
