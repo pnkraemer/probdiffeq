@@ -22,7 +22,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import adaptive, ivpsolve, timestep
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated, markov, solution
 from probdiffeq.solvers.strategies import filters, fixedpoint
@@ -73,7 +73,7 @@ adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 
 # +
-dt0 = timestep.initial(lambda y: vf(y, t=t0), (u0,))
+dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), (u0,))
 
 tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 init = solver.initial_condition(tcoeffs, output_scale=1.0)

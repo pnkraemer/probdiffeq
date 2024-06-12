@@ -1,13 +1,11 @@
 # Private and public API
 
-All public functions and classes that are in the online documnetation 
+All public functions and classes that are in the online documentation 
 are considered public API.
 At the moment, this affects the following:
 
 * `ivpsolve.py`
-* `controls.py`
 * `adaptive.py`
-* `timestep.py`
 * `taylor/*`
 * `solvers/*`
 * `impl.impl.select()`

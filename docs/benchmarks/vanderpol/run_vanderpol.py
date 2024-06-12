@@ -17,7 +17,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import adaptive, controls, ivpsolve, timestep
+from probdiffeq import adaptive, controls, ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import calibrated
 from probdiffeq.solvers.strategies import filters
@@ -100,7 +100,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         # Solve
-        dt0 = timestep.initial(vf_auto, (u0, du0))
+        dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
         solution = ivpsolve.simulate_terminal_values(
             vf_probdiffeq, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
         )
