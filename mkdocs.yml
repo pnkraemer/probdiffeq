@@ -104,7 +104,6 @@ nav:
               - filters: api_docs/solvers/strategies/filters.md
               - smoothers: api_docs/solvers/strategies/smoothers.md
               - fixedpoint: api_docs/solvers/strategies/fixedpoint.md
-              - discrete: api_docs/solvers/strategies/discrete.md
           - calibrated: api_docs/solvers/calibrated.md
           - uncalibrated: api_docs/solvers/uncalibrated.md
           - solution: api_docs/solvers/solution.md
