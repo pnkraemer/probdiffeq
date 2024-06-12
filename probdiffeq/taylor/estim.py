@@ -3,7 +3,7 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 from probdiffeq.backend import functools, ode
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers.strategies import discrete
+from probdiffeq.util import filter_util
 
 
 def make_runge_kutta_starter(dt, *, atol=1e-12, rtol=1e-10):
@@ -41,7 +41,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     ys = ode.odeint_and_save_at(vf, initial_values, save_at=ts, atol=atol, rtol=rtol)
 
     # Initial condition
-    estimator = discrete.fixedpointsmoother_precon()
+    estimator = filter_util.fixedpointsmoother_precon()
     rv_t0 = impl.ssm_util.standard_normal(num + 1, 1.0)
     conditional_t0 = impl.ssm_util.identity_conditional(num + 1)
     init = (rv_t0, conditional_t0)
@@ -58,7 +58,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     models = model_fun(0, 1e-7 * np.ones_like(ts))
 
     # Run the preconditioned fixedpoint smoother
-    (corrected, conditional), _ = discrete.estimate_fwd(
+    (corrected, conditional), _ = filter_util.estimate_fwd(
         ys,
         init=init,
         prior_transitions=ibm_transitions,

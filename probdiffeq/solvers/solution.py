@@ -8,7 +8,7 @@ from probdiffeq.backend import functools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov
-from probdiffeq.solvers.strategies import discrete
+from probdiffeq.util import filter_util
 
 # TODO: the functions in here should only depend on posteriors / strategies!
 
@@ -157,8 +157,8 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
     rv = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
 
     # Run the reverse Kalman filter
-    estimator = discrete.kalmanfilter_with_marginal_likelihood()
-    (_corrected, _num_data, logpdf), _ = discrete.estimate_rev(
+    estimator = filter_util.kalmanfilter_with_marginal_likelihood()
+    (_corrected, _num_data, logpdf), _ = filter_util.estimate_rev(
         u,
         init=rv,
         prior_transitions=posterior.conditional,

@@ -1,4 +1,7 @@
-"""Discrete filtering and smoothing."""
+"""Filtering utilities.
+
+Mostly **discrete** filtering and smoothing.
+"""
 
 from probdiffeq.backend import containers, control_flow, tree_util
 from probdiffeq.backend.typing import Any
