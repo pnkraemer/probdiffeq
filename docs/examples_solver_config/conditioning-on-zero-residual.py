@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend
 
-from probdiffeq import adaptive, ivpsolve, timestep
+from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import markov, uncalibrated
 from probdiffeq.solvers.strategies import fixedpoint
@@ -90,7 +90,7 @@ ibm = priors.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
 solver = uncalibrated.solver(fixedpoint.fixedpoint_adaptive(ibm, slr1))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)
 
-dt0 = timestep.initial(lambda y: vector_field(y, t=t0), (u0,))
+dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 
 init = solver.initial_condition(tcoeffs, output_scale=1.0)
 sol = ivpsolve.solve_and_save_at(

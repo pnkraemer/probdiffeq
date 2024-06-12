@@ -93,7 +93,6 @@ nav:
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - adaptive: api_docs/adaptive.md
-      - timestep: api_docs/timestep.md
       - impl: api_docs/impl.md
       - solvers:
           - strategies:
