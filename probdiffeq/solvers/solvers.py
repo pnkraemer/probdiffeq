@@ -1,3 +1,5 @@
+"""Probabilistic IVP solvers."""
+
 from probdiffeq import _interp
 from probdiffeq.backend import abc, containers, tree_util
 from probdiffeq.backend import numpy as np
