@@ -25,7 +25,7 @@ class Controller(Generic[T]):
     """Extract the time-step from the controller state."""
 
 
-def proportional_integral(**options) -> Controller[tuple[float, float]]:
+def control_proportional_integral(**options) -> Controller[tuple[float, float]]:
     """Construct a proportional-integral-controller."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
@@ -33,7 +33,7 @@ def proportional_integral(**options) -> Controller[tuple[float, float]]:
     return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def proportional_integral_clipped(**options) -> Controller[tuple[float, float]]:
+def control_proportional_integral_clipped(**options) -> Controller[tuple[float, float]]:
     """Construct a proportional-integral-controller with time-clipping."""
     init = _proportional_integral_init
     apply = functools.partial(_proportional_integral_apply, **options)
@@ -90,7 +90,7 @@ def _proportional_integral_extract(state: tuple[float, float], /):
     return dt_proposed
 
 
-def integral(**options) -> Controller[float]:
+def control_integral(**options) -> Controller[float]:
     """Construct an integral-controller."""
     init = functools.partial(_integral_init, **options)
     apply = functools.partial(_integral_apply, **options)
@@ -98,7 +98,7 @@ def integral(**options) -> Controller[float]:
     return Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
 
 
-def integral_clipped(**options) -> Controller[float]:
+def control_integral_clipped(**options) -> Controller[float]:
     """Construct an integral-controller with time-clipping."""
     init = functools.partial(_integral_init)
     apply = functools.partial(_integral_apply, **options)

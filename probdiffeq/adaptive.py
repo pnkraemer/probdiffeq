@@ -1,6 +1,6 @@
 """Adaptive solvers for initial value problems (IVPs)."""
 
-from probdiffeq import controls
+from probdiffeq import ivpsolvers
 from probdiffeq.backend import containers, control_flow, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any
@@ -10,7 +10,7 @@ from probdiffeq.impl import impl
 def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     """Make an IVP solver adaptive."""
     if control is None:
-        control = controls.proportional_integral()
+        control = ivpsolvers.control_proportional_integral()
 
     return _AdaptiveIVPSolver(
         solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
