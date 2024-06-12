@@ -6,11 +6,11 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Generic, TypeVar
 from probdiffeq.impl import impl
 
-T = TypeVar("T")
+_T = TypeVar("_T")
 """A type-variable for state-types."""
 
 
-class _Solver(abc.ABC, Generic[T]):
+class _Solver(abc.ABC, Generic[_T]):
     """IVP solver."""
 
     def __init__(self, strategy, *, string_repr, requires_rescaling):
@@ -33,23 +33,23 @@ class _Solver(abc.ABC, Generic[T]):
         return posterior, output_scale
 
     @abc.abstractmethod
-    def init(self, t, initial_condition) -> T:
+    def init(self, t, initial_condition) -> _T:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def step(self, state: T, *, vector_field, dt) -> T:
+    def step(self, state: _T, *, vector_field, dt) -> _T:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def extract(self, state: T, /):
+    def extract(self, state: _T, /):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def interpolate(self, t, s0: T, s1: T) -> _interp.InterpRes[T]:
+    def interpolate(self, t, s0: _T, s1: _T) -> _interp.InterpRes[_T]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def right_corner(self, s0: T, s1: T) -> _interp.InterpRes[T]:
+    def right_corner(self, s0: _T, s1: _T) -> _interp.InterpRes[_T]:
         raise NotImplementedError
 
 
