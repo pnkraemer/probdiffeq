@@ -14,11 +14,11 @@
 
 # # Dynamic and non-dynamic solvers
 #
-# You can choose between a `ivpsolvers.solver_calibrationfree()`
+# You can choose between a `adaptive.solver_calibrationfree()`
 # (which does not calibrate the output-scale),
-# a `ivpsolvers.solver_mle()`
+# a `adaptive.solver_mle()`
 # (which calibrates a global output scale via quasi-maximum-likelihood-estimation),
-# and a `ivpsolvers.solver_dynamic()`,
+# and a `adaptive.solver_dynamic()`,
 # which calibrates a time-varying,
 # piecewise constant output-scale via
 # "local' quasi-maximum-likelihood estimation,
