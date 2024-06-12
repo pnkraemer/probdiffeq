@@ -134,7 +134,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, uncalibrated
+from probdiffeq.solvers import solution, solvers
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -195,7 +195,7 @@ def solve_fixed(theta, *, ts):
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
@@ -212,7 +212,7 @@ def solve_adaptive(theta, *, save_at):
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)

@@ -27,7 +27,7 @@ import jax.numpy as jnp
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import control_flow
 from probdiffeq.impl import impl
-from probdiffeq.solvers import uncalibrated
+from probdiffeq.solvers import solvers
 from probdiffeq.solvers.strategies import fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -70,7 +70,7 @@ def solution_routine():
     ts0 = corrections.ts0(ode_order=1)
 
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=1)

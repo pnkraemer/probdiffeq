@@ -37,9 +37,9 @@ Other combinations are possible, but rather rare
 (and require some understanding of the underlying statistical concepts).
 
 ## Calibration
-Use a `calibrated.dynamic` solver if you expect that the output scale of your IVP solution varies greatly.
-Otherwise, use an `calibrated.mle` solver.
-Try a `uncalibrated.solver` for parameter-estimation.
+Use a `solvers.dynamic` solver if you expect that the output scale of your IVP solution varies greatly.
+Otherwise, use an `solvers.mle` solver.
+Try a `solvers.solver` for parameter-estimation.
 
 ## Miscellaneous
 If you use a `ts0`, choose an `isotropic` factorisation instead of a `dense` factorisation.
