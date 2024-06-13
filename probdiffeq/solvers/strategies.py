@@ -12,7 +12,7 @@ R = TypeVar("R")
 S = TypeVar("S")
 
 
-class ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
+class _ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
     """Extrapolation model interface."""
 
     @abc.abstractmethod
@@ -58,12 +58,12 @@ class _State(containers.NamedTuple):
     aux_corr: Any
 
 
-class Strategy:
+class _Strategy:
     """Estimation strategy."""
 
     def __init__(
         self,
-        extrapolation: ExtrapolationImpl,
+        extrapolation: _ExtrapolationImpl,
         correction,
         *,
         string_repr,
@@ -195,7 +195,7 @@ def _tree_flatten(strategy):
 
 def _tree_unflatten(aux, _children):
     extra, corr, string, suitable_offgrid, suitable_every, suitable_saveat = aux
-    return Strategy(
+    return _Strategy(
         extrapolation=extra,
         correction=corr,
         string_repr=string,
@@ -205,13 +205,13 @@ def _tree_unflatten(aux, _children):
     )
 
 
-tree_util.register_pytree_node(Strategy, _tree_flatten, _tree_unflatten)
+tree_util.register_pytree_node(_Strategy, _tree_flatten, _tree_unflatten)
 
 
-def smoother_adaptive(prior, correction, /) -> Strategy:
+def smoother_adaptive(prior, correction, /) -> _Strategy:
     """Construct a smoother."""
     extrapolation_impl = _PreconSmoother(*prior)
-    return Strategy(
+    return _Strategy(
         extrapolation_impl,
         correction,
         is_suitable_for_save_at=False,
@@ -221,7 +221,7 @@ def smoother_adaptive(prior, correction, /) -> Strategy:
     )
 
 
-class _PreconSmoother(ExtrapolationImpl):
+class _PreconSmoother(_ExtrapolationImpl):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
@@ -301,10 +301,10 @@ class _PreconSmoother(ExtrapolationImpl):
         return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
-def fixedpoint_adaptive(prior, correction, /) -> Strategy:
+def fixedpoint_adaptive(prior, correction, /) -> _Strategy:
     """Construct a fixedpoint-smoother."""
     extrapolation_impl = _PreconFixedPoint(*prior)
-    return Strategy(
+    return _Strategy(
         extrapolation_impl,
         correction,
         is_suitable_for_save_at=True,
@@ -314,7 +314,7 @@ def fixedpoint_adaptive(prior, correction, /) -> Strategy:
     )
 
 
-class _PreconFixedPoint(ExtrapolationImpl):
+class _PreconFixedPoint(_ExtrapolationImpl):
     def __init__(self, discretise, num_derivatives):
         self.discretise = discretise
         self.num_derivatives = num_derivatives
@@ -427,10 +427,10 @@ class _PreconFixedPoint(ExtrapolationImpl):
         return _interp.InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
-def filter_adaptive(prior, correction, /) -> Strategy:
+def filter_adaptive(prior, correction, /) -> _Strategy:
     """Construct a filter."""
     extrapolation_impl = _PreconFilter(*prior)
-    return Strategy(
+    return _Strategy(
         extrapolation_impl,
         correction,
         string_repr=f"<Filter with {extrapolation_impl}, {correction}>",
@@ -440,7 +440,7 @@ def filter_adaptive(prior, correction, /) -> Strategy:
     )
 
 
-class _PreconFilter(ExtrapolationImpl):
+class _PreconFilter(_ExtrapolationImpl):
     def __init__(self, discretise, num_derivatives):
         # todo: move sol_from_tcoeffs out of this module
         #  (and then we can ditch self.num_derivatives)
