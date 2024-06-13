@@ -13,16 +13,16 @@ It inherits automatic differentiation, vectorisation, and GPU capability from JA
 
 **Features include:**
 
-* Stable implementation
-* Calibration, step-size adaptation, and checkpointing
-* State-space model factorisations
-* Dense output and posterior sampling
-* Filtering, smoothing, and many other backends
-* Custom information operators
-* Physics-enhanced regression
-* Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
+* ⚡ Calibration and step-size adaptation
+* ⚡ Stable implementation of filtering, smoothing, and other estimation strategies
+* ⚡ Custom information operators, dense output, and posterior sampling
+* ⚡ State-space model factorisations
+* ⚡ Physics-enhanced regression
+* ⚡ Taylor-series estimation with and without Jets
+* ⚡ Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
-and many more.
+
+**Tutorials:**
 
 * **AN EASY EXAMPLE:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_quickstart/easy_example/)
 * **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_solver_config/posterior_uncertainties/)
@@ -64,17 +64,33 @@ See also: [semantic versioning](https://semver.org/).
 
 Start with the quickstart, continue with the `Solvers & Solutions` examples and only then move to the `Parameter estimation` examples and the API documentation.
 
-The examples show how to interact with the API, and explain some useful facts about probabilistic numerical solvers.
-While the API is not stable yet, the examples may be more instructive than the API docs.
+The examples show how to interact with the API and explain some valuable facts about probabilistic numerical solvers.
+They may be more instructive than the API docs.
 
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
 For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [Optax](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [BlackJAX](https://optax.readthedocs.io/en/latest/index.html).
 
+## Citing this repository
+If you find Probdiffeq helpful for your research project, please consider citing:
 
+```bibtex
+@phdthesis{kramer2024implementing,
+  title={Implementing probabilistic numerical solvers for differential equations},
+  author={Kr{\"a}mer, Peter Nicholas},
+  year={2024},
+  school={Universit{\"a}t T{\"u}bingen}
+}
+```
+This thesis contains detailed information about the maths and algorithms behind what is implemented here.
+A PDF is available [at this link](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754).
+
+Probdiffeq's algorithms have been developed over many years and in multiple research papers.
+Linking concrete citation information for specific algorithms is a work in progress.
+Feel free to reach out if you need help determining which works to cite!
 
 ## Contributing
-Contributions are absolutely welcome!
-Start with checking the existing issues for a "good first issue" and have a look at  the developer documentation.
+Contributions are welcome!
+Check the existing issues for a "good first issue" and consult the developer documentation.
 
 If you have a feature that you would like to see implemented, create an issue!
 
@@ -91,7 +107,7 @@ or execute all benchmarks via
 ```commandline
 make benchmarks-run
 ```
-Be patient, it might take a while. 
+Be patient; it might take a while. 
 Afterwards, open Jupyter to look at the result or build the documentation via
 ```
 mkdocs serve
@@ -105,13 +121,13 @@ What do you find?
 * [ProbNum](https://probnum.readthedocs.io/en/latest/)
 * [Diffrax](https://docs.kidger.site/diffrax/)
 
-Check out how to transition from those packages: [link](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/).
+Here's how to transition from those packages: [link](https://pnkraemer.github.io/probdiffeq/quickstart/transitioning_from_other_packages/).
 
-Anything missing in this list? Please open an issue or make a pull request.
+Is anything missing from this list? Please open an issue or make a pull request.
 
 ## You might also like
 
 * [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): 
-  A library for example implementations of differential equations in NumPy and JAX
+  A library, for example, implementations of differential equations in NumPy and JAX
 * [probfindiff](https://probfindiff.readthedocs.io/en/latest/): 
-  Probabilistic numerical finite differences, in JAX.
+  Probabilistic numerical finite differences in JAX.
