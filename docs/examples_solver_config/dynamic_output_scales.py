@@ -39,9 +39,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -72,11 +71,11 @@ def vf(*ys, t):  # noqa: ARG001
 # +
 num_derivatives = 1
 
-ibm = components.prior_ibm(num_derivatives=1)
-ts1 = components.correction_ts1()
-strategy = components.strategy_filter(ibm, ts1)
-dynamic = solvers.dynamic(strategy)
-mle = solvers.mle(strategy)
+ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+ts1 = ivpsolvers.correction_ts1()
+strategy = ivpsolvers.strategy_filter(ibm, ts1)
+dynamic = ivpsolvers.solver_dynamic(strategy)
+mle = ivpsolvers.solver_mle(strategy)
 
 # +
 t0, t1 = 0.0, 3.0

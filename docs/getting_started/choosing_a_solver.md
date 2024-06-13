@@ -29,16 +29,16 @@ If that does not work: let me know what you come up with...
 
 ## Filters vs smoothers
 
-Almost always, use a `components.strategy_filter` strategy for `simulate_terminal_values`, 
-a `components.strategy_smoother` strategy for `solve_adaptive_save_every_step`,
-and a `components.strategy_fixedpoint` strategy for `solve_adaptive_save_at`.
+Almost always, use a `ivpsolvers.strategy_filter` strategy for `simulate_terminal_values`, 
+a `ivpsolvers.strategy_smoother` strategy for `solve_adaptive_save_every_step`,
+and a `ivpsolvers.strategy_fixedpoint` strategy for `solve_adaptive_save_at`.
 Use either a filter (if you must) or a smoother (recommended) for `solve_fixed_step`.
 Other combinations are possible, but rather rare 
 (and require some understanding of the underlying statistical concepts).
 
 ## Calibration
-Use a `solvers.dynamic` solver if you expect that the output scale of your IVP solution varies greatly.
-Otherwise, use an `solvers.mle` solver.
+Use a `solvers.solver_dynamic` solver if you expect that the output scale of your IVP solution varies greatly.
+Otherwise, use an `solvers.solver_mle` solver.
 Try a `solvers.solver` for parameter-estimation.
 
 ## Miscellaneous

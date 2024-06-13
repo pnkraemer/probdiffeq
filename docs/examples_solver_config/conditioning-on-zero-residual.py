@@ -26,9 +26,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
@@ -65,7 +64,7 @@ u0 = jnp.asarray([0.1])
 
 NUM_DERIVATIVES = 2
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-init_raw, transitions = components.prior_ibm_discrete(
+init_raw, transitions = ivpsolvers.prior_ibm_discrete(
     ts, num_derivatives=NUM_DERIVATIVES, output_scale=100.0
 )
 
@@ -83,9 +82,9 @@ markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 # +
 # Compute the posterior
 
-slr1 = components.correction_ts1()
-ibm = components.prior_ibm(num_derivatives=NUM_DERIVATIVES)
-solver = solvers.solver(components.strategy_fixedpoint(ibm, slr1))
+slr1 = ivpsolvers.correction_ts1()
+ibm = ivpsolvers.prior_ibm(num_derivatives=NUM_DERIVATIVES)
+solver = ivpsolvers.solver(ivpsolvers.strategy_fixedpoint(ibm, slr1))
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-1, rtol=1e-2)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))

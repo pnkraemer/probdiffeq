@@ -92,15 +92,13 @@ nav:
       - examples_misc/use_equinox_bounded_while_loop.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
-      - impl: api_docs/impl.md
-      - solvers:
-          - components: api_docs/solvers/components.md
-          - solvers: api_docs/solvers/solvers.md
-          - stats: api_docs/solvers/stats.md
+      - ivpsolvers: api_docs/ivpsolvers.md
+      - stats: api_docs/stats.md
       - taylor:
           - affine: api_docs/taylor/affine.md
           - autodiff: api_docs/taylor/autodiff.md
           - estim: api_docs/taylor/estim.md
+      - impl: api_docs/impl.md
   - DEVELOPER DOCUMENTATION:
       - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md

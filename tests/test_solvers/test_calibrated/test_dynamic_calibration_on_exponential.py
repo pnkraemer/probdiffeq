@@ -5,21 +5,20 @@ This is difficult for the MLE- and calibration-free solver,
 but not for the dynamic solver.
 """
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
 from tests.setup import setup
 
 
 def test_exponential_approximated_well():
     vf, u0, (t0, t1), solution = setup.ode_affine()
 
-    ibm = components.prior_ibm(num_derivatives=1)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_filter(ibm, ts0)
-    solver = solvers.dynamic(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    solver = ivpsolvers.solver_dynamic(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition((*u0, vf(*u0, t=t0)), output_scale=output_scale)

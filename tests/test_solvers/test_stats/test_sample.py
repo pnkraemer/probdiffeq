@@ -1,10 +1,9 @@
 """Tests for sampling behaviour."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -13,10 +12,10 @@ from tests.setup import setup
 def fixture_approximation():
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.prior_ibm(num_derivatives=2)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_smoother(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())

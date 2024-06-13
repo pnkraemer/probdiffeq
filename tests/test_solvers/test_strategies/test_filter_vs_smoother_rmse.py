@@ -1,10 +1,9 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -21,10 +20,10 @@ def fixture_solver_setup():
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
-    ibm = components.prior_ibm(num_derivatives=2)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_filter(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
@@ -35,10 +34,10 @@ def fixture_filter_solution(solver_setup):
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
-    ibm = components.prior_ibm(num_derivatives=2)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_smoother(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)

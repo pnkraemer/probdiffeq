@@ -1,5 +1,6 @@
 """Routines for estimating solutions of initial value problems."""
 
+from probdiffeq import stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -12,7 +13,6 @@ from probdiffeq.backend import (
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Callable
 from probdiffeq.impl import impl
-from probdiffeq.solvers import stats
 
 
 @containers.dataclass

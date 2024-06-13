@@ -24,10 +24,9 @@ import equinox
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import control_flow
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
 
 jax.config.update("jax_platform_name", "cpu")
@@ -64,11 +63,11 @@ def solution_routine():
     t0, t1 = 0.0, 1.0
     u0 = jnp.asarray([0.1])
 
-    ibm = components.prior_ibm(num_derivatives=1)
-    ts0 = components.correction_ts0(ode_order=1)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    ts0 = ivpsolvers.correction_ts0(ode_order=1)
 
-    strategy = components.strategy_fixedpoint(ibm, ts0)
-    solver = solvers.solver(strategy)
+    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=1)

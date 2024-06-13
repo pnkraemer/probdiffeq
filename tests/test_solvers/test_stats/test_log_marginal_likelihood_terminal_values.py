@@ -1,27 +1,26 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.case()
 def case_strategy_filter():
-    return components.strategy_filter
+    return ivpsolvers.strategy_filter
 
 
 @testing.case()
 def case_strategy_smoother():
-    return components.strategy_smoother
+    return ivpsolvers.strategy_smoother
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return components.strategy_fixedpoint
+    return ivpsolvers.strategy_fixedpoint
 
 
 @testing.fixture(name="sol")
@@ -29,10 +28,10 @@ def case_strategy_fixedpoint():
 def fixture_sol(strategy_func):
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.prior_ibm(num_derivatives=4)
-    ts0 = components.correction_ts0()
+    ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+    ts0 = ivpsolvers.correction_ts0()
     strategy = strategy_func(ibm, ts0)
-    solver = solvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)

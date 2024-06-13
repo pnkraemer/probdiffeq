@@ -1,11 +1,41 @@
-"""IVP solver components."""
+"""Probabilistic IVP solvers."""
 
-from probdiffeq import _interp
+from probdiffeq import stats
 from probdiffeq.backend import abc, containers, functools, special, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Generic, TypeVar
 from probdiffeq.impl import impl
-from probdiffeq.solvers import stats
+
+
+class _InterpRes(containers.NamedTuple):
+    # todo: rename to: solution, step_from, interpolate_from?
+    #  in general, this object should not be necessary...
+    accepted: Any
+    """The new 'accepted' field.
+
+    At time `max(t, s1.t)`. Use this as the right-most reference state
+    in future interpolations, or continue time-stepping from here.
+    """
+
+    solution: Any
+    """The new 'solution' field.
+
+    At time `t`. This is the interpolation result.
+    """
+
+    previous: Any
+    """The new `previous_solution` field.
+
+    At time `t`. Use this as the right-most reference state
+    in future interpolations, or continue time-stepping from here.
+
+    The difference between `solution` and `previous` emerges in save_at* modes.
+    One belongs to the just-concluded time interval, and the other belongs to
+    the to-be-started time interval.
+    Concretely, this means that one has a unit backward model and the other
+    remembers how to step back to the previous state.
+    """
+
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -46,12 +76,12 @@ class _ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def right_corner(self, state: R, aux: S, /) -> _interp.InterpRes[tuple[R, S]]:
+    def right_corner(self, state: R, aux: S, /) -> _InterpRes:
         """Process the state at checkpoint t=t_n."""
         raise NotImplementedError
 
 
-class _State(containers.NamedTuple):
+class _StrategyState(containers.NamedTuple):
     t: Any
     hidden: Any
     aux_extra: Any
@@ -88,20 +118,20 @@ class _Strategy:
         """Construct an initial condition from a set of Taylor coefficients."""
         return self.extrapolation.initial_condition(taylor_coefficients)
 
-    def init(self, t, posterior, /) -> _State:
+    def init(self, t, posterior, /) -> _StrategyState:
         """Initialise a state from a posterior."""
         rv, extra = self.extrapolation.init(posterior)
         rv, corr = self.correction.init(rv)
-        return _State(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+        return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def predict_error(self, state: _State, /, *, dt, vector_field):
+    def predict_error(self, state: _StrategyState, /, *, dt, vector_field):
         """Predict the error of an upcoming step."""
         hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         t = state.t + dt
         error, observed, corr = self.correction.estimate_error(
             hidden, state.aux_corr, vector_field=vector_field, t=t
         )
-        state = _State(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
+        state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
 
     def complete(self, state, /, *, output_scale):
@@ -110,15 +140,15 @@ class _Strategy:
             state.hidden, state.aux_extra, output_scale=output_scale
         )
         hidden, corr = self.correction.complete(hidden, state.aux_corr)
-        return _State(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
+        return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
-    def extract(self, state: _State, /):
+    def extract(self, state: _StrategyState, /):
         """Extract the solution from a state."""
         hidden = self.correction.extract(state.hidden, state.aux_corr)
         sol = self.extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
-    def case_right_corner(self, state_t1: _State) -> _interp.InterpRes:
+    def case_right_corner(self, state_t1: _StrategyState) -> _InterpRes:
         """Process the solution in case t=t_n."""
         _tmp = self.extrapolation.right_corner(state_t1.hidden, state_t1.aux_extra)
         step_from, solution, interp_from = _tmp
@@ -126,16 +156,16 @@ class _Strategy:
         def _state(x):
             t = state_t1.t
             corr_like = tree_util.tree_map(np.empty_like, state_t1.aux_corr)
-            return _State(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+            return _StrategyState(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
         step_from = _state(step_from)
         solution = _state(solution)
         interp_from = _state(interp_from)
-        return _interp.InterpRes(step_from, solution, interp_from)
+        return _InterpRes(step_from, solution, interp_from)
 
     def case_interpolate(
-        self, t, *, s0: _State, s1: _State, output_scale
-    ) -> _interp.InterpRes[_State]:
+        self, t, *, s0: _StrategyState, s1: _StrategyState, output_scale
+    ) -> _InterpRes:
         """Process the solution in case t>t_n."""
         # Interpolate
         step_from, solution, interp_from = self.extrapolation.interpolate(
@@ -150,12 +180,12 @@ class _Strategy:
 
         def _state(t_, x):
             corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
-            return _State(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
         step_from = _state(s1.t, step_from)
         solution = _state(t, solution)
         interp_from = _state(t, interp_from)
-        return _interp.InterpRes(step_from, solution, interp_from)
+        return _InterpRes(step_from, solution, interp_from)
 
     def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
         """Compute offgrid_marginals."""
@@ -289,7 +319,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         # get back to t, not to t0.
         solution_at_t1 = (marginal_t1, conditional_t1_to_t)
 
-        return _interp.InterpRes(
+        return _InterpRes(
             accepted=solution_at_t1, solution=solution_at_t, previous=solution_at_t
         )
 
@@ -298,7 +328,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         return self.complete(*begun, output_scale=output_scale)
 
     def right_corner(self, rv, extra, /):
-        return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
+        return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
 def strategy_fixedpoint(prior, correction, /) -> _Strategy:
@@ -411,7 +441,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         rv_at_t = impl.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
         # Return the right combination of marginals and conditionals.
-        return _interp.InterpRes(
+        return _InterpRes(
             accepted=(marginal_t1, conditional_t1_to_t),
             solution=(rv_at_t, extrapolated_t[1]),
             previous=previous_new,
@@ -424,7 +454,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
     # todo: rename to prepare_future_steps?
     def right_corner(self, rv, extra, /):
         cond_identity = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
-        return _interp.InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
+        return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
 def strategy_filter(prior, correction, /) -> _Strategy:
@@ -492,10 +522,10 @@ class _PreconFilter(_ExtrapolationImpl):
         # Consistent state-types in interpolation result.
         interp = (hidden, extra)
         step_from = (marginal_t1, None)
-        return _interp.InterpRes(accepted=step_from, solution=interp, previous=interp)
+        return _InterpRes(accepted=step_from, solution=interp, previous=interp)
 
     def right_corner(self, rv, extra, /):
-        return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
+        return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
 class _PositiveCubatureRule(containers.NamedTuple):
@@ -758,3 +788,316 @@ def correction_slr1(
         linearise_fun=linearise_fun,
         string_repr=f"<SLR0 with ode_order={1}>",
     )
+
+
+_T = TypeVar("_T")
+"""A type-variable for state-types."""
+
+
+class _Solver(abc.ABC, Generic[_T]):
+    """IVP solver."""
+
+    def __init__(self, strategy, *, string_repr, requires_rescaling):
+        self.strategy = strategy
+
+        self.string_repr = string_repr
+        self.requires_rescaling = requires_rescaling
+
+    def __repr__(self):
+        return self.string_repr
+
+    def initial_condition(self, tcoeffs, /, output_scale):
+        """Construct an initial condition."""
+        if np.shape(output_scale) != np.shape(impl.prototypes.output_scale()):
+            msg1 = "Argument 'output_scale' has the wrong shape. "
+            msg2 = f"Shape {np.shape(impl.prototypes.output_scale())} expected; "
+            msg3 = f"shape {np.shape(output_scale)} received."
+            raise ValueError(msg1 + msg2 + msg3)
+        posterior = self.strategy.initial_condition(tcoeffs)
+        return posterior, output_scale
+
+    @abc.abstractmethod
+    def init(self, t, initial_condition) -> _T:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def step(self, state: _T, *, vector_field, dt) -> _T:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract(self, state: _T, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def interpolate(self, t, s0: _T, s1: _T) -> _InterpRes:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def right_corner(self, s0: _T, s1: _T) -> _InterpRes:
+        raise NotImplementedError
+
+
+class _SolverState(containers.NamedTuple):
+    """Solver state."""
+
+    strategy: Any
+    output_scale: Any
+
+    @property
+    def t(self):
+        return self.strategy.t
+
+
+def solver_mle(strategy):
+    """Create a solver that calibrates the output scale via maximum-likelihood.
+
+    Warning: needs to be combined with a call to stats.calibrate()
+    after solving if the MLE-calibration shall be *used*.
+    """
+    string_repr = f"<MLE-solver with {strategy}>"
+    return _CalibratedSolver(
+        calibration=_RunningMean(),
+        impl_step=_step_mle,
+        strategy=strategy,
+        string_repr=string_repr,
+        requires_rescaling=True,
+    )
+
+
+def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
+    output_scale_prior, _calibrated = calibration.extract(state.output_scale)
+    error, _, state_strategy = strategy.predict_error(
+        state.strategy, dt=dt, vector_field=vector_field
+    )
+
+    state_strategy = strategy.complete(state_strategy, output_scale=output_scale_prior)
+    observed = state_strategy.aux_corr
+
+    # Calibrate
+    output_scale = calibration.update(state.output_scale, observed=observed)
+
+    # Return
+    state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+    return dt * error, state
+
+
+def solver_dynamic(strategy):
+    """Create a solver that calibrates the output scale dynamically."""
+    string_repr = f"<Dynamic solver with {strategy}>"
+    return _CalibratedSolver(
+        strategy=strategy,
+        calibration=_MostRecent(),
+        string_repr=string_repr,
+        impl_step=_step_dynamic,
+        requires_rescaling=False,
+    )
+
+
+def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
+    error, observed, state_strategy = strategy.predict_error(
+        state.strategy, dt=dt, vector_field=vector_field
+    )
+
+    output_scale = calibration.update(state.output_scale, observed=observed)
+
+    prior, _calibrated = calibration.extract(output_scale)
+    state_strategy = strategy.complete(state_strategy, output_scale=prior)
+
+    # Return solution
+    state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+    return dt * error, state
+
+
+class _Calibration(abc.ABC):
+    """Calibration implementation."""
+
+    @abc.abstractmethod
+    def init(self, prior):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def update(self, state, /, observed):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def extract(self, state, /):
+        raise NotImplementedError
+
+
+class _MostRecent(_Calibration):
+    def init(self, prior):
+        return prior
+
+    def update(self, _state, /, observed):
+        return impl.stats.mahalanobis_norm_relative(0.0, observed)
+
+    def extract(self, state, /):
+        return state, state
+
+
+# TODO: if we pass the mahalanobis_relative term to the update() function,
+#  it reduces to a generic stats() module that can also be used for e.g.
+#  marginal likelihoods. In this case, the _MostRecent() stuff becomes void.
+class _RunningMean(_Calibration):
+    def init(self, prior):
+        return prior, prior, 0.0
+
+    def update(self, state, /, observed):
+        prior, calibrated, num_data = state
+
+        new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
+        calibrated = impl.ssm_util.update_mean(calibrated, new_term, num=num_data)
+        return prior, calibrated, num_data + 1.0
+
+    def extract(self, state, /):
+        prior, calibrated, _num_data = state
+        return prior, calibrated
+
+
+def _unflatten_func(nodetype):
+    return lambda *_a: nodetype()
+
+
+# Register objects as (empty) pytrees. todo: temporary?!
+for node in [_RunningMean, _MostRecent]:
+    tree_util.register_pytree_node(
+        node, flatten_func=lambda _: ((), ()), unflatten_func=_unflatten_func(node)
+    )
+
+
+class _CalibratedSolver(_Solver):
+    def __init__(self, *, calibration: _Calibration, impl_step, **kwargs):
+        super().__init__(**kwargs)
+
+        self.calibration = calibration
+        self.impl_step = impl_step
+
+    def init(self, t, initial_condition) -> _SolverState:
+        posterior, output_scale = initial_condition
+        state_strategy = self.strategy.init(t, posterior)
+        calib_state = self.calibration.init(output_scale)
+        return _SolverState(strategy=state_strategy, output_scale=calib_state)
+
+    def step(self, state: _SolverState, *, vector_field, dt) -> _SolverState:
+        return self.impl_step(
+            state,
+            vector_field=vector_field,
+            dt=dt,
+            strategy=self.strategy,
+            calibration=self.calibration,
+        )
+
+    def extract(self, state: _SolverState, /):
+        t, posterior = self.strategy.extract(state.strategy)
+        _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
+        return t, (posterior, output_scale)
+
+    def interpolate(self, t, s0: _SolverState, s1: _SolverState) -> _InterpRes:
+        output_scale, _ = self.calibration.extract(s1.output_scale)
+        acc_p, sol_p, prev_p = self.strategy.case_interpolate(
+            t, s0=s0.strategy, s1=s1.strategy, output_scale=output_scale
+        )
+        prev = self._interp_make_state(prev_p, reference=s0)
+        sol = self._interp_make_state(sol_p, reference=s1)
+        acc = self._interp_make_state(acc_p, reference=s1)
+        return _InterpRes(accepted=acc, solution=sol, previous=prev)
+
+    def right_corner(self, state_at_t0, state_at_t1) -> _InterpRes:
+        acc_p, sol_p, prev_p = self.strategy.case_right_corner(state_at_t1.strategy)
+
+        prev = self._interp_make_state(prev_p, reference=state_at_t0)
+        sol = self._interp_make_state(sol_p, reference=state_at_t1)
+        acc = self._interp_make_state(acc_p, reference=state_at_t1)
+        return _InterpRes(accepted=acc, solution=sol, previous=prev)
+
+    def _interp_make_state(
+        self, state_strategy, *, reference: _SolverState
+    ) -> _SolverState:
+        return _SolverState(state_strategy, output_scale=reference.output_scale)
+
+
+def _slvr_flatten(solver):
+    children = (solver.strategy, solver.calibration)
+    aux = (solver.impl_step, solver.requires_rescaling, solver.string_repr)
+    return children, aux
+
+
+def _slvr_unflatten(aux, children):
+    strategy, calibration = children
+    impl_step, rescaling, string_repr = aux
+    return _CalibratedSolver(
+        strategy=strategy,
+        calibration=calibration,
+        impl_step=impl_step,
+        requires_rescaling=rescaling,
+        string_repr=string_repr,
+    )
+
+
+tree_util.register_pytree_node(_CalibratedSolver, _slvr_flatten, _slvr_unflatten)
+
+
+def solver(strategy, /):
+    """Create a solver that does not calibrate the output scale automatically."""
+    string_repr = f"<Uncalibrated solver with {strategy}>"
+    return _UncalibratedSolver(
+        strategy=strategy, string_repr=string_repr, requires_rescaling=False
+    )
+
+
+class _UncalibratedSolver(_Solver[_SolverState]):
+    def init(self, t, initial_condition) -> _SolverState:
+        posterior, output_scale = initial_condition
+        state_strategy = self.strategy.init(t, posterior)
+        return _SolverState(strategy=state_strategy, output_scale=output_scale)
+
+    def step(self, state: _SolverState, *, vector_field, dt):
+        error, _observed, state_strategy = self.strategy.predict_error(
+            state.strategy, dt=dt, vector_field=vector_field
+        )
+        state_strategy = self.strategy.complete(
+            state_strategy, output_scale=state.output_scale
+        )
+        # Extract and return solution
+        state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
+        return dt * error, state
+
+    def extract(self, state: _SolverState, /):
+        t, posterior = self.strategy.extract(state.strategy)
+        return t, (posterior, state.output_scale)
+
+    def interpolate(self, t, s0: _SolverState, s1: _SolverState) -> _InterpRes:
+        acc_p, sol_p, prev_p = self.strategy.case_interpolate(
+            t, s0=s0.strategy, s1=s1.strategy, output_scale=s1.output_scale
+        )
+        prev = _SolverState(prev_p, output_scale=s0.output_scale)
+        sol = _SolverState(sol_p, output_scale=s1.output_scale)
+        acc = _SolverState(acc_p, output_scale=s1.output_scale)
+        return _InterpRes(accepted=acc, solution=sol, previous=prev)
+
+    def right_corner(self, state_at_t0, state_at_t1) -> _InterpRes:
+        acc_p, sol_p, prev_p = self.strategy.case_right_corner(state_at_t1.strategy)
+
+        prev = _SolverState(prev_p, output_scale=state_at_t0.output_scale)
+        sol = _SolverState(sol_p, output_scale=state_at_t1.output_scale)
+        acc = _SolverState(acc_p, output_scale=state_at_t1.output_scale)
+        return _InterpRes(accepted=acc, solution=sol, previous=prev)
+
+
+def _solver_flatten(slvr):
+    children = (slvr.strategy,)
+    aux = (slvr.requires_rescaling, slvr.string_repr)
+    return children, aux
+
+
+def _solver_unflatten(aux, children):
+    (strategy,) = children
+    rescaling, string_repr = aux
+    return _UncalibratedSolver(
+        strategy=strategy, requires_rescaling=rescaling, string_repr=string_repr
+    )
+
+
+tree_util.register_pytree_node(
+    _UncalibratedSolver, flatten_func=_solver_flatten, unflatten_func=_solver_unflatten
+)
