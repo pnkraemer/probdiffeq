@@ -28,7 +28,7 @@ from diffeqzoo import backend
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, markov, solvers, strategies
+from probdiffeq.solvers import components, solution, solvers, strategies
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
@@ -69,7 +69,7 @@ init_raw, transitions = components.prior_ibm_discrete(
     ts, num_derivatives=NUM_DERIVATIVES, output_scale=100.0
 )
 
-markov_seq_prior = markov.MarkovSeq(init_raw, transitions)
+markov_seq_prior = solution.MarkovSeq(init_raw, transitions)
 
 
 tcoeffs = autodiff.taylor_mode_scan(
@@ -78,7 +78,7 @@ tcoeffs = autodiff.taylor_mode_scan(
 init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(
     tcoeffs, num_derivatives=NUM_DERIVATIVES
 )
-markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
+markov_seq_tcoeffs = solution.MarkovSeq(init_tcoeffs, transitions)
 
 # +
 # Compute the posterior
@@ -95,27 +95,27 @@ sol = ivpsolve.solve_and_save_at(
     vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver
 )
 # posterior = solution.calibrate(sol.posterior, sol.output_scale)
-markov_seq_posterior = markov.markov_select_terminal(sol.posterior)
+markov_seq_posterior = solution.markov_select_terminal(sol.posterior)
 
 # +
 # Compute marginals
 
-margs_prior = markov.markov_marginals(markov_seq_prior, reverse=False)
-margs_tcoeffs = markov.markov_marginals(markov_seq_tcoeffs, reverse=False)
-margs_posterior = markov.markov_marginals(markov_seq_posterior, reverse=True)
+margs_prior = solution.markov_marginals(markov_seq_prior, reverse=False)
+margs_tcoeffs = solution.markov_marginals(markov_seq_tcoeffs, reverse=False)
+margs_posterior = solution.markov_marginals(markov_seq_posterior, reverse=True)
 
 # +
 # Compute samples
 
 num_samples = 5
 key = jax.random.PRNGKey(seed=1)
-(_qoi, samples_prior), _ = markov.markov_sample(
+(_qoi, samples_prior), _ = solution.markov_sample(
     key, markov_seq_prior, shape=(num_samples,), reverse=False
 )
-(_qoi, samples_tcoeffs), _ = markov.markov_sample(
+(_qoi, samples_tcoeffs), _ = solution.markov_sample(
     key, markov_seq_tcoeffs, shape=(num_samples,), reverse=False
 )
-(_qoi, samples_posterior), _ = markov.markov_sample(
+(_qoi, samples_posterior), _ = solution.markov_sample(
     key, markov_seq_posterior, shape=(num_samples,), reverse=True
 )
 

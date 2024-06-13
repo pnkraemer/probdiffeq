@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, markov, solvers, strategies
+from probdiffeq.solvers import components, solution, solvers, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -30,8 +30,8 @@ def fixture_approximation():
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_sample_shape(approximation, shape):
     key = random.prng_key(seed=15)
-    posterior = markov.markov_select_terminal(approximation.posterior)
-    (u, samples), (u_init, samples_init) = markov.markov_sample(
+    posterior = solution.markov_select_terminal(approximation.posterior)
+    (u, samples), (u_init, samples_init) = solution.markov_sample(
         key, posterior, shape=shape, reverse=True
     )
     margs = tree_util.tree_map(lambda x: x[1:], approximation.marginals)

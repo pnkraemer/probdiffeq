@@ -24,7 +24,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, markov, solution, solvers, strategies
+from probdiffeq.solvers import components, solution, solvers, strategies
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
@@ -133,11 +133,11 @@ sol = ivpsolve.solve_and_save_at(
 
 marginals = solution.calibrate(sol.marginals, output_scale=sol.output_scale)
 posterior = solution.calibrate(sol.posterior, output_scale=sol.output_scale)
-posterior = markov.markov_select_terminal(posterior)
+posterior = solution.markov_select_terminal(posterior)
 # -
 
 key = jax.random.PRNGKey(seed=1)
-(qoi, samples), _init = markov.markov_sample(key, posterior, shape=(2,), reverse=True)
+(qoi, samples), _init = solution.markov_sample(key, posterior, shape=(2,), reverse=True)
 
 # +
 _, num_derivatives, _ = marginals.mean.shape

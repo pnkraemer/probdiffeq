@@ -99,7 +99,6 @@ nav:
           - components: api_docs/solvers/components.md
           - solvers: api_docs/solvers/solvers.md
           - solution: api_docs/solvers/solution.md
-          - markov: api_docs/solvers/markov.md
       - taylor:
           - affine: api_docs/taylor/affine.md
           - autodiff: api_docs/taylor/autodiff.md
