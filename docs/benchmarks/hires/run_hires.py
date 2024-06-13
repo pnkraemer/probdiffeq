@@ -19,9 +19,8 @@ import tqdm
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
-from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
@@ -96,7 +95,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Build a solver
         ibm = priors.ibm_adaptive(num_derivatives=num_derivatives)
         ts1 = corrections.ts1()
-        strategy = filters.filter_adaptive(ibm, ts1)
+        strategy = strategies.filter_adaptive(ibm, ts1)
         solver = solvers.dynamic(strategy)
         control = adaptive.control_proportional_integral_clipped()
         adaptive_solver = adaptive.adaptive(

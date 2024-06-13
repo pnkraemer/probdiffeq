@@ -28,9 +28,8 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers
-from probdiffeq.solvers.strategies import smoothers
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -121,7 +120,7 @@ def vf(y, *, t, p):
 # Make a solver
 ibm = priors.ibm_adaptive(num_derivatives=1)
 ts0 = corrections.ts0()
-strategy = smoothers.smoother_adaptive(ibm, ts0)
+strategy = strategies.smoother_adaptive(ibm, ts0)
 solver_ts0 = solvers.solver(strategy)
 
 # +

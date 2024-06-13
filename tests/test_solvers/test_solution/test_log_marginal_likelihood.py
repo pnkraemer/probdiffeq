@@ -4,9 +4,8 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers
-from probdiffeq.solvers.strategies import filters, fixedpoint
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -17,7 +16,7 @@ def fixture_sol():
 
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
+    strategy = strategies.fixedpoint_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
@@ -90,7 +89,7 @@ def test_raises_error_for_filter():
 
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 
     grid = np.linspace(t0, t1, num=3)

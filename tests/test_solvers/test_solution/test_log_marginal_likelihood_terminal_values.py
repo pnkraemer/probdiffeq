@@ -4,26 +4,25 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers
-from probdiffeq.solvers.strategies import filters, fixedpoint, smoothers
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.case()
 def case_strategy_filter():
-    return filters.filter_adaptive
+    return strategies.filter_adaptive
 
 
 @testing.case()
 def case_strategy_smoother():
-    return smoothers.smoother_adaptive
+    return strategies.smoother_adaptive
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return fixedpoint.fixedpoint_adaptive
+    return strategies.fixedpoint_adaptive
 
 
 @testing.fixture(name="sol")

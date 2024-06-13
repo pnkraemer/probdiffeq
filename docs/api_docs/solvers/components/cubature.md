@@ -1,0 +1,1 @@
+::: probdiffeq.solvers.components.cubature

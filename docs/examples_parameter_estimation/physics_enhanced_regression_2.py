@@ -134,9 +134,8 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers
-from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
@@ -194,7 +193,7 @@ def solve_fixed(theta, *, ts):
     # Create a probabilistic solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
@@ -211,7 +210,7 @@ def solve_adaptive(theta, *, save_at):
     # Create a probabilistic solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)
 

@@ -95,15 +95,11 @@ nav:
       - adaptive: api_docs/adaptive.md
       - impl: api_docs/impl.md
       - solvers:
-          - strategies:
-              - components:
-                  - priors: api_docs/solvers/strategies/components/priors.md
-                  - corrections: api_docs/solvers/strategies/components/corrections.md
-                  - cubature: api_docs/solvers/strategies/components/cubature.md
-              - strategy: api_docs/solvers/strategies/strategy.md
-              - filters: api_docs/solvers/strategies/filters.md
-              - smoothers: api_docs/solvers/strategies/smoothers.md
-              - fixedpoint: api_docs/solvers/strategies/fixedpoint.md
+          - components:
+              - priors: api_docs/solvers/components/priors.md
+              - corrections: api_docs/solvers/components/corrections.md
+              - cubature: api_docs/solvers/components/cubature.md
+          - strategies: api_docs/solvers/strategies.md
           - solvers: api_docs/solvers/solvers.md
           - solution: api_docs/solvers/solution.md
           - markov: api_docs/solvers/markov.md
