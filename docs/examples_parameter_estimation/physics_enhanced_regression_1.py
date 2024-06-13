@@ -36,8 +36,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solution, solvers, strategies
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -70,8 +69,8 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
-    ibm = priors.ibm_adaptive(num_derivatives=1)
-    ts0 = corrections.ts0()
+    ibm = components.ibm_adaptive(num_derivatives=1)
+    ts0 = components.ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 

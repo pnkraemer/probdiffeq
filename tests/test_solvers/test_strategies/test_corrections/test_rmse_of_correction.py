@@ -4,8 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, cubature, priors
+from probdiffeq.solvers import components, solvers, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -13,7 +12,7 @@ from tests.setup import setup
 @testing.case()
 def case_ts0():
     try:
-        return corrections.ts0()
+        return components.ts0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -22,7 +21,7 @@ def case_ts0():
 @testing.case()
 def case_ts1():
     try:
-        return corrections.ts1()
+        return components.ts1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -31,7 +30,7 @@ def case_ts1():
 @testing.case()
 def case_slr0():
     try:
-        return corrections.slr0()
+        return components.slr0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -40,7 +39,7 @@ def case_slr0():
 @testing.case()
 def case_slr1():
     try:
-        return corrections.slr1()
+        return components.slr1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -49,7 +48,7 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return corrections.slr1(cubature_fun=cubature.gauss_hermite)
+        return components.slr1(cubature_fun=components.gauss_hermite)
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -63,7 +62,7 @@ def fixture_solution(correction_impl):
     if correction_impl == "not_implemented":
         testing.skip(reason="This type of linearisation has not been implemented.")
 
-    ibm = priors.ibm_adaptive(num_derivatives=2)
+    ibm = components.ibm_adaptive(num_derivatives=2)
     strategy = strategies.filter_adaptive(ibm, correction_impl)
     solver = solvers.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)

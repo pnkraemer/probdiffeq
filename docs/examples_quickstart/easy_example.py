@@ -24,8 +24,7 @@ import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solvers, strategies
 from probdiffeq.taylor import autodiff
 
 jax.config.update("jax_platform_name", "cpu")
@@ -84,8 +83,8 @@ impl.select("dense", ode_shape=(1,))
 #
 
 # +
-ibm = priors.ibm_adaptive(num_derivatives=4)
-ts0 = corrections.ts1(ode_order=1)
+ibm = components.ibm_adaptive(num_derivatives=4)
+ts0 = components.ts1(ode_order=1)
 
 strategy = strategies.smoother_adaptive(ibm, ts0)
 solver = solvers.solver(strategy)

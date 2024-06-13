@@ -6,8 +6,7 @@ Place all tests that have no better place here.
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solvers, strategies
 
 
 @testing.parametrize("incr", [1, -1])
@@ -21,9 +20,9 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     attribute of the extrapolation model.
     """
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
-    prior = priors.ibm_adaptive(num_derivatives=n)
+    prior = components.ibm_adaptive(num_derivatives=n)
 
-    ts0 = corrections.ts0()  # irrelevant
+    ts0 = components.ts0()  # irrelevant
 
     for strategy in [
         strategies.filter_adaptive,

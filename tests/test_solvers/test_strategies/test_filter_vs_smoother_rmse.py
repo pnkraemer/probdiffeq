@@ -4,8 +4,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solvers, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -22,8 +21,8 @@ def fixture_solver_setup():
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
-    ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = corrections.ts0()
+    ibm = components.ibm_adaptive(num_derivatives=2)
+    ts0 = components.ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 
@@ -36,8 +35,8 @@ def fixture_filter_solution(solver_setup):
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
-    ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = corrections.ts0()
+    ibm = components.ibm_adaptive(num_derivatives=2)
+    ts0 = components.ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 
