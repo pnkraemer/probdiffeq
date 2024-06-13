@@ -24,7 +24,7 @@ It inherits automatic differentiation, vectorisation, and GPU capability from JA
 
 and many more.
 
-* **AN EASY EXAMPLE:** [LINK](https://pnkraemer.github.io/probdiffeq/getting_started/easy_example/)
+* **AN EASY EXAMPLE:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_quickstart/easy_example/)
 * **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_solver_config/posterior_uncertainties/)
 * **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/getting_started/choosing_a_solver/)
 * **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/ivpsolve/)
