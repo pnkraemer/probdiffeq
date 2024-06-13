@@ -19,7 +19,7 @@ def test_exponential_approximated_well():
     ibm = components.prior_ibm(num_derivatives=1)
     ts0 = components.correction_ts0()
     strategy = components.strategy_filter(ibm, ts0)
-    solver = solvers.dynamic(strategy)
+    solver = solvers.solver_dynamic(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition((*u0, vf(*u0, t=t0)), output_scale=output_scale)

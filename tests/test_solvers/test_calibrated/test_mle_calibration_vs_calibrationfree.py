@@ -93,7 +93,7 @@ def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     strategy = strategy_fun(ibm, ts0)
 
     uncalib = solver_to_solution(solvers.solver(strategy))
-    mle = solver_to_solution(solvers.mle(strategy))
+    mle = solver_to_solution(solvers.solver_mle(strategy))
     return uncalib, mle
 
 

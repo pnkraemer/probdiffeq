@@ -64,7 +64,7 @@ class _State(containers.NamedTuple):
         return self.strategy.t
 
 
-def mle(strategy):
+def solver_mle(strategy):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
     Warning: needs to be combined with a call to stats.calibrate()
@@ -97,7 +97,7 @@ def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
     return dt * error, state
 
 
-def dynamic(strategy):
+def solver_dynamic(strategy):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
     return _CalibratedSolver(

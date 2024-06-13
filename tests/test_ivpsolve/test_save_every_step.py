@@ -16,7 +16,7 @@ def fixture_python_loop_solution():
     ibm = components.prior_ibm(num_derivatives=4)
     ts0 = components.correction_ts0()
     strategy = components.strategy_filter(ibm, ts0)
-    solver = solvers.mle(strategy)
+    solver = solvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     dt0 = ivpsolve.dt0_adaptive(

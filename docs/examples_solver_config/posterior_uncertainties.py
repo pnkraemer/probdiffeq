@@ -65,7 +65,7 @@ def vf(*ys, t):  # noqa: ARG001
 # +
 ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0()
-solver = solvers.mle(components.strategy_filter(ibm, ts0))
+solver = solvers.solver_mle(components.strategy_filter(ibm, ts0))
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
@@ -120,7 +120,7 @@ plt.show()
 # +
 ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0()
-solver = solvers.mle(components.strategy_fixedpoint(ibm, ts0))
+solver = solvers.solver_mle(components.strategy_fixedpoint(ibm, ts0))
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)

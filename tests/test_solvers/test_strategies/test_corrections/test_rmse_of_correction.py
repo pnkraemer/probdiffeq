@@ -66,7 +66,7 @@ def fixture_solution(correction_impl):
 
     ibm = components.prior_ibm(num_derivatives=2)
     strategy = components.strategy_filter(ibm, correction_impl)
-    solver = solvers.mle(strategy)
+    solver = solvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
