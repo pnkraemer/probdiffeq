@@ -74,7 +74,7 @@ num_derivatives = 1
 
 ibm = components.prior_ibm(num_derivatives=1)
 ts1 = components.correction_ts1()
-strategy = components.filter_adaptive(ibm, ts1)
+strategy = components.strategy_filter(ibm, ts1)
 dynamic = solvers.dynamic(strategy)
 mle = solvers.mle(strategy)
 

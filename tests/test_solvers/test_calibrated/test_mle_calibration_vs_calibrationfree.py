@@ -85,7 +85,7 @@ def case_simulate_terminal_values():
 @testing.fixture(name="uncalibrated_and_mle_solution")
 @testing.parametrize_with_cases("solver_to_solution", cases=".", prefix="case_")
 @testing.parametrize(
-    "strategy_fun", [components.filter_adaptive, components.fixedpoint_adaptive]
+    "strategy_fun", [components.strategy_filter, components.strategy_fixedpoint]
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     ibm = components.prior_ibm(num_derivatives=4)

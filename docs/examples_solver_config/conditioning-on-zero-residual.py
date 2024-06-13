@@ -85,7 +85,7 @@ markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 
 slr1 = components.correction_ts1()
 ibm = components.prior_ibm(num_derivatives=NUM_DERIVATIVES)
-solver = solvers.solver(components.fixedpoint_adaptive(ibm, slr1))
+solver = solvers.solver(components.strategy_fixedpoint(ibm, slr1))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))

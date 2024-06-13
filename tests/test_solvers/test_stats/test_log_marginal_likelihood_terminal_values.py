@@ -11,17 +11,17 @@ from tests.setup import setup
 
 @testing.case()
 def case_strategy_filter():
-    return components.filter_adaptive
+    return components.strategy_filter
 
 
 @testing.case()
 def case_strategy_smoother():
-    return components.smoother_adaptive
+    return components.strategy_smoother
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return components.fixedpoint_adaptive
+    return components.strategy_fixedpoint
 
 
 @testing.fixture(name="sol")

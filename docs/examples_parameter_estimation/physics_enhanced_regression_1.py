@@ -71,7 +71,7 @@ def solve(p):
     """Evaluate the parameter-to-solution map."""
     ibm = components.prior_ibm(num_derivatives=1)
     ts0 = components.correction_ts0()
-    strategy = components.smoother_adaptive(ibm, ts0)
+    strategy = components.strategy_smoother(ibm, ts0)
     solver = solvers.solver(strategy)
 
     tcoeffs = (u0, vf(u0, t0, p=p))

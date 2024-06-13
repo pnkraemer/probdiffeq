@@ -67,7 +67,7 @@ def solution_routine():
     ibm = components.prior_ibm(num_derivatives=1)
     ts0 = components.correction_ts0(ode_order=1)
 
-    strategy = components.fixedpoint_adaptive(ibm, ts0)
+    strategy = components.strategy_fixedpoint(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)
 

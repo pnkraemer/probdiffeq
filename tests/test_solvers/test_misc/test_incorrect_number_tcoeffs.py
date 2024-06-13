@@ -25,9 +25,9 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     ts0 = components.correction_ts0()  # irrelevant
 
     for strategy in [
-        components.filter_adaptive,
-        components.smoother_adaptive,
-        components.fixedpoint_adaptive,
+        components.strategy_filter,
+        components.strategy_smoother,
+        components.strategy_fixedpoint,
     ]:
         solver = solvers.solver(strategy(prior, ts0))
         output_scale = np.ones_like(impl.prototypes.output_scale())

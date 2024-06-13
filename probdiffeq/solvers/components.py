@@ -208,7 +208,7 @@ def _tree_unflatten(aux, _children):
 tree_util.register_pytree_node(_Strategy, _tree_flatten, _tree_unflatten)
 
 
-def smoother_adaptive(prior, correction, /) -> _Strategy:
+def strategy_smoother(prior, correction, /) -> _Strategy:
     """Construct a smoother."""
     extrapolation_impl = _PreconSmoother(*prior)
     return _Strategy(
@@ -301,7 +301,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
-def fixedpoint_adaptive(prior, correction, /) -> _Strategy:
+def strategy_fixedpoint(prior, correction, /) -> _Strategy:
     """Construct a fixedpoint-smoother."""
     extrapolation_impl = _PreconFixedPoint(*prior)
     return _Strategy(
@@ -427,7 +427,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         return _interp.InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
-def filter_adaptive(prior, correction, /) -> _Strategy:
+def strategy_filter(prior, correction, /) -> _Strategy:
     """Construct a filter."""
     extrapolation_impl = _PreconFilter(*prior)
     return _Strategy(
@@ -498,27 +498,27 @@ class _PreconFilter(_ExtrapolationImpl):
         return _interp.InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
-class PositiveCubatureRule(containers.NamedTuple):
+class _PositiveCubatureRule(containers.NamedTuple):
     """Cubature rule with positive weights."""
 
     points: Array
     weights_sqrtm: Array
 
 
-def cubature_third_order_spherical(input_shape) -> PositiveCubatureRule:
+def cubature_third_order_spherical(input_shape) -> _PositiveCubatureRule:
     """Third-order spherical cubature integration."""
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
         points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
-        return PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
     (S, _) = points_mat.shape
     points = np.reshape(points_mat, (S,))
-    return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _third_order_spherical_params(*, d):
@@ -528,20 +528,20 @@ def _third_order_spherical_params(*, d):
     return pts, weights_sqrtm
 
 
-def cubature_unscented_transform(input_shape, r=1.0) -> PositiveCubatureRule:
+def cubature_unscented_transform(input_shape, r=1.0) -> _PositiveCubatureRule:
     """Unscented transform."""
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
         points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
-        return PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
     (S, _) = points_mat.shape
     points = np.reshape(points_mat, (S,))
-    return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _unscented_transform_params(d, *, r):
@@ -555,7 +555,7 @@ def _unscented_transform_params(d, *, r):
     return pts, weights_sqrtm
 
 
-def cubature_gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
+def cubature_gauss_hermite(input_shape, degree=5) -> _PositiveCubatureRule:
     """(Statistician's) Gauss-Hermite cubature.
 
     The number of cubature points is `prod(input_shape)**degree`.
@@ -575,7 +575,7 @@ def cubature_gauss_hermite(input_shape, degree=5) -> PositiveCubatureRule:
     # Build a tensor grid and return class
     tensor_pts = _tensor_points(pts, d=dim)
     tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
-    return PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
+    return _PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
 
 
 # how does this generalise to an input_shape instead of an input_dimension?

@@ -15,7 +15,7 @@ def fixture_approximation():
 
     ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
-    strategy = components.smoother_adaptive(ibm, ts0)
+    strategy = components.strategy_smoother(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
