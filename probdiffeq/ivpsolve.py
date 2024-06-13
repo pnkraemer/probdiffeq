@@ -12,13 +12,8 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 from probdiffeq.solvers import stats
 
-# todo: change the Solution object to a simple
-#  named tuple containing (t, full_estimate, u_and_marginals, stats).
-#  No need to pre/append the initial condition to the solution anymore,
-#  since the user knows it already.
 
-
-class Solution:
+class _Solution:
     """Estimated initial value problem solution."""
 
     def __init__(self, t, u, output_scale, marginals, posterior, num_steps):
@@ -87,7 +82,7 @@ def _sol_flatten(sol):
 
 def _sol_unflatten(_aux, children):
     t, u, marginals, posterior, output_scale, n = children
-    return Solution(
+    return _Solution(
         t=t,
         u=u,
         marginals=marginals,
@@ -97,12 +92,12 @@ def _sol_unflatten(_aux, children):
     )
 
 
-tree_util.register_pytree_node(Solution, _sol_flatten, _sol_unflatten)
+tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
 
 
 def solve_for_terminal_values(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0
-) -> Solution:
+) -> _Solution:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t1])
     (_t, solution_save_at), _, num_steps = _solve_and_save_at(
@@ -122,7 +117,7 @@ def solve_for_terminal_values(
     posterior, output_scale = solution_save_at
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
     u = impl.hidden_model.qoi(marginals)
-    return Solution(
+    return _Solution(
         t=t1,
         u=u,
         marginals=marginals,
@@ -134,7 +129,7 @@ def solve_for_terminal_values(
 
 def solve_and_save_at(
     vector_field, initial_condition, save_at, adaptive_solver, dt0
-) -> Solution:
+) -> _Solution:
     """Solve an initial value problem and return the solution at a pre-determined grid.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -167,7 +162,7 @@ def solve_and_save_at(
     _tmp = _userfriendly_output(posterior=posterior_save_at, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
     u = impl.hidden_model.qoi(marginals)
-    return Solution(
+    return _Solution(
         t=save_at,
         u=u,
         marginals=marginals,
@@ -219,7 +214,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
 def solve_and_save_every_step(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0
-) -> Solution:
+) -> _Solution:
     """Solve an initial value problem and save every step.
 
     This function uses a native-Python while loop.
@@ -257,7 +252,7 @@ def solve_and_save_every_step(
     marginals, posterior = _tmp
 
     u = impl.hidden_model.qoi(marginals)
-    return Solution(
+    return _Solution(
         t=t,
         u=u,
         marginals=marginals,
@@ -289,7 +284,7 @@ def _solution_generator(
     yield solution
 
 
-def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
+def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
@@ -308,7 +303,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
     marginals, posterior = _tmp
 
     u = impl.hidden_model.qoi(marginals)
-    return Solution(
+    return _Solution(
         t=grid,
         u=u,
         marginals=marginals,
