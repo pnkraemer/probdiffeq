@@ -57,7 +57,7 @@ solver_1st = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = taylor.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
@@ -91,7 +91,7 @@ solver_2nd = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = taylor.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 # -
 

@@ -21,7 +21,7 @@ def fixture_python_loop_solution():
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
     )
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
 

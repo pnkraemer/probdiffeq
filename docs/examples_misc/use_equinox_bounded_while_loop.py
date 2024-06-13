@@ -69,7 +69,7 @@ def solution_routine():
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init = solver.initial_condition(tcoeffs, 1.0)
 
     def simulate(init_val):

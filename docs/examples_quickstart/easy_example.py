@@ -116,7 +116,7 @@ adaptive_solver = ivpsolve.adaptive(solver)
 #
 # Use the following functions:
 
-tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 output_scale = 1.0  # or any other value with the same shape
 init = solver.initial_condition(tcoeffs, output_scale)
 

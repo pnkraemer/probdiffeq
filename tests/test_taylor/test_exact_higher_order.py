@@ -6,13 +6,13 @@ from probdiffeq.backend import ode, testing
 
 
 @testing.case()
-def case_forward_mode_recursive():
-    return taylor.forward_mode_recursive
+def case_odejet_via_jvp():
+    return taylor.odejet_via_jvp
 
 
 @testing.case()
 def case_taylor_mode_scan():
-    return taylor.taylor_mode_scan
+    return taylor.odejet_padded_scan
 
 
 @testing.fixture(name="pb_with_solution")

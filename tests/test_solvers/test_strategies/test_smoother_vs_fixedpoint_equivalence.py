@@ -16,7 +16,7 @@ def fixture_solver_setup():
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {
         "vf": vf,
         "tcoeffs": tcoeffs,

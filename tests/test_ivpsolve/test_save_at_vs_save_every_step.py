@@ -19,7 +19,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale=output_scale)
     problem_args = (vf, init)

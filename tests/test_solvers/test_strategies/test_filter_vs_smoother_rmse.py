@@ -13,7 +13,7 @@ def fixture_solver_setup():
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     grid = np.linspace(t0, t1, endpoint=True, num=12)
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
 
 

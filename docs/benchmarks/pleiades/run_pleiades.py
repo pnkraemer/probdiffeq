@@ -113,7 +113,7 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
 
         # Initial state
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.taylor_mode_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
         init = solver.initial_condition(tcoeffs, output_scale=1.0)
 
         # Solve

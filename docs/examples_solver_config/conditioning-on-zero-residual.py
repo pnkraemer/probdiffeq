@@ -70,7 +70,7 @@ init_raw, transitions = ivpsolvers.prior_ibm_discrete(
 markov_seq_prior = stats.MarkovSeq(init_raw, transitions)
 
 
-tcoeffs = taylor.taylor_mode_scan(
+tcoeffs = taylor.odejet_padded_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
 init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(

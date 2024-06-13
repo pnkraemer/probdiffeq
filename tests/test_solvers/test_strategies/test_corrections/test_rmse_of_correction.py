@@ -69,7 +69,7 @@ def fixture_solution(correction_impl):
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_adaptive_terminal_values(

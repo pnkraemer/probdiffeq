@@ -18,7 +18,7 @@ def fixture_approximation():
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_adaptive_save_every_step(
         vf, init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1

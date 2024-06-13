@@ -7,7 +7,7 @@ from probdiffeq.impl import impl
 from probdiffeq.util import filter_util
 
 
-def make_runge_kutta_starter(dt, *, atol=1e-12, rtol=1e-10):
+def runge_kutta_starter(dt, *, atol=1e-12, rtol=1e-10):
     """Create an estimator that uses a Runge-Kutta starter."""
     # If the accuracy of the initialisation is bad, play around with dt.
     return functools.partial(_runge_kutta_starter, dt0=dt, atol=atol, rtol=rtol)
@@ -70,12 +70,12 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     return tuple(impl.stats.mean(initial))
 
 
-def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_padded_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
-    Other than `taylor_mode_unroll()`, this function implements the loop via a scan,
+    Other than `odejet_unroll()`, this function implements the loop via a scan,
     which comes at the price of padding the loop variable with zeros as appropriate.
-    It is expected to compile more quickly than `taylor_mode_unroll()`, but may
+    It is expected to compile more quickly than `odejet_unroll()`, but may
     execute more slowly.
 
     The differences should be small.
@@ -92,7 +92,7 @@ def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
         # Pad the Taylor coefficients in zeros, call jet, and return the solution.
         # This works, because the $i$th output coefficient of jet()
         # is independent of the $i+j$th input coefficient
-        # (see also the explanation in taylor_mode_doubling)
+        # (see also the explanation in odejet_doubling_unroll)
         series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
         p, s_new = functools.jet(vf, primals=inits, series=series)
 
@@ -119,12 +119,12 @@ def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
     return taylor_coeffs
 
 
-def taylor_mode_unroll(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_unroll(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
-    Other than `taylor_mode_scan()`, this function does not depend on zero-padding
+    Other than `odejet_padded_scan()`, this function does not depend on zero-padding
     the coefficients at the price of unrolling a loop of length `num-1`.
-    It is expected to compile more slowly than `taylor_mode_scan()`,
+    It is expected to compile more slowly than `odejet_padded_scan()`,
     but execute more quickly.
 
     The differences should be small.
@@ -174,7 +174,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode_recursive(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_via_jvp(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -203,7 +203,9 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree_util.Partial(df)
 
 
-def taylor_mode_doubling(vf: Callable, inits: tuple[Array, ...], /, num_doublings: int):
+def odejet_doubling_unroll(
+    vf: Callable, inits: tuple[Array, ...], /, num_doublings: int
+):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -281,7 +283,7 @@ def _unnormalise(primals, *series):
     return primals, *series_new
 
 
-def affine_recursion(vf: Callable, initial_values: tuple[Array, ...], /, num: int):
+def odejet_affine(vf: Callable, initial_values: tuple[Array, ...], /, num: int):
     """Evaluate the Taylor series of an affine differential equation.
 
     !!! warning "Compilation time"

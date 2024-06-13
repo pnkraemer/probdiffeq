@@ -193,7 +193,7 @@ def solve_fixed(theta, *, ts):
     strategy = ivpsolvers.strategy_filter(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
 
@@ -211,7 +211,7 @@ def solve_adaptive(theta, *, save_at):
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
 
-    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_adaptive_save_at(

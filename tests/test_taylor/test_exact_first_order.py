@@ -6,18 +6,18 @@ from probdiffeq.backend import ode, testing
 
 
 @testing.case()
-def case_forward_mode_recursive():
-    return taylor.forward_mode_recursive
+def case_odejet_via_jvp():
+    return taylor.odejet_via_jvp
 
 
 @testing.case()
 def case_taylor_mode_scan():
-    return taylor.taylor_mode_scan
+    return taylor.odejet_padded_scan
 
 
 @testing.case()
 def case_taylor_mode_unroll():
-    return taylor.taylor_mode_unroll
+    return taylor.odejet_unroll
 
 
 @testing.fixture(name="pb_with_solution")
@@ -44,7 +44,7 @@ def test_approximation_identical_to_reference_doubling(pb_with_solution, num_dou
     """Separately test the doubling-function, because its API is different."""
     (f, init), solution = pb_with_solution
 
-    derivatives = taylor.taylor_mode_doubling(f, init, num_doublings=num_doublings)
+    derivatives = taylor.odejet_doubling_unroll(f, init, num_doublings=num_doublings)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
     for dy, dy_ref in zip(derivatives, solution):
         assert np.allclose(dy, dy_ref)
