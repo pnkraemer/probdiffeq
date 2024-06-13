@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, strategies
+from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -65,7 +65,7 @@ def fixture_solution(correction_impl):
         testing.skip(reason="This type of linearisation has not been implemented.")
 
     ibm = components.prior_ibm(num_derivatives=2)
-    strategy = strategies.filter_adaptive(ibm, correction_impl)
+    strategy = components.strategy_filter(ibm, correction_impl)
     solver = solvers.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
