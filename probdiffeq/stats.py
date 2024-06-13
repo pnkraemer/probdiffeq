@@ -70,18 +70,6 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
     return (qois, samples), (init_qoi, init_sample)
 
 
-def markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
-    """Rescale the Cholesky factor of the covariance of a Markov sequence."""
-    init = impl.variable.rescale_cholesky(markov_seq.init, factor)
-    cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
-    return MarkovSeq(init=init, conditional=cond)
-
-
-def _rescale_cholesky_conditional(conditional, factor, /):
-    noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
-    return cond_util.Conditional(conditional.matmul, noise_new)
-
-
 def markov_select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
     """Discard all intermediate filtering solutions from a Markov sequence.
 
@@ -273,5 +261,17 @@ def calibrate(x, /, output_scale):
     if np.ndim(output_scale) > np.ndim(impl.prototypes.output_scale()):
         output_scale = output_scale[-1]
     if isinstance(x, MarkovSeq):
-        return markov_rescale_cholesky(x, output_scale)
+        return _markov_rescale_cholesky(x, output_scale)
     return impl.variable.rescale_cholesky(x, output_scale)
+
+
+def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
+    """Rescale the Cholesky factor of the covariance of a Markov sequence."""
+    init = impl.variable.rescale_cholesky(markov_seq.init, factor)
+    cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
+    return MarkovSeq(init=init, conditional=cond)
+
+
+def _rescale_cholesky_conditional(conditional, factor, /):
+    noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
+    return cond_util.Conditional(conditional.matmul, noise_new)
