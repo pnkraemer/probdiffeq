@@ -22,7 +22,7 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
     prior = components.ibm_adaptive(num_derivatives=n)
 
-    ts0 = components.ts0()  # irrelevant
+    ts0 = components.correction_ts0()  # irrelevant
 
     for strategy in [
         strategies.filter_adaptive,

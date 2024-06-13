@@ -17,7 +17,7 @@ def test_exponential_approximated_well():
     vf, u0, (t0, t1), solution = setup.ode_affine()
 
     ibm = components.ibm_adaptive(num_derivatives=1)
-    ts0 = components.ts0()
+    ts0 = components.correction_ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.dynamic(strategy)
 

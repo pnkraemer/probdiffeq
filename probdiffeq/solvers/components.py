@@ -132,7 +132,7 @@ def _estimate_error(observed, /):
     return output_scale * error_estimate_unscaled
 
 
-def ts0(*, ode_order=1) -> _ODEConstraintTaylor:
+def correction_ts0(*, ode_order=1) -> _ODEConstraintTaylor:
     """Zeroth-order Taylor linearisation."""
     return _ODEConstraintTaylor(
         ode_order=ode_order,
@@ -141,7 +141,7 @@ def ts0(*, ode_order=1) -> _ODEConstraintTaylor:
     )
 
 
-def ts1(*, ode_order=1) -> _ODEConstraintTaylor:
+def correction_ts1(*, ode_order=1) -> _ODEConstraintTaylor:
     """First-order Taylor linearisation."""
     return _ODEConstraintTaylor(
         ode_order=ode_order,
@@ -150,7 +150,7 @@ def ts1(*, ode_order=1) -> _ODEConstraintTaylor:
     )
 
 
-def slr0(cubature_fun=None) -> _ODEConstraintStatistical:
+def correction_slr0(cubature_fun=None) -> _ODEConstraintStatistical:
     """Zeroth-order statistical linear regression."""
     cubature_fun = cubature_fun or third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
@@ -161,7 +161,7 @@ def slr0(cubature_fun=None) -> _ODEConstraintStatistical:
     )
 
 
-def slr1(cubature_fun=None) -> _ODEConstraintStatistical:
+def correction_slr1(cubature_fun=None) -> _ODEConstraintStatistical:
     """First-order statistical linear regression."""
     cubature_fun = cubature_fun or third_order_spherical
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)

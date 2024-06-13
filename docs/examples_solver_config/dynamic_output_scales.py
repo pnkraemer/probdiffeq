@@ -73,7 +73,7 @@ def vf(*ys, t):  # noqa: ARG001
 num_derivatives = 1
 
 ibm = components.ibm_adaptive(num_derivatives=1)
-ts1 = components.ts1()
+ts1 = components.correction_ts1()
 strategy = strategies.filter_adaptive(ibm, ts1)
 dynamic = solvers.dynamic(strategy)
 mle = solvers.mle(strategy)

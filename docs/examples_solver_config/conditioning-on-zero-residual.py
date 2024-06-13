@@ -83,7 +83,7 @@ markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
 # +
 # Compute the posterior
 
-slr1 = components.ts1()
+slr1 = components.correction_ts1()
 ibm = components.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
 solver = solvers.solver(strategies.fixedpoint_adaptive(ibm, slr1))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)

@@ -332,10 +332,10 @@ if __name__ == "__main__":
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
         "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, correction_fun=components.ts0
+            num_derivatives=5, correction_fun=components.correction_ts0
         ),
         r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, correction_fun=components.ts0
+            num_derivatives=8, correction_fun=components.correction_ts0
         ),
     }
 

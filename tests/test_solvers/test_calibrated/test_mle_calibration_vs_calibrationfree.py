@@ -89,7 +89,7 @@ def case_simulate_terminal_values():
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     ibm = components.ibm_adaptive(num_derivatives=4)
-    ts0 = components.ts0()
+    ts0 = components.correction_ts0()
     strategy = strategy_fun(ibm, ts0)
 
     uncalib = solver_to_solution(solvers.solver(strategy))

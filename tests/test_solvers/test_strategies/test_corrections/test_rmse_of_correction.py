@@ -12,7 +12,7 @@ from tests.setup import setup
 @testing.case()
 def case_ts0():
     try:
-        return components.ts0()
+        return components.correction_ts0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -21,7 +21,7 @@ def case_ts0():
 @testing.case()
 def case_ts1():
     try:
-        return components.ts1()
+        return components.correction_ts1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -30,7 +30,7 @@ def case_ts1():
 @testing.case()
 def case_slr0():
     try:
-        return components.slr0()
+        return components.correction_slr0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -39,7 +39,7 @@ def case_slr0():
 @testing.case()
 def case_slr1():
     try:
-        return components.slr1()
+        return components.correction_slr1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -48,7 +48,7 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return components.slr1(cubature_fun=components.gauss_hermite)
+        return components.correction_slr1(cubature_fun=components.gauss_hermite)
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError

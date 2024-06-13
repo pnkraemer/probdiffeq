@@ -31,7 +31,7 @@ def fixture_solver_setup():
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
     ibm = components.ibm_adaptive(num_derivatives=2)
-    ts0 = components.ts0()
+    ts0 = components.correction_ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
@@ -51,7 +51,7 @@ def fixture_solution_smoother(solver_setup):
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     ibm = components.ibm_adaptive(num_derivatives=2)
-    ts0 = components.ts0()
+    ts0 = components.correction_ts0()
     strategy = strategies.fixedpoint_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
@@ -77,7 +77,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Re-generate the smoothing solver
     ibm = components.ibm_adaptive(num_derivatives=2)
-    ts0 = components.ts0()
+    ts0 = components.correction_ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver_smoother = solvers.solver(strategy)
 
@@ -89,7 +89,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     ibm = components.ibm_adaptive(num_derivatives=2)
-    ts0 = components.ts0()
+    ts0 = components.correction_ts0()
     strategy = strategies.fixedpoint_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)

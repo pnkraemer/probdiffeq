@@ -84,7 +84,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         ibm = components.ibm_adaptive(num_derivatives=num_derivatives)
-        ts0_or_ts1 = components.ts1(ode_order=2)
+        ts0_or_ts1 = components.correction_ts1(ode_order=2)
         strategy = strategies.filter_adaptive(ibm, ts0_or_ts1)
         solver = solvers.dynamic(strategy)
         control = adaptive.control_proportional_integral_clipped()

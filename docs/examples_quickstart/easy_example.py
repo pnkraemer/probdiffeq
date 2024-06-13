@@ -84,7 +84,7 @@ impl.select("dense", ode_shape=(1,))
 
 # +
 ibm = components.ibm_adaptive(num_derivatives=4)
-ts0 = components.ts1(ode_order=1)
+ts0 = components.correction_ts1(ode_order=1)
 
 strategy = strategies.smoother_adaptive(ibm, ts0)
 solver = solvers.solver(strategy)

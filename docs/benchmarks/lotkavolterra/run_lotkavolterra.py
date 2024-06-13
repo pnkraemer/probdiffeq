@@ -248,7 +248,7 @@ if __name__ == "__main__":
     timeit_fun = timeit_fun_from_args(args)
 
     # Assemble algorithms
-    ts0, ts1 = components.ts0, components.ts1
+    ts0, ts1 = components.correction_ts0, components.correction_ts1
     ts0_iso = solver_probdiffeq(5, correction=ts0, implementation="isotropic")
     ts0_bd = solver_probdiffeq(5, correction=ts0, implementation="blockdiag")
     ts1_dense = solver_probdiffeq(8, correction=ts1, implementation="dense")
