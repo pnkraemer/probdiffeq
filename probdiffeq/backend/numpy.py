@@ -49,7 +49,7 @@ def diff_along_axis(arr, /, *, axis):
 
 
 def reshape(arr, /, new_shape, order="C"):
-    return jnp.reshape(arr, shape=new_shape, order=order)
+    return jnp.reshape(arr, new_shape, order=order)
 
 
 def flip(arr, /):
