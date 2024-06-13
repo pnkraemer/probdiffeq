@@ -21,6 +21,9 @@ It inherits automatic differentiation, vectorisation, and GPU capability from JA
 * ⚡ Taylor-series estimation with and without Jets
 * ⚡ Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
+
+**Tutorials:**
+
 * **AN EASY EXAMPLE:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_quickstart/easy_example/)
 * **EXAMPLES:** [LINK](https://pnkraemer.github.io/probdiffeq/examples_solver_config/posterior_uncertainties/)
 * **CHOOSING A SOLVER:** [LINK](https://pnkraemer.github.io/probdiffeq/getting_started/choosing_a_solver/)
