@@ -41,7 +41,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, strategies
+from probdiffeq.solvers import components, solvers
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -74,7 +74,7 @@ num_derivatives = 1
 
 ibm = components.prior_ibm(num_derivatives=1)
 ts1 = components.correction_ts1()
-strategy = strategies.filter_adaptive(ibm, ts1)
+strategy = components.filter_adaptive(ibm, ts1)
 dynamic = solvers.dynamic(strategy)
 mle = solvers.mle(strategy)
 

@@ -27,7 +27,7 @@ import jax.numpy as jnp
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import control_flow
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, strategies
+from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
 
 jax.config.update("jax_platform_name", "cpu")
@@ -67,7 +67,7 @@ def solution_routine():
     ibm = components.prior_ibm(num_derivatives=1)
     ts0 = components.correction_ts0(ode_order=1)
 
-    strategy = strategies.fixedpoint_adaptive(ibm, ts0)
+    strategy = components.fixedpoint_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver)
 

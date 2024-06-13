@@ -29,9 +29,9 @@ If that does not work: let me know what you come up with...
 
 ## Filters vs smoothers
 
-Almost always, use a `strategies.filter_adaptive` strategy for `simulate_terminal_values`, 
-a `strategies.smoother_adaptive` strategy for `solve_and_save_every_step`,
-and a `strategies.fixedpoint_adaptive` strategy for `solve_and_save_at`.
+Almost always, use a `components.filter_adaptive` strategy for `simulate_terminal_values`, 
+a `components.smoother_adaptive` strategy for `solve_and_save_every_step`,
+and a `components.fixedpoint_adaptive` strategy for `solve_and_save_at`.
 Use either a filter (if you must) or a smoother (recommended) for `solve_fixed_step`.
 Other combinations are possible, but rather rare 
 (and require some understanding of the underlying statistical concepts).

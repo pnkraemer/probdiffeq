@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats, strategies
+from probdiffeq.solvers import components, solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -15,7 +15,7 @@ def fixture_approximation():
 
     ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
-    strategy = strategies.smoother_adaptive(ibm, ts0)
+    strategy = components.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 

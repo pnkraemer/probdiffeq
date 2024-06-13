@@ -95,7 +95,6 @@ nav:
       - adaptive: api_docs/adaptive.md
       - impl: api_docs/impl.md
       - solvers:
-          - strategies: api_docs/solvers/strategies.md
           - components: api_docs/solvers/components.md
           - solvers: api_docs/solvers/solvers.md
           - stats: api_docs/solvers/stats.md
