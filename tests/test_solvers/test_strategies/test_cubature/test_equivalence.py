@@ -1,7 +1,7 @@
 """Test equivalences between cubature rules."""
 
+from probdiffeq import solvers
 from probdiffeq.backend import numpy as np
-from probdiffeq.solvers import solvers
 
 
 def test_third_order_spherical_vs_unscented_transform_scalar_input():

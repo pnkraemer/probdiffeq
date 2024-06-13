@@ -1,10 +1,9 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 

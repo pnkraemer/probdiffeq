@@ -1,10 +1,9 @@
 """Some strategies don't work with all solution routines."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 

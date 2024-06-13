@@ -26,9 +26,8 @@ import matplotlib.pyplot as plt
 import optax
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers, stats
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, stats
 from probdiffeq.util.doc_util import notebook
 
 # -

@@ -1,10 +1,9 @@
 """Compare simulate_terminal_values to solve_adaptive_save_every_step."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 

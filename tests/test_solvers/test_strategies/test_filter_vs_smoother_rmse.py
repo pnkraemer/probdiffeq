@@ -1,10 +1,9 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 

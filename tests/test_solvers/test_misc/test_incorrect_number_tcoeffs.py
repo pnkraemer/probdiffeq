@@ -3,10 +3,10 @@
 Place all tests that have no better place here.
 """
 
+from probdiffeq import solvers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 
 
 @testing.parametrize("incr", [1, -1])

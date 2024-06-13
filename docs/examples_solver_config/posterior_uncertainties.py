@@ -22,9 +22,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers, stats
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, stats
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 

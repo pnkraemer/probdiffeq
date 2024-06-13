@@ -1,11 +1,10 @@
 """Probabilistic IVP solvers."""
 
-from probdiffeq import _interp
+from probdiffeq import _interp, stats
 from probdiffeq.backend import abc, containers, functools, special, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Generic, TypeVar
 from probdiffeq.impl import impl
-from probdiffeq.solvers import stats
 
 T = TypeVar("T")
 R = TypeVar("R")

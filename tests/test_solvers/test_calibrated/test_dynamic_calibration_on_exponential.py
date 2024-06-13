@@ -5,11 +5,10 @@ This is difficult for the MLE- and calibration-free solver,
 but not for the dynamic solver.
 """
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from tests.setup import setup
 
 

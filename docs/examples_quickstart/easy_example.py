@@ -22,9 +22,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 
 jax.config.update("jax_platform_name", "cpu")

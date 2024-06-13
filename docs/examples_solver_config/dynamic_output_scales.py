@@ -39,9 +39,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.util.doc_util import notebook
 
 # -

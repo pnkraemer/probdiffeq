@@ -1,10 +1,9 @@
 """Assert that solve_with_python_loop is accurate."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 

@@ -93,9 +93,8 @@ nav:
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - impl: api_docs/impl.md
-      - solvers:
-          - solvers: api_docs/solvers/solvers.md
-          - stats: api_docs/solvers/stats.md
+      - solvers: api_docs/solvers.md
+      - stats: api_docs/stats.md
       - taylor:
           - affine: api_docs/taylor/affine.md
           - autodiff: api_docs/taylor/autodiff.md

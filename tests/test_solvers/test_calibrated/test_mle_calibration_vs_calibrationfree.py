@@ -5,11 +5,10 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers, stats
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 

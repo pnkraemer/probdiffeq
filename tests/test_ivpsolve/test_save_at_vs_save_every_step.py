@@ -1,10 +1,9 @@
 """Assert that solve_adaptive_save_at is consistent with solve_with_python_loop()."""
 
-from probdiffeq import ivpsolve
+from probdiffeq import ivpsolve, solvers, stats
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
