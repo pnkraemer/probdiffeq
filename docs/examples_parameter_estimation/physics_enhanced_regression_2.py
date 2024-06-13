@@ -134,7 +134,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
@@ -255,7 +255,7 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     """Evaluate the logposterior-function of the data."""
     y_T = solve_fixed(theta, ts=ts)
-    logpdf_data = solution.log_marginal_likelihood_terminal_values(
+    logpdf_data = stats.log_marginal_likelihood_terminal_values(
         data, standard_deviation=obs_stdev, posterior=y_T.posterior
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)

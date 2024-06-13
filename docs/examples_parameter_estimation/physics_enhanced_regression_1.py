@@ -36,7 +36,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -113,7 +113,7 @@ plt.show()
 def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
     """Evaluate the data fit as a function of the parameters."""
     sol_ = solve(parameters_)
-    return -1.0 * solution.log_marginal_likelihood(
+    return -1.0 * stats.log_marginal_likelihood(
         data,
         standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
         posterior=sol_.posterior,

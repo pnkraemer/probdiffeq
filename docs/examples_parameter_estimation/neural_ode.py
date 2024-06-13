@@ -28,7 +28,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -78,7 +78,7 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
         )
 
         observation_std = jnp.ones_like(grid) * standard_deviation
-        marginal_likelihood = solution.log_marginal_likelihood(
+        marginal_likelihood = stats.log_marginal_likelihood(
             data[:, None], standard_deviation=observation_std, posterior=sol.posterior
         )
         return -1 * marginal_likelihood

@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -31,7 +31,7 @@ def fixture_sol():
 
 def test_output_is_a_scalar_and_not_nan_and_not_inf(sol):
     data = sol.u + 0.005
-    lml = solution.log_marginal_likelihood(
+    lml = stats.log_marginal_likelihood(
         data, standard_deviation=np.ones_like(sol.t), posterior=sol.posterior
     )
     assert lml.shape == ()
@@ -48,7 +48,7 @@ def test_that_function_raises_error_for_wrong_std_shape_too_many(sol):
     k = sol.u.shape[0]
 
     with testing.raises(ValueError, match="does not match"):
-        _ = solution.log_marginal_likelihood(
+        _ = stats.log_marginal_likelihood(
             data, standard_deviation=np.ones((k + 1,)), posterior=sol.posterior
         )
 
@@ -62,7 +62,7 @@ def test_that_function_raises_error_for_wrong_std_shape_wrong_ndim(sol):
     k = sol.u.shape[0]
 
     with testing.raises(ValueError, match="does not match"):
-        _ = solution.log_marginal_likelihood(
+        _ = stats.log_marginal_likelihood(
             data, standard_deviation=np.ones((k, 1)), posterior=sol.posterior
         )
 
@@ -77,7 +77,7 @@ def test_raises_error_for_terminal_values(sol):
 
     posterior_t1 = tree_util.tree_map(lambda s: s[-1], sol)
     with testing.raises(ValueError, match="expected"):
-        _ = solution.log_marginal_likelihood(
+        _ = stats.log_marginal_likelihood(
             data[-1], standard_deviation=np.ones_like(data[-1]), posterior=posterior_t1
         )
 
@@ -100,6 +100,6 @@ def test_raises_error_for_filter():
     data = sol.u + 0.1
     std = np.ones((sol.u.shape[0],))  # values irrelevant
     with testing.raises(TypeError, match="ilter"):
-        _ = solution.log_marginal_likelihood(
+        _ = stats.log_marginal_likelihood(
             data, standard_deviation=std, posterior=sol.posterior
         )

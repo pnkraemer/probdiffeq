@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -32,7 +32,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     solution_adaptive = ivpsolve.solve_and_save_every_step(
         *problem_args, t0=t0, t1=t1, **adaptive_kwargs
     )
-    u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(
+    u_interp, marginals_interp = stats.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_adaptive, solver=solver
     )
 

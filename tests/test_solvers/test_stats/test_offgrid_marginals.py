@@ -3,7 +3,7 @@
 from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -26,7 +26,7 @@ def test_filter_marginals_close_only_to_left_boundary():
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    u, _ = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    u, _ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
     assert np.allclose(u[0], sol.u[-2], atol=1e-3, rtol=1e-3)
     assert not np.allclose(u[-1], sol.u[-1], atol=1e-3, rtol=1e-3)
 
@@ -48,7 +48,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    u, _ = solution.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    u, _ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
 
     assert np.allclose(u[0], sol.u[-2], atol=1e-3, rtol=1e-3)
     assert np.allclose(u[-1], sol.u[-1], atol=1e-3, rtol=1e-3)

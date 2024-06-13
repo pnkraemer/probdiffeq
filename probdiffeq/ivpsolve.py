@@ -10,7 +10,7 @@ from probdiffeq.backend import (
 )
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import markov
+from probdiffeq.solvers import stats
 
 # todo: change the Solution object to a simple
 #  named tuple containing (t, full_estimate, u_and_marginals, stats).
@@ -120,7 +120,7 @@ def simulate_terminal_values(
 
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
-    marginals = posterior.init if isinstance(posterior, markov.MarkovSeq) else posterior
+    marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
     u = impl.hidden_model.qoi(marginals)
     return Solution(
         t=t1,
@@ -319,10 +319,10 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
 
 
 def _userfriendly_output(*, posterior, posterior_t0):
-    if isinstance(posterior, markov.MarkovSeq):
+    if isinstance(posterior, stats.MarkovSeq):
         # Compute marginals
-        posterior_no_filter_marginals = markov.select_terminal(posterior)
-        marginals = markov.marginals(posterior_no_filter_marginals, reverse=True)
+        posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
+        marginals = stats.markov_marginals(posterior_no_filter_marginals, reverse=True)
 
         # Prepend the marginal at t1 to the computed marginals
         marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
@@ -331,7 +331,7 @@ def _userfriendly_output(*, posterior, posterior_t0):
         # Prepend the marginal at t1 to the inits
         init_t0 = posterior_t0.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
-        posterior = markov.MarkovSeq(init=init, conditional=posterior.conditional)
+        posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
     else:
         posterior = tree_array_util.tree_prepend(posterior_t0, posterior)
         marginals = posterior

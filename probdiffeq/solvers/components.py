@@ -4,7 +4,7 @@ from probdiffeq.backend import abc, containers, functools, special, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 from probdiffeq.impl import impl
-from probdiffeq.solvers import markov
+from probdiffeq.solvers import stats
 
 
 class PositiveCubatureRule(containers.NamedTuple):
@@ -119,7 +119,7 @@ def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = impl.ssm_util.standard_normal(num_derivatives + 1, output_scale=output_scale)
-    return markov.MarkovSeq(init, conditionals)
+    return stats.MarkovSeq(init, conditionals)
 
 
 class _Correction(abc.ABC):
