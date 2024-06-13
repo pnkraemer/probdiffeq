@@ -48,7 +48,9 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return components.correction_slr1(cubature_fun=components.gauss_hermite)
+        return components.correction_slr1(
+            cubature_fun=components.cubature_gauss_hermite
+        )
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
