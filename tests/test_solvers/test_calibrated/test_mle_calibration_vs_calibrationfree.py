@@ -5,18 +5,17 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.case()
 def case_solve_fixed_grid():
     vf, u0, (t0, t1) = setup.ode()
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5)}
 
@@ -31,7 +30,7 @@ def case_solve_fixed_grid():
 def case_solve_adaptive_save_at():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     kwargs = {"save_at": np.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
 
@@ -49,7 +48,7 @@ def case_solve_adaptive_save_at():
 def case_solve_adaptive_save_every_step():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
 
@@ -67,7 +66,7 @@ def case_solve_adaptive_save_every_step():
 def case_simulate_terminal_values():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
 

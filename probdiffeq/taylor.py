@@ -1,16 +1,81 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-from probdiffeq.backend import control_flow, functools, itertools, tree_util
+from probdiffeq.backend import control_flow, functools, itertools, ode, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array, Callable
+from probdiffeq.impl import impl
+from probdiffeq.util import filter_util
 
 
-def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def runge_kutta_starter(dt, *, atol=1e-12, rtol=1e-10):
+    """Create an estimator that uses a Runge-Kutta starter."""
+    # If the accuracy of the initialisation is bad, play around with dt.
+    return functools.partial(_runge_kutta_starter, dt0=dt, atol=atol, rtol=rtol)
+
+
+# atol and rtol must be static bc. of jax.odeint...
+@functools.partial(
+    functools.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"]
+)
+def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
+    # TODO [inaccuracy]: the initial-value uncertainty is discarded
+    # TODO [feature]: allow implementations other than IsoIBM?
+    # TODO [feature]: higher-order ODEs
+
+    # Assertions and early exits
+
+    if len(initial_values) > 1:
+        msg = "Higher-order ODEs are not supported at the moment."
+        raise ValueError(msg)
+
+    if num == 0:
+        return initial_values
+
+    if num == 1:
+        return *initial_values, vf(*initial_values, t)
+
+    # Generate data
+
+    # TODO: allow flexible "solve" method?
+    k = num + 1  # important: k > num
+    ts = np.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
+    ys = ode.odeint_and_save_at(vf, initial_values, save_at=ts, atol=atol, rtol=rtol)
+
+    # Initial condition
+    estimator = filter_util.fixedpointsmoother_precon()
+    rv_t0 = impl.ssm_util.standard_normal(num + 1, 1.0)
+    conditional_t0 = impl.ssm_util.identity_conditional(num + 1)
+    init = (rv_t0, conditional_t0)
+
+    # Discretised prior
+    discretise = impl.ssm_util.ibm_transitions(num, 1.0)
+    ibm_transitions = functools.vmap(discretise)(np.diff(ts))
+
+    # Generate an observation-model for the QOI
+    # (1e-7 observation noise for nuggets and for reusing existing code)
+    model_fun = functools.vmap(
+        impl.hidden_model.conditional_to_derivative, in_axes=(None, 0)
+    )
+    models = model_fun(0, 1e-7 * np.ones_like(ts))
+
+    # Run the preconditioned fixedpoint smoother
+    (corrected, conditional), _ = filter_util.estimate_fwd(
+        ys,
+        init=init,
+        prior_transitions=ibm_transitions,
+        observation_model=models,
+        estimator=estimator,
+    )
+    initial = impl.conditional.marginalise(corrected, conditional)
+    return tuple(impl.stats.mean(initial))
+
+
+def odejet_padded_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
-    Other than `taylor_mode_unroll()`, this function implements the loop via a scan,
+    Other than `odejet_unroll()`, this function implements the loop via a scan,
     which comes at the price of padding the loop variable with zeros as appropriate.
-    It is expected to compile more quickly than `taylor_mode_unroll()`, but may
+    It is expected to compile more quickly than `odejet_unroll()`, but may
     execute more slowly.
 
     The differences should be small.
@@ -27,7 +92,7 @@ def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
         # Pad the Taylor coefficients in zeros, call jet, and return the solution.
         # This works, because the $i$th output coefficient of jet()
         # is independent of the $i+j$th input coefficient
-        # (see also the explanation in taylor_mode_doubling)
+        # (see also the explanation in odejet_doubling_unroll)
         series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
         p, s_new = functools.jet(vf, primals=inits, series=series)
 
@@ -54,12 +119,12 @@ def taylor_mode_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
     return taylor_coeffs
 
 
-def taylor_mode_unroll(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_unroll(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
-    Other than `taylor_mode_scan()`, this function does not depend on zero-padding
+    Other than `odejet_padded_scan()`, this function does not depend on zero-padding
     the coefficients at the price of unrolling a loop of length `num-1`.
-    It is expected to compile more slowly than `taylor_mode_scan()`,
+    It is expected to compile more slowly than `odejet_padded_scan()`,
     but execute more quickly.
 
     The differences should be small.
@@ -109,7 +174,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def forward_mode_recursive(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_via_jvp(vf: Callable, inits: tuple[Array, ...], /, num: int):
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -138,7 +203,9 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree_util.Partial(df)
 
 
-def taylor_mode_doubling(vf: Callable, inits: tuple[Array, ...], /, num_doublings: int):
+def odejet_doubling_unroll(
+    vf: Callable, inits: tuple[Array, ...], /, num_doublings: int
+):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -214,3 +281,20 @@ def _unnormalise(primals, *series):
     """Normalised Taylor series to un-normalised Taylor series."""
     series_new = [s * np.factorial(i + 1) for i, s in enumerate(series)]
     return primals, *series_new
+
+
+def odejet_affine(vf: Callable, initial_values: tuple[Array, ...], /, num: int):
+    """Evaluate the Taylor series of an affine differential equation.
+
+    !!! warning "Compilation time"
+        JIT-compiling this function unrolls a loop of length `num`.
+
+    """
+    if num == 0:
+        return initial_values
+
+    fx, jvp_fn = functools.linearize(vf, *initial_values)
+
+    tmp = fx
+    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
+    return [*initial_values, fx, *fx_evaluations]

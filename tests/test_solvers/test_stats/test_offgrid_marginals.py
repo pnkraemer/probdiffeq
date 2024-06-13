@@ -1,9 +1,8 @@
 """Tests for IVP solvers."""
 
-from probdiffeq import ivpsolve, ivpsolvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -40,7 +39,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     solver = ivpsolvers.solver(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init = solver.initial_condition(tcoeffs, output_scale)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver)

@@ -22,9 +22,8 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 
 jax.config.update("jax_platform_name", "cpu")
 
@@ -117,7 +116,7 @@ adaptive_solver = ivpsolve.adaptive(solver)
 #
 # Use the following functions:
 
-tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 output_scale = 1.0  # or any other value with the same shape
 init = solver.initial_condition(tcoeffs, output_scale)
 

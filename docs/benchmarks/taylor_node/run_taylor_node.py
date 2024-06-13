@@ -15,8 +15,8 @@ import jax
 import jax.numpy as jnp
 from diffeqzoo import backend
 
+from probdiffeq import taylor
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
@@ -64,7 +64,7 @@ def taylor_mode_scan() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_scan(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -76,7 +76,7 @@ def taylor_mode_unroll() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_unroll(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.odejet_unroll(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -88,19 +88,19 @@ def taylor_mode_doubling() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_doubling(vf_auto, (u0,), num_doublings=num)
+        tcoeffs = taylor.odejet_doubling_unroll(vf_auto, (u0,), num_doublings=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
 
 
-def forward_mode_recursive() -> Callable:
+def odejet_via_jvp() -> Callable:
     """Forward-mode estimation."""
     vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.forward_mode_recursive(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.odejet_via_jvp(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -165,9 +165,12 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 
 if __name__ == "__main__":
     set_jax_config()
-    backend.select("jax")
+
+    if not backend.has_been_selected:
+        backend.select("jax")
+
     algorithms = {
-        r"Forward-mode": forward_mode_recursive(),
+        r"Forward-mode": odejet_via_jvp(),
         r"Taylor-mode (scan)": taylor_mode_scan(),
         r"Taylor-mode (unroll)": taylor_mode_unroll(),
         r"Taylor-mode (doubling)": taylor_mode_doubling(),

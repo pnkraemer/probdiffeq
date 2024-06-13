@@ -24,10 +24,9 @@ import equinox
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import control_flow
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 
 jax.config.update("jax_platform_name", "cpu")
 impl.select("dense", ode_shape=(1,))
@@ -70,7 +69,7 @@ def solution_routine():
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
 
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init = solver.initial_condition(tcoeffs, 1.0)
 
     def simulate(init_val):

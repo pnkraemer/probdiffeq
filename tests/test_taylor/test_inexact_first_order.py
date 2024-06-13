@@ -1,23 +1,23 @@
 """Tests for inexact approximations for first-order problems."""
 
+from probdiffeq import taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff, estim
 
 
 @testing.case()
 def case_runge_kutta_starter():
     if impl.impl_name != "isotropic":
         testing.skip(reason="Runge-Kutta starters currently require isotropic SSMs.")
-    return estim.make_runge_kutta_starter(dt=0.01)
+    return taylor.runge_kutta_starter(dt=0.01)
 
 
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     vf, (u0,), (t0, _) = ode.ivp_lotka_volterra()
 
-    solution = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=3)
+    solution = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
     return (vf, (u0,), t0), solution
 
 

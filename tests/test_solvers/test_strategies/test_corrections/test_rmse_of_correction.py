@@ -1,10 +1,9 @@
 """Assert that every recipe yields a decent ODE approximation."""
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -70,7 +69,7 @@ def fixture_solution(correction_impl):
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
 
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
     return ivpsolve.solve_adaptive_terminal_values(

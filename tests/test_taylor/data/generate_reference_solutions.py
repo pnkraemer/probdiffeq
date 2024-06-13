@@ -1,8 +1,8 @@
 """Precompute and save reference solutions. Accelerate testing."""
 
+from probdiffeq import taylor
 from probdiffeq.backend import config, ode
 from probdiffeq.backend import numpy as np
-from probdiffeq.taylor import autodiff
 
 
 def set_environment():
@@ -20,15 +20,13 @@ def set_environment():
 def three_body_first(num_derivatives_max=6):
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
 
-    return autodiff.taylor_mode_unroll(
-        lambda y: vf(y, t=t0), (u0,), num=num_derivatives_max
-    )
+    return taylor.odejet_unroll(lambda y: vf(y, t=t0), (u0,), num=num_derivatives_max)
 
 
 def van_der_pol_second(num_derivatives_max=6):
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
 
-    return autodiff.taylor_mode_unroll(
+    return taylor.odejet_unroll(
         lambda *ys: vf(*ys, t=t0), (u0, du0), num=num_derivatives_max
     )
 
