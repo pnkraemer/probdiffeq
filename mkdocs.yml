@@ -92,7 +92,6 @@ nav:
       - examples_misc/use_equinox_bounded_while_loop.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
-      - adaptive: api_docs/adaptive.md
       - impl: api_docs/impl.md
       - solvers:
           - components: api_docs/solvers/components.md

@@ -3,7 +3,7 @@
 That is, when called with correct adaptive- and checkpoint-setups.
 """
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -34,7 +34,7 @@ def fixture_solution_smoother(solver_setup):
     ts0 = components.correction_ts0()
     strategy = components.strategy_smoother(ibm, ts0)
     solver = solvers.solver(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
@@ -54,7 +54,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = components.correction_ts0()
     strategy = components.strategy_fixedpoint(ibm, ts0)
     solver = solvers.solver(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     save_at = solution_smoother.t
 
@@ -92,7 +92,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ts0 = components.correction_ts0()
     strategy = components.strategy_fixedpoint(ibm, ts0)
     solver = solvers.solver(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
 

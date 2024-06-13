@@ -1,6 +1,6 @@
 """Tests for interaction with the solution object."""
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -18,7 +18,7 @@ def fixture_approximate_solution():
     ts0 = components.correction_ts0()
     strategy = components.strategy_filter(ibm, ts0)
     solver = solvers.mle(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=1)
@@ -65,7 +65,7 @@ def fixture_approximate_solution_batched():
     ts0 = components.correction_ts0()
     strategy = components.strategy_filter(ibm, ts0)
     solver = solvers.mle(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     save_at = np.linspace(t0, t1, endpoint=True, num=4)

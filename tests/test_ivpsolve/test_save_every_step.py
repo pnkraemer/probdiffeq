@@ -1,6 +1,6 @@
 """Assert that solve_with_python_loop is accurate."""
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
@@ -17,7 +17,7 @@ def fixture_python_loop_solution():
     ts0 = components.correction_ts0()
     strategy = components.strategy_filter(ibm, ts0)
     solver = solvers.mle(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     dt0 = ivpsolve.dt0_adaptive(
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5

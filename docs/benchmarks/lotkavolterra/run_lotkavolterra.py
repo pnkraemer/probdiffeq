@@ -18,7 +18,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
@@ -84,8 +84,8 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         ibm = components.prior_ibm(num_derivatives=num_derivatives)
         strategy = components.strategy_filter(ibm, correction())
         solver = solvers.mle(strategy)
-        control = adaptive.control_proportional_integral()
-        adaptive_solver = adaptive.adaptive(
+        control = ivpsolve.control_proportional_integral()
+        adaptive_solver = ivpsolve.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control
         )
 

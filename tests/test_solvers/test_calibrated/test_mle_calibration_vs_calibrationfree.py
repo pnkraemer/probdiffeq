@@ -5,7 +5,7 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
@@ -38,7 +38,7 @@ def case_solve_adaptive_save_at():
 
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
-        adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_save_at(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
@@ -56,7 +56,7 @@ def case_solve_adaptive_save_every_step():
 
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
-        adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_save_every_step(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
@@ -74,7 +74,7 @@ def case_simulate_terminal_values():
 
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
-        adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )

@@ -1,6 +1,6 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
@@ -33,7 +33,7 @@ def fixture_sol(strategy_func):
     ts0 = components.correction_ts0()
     strategy = strategy_func(ibm, ts0)
     solver = solvers.solver(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())

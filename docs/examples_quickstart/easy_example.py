@@ -22,7 +22,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
@@ -88,7 +88,7 @@ ts0 = components.correction_ts1(ode_order=1)
 
 strategy = components.strategy_smoother(ibm, ts0)
 solver = solvers.solver(strategy)
-adaptive_solver = adaptive.adaptive(solver)
+adaptive_solver = ivpsolve.adaptive(solver)
 # -
 
 # Why so many layers?

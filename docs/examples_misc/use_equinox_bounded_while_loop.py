@@ -24,7 +24,7 @@ import equinox
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import control_flow
 from probdiffeq.impl import impl
 from probdiffeq.solvers import components, solvers
@@ -69,7 +69,7 @@ def solution_routine():
 
     strategy = components.strategy_fixedpoint(ibm, ts0)
     solver = solvers.solver(strategy)
-    adaptive_solver = adaptive.adaptive(solver)
+    adaptive_solver = ivpsolve.adaptive(solver)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init = solver.initial_condition(tcoeffs, 1.0)
