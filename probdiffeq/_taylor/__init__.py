@@ -1,1 +1,0 @@
-"""Taylor-series estimation."""
