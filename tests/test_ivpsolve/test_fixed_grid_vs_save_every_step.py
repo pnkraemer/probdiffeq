@@ -4,8 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solvers, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -13,8 +12,8 @@ from tests.setup import setup
 def test_fixed_grid_result_matches_adaptive_grid_result():
     vf, u0, (t0, t1) = setup.ode()
 
-    ibm = priors.ibm_adaptive(num_derivatives=2)
-    ts0 = corrections.ts0()
+    ibm = components.prior_ibm(num_derivatives=2)
+    ts0 = components.correction_ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.mle(strategy)
     control = adaptive.control_integral_clipped()  # Any clipped controller will do.

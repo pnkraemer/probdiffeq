@@ -20,8 +20,7 @@ import tqdm
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solvers, strategies
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
@@ -105,7 +104,7 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        ibm = priors.ibm_adaptive(num_derivatives=num_derivatives)
+        ibm = components.prior_ibm(num_derivatives=num_derivatives)
         ts0_or_ts1 = correction_fun(ode_order=2)
         strategy = strategies.filter_adaptive(ibm, ts0_or_ts1)
         solver = solvers.dynamic(strategy)
@@ -333,10 +332,10 @@ if __name__ == "__main__":
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
         "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, correction_fun=corrections.ts0
+            num_derivatives=5, correction_fun=components.correction_ts0
         ),
         r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, correction_fun=corrections.ts0
+            num_derivatives=8, correction_fun=components.correction_ts0
         ),
     }
 

@@ -19,8 +19,7 @@ import tqdm
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers, strategies
-from probdiffeq.solvers.components import corrections, priors
+from probdiffeq.solvers import components, solvers, strategies
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
@@ -84,8 +83,8 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        ibm = priors.ibm_adaptive(num_derivatives=num_derivatives)
-        ts0_or_ts1 = corrections.ts1(ode_order=2)
+        ibm = components.prior_ibm(num_derivatives=num_derivatives)
+        ts0_or_ts1 = components.correction_ts1(ode_order=2)
         strategy = strategies.filter_adaptive(ibm, ts0_or_ts1)
         solver = solvers.dynamic(strategy)
         control = adaptive.control_proportional_integral_clipped()
