@@ -6,11 +6,10 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Generic, TypeVar
 from probdiffeq.impl import impl
 
-# todo: rename to: solution, step_from, interpolate_from?
-#  in general, this object should not be necessary...
-
 
 class _InterpRes(containers.NamedTuple):
+    # todo: rename to: solution, step_from, interpolate_from?
+    #  in general, this object should not be necessary...
     accepted: Any
     """The new 'accepted' field.
 
