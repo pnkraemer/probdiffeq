@@ -94,10 +94,7 @@ nav:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md
       - stats: api_docs/stats.md
-      - taylor:
-          - affine: api_docs/taylor/affine.md
-          - autodiff: api_docs/taylor/autodiff.md
-          - estim: api_docs/taylor/estim.md
+      - taylor: api_docs/taylor.md
       - impl: api_docs/impl.md
   - DEVELOPER DOCUMENTATION:
       - Changelog: dev_docs/changelog.md

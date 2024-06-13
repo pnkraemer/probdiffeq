@@ -26,9 +26,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend
 
-from probdiffeq import ivpsolve, ivpsolvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -71,7 +70,7 @@ init_raw, transitions = ivpsolvers.prior_ibm_discrete(
 markov_seq_prior = stats.MarkovSeq(init_raw, transitions)
 
 
-tcoeffs = autodiff.taylor_mode_scan(
+tcoeffs = taylor.taylor_mode_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
 init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(

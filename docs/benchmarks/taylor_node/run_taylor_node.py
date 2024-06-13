@@ -15,8 +15,8 @@ import jax
 import jax.numpy as jnp
 from diffeqzoo import backend
 
+from probdiffeq import taylor
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
 
 
@@ -64,7 +64,7 @@ def taylor_mode_scan() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_scan(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.taylor_mode_scan(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -76,7 +76,7 @@ def taylor_mode_unroll() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_unroll(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.taylor_mode_unroll(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -88,7 +88,7 @@ def taylor_mode_doubling() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.taylor_mode_doubling(vf_auto, (u0,), num_doublings=num)
+        tcoeffs = taylor.taylor_mode_doubling(vf_auto, (u0,), num_doublings=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate
@@ -100,7 +100,7 @@ def forward_mode_recursive() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = autodiff.forward_mode_recursive(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.forward_mode_recursive(vf_auto, (u0,), num=num)
         return jax.block_until_ready(tcoeffs)
 
     return estimate

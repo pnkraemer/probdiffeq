@@ -1,18 +1,18 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
+from probdiffeq import taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
-from probdiffeq.taylor import autodiff
 
 
 @testing.case()
 def case_forward_mode_recursive():
-    return autodiff.forward_mode_recursive
+    return taylor.forward_mode_recursive
 
 
 @testing.case()
 def case_taylor_mode_scan():
-    return autodiff.taylor_mode_scan
+    return taylor.taylor_mode_scan
 
 
 @testing.fixture(name="pb_with_solution")

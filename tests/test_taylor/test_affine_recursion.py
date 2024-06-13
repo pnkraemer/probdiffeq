@@ -1,8 +1,8 @@
 """Tests for the affine recursion."""
 
+from probdiffeq import taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
-from probdiffeq.taylor import affine, autodiff
 
 
 @testing.parametrize("num", [1, 2, 4])
@@ -10,7 +10,7 @@ def test_affine_recursion(num, num_derivatives_max=5):
     """The approximation should coincide with the reference."""
     f, init, solution = _affine_problem(num_derivatives_max)
 
-    derivatives = affine.affine_recursion(f, init, num=num)
+    derivatives = taylor.affine_recursion(f, init, num=num)
 
     # check shape
     assert len(derivatives) == len(init) + num
@@ -29,5 +29,5 @@ def _affine_problem(n):
 
     init = (np.arange(9.0, 11.0),)
 
-    solution = autodiff.taylor_mode_scan(vf, init, num=n)
+    solution = taylor.taylor_mode_scan(vf, init, num=n)
     return vf, init, solution

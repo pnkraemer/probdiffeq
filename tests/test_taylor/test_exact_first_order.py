@@ -1,23 +1,23 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
+from probdiffeq import taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
-from probdiffeq.taylor import autodiff
 
 
 @testing.case()
 def case_forward_mode_recursive():
-    return autodiff.forward_mode_recursive
+    return taylor.forward_mode_recursive
 
 
 @testing.case()
 def case_taylor_mode_scan():
-    return autodiff.taylor_mode_scan
+    return taylor.taylor_mode_scan
 
 
 @testing.case()
 def case_taylor_mode_unroll():
-    return autodiff.taylor_mode_unroll
+    return taylor.taylor_mode_unroll
 
 
 @testing.fixture(name="pb_with_solution")
@@ -44,7 +44,7 @@ def test_approximation_identical_to_reference_doubling(pb_with_solution, num_dou
     """Separately test the doubling-function, because its API is different."""
     (f, init), solution = pb_with_solution
 
-    derivatives = autodiff.taylor_mode_doubling(f, init, num_doublings=num_doublings)
+    derivatives = taylor.taylor_mode_doubling(f, init, num_doublings=num_doublings)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
     for dy, dy_ref in zip(derivatives, solution):
         assert np.allclose(dy, dy_ref)

@@ -1,10 +1,9 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -14,7 +13,7 @@ def fixture_solver_setup():
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     grid = np.linspace(t0, t1, endpoint=True, num=12)
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
 
 

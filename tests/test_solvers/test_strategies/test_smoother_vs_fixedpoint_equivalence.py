@@ -3,11 +3,10 @@
 That is, when called with correct adaptive- and checkpoint-setups.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
@@ -17,7 +16,7 @@ def fixture_solver_setup():
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
 
-    tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = taylor.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {
         "vf": vf,
         "tcoeffs": tcoeffs,

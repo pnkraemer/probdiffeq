@@ -22,9 +22,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.impl import impl
-from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -58,7 +57,7 @@ solver_1st = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = autodiff.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
+tcoeffs = taylor.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
@@ -92,7 +91,7 @@ solver_2nd = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = autodiff.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+tcoeffs = taylor.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
