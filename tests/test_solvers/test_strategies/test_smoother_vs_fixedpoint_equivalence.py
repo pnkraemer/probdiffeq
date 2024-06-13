@@ -7,7 +7,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -83,7 +83,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
-    u_interp, marginals_interp = solution.offgrid_marginals_searchsorted(
+    u_interp, marginals_interp = stats.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
     )
 

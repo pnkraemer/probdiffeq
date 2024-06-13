@@ -67,7 +67,7 @@ class _State(containers.NamedTuple):
 def mle(strategy):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
-    Warning: needs to be combined with a call to solution.calibrate()
+    Warning: needs to be combined with a call to stats.calibrate()
     after solving if the MLE-calibration shall be *used*.
     """
     string_repr = f"<MLE-solver with {strategy}>"

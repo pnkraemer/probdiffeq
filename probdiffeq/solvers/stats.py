@@ -1,4 +1,4 @@
-"""Interact with estimated solutions (on dense grids).
+"""Interact with IVP solutions.
 
 For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.

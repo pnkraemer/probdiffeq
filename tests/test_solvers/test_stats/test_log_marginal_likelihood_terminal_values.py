@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -49,7 +49,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(sol):
     See also: issue #477 (closed).
     """
     data = sol.u + 0.1
-    mll = solution.log_marginal_likelihood_terminal_values(
+    mll = stats.log_marginal_likelihood_terminal_values(
         data, standard_deviation=np.asarray(1e-2), posterior=sol.posterior
     )
     assert mll.shape == ()
@@ -62,12 +62,12 @@ def test_terminal_values_error_for_wrong_shapes(sol):
 
     # Non-scalar observation std
     with testing.raises(ValueError, match="expected"):
-        _ = solution.log_marginal_likelihood_terminal_values(
+        _ = stats.log_marginal_likelihood_terminal_values(
             data, standard_deviation=np.ones((1,)), posterior=sol.posterior
         )
 
     # Data does not match u
     with testing.raises(ValueError, match="expected"):
-        _ = solution.log_marginal_likelihood_terminal_values(
+        _ = stats.log_marginal_likelihood_terminal_values(
             data[None, ...], standard_deviation=np.ones(()), posterior=sol.posterior
         )

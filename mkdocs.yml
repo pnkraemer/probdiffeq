@@ -98,7 +98,7 @@ nav:
           - strategies: api_docs/solvers/strategies.md
           - components: api_docs/solvers/components.md
           - solvers: api_docs/solvers/solvers.md
-          - solution: api_docs/solvers/solution.md
+          - stats: api_docs/solvers/stats.md
       - taylor:
           - affine: api_docs/taylor/affine.md
           - autodiff: api_docs/taylor/autodiff.md

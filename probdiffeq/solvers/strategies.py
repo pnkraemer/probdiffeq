@@ -5,7 +5,7 @@ from probdiffeq.backend import abc, containers, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Generic, TypeVar
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution
+from probdiffeq.solvers import stats
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -229,13 +229,13 @@ class _PreconSmoother(_ExtrapolationImpl):
     def initial_condition(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.ssm_util.identity_conditional(len(tcoeffs))
-        return solution.MarkovSeq(init=rv, conditional=cond)
+        return stats.MarkovSeq(init=rv, conditional=cond)
 
-    def init(self, sol: solution.MarkovSeq, /):
+    def init(self, sol: stats.MarkovSeq, /):
         return sol.init, sol.conditional
 
     def extract(self, hidden_state, extra, /):
-        return solution.MarkovSeq(init=hidden_state, conditional=extra)
+        return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
     def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
@@ -322,13 +322,13 @@ class _PreconFixedPoint(_ExtrapolationImpl):
     def initial_condition(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.ssm_util.identity_conditional(len(tcoeffs))
-        return solution.MarkovSeq(init=rv, conditional=cond)
+        return stats.MarkovSeq(init=rv, conditional=cond)
 
-    def init(self, sol: solution.MarkovSeq, /):
+    def init(self, sol: stats.MarkovSeq, /):
         return sol.init, sol.conditional
 
     def extract(self, hidden_state, extra, /):
-        return solution.MarkovSeq(init=hidden_state, conditional=extra)
+        return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
     def begin(self, rv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)

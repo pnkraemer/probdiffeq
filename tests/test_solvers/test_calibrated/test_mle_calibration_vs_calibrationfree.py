@@ -2,14 +2,14 @@
 
 The posterior of the MLE solver is the same as for the calibration-free solver.
 The output scale is different.
-After applying solution.calibrate(), the posterior is different.
+After applying stats.calibrate(), the posterior is different.
 """
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solution, solvers, strategies
+from probdiffeq.solvers import components, solvers, stats, strategies
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -114,5 +114,5 @@ def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     assert not np.allclose(output_scale_uncalibrated, output_scale_mle)
 
     # With a call to calibrate(), the posteriors are different.
-    posterior_calibrated = solution.calibrate(posterior_mle, output_scale_mle)
+    posterior_calibrated = stats.calibrate(posterior_mle, output_scale_mle)
     assert not testing.tree_all_allclose(posterior_uncalibrated, posterior_calibrated)
