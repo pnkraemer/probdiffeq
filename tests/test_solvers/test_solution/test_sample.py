@@ -30,8 +30,8 @@ def fixture_approximation():
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_sample_shape(approximation, shape):
     key = random.prng_key(seed=15)
-    posterior = markov.select_terminal(approximation.posterior)
-    (u, samples), (u_init, samples_init) = markov.sample(
+    posterior = markov.markov_select_terminal(approximation.posterior)
+    (u, samples), (u_init, samples_init) = markov.markov_sample(
         key, posterior, shape=shape, reverse=True
     )
     margs = tree_util.tree_map(lambda x: x[1:], approximation.marginals)

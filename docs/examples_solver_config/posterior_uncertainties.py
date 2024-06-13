@@ -133,11 +133,11 @@ sol = ivpsolve.solve_and_save_at(
 
 marginals = solution.calibrate(sol.marginals, output_scale=sol.output_scale)
 posterior = solution.calibrate(sol.posterior, output_scale=sol.output_scale)
-posterior = markov.select_terminal(posterior)
+posterior = markov.markov_select_terminal(posterior)
 # -
 
 key = jax.random.PRNGKey(seed=1)
-(qoi, samples), _init = markov.sample(key, posterior, shape=(2,), reverse=True)
+(qoi, samples), _init = markov.markov_sample(key, posterior, shape=(2,), reverse=True)
 
 # +
 _, num_derivatives, _ = marginals.mean.shape

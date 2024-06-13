@@ -175,5 +175,5 @@ def calibrate(x, /, output_scale):
     if np.ndim(output_scale) > np.ndim(impl.prototypes.output_scale()):
         output_scale = output_scale[-1]
     if isinstance(x, markov.MarkovSeq):
-        return markov.rescale_cholesky(x, output_scale)
+        return markov.markov_rescale_cholesky(x, output_scale)
     return impl.variable.rescale_cholesky(x, output_scale)

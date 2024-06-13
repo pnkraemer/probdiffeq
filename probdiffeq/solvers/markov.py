@@ -13,7 +13,7 @@ class MarkovSeq(containers.NamedTuple):
     conditional: Any
 
 
-def sample(key, markov_seq: MarkovSeq, *, shape, reverse):
+def markov_sample(key, markov_seq: MarkovSeq, *, shape, reverse):
     """Sample from a Markov sequence."""
     _assert_filtering_solution_removed(markov_seq)
     # A smoother samples on the grid by sampling i.i.d values
@@ -63,7 +63,7 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
     return (qois, samples), (init_qoi, init_sample)
 
 
-def rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
+def markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     """Rescale the Cholesky factor of the covariance of a Markov sequence."""
     init = impl.variable.rescale_cholesky(markov_seq.init, factor)
     cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
@@ -75,7 +75,7 @@ def _rescale_cholesky_conditional(conditional, factor, /):
     return cond_util.Conditional(conditional.matmul, noise_new)
 
 
-def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
+def markov_select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
     """Discard all intermediate filtering solutions from a Markov sequence.
 
     This function is useful to convert a smoothing-solution into a Markov sequence
@@ -85,7 +85,7 @@ def select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
     return MarkovSeq(init, markov_seq.conditional)
 
 
-def marginals(markov_seq: MarkovSeq, *, reverse):
+def markov_marginals(markov_seq: MarkovSeq, *, reverse):
     """Extract the (time-)marginals from a Markov sequence."""
     _assert_filtering_solution_removed(markov_seq)
 
@@ -100,5 +100,5 @@ def marginals(markov_seq: MarkovSeq, *, reverse):
 
 def _assert_filtering_solution_removed(markov_seq):
     if markov_seq.init.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-        msg = "Did you forget to call markov.select_terminal() before?"
+        msg = "Did you forget to call markov.markov_select_terminal() before?"
         raise ValueError(msg)

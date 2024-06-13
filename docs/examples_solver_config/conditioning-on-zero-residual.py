@@ -95,27 +95,27 @@ sol = ivpsolve.solve_and_save_at(
     vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver
 )
 # posterior = solution.calibrate(sol.posterior, sol.output_scale)
-markov_seq_posterior = markov.select_terminal(sol.posterior)
+markov_seq_posterior = markov.markov_select_terminal(sol.posterior)
 
 # +
 # Compute marginals
 
-margs_prior = markov.marginals(markov_seq_prior, reverse=False)
-margs_tcoeffs = markov.marginals(markov_seq_tcoeffs, reverse=False)
-margs_posterior = markov.marginals(markov_seq_posterior, reverse=True)
+margs_prior = markov.markov_marginals(markov_seq_prior, reverse=False)
+margs_tcoeffs = markov.markov_marginals(markov_seq_tcoeffs, reverse=False)
+margs_posterior = markov.markov_marginals(markov_seq_posterior, reverse=True)
 
 # +
 # Compute samples
 
 num_samples = 5
 key = jax.random.PRNGKey(seed=1)
-(_qoi, samples_prior), _ = markov.sample(
+(_qoi, samples_prior), _ = markov.markov_sample(
     key, markov_seq_prior, shape=(num_samples,), reverse=False
 )
-(_qoi, samples_tcoeffs), _ = markov.sample(
+(_qoi, samples_tcoeffs), _ = markov.markov_sample(
     key, markov_seq_tcoeffs, shape=(num_samples,), reverse=False
 )
-(_qoi, samples_posterior), _ = markov.sample(
+(_qoi, samples_posterior), _ = markov.markov_sample(
     key, markov_seq_posterior, shape=(num_samples,), reverse=True
 )
 

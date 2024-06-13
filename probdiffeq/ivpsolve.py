@@ -321,8 +321,8 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> Solution:
 def _userfriendly_output(*, posterior, posterior_t0):
     if isinstance(posterior, markov.MarkovSeq):
         # Compute marginals
-        posterior_no_filter_marginals = markov.select_terminal(posterior)
-        marginals = markov.marginals(posterior_no_filter_marginals, reverse=True)
+        posterior_no_filter_marginals = markov.markov_select_terminal(posterior)
+        marginals = markov.markov_marginals(posterior_no_filter_marginals, reverse=True)
 
         # Prepend the marginal at t1 to the computed marginals
         marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
