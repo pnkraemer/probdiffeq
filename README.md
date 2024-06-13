@@ -83,6 +83,9 @@ If you find Probdiffeq helpful for your research project, please consider citing
 This thesis contains detailed information about the maths and algorithms behind what is implemented here.
 A PDF is available here ([LINK](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754)).
 
+All of Probdiffeq's algorithms have been developed over many years and in multiple research papers.
+Linking concrete citation information for specific algorithms is a work in progress.
+If you are unsure which works to cite, feel invited to reach out!
 
 ## Contributing
 Contributions are absolutely welcome!
