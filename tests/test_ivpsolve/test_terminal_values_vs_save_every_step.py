@@ -14,7 +14,7 @@ def fixture_problem_args_kwargs():
     vf, u0, (t0, t1) = setup.ode()
 
     # Generate a solver
-    ibm = components.ibm_adaptive(num_derivatives=2)
+    ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.mle(strategy)

@@ -64,7 +64,7 @@ def solution_routine():
     t0, t1 = 0.0, 1.0
     u0 = jnp.asarray([0.1])
 
-    ibm = components.ibm_adaptive(num_derivatives=1)
+    ibm = components.prior_ibm(num_derivatives=1)
     ts0 = components.correction_ts0(ode_order=1)
 
     strategy = strategies.fixedpoint_adaptive(ibm, ts0)

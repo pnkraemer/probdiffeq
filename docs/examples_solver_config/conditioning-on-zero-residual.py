@@ -65,7 +65,7 @@ u0 = jnp.asarray([0.1])
 
 NUM_DERIVATIVES = 2
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-init_raw, transitions = components.ibm_discretised(
+init_raw, transitions = components.prior_ibm_discrete(
     ts, num_derivatives=NUM_DERIVATIVES, output_scale=100.0
 )
 
@@ -84,7 +84,7 @@ markov_seq_tcoeffs = markov.MarkovSeq(init_tcoeffs, transitions)
 # Compute the posterior
 
 slr1 = components.correction_ts1()
-ibm = components.ibm_adaptive(num_derivatives=NUM_DERIVATIVES)
+ibm = components.prior_ibm(num_derivatives=NUM_DERIVATIVES)
 solver = solvers.solver(strategies.fixedpoint_adaptive(ibm, slr1))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)
 

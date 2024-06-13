@@ -15,7 +15,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     vf, u0, (t0, t1) = setup.ode()
 
     # Generate a solver
-    ibm = components.ibm_adaptive(num_derivatives=2)
+    ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)

@@ -63,7 +63,7 @@ def vf(*ys, t):  # noqa: ARG001
 # ## Filter
 
 # +
-ibm = components.ibm_adaptive(num_derivatives=4)
+ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0()
 solver = solvers.mle(strategies.filter_adaptive(ibm, ts0))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
@@ -118,7 +118,7 @@ plt.show()
 # ## Smoother
 
 # +
-ibm = components.ibm_adaptive(num_derivatives=4)
+ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0()
 solver = solvers.mle(strategies.fixedpoint_adaptive(ibm, ts0))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)

@@ -53,7 +53,7 @@ def vf_1(y, t):  # noqa: ARG001
     return f(y, *f_args)
 
 
-ibm = components.ibm_adaptive(num_derivatives=4)
+ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0()
 solver_1st = solvers.mle(strategies.filter_adaptive(ibm, ts0))
 adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
@@ -87,7 +87,7 @@ def vf_2(y, dy, t):  # noqa: ARG001
 
 
 # One derivative more than above because we don't transform to first order
-ibm = components.ibm_adaptive(num_derivatives=4)
+ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0(ode_order=2)
 solver_2nd = solvers.mle(strategies.filter_adaptive(ibm, ts0))
 adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)

@@ -62,7 +62,7 @@ def fixture_solution(correction_impl):
     if correction_impl == "not_implemented":
         testing.skip(reason="This type of linearisation has not been implemented.")
 
-    ibm = components.ibm_adaptive(num_derivatives=2)
+    ibm = components.prior_ibm(num_derivatives=2)
     strategy = strategies.filter_adaptive(ibm, correction_impl)
     solver = solvers.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)

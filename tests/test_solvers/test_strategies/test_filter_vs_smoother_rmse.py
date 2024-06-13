@@ -21,7 +21,7 @@ def fixture_solver_setup():
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
-    ibm = components.ibm_adaptive(num_derivatives=2)
+    ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
@@ -35,7 +35,7 @@ def fixture_filter_solution(solver_setup):
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
-    ibm = components.ibm_adaptive(num_derivatives=2)
+    ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)

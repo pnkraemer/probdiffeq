@@ -81,7 +81,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
     def param_to_solution(tol):
         impl.select(implementation, ode_shape=(2,))
         # Build a solver
-        ibm = components.ibm_adaptive(num_derivatives=num_derivatives)
+        ibm = components.prior_ibm(num_derivatives=num_derivatives)
         strategy = strategies.filter_adaptive(ibm, correction())
         solver = solvers.mle(strategy)
         control = adaptive.control_proportional_integral()

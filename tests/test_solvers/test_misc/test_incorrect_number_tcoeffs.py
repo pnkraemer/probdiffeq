@@ -20,7 +20,7 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
     attribute of the extrapolation model.
     """
     tcoeffs_wrong_length = [None] * (n + 1 + incr)  # 'None' bc. values irrelevant
-    prior = components.ibm_adaptive(num_derivatives=n)
+    prior = components.prior_ibm(num_derivatives=n)
 
     ts0 = components.correction_ts0()  # irrelevant
 

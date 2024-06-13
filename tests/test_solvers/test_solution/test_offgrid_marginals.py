@@ -12,7 +12,7 @@ def test_filter_marginals_close_only_to_left_boundary():
     """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.ibm_adaptive(num_derivatives=1)
+    ibm = components.prior_ibm(num_derivatives=1)
     ts0 = components.correction_ts0()
     strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
@@ -35,7 +35,7 @@ def test_smoother_marginals_close_to_both_boundaries():
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.ibm_adaptive(num_derivatives=4)
+    ibm = components.prior_ibm(num_derivatives=4)
     ts0 = components.correction_ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)

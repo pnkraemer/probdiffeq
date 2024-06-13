@@ -117,7 +117,7 @@ def vf(y, *, t, p):
 
 
 # Make a solver
-ibm = components.ibm_adaptive(num_derivatives=1)
+ibm = components.prior_ibm(num_derivatives=1)
 ts0 = components.correction_ts0()
 strategy = strategies.smoother_adaptive(ibm, ts0)
 solver_ts0 = solvers.solver(strategy)

@@ -13,7 +13,7 @@ from tests.setup import setup
 def fixture_approximation():
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.ibm_adaptive(num_derivatives=2)
+    ibm = components.prior_ibm(num_derivatives=2)
     ts0 = components.correction_ts0()
     strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)

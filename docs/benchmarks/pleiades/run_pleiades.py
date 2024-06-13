@@ -104,7 +104,7 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        ibm = components.ibm_adaptive(num_derivatives=num_derivatives)
+        ibm = components.prior_ibm(num_derivatives=num_derivatives)
         ts0_or_ts1 = correction_fun(ode_order=2)
         strategy = strategies.filter_adaptive(ibm, ts0_or_ts1)
         solver = solvers.dynamic(strategy)
