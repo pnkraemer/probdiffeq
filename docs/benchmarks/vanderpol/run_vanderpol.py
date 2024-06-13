@@ -99,7 +99,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
 
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
-        solution = ivpsolve.simulate_terminal_values(
+        solution = ivpsolve.solve_for_terminal_values(
             vf_probdiffeq, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
         )
 

@@ -39,7 +39,7 @@ def fixture_solution_with_python_while_loop(problem_args_kwargs):
 @testing.fixture(name="simulation_terminal_values")
 def fixture_simulation_terminal_values(problem_args_kwargs):
     args, kwargs = problem_args_kwargs
-    return ivpsolve.simulate_terminal_values(*args, **kwargs)
+    return ivpsolve.solve_for_terminal_values(*args, **kwargs)
 
 
 def test_terminal_values_identical(solution_python_loop, simulation_terminal_values):

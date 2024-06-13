@@ -100,7 +100,7 @@ def _sol_unflatten(_aux, children):
 tree_util.register_pytree_node(Solution, _sol_flatten, _sol_unflatten)
 
 
-def simulate_terminal_values(
+def solve_for_terminal_values(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0
 ) -> Solution:
     """Simulate the terminal values of an initial value problem."""

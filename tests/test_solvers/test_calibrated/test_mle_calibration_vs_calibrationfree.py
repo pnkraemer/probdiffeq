@@ -75,7 +75,7 @@ def case_simulate_terminal_values():
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
         adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
-        return ivpsolve.simulate_terminal_values(
+        return ivpsolve.solve_for_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 

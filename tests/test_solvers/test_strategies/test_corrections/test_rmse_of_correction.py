@@ -74,7 +74,7 @@ def fixture_solution(correction_impl):
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
-    return ivpsolve.simulate_terminal_values(vf, init, t0=t0, t1=t1, **adaptive_kwargs)
+    return ivpsolve.solve_for_terminal_values(vf, init, t0=t0, t1=t1, **adaptive_kwargs)
 
 
 @testing.fixture(name="reference_solution")
