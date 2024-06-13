@@ -165,7 +165,10 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 
 if __name__ == "__main__":
     set_jax_config()
-    backend.select("jax")
+
+    if not backend.has_been_selected:
+        backend.select("jax")
+
     algorithms = {
         r"Forward-mode": odejet_via_jvp(),
         r"Taylor-mode (scan)": taylor_mode_scan(),
