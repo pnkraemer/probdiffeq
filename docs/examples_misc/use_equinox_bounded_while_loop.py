@@ -76,7 +76,7 @@ def solution_routine():
 
     def simulate(init_val):
         """Evaluate the parameter-to-solution function."""
-        sol = ivpsolve.solve_for_terminal_values(
+        sol = ivpsolve.solve_adaptive_terminal_values(
             vf, init_val, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver
         )
 

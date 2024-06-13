@@ -29,7 +29,7 @@ def fixture_python_loop_solution():
 
     args = (vf, init)
     kwargs = {"t0": t0, "t1": t1, "adaptive_solver": adaptive_solver, "dt0": dt0}
-    return ivpsolve.solve_and_save_every_step(*args, **kwargs)
+    return ivpsolve.solve_adaptive_save_every_step(*args, **kwargs)
 
 
 @testing.fixture(name="reference_solution")

@@ -63,7 +63,7 @@ tcoeffs = autodiff.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
-solution = ivpsolve.solve_and_save_every_step(
+solution = ivpsolve.solve_adaptive_save_every_step(
     vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st
 )
 
@@ -97,7 +97,7 @@ tcoeffs = autodiff.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=
 init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
-solution = ivpsolve.solve_and_save_every_step(
+solution = ivpsolve.solve_adaptive_save_every_step(
     vf_2, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_2nd
 )
 

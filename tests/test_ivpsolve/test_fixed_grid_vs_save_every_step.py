@@ -1,4 +1,4 @@
-"""Compare solve_fixed_grid to solve_and_save_every_step."""
+"""Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
@@ -30,7 +30,9 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
         "dt0": 0.1,
         "adaptive_solver": adaptive_solver,
     }
-    solution_adaptive = ivpsolve.solve_and_save_every_step(*args, **adaptive_kwargs)
+    solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
+        *args, **adaptive_kwargs
+    )
 
     grid_adaptive = solution_adaptive.t
     fixed_kwargs = {"grid": grid_adaptive, "solver": solver}

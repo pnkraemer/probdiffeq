@@ -6,7 +6,7 @@ To ensure that all strategies work correctly, we do the following:
 using the same configuration (e.g. fixed grid solutions).
 Both should yield a reasonable approximation of the ODE solution.
 (This is a slightly unpredictable test because it depends highly on parameter choices.)
-* The result of the fixed-point smoother in solve_and_save_at should be *identical*
+* The result of the fixed-point smoother in solve_adaptive_save_at should be *identical*
 to interpolating the smoother results (we can reuse the solution from earlier).
 This is a strict test, and one that has failed many times in the past.
 

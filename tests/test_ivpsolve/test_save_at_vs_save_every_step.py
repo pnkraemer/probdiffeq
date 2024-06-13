@@ -1,4 +1,4 @@
-"""Assert that solve_and_save_at is consistent with solve_with_python_loop()."""
+"""Assert that solve_adaptive_save_at is consistent with solve_with_python_loop()."""
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
@@ -29,7 +29,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
-    solution_adaptive = ivpsolve.solve_and_save_every_step(
+    solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
         *problem_args, t0=t0, t1=t1, **adaptive_kwargs
     )
     u_interp, marginals_interp = stats.offgrid_marginals_searchsorted(
@@ -37,7 +37,7 @@ def test_save_at_result_matches_interpolated_adaptive_result():
     )
 
     # Compute a save-at solution and remove the edge-points
-    solution_save_at = ivpsolve.solve_and_save_at(
+    solution_save_at = ivpsolve.solve_adaptive_save_at(
         *problem_args, save_at=ts, **adaptive_kwargs
     )
 

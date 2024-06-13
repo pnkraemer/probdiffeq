@@ -24,7 +24,7 @@ def fixture_approximate_solution():
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=1)
     init = solver.initial_condition(tcoeffs, output_scale)
 
-    return ivpsolve.solve_and_save_every_step(
+    return ivpsolve.solve_adaptive_save_every_step(
         vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver
     )
 
@@ -74,7 +74,7 @@ def fixture_approximate_solution_batched():
     def solve(init):
         tcoeffs = (init, vf(init, t=None))
         initcond = solver.initial_condition(tcoeffs, output_scale=output_scale)
-        return ivpsolve.solve_and_save_at(
+        return ivpsolve.solve_adaptive_save_at(
             vf, initcond, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
         )
 

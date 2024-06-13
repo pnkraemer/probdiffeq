@@ -91,7 +91,7 @@ adaptive_solver = adaptive.adaptive(solver, atol=1e-1, rtol=1e-2)
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 
 init = solver.initial_condition(tcoeffs, output_scale=1.0)
-sol = ivpsolve.solve_and_save_at(
+sol = ivpsolve.solve_adaptive_save_at(
     vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver
 )
 # posterior = stats.calibrate(sol.posterior, sol.output_scale)

@@ -216,7 +216,7 @@ def solve_adaptive(theta, *, save_at):
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
     init = solver.initial_condition(tcoeffs, output_scale)
-    return ivpsolve.solve_and_save_at(
+    return ivpsolve.solve_adaptive_save_at(
         vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
     )
 

@@ -24,7 +24,7 @@ def fixture_sol():
     init = solver.initial_condition(tcoeffs, output_scale)
 
     save_at = np.linspace(t0, t1, endpoint=True, num=4)
-    return ivpsolve.solve_and_save_at(
+    return ivpsolve.solve_adaptive_save_at(
         vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
     )
 

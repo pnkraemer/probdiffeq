@@ -38,7 +38,7 @@ def fixture_solution_smoother(solver_setup):
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
-    return ivpsolve.solve_and_save_every_step(
+    return ivpsolve.solve_adaptive_save_every_step(
         solver_setup["vf"],
         init,
         t0=solver_setup["t0"],
@@ -61,7 +61,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
 
-    solution_fixedpoint = ivpsolve.solve_and_save_at(
+    solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
         solver_setup["vf"],
         init,
         save_at=save_at,
@@ -96,7 +96,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
 
-    solution_fixedpoint = ivpsolve.solve_and_save_at(
+    solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
         solver_setup["vf"], init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1
     )
 

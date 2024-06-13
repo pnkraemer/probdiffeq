@@ -23,7 +23,7 @@ def test_warning_for_fixedpoint_in_save_every_step_mode():
     init = solver.initial_condition(tcoeffs, output_scale)
 
     with testing.warns():
-        _ = ivpsolve.solve_and_save_every_step(
+        _ = ivpsolve.solve_adaptive_save_every_step(
             vf, init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1
         )
 
@@ -42,7 +42,7 @@ def test_warning_for_smoother_in_save_at_mode():
     init = solver.initial_condition(tcoeffs, output_scale)
 
     with testing.warns():
-        _ = ivpsolve.solve_and_save_at(
+        _ = ivpsolve.solve_adaptive_save_at(
             vf,
             init,
             save_at=np.linspace(t0, t1),

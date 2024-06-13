@@ -29,7 +29,7 @@ def case_solve_fixed_grid():
 
 
 @testing.case()
-def case_solve_and_save_at():
+def case_solve_adaptive_save_at():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
@@ -39,7 +39,7 @@ def case_solve_and_save_at():
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
         adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
-        return ivpsolve.solve_and_save_at(
+        return ivpsolve.solve_adaptive_save_at(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 
@@ -47,7 +47,7 @@ def case_solve_and_save_at():
 
 
 @testing.case()
-def case_solve_and_save_every_step():
+def case_solve_adaptive_save_every_step():
     vf, u0, (t0, t1) = setup.ode()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=4)
@@ -57,7 +57,7 @@ def case_solve_and_save_every_step():
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
         adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
-        return ivpsolve.solve_and_save_every_step(
+        return ivpsolve.solve_adaptive_save_every_step(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 
@@ -75,7 +75,7 @@ def case_simulate_terminal_values():
     def solver_to_solution(solver):
         init = solver.initial_condition(tcoeffs, output_scale)
         adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
-        return ivpsolve.solve_for_terminal_values(
+        return ivpsolve.solve_adaptive_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 

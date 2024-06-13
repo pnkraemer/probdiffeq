@@ -95,12 +95,12 @@ def _sol_unflatten(_aux, children):
 tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
 
 
-def solve_for_terminal_values(
+def solve_adaptive_terminal_values(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0
 ) -> _Solution:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t1])
-    (_t, solution_save_at), _, num_steps = _solve_and_save_at(
+    (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
         tree_util.Partial(vector_field),
         t0,
         initial_condition,
@@ -127,7 +127,7 @@ def solve_for_terminal_values(
     )
 
 
-def solve_and_save_at(
+def solve_adaptive_save_at(
     vector_field, initial_condition, save_at, adaptive_solver, dt0
 ) -> _Solution:
     """Solve an initial value problem and return the solution at a pre-determined grid.
@@ -142,11 +142,11 @@ def solve_and_save_at(
     if not adaptive_solver.solver.strategy.is_suitable_for_save_at:
         msg = (
             f"Strategy {adaptive_solver.solver.strategy} should not "
-            f"be used in solve_and_save_at. "
+            f"be used in solve_adaptive_save_at. "
         )
         warnings.warn(msg, stacklevel=1)
 
-    (_t, solution_save_at), _, num_steps = _solve_and_save_at(
+    (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
         tree_util.Partial(vector_field),
         save_at[0],
         initial_condition,
@@ -172,7 +172,7 @@ def solve_and_save_at(
     )
 
 
-def _solve_and_save_at(
+def _solve_adaptive_save_at(
     vector_field, t, initial_condition, *, save_at, adaptive_solver, dt0
 ):
     advance_func = functools.partial(
@@ -212,7 +212,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
     return state, solution
 
 
-def solve_and_save_every_step(
+def solve_adaptive_save_every_step(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0
 ) -> _Solution:
     """Solve an initial value problem and save every step.
@@ -225,7 +225,7 @@ def solve_and_save_every_step(
     if not adaptive_solver.solver.strategy.is_suitable_for_save_every_step:
         msg = (
             f"Strategy {adaptive_solver.solver.strategy} should not "
-            f"be used in solve_and_save_every_step."
+            f"be used in solve_adaptive_save_every_step."
         )
         warnings.warn(msg, stacklevel=1)
 
