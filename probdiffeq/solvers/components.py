@@ -27,7 +27,7 @@ def ibm_discretised(ts, *, num_derivatives, output_scale=None):
     return markov.MarkovSeq(init, conditionals)
 
 
-class Correction(abc.ABC):
+class _Correction(abc.ABC):
     """Correction model interface."""
 
     def __init__(self, ode_order):
@@ -54,7 +54,7 @@ class Correction(abc.ABC):
         raise NotImplementedError
 
 
-class _ODEConstraintTaylor(Correction):
+class _ODEConstraintTaylor(_Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
@@ -87,7 +87,7 @@ class _ODEConstraintTaylor(Correction):
         return ssv
 
 
-class _ODEConstraintStatistical(Correction):
+class _ODEConstraintStatistical(_Correction):
     def __init__(self, ode_order, linearise_fun, string_repr):
         super().__init__(ode_order=ode_order)
 
