@@ -3,9 +3,8 @@
 from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers
-from probdiffeq.solvers.strategies import filters, smoothers
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -16,7 +15,7 @@ def test_filter_marginals_close_only_to_left_boundary():
 
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
@@ -39,7 +38,7 @@ def test_smoother_marginals_close_to_both_boundaries():
 
     ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = corrections.ts0()
-    strategy = smoothers.smoother_adaptive(ibm, ts0)
+    strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())

@@ -7,9 +7,8 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, solvers
-from probdiffeq.solvers.strategies import fixedpoint, smoothers
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solution, solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -34,7 +33,7 @@ def fixture_solver_setup():
 def fixture_solution_smoother(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = smoothers.smoother_adaptive(ibm, ts0)
+    strategy = strategies.smoother_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
 
@@ -54,7 +53,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
+    strategy = strategies.fixedpoint_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
 
@@ -80,7 +79,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     # Re-generate the smoothing solver
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = smoothers.smoother_adaptive(ibm, ts0)
+    strategy = strategies.smoother_adaptive(ibm, ts0)
     solver_smoother = solvers.solver(strategy)
 
     # Compute the offgrid-marginals
@@ -92,7 +91,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
-    strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
+    strategy = strategies.fixedpoint_adaptive(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]

@@ -24,9 +24,8 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
-from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
 
@@ -57,7 +56,7 @@ def vf_1(y, t):  # noqa: ARG001
 
 ibm = priors.ibm_adaptive(num_derivatives=4)
 ts0 = corrections.ts0()
-solver_1st = solvers.mle(filters.filter_adaptive(ibm, ts0))
+solver_1st = solvers.mle(strategies.filter_adaptive(ibm, ts0))
 adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
@@ -91,7 +90,7 @@ def vf_2(y, dy, t):  # noqa: ARG001
 # One derivative more than above because we don't transform to first order
 ibm = priors.ibm_adaptive(num_derivatives=4)
 ts0 = corrections.ts0(ode_order=2)
-solver_2nd = solvers.mle(filters.filter_adaptive(ibm, ts0))
+solver_2nd = solvers.mle(strategies.filter_adaptive(ibm, ts0))
 adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 

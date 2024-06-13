@@ -4,9 +4,8 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
-from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -18,7 +17,7 @@ def fixture_approximate_solution():
     # Generate a solver
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
@@ -65,7 +64,7 @@ def fixture_approximate_solution_batched():
     # Generate a solver
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 

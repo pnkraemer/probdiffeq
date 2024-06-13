@@ -9,9 +9,8 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solvers
-from probdiffeq.solvers.strategies import filters
-from probdiffeq.solvers.strategies.components import corrections, priors
+from probdiffeq.solvers import solvers, strategies
+from probdiffeq.solvers.components import corrections, priors
 from tests.setup import setup
 
 
@@ -20,7 +19,7 @@ def test_exponential_approximated_well():
 
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = corrections.ts0()
-    strategy = filters.filter_adaptive(ibm, ts0)
+    strategy = strategies.filter_adaptive(ibm, ts0)
     solver = solvers.dynamic(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
