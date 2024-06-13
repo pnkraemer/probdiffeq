@@ -1,6 +1,6 @@
-"""Compare solve_fixed_grid to solve_and_save_every_step."""
+"""Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
@@ -16,8 +16,8 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
     ts0 = components.correction_ts0()
     strategy = components.strategy_filter(ibm, ts0)
     solver = solvers.mle(strategy)
-    control = adaptive.control_integral_clipped()  # Any clipped controller will do.
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2, control=control)
+    control = ivpsolve.control_integral_clipped()  # Any clipped controller will do.
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, control=control)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
@@ -30,7 +30,9 @@ def test_fixed_grid_result_matches_adaptive_grid_result():
         "dt0": 0.1,
         "adaptive_solver": adaptive_solver,
     }
-    solution_adaptive = ivpsolve.solve_and_save_every_step(*args, **adaptive_kwargs)
+    solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
+        *args, **adaptive_kwargs
+    )
 
     grid_adaptive = solution_adaptive.t
     fixed_kwargs = {"grid": grid_adaptive, "solver": solver}

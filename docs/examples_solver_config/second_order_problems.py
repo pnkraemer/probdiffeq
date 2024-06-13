@@ -22,7 +22,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
@@ -56,14 +56,14 @@ def vf_1(y, t):  # noqa: ARG001
 ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0()
 solver_1st = solvers.mle(components.strategy_filter(ibm, ts0))
-adaptive_solver_1st = adaptive.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
+adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
 tcoeffs = autodiff.taylor_mode_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
-solution = ivpsolve.solve_and_save_every_step(
+solution = ivpsolve.solve_adaptive_save_every_step(
     vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st
 )
 
@@ -90,14 +90,14 @@ def vf_2(y, dy, t):  # noqa: ARG001
 ibm = components.prior_ibm(num_derivatives=4)
 ts0 = components.correction_ts0(ode_order=2)
 solver_2nd = solvers.mle(components.strategy_filter(ibm, ts0))
-adaptive_solver_2nd = adaptive.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
+adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 
 tcoeffs = autodiff.taylor_mode_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
-solution = ivpsolve.solve_and_save_every_step(
+solution = ivpsolve.solve_adaptive_save_every_step(
     vf_2, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_2nd
 )
 

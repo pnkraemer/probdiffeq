@@ -1,6 +1,6 @@
 """Assert that every recipe yields a decent ODE approximation."""
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
@@ -67,14 +67,16 @@ def fixture_solution(correction_impl):
     ibm = components.prior_ibm(num_derivatives=2)
     strategy = components.strategy_filter(ibm, correction_impl)
     solver = solvers.mle(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), u0, num=2)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     init = solver.initial_condition(tcoeffs, output_scale)
-    return ivpsolve.simulate_terminal_values(vf, init, t0=t0, t1=t1, **adaptive_kwargs)
+    return ivpsolve.solve_adaptive_terminal_values(
+        vf, init, t0=t0, t1=t1, **adaptive_kwargs
+    )
 
 
 @testing.fixture(name="reference_solution")

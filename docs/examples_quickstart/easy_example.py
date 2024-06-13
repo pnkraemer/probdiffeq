@@ -22,7 +22,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
 from probdiffeq.solvers import components, solvers
 from probdiffeq.taylor import autodiff
@@ -88,7 +88,7 @@ ts0 = components.correction_ts1(ode_order=1)
 
 strategy = components.strategy_smoother(ibm, ts0)
 solver = solvers.solver(strategy)
-adaptive_solver = adaptive.adaptive(solver)
+adaptive_solver = ivpsolve.adaptive(solver)
 # -
 
 # Why so many layers?
@@ -136,7 +136,7 @@ init = solver.initial_condition(tcoeffs, output_scale)
 
 # +
 dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), (u0,))  # or use e.g. dt0=0.1
-solution = ivpsolve.solve_and_save_every_step(
+solution = ivpsolve.solve_adaptive_save_every_step(
     vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
 )
 

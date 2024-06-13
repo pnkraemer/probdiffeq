@@ -1,6 +1,6 @@
 """Tests for sampling behaviour."""
 
-from probdiffeq import adaptive, ivpsolve
+from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
@@ -17,12 +17,12 @@ def fixture_approximation():
     ts0 = components.correction_ts0()
     strategy = components.strategy_smoother(ibm, ts0)
     solver = solvers.solver(strategy)
-    adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init = solver.initial_condition(tcoeffs, output_scale)
-    return ivpsolve.solve_and_save_every_step(
+    return ivpsolve.solve_adaptive_save_every_step(
         vf, init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1
     )
 
