@@ -13,14 +13,13 @@ It inherits automatic differentiation, vectorisation, and GPU capability from JA
 
 **Features include:**
 
-* Stable implementation
-* Calibration, step-size adaptation, and checkpointing
-* State-space model factorisations
-* Dense output and posterior sampling
-* Filtering, smoothing, and many other backends
-* Custom information operators
-* Physics-enhanced regression
-* Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
+* ⚡ Calibration and step-size adaptation
+* ⚡ Stable implementation of filtering, smoothing, and other estimation strategies
+* ⚡ Custom information operators, dense output, and posterior sampling
+* ⚡ State-space model factorisations
+* ⚡ Physics-enhanced regression
+* ⚡ Taylor-series estimation with and without Jets
+* ⚡ Compatibility with other JAX-based libraries such as [Optax](https://optax.readthedocs.io/en/latest/index.html) or [BlackJAX](https://blackjax-devs.github.io/blackjax/).
 
 and many more.
 
@@ -70,6 +69,19 @@ While the API is not stable yet, the examples may be more instructive than the A
 The advanced examples show applications of probabilistic numerical solvers, often in conjunction with external libraries.
 For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [Optax](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [BlackJAX](https://optax.readthedocs.io/en/latest/index.html).
 
+## Citing this repository
+If you find Probdiffeq helpful for your research project, please consider citing:
+
+```bibtex
+@phdthesis{kramer2024implementing,
+  title={Implementing probabilistic numerical solvers for differential equations},
+  author={Kr{\"a}mer, Peter Nicholas},
+  year={2024},
+  school={Universit{\"a}t T{\"u}bingen}
+}
+```
+This thesis contains detailed information about the maths and algorithms behind what is implemented here.
+A PDF is available here ([LINK](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754)).
 
 
 ## Contributing
