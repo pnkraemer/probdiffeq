@@ -4,24 +4,24 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats
+from probdiffeq.solvers import solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
 
 @testing.case()
 def case_strategy_filter():
-    return components.strategy_filter
+    return solvers.strategy_filter
 
 
 @testing.case()
 def case_strategy_smoother():
-    return components.strategy_smoother
+    return solvers.strategy_smoother
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return components.strategy_fixedpoint
+    return solvers.strategy_fixedpoint
 
 
 @testing.fixture(name="sol")
@@ -29,8 +29,8 @@ def case_strategy_fixedpoint():
 def fixture_sol(strategy_func):
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.prior_ibm(num_derivatives=4)
-    ts0 = components.correction_ts0()
+    ibm = solvers.prior_ibm(num_derivatives=4)
+    ts0 = solvers.correction_ts0()
     strategy = strategy_func(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)

@@ -9,16 +9,16 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
+from probdiffeq.solvers import solvers
 from tests.setup import setup
 
 
 def test_exponential_approximated_well():
     vf, u0, (t0, t1), solution = setup.ode_affine()
 
-    ibm = components.prior_ibm(num_derivatives=1)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_filter(ibm, ts0)
+    ibm = solvers.prior_ibm(num_derivatives=1)
+    ts0 = solvers.correction_ts0()
+    strategy = solvers.strategy_filter(ibm, ts0)
     solver = solvers.solver_dynamic(strategy)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())

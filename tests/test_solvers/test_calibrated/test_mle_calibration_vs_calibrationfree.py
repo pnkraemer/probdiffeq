@@ -9,7 +9,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats
+from probdiffeq.solvers import solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -85,11 +85,11 @@ def case_simulate_terminal_values():
 @testing.fixture(name="uncalibrated_and_mle_solution")
 @testing.parametrize_with_cases("solver_to_solution", cases=".", prefix="case_")
 @testing.parametrize(
-    "strategy_fun", [components.strategy_filter, components.strategy_fixedpoint]
+    "strategy_fun", [solvers.strategy_filter, solvers.strategy_fixedpoint]
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
-    ibm = components.prior_ibm(num_derivatives=4)
-    ts0 = components.correction_ts0()
+    ibm = solvers.prior_ibm(num_derivatives=4)
+    ts0 = solvers.correction_ts0()
     strategy = strategy_fun(ibm, ts0)
 
     uncalib = solver_to_solution(solvers.solver(strategy))

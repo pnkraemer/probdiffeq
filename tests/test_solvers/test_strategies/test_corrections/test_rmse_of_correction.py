@@ -4,7 +4,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
+from probdiffeq.solvers import solvers
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -12,7 +12,7 @@ from tests.setup import setup
 @testing.case()
 def case_ts0():
     try:
-        return components.correction_ts0()
+        return solvers.correction_ts0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -21,7 +21,7 @@ def case_ts0():
 @testing.case()
 def case_ts1():
     try:
-        return components.correction_ts1()
+        return solvers.correction_ts1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -30,7 +30,7 @@ def case_ts1():
 @testing.case()
 def case_slr0():
     try:
-        return components.correction_slr0()
+        return solvers.correction_slr0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -39,7 +39,7 @@ def case_slr0():
 @testing.case()
 def case_slr1():
     try:
-        return components.correction_slr1()
+        return solvers.correction_slr1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -48,9 +48,7 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return components.correction_slr1(
-            cubature_fun=components.cubature_gauss_hermite
-        )
+        return solvers.correction_slr1(cubature_fun=solvers.cubature_gauss_hermite)
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -64,8 +62,8 @@ def fixture_solution(correction_impl):
     if correction_impl == "not_implemented":
         testing.skip(reason="This type of linearisation has not been implemented.")
 
-    ibm = components.prior_ibm(num_derivatives=2)
-    strategy = components.strategy_filter(ibm, correction_impl)
+    ibm = solvers.prior_ibm(num_derivatives=2)
+    strategy = solvers.strategy_filter(ibm, correction_impl)
     solver = solvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 

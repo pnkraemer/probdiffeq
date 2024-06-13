@@ -4,7 +4,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers, stats
+from probdiffeq.solvers import solvers, stats
 from probdiffeq.taylor import autodiff
 from tests.setup import setup
 
@@ -13,9 +13,9 @@ from tests.setup import setup
 def fixture_sol():
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.prior_ibm(num_derivatives=2)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_fixedpoint(ibm, ts0)
+    ibm = solvers.prior_ibm(num_derivatives=2)
+    ts0 = solvers.correction_ts0()
+    strategy = solvers.strategy_fixedpoint(ibm, ts0)
     solver = solvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
@@ -86,9 +86,9 @@ def test_raises_error_for_filter():
     """Non-terminal value calls are not possible for filters."""
     vf, (u0,), (t0, t1) = setup.ode()
 
-    ibm = components.prior_ibm(num_derivatives=2)
-    ts0 = components.correction_ts0()
-    strategy = components.strategy_filter(ibm, ts0)
+    ibm = solvers.prior_ibm(num_derivatives=2)
+    ts0 = solvers.correction_ts0()
+    strategy = solvers.strategy_filter(ibm, ts0)
     solver = solvers.solver(strategy)
 
     grid = np.linspace(t0, t1, num=3)

@@ -41,7 +41,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import components, solvers
+from probdiffeq.solvers import solvers
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -72,9 +72,9 @@ def vf(*ys, t):  # noqa: ARG001
 # +
 num_derivatives = 1
 
-ibm = components.prior_ibm(num_derivatives=1)
-ts1 = components.correction_ts1()
-strategy = components.strategy_filter(ibm, ts1)
+ibm = solvers.prior_ibm(num_derivatives=1)
+ts1 = solvers.correction_ts1()
+strategy = solvers.strategy_filter(ibm, ts1)
 dynamic = solvers.solver_dynamic(strategy)
 mle = solvers.solver_mle(strategy)
 
