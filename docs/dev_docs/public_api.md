@@ -7,7 +7,7 @@ At the moment, this affects the following:
 * `ivpsolve.py`
 * `adaptive.py`
 * `taylor/*`
-* `solvers.py`
+* `ivpsolvers.py`
 * `stats.py`
 * `impl.impl.select()`
 

@@ -22,7 +22,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff
 
@@ -82,11 +82,11 @@ impl.select("dense", ode_shape=(1,))
 #
 
 # +
-ibm = solvers.prior_ibm(num_derivatives=4)
-ts0 = solvers.correction_ts1(ode_order=1)
+ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+ts0 = ivpsolvers.correction_ts1(ode_order=1)
 
-strategy = solvers.strategy_smoother(ibm, ts0)
-solver = solvers.solver(strategy)
+strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+solver = ivpsolvers.solver(strategy)
 adaptive_solver = ivpsolve.adaptive(solver)
 # -
 

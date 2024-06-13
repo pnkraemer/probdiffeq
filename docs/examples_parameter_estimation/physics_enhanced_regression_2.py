@@ -132,7 +132,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, solvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
@@ -189,10 +189,10 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 def solve_fixed(theta, *, ts):
     """Evaluate the parameter-to-solution map, solving on a fixed grid."""
     # Create a probabilistic solver
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_filter(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
@@ -206,10 +206,10 @@ def solve_fixed(theta, *, ts):
 def solve_adaptive(theta, *, save_at):
     """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
     # Create a probabilistic solver
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_filter(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
 
     tcoeffs = autodiff.taylor_mode_scan(lambda y: vf(y, t=t0), (theta,), num=2)

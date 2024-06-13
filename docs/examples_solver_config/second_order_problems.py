@@ -22,7 +22,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
@@ -52,9 +52,9 @@ def vf_1(y, t):  # noqa: ARG001
     return f(y, *f_args)
 
 
-ibm = solvers.prior_ibm(num_derivatives=4)
-ts0 = solvers.correction_ts0()
-solver_1st = solvers.solver_mle(solvers.strategy_filter(ibm, ts0))
+ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+ts0 = ivpsolvers.correction_ts0()
+solver_1st = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
@@ -86,9 +86,9 @@ def vf_2(y, dy, t):  # noqa: ARG001
 
 
 # One derivative more than above because we don't transform to first order
-ibm = solvers.prior_ibm(num_derivatives=4)
-ts0 = solvers.correction_ts0(ode_order=2)
-solver_2nd = solvers.solver_mle(solvers.strategy_filter(ibm, ts0))
+ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+ts0 = ivpsolvers.correction_ts0(ode_order=2)
+solver_2nd = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 

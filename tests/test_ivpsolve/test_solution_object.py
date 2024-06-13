@@ -1,6 +1,6 @@
 """Tests for interaction with the solution object."""
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -13,10 +13,10 @@ def fixture_approximate_solution():
     vf, u0, (t0, t1) = setup.ode()
 
     # Generate a solver
-    ibm = solvers.prior_ibm(num_derivatives=1)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_filter(ibm, ts0)
-    solver = solvers.solver_mle(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    solver = ivpsolvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
@@ -60,10 +60,10 @@ def fixture_approximate_solution_batched():
     vf, (u0,), (t0, t1) = setup.ode()
 
     # Generate a solver
-    ibm = solvers.prior_ibm(num_derivatives=1)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_filter(ibm, ts0)
-    solver = solvers.solver_mle(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    solver = ivpsolvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())

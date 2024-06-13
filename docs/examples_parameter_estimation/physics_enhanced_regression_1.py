@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 import optax
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, solvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
@@ -68,10 +68,10 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
-    ibm = solvers.prior_ibm(num_derivatives=1)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_smoother(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
 
     tcoeffs = (u0, vf(u0, t0, p=p))
     output_scale = 10.0

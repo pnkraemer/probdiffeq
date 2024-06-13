@@ -1,6 +1,6 @@
 """Assert that every recipe yields a decent ODE approximation."""
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
@@ -11,7 +11,7 @@ from tests.setup import setup
 @testing.case()
 def case_ts0():
     try:
-        return solvers.correction_ts0()
+        return ivpsolvers.correction_ts0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -20,7 +20,7 @@ def case_ts0():
 @testing.case()
 def case_ts1():
     try:
-        return solvers.correction_ts1()
+        return ivpsolvers.correction_ts1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -29,7 +29,7 @@ def case_ts1():
 @testing.case()
 def case_slr0():
     try:
-        return solvers.correction_slr0()
+        return ivpsolvers.correction_slr0()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -38,7 +38,7 @@ def case_slr0():
 @testing.case()
 def case_slr1():
     try:
-        return solvers.correction_slr1()
+        return ivpsolvers.correction_slr1()
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -47,7 +47,9 @@ def case_slr1():
 @testing.case()
 def case_slr1_gauss_hermite():
     try:
-        return solvers.correction_slr1(cubature_fun=solvers.cubature_gauss_hermite)
+        return ivpsolvers.correction_slr1(
+            cubature_fun=ivpsolvers.cubature_gauss_hermite
+        )
     except NotImplementedError:
         return "not_implemented"
     raise RuntimeError
@@ -61,9 +63,9 @@ def fixture_solution(correction_impl):
     if correction_impl == "not_implemented":
         testing.skip(reason="This type of linearisation has not been implemented.")
 
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    strategy = solvers.strategy_filter(ibm, correction_impl)
-    solver = solvers.solver_mle(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    strategy = ivpsolvers.strategy_filter(ibm, correction_impl)
+    solver = ivpsolvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}

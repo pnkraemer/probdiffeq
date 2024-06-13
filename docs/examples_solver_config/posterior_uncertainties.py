@@ -22,7 +22,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, solvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import notebook
@@ -62,9 +62,9 @@ def vf(*ys, t):  # noqa: ARG001
 # ## Filter
 
 # +
-ibm = solvers.prior_ibm(num_derivatives=4)
-ts0 = solvers.correction_ts0()
-solver = solvers.solver_mle(solvers.strategy_filter(ibm, ts0))
+ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+ts0 = ivpsolvers.correction_ts0()
+solver = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
@@ -117,9 +117,9 @@ plt.show()
 # ## Smoother
 
 # +
-ibm = solvers.prior_ibm(num_derivatives=4)
-ts0 = solvers.correction_ts0()
-solver = solvers.solver_mle(solvers.strategy_fixedpoint(ibm, ts0))
+ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+ts0 = ivpsolvers.correction_ts0()
+solver = ivpsolvers.solver_mle(ivpsolvers.strategy_fixedpoint(ibm, ts0))
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)

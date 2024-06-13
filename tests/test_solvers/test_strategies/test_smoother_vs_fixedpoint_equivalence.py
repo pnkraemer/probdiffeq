@@ -3,7 +3,7 @@
 That is, when called with correct adaptive- and checkpoint-setups.
 """
 
-from probdiffeq import ivpsolve, solvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
@@ -29,10 +29,10 @@ def fixture_solver_setup():
 
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_smoother(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
@@ -49,10 +49,10 @@ def fixture_solution_smoother(solver_setup):
 
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
     """Test that with save_at=smoother_solution.t, the results should be identical."""
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_fixedpoint(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     save_at = solution_smoother.t
@@ -75,10 +75,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     save_at = solution_smoother.t
 
     # Re-generate the smoothing solver
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_smoother(ibm, ts0)
-    solver_smoother = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    solver_smoother = ivpsolvers.solver(strategy)
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
@@ -87,10 +87,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     )
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
-    ibm = solvers.prior_ibm(num_derivatives=2)
-    ts0 = solvers.correction_ts0()
-    strategy = solvers.strategy_fixedpoint(ibm, ts0)
-    solver = solvers.solver(strategy)
+    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    ts0 = ivpsolvers.correction_ts0()
+    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
+    solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)

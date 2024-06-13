@@ -5,7 +5,7 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import ivpsolve, solvers, stats
+from probdiffeq import ivpsolve, ivpsolvers, stats
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
@@ -84,15 +84,15 @@ def case_simulate_terminal_values():
 @testing.fixture(name="uncalibrated_and_mle_solution")
 @testing.parametrize_with_cases("solver_to_solution", cases=".", prefix="case_")
 @testing.parametrize(
-    "strategy_fun", [solvers.strategy_filter, solvers.strategy_fixedpoint]
+    "strategy_fun", [ivpsolvers.strategy_filter, ivpsolvers.strategy_fixedpoint]
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
-    ibm = solvers.prior_ibm(num_derivatives=4)
-    ts0 = solvers.correction_ts0()
+    ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+    ts0 = ivpsolvers.correction_ts0()
     strategy = strategy_fun(ibm, ts0)
 
-    uncalib = solver_to_solution(solvers.solver(strategy))
-    mle = solver_to_solution(solvers.solver_mle(strategy))
+    uncalib = solver_to_solution(ivpsolvers.solver(strategy))
+    mle = solver_to_solution(ivpsolvers.solver_mle(strategy))
     return uncalib, mle
 
 

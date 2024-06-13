@@ -18,7 +18,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, solvers
+from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.impl import impl
 from probdiffeq.taylor import autodiff
 from probdiffeq.util.doc_util import info
@@ -80,9 +80,9 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
     def param_to_solution(tol):
         impl.select(implementation, ode_shape=(2,))
         # Build a solver
-        ibm = solvers.prior_ibm(num_derivatives=num_derivatives)
-        strategy = solvers.strategy_filter(ibm, correction())
-        solver = solvers.solver_mle(strategy)
+        ibm = ivpsolvers.prior_ibm(num_derivatives=num_derivatives)
+        strategy = ivpsolvers.strategy_filter(ibm, correction())
+        solver = ivpsolvers.solver_mle(strategy)
         control = ivpsolve.control_proportional_integral()
         adaptive_solver = ivpsolve.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     timeit_fun = timeit_fun_from_args(args)
 
     # Assemble algorithms
-    ts0, ts1 = solvers.correction_ts0, solvers.correction_ts1
+    ts0, ts1 = ivpsolvers.correction_ts0, ivpsolvers.correction_ts1
     ts0_iso = solver_probdiffeq(5, correction=ts0, implementation="isotropic")
     ts0_bd = solver_probdiffeq(5, correction=ts0, implementation="blockdiag")
     ts1_dense = solver_probdiffeq(8, correction=ts1, implementation="dense")
