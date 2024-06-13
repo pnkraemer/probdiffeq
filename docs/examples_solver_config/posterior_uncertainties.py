@@ -24,7 +24,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import calibrated, markov, solution
+from probdiffeq.solvers import markov, solution, solvers
 from probdiffeq.solvers.strategies import filters, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -67,7 +67,7 @@ def vf(*ys, t):  # noqa: ARG001
 # +
 ibm = priors.ibm_adaptive(num_derivatives=4)
 ts0 = corrections.ts0()
-solver = calibrated.mle(filters.filter_adaptive(ibm, ts0))
+solver = solvers.mle(filters.filter_adaptive(ibm, ts0))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
@@ -122,7 +122,7 @@ plt.show()
 # +
 ibm = priors.ibm_adaptive(num_derivatives=4)
 ts0 = corrections.ts0()
-solver = calibrated.mle(fixedpoint.fixedpoint_adaptive(ibm, ts0))
+solver = solvers.mle(fixedpoint.fixedpoint_adaptive(ibm, ts0))
 adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)

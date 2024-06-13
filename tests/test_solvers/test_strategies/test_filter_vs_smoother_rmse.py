@@ -4,7 +4,7 @@ from probdiffeq import ivpsolve
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import uncalibrated
+from probdiffeq.solvers import solvers
 from probdiffeq.solvers.strategies import filters, smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -26,7 +26,7 @@ def fixture_filter_solution(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)
@@ -40,7 +40,7 @@ def fixture_smoother_solution(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)

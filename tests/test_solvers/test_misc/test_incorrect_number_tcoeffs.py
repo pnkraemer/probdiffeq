@@ -6,7 +6,7 @@ Place all tests that have no better place here.
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import uncalibrated
+from probdiffeq.solvers import solvers
 from probdiffeq.solvers.strategies import filters, fixedpoint, smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
 
@@ -31,7 +31,7 @@ def test_incorrect_number_of_taylor_coefficients_init(incr, n):
         smoothers.smoother_adaptive,
         fixedpoint.fixedpoint_adaptive,
     ]:
-        solver = uncalibrated.solver(strategy(prior, ts0))
+        solver = solvers.solver(strategy(prior, ts0))
         output_scale = np.ones_like(impl.prototypes.output_scale())
         with testing.raises(ValueError):
             _ = solver.initial_condition(

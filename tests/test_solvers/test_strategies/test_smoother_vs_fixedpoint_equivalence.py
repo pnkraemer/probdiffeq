@@ -7,7 +7,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, uncalibrated
+from probdiffeq.solvers import solution, solvers
 from probdiffeq.solvers.strategies import fixedpoint, smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -35,7 +35,7 @@ def fixture_solution_smoother(solver_setup):
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
@@ -55,7 +55,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
 
     save_at = solution_smoother.t
@@ -81,7 +81,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
-    solver_smoother = uncalibrated.solver(strategy)
+    solver_smoother = solvers.solver(strategy)
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
@@ -93,7 +93,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ibm = priors.ibm_adaptive(num_derivatives=2)
     ts0 = corrections.ts0()
     strategy = fixedpoint.fixedpoint_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-3, rtol=1e-3)
     tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
     init = solver.initial_condition(tcoeffs, output_scale)

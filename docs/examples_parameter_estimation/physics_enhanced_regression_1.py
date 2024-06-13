@@ -36,7 +36,7 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import solution, uncalibrated
+from probdiffeq.solvers import solution, solvers
 from probdiffeq.solvers.strategies import smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.util.doc_util import notebook
@@ -74,7 +74,7 @@ def solve(p):
     ibm = priors.ibm_adaptive(num_derivatives=1)
     ts0 = corrections.ts0()
     strategy = smoothers.smoother_adaptive(ibm, ts0)
-    solver = uncalibrated.solver(strategy)
+    solver = solvers.solver(strategy)
 
     tcoeffs = (u0, vf(u0, t0, p=p))
     output_scale = 10.0

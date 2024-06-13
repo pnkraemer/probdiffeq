@@ -104,8 +104,7 @@ nav:
               - filters: api_docs/solvers/strategies/filters.md
               - smoothers: api_docs/solvers/strategies/smoothers.md
               - fixedpoint: api_docs/solvers/strategies/fixedpoint.md
-          - calibrated: api_docs/solvers/calibrated.md
-          - uncalibrated: api_docs/solvers/uncalibrated.md
+          - solvers: api_docs/solvers/solvers.md
           - solution: api_docs/solvers/solution.md
           - markov: api_docs/solvers/markov.md
       - taylor:

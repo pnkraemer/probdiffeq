@@ -24,7 +24,7 @@ import jax.numpy as jnp
 
 from probdiffeq import adaptive, ivpsolve
 from probdiffeq.impl import impl
-from probdiffeq.solvers import uncalibrated
+from probdiffeq.solvers import solvers
 from probdiffeq.solvers.strategies import smoothers
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -89,7 +89,7 @@ ibm = priors.ibm_adaptive(num_derivatives=4)
 ts0 = corrections.ts1(ode_order=1)
 
 strategy = smoothers.smoother_adaptive(ibm, ts0)
-solver = uncalibrated.solver(strategy)
+solver = solvers.solver(strategy)
 adaptive_solver = adaptive.adaptive(solver)
 # -
 

@@ -4,7 +4,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import calibrated
+from probdiffeq.solvers import solvers
 from probdiffeq.solvers.strategies import filters
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -18,7 +18,7 @@ def fixture_python_loop_solution():
     ibm = priors.ibm_adaptive(num_derivatives=4)
     ts0 = corrections.ts0()
     strategy = filters.filter_adaptive(ibm, ts0)
-    solver = calibrated.mle(strategy)
+    solver = solvers.mle(strategy)
     adaptive_solver = adaptive.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     dt0 = ivpsolve.dt0_adaptive(

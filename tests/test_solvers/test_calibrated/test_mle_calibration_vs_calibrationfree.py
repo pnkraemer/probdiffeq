@@ -9,7 +9,7 @@ from probdiffeq import adaptive, ivpsolve
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from probdiffeq.solvers import calibrated, solution, uncalibrated
+from probdiffeq.solvers import solution, solvers
 from probdiffeq.solvers.strategies import filters, fixedpoint
 from probdiffeq.solvers.strategies.components import corrections, priors
 from probdiffeq.taylor import autodiff
@@ -94,8 +94,8 @@ def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     ts0 = corrections.ts0()
     strategy = strategy_fun(ibm, ts0)
 
-    uncalib = solver_to_solution(uncalibrated.solver(strategy))
-    mle = solver_to_solution(calibrated.mle(strategy))
+    uncalib = solver_to_solution(solvers.solver(strategy))
+    mle = solver_to_solution(solvers.mle(strategy))
     return uncalib, mle
 
 
