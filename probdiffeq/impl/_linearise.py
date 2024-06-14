@@ -1,4 +1,6 @@
-from probdiffeq.backend import abc
+from probdiffeq.backend import abc, functools
+from probdiffeq.backend import numpy as np
+from probdiffeq.util import linop_util
 
 
 class LinearisationBackend(abc.ABC):
@@ -32,7 +34,7 @@ class DenseLinearisation(LinearisationBackend):
                 msg = f"{np.shape(a0(mean))} != {expected_shape}"
                 raise ValueError(msg)
 
-            fx = ts0(fun, a0(mean))
+            fx = self.ts0(fun, a0(mean))
             linop = linop_util.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
             return linop, -fx
 
@@ -47,9 +49,9 @@ class DenseLinearisation(LinearisationBackend):
                 msg = f"{np.shape(a0(mean))} != {expected_shape}"
                 raise ValueError(msg)
 
-            jvp, fx = ts1(fun, a0(mean))
+            jvp, fx = self.ts1(fun, a0(mean))
 
-            @_autobatch_linop
+            @self._autobatch_linop
             def A(x):
                 x1 = a1(x)
                 x0 = a0(x)
@@ -62,12 +64,16 @@ class DenseLinearisation(LinearisationBackend):
 
     def ode_statistical_1st(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        linearise_fun = functools.partial(slr1, cubature_rule=cubature_rule)
+        linearise_fun = functools.partial(self.slr1, cubature_rule=cubature_rule)
 
         def new(fun, rv, /):
             # Projection functions
-            a0 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=0))
-            a1 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=1))
+            a0 = self._autobatch_linop(
+                functools.partial(self._select_dy, idx_or_slice=0)
+            )
+            a1 = self._autobatch_linop(
+                functools.partial(self._select_dy, idx_or_slice=1)
+            )
 
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
@@ -90,12 +96,16 @@ class DenseLinearisation(LinearisationBackend):
 
     def ode_statistical_0th(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        linearise_fun = functools.partial(slr0, cubature_rule=cubature_rule)
+        linearise_fun = functools.partial(self.slr0, cubature_rule=cubature_rule)
 
         def new(fun, rv, /):
             # Projection functions
-            a0 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=0))
-            a1 = _autobatch_linop(functools.partial(self._select_dy, idx_or_slice=1))
+            a0 = self._autobatch_linop(
+                functools.partial(self._select_dy, idx_or_slice=0)
+            )
+            a1 = self._autobatch_linop(
+                functools.partial(self._select_dy, idx_or_slice=1)
+            )
 
             # Extract the linearisation point
             m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
@@ -116,67 +126,67 @@ class DenseLinearisation(LinearisationBackend):
         x_reshaped = np.reshape(x, (-1, d), order="F")
         return x_reshaped[idx_or_slice, ...]
 
+    @staticmethod
+    def _autobatch_linop(fun):
+        def fun_(x):
+            if np.ndim(x) > 1:
+                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
+            return fun(x)
 
-def _autobatch_linop(fun):
-    def fun_(x):
-        if np.ndim(x) > 1:
-            return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
-        return fun(x)
+        return fun_
 
-    return fun_
+    @staticmethod
+    def ts0(fn, m):
+        return fn(m)
 
+    @staticmethod
+    def ts1(fn, m):
+        b, jvp = functools.linearize(fn, m)
+        return jvp, b - jvp(m)
 
-def ts0(fn, m):
-    return fn(m)
+    @staticmethod
+    def slr1(fn, x, *, cubature_rule):
+        """Linearise a function with first-order statistical linear regression."""
+        # Create sigma-points
+        pts_centered = cubature_rule.points @ x.cholesky.T
+        pts = x.mean[None, :] + pts_centered
+        pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
 
+        # Evaluate the nonlinear function
+        fx = functools.vmap(fn)(pts)
+        fx_mean = cubature_rule.weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None, :]
+        fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
-def ts1(fn, m):
-    b, jvp = functools.linearize(fn, m)
-    return jvp, b - jvp(m)
+        # Compute statistical linear regression matrices
+        _, (cov_sqrtm_cond, linop_cond) = cholesky_util.revert_conditional_noisefree(
+            R_X_F=pts_centered_normed, R_X=fx_centered_normed
+        )
+        mean_cond = fx_mean - linop_cond @ x.mean
+        rv_cond = _normal.Normal(mean_cond, cov_sqrtm_cond.T)
+        return linop_cond, rv_cond
 
+    @staticmethod
+    def slr0(fn, x, *, cubature_rule):
+        """Linearise a function with zeroth-order statistical linear regression.
 
-def slr1(fn, x, *, cubature_rule):
-    """Linearise a function with first-order statistical linear regression."""
-    # Create sigma-points
-    pts_centered = cubature_rule.points @ x.cholesky.T
-    pts = x.mean[None, :] + pts_centered
-    pts_centered_normed = pts_centered * cubature_rule.weights_sqrtm[:, None]
+        !!! warning "Warning: highly EXPERIMENTAL feature!"
+            This feature is highly experimental.
+            There is no guarantee that it works correctly.
+            It might be deleted tomorrow
+            and without any deprecation policy.
 
-    # Evaluate the nonlinear function
-    fx = functools.vmap(fn)(pts)
-    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
-    fx_centered = fx - fx_mean[None, :]
-    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
+        """
+        # Create sigma-points
+        pts_centered = cubature_rule.points @ x.cholesky.T
+        pts = x.mean[None, :] + pts_centered
 
-    # Compute statistical linear regression matrices
-    _, (cov_sqrtm_cond, linop_cond) = cholesky_util.revert_conditional_noisefree(
-        R_X_F=pts_centered_normed, R_X=fx_centered_normed
-    )
-    mean_cond = fx_mean - linop_cond @ x.mean
-    rv_cond = _normal.Normal(mean_cond, cov_sqrtm_cond.T)
-    return linop_cond, rv_cond
+        # Evaluate the nonlinear function
+        fx = functools.vmap(fn)(pts)
+        fx_mean = cubature_rule.weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None, :]
+        fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
 
+        cov_sqrtm = cholesky_util.triu_via_qr(fx_centered_normed)
 
-def slr0(fn, x, *, cubature_rule):
-    """Linearise a function with zeroth-order statistical linear regression.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This feature is highly experimental.
-        There is no guarantee that it works correctly.
-        It might be deleted tomorrow
-        and without any deprecation policy.
-
-    """
-    # Create sigma-points
-    pts_centered = cubature_rule.points @ x.cholesky.T
-    pts = x.mean[None, :] + pts_centered
-
-    # Evaluate the nonlinear function
-    fx = functools.vmap(fn)(pts)
-    fx_mean = cubature_rule.weights_sqrtm**2 @ fx
-    fx_centered = fx - fx_mean[None, :]
-    fx_centered_normed = fx_centered * cubature_rule.weights_sqrtm[:, None]
-
-    cov_sqrtm = cholesky_util.triu_via_qr(fx_centered_normed)
-
-    return _normal.Normal(fx_mean, cov_sqrtm.T)
+        return _normal.Normal(fx_mean, cov_sqrtm.T)
