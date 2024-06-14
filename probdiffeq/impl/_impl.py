@@ -125,9 +125,10 @@ def _select_dense(*, ode_shape):
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
     stats = _stats.DenseStats(ode_shape=ode_shape)
     conditional = _conditional.DenseConditional()
+    transform = _transform.DenseTransform()
     return FactorisedImpl(
         linearise=linearise,
-        transform=None,
+        transform=transform,
         conditional=conditional,
         ssm_util=ssm_util,
         prototypes=prototypes,

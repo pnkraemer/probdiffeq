@@ -35,7 +35,9 @@ class DenseLinearisation(LinearisationBackend):
                 raise ValueError(msg)
 
             fx = self.ts0(fun, a0(mean))
-            linop = linop_util.parametrised_linop(lambda v, _p: _autobatch_linop(a1)(v))
+            linop = linop_util.parametrised_linop(
+                lambda v, _p: self._autobatch_linop(a1)(v)
+            )
             return linop, -fx
 
         return linearise_fun_wrapped

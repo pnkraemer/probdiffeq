@@ -1,4 +1,5 @@
-from probdiffeq.backend import abc
+from probdiffeq.backend import abc, linalg
+from probdiffeq.backend import numpy as np
 
 
 class StatsBackend(abc.ABC):
