@@ -107,16 +107,24 @@ class FactorisedImpl:
     stats: _stats.StatsBackend
 
 
-def choose(which, **kwargs) -> FactorisedImpl:
+def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
     if which == "scalar":
-        return _select_scalar(**kwargs)
+        return _select_scalar()
+
+    if ode_shape is None:
+        msg = "Please provide an ODE shape."
+        raise ValueError(msg)
+
     if which == "dense":
-        return _select_dense(**kwargs)
+        return _select_dense(ode_shape=ode_shape)
     if which == "isotropic":
-        return _select_isotropic(**kwargs)
+        return _select_isotropic(ode_shape=ode_shape)
     if which == "blockdiag":
-        return _select_blockdiag(**kwargs)
-    raise ValueError
+        return _select_blockdiag(ode_shape=ode_shape)
+
+    msg1 = f"Implementation '{which}' unknown. "
+    msg2 = "Choose an implementation out of {scalar, dense, isotropic, blockdiag}."
+    raise ValueError(msg1 + msg2)
 
 
 def _select_dense(*, ode_shape):
@@ -138,75 +146,3 @@ def _select_dense(*, ode_shape):
         hidden_model=hidden_model,
         stats=stats,
     )
-
-
-#
-# class FactorisedImpl(abc.ABC):
-#     """Interface for the implementations provided by the backend."""
-#
-#     @abc.abstractmethod
-#     def linearise(self) -> _linearise.LinearisationBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def transform(self) -> _transform.TransformBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def conditional(self) -> _conditional.ConditionalBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def ssm_util(self) -> _ssm_util.SSMUtilBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def prototypes(self) -> _prototypes.PrototypeBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def variable(self) -> _variable.VariableBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def hidden_model(self) -> _hidden_model.HiddenModelBackend:
-#         raise NotImplementedError
-#
-#     @abc.abstractmethod
-#     def stats(self) -> _stats.StatsBackend:
-#         raise NotImplementedError
-#
-#
-# def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
-#     # In this function, we import outside toplevel.
-#     #
-#     # Why?
-#     # 1. To avoid cyclic imports
-#     # 2. To avoid import errors if some backends require additional dependencies
-#     #
-#     if which == "scalar":
-#         import probdiffeq.impl.scalar.factorised_impl
-#
-#         return probdiffeq.impl.scalar.factorised_impl.Scalar()
-#
-#     if ode_shape is None:
-#         msg = "Please provide an ODE shape."
-#         raise ValueError(msg)
-#
-#     if which == "dense":
-#         import probdiffeq.impl.dense.factorised_impl
-#
-#         return probdiffeq.impl.dense.factorised_impl.Dense(ode_shape=ode_shape)
-#
-#     if which == "isotropic":
-#         import probdiffeq.impl.isotropic.factorised_impl
-#
-#         return probdiffeq.impl.isotropic.factorised_impl.Isotropic(ode_shape=ode_shape)
-#
-#     if which == "blockdiag":
-#         import probdiffeq.impl.blockdiag.factorised_impl
-#
-#         return probdiffeq.impl.blockdiag.factorised_impl.BlockDiag(ode_shape=ode_shape)
-#     msg1 = f"Implementation '{which}' unknown. "
-#     msg2 = "Choose an implementation out of {scalar, dense, isotropic, blockdiag}."
-#     raise ValueError(msg1 + msg2)
