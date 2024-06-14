@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, linalg
+from probdiffeq.backend import abc, functools, linalg
 from probdiffeq.backend import numpy as np
 
 

@@ -1,6 +1,7 @@
 from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
-from probdiffeq.util import linop_util
+from probdiffeq.impl import _normal
+from probdiffeq.util import cholesky_util, linop_util
 
 
 class LinearisationBackend(abc.ABC):

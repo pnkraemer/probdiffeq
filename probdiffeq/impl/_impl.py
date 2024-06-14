@@ -127,6 +127,7 @@ def _select_dense(*, ode_shape):
     conditional = _conditional.DenseConditional()
     transform = _transform.DenseTransform()
     variable = _variable.DenseVariable(ode_shape=ode_shape)
+    hidden_model = _hidden_model.DenseHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
         linearise=linearise,
         transform=transform,
@@ -134,7 +135,7 @@ def _select_dense(*, ode_shape):
         ssm_util=ssm_util,
         prototypes=prototypes,
         variable=variable,
-        hidden_model=None,
+        hidden_model=hidden_model,
         stats=stats,
     )
 
