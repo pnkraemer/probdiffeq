@@ -140,7 +140,7 @@ def _select_dense(*, ode_shape) -> FactorisedImpl:
     ssm_util = _ssm_util.DenseSSMUtil(ode_shape=ode_shape)
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
     stats = _stats.DenseStats(ode_shape=ode_shape)
-    conditional = _conditional.DenseConditional()
+    conditional = _conditional.DenseConditional(ode_shape=ode_shape)
     transform = _transform.DenseTransform()
     hidden_model = _hidden_model.DenseHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
@@ -159,7 +159,7 @@ def _select_isotropic(*, ode_shape) -> FactorisedImpl:
     ssm_util = _ssm_util.IsotropicSSMUtil(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape)
     linearise = _linearise.IsotropicLinearisation()
-    conditional = _conditional.IsotropicConditional()
+    conditional = _conditional.IsotropicConditional(ode_shape=ode_shape)
     transform = _transform.IsotropicTransform()
     hidden_model = _hidden_model.IsotropicHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
@@ -178,7 +178,7 @@ def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
     ssm_util = _ssm_util.BlockDiagSSMUtil(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape)
     linearise = _linearise.BlockDiagLinearisation()
-    conditional = _conditional.BlockDiagConditional()
+    conditional = _conditional.BlockDiagConditional(ode_shape=ode_shape)
     transform = _transform.BlockDiagTransform(ode_shape=ode_shape)
     hidden_model = _hidden_model.BlockDiagHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(

@@ -44,7 +44,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     # Initial condition
     estimator = filter_util.fixedpointsmoother_precon()
     rv_t0 = impl.ssm_util.standard_normal(num + 1, 1.0)
-    conditional_t0 = impl.ssm_util.identity_conditional(num + 1)
+    conditional_t0 = impl.conditional.identity(num + 1)
     init = (rv_t0, conditional_t0)
 
     # Discretised prior

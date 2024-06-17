@@ -258,7 +258,7 @@ class _PreconSmoother(_ExtrapolationImpl):
 
     def initial_condition(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
-        cond = impl.ssm_util.identity_conditional(len(tcoeffs))
+        cond = impl.conditional.identity(len(tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(self, sol: stats.MarkovSeq, /):
@@ -351,7 +351,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
 
     def initial_condition(self, tcoeffs, /):
         rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
-        cond = impl.ssm_util.identity_conditional(len(tcoeffs))
+        cond = impl.conditional.identity(len(tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(self, sol: stats.MarkovSeq, /):
@@ -389,7 +389,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         return extrapolated, cond
 
     def reset(self, ssv, _extra, /):
-        cond = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
+        cond = impl.conditional.identity(self.num_derivatives + 1)
         return ssv, cond
 
     def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
@@ -432,7 +432,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
         extrapolated_t = self._extrapolate(*state_t0, dt0, output_scale)
-        conditional_id = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
+        conditional_id = impl.conditional.identity(self.num_derivatives + 1)
         previous_new = (extrapolated_t[0], conditional_id)
         extrapolated_t1 = self._extrapolate(*previous_new, dt1, output_scale)
 
@@ -453,7 +453,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
 
     # todo: rename to prepare_future_steps?
     def right_corner(self, rv, extra, /):
-        cond_identity = impl.ssm_util.identity_conditional(self.num_derivatives + 1)
+        cond_identity = impl.conditional.identity(self.num_derivatives + 1)
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 

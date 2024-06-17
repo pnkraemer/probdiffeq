@@ -34,6 +34,10 @@ class ConditionalBackend(abc.ABC):
     def conditional(self, matmul, noise):
         return Conditional(matmul, noise)
 
+    @abc.abstractmethod
+    def identity(self, num_derivatives_per_ode_dimension, /):
+        raise NotImplementedError
+
 
 class ScalarConditional(ConditionalBackend):
     def marginalise(self, rv, conditional, /):
@@ -74,8 +78,18 @@ class ScalarConditional(ConditionalBackend):
         noise = _normal.Normal(xi, Xi)
         return Conditional(g, noise)
 
+    def identity(self, ndim, /) -> Conditional:
+        transition = np.eye(ndim)
+        mean = np.zeros((ndim,))
+        cov_sqrtm = np.zeros((ndim, ndim))
+        noise = _normal.Normal(mean, cov_sqrtm)
+        return Conditional(transition, noise)
+
 
 class DenseConditional(ConditionalBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def apply(self, x, conditional, /):
         matrix, noise = conditional
         return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
@@ -115,8 +129,20 @@ class DenseConditional(ConditionalBackend):
         observed = _normal.Normal(mean_observed, r_obs.T)
         return observed, Conditional(gain, corrected)
 
+    def identity(self, ndim, /) -> Conditional:
+        (d,) = self.ode_shape
+        n = ndim * d
+
+        A = np.eye(n)
+        m = np.zeros((n,))
+        C = np.zeros((n, n))
+        return Conditional(A, _normal.Normal(m, C))
+
 
 class IsotropicConditional(ConditionalBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def apply(self, x, conditional, /):
         A, noise = conditional
         # if the gain is qoi-to-hidden, the data is a (d,) array.
@@ -162,8 +188,18 @@ class IsotropicConditional(ConditionalBackend):
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
         return extrapolated, Conditional(gain, corrected)
 
+    def identity(self, num_hidden_states_per_ode_dim, /) -> Conditional:
+        m0 = np.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
+        c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
+        noise = _normal.Normal(m0, c0)
+        matrix = np.eye(num_hidden_states_per_ode_dim)
+        return Conditional(matrix, noise)
+
 
 class BlockDiagConditional(ConditionalBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def apply(self, x, conditional, /):
         if np.ndim(x) == 1:
             x = x[..., None]
@@ -216,6 +252,14 @@ class BlockDiagConditional(ConditionalBackend):
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
         return observed, Conditional(gain, corrected)
+
+    def identity(self, ndim, /) -> Conditional:
+        m0 = np.zeros((*self.ode_shape, ndim))
+        c0 = np.zeros((*self.ode_shape, ndim, ndim))
+        noise = _normal.Normal(m0, c0)
+
+        matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        return Conditional(matrix, noise)
 
 
 def _transpose(matrix):

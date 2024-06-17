@@ -28,12 +28,6 @@ class SSMUtilBackend(abc.ABC):
     def update_mean(self, mean, x, /, num):
         raise NotImplementedError
 
-    # TODO: move those to random.py and cond.py instead?
-
-    @abc.abstractmethod
-    def identity_conditional(self, num_derivatives_per_ode_dimension, /):
-        raise NotImplementedError
-
     @abc.abstractmethod
     def standard_normal(self, num_derivatives_per_ode_dimension, /, output_scale):
         raise NotImplementedError
@@ -72,13 +66,6 @@ class ScalarSSMUtil(SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, ndim, /):
-        transition = np.eye(ndim)
-        mean = np.zeros((ndim,))
-        cov_sqrtm = np.zeros((ndim, ndim))
-        noise = _normal.Normal(mean, cov_sqrtm)
-        return _conditional.Conditional(transition, noise)
-
     def standard_normal(self, ndim, /, output_scale):
         mean = np.zeros((ndim,))
         cholesky = output_scale * np.eye(ndim)
@@ -113,15 +100,6 @@ class DenseSSMUtil(SSMUtilBackend):
             return _conditional.Conditional(A, noise), (p, p_inv)
 
         return discretise
-
-    def identity_conditional(self, ndim, /):
-        (d,) = self.ode_shape
-        n = ndim * d
-
-        A = np.eye(n)
-        m = np.zeros((n,))
-        C = np.zeros((n, n))
-        return _conditional.Conditional(A, _normal.Normal(m, C))
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -182,13 +160,6 @@ class IsotropicSSMUtil(SSMUtilBackend):
 
         return discretise
 
-    def identity_conditional(self, num_hidden_states_per_ode_dim, /):
-        m0 = np.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
-        c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
-        noise = _normal.Normal(m0, c0)
-        matrix = np.eye(num_hidden_states_per_ode_dim)
-        return _conditional.Conditional(matrix, noise)
-
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
             msg1 = f"The number of Taylor coefficients {len(tcoeffs)} does not match "
@@ -238,14 +209,6 @@ class BlockDiagSSMUtil(SSMUtilBackend):
             return (a, noise), (p, p_inv)
 
         return discretise
-
-    def identity_conditional(self, ndim, /):
-        m0 = np.zeros((*self.ode_shape, ndim))
-        c0 = np.zeros((*self.ode_shape, ndim, ndim))
-        noise = _normal.Normal(m0, c0)
-
-        matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return _conditional.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
