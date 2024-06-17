@@ -257,7 +257,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         self.num_derivatives = num_derivatives
 
     def initial_condition(self, tcoeffs, /):
-        rv = impl.normal.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        rv = impl.normal.from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
@@ -350,7 +350,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         self.num_derivatives = num_derivatives
 
     def initial_condition(self, tcoeffs, /):
-        rv = impl.normal.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        rv = impl.normal.from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
@@ -478,7 +478,7 @@ class _PreconFilter(_ExtrapolationImpl):
         self.num_derivatives = num_derivatives
 
     def initial_condition(self, tcoeffs, /):
-        return impl.normal.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        return impl.normal.from_tcoeffs(tcoeffs, self.num_derivatives)
 
     def init(self, sol, /):
         return sol, None
@@ -639,7 +639,7 @@ def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = impl.normal.standard_normal(num_derivatives + 1, output_scale=output_scale)
+    init = impl.normal.standard(num_derivatives + 1, output_scale=output_scale)
     return stats.MarkovSeq(init, conditionals)
 
 

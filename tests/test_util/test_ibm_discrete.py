@@ -11,7 +11,7 @@ def test_marginal_moments_are_correct(num_derivatives=2):
     t0, t1 = 0.0, 3.4123412
     grid = np.linspace(t0, t1, endpoint=True, num=20)
 
-    init = impl.normal.standard_normal(num_derivatives + 1, output_scale)
+    init = impl.normal.standard(num_derivatives + 1, output_scale)
     discretise = impl.conditional.ibm_transitions(num_derivatives, output_scale)
     transitions = functools.vmap(discretise)(np.diff(grid))
 
