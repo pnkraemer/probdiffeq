@@ -93,7 +93,7 @@ class FactorisedImpl:
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
     transform: _transform.TransformBackend
-    hidden_model: _hidden_model.HiddenModelBackend = None
+    hidden_model: _hidden_model.HiddenModelBackend
 
 
 def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
@@ -187,6 +187,7 @@ def _select_blockdiag(*, ode_shape):
     linearise = _linearise.BlockDiagLinearisation()
     conditional = _conditional.BlockDiagConditional()
     transform = _transform.BlockDiagTransform(ode_shape=ode_shape)
+    hidden_model = _hidden_model.BlockDiagHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -195,4 +196,5 @@ def _select_blockdiag(*, ode_shape):
         linearise=linearise,
         conditional=conditional,
         transform=transform,
+        hidden_model=hidden_model,
     )
