@@ -1,1 +1,0 @@
-"""Isotropic state-space models."""

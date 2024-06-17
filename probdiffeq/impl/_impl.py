@@ -2,7 +2,7 @@
 
 import warnings
 
-from probdiffeq.backend import abc
+from probdiffeq.backend import containers
 from probdiffeq.backend.typing import Optional
 from probdiffeq.impl import (
     _conditional,
@@ -16,82 +16,11 @@ from probdiffeq.impl import (
 )
 
 
-class FactorisedImpl(abc.ABC):
-    """Interface for the implementations provided by the backend."""
-
-    @abc.abstractmethod
-    def linearise(self) -> _linearise.LinearisationBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def transform(self) -> _transform.TransformBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def conditional(self) -> _conditional.ConditionalBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def ssm_util(self) -> _ssm_util.SSMUtilBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def prototypes(self) -> _prototypes.PrototypeBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def variable(self) -> _variable.VariableBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def hidden_model(self) -> _hidden_model.HiddenModelBackend:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def stats(self) -> _stats.StatsBackend:
-        raise NotImplementedError
-
-
-def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
-    # In this function, we import outside toplevel.
-    #
-    # Why?
-    # 1. To avoid cyclic imports
-    # 2. To avoid import errors if some backends require additional dependencies
-    #
-    if which == "scalar":
-        import probdiffeq.impl.scalar.factorised_impl
-
-        return probdiffeq.impl.scalar.factorised_impl.Scalar()
-
-    if ode_shape is None:
-        msg = "Please provide an ODE shape."
-        raise ValueError(msg)
-
-    if which == "dense":
-        import probdiffeq.impl.dense.factorised_impl
-
-        return probdiffeq.impl.dense.factorised_impl.Dense(ode_shape=ode_shape)
-
-    if which == "isotropic":
-        import probdiffeq.impl.isotropic.factorised_impl
-
-        return probdiffeq.impl.isotropic.factorised_impl.Isotropic(ode_shape=ode_shape)
-
-    if which == "blockdiag":
-        import probdiffeq.impl.blockdiag.factorised_impl
-
-        return probdiffeq.impl.blockdiag.factorised_impl.BlockDiag(ode_shape=ode_shape)
-    msg1 = f"Implementation '{which}' unknown. "
-    msg2 = "Choose an implementation out of {scalar, dense, isotropic, blockdiag}."
-    raise ValueError(msg1 + msg2)
-
-
 class Impl:
     """User-facing implementation 'package'.
 
     Wrap a factorised implementations and garnish it with error messages
-    and a "selection" functionality.
+    and a `select()` functionality.
     """
 
     def __init__(self) -> None:
@@ -111,56 +40,169 @@ class Impl:
 
     @property
     def linearise(self) -> _linearise.LinearisationBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.linearise()
+        if self._fact is not None:
+            return self._fact.linearise
+
+        raise ValueError(self.error_msg())
 
     @property
     def conditional(self) -> _conditional.ConditionalBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.conditional()
+        if self._fact is not None:
+            return self._fact.conditional
+        raise ValueError(self.error_msg())
 
     @property
     def transform(self) -> _transform.TransformBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.transform()
+        if self._fact is not None:
+            return self._fact.transform
+        raise ValueError(self.error_msg())
 
     @property
     def ssm_util(self) -> _ssm_util.SSMUtilBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.ssm_util()
+        if self._fact is not None:
+            return self._fact.ssm_util
+        raise ValueError(self.error_msg())
 
     @property
     def prototypes(self) -> _prototypes.PrototypeBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.prototypes()
+        if self._fact is not None:
+            return self._fact.prototypes
+        raise ValueError(self.error_msg())
 
     @property
     def variable(self) -> _variable.VariableBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.variable()
+        if self._fact is not None:
+            return self._fact.variable
+        raise ValueError(self.error_msg())
 
     @property
     def hidden_model(self) -> _hidden_model.HiddenModelBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.hidden_model()
+        if self._fact is not None:
+            return self._fact.hidden_model
+        raise ValueError(self.error_msg())
 
     @property
     def stats(self) -> _stats.StatsBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
-        return self._fact.stats()
+        if self._fact is not None:
+            return self._fact.stats
+        raise ValueError(self.error_msg())
+
+    @staticmethod
+    def error_msg():
+        return "Select a factorisation first."
+
+
+@containers.dataclass
+class FactorisedImpl:
+    prototypes: _prototypes.PrototypeBackend
+    ssm_util: _ssm_util.SSMUtilBackend
+    variable: _variable.VariableBackend
+    stats: _stats.StatsBackend
+    linearise: _linearise.LinearisationBackend
+    conditional: _conditional.ConditionalBackend
+    transform: _transform.TransformBackend
+    hidden_model: _hidden_model.HiddenModelBackend
+
+
+def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
+    if which == "scalar":
+        return _select_scalar()
+
+    if ode_shape is None:
+        msg = "Please provide an ODE shape."
+        raise ValueError(msg)
+
+    if which == "dense":
+        return _select_dense(ode_shape=ode_shape)
+    if which == "isotropic":
+        return _select_isotropic(ode_shape=ode_shape)
+    if which == "blockdiag":
+        return _select_blockdiag(ode_shape=ode_shape)
+
+    msg1 = f"Implementation '{which}' unknown. "
+    msg2 = "Choose an implementation out of {scalar, dense, isotropic, blockdiag}."
+    raise ValueError(msg1 + msg2)
+
+
+def _select_scalar() -> FactorisedImpl:
+    prototypes = _prototypes.ScalarPrototype()
+    ssm_util = _ssm_util.ScalarSSMUtil()
+    variable = _variable.ScalarVariable()
+    stats = _stats.ScalarStats()
+    linearise = _linearise.ScalarLinearisation()
+    conditional = _conditional.ScalarConditional()
+    transform = _transform.ScalarTransform()
+    hidden_model = _hidden_model.ScalarHiddenModel()
+    return FactorisedImpl(
+        prototypes=prototypes,
+        ssm_util=ssm_util,
+        variable=variable,
+        stats=stats,
+        linearise=linearise,
+        conditional=conditional,
+        transform=transform,
+        hidden_model=hidden_model,
+    )
+
+
+def _select_dense(*, ode_shape) -> FactorisedImpl:
+    prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
+    ssm_util = _ssm_util.DenseSSMUtil(ode_shape=ode_shape)
+    linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
+    stats = _stats.DenseStats(ode_shape=ode_shape)
+    conditional = _conditional.DenseConditional()
+    transform = _transform.DenseTransform()
+    variable = _variable.DenseVariable(ode_shape=ode_shape)
+    hidden_model = _hidden_model.DenseHiddenModel(ode_shape=ode_shape)
+    return FactorisedImpl(
+        linearise=linearise,
+        transform=transform,
+        conditional=conditional,
+        ssm_util=ssm_util,
+        prototypes=prototypes,
+        variable=variable,
+        hidden_model=hidden_model,
+        stats=stats,
+    )
+
+
+def _select_isotropic(*, ode_shape) -> FactorisedImpl:
+    prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
+    ssm_util = _ssm_util.IsotropicSSMUtil(ode_shape=ode_shape)
+    variable = _variable.IsotropicVariable(ode_shape=ode_shape)
+    stats = _stats.IsotropicStats(ode_shape=ode_shape)
+    linearise = _linearise.IsotropicLinearisation()
+    conditional = _conditional.IsotropicConditional()
+    transform = _transform.IsotropicTransform()
+    hidden_model = _hidden_model.IsotropicHiddenModel(ode_shape=ode_shape)
+    return FactorisedImpl(
+        prototypes=prototypes,
+        ssm_util=ssm_util,
+        variable=variable,
+        stats=stats,
+        linearise=linearise,
+        conditional=conditional,
+        transform=transform,
+        hidden_model=hidden_model,
+    )
+
+
+def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
+    prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
+    ssm_util = _ssm_util.BlockDiagSSMUtil(ode_shape=ode_shape)
+    variable = _variable.BlockDiagVariable(ode_shape=ode_shape)
+    stats = _stats.BlockDiagStats(ode_shape=ode_shape)
+    linearise = _linearise.BlockDiagLinearisation()
+    conditional = _conditional.BlockDiagConditional()
+    transform = _transform.BlockDiagTransform(ode_shape=ode_shape)
+    hidden_model = _hidden_model.BlockDiagHiddenModel(ode_shape=ode_shape)
+    return FactorisedImpl(
+        prototypes=prototypes,
+        ssm_util=ssm_util,
+        variable=variable,
+        stats=stats,
+        linearise=linearise,
+        conditional=conditional,
+        transform=transform,
+        hidden_model=hidden_model,
+    )

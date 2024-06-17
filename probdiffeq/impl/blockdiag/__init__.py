@@ -1,1 +1,0 @@
-"""Block-diagonal models."""
