@@ -89,11 +89,11 @@ class FactorisedImpl:
     prototypes: _prototypes.PrototypeBackend
     ssm_util: _ssm_util.SSMUtilBackend
     variable: _variable.VariableBackend
+    stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend = None
     transform: _transform.TransformBackend = None
     conditional: _conditional.ConditionalBackend = None
     hidden_model: _hidden_model.HiddenModelBackend = None
-    stats: _stats.StatsBackend = None
 
 
 def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
@@ -183,4 +183,7 @@ def _select_blockdiag(*, ode_shape):
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     ssm_util = _ssm_util.BlockDiagSSMUtil(ode_shape=ode_shape)
     variable = _variable.BlockDiagVariable(ode_shape=ode_shape)
-    return FactorisedImpl(prototypes=prototypes, ssm_util=ssm_util, variable=variable)
+    stats = _stats.BlockDiagStats(ode_shape=ode_shape)
+    return FactorisedImpl(
+        prototypes=prototypes, ssm_util=ssm_util, variable=variable, stats=stats
+    )
