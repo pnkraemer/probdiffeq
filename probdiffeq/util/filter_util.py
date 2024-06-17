@@ -57,9 +57,9 @@ def fixedpointsmoother_precon():
         rv, conditional_rev = state
 
         # Extrapolate
-        rv = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv = impl.normal.preconditioner_apply(rv, p_inv)
         rv, conditional_new = impl.conditional.revert(rv, conditional)
-        rv = impl.ssm_util.preconditioner_apply(rv, p)
+        rv = impl.normal.preconditioner_apply(rv, p)
         conditional_new = impl.conditional.preconditioner_apply(
             conditional_new, p, p_inv
         )

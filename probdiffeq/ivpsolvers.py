@@ -257,7 +257,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         self.num_derivatives = num_derivatives
 
     def initial_condition(self, tcoeffs, /):
-        rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        rv = impl.normal.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
@@ -270,12 +270,12 @@ class _PreconSmoother(_ExtrapolationImpl):
     def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
-        rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = impl.normal.preconditioner_apply(rv, p_inv)
 
         m_p = impl.stats.mean(rv_p)
         extrapolated_p = impl.conditional.apply(m_p, cond)
 
-        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
@@ -286,7 +286,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         A, noise = cond
         noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
-        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
         cond = impl.conditional.preconditioner_apply(cond_p, p, p_inv)
 
         # Gather and return
@@ -350,7 +350,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         self.num_derivatives = num_derivatives
 
     def initial_condition(self, tcoeffs, /):
-        rv = impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        rv = impl.normal.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
@@ -363,12 +363,12 @@ class _PreconFixedPoint(_ExtrapolationImpl):
     def begin(self, rv, extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
-        rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = impl.normal.preconditioner_apply(rv, p_inv)
 
         m_ext_p = impl.stats.mean(rv_p)
         extrapolated_p = impl.conditional.apply(m_ext_p, cond)
 
-        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p, extra)
         return extrapolated, cache
 
@@ -379,7 +379,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         A, noise = cond
         noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
-        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
         cond = impl.conditional.preconditioner_apply(cond_p, p, p_inv)
 
         # Merge conditionals
@@ -478,7 +478,7 @@ class _PreconFilter(_ExtrapolationImpl):
         self.num_derivatives = num_derivatives
 
     def initial_condition(self, tcoeffs, /):
-        return impl.ssm_util.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
+        return impl.normal.normal_from_tcoeffs(tcoeffs, self.num_derivatives)
 
     def init(self, sol, /):
         return sol, None
@@ -489,12 +489,12 @@ class _PreconFilter(_ExtrapolationImpl):
     def begin(self, rv, _extra, /, dt):
         cond, (p, p_inv) = self.discretise(dt)
 
-        rv_p = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv_p = impl.normal.preconditioner_apply(rv, p_inv)
 
         m_ext_p = impl.stats.mean(rv_p)
         extrapolated_p = impl.conditional.apply(m_ext_p, cond)
 
-        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
@@ -505,7 +505,7 @@ class _PreconFilter(_ExtrapolationImpl):
         A, noise = cond
         noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p = impl.conditional.marginalise(rv_p, (A, noise))
-        extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
+        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
 
         # Gather and return
         return extrapolated, None
@@ -639,7 +639,7 @@ def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = impl.ssm_util.standard_normal(num_derivatives + 1, output_scale=output_scale)
+    init = impl.normal.standard_normal(num_derivatives + 1, output_scale=output_scale)
     return stats.MarkovSeq(init, conditionals)
 
 
@@ -946,7 +946,7 @@ class _RunningMean(_Calibration):
         prior, calibrated, num_data = state
 
         new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
-        calibrated = impl.ssm_util.update_mean(calibrated, new_term, num=num_data)
+        calibrated = impl.normal.update_mean(calibrated, new_term, num=num_data)
         return prior, calibrated, num_data + 1.0
 
     def extract(self, state, /):

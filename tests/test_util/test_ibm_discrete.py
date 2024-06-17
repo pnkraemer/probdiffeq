@@ -11,7 +11,7 @@ def test_marginal_moments_are_correct(num_derivatives=2):
     t0, t1 = 0.0, 3.4123412
     grid = np.linspace(t0, t1, endpoint=True, num=20)
 
-    init = impl.ssm_util.standard_normal(num_derivatives + 1, output_scale)
+    init = impl.normal.standard_normal(num_derivatives + 1, output_scale)
     discretise = impl.conditional.ibm_transitions(num_derivatives, output_scale)
     transitions = functools.vmap(discretise)(np.diff(grid))
 
@@ -31,9 +31,9 @@ def test_marginal_moments_are_correct(num_derivatives=2):
 def _marginal_moments(init, transitions):
     def step(rv, model):
         cond, (p, p_inv) = model
-        rv = impl.ssm_util.preconditioner_apply(rv, p_inv)
+        rv = impl.normal.preconditioner_apply(rv, p_inv)
         rv = impl.conditional.marginalise(rv, cond)
-        rv = impl.ssm_util.preconditioner_apply(rv, p)
+        rv = impl.normal.preconditioner_apply(rv, p)
         return rv, rv
 
     _, rvs = control_flow.scan(step, init=init, xs=transitions, reverse=False)

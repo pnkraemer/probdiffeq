@@ -188,7 +188,8 @@ class DenseConditional(ConditionalBackend):
 
     def preconditioner_apply(self, cond, p, p_inv, /):
         A, noise = cond
-        noise = self.preconditioner_apply(noise, p)
+        normal = _normal.DenseNormal(ode_shape=self.ode_shape)
+        noise = normal.preconditioner_apply(noise, p)
         A = p[:, None] * A * p_inv[None, :]
         return Conditional(A, noise)
 
@@ -353,7 +354,9 @@ class BlockDiagConditional(ConditionalBackend):
     def preconditioner_apply(self, cond, p, p_inv, /):
         A, noise = cond
         A_new = p[None, :, None] * A * p_inv[None, None, :]
-        noise = self.preconditioner_apply(noise, p)
+
+        normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
+        noise = normal.preconditioner_apply(noise, p)
         return Conditional(A_new, noise)
 
 
