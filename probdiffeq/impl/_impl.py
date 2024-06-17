@@ -40,71 +40,60 @@ class Impl:
 
     @property
     def linearise(self) -> _linearise.LinearisationBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.linearise
 
     @property
     def conditional(self) -> _conditional.ConditionalBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.conditional
 
     @property
     def transform(self) -> _transform.TransformBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.transform
 
     @property
     def ssm_util(self) -> _ssm_util.SSMUtilBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.ssm_util
 
     @property
     def prototypes(self) -> _prototypes.PrototypeBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.prototypes
 
     @property
     def variable(self) -> _variable.VariableBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.variable
 
     @property
     def hidden_model(self) -> _hidden_model.HiddenModelBackend:
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+        self._verify_fact()
         return self._fact.hidden_model
 
     @property
     def stats(self) -> _stats.StatsBackend:
+        self._verify_fact()
+        return self._fact.stats
+
+    def _verify_fact(self):
         if self._fact is None:
             msg = "Select a factorisation first."
             raise ValueError(msg)
-        return self._fact.stats
 
 
 @containers.dataclass
 class FactorisedImpl:
-    linearise: _linearise.LinearisationBackend
-    transform: _transform.TransformBackend
-    conditional: _conditional.ConditionalBackend
-    ssm_util: _ssm_util.SSMUtilBackend
-    prototypes: _prototypes.PrototypeBackend
-    variable: _variable.VariableBackend
-    hidden_model: _hidden_model.HiddenModelBackend
-    stats: _stats.StatsBackend
+    linearise: _linearise.LinearisationBackend = None
+    transform: _transform.TransformBackend = None
+    conditional: _conditional.ConditionalBackend = None
+    ssm_util: _ssm_util.SSMUtilBackend = None
+    prototypes: _prototypes.PrototypeBackend = None
+    variable: _variable.VariableBackend = None
+    hidden_model: _hidden_model.HiddenModelBackend = None
+    stats: _stats.StatsBackend = None
 
 
 def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
@@ -146,3 +135,8 @@ def _select_dense(*, ode_shape):
         hidden_model=hidden_model,
         stats=stats,
     )
+
+
+def _select_isotropic(*, ode_shape):
+    prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
+    return FactorisedImpl(prototypes=prototypes)
