@@ -87,9 +87,9 @@ class DenseNormal(NormalBackend):
         return Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
-        return cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x) / np.sqrt(
-            num + 1
-        )
+        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        denominator = np.sqrt(num + 1)
+        return nominator / denominator
 
 
 class IsotropicNormal(NormalBackend):

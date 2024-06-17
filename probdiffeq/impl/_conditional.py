@@ -3,7 +3,7 @@
 from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Callable
-from probdiffeq.impl import _conditional, _normal
+from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util, linop_util
 
 
@@ -50,7 +50,7 @@ class ScalarTransform(TransformBackend):
         m_cor = rv.mean - gain * (A(rv.mean) + b)
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(A(rv.mean) + b, cholesky_obs)
-        return observed, _conditional.Conditional(gain, corrected)
+        return observed, Conditional(gain, corrected)
 
 
 class DenseTransform(TransformBackend):
@@ -74,7 +74,7 @@ class DenseTransform(TransformBackend):
         m_cor = mean - gain @ (A @ mean + b)
         corrected = _normal.Normal(m_cor, r_cor.T)
         observed = _normal.Normal(A @ mean + b, r_obs.T)
-        return observed, _conditional.Conditional(gain, corrected)
+        return observed, Conditional(gain, corrected)
 
 
 class IsotropicTransform(TransformBackend):
@@ -103,7 +103,7 @@ class IsotropicTransform(TransformBackend):
         m_cor = mean - gain * mean_observed
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, _conditional.Conditional(gain, corrected)
+        return observed, Conditional(gain, corrected)
 
 
 class BlockDiagTransform(TransformBackend):
@@ -134,7 +134,7 @@ class BlockDiagTransform(TransformBackend):
         m_cor = rv.mean - (gain * (mean_observed[..., None]))[..., 0]
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, _conditional.Conditional(gain, corrected)
+        return observed, Conditional(gain, corrected)
 
 
 class Conditional(containers.NamedTuple):
