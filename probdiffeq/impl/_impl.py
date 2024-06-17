@@ -123,6 +123,7 @@ def _select_scalar():
     stats = _stats.ScalarStats()
     linearise = _linearise.ScalarLinearisation()
     conditional = _conditional.ScalarConditional()
+    transform = _transform.ScalarTransform()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -130,6 +131,7 @@ def _select_scalar():
         stats=stats,
         linearise=linearise,
         conditional=conditional,
+        transform=transform,
     )
 
 
