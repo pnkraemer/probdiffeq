@@ -20,7 +20,7 @@ class Impl:
     """User-facing implementation 'package'.
 
     Wrap a factorised implementations and garnish it with error messages
-    and a "selection" functionality.
+    and a `select()` functionality.
     """
 
     def __init__(self) -> None:
@@ -124,7 +124,7 @@ def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
     raise ValueError(msg1 + msg2)
 
 
-def _select_scalar():
+def _select_scalar() -> FactorisedImpl:
     prototypes = _prototypes.ScalarPrototype()
     ssm_util = _ssm_util.ScalarSSMUtil()
     variable = _variable.ScalarVariable()
@@ -145,7 +145,7 @@ def _select_scalar():
     )
 
 
-def _select_dense(*, ode_shape):
+def _select_dense(*, ode_shape) -> FactorisedImpl:
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     ssm_util = _ssm_util.DenseSSMUtil(ode_shape=ode_shape)
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
@@ -166,7 +166,7 @@ def _select_dense(*, ode_shape):
     )
 
 
-def _select_isotropic(*, ode_shape):
+def _select_isotropic(*, ode_shape) -> FactorisedImpl:
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     ssm_util = _ssm_util.IsotropicSSMUtil(ode_shape=ode_shape)
     variable = _variable.IsotropicVariable(ode_shape=ode_shape)
@@ -187,7 +187,7 @@ def _select_isotropic(*, ode_shape):
     )
 
 
-def _select_blockdiag(*, ode_shape):
+def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     ssm_util = _ssm_util.BlockDiagSSMUtil(ode_shape=ode_shape)
     variable = _variable.BlockDiagVariable(ode_shape=ode_shape)
