@@ -626,7 +626,7 @@ def _tensor_points(x, /, *, d):
 def prior_ibm(num_derivatives, output_scale=None):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     output_scale = output_scale or np.ones_like(impl.prototypes.output_scale())
-    discretise = impl.ssm_util.ibm_transitions(num_derivatives, output_scale)
+    discretise = impl.conditional.ibm_transitions(num_derivatives, output_scale)
     return discretise, num_derivatives
 
 

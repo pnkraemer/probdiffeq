@@ -48,7 +48,7 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
     init = (rv_t0, conditional_t0)
 
     # Discretised prior
-    discretise = impl.ssm_util.ibm_transitions(num, 1.0)
+    discretise = impl.conditional.ibm_transitions(num, 1.0)
     ibm_transitions = functools.vmap(discretise)(np.diff(ts))
 
     # Generate an observation-model for the QOI

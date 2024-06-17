@@ -1,6 +1,6 @@
 """Conditionals."""
 
-from probdiffeq.backend import abc, containers, functools, linalg
+from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
@@ -36,6 +36,10 @@ class ConditionalBackend(abc.ABC):
 
     @abc.abstractmethod
     def identity(self, num_derivatives_per_ode_dimension, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ibm_transitions(self, num_derivatives, output_scale=None):
         raise NotImplementedError
 
 
@@ -84,6 +88,19 @@ class ScalarConditional(ConditionalBackend):
         cov_sqrtm = np.zeros((ndim, ndim))
         noise = _normal.Normal(mean, cov_sqrtm)
         return Conditional(transition, noise)
+
+    def ibm_transitions(self, num_derivatives, output_scale=1.0):
+        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+        q0 = np.zeros((num_derivatives + 1,))
+        noise = _normal.Normal(q0, q_sqrtm)
+
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            return Conditional(a, noise), (p, p_inv)
+
+        return discretise
 
 
 class DenseConditional(ConditionalBackend):
@@ -137,6 +154,27 @@ class DenseConditional(ConditionalBackend):
         m = np.zeros((n,))
         C = np.zeros((n, n))
         return Conditional(A, _normal.Normal(m, C))
+
+    def ibm_transitions(self, num_derivatives, output_scale):
+        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+        (d,) = self.ode_shape
+        eye_d = np.eye(d)
+        A = np.kron(eye_d, a)
+        Q = np.kron(eye_d, q_sqrtm)
+
+        ndim = d * (num_derivatives + 1)
+        q0 = np.zeros((ndim,))
+        noise = _normal.Normal(q0, Q)
+
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            p = np.tile(p, d)
+            p_inv = np.tile(p_inv, d)
+            return Conditional(A, noise), (p, p_inv)
+
+        return discretise
 
 
 class IsotropicConditional(ConditionalBackend):
@@ -194,6 +232,18 @@ class IsotropicConditional(ConditionalBackend):
         noise = _normal.Normal(m0, c0)
         matrix = np.eye(num_hidden_states_per_ode_dim)
         return Conditional(matrix, noise)
+
+    def ibm_transitions(self, num_derivatives, output_scale):
+        A, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+        q0 = np.zeros((num_derivatives + 1, *self.ode_shape))
+        noise = _normal.Normal(q0, q_sqrtm)
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            return Conditional(A, noise), (p, p_inv)
+
+        return discretise
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -261,6 +311,62 @@ class BlockDiagConditional(ConditionalBackend):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return Conditional(matrix, noise)
 
+    def ibm_transitions(self, num_derivatives, output_scale):
+        system_matrices = functools.vmap(system_matrices_1d, in_axes=(None, 0))
+        a, q_sqrtm = system_matrices(num_derivatives, output_scale)
+
+        q0 = np.zeros((*self.ode_shape, num_derivatives + 1))
+        noise = _normal.Normal(q0, q_sqrtm)
+
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            return (a, noise), (p, p_inv)
+
+        return discretise
+
 
 def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
+
+
+def system_matrices_1d(num_derivatives, output_scale):
+    """Construct the IBM system matrices."""
+    x = np.arange(0, num_derivatives + 1)
+
+    A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
+    Q_1d = np.flip(_hilbert(x))
+    return A_1d, output_scale * linalg.cholesky_factor(Q_1d)
+
+
+def preconditioner_diagonal(dt, *, scales, powers):
+    """Construct the diagonal IBM preconditioner."""
+    dt_abs = np.abs(dt)
+    scaling_vector = np.power(dt_abs, powers) / scales
+    scaling_vector_inv = np.power(dt_abs, -powers) * scales
+    return scaling_vector, scaling_vector_inv
+
+
+def preconditioner_prepare(*, num_derivatives):
+    powers = np.arange(num_derivatives, -1.0, step=-1.0)
+    scales = np.factorial(powers)
+    powers = powers + 0.5
+    return tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
+
+
+def _hilbert(a):
+    return 1 / (a[:, None] + a[None, :] + 1)
+
+
+def _pascal(a, /):
+    return _batch_gram(_binom)(a[:, None], a[None, :])
+
+
+def _batch_gram(k, /):
+    k_vmapped_x = functools.vmap(k, in_axes=(0, None), out_axes=-1)
+    return functools.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+
+
+def _binom(n, k):
+    return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
