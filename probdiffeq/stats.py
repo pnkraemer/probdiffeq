@@ -51,14 +51,14 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
         conditional, base = conditionals_and_base_samples
 
         rv = impl.conditional.apply(samp_prev, conditional)
-        smp = impl.variable.transform_unit_sample(base, rv)
+        smp = impl.stats.transform_unit_sample(base, rv)
         qoi = impl.hidden_model.qoi_from_sample(smp)
         return (qoi, smp), (qoi, smp)
 
     base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
 
     # Compute a sample at the terminal value
-    init_sample = impl.variable.transform_unit_sample(base_sample_init, markov_seq.init)
+    init_sample = impl.stats.transform_unit_sample(base_sample_init, markov_seq.init)
     init_qoi = impl.hidden_model.qoi_from_sample(init_sample)
     init_val = (init_qoi, init_sample)
 
@@ -262,16 +262,16 @@ def calibrate(x, /, output_scale):
         output_scale = output_scale[-1]
     if isinstance(x, MarkovSeq):
         return _markov_rescale_cholesky(x, output_scale)
-    return impl.variable.rescale_cholesky(x, output_scale)
+    return impl.stats.rescale_cholesky(x, output_scale)
 
 
 def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     """Rescale the Cholesky factor of the covariance of a Markov sequence."""
-    init = impl.variable.rescale_cholesky(markov_seq.init, factor)
+    init = impl.stats.rescale_cholesky(markov_seq.init, factor)
     cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
     return MarkovSeq(init=init, conditional=cond)
 
 
 def _rescale_cholesky_conditional(conditional, factor, /):
-    noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
+    noise_new = impl.stats.rescale_cholesky(conditional.noise, factor)
     return impl.conditional.conditional(conditional.matmul, noise_new)

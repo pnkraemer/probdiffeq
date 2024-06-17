@@ -11,7 +11,7 @@ from tests.setup import setup
 
 def test_logpdf():
     rv = setup.rv()
-    (mean_dense, cov_dense) = impl.variable.to_multivariate_normal(rv)
+    (mean_dense, cov_dense) = impl.stats.to_multivariate_normal(rv)
 
     u = np.ones_like(impl.stats.mean(rv))
     u_dense = np.ones_like(mean_dense)
