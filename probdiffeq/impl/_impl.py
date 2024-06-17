@@ -177,3 +177,8 @@ def _select_isotropic(*, ode_shape):
         transform=transform,
         hidden_model=hidden_model,
     )
+
+
+def _select_blockdiag(*, ode_shape):
+    prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
+    return FactorisedImpl(prototypes=prototypes)
