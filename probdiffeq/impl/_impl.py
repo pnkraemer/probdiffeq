@@ -91,8 +91,8 @@ class FactorisedImpl:
     variable: _variable.VariableBackend
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
+    conditional: _conditional.ConditionalBackend
     transform: _transform.TransformBackend = None
-    conditional: _conditional.ConditionalBackend = None
     hidden_model: _hidden_model.HiddenModelBackend = None
 
 
@@ -185,10 +185,12 @@ def _select_blockdiag(*, ode_shape):
     variable = _variable.BlockDiagVariable(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape)
     linearise = _linearise.BlockDiagLinearisation()
+    conditional = _conditional.BlockDiagConditional()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
         variable=variable,
         stats=stats,
         linearise=linearise,
+        conditional=conditional,
     )
