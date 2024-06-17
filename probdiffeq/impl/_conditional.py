@@ -1,9 +1,17 @@
 """Conditionals."""
 
-from probdiffeq.backend import abc, functools, linalg
+from probdiffeq.backend import abc, containers, functools, linalg
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util, cond_util
+
+
+class Conditional(containers.NamedTuple):
+    """Conditional distributions."""
+
+    matmul: Array  # or anything with a __matmul__ implementation
+    noise: Any  # Usually a random-variable type
 
 
 class ConditionalBackend(abc.ABC):

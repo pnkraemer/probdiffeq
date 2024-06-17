@@ -2,8 +2,8 @@
 
 from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
-from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util, cond_util, ibm_util
+from probdiffeq.impl import _conditional, _normal
+from probdiffeq.util import cholesky_util, ibm_util
 
 
 class SSMUtilBackend(abc.ABC):
@@ -57,7 +57,7 @@ class ScalarSSMUtil(SSMUtilBackend):
         A, noise = cond
         A = p[:, None] * A * p_inv[None, :]
         noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
-        return cond_util.Conditional(A, noise)
+        return _conditional.Conditional(A, noise)
 
     def ibm_transitions(self, num_derivatives, output_scale=1.0):
         a, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
@@ -68,7 +68,7 @@ class ScalarSSMUtil(SSMUtilBackend):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return cond_util.Conditional(a, noise), (p, p_inv)
+            return _conditional.Conditional(a, noise), (p, p_inv)
 
         return discretise
 
@@ -77,7 +77,7 @@ class ScalarSSMUtil(SSMUtilBackend):
         mean = np.zeros((ndim,))
         cov_sqrtm = np.zeros((ndim, ndim))
         noise = _normal.Normal(mean, cov_sqrtm)
-        return cond_util.Conditional(transition, noise)
+        return _conditional.Conditional(transition, noise)
 
     def standard_normal(self, ndim, /, output_scale):
         mean = np.zeros((ndim,))
@@ -110,7 +110,7 @@ class DenseSSMUtil(SSMUtilBackend):
             p, p_inv = precon_fun(dt)
             p = np.tile(p, d)
             p_inv = np.tile(p_inv, d)
-            return cond_util.Conditional(A, noise), (p, p_inv)
+            return _conditional.Conditional(A, noise), (p, p_inv)
 
         return discretise
 
@@ -121,7 +121,7 @@ class DenseSSMUtil(SSMUtilBackend):
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        return cond_util.Conditional(A, _normal.Normal(m, C))
+        return _conditional.Conditional(A, _normal.Normal(m, C))
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -151,7 +151,7 @@ class DenseSSMUtil(SSMUtilBackend):
         A, noise = cond
         noise = self.preconditioner_apply(noise, p)
         A = p[:, None] * A * p_inv[None, :]
-        return cond_util.Conditional(A, noise)
+        return _conditional.Conditional(A, noise)
 
     def standard_normal(self, ndim, /, output_scale):
         eye_n = np.eye(ndim)
@@ -178,7 +178,7 @@ class IsotropicSSMUtil(SSMUtilBackend):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return cond_util.Conditional(A, noise), (p, p_inv)
+            return _conditional.Conditional(A, noise), (p, p_inv)
 
         return discretise
 
@@ -187,7 +187,7 @@ class IsotropicSSMUtil(SSMUtilBackend):
         c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = np.eye(num_hidden_states_per_ode_dim)
-        return cond_util.Conditional(matrix, noise)
+        return _conditional.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -208,7 +208,7 @@ class IsotropicSSMUtil(SSMUtilBackend):
         A_new = p[:, None] * A * p_inv[None, :]
 
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return cond_util.Conditional(A_new, noise)
+        return _conditional.Conditional(A_new, noise)
 
     def standard_normal(self, num, /, output_scale):
         mean = np.zeros((num, *self.ode_shape))
@@ -245,7 +245,7 @@ class BlockDiagSSMUtil(SSMUtilBackend):
         noise = _normal.Normal(m0, c0)
 
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return cond_util.Conditional(matrix, noise)
+        return _conditional.Conditional(matrix, noise)
 
     def normal_from_tcoeffs(self, tcoeffs, /, num_derivatives):
         if len(tcoeffs) != num_derivatives + 1:
@@ -267,7 +267,7 @@ class BlockDiagSSMUtil(SSMUtilBackend):
         A, noise = cond
         A_new = p[None, :, None] * A * p_inv[None, None, :]
         noise = self.preconditioner_apply(noise, p)
-        return cond_util.Conditional(A_new, noise)
+        return _conditional.Conditional(A_new, noise)
 
     def standard_normal(self, ndim, output_scale):
         mean = np.zeros((*self.ode_shape, ndim))
