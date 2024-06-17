@@ -139,4 +139,5 @@ def _select_dense(*, ode_shape):
 
 def _select_isotropic(*, ode_shape):
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
-    return FactorisedImpl(prototypes=prototypes)
+    ssm_util = _ssm_util.IsotropicSSMUtil(ode_shape=ode_shape)
+    return FactorisedImpl(prototypes=prototypes, ssm_util=ssm_util)
