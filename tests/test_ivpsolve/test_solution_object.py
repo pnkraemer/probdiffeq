@@ -101,11 +101,9 @@ def test_marginal_nth_derivative_of_solution(approximate_solution):
     # Assert that the marginals have the same shape as the qoi.
     for i in (0, 1):
         marginals = approximate_solution.marginals
-        derivatives = impl.hidden_model.marginal_nth_derivative(marginals, i)
+        derivatives = impl.stats.marginal_nth_derivative(marginals, i)
         assert derivatives.mean.shape == approximate_solution.u.shape
 
     # if the requested derivative is not in the state-space model, raise a ValueError
     with testing.raises(ValueError):
-        _ = impl.hidden_model.marginal_nth_derivative(
-            approximate_solution.marginals, 100
-        )
+        _ = impl.stats.marginal_nth_derivative(approximate_solution.marginals, 100)

@@ -295,8 +295,8 @@ class _AdaptiveIVPSolver:
             dt=self.control.extract(state_control),
         )
         # Normalise the error
-        u_proposed = impl.hidden_model.qoi(state_proposed.strategy.hidden)
-        u_step_from = impl.hidden_model.qoi(state_proposed.strategy.hidden)
+        u_proposed = impl.stats.qoi(state_proposed.strategy.hidden)
+        u_step_from = impl.stats.qoi(state_proposed.strategy.hidden)
         u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
         error_normalised = self._normalise_error(error_estimate, u=u)
 
@@ -473,7 +473,7 @@ def solve_adaptive_terminal_values(
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
-    u = impl.hidden_model.qoi(marginals)
+    u = impl.stats.qoi(marginals)
     return _Solution(
         t=t1,
         u=u,
@@ -518,7 +518,7 @@ def solve_adaptive_save_at(
     posterior_save_at, output_scale = solution_save_at
     _tmp = _userfriendly_output(posterior=posterior_save_at, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
-    u = impl.hidden_model.qoi(marginals)
+    u = impl.stats.qoi(marginals)
     return _Solution(
         t=save_at,
         u=u,
@@ -608,7 +608,7 @@ def solve_adaptive_save_every_step(
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.hidden_model.qoi(marginals)
+    u = impl.stats.qoi(marginals)
     return _Solution(
         t=t,
         u=u,
@@ -659,7 +659,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.hidden_model.qoi(marginals)
+    u = impl.stats.qoi(marginals)
     return _Solution(
         t=grid,
         u=u,

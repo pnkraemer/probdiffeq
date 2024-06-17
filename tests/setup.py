@@ -39,7 +39,7 @@ class _Setup:
 
     def rv(self):
         output_scale = np.ones_like(impl.prototypes.output_scale())
-        discretise_func = impl.ssm_util.ibm_transitions(3, output_scale)
+        discretise_func = impl.conditional.ibm_transitions(3, output_scale)
         (_matrix, rv), _pre = discretise_func(0.5)
         return rv
 

@@ -73,9 +73,7 @@ markov_seq_prior = stats.MarkovSeq(init_raw, transitions)
 tcoeffs = taylor.odejet_padded_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
-init_tcoeffs = impl.ssm_util.normal_from_tcoeffs(
-    tcoeffs, num_derivatives=NUM_DERIVATIVES
-)
+init_tcoeffs = impl.normal.from_tcoeffs(tcoeffs, num_derivatives=NUM_DERIVATIVES)
 markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 
 # +

@@ -43,19 +43,17 @@ def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
 
     # Initial condition
     estimator = filter_util.fixedpointsmoother_precon()
-    rv_t0 = impl.ssm_util.standard_normal(num + 1, 1.0)
-    conditional_t0 = impl.ssm_util.identity_conditional(num + 1)
+    rv_t0 = impl.normal.standard(num + 1, 1.0)
+    conditional_t0 = impl.conditional.identity(num + 1)
     init = (rv_t0, conditional_t0)
 
     # Discretised prior
-    discretise = impl.ssm_util.ibm_transitions(num, 1.0)
+    discretise = impl.conditional.ibm_transitions(num, 1.0)
     ibm_transitions = functools.vmap(discretise)(np.diff(ts))
 
     # Generate an observation-model for the QOI
     # (1e-7 observation noise for nuggets and for reusing existing code)
-    model_fun = functools.vmap(
-        impl.hidden_model.conditional_to_derivative, in_axes=(None, 0)
-    )
+    model_fun = functools.vmap(impl.conditional.to_derivative, in_axes=(None, 0))
     models = model_fun(0, 1e-7 * np.ones_like(ts))
 
     # Run the preconditioned fixedpoint smoother

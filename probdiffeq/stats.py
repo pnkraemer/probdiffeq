@@ -52,14 +52,14 @@ def _transform_unit_sample(markov_seq, base_sample, /, reverse):
 
         rv = impl.conditional.apply(samp_prev, conditional)
         smp = impl.stats.transform_unit_sample(base, rv)
-        qoi = impl.hidden_model.qoi_from_sample(smp)
+        qoi = impl.stats.qoi_from_sample(smp)
         return (qoi, smp), (qoi, smp)
 
     base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
 
     # Compute a sample at the terminal value
     init_sample = impl.stats.transform_unit_sample(base_sample_init, markov_seq.init)
-    init_qoi = impl.hidden_model.qoi_from_sample(init_sample)
+    init_qoi = impl.stats.qoi_from_sample(init_sample)
     init_val = (init_qoi, init_sample)
 
     # Loop over backward models and the remaining base samples
@@ -178,7 +178,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         raise ValueError(msg)
 
     # Generate an observation-model for the QOI
-    model = impl.hidden_model.conditional_to_derivative(0, standard_deviation)
+    model = impl.conditional.to_derivative(0, standard_deviation)
     rv = posterior.init if isinstance(posterior, MarkovSeq) else posterior
 
     _corrected, logpdf = _condition_and_logpdf(rv, u, model)
@@ -234,9 +234,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         raise TypeError(msg1 + msg2)
 
     # Generate an observation-model for the QOI
-    model_fun = functools.vmap(
-        impl.hidden_model.conditional_to_derivative, in_axes=(None, 0)
-    )
+    model_fun = functools.vmap(impl.conditional.to_derivative, in_axes=(None, 0))
     models = model_fun(0, standard_deviation)
 
     # Select the terminal variable

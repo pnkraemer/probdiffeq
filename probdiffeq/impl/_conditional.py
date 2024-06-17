@@ -1,10 +1,140 @@
 """Conditionals."""
 
-from probdiffeq.backend import abc, containers, functools, linalg
+from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Array
+from probdiffeq.backend.typing import Any, Array, Callable
 from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util
+from probdiffeq.util import cholesky_util, linop_util
+
+
+class Transformation(containers.NamedTuple):
+    matmul: Callable
+    bias: Array
+
+
+class TransformBackend(abc.ABC):
+    @abc.abstractmethod
+    def marginalise(self, rv, transformation, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def revert(self, rv, transformation, /):
+        raise NotImplementedError
+
+
+class ScalarTransform(TransformBackend):
+    def marginalise(self, rv, transformation, /):
+        # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
+        matmul, b = transformation
+        cholesky_new = cholesky_util.triu_via_qr(matmul(rv.cholesky)[:, None])
+        cholesky_new_squeezed = np.reshape(cholesky_new, ())
+        return _normal.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
+
+    def revert(self, rv, transformation, /):
+        # Assumes that A maps a vector to a scalar...
+
+        # Extract information
+        A, b = transformation
+
+        # QR-decomposition
+        # (todo: rename revert_conditional_noisefree
+        #  to transformation_revert_cov_sqrt())
+        r_obs, (r_cor, gain) = cholesky_util.revert_conditional_noisefree(
+            R_X_F=A(rv.cholesky)[:, None], R_X=rv.cholesky.T
+        )
+        cholesky_obs = np.reshape(r_obs, ())
+        cholesky_cor = r_cor.T
+        gain = np.squeeze_along_axis(gain, axis=-1)
+
+        # Gather terms and return
+        m_cor = rv.mean - gain * (A(rv.mean) + b)
+        corrected = _normal.Normal(m_cor, cholesky_cor)
+        observed = _normal.Normal(A(rv.mean) + b, cholesky_obs)
+        return observed, Conditional(gain, corrected)
+
+
+class DenseTransform(TransformBackend):
+    def marginalise(self, rv, transformation, /):
+        A, b = transformation
+        cholesky_new = cholesky_util.triu_via_qr((A @ rv.cholesky).T).T
+        return _normal.Normal(A @ rv.mean + b, cholesky_new)
+
+    def revert(self, rv, transformation, /):
+        A, b = transformation
+        mean, cholesky = rv.mean, rv.cholesky
+
+        # QR-decomposition
+        # (todo: rename revert_conditional_noisefree to
+        #   revert_transformation_cov_sqrt())
+        r_obs, (r_cor, gain) = cholesky_util.revert_conditional_noisefree(
+            R_X_F=(A @ cholesky).T, R_X=cholesky.T
+        )
+
+        # Gather terms and return
+        m_cor = mean - gain @ (A @ mean + b)
+        corrected = _normal.Normal(m_cor, r_cor.T)
+        observed = _normal.Normal(A @ mean + b, r_obs.T)
+        return observed, Conditional(gain, corrected)
+
+
+class IsotropicTransform(TransformBackend):
+    def marginalise(self, rv, transformation, /):
+        A, b = transformation
+        mean, cholesky = rv.mean, rv.cholesky
+        cholesky_new = cholesky_util.triu_via_qr((A @ cholesky).T)
+        cholesky_squeezed = np.reshape(cholesky_new, ())
+        return _normal.Normal((A @ mean) + b, cholesky_squeezed)
+
+    def revert(self, rv, transformation, /):
+        A, b = transformation
+        mean, cholesky = rv.mean, rv.cholesky
+
+        # QR-decomposition
+        # (todo: rename revert_conditional_noisefree
+        #   to revert_transformation_cov_sqrt())
+        r_obs, (r_cor, gain) = cholesky_util.revert_conditional_noisefree(
+            R_X_F=(A @ cholesky).T, R_X=cholesky.T
+        )
+        cholesky_obs = np.reshape(r_obs, ())
+        cholesky_cor = r_cor.T
+
+        # Gather terms and return
+        mean_observed = A @ mean + b
+        m_cor = mean - gain * mean_observed
+        corrected = _normal.Normal(m_cor, cholesky_cor)
+        observed = _normal.Normal(mean_observed, cholesky_obs)
+        return observed, Conditional(gain, corrected)
+
+
+class BlockDiagTransform(TransformBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
+    def marginalise(self, rv, transformation, /):
+        A, b = transformation
+        mean, cholesky = rv.mean, rv.cholesky
+
+        A_cholesky = A @ cholesky
+        cholesky = functools.vmap(cholesky_util.triu_via_qr)(_transpose(A_cholesky))
+        mean = A @ mean + b
+        return _normal.Normal(mean, cholesky)
+
+    def revert(self, rv, transformation, /):
+        A, bias = transformation
+        cholesky_upper = np.transpose(rv.cholesky, axes=(0, -1, -2))
+        A_cholesky_upper = _transpose(A @ rv.cholesky)
+
+        revert_fun = functools.vmap(cholesky_util.revert_conditional_noisefree)
+        r_obs, (r_cor, gain) = revert_fun(A_cholesky_upper, cholesky_upper)
+        cholesky_obs = _transpose(r_obs)
+        cholesky_cor = _transpose(r_cor)
+
+        # Gather terms and return
+        mean_observed = (A @ rv.mean) + bias
+        m_cor = rv.mean - (gain * (mean_observed[..., None]))[..., 0]
+        corrected = _normal.Normal(m_cor, cholesky_cor)
+        observed = _normal.Normal(mean_observed, cholesky_obs)
+        return observed, Conditional(gain, corrected)
 
 
 class Conditional(containers.NamedTuple):
@@ -33,6 +163,22 @@ class ConditionalBackend(abc.ABC):
 
     def conditional(self, matmul, noise):
         return Conditional(matmul, noise)
+
+    @abc.abstractmethod
+    def identity(self, num_derivatives_per_ode_dimension, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ibm_transitions(self, num_derivatives, output_scale=None):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def to_derivative(self, i, standard_deviation):
+        raise NotImplementedError
 
 
 class ScalarConditional(ConditionalBackend):
@@ -74,8 +220,47 @@ class ScalarConditional(ConditionalBackend):
         noise = _normal.Normal(xi, Xi)
         return Conditional(g, noise)
 
+    def identity(self, ndim, /) -> Conditional:
+        transition = np.eye(ndim)
+        mean = np.zeros((ndim,))
+        cov_sqrtm = np.zeros((ndim, ndim))
+        noise = _normal.Normal(mean, cov_sqrtm)
+        return Conditional(transition, noise)
+
+    def ibm_transitions(self, num_derivatives, output_scale=1.0):
+        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+        q0 = np.zeros((num_derivatives + 1,))
+        noise = _normal.Normal(q0, q_sqrtm)
+
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            return Conditional(a, noise), (p, p_inv)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+        A = p[:, None] * A * p_inv[None, :]
+        noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
+        return Conditional(A, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[[i], ...]
+
+        bias = np.zeros(())
+        eye = np.eye(1)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return Conditional(linop, noise)
+
 
 class DenseConditional(ConditionalBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def apply(self, x, conditional, /):
         matrix, noise = conditional
         return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
@@ -115,8 +300,75 @@ class DenseConditional(ConditionalBackend):
         observed = _normal.Normal(mean_observed, r_obs.T)
         return observed, Conditional(gain, corrected)
 
+    def identity(self, ndim, /) -> Conditional:
+        (d,) = self.ode_shape
+        n = ndim * d
+
+        A = np.eye(n)
+        m = np.zeros((n,))
+        C = np.zeros((n, n))
+        return Conditional(A, _normal.Normal(m, C))
+
+    def ibm_transitions(self, num_derivatives, output_scale):
+        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+        (d,) = self.ode_shape
+        eye_d = np.eye(d)
+        A = np.kron(eye_d, a)
+        Q = np.kron(eye_d, q_sqrtm)
+
+        ndim = d * (num_derivatives + 1)
+        q0 = np.zeros((ndim,))
+        noise = _normal.Normal(q0, Q)
+
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            p = np.tile(p, d)
+            p_inv = np.tile(p_inv, d)
+            return Conditional(A, noise), (p, p_inv)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+        normal = _normal.DenseNormal(ode_shape=self.ode_shape)
+        noise = normal.preconditioner_apply(noise, p)
+        A = p[:, None] * A * p_inv[None, :]
+        return Conditional(A, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        a0 = functools.partial(self._select, idx_or_slice=i)
+
+        (d,) = self.ode_shape
+        bias = np.zeros((d,))
+        eye = np.eye(d)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(
+            lambda s, _p: self._autobatch_linop(a0)(s)
+        )
+        return Conditional(linop, noise)
+
+    def _select(self, x, /, idx_or_slice):
+        x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
+        if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
+            raise ValueError
+        return x_reshaped[idx_or_slice]
+
+    @staticmethod
+    def _autobatch_linop(fun):
+        def fun_(x):
+            if np.ndim(x) > 1:
+                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
+            return fun(x)
+
+        return fun_
+
 
 class IsotropicConditional(ConditionalBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def apply(self, x, conditional, /):
         A, noise = conditional
         # if the gain is qoi-to-hidden, the data is a (d,) array.
@@ -162,8 +414,48 @@ class IsotropicConditional(ConditionalBackend):
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
         return extrapolated, Conditional(gain, corrected)
 
+    def identity(self, num_hidden_states_per_ode_dim, /) -> Conditional:
+        m0 = np.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
+        c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
+        noise = _normal.Normal(m0, c0)
+        matrix = np.eye(num_hidden_states_per_ode_dim)
+        return Conditional(matrix, noise)
+
+    def ibm_transitions(self, num_derivatives, output_scale):
+        A, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+        q0 = np.zeros((num_derivatives + 1, *self.ode_shape))
+        noise = _normal.Normal(q0, q_sqrtm)
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            return Conditional(A, noise), (p, p_inv)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+
+        A_new = p[:, None] * A * p_inv[None, :]
+
+        noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
+        return Conditional(A_new, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[[i], ...]
+
+        bias = np.zeros(self.ode_shape)
+        eye = np.eye(1)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return Conditional(linop, noise)
+
 
 class BlockDiagConditional(ConditionalBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
     def apply(self, x, conditional, /):
         if np.ndim(x) == 1:
             x = x[..., None]
@@ -217,6 +509,88 @@ class BlockDiagConditional(ConditionalBackend):
         observed = _normal.Normal(mean_observed, cholesky_obs)
         return observed, Conditional(gain, corrected)
 
+    def identity(self, ndim, /) -> Conditional:
+        m0 = np.zeros((*self.ode_shape, ndim))
+        c0 = np.zeros((*self.ode_shape, ndim, ndim))
+        noise = _normal.Normal(m0, c0)
+
+        matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        return Conditional(matrix, noise)
+
+    def ibm_transitions(self, num_derivatives, output_scale):
+        system_matrices = functools.vmap(system_matrices_1d, in_axes=(None, 0))
+        a, q_sqrtm = system_matrices(num_derivatives, output_scale)
+
+        q0 = np.zeros((*self.ode_shape, num_derivatives + 1))
+        noise = _normal.Normal(q0, q_sqrtm)
+
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+
+        def discretise(dt):
+            p, p_inv = precon_fun(dt)
+            return (a, noise), (p, p_inv)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+        A_new = p[None, :, None] * A * p_inv[None, None, :]
+
+        normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
+        noise = normal.preconditioner_apply(noise, p)
+        return Conditional(A_new, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[:, [i], ...]
+
+        bias = np.zeros((*self.ode_shape, 1))
+        eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return Conditional(linop, noise)
+
 
 def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
+
+
+def system_matrices_1d(num_derivatives, output_scale):
+    """Construct the IBM system matrices."""
+    x = np.arange(0, num_derivatives + 1)
+
+    A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
+    Q_1d = np.flip(_hilbert(x))
+    return A_1d, output_scale * linalg.cholesky_factor(Q_1d)
+
+
+def preconditioner_diagonal(dt, *, scales, powers):
+    """Construct the diagonal IBM preconditioner."""
+    dt_abs = np.abs(dt)
+    scaling_vector = np.power(dt_abs, powers) / scales
+    scaling_vector_inv = np.power(dt_abs, -powers) * scales
+    return scaling_vector, scaling_vector_inv
+
+
+def preconditioner_prepare(*, num_derivatives):
+    powers = np.arange(num_derivatives, -1.0, step=-1.0)
+    scales = np.factorial(powers)
+    powers = powers + 0.5
+    return tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
+
+
+def _hilbert(a):
+    return 1 / (a[:, None] + a[None, :] + 1)
+
+
+def _pascal(a, /):
+    return _batch_gram(_binom)(a[:, None], a[None, :])
+
+
+def _batch_gram(k, /):
+    k_vmapped_x = functools.vmap(k, in_axes=(0, None), out_axes=-1)
+    return functools.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+
+
+def _binom(n, k):
+    return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
