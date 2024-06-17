@@ -121,8 +121,13 @@ def _select_scalar():
     ssm_util = _ssm_util.ScalarSSMUtil()
     variable = _variable.ScalarVariable()
     stats = _stats.ScalarStats()
+    linearise = _linearise.ScalarLinearisation()
     return FactorisedImpl(
-        prototypes=prototypes, ssm_util=ssm_util, variable=variable, stats=stats
+        prototypes=prototypes,
+        ssm_util=ssm_util,
+        variable=variable,
+        stats=stats,
+        linearise=linearise,
     )
 
 

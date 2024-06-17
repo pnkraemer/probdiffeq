@@ -22,6 +22,28 @@ class LinearisationBackend(abc.ABC):
         raise NotImplementedError
 
 
+class ScalarLinearisation(LinearisationBackend):
+    def ode_taylor_0th(self, ode_order):
+        def linearise_fun_wrapped(fun, mean):
+            fx = self.ts0(fun, mean[:ode_order])
+            return lambda s: s[ode_order], -fx
+
+        return linearise_fun_wrapped
+
+    def ode_taylor_1st(self, ode_order):
+        raise NotImplementedError
+
+    def ode_statistical_1st(self, cubature_fun):
+        raise NotImplementedError
+
+    def ode_statistical_0th(self, cubature_fun):
+        raise NotImplementedError
+
+    @staticmethod
+    def ts0(fn, m):
+        return fn(m)
+
+
 class DenseLinearisation(LinearisationBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
