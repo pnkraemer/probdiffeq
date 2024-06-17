@@ -946,7 +946,7 @@ class _RunningMean(_Calibration):
         prior, calibrated, num_data = state
 
         new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
-        calibrated = impl.normal.update_mean(calibrated, new_term, num=num_data)
+        calibrated = impl.stats.update_mean(calibrated, new_term, num=num_data)
         return prior, calibrated, num_data + 1.0
 
     def extract(self, state, /):

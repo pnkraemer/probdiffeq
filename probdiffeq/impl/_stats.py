@@ -49,6 +49,10 @@ class StatsBackend(abc.ABC):
     def qoi_from_sample(self, sample, /):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def update_mean(self, mean, x, /, num):
+        raise NotImplementedError
+
 
 class ScalarStats(StatsBackend):
     def mahalanobis_norm_relative(self, u, /, rv):
@@ -108,6 +112,10 @@ class ScalarStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[0]
+
+    def update_mean(self, mean, x, /, num):
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)
 
 
 class DenseStats(StatsBackend):
@@ -192,6 +200,11 @@ class DenseStats(StatsBackend):
 
         return fun_
 
+    def update_mean(self, mean, x, /, num):
+        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        denominator = np.sqrt(num + 1)
+        return nominator / denominator
+
 
 class IsotropicStats(StatsBackend):
     def __init__(self, ode_shape):
@@ -266,6 +279,10 @@ class IsotropicStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[0, :]
+
+    def update_mean(self, mean, x, /, num):
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)
 
 
 class BlockDiagStats(StatsBackend):
@@ -343,3 +360,11 @@ class BlockDiagStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[..., 0]
+
+    def update_mean(self, mean, x, /, num):
+        if np.ndim(mean) > 0:
+            assert np.shape(mean) == np.shape(x)
+            return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
+
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)

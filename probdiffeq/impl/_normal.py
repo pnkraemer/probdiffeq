@@ -1,7 +1,6 @@
-from probdiffeq.backend import abc, containers, functools
+from probdiffeq.backend import abc, containers
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
-from probdiffeq.util import cholesky_util
 
 
 class Normal(containers.NamedTuple):
@@ -15,11 +14,7 @@ class NormalBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def preconditioner_apply(self, rv, p, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def update_mean(self, mean, x, /, num):
+    def preconditioner_apply(self, rv: Normal, p, /) -> Normal:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -45,10 +40,6 @@ class ScalarNormal(NormalBackend):
         mean = np.zeros((ndim,))
         cholesky = output_scale * np.eye(ndim)
         return Normal(mean, cholesky)
-
-    def update_mean(self, mean, x, /, num):
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
 
 
 class DenseNormal(NormalBackend):
@@ -86,11 +77,6 @@ class DenseNormal(NormalBackend):
         mean = np.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
         return Normal(mean, cholesky)
 
-    def update_mean(self, mean, x, /, num):
-        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        denominator = np.sqrt(num + 1)
-        return nominator / denominator
-
 
 class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
@@ -113,10 +99,6 @@ class IsotropicNormal(NormalBackend):
         mean = np.zeros((num, *self.ode_shape))
         cholesky = output_scale * np.eye(num)
         return Normal(mean, cholesky)
-
-    def update_mean(self, mean, x, /, num):
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
 
 
 class BlockDiagNormal(NormalBackend):
@@ -143,11 +125,3 @@ class BlockDiagNormal(NormalBackend):
         mean = np.zeros((*self.ode_shape, ndim))
         cholesky = output_scale[:, None, None] * np.eye(ndim)[None, ...]
         return Normal(mean, cholesky)
-
-    def update_mean(self, mean, x, /, num):
-        if np.ndim(mean) > 0:
-            assert np.shape(mean) == np.shape(x)
-            return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
-
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
