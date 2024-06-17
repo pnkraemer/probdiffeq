@@ -204,7 +204,7 @@ class _Strategy:
             output_scale=output_scale,
         )
 
-        u = impl.hidden_model.qoi(marginals)
+        u = impl.stats.qoi(marginals)
         return u, marginals
 
 

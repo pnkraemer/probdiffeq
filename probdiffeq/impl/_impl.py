@@ -6,7 +6,6 @@ from probdiffeq.backend import containers
 from probdiffeq.backend.typing import Optional
 from probdiffeq.impl import (
     _conditional,
-    _hidden_model,
     _linearise,
     _normal,
     _prototypes,
@@ -69,12 +68,6 @@ class Impl:
         raise ValueError(self.error_msg())
 
     @property
-    def hidden_model(self) -> _hidden_model.HiddenModelBackend:
-        if self._fact is not None:
-            return self._fact.hidden_model
-        raise ValueError(self.error_msg())
-
-    @property
     def stats(self) -> _stats.StatsBackend:
         if self._fact is not None:
             return self._fact.stats
@@ -93,7 +86,6 @@ class FactorisedImpl:
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
     transform: _transform.TransformBackend
-    hidden_model: _hidden_model.HiddenModelBackend
 
 
 def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
@@ -123,7 +115,6 @@ def _select_scalar() -> FactorisedImpl:
     linearise = _linearise.ScalarLinearisation()
     conditional = _conditional.ScalarConditional()
     transform = _transform.ScalarTransform()
-    hidden_model = _hidden_model.ScalarHiddenModel()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -131,7 +122,6 @@ def _select_scalar() -> FactorisedImpl:
         linearise=linearise,
         conditional=conditional,
         transform=transform,
-        hidden_model=hidden_model,
     )
 
 
@@ -142,14 +132,12 @@ def _select_dense(*, ode_shape) -> FactorisedImpl:
     stats = _stats.DenseStats(ode_shape=ode_shape)
     conditional = _conditional.DenseConditional(ode_shape=ode_shape)
     transform = _transform.DenseTransform()
-    hidden_model = _hidden_model.DenseHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
         linearise=linearise,
         transform=transform,
         conditional=conditional,
         ssm_util=ssm_util,
         prototypes=prototypes,
-        hidden_model=hidden_model,
         stats=stats,
     )
 
@@ -161,7 +149,6 @@ def _select_isotropic(*, ode_shape) -> FactorisedImpl:
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional(ode_shape=ode_shape)
     transform = _transform.IsotropicTransform()
-    hidden_model = _hidden_model.IsotropicHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -169,7 +156,6 @@ def _select_isotropic(*, ode_shape) -> FactorisedImpl:
         linearise=linearise,
         conditional=conditional,
         transform=transform,
-        hidden_model=hidden_model,
     )
 
 
@@ -180,7 +166,6 @@ def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
     linearise = _linearise.BlockDiagLinearisation()
     conditional = _conditional.BlockDiagConditional(ode_shape=ode_shape)
     transform = _transform.BlockDiagTransform(ode_shape=ode_shape)
-    hidden_model = _hidden_model.BlockDiagHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -188,5 +173,4 @@ def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
         linearise=linearise,
         conditional=conditional,
         transform=transform,
-        hidden_model=hidden_model,
     )
