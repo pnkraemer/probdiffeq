@@ -55,7 +55,9 @@ class DenseHiddenModel(HiddenModelBackend):
         bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: _autobatch_linop(a0)(s))
+        linop = linop_util.parametrised_linop(
+            lambda s, _p: self._autobatch_linop(a0)(s)
+        )
         return cond_util.Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
@@ -64,11 +66,45 @@ class DenseHiddenModel(HiddenModelBackend):
             raise ValueError
         return x_reshaped[idx_or_slice]
 
+    @staticmethod
+    def _autobatch_linop(fun):
+        def fun_(x):
+            if np.ndim(x) > 1:
+                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
+            return fun(x)
 
-def _autobatch_linop(fun):
-    def fun_(x):
-        if np.ndim(x) > 1:
-            return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
-        return fun(x)
+        return fun_
 
-    return fun_
+
+class IsotropicHiddenModel(HiddenModelBackend):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
+    def qoi(self, rv):
+        return rv.mean[..., 0, :]
+
+    def marginal_nth_derivative(self, rv, i):
+        if np.ndim(rv.mean) > 2:
+            return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
+                rv, i
+            )
+
+        if i > np.shape(rv.mean)[0]:
+            raise ValueError
+
+        mean = rv.mean[i, :]
+        cholesky = cholesky_util.triu_via_qr(rv.cholesky[[i], :].T).T
+        return _normal.Normal(mean, cholesky)
+
+    def qoi_from_sample(self, sample, /):
+        return sample[0, :]
+
+    def conditional_to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[[i], ...]
+
+        bias = np.zeros(self.ode_shape)
+        eye = np.eye(1)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return cond_util.Conditional(linop, noise)

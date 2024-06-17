@@ -145,6 +145,7 @@ def _select_isotropic(*, ode_shape):
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional()
     transform = _transform.IsotropicTransform()
+    hidden_model = _hidden_model.IsotropicHiddenModel(ode_shape=ode_shape)
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -153,4 +154,5 @@ def _select_isotropic(*, ode_shape):
         linearise=linearise,
         conditional=conditional,
         transform=transform,
+        hidden_model=hidden_model,
     )
