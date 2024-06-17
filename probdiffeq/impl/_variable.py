@@ -12,19 +12,12 @@ class VariableBackend(abc.ABC):
     def rescale_cholesky(self, rv, factor, /):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def transform_unit_sample(self, unit_sample, /, rv):
-        raise NotImplementedError
-
 
 class ScalarVariable(VariableBackend):
     def rescale_cholesky(self, rv, factor):
         if np.ndim(factor) > 0:
             return functools.vmap(self.rescale_cholesky)(rv, factor)
         return _normal.Normal(rv.mean, factor * rv.cholesky)
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        return rv.mean + rv.cholesky @ unit_sample
 
     def to_multivariate_normal(self, rv):
         return rv.mean, rv.cholesky @ rv.cholesky.T
@@ -38,9 +31,6 @@ class DenseVariable(VariableBackend):
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 
-    def transform_unit_sample(self, unit_sample, /, rv):
-        return rv.mean + rv.cholesky @ unit_sample
-
     def to_multivariate_normal(self, rv):
         return rv.mean, rv.cholesky @ rv.cholesky.T
 
@@ -52,9 +42,6 @@ class IsotropicVariable(VariableBackend):
     def rescale_cholesky(self, rv, factor, /):
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        return rv.mean + rv.cholesky @ unit_sample
 
     def to_multivariate_normal(self, rv):
         eye_d = np.eye(*self.ode_shape)
@@ -71,9 +58,6 @@ class BlockDiagVariable(VariableBackend):
     def rescale_cholesky(self, rv, factor, /):
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
 
     def to_multivariate_normal(self, rv):
         mean = np.reshape(rv.mean.T, (-1,), order="F")

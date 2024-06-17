@@ -24,6 +24,10 @@ class StatsBackend(abc.ABC):
     def sample_shape(self, rv):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def transform_unit_sample(self, unit_sample, /, rv):
+        raise NotImplementedError
+
 
 class ScalarStats(StatsBackend):
     def mahalanobis_norm_relative(self, u, /, rv):
@@ -52,6 +56,9 @@ class ScalarStats(StatsBackend):
 
     def sample_shape(self, rv):
         return rv.mean.shape
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + rv.cholesky @ unit_sample
 
 
 class DenseStats(StatsBackend):
@@ -89,6 +96,9 @@ class DenseStats(StatsBackend):
 
     def sample_shape(self, rv):
         return rv.mean.shape
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + rv.cholesky @ unit_sample
 
 
 class IsotropicStats(StatsBackend):
@@ -132,6 +142,9 @@ class IsotropicStats(StatsBackend):
     def sample_shape(self, rv):
         return rv.mean.shape
 
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + rv.cholesky @ unit_sample
+
 
 class BlockDiagStats(StatsBackend):
     def __init__(self, ode_shape):
@@ -169,3 +182,6 @@ class BlockDiagStats(StatsBackend):
             return functools.vmap(self.standard_deviation)(rv)
 
         return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
