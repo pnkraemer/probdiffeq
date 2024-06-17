@@ -1,9 +1,9 @@
 """SSM utilities."""
 
-from probdiffeq.backend import abc, functools
+from probdiffeq.backend import abc, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _conditional, _normal
-from probdiffeq.util import cholesky_util, ibm_util
+from probdiffeq.util import cholesky_util
 
 
 class SSMUtilBackend(abc.ABC):
@@ -60,11 +60,11 @@ class ScalarSSMUtil(SSMUtilBackend):
         return _conditional.Conditional(A, noise)
 
     def ibm_transitions(self, num_derivatives, output_scale=1.0):
-        a, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
+        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
         q0 = np.zeros((num_derivatives + 1,))
         noise = _normal.Normal(q0, q_sqrtm)
 
-        precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
@@ -94,7 +94,7 @@ class DenseSSMUtil(SSMUtilBackend):
         self.ode_shape = ode_shape
 
     def ibm_transitions(self, num_derivatives, output_scale):
-        a, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
+        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
         (d,) = self.ode_shape
         eye_d = np.eye(d)
         A = np.kron(eye_d, a)
@@ -104,7 +104,7 @@ class DenseSSMUtil(SSMUtilBackend):
         q0 = np.zeros((ndim,))
         noise = _normal.Normal(q0, Q)
 
-        precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
@@ -171,10 +171,10 @@ class IsotropicSSMUtil(SSMUtilBackend):
         self.ode_shape = ode_shape
 
     def ibm_transitions(self, num_derivatives, output_scale):
-        A, q_sqrtm = ibm_util.system_matrices_1d(num_derivatives, output_scale)
+        A, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
         q0 = np.zeros((num_derivatives + 1, *self.ode_shape))
         noise = _normal.Normal(q0, q_sqrtm)
-        precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
@@ -225,13 +225,13 @@ class BlockDiagSSMUtil(SSMUtilBackend):
         self.ode_shape = ode_shape
 
     def ibm_transitions(self, num_derivatives, output_scale):
-        system_matrices = functools.vmap(ibm_util.system_matrices_1d, in_axes=(None, 0))
+        system_matrices = functools.vmap(system_matrices_1d, in_axes=(None, 0))
         a, q_sqrtm = system_matrices(num_derivatives, output_scale)
 
         q0 = np.zeros((*self.ode_shape, num_derivatives + 1))
         noise = _normal.Normal(q0, q_sqrtm)
 
-        precon_fun = ibm_util.preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
@@ -281,3 +281,44 @@ class BlockDiagSSMUtil(SSMUtilBackend):
 
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
         return sum_updated / np.sqrt(num + 1)
+
+
+def system_matrices_1d(num_derivatives, output_scale):
+    """Construct the IBM system matrices."""
+    x = np.arange(0, num_derivatives + 1)
+
+    A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
+    Q_1d = np.flip(_hilbert(x))
+    return A_1d, output_scale * linalg.cholesky_factor(Q_1d)
+
+
+def preconditioner_diagonal(dt, *, scales, powers):
+    """Construct the diagonal IBM preconditioner."""
+    dt_abs = np.abs(dt)
+    scaling_vector = np.power(dt_abs, powers) / scales
+    scaling_vector_inv = np.power(dt_abs, -powers) * scales
+    return scaling_vector, scaling_vector_inv
+
+
+def preconditioner_prepare(*, num_derivatives):
+    powers = np.arange(num_derivatives, -1.0, step=-1.0)
+    scales = np.factorial(powers)
+    powers = powers + 0.5
+    return tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
+
+
+def _hilbert(a):
+    return 1 / (a[:, None] + a[None, :] + 1)
+
+
+def _pascal(a, /):
+    return _batch_gram(_binom)(a[:, None], a[None, :])
+
+
+def _batch_gram(k, /):
+    k_vmapped_x = functools.vmap(k, in_axes=(0, None), out_axes=-1)
+    return functools.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+
+
+def _binom(n, k):
+    return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
