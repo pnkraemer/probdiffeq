@@ -262,16 +262,16 @@ def calibrate(x, /, output_scale):
         output_scale = output_scale[-1]
     if isinstance(x, MarkovSeq):
         return _markov_rescale_cholesky(x, output_scale)
-    return impl.variable.rescale_cholesky(x, output_scale)
+    return impl.stats.rescale_cholesky(x, output_scale)
 
 
 def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
     """Rescale the Cholesky factor of the covariance of a Markov sequence."""
-    init = impl.variable.rescale_cholesky(markov_seq.init, factor)
+    init = impl.stats.rescale_cholesky(markov_seq.init, factor)
     cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
     return MarkovSeq(init=init, conditional=cond)
 
 
 def _rescale_cholesky_conditional(conditional, factor, /):
-    noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
+    noise_new = impl.stats.rescale_cholesky(conditional.noise, factor)
     return impl.conditional.conditional(conditional.matmul, noise_new)

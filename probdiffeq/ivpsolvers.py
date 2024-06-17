@@ -284,7 +284,7 @@ class _PreconSmoother(_ExtrapolationImpl):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = impl.variable.rescale_cholesky(noise, output_scale)
+        noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
         extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
         cond = impl.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
@@ -377,7 +377,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = impl.variable.rescale_cholesky(noise, output_scale)
+        noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
         extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
         cond = impl.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
@@ -503,7 +503,7 @@ class _PreconFilter(_ExtrapolationImpl):
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = impl.variable.rescale_cholesky(noise, output_scale)
+        noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p = impl.conditional.marginalise(rv_p, (A, noise))
         extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
 
