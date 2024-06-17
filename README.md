@@ -30,7 +30,6 @@ It inherits automatic differentiation, vectorisation, and GPU capability from JA
 * **API DOCUMENTATION:** [LINK](https://pnkraemer.github.io/probdiffeq/api_docs/ivpsolve/)
 * **ISSUE TRACKER:** [LINK](https://github.com/pnkraemer/probdiffeq/issues)
 * **BENCHMARKS:** [LINK](https://pnkraemer.github.io/probdiffeq/benchmarks/lotkavolterra/plot/)
-* **CHANGELOG:** [LINK](https://pnkraemer.github.io/probdiffeq/dev_docs/changelog/)
 
 
 ## Installation

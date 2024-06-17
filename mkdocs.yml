@@ -97,7 +97,6 @@ nav:
       - taylor: api_docs/taylor.md
       - impl: api_docs/impl.md
   - DEVELOPER DOCUMENTATION:
-      - Changelog: dev_docs/changelog.md
       - dev_docs/public_api.md
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md
