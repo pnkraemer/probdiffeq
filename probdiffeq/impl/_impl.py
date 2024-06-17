@@ -144,6 +144,7 @@ def _select_isotropic(*, ode_shape):
     stats = _stats.IsotropicStats(ode_shape=ode_shape)
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional()
+    transform = _transform.IsotropicTransform()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -151,4 +152,5 @@ def _select_isotropic(*, ode_shape):
         stats=stats,
         linearise=linearise,
         conditional=conditional,
+        transform=transform,
     )
