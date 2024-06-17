@@ -87,10 +87,10 @@ class Impl:
 @containers.dataclass
 class FactorisedImpl:
     prototypes: _prototypes.PrototypeBackend
+    ssm_util: _ssm_util.SSMUtilBackend
     linearise: _linearise.LinearisationBackend = None
     transform: _transform.TransformBackend = None
     conditional: _conditional.ConditionalBackend = None
-    ssm_util: _ssm_util.SSMUtilBackend = None
     variable: _variable.VariableBackend = None
     hidden_model: _hidden_model.HiddenModelBackend = None
     stats: _stats.StatsBackend = None
@@ -181,4 +181,5 @@ def _select_isotropic(*, ode_shape):
 
 def _select_blockdiag(*, ode_shape):
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
-    return FactorisedImpl(prototypes=prototypes)
+    ssm_util = _ssm_util.BlockDiagSSMUtil(ode_shape=ode_shape)
+    return FactorisedImpl(prototypes=prototypes, ssm_util=ssm_util)
