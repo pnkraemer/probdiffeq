@@ -274,4 +274,4 @@ def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
 
 def _rescale_cholesky_conditional(conditional, factor, /):
     noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
-    return impl.conditional.Conditional(conditional.matmul, noise_new)
+    return impl.conditional.conditional(conditional.matmul, noise_new)
