@@ -119,7 +119,8 @@ def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
 def _select_scalar():
     prototypes = _prototypes.ScalarPrototype()
     ssm_util = _ssm_util.ScalarSSMUtil()
-    return FactorisedImpl(prototypes=prototypes, ssm_util=ssm_util)
+    variable = _variable.ScalarVariable()
+    return FactorisedImpl(prototypes=prototypes, ssm_util=ssm_util, variable=variable)
 
 
 def _select_dense(*, ode_shape):

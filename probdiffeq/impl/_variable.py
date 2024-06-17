@@ -17,6 +17,19 @@ class VariableBackend(abc.ABC):
         raise NotImplementedError
 
 
+class ScalarVariable(VariableBackend):
+    def rescale_cholesky(self, rv, factor):
+        if np.ndim(factor) > 0:
+            return functools.vmap(self.rescale_cholesky)(rv, factor)
+        return _normal.Normal(rv.mean, factor * rv.cholesky)
+
+    def transform_unit_sample(self, unit_sample, /, rv):
+        return rv.mean + rv.cholesky @ unit_sample
+
+    def to_multivariate_normal(self, rv):
+        return rv.mean, rv.cholesky @ rv.cholesky.T
+
+
 class DenseVariable(VariableBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
