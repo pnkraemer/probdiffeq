@@ -287,7 +287,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
         extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
-        cond = impl.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+        cond = impl.conditional.preconditioner_apply(cond_p, p, p_inv)
 
         # Gather and return
         return extrapolated, cond
@@ -380,7 +380,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         noise = impl.stats.rescale_cholesky(noise, output_scale)
         extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
         extrapolated = impl.ssm_util.preconditioner_apply(extrapolated_p, p)
-        cond = impl.ssm_util.preconditioner_apply_cond(cond_p, p, p_inv)
+        cond = impl.conditional.preconditioner_apply(cond_p, p, p_inv)
 
         # Merge conditionals
         cond = impl.conditional.merge(bw0, cond)
@@ -635,7 +635,7 @@ def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
     discretise, _ = prior_ibm(num_derivatives, output_scale=output_scale)
     transitions, (p, p_inv) = functools.vmap(discretise)(np.diff(ts))
 
-    preconditioner_apply_vmap = functools.vmap(impl.ssm_util.preconditioner_apply_cond)
+    preconditioner_apply_vmap = functools.vmap(impl.conditional.preconditioner_apply)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())

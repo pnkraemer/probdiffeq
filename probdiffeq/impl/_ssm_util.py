@@ -2,7 +2,7 @@
 
 from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
-from probdiffeq.impl import _conditional, _normal
+from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
 
 
@@ -13,10 +13,6 @@ class SSMUtilBackend(abc.ABC):
 
     @abc.abstractmethod
     def preconditioner_apply(self, rv, p, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def preconditioner_apply_cond(self, cond, p, p_inv, /):
         raise NotImplementedError
 
     # TODO: rename to avoid confusion with conditionals?
@@ -42,12 +38,6 @@ class ScalarSSMUtil(SSMUtilBackend):
 
     def preconditioner_apply(self, rv, p, /):
         return _normal.Normal(p * rv.mean, p[:, None] * rv.cholesky)
-
-    def preconditioner_apply_cond(self, cond, p, p_inv, /):
-        A, noise = cond
-        A = p[:, None] * A * p_inv[None, :]
-        noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
-        return _conditional.Conditional(A, noise)
 
     def standard_normal(self, ndim, /, output_scale):
         mean = np.zeros((ndim,))
@@ -87,12 +77,6 @@ class DenseSSMUtil(SSMUtilBackend):
         cholesky = p[:, None] * rv.cholesky
         return _normal.Normal(mean, cholesky)
 
-    def preconditioner_apply_cond(self, cond, p, p_inv, /):
-        A, noise = cond
-        noise = self.preconditioner_apply(noise, p)
-        A = p[:, None] * A * p_inv[None, :]
-        return _conditional.Conditional(A, noise)
-
     def standard_normal(self, ndim, /, output_scale):
         eye_n = np.eye(ndim)
         eye_d = output_scale * np.eye(*self.ode_shape)
@@ -123,14 +107,6 @@ class IsotropicSSMUtil(SSMUtilBackend):
     def preconditioner_apply(self, rv, p, /):
         return _normal.Normal(p[:, None] * rv.mean, p[:, None] * rv.cholesky)
 
-    def preconditioner_apply_cond(self, cond, p, p_inv, /):
-        A, noise = cond
-
-        A_new = p[:, None] * A * p_inv[None, :]
-
-        noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return _conditional.Conditional(A_new, noise)
-
     def standard_normal(self, num, /, output_scale):
         mean = np.zeros((num, *self.ode_shape))
         cholesky = output_scale * np.eye(num)
@@ -160,12 +136,6 @@ class BlockDiagSSMUtil(SSMUtilBackend):
         mean = p[None, :] * rv.mean
         cholesky = p[None, :, None] * rv.cholesky
         return _normal.Normal(mean, cholesky)
-
-    def preconditioner_apply_cond(self, cond, p, p_inv, /):
-        A, noise = cond
-        A_new = p[None, :, None] * A * p_inv[None, None, :]
-        noise = self.preconditioner_apply(noise, p)
-        return _conditional.Conditional(A_new, noise)
 
     def standard_normal(self, ndim, output_scale):
         mean = np.zeros((*self.ode_shape, ndim))

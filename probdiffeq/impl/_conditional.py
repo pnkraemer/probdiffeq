@@ -42,6 +42,10 @@ class ConditionalBackend(abc.ABC):
     def ibm_transitions(self, num_derivatives, output_scale=None):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        raise NotImplementedError
+
 
 class ScalarConditional(ConditionalBackend):
     def marginalise(self, rv, conditional, /):
@@ -101,6 +105,12 @@ class ScalarConditional(ConditionalBackend):
             return Conditional(a, noise), (p, p_inv)
 
         return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+        A = p[:, None] * A * p_inv[None, :]
+        noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
+        return Conditional(A, noise)
 
 
 class DenseConditional(ConditionalBackend):
@@ -176,6 +186,12 @@ class DenseConditional(ConditionalBackend):
 
         return discretise
 
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+        noise = self.preconditioner_apply(noise, p)
+        A = p[:, None] * A * p_inv[None, :]
+        return Conditional(A, noise)
+
 
 class IsotropicConditional(ConditionalBackend):
     def __init__(self, ode_shape):
@@ -244,6 +260,14 @@ class IsotropicConditional(ConditionalBackend):
             return Conditional(A, noise), (p, p_inv)
 
         return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+
+        A_new = p[:, None] * A * p_inv[None, :]
+
+        noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
+        return Conditional(A_new, noise)
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -325,6 +349,12 @@ class BlockDiagConditional(ConditionalBackend):
             return (a, noise), (p, p_inv)
 
         return discretise
+
+    def preconditioner_apply(self, cond, p, p_inv, /):
+        A, noise = cond
+        A_new = p[None, :, None] * A * p_inv[None, None, :]
+        noise = self.preconditioner_apply(noise, p)
+        return Conditional(A_new, noise)
 
 
 def _transpose(matrix):
