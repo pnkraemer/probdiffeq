@@ -143,10 +143,12 @@ def _select_isotropic(*, ode_shape):
     variable = _variable.IsotropicVariable(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape)
     linearise = _linearise.IsotropicLinearisation()
+    conditional = _conditional.IsotropicConditional()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
         variable=variable,
         stats=stats,
         linearise=linearise,
+        conditional=conditional,
     )
