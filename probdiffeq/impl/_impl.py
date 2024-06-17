@@ -116,6 +116,11 @@ def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
     raise ValueError(msg1 + msg2)
 
 
+def _select_scalar():
+    prototypes = _prototypes.ScalarPrototype()
+    return FactorisedImpl(prototypes=prototypes)
+
+
 def _select_dense(*, ode_shape):
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     ssm_util = _ssm_util.DenseSSMUtil(ode_shape=ode_shape)
