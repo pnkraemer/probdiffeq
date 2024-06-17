@@ -40,48 +40,56 @@ class Impl:
 
     @property
     def linearise(self) -> _linearise.LinearisationBackend:
-        self._verify_fact()
-        return self._fact.linearise
+        if self._fact is not None:
+            return self._fact.linearise
+
+        raise ValueError(self.error_msg())
 
     @property
     def conditional(self) -> _conditional.ConditionalBackend:
-        self._verify_fact()
-        return self._fact.conditional
+        if self._fact is not None:
+            return self._fact.conditional
+        raise ValueError(self.error_msg())
 
     @property
     def transform(self) -> _transform.TransformBackend:
-        self._verify_fact()
-        return self._fact.transform
+        if self._fact is not None:
+            return self._fact.transform
+        raise ValueError(self.error_msg())
 
     @property
     def ssm_util(self) -> _ssm_util.SSMUtilBackend:
-        self._verify_fact()
-        return self._fact.ssm_util
+        if self._fact is not None:
+            return self._fact.ssm_util
+        raise ValueError(self.error_msg())
 
     @property
     def prototypes(self) -> _prototypes.PrototypeBackend:
-        self._verify_fact()
-        return self._fact.prototypes
+        if self._fact is not None:
+            return self._fact.prototypes
+        raise ValueError(self.error_msg())
 
     @property
     def variable(self) -> _variable.VariableBackend:
-        self._verify_fact()
-        return self._fact.variable
+        if self._fact is not None:
+            return self._fact.variable
+        raise ValueError(self.error_msg())
 
     @property
     def hidden_model(self) -> _hidden_model.HiddenModelBackend:
-        self._verify_fact()
-        return self._fact.hidden_model
+        if self._fact is not None:
+            return self._fact.hidden_model
+        raise ValueError(self.error_msg())
 
     @property
     def stats(self) -> _stats.StatsBackend:
-        self._verify_fact()
-        return self._fact.stats
+        if self._fact is not None:
+            return self._fact.stats
+        raise ValueError(self.error_msg())
 
-    def _verify_fact(self):
-        if self._fact is None:
-            msg = "Select a factorisation first."
-            raise ValueError(msg)
+    @staticmethod
+    def error_msg():
+        return "Select a factorisation first."
 
 
 @containers.dataclass
