@@ -1,7 +1,7 @@
 from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
-from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util, cond_util, linop_util
+from probdiffeq.impl import _conditional, _normal
+from probdiffeq.util import cholesky_util, linop_util
 
 
 class HiddenModelBackend(abc.ABC):
@@ -51,7 +51,7 @@ class ScalarHiddenModel(HiddenModelBackend):
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return cond_util.Conditional(linop, noise)
+        return _conditional.Conditional(linop, noise)
 
 
 class DenseHiddenModel(HiddenModelBackend):
@@ -90,7 +90,7 @@ class DenseHiddenModel(HiddenModelBackend):
         linop = linop_util.parametrised_linop(
             lambda s, _p: self._autobatch_linop(a0)(s)
         )
-        return cond_util.Conditional(linop, noise)
+        return _conditional.Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
         x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
@@ -139,7 +139,7 @@ class IsotropicHiddenModel(HiddenModelBackend):
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return cond_util.Conditional(linop, noise)
+        return _conditional.Conditional(linop, noise)
 
 
 class BlockDiagHiddenModel(HiddenModelBackend):
@@ -176,4 +176,4 @@ class BlockDiagHiddenModel(HiddenModelBackend):
         eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
         noise = _normal.Normal(bias, standard_deviation * eye)
         linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return cond_util.Conditional(linop, noise)
+        return _conditional.Conditional(linop, noise)

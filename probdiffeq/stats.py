@@ -8,7 +8,7 @@ from probdiffeq.backend import containers, control_flow, functools, random, tree
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any
 from probdiffeq.impl import impl
-from probdiffeq.util import cond_util, filter_util
+from probdiffeq.util import filter_util
 
 # TODO: the functions in here should only depend on posteriors / strategies!
 
@@ -274,4 +274,4 @@ def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
 
 def _rescale_cholesky_conditional(conditional, factor, /):
     noise_new = impl.variable.rescale_cholesky(conditional.noise, factor)
-    return cond_util.Conditional(conditional.matmul, noise_new)
+    return impl.conditional.conditional(conditional.matmul, noise_new)

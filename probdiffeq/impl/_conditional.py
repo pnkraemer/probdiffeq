@@ -1,9 +1,17 @@
 """Conditionals."""
 
-from probdiffeq.backend import abc, functools, linalg
+from probdiffeq.backend import abc, containers, functools, linalg
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util, cond_util
+from probdiffeq.util import cholesky_util
+
+
+class Conditional(containers.NamedTuple):
+    """Conditional distributions."""
+
+    matmul: Array  # or anything with a __matmul__ implementation
+    noise: Any  # Usually a random-variable type
 
 
 class ConditionalBackend(abc.ABC):
@@ -22,6 +30,9 @@ class ConditionalBackend(abc.ABC):
     @abc.abstractmethod
     def merge(self, cond1, cond2, /):
         raise NotImplementedError
+
+    def conditional(self, matmul, noise):
+        return Conditional(matmul, noise)
 
 
 class ScalarConditional(ConditionalBackend):
@@ -44,7 +55,7 @@ class ScalarConditional(ConditionalBackend):
 
         marginal = _normal.Normal(m_ext, r_ext.T)
         noise = _normal.Normal(m_cond, r_bw_p.T)
-        return marginal, cond_util.Conditional(g_bw_p, noise)
+        return marginal, Conditional(g_bw_p, noise)
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
@@ -61,7 +72,7 @@ class ScalarConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
         noise = _normal.Normal(xi, Xi)
-        return cond_util.Conditional(g, noise)
+        return Conditional(g, noise)
 
 
 class DenseConditional(ConditionalBackend):
@@ -84,7 +95,7 @@ class DenseConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(
             R_stack=((A @ d.cholesky).T, b.cholesky.T)
         )
-        return cond_util.Conditional(g, _normal.Normal(xi, Xi.T))
+        return Conditional(g, _normal.Normal(xi, Xi.T))
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
@@ -102,7 +113,7 @@ class DenseConditional(ConditionalBackend):
         m_cor = mean - gain @ mean_observed
         corrected = _normal.Normal(m_cor, r_cor.T)
         observed = _normal.Normal(mean_observed, r_obs.T)
-        return observed, cond_util.Conditional(gain, corrected)
+        return observed, Conditional(gain, corrected)
 
 
 class IsotropicConditional(ConditionalBackend):
@@ -133,7 +144,7 @@ class IsotropicConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack).T
 
         noise = _normal.Normal(xi, Xi)
-        return cond_util.Conditional(g, noise)
+        return Conditional(g, noise)
 
     def revert(self, rv, conditional, /):
         matrix, noise = conditional
@@ -149,7 +160,7 @@ class IsotropicConditional(ConditionalBackend):
 
         extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
-        return extrapolated, cond_util.Conditional(gain, corrected)
+        return extrapolated, Conditional(gain, corrected)
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -185,7 +196,7 @@ class BlockDiagConditional(ConditionalBackend):
         Xi = _transpose(functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack))
 
         noise = _normal.Normal(xi, Xi)
-        return cond_util.Conditional(g, noise)
+        return Conditional(g, noise)
 
     def revert(self, rv, conditional, /):
         A, noise = conditional
@@ -204,7 +215,7 @@ class BlockDiagConditional(ConditionalBackend):
         m_cor = rv.mean - (gain @ (mean_observed[..., None]))[..., 0]
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, cond_util.Conditional(gain, corrected)
+        return observed, Conditional(gain, corrected)
 
 
 def _transpose(matrix):
