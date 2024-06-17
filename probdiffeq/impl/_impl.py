@@ -4,14 +4,7 @@ import warnings
 
 from probdiffeq.backend import containers
 from probdiffeq.backend.typing import Optional
-from probdiffeq.impl import (
-    _conditional,
-    _linearise,
-    _normal,
-    _prototypes,
-    _stats,
-    _transform,
-)
+from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
 
 
 class Impl:
@@ -50,7 +43,7 @@ class Impl:
         raise ValueError(self.error_msg())
 
     @property
-    def transform(self) -> _transform.TransformBackend:
+    def transform(self) -> _conditional.TransformBackend:
         if self._fact is not None:
             return self._fact.transform
         raise ValueError(self.error_msg())
@@ -85,7 +78,7 @@ class FactorisedImpl:
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
-    transform: _transform.TransformBackend
+    transform: _conditional.TransformBackend
 
 
 def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
@@ -114,7 +107,7 @@ def _select_scalar() -> FactorisedImpl:
     stats = _stats.ScalarStats()
     linearise = _linearise.ScalarLinearisation()
     conditional = _conditional.ScalarConditional()
-    transform = _transform.ScalarTransform()
+    transform = _conditional.ScalarTransform()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -131,7 +124,7 @@ def _select_dense(*, ode_shape) -> FactorisedImpl:
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
     stats = _stats.DenseStats(ode_shape=ode_shape)
     conditional = _conditional.DenseConditional(ode_shape=ode_shape)
-    transform = _transform.DenseTransform()
+    transform = _conditional.DenseTransform()
     return FactorisedImpl(
         linearise=linearise,
         transform=transform,
@@ -148,7 +141,7 @@ def _select_isotropic(*, ode_shape) -> FactorisedImpl:
     stats = _stats.IsotropicStats(ode_shape=ode_shape)
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional(ode_shape=ode_shape)
-    transform = _transform.IsotropicTransform()
+    transform = _conditional.IsotropicTransform()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -165,7 +158,7 @@ def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
     stats = _stats.BlockDiagStats(ode_shape=ode_shape)
     linearise = _linearise.BlockDiagLinearisation()
     conditional = _conditional.BlockDiagConditional(ode_shape=ode_shape)
-    transform = _transform.BlockDiagTransform(ode_shape=ode_shape)
+    transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
