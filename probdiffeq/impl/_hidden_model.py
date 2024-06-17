@@ -1,7 +1,7 @@
 from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
-from probdiffeq.impl import _conditional, _normal
-from probdiffeq.util import cholesky_util, linop_util
+from probdiffeq.impl import _normal
+from probdiffeq.util import cholesky_util
 
 
 class HiddenModelBackend(abc.ABC):
@@ -15,10 +15,6 @@ class HiddenModelBackend(abc.ABC):
 
     @abc.abstractmethod
     def qoi_from_sample(self, sample, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def conditional_to_derivative(self, i, standard_deviation):
         raise NotImplementedError
 
 
@@ -42,16 +38,6 @@ class ScalarHiddenModel(HiddenModelBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[0]
-
-    def conditional_to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[[i], ...]
-
-        bias = np.zeros(())
-        eye = np.eye(1)
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return _conditional.Conditional(linop, noise)
 
 
 class DenseHiddenModel(HiddenModelBackend):
@@ -78,19 +64,6 @@ class DenseHiddenModel(HiddenModelBackend):
     def qoi_from_sample(self, sample, /):
         sample_reshaped = np.reshape(sample, (-1, *self.ode_shape), order="F")
         return sample_reshaped[0]
-
-    # TODO: move to linearise.py?
-    def conditional_to_derivative(self, i, standard_deviation):
-        a0 = functools.partial(self._select, idx_or_slice=i)
-
-        (d,) = self.ode_shape
-        bias = np.zeros((d,))
-        eye = np.eye(d)
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(
-            lambda s, _p: self._autobatch_linop(a0)(s)
-        )
-        return _conditional.Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
         x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
@@ -131,16 +104,6 @@ class IsotropicHiddenModel(HiddenModelBackend):
     def qoi_from_sample(self, sample, /):
         return sample[0, :]
 
-    def conditional_to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[[i], ...]
-
-        bias = np.zeros(self.ode_shape)
-        eye = np.eye(1)
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return _conditional.Conditional(linop, noise)
-
 
 class BlockDiagHiddenModel(HiddenModelBackend):
     def __init__(self, ode_shape):
@@ -167,13 +130,3 @@ class BlockDiagHiddenModel(HiddenModelBackend):
 
     def qoi_from_sample(self, sample, /):
         return sample[..., 0]
-
-    def conditional_to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[:, [i], ...]
-
-        bias = np.zeros((*self.ode_shape, 1))
-        eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return _conditional.Conditional(linop, noise)

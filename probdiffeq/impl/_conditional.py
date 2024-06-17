@@ -4,7 +4,7 @@ from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util
+from probdiffeq.util import cholesky_util, linop_util
 
 
 class Conditional(containers.NamedTuple):
@@ -44,6 +44,10 @@ class ConditionalBackend(abc.ABC):
 
     @abc.abstractmethod
     def preconditioner_apply(self, cond, p, p_inv, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def to_derivative(self, i, standard_deviation):
         raise NotImplementedError
 
 
@@ -111,6 +115,16 @@ class ScalarConditional(ConditionalBackend):
         A = p[:, None] * A * p_inv[None, :]
         noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
         return Conditional(A, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[[i], ...]
+
+        bias = np.zeros(())
+        eye = np.eye(1)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return Conditional(linop, noise)
 
 
 class DenseConditional(ConditionalBackend):
@@ -193,6 +207,33 @@ class DenseConditional(ConditionalBackend):
         A = p[:, None] * A * p_inv[None, :]
         return Conditional(A, noise)
 
+    def to_derivative(self, i, standard_deviation):
+        a0 = functools.partial(self._select, idx_or_slice=i)
+
+        (d,) = self.ode_shape
+        bias = np.zeros((d,))
+        eye = np.eye(d)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(
+            lambda s, _p: self._autobatch_linop(a0)(s)
+        )
+        return Conditional(linop, noise)
+
+    def _select(self, x, /, idx_or_slice):
+        x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
+        if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
+            raise ValueError
+        return x_reshaped[idx_or_slice]
+
+    @staticmethod
+    def _autobatch_linop(fun):
+        def fun_(x):
+            if np.ndim(x) > 1:
+                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
+            return fun(x)
+
+        return fun_
+
 
 class IsotropicConditional(ConditionalBackend):
     def __init__(self, ode_shape):
@@ -269,6 +310,16 @@ class IsotropicConditional(ConditionalBackend):
 
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
         return Conditional(A_new, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[[i], ...]
+
+        bias = np.zeros(self.ode_shape)
+        eye = np.eye(1)
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return Conditional(linop, noise)
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -358,6 +409,16 @@ class BlockDiagConditional(ConditionalBackend):
         normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
         noise = normal.preconditioner_apply(noise, p)
         return Conditional(A_new, noise)
+
+    def to_derivative(self, i, standard_deviation):
+        def A(x):
+            return x[:, [i], ...]
+
+        bias = np.zeros((*self.ode_shape, 1))
+        eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
+        noise = _normal.Normal(bias, standard_deviation * eye)
+        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+        return Conditional(linop, noise)
 
 
 def _transpose(matrix):
