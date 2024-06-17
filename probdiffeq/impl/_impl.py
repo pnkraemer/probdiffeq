@@ -124,6 +124,7 @@ def _select_scalar():
     linearise = _linearise.ScalarLinearisation()
     conditional = _conditional.ScalarConditional()
     transform = _transform.ScalarTransform()
+    hidden_model = _hidden_model.ScalarHiddenModel()
     return FactorisedImpl(
         prototypes=prototypes,
         ssm_util=ssm_util,
@@ -132,6 +133,7 @@ def _select_scalar():
         linearise=linearise,
         conditional=conditional,
         transform=transform,
+        hidden_model=hidden_model,
     )
 
 
