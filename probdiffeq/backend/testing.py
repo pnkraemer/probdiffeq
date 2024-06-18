@@ -29,9 +29,7 @@ def skip(reason):
     return pytest.skip(reason=reason)
 
 
-def fixture(name=None, scope="module"):
-    # We have a different default! Usually, the scope is set to "function".
-    # We benefit so much from "module" that we choose this instead.
+def fixture(name=None, scope="function"):
     return pytest_cases.fixture(name=name, scope=scope)
 
 
