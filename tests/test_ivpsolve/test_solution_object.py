@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 
 @testing.fixture(name="approximate_solution")
 def fixture_approximate_solution(ssm):
-    vf, u0, (t0, t1) = ssm.ode
+    vf, u0, (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)
@@ -55,7 +55,7 @@ def test_iter_impossible(approximate_solution):
 
 @testing.fixture(name="approximate_solution_batched")
 def fixture_approximate_solution_batched(ssm):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)

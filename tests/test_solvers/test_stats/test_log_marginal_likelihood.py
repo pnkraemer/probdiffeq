@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 
 @testing.fixture(name="sol")
 def fixture_sol(ssm):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()
@@ -81,7 +81,7 @@ def test_raises_error_for_terminal_values(sol):
 
 def test_raises_error_for_filter(ssm):
     """Non-terminal value calls are not possible for filters."""
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

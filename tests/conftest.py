@@ -24,9 +24,9 @@ class SSMConfig:
 
     # todo: rename to default_rv(), default_ode(), and default_ode_affine()
     # todo: make them callables?
-    rv: Any
-    ode: Any
-    ode_affine: Any
+    default_rv: Any
+    default_ode: Any
+    default_ode_affine: Any
 
 
 # todo: if we replace the fixture with cases, we can opt-in the tests
@@ -52,7 +52,7 @@ def fixture_ssm():
         ode_affine = ode.ivp_affine_multi_dimensional()
 
         # Return the SSM config
-        return SSMConfig(rv=rv, ode=ode_, ode_affine=ode_affine)
+        return SSMConfig(default_rv=rv, default_ode=ode_, default_ode_affine=ode_affine)
     if which in ["scalar"]:
         impl.select("scalar")
 
@@ -66,5 +66,5 @@ def fixture_ssm():
         ode_affine = ode.ivp_affine_scalar()
 
         # Return the SSM config
-        return SSMConfig(rv=rv, ode=ode_, ode_affine=ode_affine)
+        return SSMConfig(default_rv=rv, default_ode=ode_, default_ode_affine=ode_affine)
     raise ValueError

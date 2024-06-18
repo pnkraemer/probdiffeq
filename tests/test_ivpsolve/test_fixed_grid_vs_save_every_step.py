@@ -7,7 +7,7 @@ from probdiffeq.impl import impl
 
 
 def test_fixed_grid_result_matches_adaptive_grid_result(ssm):
-    vf, u0, (t0, t1) = ssm.ode
+    vf, u0, (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

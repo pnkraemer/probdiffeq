@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 
 @testing.fixture(name="python_loop_solution")
 def fixture_python_loop_solution(ssm):
-    vf, u0, (t0, t1) = ssm.ode
+    vf, u0, (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=4)
     ts0 = ivpsolvers.correction_ts0()
@@ -31,7 +31,7 @@ def fixture_python_loop_solution(ssm):
 
 @testing.fixture(name="reference_solution")
 def fixture_reference_solution(ssm):
-    vf, u0, (t0, t1) = ssm.ode
+    vf, u0, (t0, t1) = ssm.default_ode
     return ode.odeint_dense(vf, u0, t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
 
 

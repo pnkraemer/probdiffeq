@@ -7,7 +7,7 @@ from probdiffeq.impl import impl
 
 
 def test_warning_for_fixedpoint_in_save_every_step_mode(ssm):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()
@@ -26,7 +26,7 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(ssm):
 
 
 def test_warning_for_smoother_in_save_at_mode(ssm):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

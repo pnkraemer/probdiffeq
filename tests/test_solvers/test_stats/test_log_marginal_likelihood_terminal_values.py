@@ -24,7 +24,7 @@ def case_strategy_fixedpoint():
 @testing.fixture(name="sol")
 @testing.parametrize_with_cases("strategy_func", cases=".", prefix="case_strategy_")
 def fixture_sol(ssm, strategy_func):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=4)
     ts0 = ivpsolvers.correction_ts0()

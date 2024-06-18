@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 
 @testing.fixture(name="problem_args_kwargs")
 def fixture_problem_args_kwargs(ssm):
-    vf, u0, (t0, t1) = ssm.ode
+    vf, u0, (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)

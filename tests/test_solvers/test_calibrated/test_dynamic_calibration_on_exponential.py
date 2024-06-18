@@ -12,7 +12,7 @@ from probdiffeq.impl import impl
 
 
 def test_exponential_approximated_well(ssm):
-    vf, u0, (t0, t1), solution = ssm.ode_affine
+    vf, u0, (t0, t1), solution = ssm.default_ode_affine
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)
     ts0 = ivpsolvers.correction_ts0()

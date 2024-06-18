@@ -11,7 +11,7 @@ from probdiffeq.impl import impl
 
 @testing.fixture(name="solver_setup")
 def fixture_solver_setup(ssm):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
 

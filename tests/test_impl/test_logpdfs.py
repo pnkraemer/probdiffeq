@@ -9,7 +9,7 @@ from probdiffeq.impl import impl
 
 
 def test_logpdf(ssm):
-    rv = ssm.rv
+    rv = ssm.default_rv
 
     (mean_dense, cov_dense) = impl.stats.to_multivariate_normal(rv)
 
@@ -22,7 +22,7 @@ def test_logpdf(ssm):
 
 
 def test_grad_not_none(ssm):
-    rv = ssm.rv
+    rv = ssm.default_rv
     u = np.ones_like(impl.stats.mean(rv))
 
     pdf = functools.jacrev(impl.stats.logpdf)(u, rv)

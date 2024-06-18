@@ -8,7 +8,7 @@ from probdiffeq.impl import impl
 
 @testing.fixture(name="approximation")
 def fixture_approximation(ssm):
-    vf, (u0,), (t0, t1) = ssm.ode
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

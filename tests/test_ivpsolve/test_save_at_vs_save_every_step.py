@@ -9,7 +9,7 @@ from probdiffeq.impl import impl
 def test_save_at_result_matches_interpolated_adaptive_result(ssm):
     """Test that the save_at result matches the interpolation (using a filter)."""
     # Make a problem
-    vf, u0, (t0, t1) = ssm.ode
+    vf, u0, (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
