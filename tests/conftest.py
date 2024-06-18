@@ -1,7 +1,10 @@
 """Test-setup."""
 
-from probdiffeq.backend import config, ode, warnings
+import os
+
+from probdiffeq.backend import config, containers, ode, testing, warnings
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Any
 from probdiffeq.impl import impl
 
 # All warnings shall be errors
@@ -15,33 +18,53 @@ config.update("platform_name", "cpu")
 config.update("enable_x64", True)
 
 
-class _Setup:
-    def __init__(self):
-        self._which = None
+@containers.dataclass
+class SSMConfig:
+    """State-space model configuration."""
 
-    def select(self, which, /):
-        if which == "scalar":
-            impl.select("scalar")
-        else:
-            impl.select(which, ode_shape=(2,))
+    # todo: rename to default_rv(), default_ode(), and default_ode_affine()
+    # todo: make them callables?
+    rv: Any
+    ode: Any
+    ode_affine: Any
 
-        self._which = which
 
-    def ode(self):
-        if self._which == "scalar":
-            return ode.ivp_logistic()
-        return ode.ivp_lotka_volterra()
+# todo: if we replace the fixture with cases, we can opt-in the tests
+#  to running with different configurations instead of opt-out.
+@testing.fixture(name="ssm")
+def fixture_ssm():
+    """Select a state-space model factorisation."""
+    if "IMPL" not in os.environ:
+        msg = "Select an implementation"
+        raise KeyError(msg)
 
-    def ode_affine(self):
-        if self._which == "scalar":
-            return ode.ivp_affine_scalar()
-        return ode.ivp_affine_multi_dimensional()
+    which = os.environ["IMPL"]
+    if which in ["dense", "isotropic", "blockdiag"]:
+        impl.select(which, ode_shape=(2,))
 
-    def rv(self):
+        # Prepare an RV:
         output_scale = np.ones_like(impl.prototypes.output_scale())
         discretise_func = impl.conditional.ibm_transitions(3, output_scale)
         (_matrix, rv), _pre = discretise_func(0.5)
-        return rv
 
+        # Prepare an ODE
+        ode_ = ode.ivp_lotka_volterra()
+        ode_affine = ode.ivp_affine_multi_dimensional()
 
-setup = _Setup()
+        # Return the SSM config
+        return SSMConfig(rv=rv, ode=ode_, ode_affine=ode_affine)
+    if which in ["scalar"]:
+        impl.select("scalar")
+
+        # Prepare an RV
+        output_scale = np.ones_like(impl.prototypes.output_scale())
+        discretise_func = impl.conditional.ibm_transitions(3, output_scale)
+        (_matrix, rv), _pre = discretise_func(0.5)
+
+        # Prepare an ODE
+        ode_ = ode.ivp_logistic()
+        ode_affine = ode.ivp_affine_scalar()
+
+        # Return the SSM config
+        return SSMConfig(rv=rv, ode=ode_, ode_affine=ode_affine)
+    raise ValueError

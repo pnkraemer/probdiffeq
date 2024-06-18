@@ -4,7 +4,6 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.case()
@@ -24,8 +23,8 @@ def case_strategy_fixedpoint():
 
 @testing.fixture(name="sol")
 @testing.parametrize_with_cases("strategy_func", cases=".", prefix="case_strategy_")
-def fixture_sol(strategy_func):
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_sol(ssm, strategy_func):
+    vf, (u0,), (t0, t1) = ssm.ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=4)
     ts0 = ivpsolvers.correction_ts0()

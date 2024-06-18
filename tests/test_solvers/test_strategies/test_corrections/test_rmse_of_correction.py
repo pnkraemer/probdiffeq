@@ -4,7 +4,6 @@ from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.case()
@@ -56,8 +55,8 @@ def case_slr1_gauss_hermite():
 
 @testing.fixture(name="solution")
 @testing.parametrize_with_cases("correction_impl", cases=".", prefix="case_")
-def fixture_solution(correction_impl):
-    vf, u0, (t0, t1) = setup.ode()
+def fixture_solution(ssm, correction_impl):
+    vf, u0, (t0, t1) = ssm.ode
 
     if correction_impl == "not_implemented":
         testing.skip(reason="This type of linearisation has not been implemented.")
@@ -78,8 +77,8 @@ def fixture_solution(correction_impl):
 
 
 @testing.fixture(name="reference_solution")
-def fixture_reference_solution():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_reference_solution(ssm):
+    vf, (u0,), (t0, t1) = ssm.ode
     return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
 
 

@@ -4,12 +4,11 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import random, testing, tree_util
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.fixture(name="approximation")
-def fixture_approximation():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_approximation(ssm):
+    vf, (u0,), (t0, t1) = ssm.ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

@@ -4,12 +4,11 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.fixture(name="sol")
-def fixture_sol():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_sol(ssm):
+    vf, (u0,), (t0, t1) = ssm.ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()
@@ -80,9 +79,9 @@ def test_raises_error_for_terminal_values(sol):
         )
 
 
-def test_raises_error_for_filter():
+def test_raises_error_for_filter(ssm):
     """Non-terminal value calls are not possible for filters."""
-    vf, (u0,), (t0, t1) = setup.ode()
+    vf, (u0,), (t0, t1) = ssm.ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

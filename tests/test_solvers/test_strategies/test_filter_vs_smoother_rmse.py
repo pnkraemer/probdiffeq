@@ -4,12 +4,11 @@ from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.fixture(name="solver_setup")
-def fixture_solver_setup():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_solver_setup(ssm):
+    vf, (u0,), (t0, t1) = ssm.ode
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
     grid = np.linspace(t0, t1, endpoint=True, num=12)
@@ -46,8 +45,8 @@ def fixture_smoother_solution(solver_setup):
 
 
 @testing.fixture(name="reference_solution")
-def fixture_reference_solution():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_reference_solution(ssm):
+    vf, (u0,), (t0, t1) = ssm.ode
     return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
 
 

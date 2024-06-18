@@ -3,12 +3,11 @@
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
-def test_filter_marginals_close_only_to_left_boundary():
+def test_filter_marginals_close_only_to_left_boundary(ssm):
     """Assert that the filter-marginals interpolate well close to the left boundary."""
-    vf, (u0,), (t0, t1) = setup.ode()
+    vf, (u0,), (t0, t1) = ssm.ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)
     ts0 = ivpsolvers.correction_ts0()
@@ -29,9 +28,9 @@ def test_filter_marginals_close_only_to_left_boundary():
     assert not np.allclose(u[-1], sol.u[-1], atol=1e-3, rtol=1e-3)
 
 
-def test_smoother_marginals_close_to_both_boundaries():
+def test_smoother_marginals_close_to_both_boundaries(ssm):
     """Assert that the smoother-marginals interpolate well close to the boundary."""
-    vf, (u0,), (t0, t1) = setup.ode()
+    vf, (u0,), (t0, t1) = ssm.ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=4)
     ts0 = ivpsolvers.correction_ts0()
