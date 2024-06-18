@@ -5,7 +5,7 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 
 
-def test_marginal_moments_are_correct(num_derivatives=2):
+def test_marginal_moments_are_correct(ssm, num_derivatives=2):  # noqa: ARG001
     """Solve a second-order, scalar, linear, separable BVP."""
     output_scale = 10.0 * np.ones_like(impl.prototypes.output_scale())
     t0, t1 = 0.0, 3.4123412

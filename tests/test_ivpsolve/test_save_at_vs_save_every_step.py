@@ -4,13 +4,12 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
-def test_save_at_result_matches_interpolated_adaptive_result():
+def test_save_at_result_matches_interpolated_adaptive_result(ssm):
     """Test that the save_at result matches the interpolation (using a filter)."""
     # Make a problem
-    vf, u0, (t0, t1) = setup.ode()
+    vf, u0, (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)

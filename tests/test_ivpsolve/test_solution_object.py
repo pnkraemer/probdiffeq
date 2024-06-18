@@ -4,12 +4,11 @@ from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import functools, testing
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.fixture(name="approximate_solution")
-def fixture_approximate_solution():
-    vf, u0, (t0, t1) = setup.ode()
+def fixture_approximate_solution(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)
@@ -55,8 +54,8 @@ def test_iter_impossible(approximate_solution):
 
 
 @testing.fixture(name="approximate_solution_batched")
-def fixture_approximate_solution_batched():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_approximate_solution_batched(ssm):
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)

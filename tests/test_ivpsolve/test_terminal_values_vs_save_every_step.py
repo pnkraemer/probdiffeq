@@ -4,12 +4,11 @@ from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing, tree_util
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.fixture(name="problem_args_kwargs")
-def fixture_problem_args_kwargs():
-    vf, u0, (t0, t1) = setup.ode()
+def fixture_problem_args_kwargs(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
 
     # Generate a solver
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)

@@ -9,11 +9,10 @@ from probdiffeq import ivpsolve, ivpsolvers
 from probdiffeq.backend import linalg
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
-def test_exponential_approximated_well():
-    vf, u0, (t0, t1), solution = setup.ode_affine()
+def test_exponential_approximated_well(ssm):
+    vf, u0, (t0, t1), solution = ssm.default_ode_affine
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=1)
     ts0 = ivpsolvers.correction_ts0()

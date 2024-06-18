@@ -1,7 +1,5 @@
 """State-space model impl."""
 
-import warnings
-
 from probdiffeq.backend import containers
 from probdiffeq.backend.typing import Optional
 from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
@@ -19,9 +17,6 @@ class Impl:
         self._fact_name: str = "None"
 
     def select(self, which, **kwargs):
-        if self._fact is not None:
-            msg = f"An implementation has already been selected: '{self._fact_name}'."
-            warnings.warn(msg, stacklevel=1)
         self._fact = choose(which, **kwargs)
         self._fact_name = which
 

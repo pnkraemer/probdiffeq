@@ -4,11 +4,10 @@ from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
-def test_warning_for_fixedpoint_in_save_every_step_mode():
-    vf, (u0,), (t0, t1) = setup.ode()
+def test_warning_for_fixedpoint_in_save_every_step_mode(ssm):
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()
@@ -26,8 +25,8 @@ def test_warning_for_fixedpoint_in_save_every_step_mode():
         )
 
 
-def test_warning_for_smoother_in_save_at_mode():
-    vf, (u0,), (t0, t1) = setup.ode()
+def test_warning_for_smoother_in_save_at_mode(ssm):
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

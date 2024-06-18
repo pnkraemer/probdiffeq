@@ -7,12 +7,11 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import functools, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.fixture(name="solver_setup")
-def fixture_solver_setup():
-    vf, (u0,), (t0, t1) = setup.ode()
+def fixture_solver_setup(ssm):
+    vf, (u0,), (t0, t1) = ssm.default_ode
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
 

@@ -4,11 +4,10 @@ from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
-def test_fixed_grid_result_matches_adaptive_grid_result():
-    vf, u0, (t0, t1) = setup.ode()
+def test_fixed_grid_result_matches_adaptive_grid_result(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
 
     ibm = ivpsolvers.prior_ibm(num_derivatives=2)
     ts0 = ivpsolvers.correction_ts0()

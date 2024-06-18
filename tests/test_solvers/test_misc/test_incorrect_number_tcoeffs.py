@@ -11,7 +11,7 @@ from probdiffeq.impl import impl
 
 @testing.parametrize("incr", [1, -1])
 @testing.parametrize("n", [2])
-def test_incorrect_number_of_taylor_coefficients_init(incr, n):
+def test_incorrect_number_of_taylor_coefficients_init(ssm, incr, n):  # noqa: ARG001
     """Assert that a specific ValueError is raised.
 
     Specifically:

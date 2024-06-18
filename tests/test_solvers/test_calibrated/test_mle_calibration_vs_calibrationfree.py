@@ -9,12 +9,11 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
 @testing.case()
-def case_solve_fixed_grid():
-    vf, u0, (t0, t1) = setup.ode()
+def case_solve_fixed_grid(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5)}
@@ -27,8 +26,8 @@ def case_solve_fixed_grid():
 
 
 @testing.case()
-def case_solve_adaptive_save_at():
-    vf, u0, (t0, t1) = setup.ode()
+def case_solve_adaptive_save_at(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
@@ -45,8 +44,8 @@ def case_solve_adaptive_save_at():
 
 
 @testing.case()
-def case_solve_adaptive_save_every_step():
-    vf, u0, (t0, t1) = setup.ode()
+def case_solve_adaptive_save_every_step(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
@@ -63,8 +62,8 @@ def case_solve_adaptive_save_every_step():
 
 
 @testing.case()
-def case_simulate_terminal_values():
-    vf, u0, (t0, t1) = setup.ode()
+def case_simulate_terminal_values(ssm):
+    vf, u0, (t0, t1) = ssm.default_ode
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())

@@ -6,11 +6,11 @@ Necessary because the implementation has been faulty in the past. Never again.
 from probdiffeq.backend import functools, stats
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
-from tests.setup import setup
 
 
-def test_logpdf():
-    rv = setup.rv()
+def test_logpdf(ssm):
+    rv = ssm.default_rv
+
     (mean_dense, cov_dense) = impl.stats.to_multivariate_normal(rv)
 
     u = np.ones_like(impl.stats.mean(rv))
@@ -21,8 +21,8 @@ def test_logpdf():
     assert np.allclose(pdf1, pdf2)
 
 
-def test_grad_not_none():
-    rv = setup.rv()
+def test_grad_not_none(ssm):
+    rv = ssm.default_rv
     u = np.ones_like(impl.stats.mean(rv))
 
     pdf = functools.jacrev(impl.stats.logpdf)(u, rv)
