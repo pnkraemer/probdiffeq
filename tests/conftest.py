@@ -22,8 +22,6 @@ config.update("enable_x64", True)
 class SSMConfig:
     """State-space model configuration."""
 
-    # todo: rename to default_rv(), default_ode(), and default_ode_affine()
-    # todo: make them callables?
     default_rv: Any
     default_ode: Any
     default_ode_affine: Any
