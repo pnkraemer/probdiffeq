@@ -20,7 +20,7 @@ manipulation of square root matrices.
 
 """
 
-from probdiffeq.backend import control_flow, linalg, tree_util
+from probdiffeq.backend import linalg, tree_util
 from probdiffeq.backend import numpy as np
 
 
@@ -89,15 +89,7 @@ def revert_conditional(R_X_F, R_X, R_YX):
         raise ValueError(msg)
 
     R = np.block([[R_YX, np.zeros((R_YX.shape[0], R_X.shape[1]))], [R_X_F, R_X]])
-    # If R_X_F and R_X are zero, but R_YX is not zero, qr(R) can be implemented via
-    # qr(R_YX) and embedding the result in zeros. This is what we do here.
-    # Without this case distinction, reverse-mode derivatives are not defined.
-    is_zero_r_x_f = linalg.matrix_norm(R_X_F) == 0.0
-    is_zero_r_x = linalg.matrix_norm(R_X) == 0.0
-    cond = np.logical_and(is_zero_r_x_f, is_zero_r_x)
-    R = control_flow.cond(
-        cond, _triu_via_shortcut, lambda a, _b: triu_via_qr(a), R, R_YX
-    )
+    R = triu_via_qr(R)
 
     # ~R_{Y}
     d_out = R_YX.shape[1]
@@ -162,13 +154,4 @@ def triu_via_qr(R, /):
     # TODO: enforce positive diagonals?
     #  (or expose this option; some equivalence tests might fail
     #   if we always use a positive diagonal.)
-
-    # Only do something if R is not already triangular.
-    # This distinction may seem unnecessary but is important,
-    # because otherwise, reverse-mode derivatives are not defined!
-    matrix_is_already_triu = np.all(linalg.triu(R) == R)
-
-    _nrows, ncols = np.shape(R)
-    return control_flow.cond(
-        matrix_is_already_triu, lambda s: s[:ncols, :ncols], linalg.qr_r, R
-    )
+    return linalg.qr_r(R)
