@@ -22,6 +22,10 @@ def qr_r_jvp(primals, tangents):
 
     Refer to Issue #668 for why we need this.
     """
+    # todo: maybe the QR decomposition should not be differentiable at the origin...
+    #  but what we definitely want is that triangularisation (which calls qr_r) is
+    #  differentiable at the origin. See #668.
+    #  But for now, we don't distinguish between those two cases.
     (M,) = primals
     (M_dot,) = tangents
     Q, R = jnp.linalg.qr(M, mode="reduced")
