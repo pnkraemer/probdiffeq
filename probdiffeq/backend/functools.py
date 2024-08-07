@@ -32,3 +32,7 @@ def jvp(func, /, primals, tangents):
 
 def jacrev(func):
     return jax.jacrev(func)
+
+
+def grad(func):
+    return jax.grad(func)

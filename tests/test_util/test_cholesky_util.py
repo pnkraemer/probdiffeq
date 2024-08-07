@@ -79,7 +79,7 @@ def test_sqrt_sum_square_error():
 def test_reverse_conditional_jacrev_zero_matrix():
     """For zero-valued input covariances, reverse-mode gradients need a trick.
 
-    This resolves issue 668.
+    This resolves issue #668.
     """
     C = _some_array((3, 3)) * 0.0
     HC = _some_array((2, 3)) * 0.0
@@ -93,7 +93,7 @@ def test_reverse_conditional_jacrev_zero_matrix():
 def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
     """For zero-valued input covariances, reverse-mode gradients need a trick.
 
-    This resolves issue 668.
+    This resolves issue #668.
     """
     C = _some_array((3, 3)) * 0.0
     HC = _some_array((3, 2))
@@ -101,6 +101,50 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
     result = functools.jacrev(cholesky_util.sum_of_sqrtm_factors)((C.T, HC.T))
     is_not_nan = _tree_is_free_of_nans(result)
     assert is_not_nan
+
+
+def test_sqrt_sum_square_scalar_derivative_value_test():
+    """Test that the values match previous versions.
+
+    Why? Because we implement custom derivatives for triangularisation
+    to resolve specific corner cases, but need to assert that these are correct.
+    """
+
+    @functools.grad
+    def triu_via_naive_arithmetic_and_autograd(x, y, z):
+        return np.sqrt(x**2 + y**2 + z**2)
+
+    @functools.grad
+    def triu_via_qr_r(x, y, z):
+        return cholesky_util.sqrt_sum_square_scalar(x, y, z)
+
+    a, b, c = 3.0, 4.0, 5.0
+    expected = triu_via_naive_arithmetic_and_autograd(a, b, c)
+    received = triu_via_qr_r(a, b, c)
+    assert np.allclose(expected, received)
+
+
+def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
+    """Like the previous test, but for zero inputs.
+
+    This ensures that the QR decomposition is differentiable at the origin,
+    which is not the case unless we use custom JVPs.
+    """
+
+    # Use square of triu to ensure that the reference is differentiable
+    # (np.sqrt is not differentiable at zero)
+    @functools.grad
+    def triu_via_naive_arithmetic_and_autograd(x, y, z):
+        return x**2 + y**2 + z**2
+
+    @functools.grad
+    def triu_via_qr_r(x, y, z):
+        return cholesky_util.sqrt_sum_square_scalar(x, y, z) ** 2
+
+    a, b, c = 0.0, 0.0, 0.0
+    expected = triu_via_naive_arithmetic_and_autograd(a, b, c)
+    received = triu_via_qr_r(a, b, c)
+    assert np.allclose(expected, received)
 
 
 def _tree_is_free_of_nans(tree):
