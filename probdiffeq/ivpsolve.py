@@ -219,10 +219,6 @@ class _AdaptiveState(containers.NamedTuple):
     control: Any
     stats: Any
 
-    @property
-    def t(self):
-        return self.step_from.t
-
 
 class _AdaptiveIVPSolver:
     """Adaptive IVP solvers."""
@@ -551,7 +547,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
         # the difference from s.t to t_next is smaller than a constant factor
         # (which is a "small" multiple of the current machine precision)
         # or if s.t > t_next holds.
-        return s.t + 10 * np.finfo_eps(float) < t_next
+        return s.step_from.t + 10 * np.finfo_eps(float) < t_next
 
     def body_fun(s):
         return adaptive_solver.rejection_loop(s, vector_field=vector_field, t1=t_next)
@@ -560,7 +556,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     state, solution = control_flow.cond(
-        state.t > t_next + 10 * np.finfo_eps(float),
+        state.step_from.t > t_next + 10 * np.finfo_eps(float),
         adaptive_solver.interpolate_and_extract,
         lambda s, _t: adaptive_solver.right_corner_and_extract(s),
         state,
@@ -625,15 +621,15 @@ def _solution_generator(
     """Generate a probabilistic IVP solution iteratively."""
     state = adaptive_solver.init(t, initial_condition, dt0=dt0, num_steps=0)
 
-    while state.t < t1:
+    while state.step_from.t < t1:
         state = adaptive_solver.rejection_loop(state, vector_field=vector_field, t1=t1)
 
-        if state.t < t1:
+        if state.step_from.t < t1:
             solution = adaptive_solver.extract(state)
             yield solution
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
-    if state.t > t1:
+    if state.step_from.t > t1:
         _, solution = adaptive_solver.interpolate_and_extract(state, t=t1)
     else:
         _, solution = adaptive_solver.right_corner_and_extract(state)
