@@ -78,7 +78,7 @@ class _ExtrapolationImpl(abc.ABC, Generic[T, R, S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def right_corner(self, state: R, aux: S, /) -> _InterpRes:
+    def interpolate_at_t1(self, state: R, aux: S, /) -> _InterpRes:
         """Process the state at checkpoint t=t_n."""
         raise NotImplementedError
 
@@ -150,9 +150,9 @@ class _Strategy:
         sol = self.extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
-    def case_right_corner(self, state_t1: _StrategyState) -> _InterpRes:
+    def case_interpolate_at_t1(self, state_t1: _StrategyState) -> _InterpRes:
         """Process the solution in case t=t_n."""
-        _tmp = self.extrapolation.right_corner(state_t1.hidden, state_t1.aux_extra)
+        _tmp = self.extrapolation.interpolate_at_t1(state_t1.hidden, state_t1.aux_extra)
         step_from, solution, interp_from = _tmp
 
         def _state(x):
@@ -329,7 +329,7 @@ class _PreconSmoother(_ExtrapolationImpl):
         begun = self.begin(state, extra, dt=dt)
         return self.complete(*begun, output_scale=output_scale)
 
-    def right_corner(self, rv, extra, /):
+    def interpolate_at_t1(self, rv, extra, /):
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
@@ -454,7 +454,7 @@ class _PreconFixedPoint(_ExtrapolationImpl):
         return self.complete(*begun, output_scale=output_scale)
 
     # todo: rename to prepare_future_steps?
-    def right_corner(self, rv, extra, /):
+    def interpolate_at_t1(self, rv, extra, /):
         cond_identity = impl.conditional.identity(self.num_derivatives + 1)
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
@@ -526,7 +526,7 @@ class _PreconFilter(_ExtrapolationImpl):
         step_from = (marginal_t1, None)
         return _InterpRes(accepted=step_from, solution=interp, previous=interp)
 
-    def right_corner(self, rv, extra, /):
+    def interpolate_at_t1(self, rv, extra, /):
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
@@ -836,6 +836,7 @@ class _Solver(abc.ABC, Generic[_T]):
 
     @abc.abstractmethod
     def interpolate_at_t1(self, *, interp_from: _T, interp_to: _T) -> _InterpRes:
+        """Like calling interpolate with a `t` that is at the boundary of the domain."""
         raise NotImplementedError
 
 
@@ -1007,7 +1008,7 @@ class _CalibratedSolver(_Solver):
         return _InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        acc_p, sol_p, prev_p = self.strategy.case_right_corner(interp_to.strategy)
+        acc_p, sol_p, prev_p = self.strategy.case_interpolate_at_t1(interp_to.strategy)
 
         prev = _SolverState(prev_p, output_scale=interp_from.output_scale)
         sol = _SolverState(sol_p, output_scale=interp_to.output_scale)
@@ -1080,7 +1081,7 @@ class _UncalibratedSolver(_Solver[_SolverState]):
         return _InterpRes(accepted=acc, solution=sol, previous=prev)
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        acc_p, sol_p, prev_p = self.strategy.case_right_corner(interp_to.strategy)
+        acc_p, sol_p, prev_p = self.strategy.case_interpolate_at_t1(interp_to.strategy)
 
         prev = _SolverState(prev_p, output_scale=interp_from.output_scale)
         sol = _SolverState(sol_p, output_scale=interp_to.output_scale)
