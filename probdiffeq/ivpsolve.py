@@ -315,13 +315,17 @@ class _AdaptiveIVPSolver:
         dim = np.atleast_1d(u).size
         return linalg.vector_norm(error_relative, order=self.norm_ord) / np.sqrt(dim)
 
-    def extract(self, state):
+    def extract_before_t1(self, state):
         solution_solver = self.solver.extract(state.step_from)
         solution_control = self.control.extract(state.control)
         return solution_solver, solution_control, state.stats
 
-    def right_corner_and_extract(self, state):
-        interp = self.solver.right_corner(state.interp_from, state.step_from)
+    def extract_at_t1(self, state):
+        # todo: make the "at t1" decision inside interpolate(),
+        #  which collapses the next two functions together
+        interp = self.solver.interpolate_at_t1(
+            interp_from=state.interp_from, interp_to=state.step_from
+        )
         accepted, solution, previous = interp
         state = _AdaptiveState(accepted, previous, state.control, state.stats)
 
@@ -329,8 +333,10 @@ class _AdaptiveIVPSolver:
         solution_control = self.control.extract(state.control)
         return state, (solution_solver, solution_control, state.stats)
 
-    def interpolate_and_extract(self, state, t):
-        interp = self.solver.interpolate(s1=state.step_from, s0=state.interp_from, t=t)
+    def extract_after_t1_via_interpolation(self, state, t):
+        interp = self.solver.interpolate(
+            t, interp_from=state.interp_from, interp_to=state.step_from
+        )
 
         accepted, solution, previous = interp
         state = _AdaptiveState(accepted, previous, state.control, state.stats)
@@ -557,8 +563,8 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     state, solution = control_flow.cond(
         state.step_from.t > t_next + 10 * np.finfo_eps(float),
-        adaptive_solver.interpolate_and_extract,
-        lambda s, _t: adaptive_solver.right_corner_and_extract(s),
+        adaptive_solver.extract_after_t1_via_interpolation,
+        lambda s, _t: adaptive_solver.extract_at_t1(s),
         state,
         t_next,
     )
@@ -625,14 +631,14 @@ def _solution_generator(
         state = adaptive_solver.rejection_loop(state, vector_field=vector_field, t1=t1)
 
         if state.step_from.t < t1:
-            solution = adaptive_solver.extract(state)
+            solution = adaptive_solver.extract_before_t1(state)
             yield solution
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     if state.step_from.t > t1:
-        _, solution = adaptive_solver.interpolate_and_extract(state, t=t1)
+        _, solution = adaptive_solver.extract_after_t1_via_interpolation(state, t=t1)
     else:
-        _, solution = adaptive_solver.right_corner_and_extract(state)
+        _, solution = adaptive_solver.extract_at_t1(state)
 
     yield solution
 
