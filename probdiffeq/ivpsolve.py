@@ -321,7 +321,11 @@ class _AdaptiveIVPSolver:
         return solution_solver, solution_control, state.stats
 
     def extract_at_t1(self, state):
-        interp = self.solver.right_corner(state.interp_from, state.step_from)
+        # todo: make the "at t1" decision inside interpolate(),
+        #  which collapses the next two functions together
+        interp = self.solver.interpolate_at_t1(
+            interp_from=state.interp_from, interp_to=state.step_from
+        )
         accepted, solution, previous = interp
         state = _AdaptiveState(accepted, previous, state.control, state.stats)
 
@@ -330,7 +334,9 @@ class _AdaptiveIVPSolver:
         return state, (solution_solver, solution_control, state.stats)
 
     def extract_after_t1_via_interpolation(self, state, t):
-        interp = self.solver.interpolate(s1=state.step_from, s0=state.interp_from, t=t)
+        interp = self.solver.interpolate(
+            t, interp_from=state.interp_from, interp_to=state.step_from
+        )
 
         accepted, solution, previous = interp
         state = _AdaptiveState(accepted, previous, state.control, state.stats)
