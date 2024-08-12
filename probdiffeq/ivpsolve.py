@@ -326,10 +326,11 @@ class _AdaptiveIVPSolver:
         interp = self.solver.interpolate_at_t1(
             interp_from=state.interp_from, interp_to=state.step_from
         )
-        accepted, solution, previous = interp
-        state = _AdaptiveState(accepted, previous, state.control, state.stats)
+        state = _AdaptiveState(
+            interp.step_from, interp.interp_from, state.control, state.stats
+        )
 
-        solution_solver = self.solver.extract(solution)
+        solution_solver = self.solver.extract(interp.interpolated)
         solution_control = self.control.extract(state.control)
         return state, (solution_solver, solution_control, state.stats)
 
@@ -337,11 +338,11 @@ class _AdaptiveIVPSolver:
         interp = self.solver.interpolate(
             t, interp_from=state.interp_from, interp_to=state.step_from
         )
+        state = _AdaptiveState(
+            interp.step_from, interp.interp_from, state.control, state.stats
+        )
 
-        accepted, solution, previous = interp
-        state = _AdaptiveState(accepted, previous, state.control, state.stats)
-
-        solution_solver = self.solver.extract(solution)
+        solution_solver = self.solver.extract(interp.interpolated)
         solution_control = self.control.extract(state.control)
         return state, (solution_solver, solution_control, state.stats)
 
