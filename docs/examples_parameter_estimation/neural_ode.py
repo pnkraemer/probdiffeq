@@ -91,7 +91,7 @@ def build_update_fn(*, optimizer, loss_fn):
     @jax.jit
     def update(params, opt_state):
         """Update the optimiser state."""
-        loss, grads = jax.value_and_grad(loss_fn)(params)
+        _loss, grads = jax.value_and_grad(loss_fn)(params)
         updates, opt_state = optimizer.update(grads, opt_state)
         params = optax.apply_updates(params, updates)
         return params, opt_state

@@ -2,14 +2,9 @@
 
 from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Array, Callable
+from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util, linop_util
-
-
-class Transformation(containers.NamedTuple):
-    matmul: Callable
-    bias: Array
 
 
 class TransformBackend(abc.ABC):
@@ -165,7 +160,7 @@ class ConditionalBackend(abc.ABC):
         return Conditional(matmul, noise)
 
     @abc.abstractmethod
-    def identity(self, num_derivatives_per_ode_dimension, /):
+    def identity(self, ndim, /):
         raise NotImplementedError
 
     @abc.abstractmethod

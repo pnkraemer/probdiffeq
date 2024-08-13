@@ -106,20 +106,6 @@ def revert_conditional(R_X_F, R_X, R_YX):
     return R_Y, (R_XY, G)
 
 
-def _triu_via_shortcut(R, R_YX):
-    """If R_X and R_X_F are zero, triu_via_qr(R) can be implemented cheaply.
-
-    Namely, by applying it only to R_YX and embedding the result in zeros.
-    This is not only more efficient because it requires fewer floating-point operations
-    than qr-decomposing the full matrix, but it also admits a well-defined
-    reverse-mode derivative!
-    """
-    R = np.zeros_like(R)
-    R_YX = triu_via_qr(R_YX)
-    n, m = np.shape(R_YX)
-    return R.at[:n, :m].set(R_YX)
-
-
 def _is_matrix(mat, matrix_ndim=2):
     return np.ndim(mat) == matrix_ndim
 
