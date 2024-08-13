@@ -42,7 +42,7 @@ class _InterpRes(Generic[R]):
 
 
 @containers.dataclass
-class _ExtrapolationImpl(Generic[T, R, S]):
+class _ExtraImpl(Generic[T, R, S]):
     """Extrapolation model interface."""
 
     num_derivatives: int
@@ -70,9 +70,7 @@ class _ExtrapolationImpl(Generic[T, R, S]):
     """Process the state at checkpoint t=t_n."""
 
 
-def _extrapolation_impl_precon_smoother(
-    discretise, num_derivatives
-) -> _ExtrapolationImpl:
+def _extrapolation_impl_precon_smoother(discretise, num_derivatives) -> _ExtraImpl:
     def initial_condition(tcoeffs, /):
         rv = impl.normal.from_tcoeffs(tcoeffs, num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
@@ -149,7 +147,7 @@ def _extrapolation_impl_precon_smoother(
     def interpolate_at_t1(rv, extra, /):
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
-    return _ExtrapolationImpl(
+    return _ExtraImpl(
         num_derivatives=num_derivatives,
         initial_condition=initial_condition,
         init=init,
@@ -161,9 +159,7 @@ def _extrapolation_impl_precon_smoother(
     )
 
 
-def _extrapolation_impl_precon_fixedpoint(
-    discretise, num_derivatives
-) -> _ExtrapolationImpl:
+def _extrapolation_impl_precon_fixedpoint(discretise, num_derivatives) -> _ExtraImpl:
     def initial_condition(tcoeffs, /):
         rv = impl.normal.from_tcoeffs(tcoeffs, num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
@@ -266,7 +262,7 @@ def _extrapolation_impl_precon_fixedpoint(
         cond_identity = impl.conditional.identity(num_derivatives + 1)
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
-    return _ExtrapolationImpl(
+    return _ExtraImpl(
         num_derivatives=num_derivatives,
         init=init,
         initial_condition=initial_condition,
@@ -278,9 +274,7 @@ def _extrapolation_impl_precon_fixedpoint(
     )
 
 
-def _extrapolation_impl_precon_filter(
-    discretise, num_derivatives
-) -> _ExtrapolationImpl:
+def _extrapolation_impl_precon_filter(discretise, num_derivatives) -> _ExtraImpl:
     def init(sol, /):
         return sol, None
 
@@ -331,7 +325,7 @@ def _extrapolation_impl_precon_filter(
     def interpolate_at_t1(rv, extra, /):
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
-    return _ExtrapolationImpl(
+    return _ExtraImpl(
         num_derivatives=num_derivatives,
         init=init,
         initial_condition=initial_condition,
@@ -355,7 +349,7 @@ class _Strategy:
 
     def __init__(
         self,
-        extrapolation: _ExtrapolationImpl,
+        extrapolation: _ExtraImpl,
         correction,
         *,
         string_repr,
