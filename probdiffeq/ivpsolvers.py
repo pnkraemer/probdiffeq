@@ -805,48 +805,20 @@ _T = TypeVar("_T")
 """A type-variable for state-types."""
 
 
-class _Solver(abc.ABC, Generic[_T]):
+@containers.dataclass
+class _IVPSolver(Generic[_T]):
     """IVP solver."""
 
-    def __init__(self, strategy, *, string_repr, requires_rescaling):
-        self.strategy = strategy
+    strategy: _Strategy
+    string_repr: str
+    requires_rescaling: bool
 
-        self.string_repr = string_repr
-        self.requires_rescaling = requires_rescaling
-
-    def __repr__(self):
-        return self.string_repr
-
-    def initial_condition(self, tcoeffs, /, output_scale):
-        """Construct an initial condition."""
-        if np.shape(output_scale) != np.shape(impl.prototypes.output_scale()):
-            msg1 = "Argument 'output_scale' has the wrong shape. "
-            msg2 = f"Shape {np.shape(impl.prototypes.output_scale())} expected; "
-            msg3 = f"shape {np.shape(output_scale)} received."
-            raise ValueError(msg1 + msg2 + msg3)
-        posterior = self.strategy.initial_condition(tcoeffs)
-        return posterior, output_scale
-
-    @abc.abstractmethod
-    def init(self, t, initial_condition) -> _T:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def step(self, state: _T, *, vector_field, dt) -> _T:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract(self, state: _T, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def interpolate(self, t, *, interp_from: _T, interp_to: _T) -> _InterpRes:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def interpolate_at_t1(self, *, interp_from: _T, interp_to: _T) -> _InterpRes:
-        """Like calling interpolate with a `t` that is at the boundary of the domain."""
-        raise NotImplementedError
+    initial_condition: Callable
+    init: Callable
+    step: Callable
+    extract: Callable
+    interpolate: Callable
+    interpolate_at_t1: Callable
 
 
 class _SolverState(containers.NamedTuple):
@@ -867,57 +839,59 @@ def solver_mle(strategy):
     after solving if the MLE-calibration shall be *used*.
     """
     string_repr = f"<MLE-solver with {strategy}>"
-    return _CalibratedSolver(
+
+    def step_mle(state, /, dt, vector_field, *, calibration):
+        output_scale_prior, _calibrated = calibration.extract(state.output_scale)
+        error, _, state_strategy = strategy.begin(
+            state.strategy, dt=dt, vector_field=vector_field
+        )
+
+        state_strategy = strategy.complete(
+            state_strategy, output_scale=output_scale_prior
+        )
+        observed = state_strategy.aux_corr
+
+        # Calibrate
+        output_scale = calibration.update(state.output_scale, observed=observed)
+
+        # Return
+        state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+        return dt * error, state
+
+    return _ivp_solver_calibrated(
         calibration=_RunningMean(),
-        impl_step=_step_mle,
+        impl_step=step_mle,
         strategy=strategy,
         string_repr=string_repr,
         requires_rescaling=True,
     )
 
 
-def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
-    output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-    error, _, state_strategy = strategy.begin(
-        state.strategy, dt=dt, vector_field=vector_field
-    )
-
-    state_strategy = strategy.complete(state_strategy, output_scale=output_scale_prior)
-    observed = state_strategy.aux_corr
-
-    # Calibrate
-    output_scale = calibration.update(state.output_scale, observed=observed)
-
-    # Return
-    state = _SolverState(strategy=state_strategy, output_scale=output_scale)
-    return dt * error, state
-
-
 def solver_dynamic(strategy):
     """Create a solver that calibrates the output scale dynamically."""
     string_repr = f"<Dynamic solver with {strategy}>"
-    return _CalibratedSolver(
+
+    def step_dynamic(state, /, dt, vector_field, *, calibration):
+        error, observed, state_strategy = strategy.begin(
+            state.strategy, dt=dt, vector_field=vector_field
+        )
+
+        output_scale = calibration.update(state.output_scale, observed=observed)
+
+        prior, _calibrated = calibration.extract(output_scale)
+        state_strategy = strategy.complete(state_strategy, output_scale=prior)
+
+        # Return solution
+        state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+        return dt * error, state
+
+    return _ivp_solver_calibrated(
         strategy=strategy,
         calibration=_MostRecent(),
         string_repr=string_repr,
-        impl_step=_step_dynamic,
+        impl_step=step_dynamic,
         requires_rescaling=False,
     )
-
-
-def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
-    error, observed, state_strategy = strategy.begin(
-        state.strategy, dt=dt, vector_field=vector_field
-    )
-
-    output_scale = calibration.update(state.output_scale, observed=observed)
-
-    prior, _calibrated = calibration.extract(output_scale)
-    state_strategy = strategy.complete(state_strategy, output_scale=prior)
-
-    # Return solution
-    state = _SolverState(strategy=state_strategy, output_scale=output_scale)
-    return dt * error, state
 
 
 class _Calibration(abc.ABC):
@@ -977,38 +951,30 @@ for node in [_RunningMean, _MostRecent]:
     )
 
 
-class _CalibratedSolver(_Solver):
-    def __init__(self, *, calibration: _Calibration, impl_step, **kwargs):
-        super().__init__(**kwargs)
-
-        self.calibration = calibration
-        self.impl_step = impl_step
-
-    def init(self, t, initial_condition) -> _SolverState:
+def _ivp_solver_calibrated(
+    *, calibration, impl_step, strategy, string_repr, requires_rescaling
+) -> _IVPSolver:
+    def init(t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
-        state_strategy = self.strategy.init(t, posterior)
-        calib_state = self.calibration.init(output_scale)
+        state_strategy = strategy.init(t, posterior)
+        calib_state = calibration.init(output_scale)
         return _SolverState(strategy=state_strategy, output_scale=calib_state)
 
-    def step(self, state: _SolverState, *, vector_field, dt) -> _SolverState:
-        return self.impl_step(
-            state,
-            vector_field=vector_field,
-            dt=dt,
-            strategy=self.strategy,
-            calibration=self.calibration,
+    def step(state: _SolverState, *, vector_field, dt) -> _SolverState:
+        return impl_step(
+            state, vector_field=vector_field, dt=dt, calibration=calibration
         )
 
-    def extract(self, state: _SolverState, /):
-        t, posterior = self.strategy.extract(state.strategy)
-        _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
+    def extract(state: _SolverState, /):
+        t, posterior = strategy.extract(state.strategy)
+        _output_scale_prior, output_scale = calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
     def interpolate(
-        self, t, *, interp_from: _SolverState, interp_to: _SolverState
+        t, *, interp_from: _SolverState, interp_to: _SolverState
     ) -> _InterpRes:
-        output_scale, _ = self.calibration.extract(interp_to.output_scale)
-        interp = self.strategy.case_interpolate(
+        output_scale, _ = calibration.extract(interp_to.output_scale)
+        interp = strategy.case_interpolate(
             t, s0=interp_from.strategy, s1=interp_to.strategy, output_scale=output_scale
         )
         prev = _SolverState(interp.interp_from, output_scale=interp_from.output_scale)
@@ -1016,69 +982,53 @@ class _CalibratedSolver(_Solver):
         acc = _SolverState(interp.step_from, output_scale=interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
-    def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        x = self.strategy.case_interpolate_at_t1(interp_to.strategy)
+    def interpolate_at_t1(*, interp_from, interp_to) -> _InterpRes:
+        x = strategy.case_interpolate_at_t1(interp_to.strategy)
 
         prev = _SolverState(x.interp_from, output_scale=interp_from.output_scale)
         sol = _SolverState(x.interpolated, output_scale=interp_to.output_scale)
         acc = _SolverState(x.step_from, output_scale=interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
-
-def _slvr_flatten(solver):
-    children = (solver.strategy, solver.calibration)
-    aux = (solver.impl_step, solver.requires_rescaling, solver.string_repr)
-    return children, aux
-
-
-def _slvr_unflatten(aux, children):
-    strategy, calibration = children
-    impl_step, rescaling, string_repr = aux
-    return _CalibratedSolver(
+    return _ivp_solver(
         strategy=strategy,
-        calibration=calibration,
-        impl_step=impl_step,
-        requires_rescaling=rescaling,
         string_repr=string_repr,
+        requires_rescaling=requires_rescaling,
+        init=init,
+        step=step,
+        extract=extract,
+        interpolate=interpolate,
+        interpolate_at_t1=interpolate_at_t1,
     )
-
-
-tree_util.register_pytree_node(_CalibratedSolver, _slvr_flatten, _slvr_unflatten)
 
 
 def solver(strategy, /):
     """Create a solver that does not calibrate the output scale automatically."""
-    string_repr = f"<Uncalibrated solver with {strategy}>"
-    return _UncalibratedSolver(
-        strategy=strategy, string_repr=string_repr, requires_rescaling=False
-    )
 
-
-class _UncalibratedSolver(_Solver[_SolverState]):
-    def init(self, t, initial_condition) -> _SolverState:
+    def init(t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
-        state_strategy = self.strategy.init(t, posterior)
+        state_strategy = strategy.init(t, posterior)
         return _SolverState(strategy=state_strategy, output_scale=output_scale)
 
-    def step(self, state: _SolverState, *, vector_field, dt):
-        error, _observed, state_strategy = self.strategy.begin(
+    def step(state: _SolverState, *, vector_field, dt):
+        error, _observed, state_strategy = strategy.begin(
             state.strategy, dt=dt, vector_field=vector_field
         )
-        state_strategy = self.strategy.complete(
+        state_strategy = strategy.complete(
             state_strategy, output_scale=state.output_scale
         )
         # Extract and return solution
         state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
         return dt * error, state
 
-    def extract(self, state: _SolverState, /):
-        t, posterior = self.strategy.extract(state.strategy)
+    def extract(state: _SolverState, /):
+        t, posterior = strategy.extract(state.strategy)
         return t, (posterior, state.output_scale)
 
     def interpolate(
-        self, t, *, interp_from: _SolverState, interp_to: _SolverState
+        t, *, interp_from: _SolverState, interp_to: _SolverState
     ) -> _InterpRes:
-        interp = self.strategy.case_interpolate(
+        interp = strategy.case_interpolate(
             t,
             s0=interp_from.strategy,
             s1=interp_to.strategy,
@@ -1089,29 +1039,56 @@ class _UncalibratedSolver(_Solver[_SolverState]):
         acc = _SolverState(interp.step_from, output_scale=interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
-    def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        interp = self.strategy.case_interpolate_at_t1(interp_to.strategy)
+    def interpolate_at_t1(*, interp_from, interp_to) -> _InterpRes:
+        interp = strategy.case_interpolate_at_t1(interp_to.strategy)
 
         prev = _SolverState(interp.interp_from, output_scale=interp_from.output_scale)
         sol = _SolverState(interp.interpolated, output_scale=interp_to.output_scale)
         acc = _SolverState(interp.step_from, output_scale=interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
-
-def _solver_flatten(slvr):
-    children = (slvr.strategy,)
-    aux = (slvr.requires_rescaling, slvr.string_repr)
-    return children, aux
-
-
-def _solver_unflatten(aux, children):
-    (strategy,) = children
-    rescaling, string_repr = aux
-    return _UncalibratedSolver(
-        strategy=strategy, requires_rescaling=rescaling, string_repr=string_repr
+    string_repr = f"<Uncalibrated solver with {strategy}>"
+    return _ivp_solver(
+        strategy=strategy,
+        string_repr=string_repr,
+        requires_rescaling=False,
+        init=init,
+        step=step,
+        extract=extract,
+        interpolate=interpolate,
+        interpolate_at_t1=interpolate_at_t1,
     )
 
 
-tree_util.register_pytree_node(
-    _UncalibratedSolver, flatten_func=_solver_flatten, unflatten_func=_solver_unflatten
-)
+def _ivp_solver(
+    *,
+    strategy,
+    string_repr,
+    requires_rescaling,
+    init,
+    step,
+    extract,
+    interpolate,
+    interpolate_at_t1,
+):
+    def initial_condition(tcoeffs, /, output_scale):
+        """Construct an initial condition."""
+        if np.shape(output_scale) != np.shape(impl.prototypes.output_scale()):
+            msg1 = "Argument 'output_scale' has the wrong shape. "
+            msg2 = f"Shape {np.shape(impl.prototypes.output_scale())} expected; "
+            msg3 = f"shape {np.shape(output_scale)} received."
+            raise ValueError(msg1 + msg2 + msg3)
+        posterior = strategy.initial_condition(tcoeffs)
+        return posterior, output_scale
+
+    return _IVPSolver(
+        strategy=strategy,
+        string_repr=string_repr,
+        requires_rescaling=requires_rescaling,
+        initial_condition=initial_condition,
+        init=init,
+        step=step,
+        extract=extract,
+        interpolate=interpolate,
+        interpolate_at_t1=interpolate_at_t1,
+    )

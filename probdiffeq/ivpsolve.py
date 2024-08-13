@@ -351,14 +351,14 @@ class _AdaptiveIVPSolver:
 
 
 def _asolver_flatten(asolver):
-    children = (asolver.solver, asolver.atol, asolver.rtol, asolver.control)
-    aux = (asolver.norm_ord,)
+    children = (asolver.atol, asolver.rtol, asolver.control)
+    aux = (asolver.solver, asolver.norm_ord)
     return children, aux
 
 
 def _asolver_unflatten(aux, children):
-    solver, atol, rtol, control = children
-    (norm_ord,) = aux
+    atol, rtol, control = children
+    (solver, norm_ord) = aux
     return _AdaptiveIVPSolver(
         solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
     )
