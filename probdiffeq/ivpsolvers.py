@@ -123,7 +123,7 @@ class _Strategy:
         rv, corr = self.correction.init(rv)
         return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def predict_error(self, state: _StrategyState, /, *, dt, vector_field):
+    def begin(self, state: _StrategyState, /, *, dt, vector_field):
         """Predict the error of an upcoming step."""
         hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         t = state.t + dt
@@ -395,10 +395,6 @@ class _PreconFixedPoint(_ExtrapolationImpl):
 
         # Gather and return
         return extrapolated, cond
-
-    def reset(self, ssv, _extra, /):
-        cond = impl.conditional.identity(self.num_derivatives + 1)
-        return ssv, cond
 
     def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
         """Interpolate.
@@ -875,7 +871,7 @@ def solver_mle(strategy):
 
 def _step_mle(state, /, dt, vector_field, *, strategy, calibration):
     output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-    error, _, state_strategy = strategy.predict_error(
+    error, _, state_strategy = strategy.begin(
         state.strategy, dt=dt, vector_field=vector_field
     )
 
@@ -903,7 +899,7 @@ def solver_dynamic(strategy):
 
 
 def _step_dynamic(state, /, dt, vector_field, *, strategy, calibration):
-    error, observed, state_strategy = strategy.predict_error(
+    error, observed, state_strategy = strategy.begin(
         state.strategy, dt=dt, vector_field=vector_field
     )
 
@@ -1058,7 +1054,7 @@ class _UncalibratedSolver(_Solver[_SolverState]):
         return _SolverState(strategy=state_strategy, output_scale=output_scale)
 
     def step(self, state: _SolverState, *, vector_field, dt):
-        error, _observed, state_strategy = self.strategy.predict_error(
+        error, _observed, state_strategy = self.strategy.begin(
             state.strategy, dt=dt, vector_field=vector_field
         )
         state_strategy = self.strategy.complete(
