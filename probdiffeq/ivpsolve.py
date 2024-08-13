@@ -174,22 +174,6 @@ def _integral_extract(dt, /):
     return dt
 
 
-# Register the control algorithm as a pytree (temporary?)
-
-
-def _flatten(ctrl):
-    aux = ctrl.init, ctrl.apply, ctrl.clip, ctrl.extract
-    return (), aux
-
-
-def _unflatten(aux, _children):
-    init, apply, clip, extract = aux
-    return _Controller(init=init, apply=apply, clip=clip, extract=extract)
-
-
-tree_util.register_pytree_node(_Controller, _flatten, _unflatten)
-
-
 def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     """Make an IVP solver adaptive."""
     if control is None:
@@ -351,14 +335,14 @@ class _AdaptiveIVPSolver:
 
 
 def _asolver_flatten(asolver):
-    children = (asolver.atol, asolver.rtol, asolver.control)
-    aux = (asolver.solver, asolver.norm_ord)
+    children = (asolver.atol, asolver.rtol)
+    aux = (asolver.solver, asolver.control, asolver.norm_ord)
     return children, aux
 
 
 def _asolver_unflatten(aux, children):
-    atol, rtol, control = children
-    (solver, norm_ord) = aux
+    atol, rtol = children
+    (solver, control, norm_ord) = aux
     return _AdaptiveIVPSolver(
         solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
     )
