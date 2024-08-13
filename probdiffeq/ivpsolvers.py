@@ -1,7 +1,7 @@
 """Probabilistic IVP solvers."""
 
 from probdiffeq import stats
-from probdiffeq.backend import abc, containers, functools, special, tree_util
+from probdiffeq.backend import containers, functools, special, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 from probdiffeq.impl import impl
@@ -802,6 +802,51 @@ def _estimate_error(observed, /):
 
 
 @containers.dataclass
+class _Calibration:
+    """Calibration implementation."""
+
+    init: Callable
+    update: Callable
+    extract: Callable
+
+
+def _calibration_most_recent() -> _Calibration:
+    def init(prior):
+        return prior
+
+    def update(_state, /, observed):
+        return impl.stats.mahalanobis_norm_relative(0.0, observed)
+
+    def extract(state, /):
+        return state, state
+
+    return _Calibration(init=init, update=update, extract=extract)
+
+
+def _calibration_running_mean() -> _Calibration:
+    # TODO: if we pass the mahalanobis_relative term to the update() function,
+    #  it reduces to a generic stats() module that can also be used for e.g.
+    #  marginal likelihoods.
+    #  In this case, the _calibration_most_recent() stuff becomes void.
+
+    def init(prior):
+        return prior, prior, 0.0
+
+    def update(state, /, observed):
+        prior, calibrated, num_data = state
+
+        new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
+        calibrated = impl.stats.update_mean(calibrated, new_term, num=num_data)
+        return prior, calibrated, num_data + 1.0
+
+    def extract(state, /):
+        prior, calibrated, _num_data = state
+        return prior, calibrated
+
+    return _Calibration(init=init, update=update, extract=extract)
+
+
+@containers.dataclass
 class _IVPSolver:
     """IVP solver."""
 
@@ -855,7 +900,7 @@ def solver_mle(strategy):
         return dt * error, state
 
     return _ivp_solver_calibrated(
-        calibration=_RunningMean(),
+        calibration=_calibration_running_mean(),
         impl_step=step_mle,
         strategy=strategy,
         string_repr=string_repr,
@@ -883,67 +928,10 @@ def solver_dynamic(strategy):
 
     return _ivp_solver_calibrated(
         strategy=strategy,
-        calibration=_MostRecent(),
+        calibration=_calibration_most_recent(),
         string_repr=string_repr,
         impl_step=step_dynamic,
         requires_rescaling=False,
-    )
-
-
-class _Calibration(abc.ABC):
-    """Calibration implementation."""
-
-    @abc.abstractmethod
-    def init(self, prior):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def update(self, state, /, observed):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def extract(self, state, /):
-        raise NotImplementedError
-
-
-class _MostRecent(_Calibration):
-    def init(self, prior):
-        return prior
-
-    def update(self, _state, /, observed):
-        return impl.stats.mahalanobis_norm_relative(0.0, observed)
-
-    def extract(self, state, /):
-        return state, state
-
-
-# TODO: if we pass the mahalanobis_relative term to the update() function,
-#  it reduces to a generic stats() module that can also be used for e.g.
-#  marginal likelihoods. In this case, the _MostRecent() stuff becomes void.
-class _RunningMean(_Calibration):
-    def init(self, prior):
-        return prior, prior, 0.0
-
-    def update(self, state, /, observed):
-        prior, calibrated, num_data = state
-
-        new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
-        calibrated = impl.stats.update_mean(calibrated, new_term, num=num_data)
-        return prior, calibrated, num_data + 1.0
-
-    def extract(self, state, /):
-        prior, calibrated, _num_data = state
-        return prior, calibrated
-
-
-def _unflatten_func(nodetype):
-    return lambda *_a: nodetype()
-
-
-# Register objects as (empty) pytrees. todo: temporary?!
-for node in [_RunningMean, _MostRecent]:
-    tree_util.register_pytree_node(
-        node, flatten_func=lambda _: ((), ()), unflatten_func=_unflatten_func(node)
     )
 
 
