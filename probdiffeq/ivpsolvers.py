@@ -41,6 +41,101 @@ class _InterpRes(Generic[R]):
     """
 
 
+class _PositiveCubatureRule(containers.NamedTuple):
+    """Cubature rule with positive weights."""
+
+    points: Array
+    weights_sqrtm: Array
+
+
+def cubature_third_order_spherical(input_shape) -> _PositiveCubatureRule:
+    """Third-order spherical cubature integration."""
+    assert len(input_shape) <= 1
+    if len(input_shape) == 1:
+        (d,) = input_shape
+        points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
+        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+
+    # If input_shape == (), compute weights via input_shape=(1,)
+    # and 'squeeze' the points.
+    points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
+    (S, _) = points_mat.shape
+    points = np.reshape(points_mat, (S,))
+    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+
+
+def _third_order_spherical_params(*, d):
+    eye_d = np.eye(d) * np.sqrt(d)
+    pts = np.concatenate((eye_d, -1 * eye_d))
+    weights_sqrtm = np.ones((2 * d,)) / np.sqrt(2.0 * d)
+    return pts, weights_sqrtm
+
+
+def cubature_unscented_transform(input_shape, r=1.0) -> _PositiveCubatureRule:
+    """Unscented transform."""
+    assert len(input_shape) <= 1
+    if len(input_shape) == 1:
+        (d,) = input_shape
+        points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
+        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+
+    # If input_shape == (), compute weights via input_shape=(1,)
+    # and 'squeeze' the points.
+    points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
+    (S, _) = points_mat.shape
+    points = np.reshape(points_mat, (S,))
+    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+
+
+def _unscented_transform_params(d, *, r):
+    eye_d = np.eye(d) * np.sqrt(d + r)
+    zeros = np.zeros((1, d))
+    pts = np.concatenate((eye_d, zeros, -1 * eye_d))
+    _scale = d + r
+    weights_sqrtm1 = np.ones((d,)) / np.sqrt(2.0 * _scale)
+    weights_sqrtm2 = np.sqrt(r / _scale)
+    weights_sqrtm = np.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
+    return pts, weights_sqrtm
+
+
+def cubature_gauss_hermite(input_shape, degree=5) -> _PositiveCubatureRule:
+    """(Statistician's) Gauss-Hermite cubature.
+
+    The number of cubature points is `prod(input_shape)**degree`.
+    """
+    assert len(input_shape) == 1
+    (dim,) = input_shape
+
+    # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
+    _roots = special.roots_hermitenorm(n=degree, mu=True)
+    pts, weights, sum_of_weights = _roots
+    weights = weights / sum_of_weights
+
+    # Transform into jax arrays and take square root of weights
+    pts = np.asarray(pts)
+    weights_sqrtm = np.sqrt(np.asarray(weights))
+
+    # Build a tensor grid and return class
+    tensor_pts = _tensor_points(pts, d=dim)
+    tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
+    return _PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
+
+
+# how does this generalise to an input_shape instead of an input_dimension?
+# via tree_map(lambda s: _tensor_points(x, s), input_shape)?
+
+
+def _tensor_weights(*args, **kwargs):
+    mesh = _tensor_points(*args, **kwargs)
+    return np.prod_along_axis(mesh, axis=1)
+
+
+def _tensor_points(x, /, *, d):
+    x_mesh = np.meshgrid(*([x] * d))
+    y_mesh = tree_util.tree_map(lambda s: np.reshape(s, (-1,)), x_mesh)
+    return np.stack(y_mesh).T
+
+
 @containers.dataclass
 class _ExtraImpl(Generic[T, R, S]):
     """Extrapolation model interface."""
@@ -337,320 +432,6 @@ def _extra_impl_precon_filter(discretise, num_derivatives) -> _ExtraImpl:
     )
 
 
-class _StrategyState(containers.NamedTuple):
-    t: Any
-    hidden: Any
-    aux_extra: Any
-    aux_corr: Any
-
-
-@containers.dataclass
-class _Strategy:
-    """Estimation strategy."""
-
-    name: str
-
-    is_suitable_for_save_at: int
-    is_suitable_for_save_every_step: int
-
-    extrapolation: _ExtraImpl
-
-    initial_condition: Callable
-    """Construct an initial condition from a set of Taylor coefficients."""
-
-    init: Callable
-    """Initialise a state from a posterior."""
-
-    begin: Callable
-    """Predict the error of an upcoming step."""
-
-    complete: Callable
-    """Complete the step after the error has been predicted."""
-
-    extract: Callable
-    """Extract the solution from a state."""
-
-    case_interpolate_at_t1: Callable
-    """Process the solution in case t=t_n."""
-
-    case_interpolate: Callable
-
-    offgrid_marginals: Callable
-    """Compute offgrid_marginals."""
-
-
-def strategy_smoother(prior, correction, /) -> _Strategy:
-    """Construct a smoother."""
-    extrapolation_impl = _extra_impl_precon_smoother(*prior)
-    return _strategy(
-        extrapolation_impl,
-        correction,
-        is_suitable_for_save_at=False,
-        is_suitable_for_save_every_step=True,
-        is_suitable_for_offgrid_marginals=True,
-        string_repr=f"<Smoother with {extrapolation_impl}, {correction}>",
-    )
-
-
-def strategy_fixedpoint(prior, correction, /) -> _Strategy:
-    """Construct a fixedpoint-smoother."""
-    extrapolation_impl = _extra_impl_precon_fixedpoint(*prior)
-    return _strategy(
-        extrapolation_impl,
-        correction,
-        is_suitable_for_save_at=True,
-        is_suitable_for_save_every_step=False,
-        is_suitable_for_offgrid_marginals=False,
-        string_repr=f"<Fixedpoint smoother with {extrapolation_impl}, {correction}>",
-    )
-
-
-def strategy_filter(prior, correction, /) -> _Strategy:
-    """Construct a filter."""
-    extrapolation_impl = _extra_impl_precon_filter(*prior)
-    return _strategy(
-        extrapolation_impl,
-        correction,
-        string_repr=f"<Filter with {extrapolation_impl}, {correction}>",
-        is_suitable_for_save_at=True,
-        is_suitable_for_offgrid_marginals=True,
-        is_suitable_for_save_every_step=True,
-    )
-
-
-def _strategy(
-    extrapolation: _ExtraImpl,
-    correction,
-    *,
-    string_repr,
-    is_suitable_for_save_at,
-    is_suitable_for_save_every_step,
-    is_suitable_for_offgrid_marginals,
-):
-    def init(t, posterior, /) -> _StrategyState:
-        rv, extra = extrapolation.init(posterior)
-        rv, corr = correction.init(rv)
-        return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
-
-    def initial_condition(taylor_coefficients, /):
-        return extrapolation.initial_condition(taylor_coefficients)
-
-    def begin(state: _StrategyState, /, *, dt, vector_field):
-        hidden, extra = extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
-        t = state.t + dt
-        error, observed, corr = correction.estimate_error(
-            hidden, state.aux_corr, vector_field=vector_field, t=t
-        )
-        state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
-        return error, observed, state
-
-    def complete(state, /, *, output_scale):
-        hidden, extra = extrapolation.complete(
-            state.hidden, state.aux_extra, output_scale=output_scale
-        )
-        hidden, corr = correction.complete(hidden, state.aux_corr)
-        return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
-
-    def extract(state: _StrategyState, /):
-        hidden = correction.extract(state.hidden, state.aux_corr)
-        sol = extrapolation.extract(hidden, state.aux_extra)
-        return state.t, sol
-
-    def case_interpolate_at_t1(state_t1: _StrategyState) -> _InterpRes:
-        _tmp = extrapolation.interpolate_at_t1(state_t1.hidden, state_t1.aux_extra)
-        step_from, solution, interp_from = (
-            _tmp.step_from,
-            _tmp.interpolated,
-            _tmp.interp_from,
-        )
-
-        def _state(x):
-            t = state_t1.t
-            corr_like = tree_util.tree_map(np.empty_like, state_t1.aux_corr)
-            return _StrategyState(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
-
-        step_from = _state(step_from)
-        solution = _state(solution)
-        interp_from = _state(interp_from)
-        return _InterpRes(step_from, solution, interp_from)
-
-    def case_interpolate(
-        t, *, s0: _StrategyState, s1: _StrategyState, output_scale
-    ) -> _InterpRes:
-        """Process the solution in case t>t_n."""
-        # Interpolate
-        interp = extrapolation.interpolate(
-            state_t0=(s0.hidden, s0.aux_extra),
-            marginal_t1=s1.hidden,
-            dt0=t - s0.t,
-            dt1=s1.t - t,
-            output_scale=output_scale,
-        )
-
-        # Turn outputs into valid states
-
-        def _state(t_, x):
-            corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
-            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
-
-        step_from = _state(s1.t, interp.step_from)
-        interpolated = _state(t, interp.interpolated)
-        interp_from = _state(t, interp.interp_from)
-        return _InterpRes(
-            step_from=step_from, interpolated=interpolated, interp_from=interp_from
-        )
-
-    def offgrid_marginals(*, t, marginals_t1, posterior_t0, t0, t1, output_scale):
-        if not is_suitable_for_offgrid_marginals:
-            raise NotImplementedError
-
-        dt0 = t - t0
-        dt1 = t1 - t
-        state_t0 = init(t0, posterior_t0)
-
-        interp = extrapolation.interpolate(
-            state_t0=(state_t0.hidden, state_t0.aux_extra),
-            marginal_t1=marginals_t1,
-            dt0=dt0,
-            dt1=dt1,
-            output_scale=output_scale,
-        )
-
-        (marginals, _aux) = interp.interpolated
-        u = impl.stats.qoi(marginals)
-        return u, marginals
-
-    return _Strategy(
-        name=string_repr,
-        init=init,
-        initial_condition=initial_condition,
-        begin=begin,
-        complete=complete,
-        extract=extract,
-        case_interpolate_at_t1=case_interpolate_at_t1,
-        case_interpolate=case_interpolate,
-        offgrid_marginals=offgrid_marginals,
-        is_suitable_for_save_at=is_suitable_for_save_at,
-        is_suitable_for_save_every_step=is_suitable_for_save_every_step,
-        extrapolation=extrapolation,
-    )
-
-
-class _PositiveCubatureRule(containers.NamedTuple):
-    """Cubature rule with positive weights."""
-
-    points: Array
-    weights_sqrtm: Array
-
-
-def cubature_third_order_spherical(input_shape) -> _PositiveCubatureRule:
-    """Third-order spherical cubature integration."""
-    assert len(input_shape) <= 1
-    if len(input_shape) == 1:
-        (d,) = input_shape
-        points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
-        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
-
-    # If input_shape == (), compute weights via input_shape=(1,)
-    # and 'squeeze' the points.
-    points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
-    (S, _) = points_mat.shape
-    points = np.reshape(points_mat, (S,))
-    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
-
-
-def _third_order_spherical_params(*, d):
-    eye_d = np.eye(d) * np.sqrt(d)
-    pts = np.concatenate((eye_d, -1 * eye_d))
-    weights_sqrtm = np.ones((2 * d,)) / np.sqrt(2.0 * d)
-    return pts, weights_sqrtm
-
-
-def cubature_unscented_transform(input_shape, r=1.0) -> _PositiveCubatureRule:
-    """Unscented transform."""
-    assert len(input_shape) <= 1
-    if len(input_shape) == 1:
-        (d,) = input_shape
-        points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
-        return _PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
-
-    # If input_shape == (), compute weights via input_shape=(1,)
-    # and 'squeeze' the points.
-    points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
-    (S, _) = points_mat.shape
-    points = np.reshape(points_mat, (S,))
-    return _PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
-
-
-def _unscented_transform_params(d, *, r):
-    eye_d = np.eye(d) * np.sqrt(d + r)
-    zeros = np.zeros((1, d))
-    pts = np.concatenate((eye_d, zeros, -1 * eye_d))
-    _scale = d + r
-    weights_sqrtm1 = np.ones((d,)) / np.sqrt(2.0 * _scale)
-    weights_sqrtm2 = np.sqrt(r / _scale)
-    weights_sqrtm = np.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
-    return pts, weights_sqrtm
-
-
-def cubature_gauss_hermite(input_shape, degree=5) -> _PositiveCubatureRule:
-    """(Statistician's) Gauss-Hermite cubature.
-
-    The number of cubature points is `prod(input_shape)**degree`.
-    """
-    assert len(input_shape) == 1
-    (dim,) = input_shape
-
-    # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
-    _roots = special.roots_hermitenorm(n=degree, mu=True)
-    pts, weights, sum_of_weights = _roots
-    weights = weights / sum_of_weights
-
-    # Transform into jax arrays and take square root of weights
-    pts = np.asarray(pts)
-    weights_sqrtm = np.sqrt(np.asarray(weights))
-
-    # Build a tensor grid and return class
-    tensor_pts = _tensor_points(pts, d=dim)
-    tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
-    return _PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
-
-
-# how does this generalise to an input_shape instead of an input_dimension?
-# via tree_map(lambda s: _tensor_points(x, s), input_shape)?
-
-
-def _tensor_weights(*args, **kwargs):
-    mesh = _tensor_points(*args, **kwargs)
-    return np.prod_along_axis(mesh, axis=1)
-
-
-def _tensor_points(x, /, *, d):
-    x_mesh = np.meshgrid(*([x] * d))
-    y_mesh = tree_util.tree_map(lambda s: np.reshape(s, (-1,)), x_mesh)
-    return np.stack(y_mesh).T
-
-
-def prior_ibm(num_derivatives, output_scale=None):
-    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
-    output_scale = output_scale or np.ones_like(impl.prototypes.output_scale())
-    discretise = impl.conditional.ibm_transitions(num_derivatives, output_scale)
-    return discretise, num_derivatives
-
-
-def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
-    """Compute a time-discretised, multiply-integrated Wiener process."""
-    discretise, _ = prior_ibm(num_derivatives, output_scale=output_scale)
-    transitions, (p, p_inv) = functools.vmap(discretise)(np.diff(ts))
-
-    preconditioner_apply_vmap = functools.vmap(impl.conditional.preconditioner_apply)
-    conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
-
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = impl.normal.standard(num_derivatives + 1, output_scale=output_scale)
-    return stats.MarkovSeq(init, conditionals)
-
-
 @containers.dataclass
 class _Correction:
     """Correction model interface."""
@@ -791,6 +572,224 @@ def _estimate_error(observed, /):
     return output_scale * error_estimate_unscaled
 
 
+class _StrategyState(containers.NamedTuple):
+    t: Any
+    hidden: Any
+    aux_extra: Any
+    aux_corr: Any
+
+
+@containers.dataclass
+class _Strategy:
+    """Estimation strategy."""
+
+    name: str
+
+    is_suitable_for_save_at: int
+    is_suitable_for_save_every_step: int
+    num_derivatives: int
+
+    initial_condition: Callable
+    """Construct an initial condition from a set of Taylor coefficients."""
+
+    init: Callable
+    """Initialise a state from a posterior."""
+
+    begin: Callable
+    """Predict the error of an upcoming step."""
+
+    complete: Callable
+    """Complete the step after the error has been predicted."""
+
+    extract: Callable
+    """Extract the solution from a state."""
+
+    case_interpolate_at_t1: Callable
+    """Process the solution in case t=t_n."""
+
+    case_interpolate: Callable
+
+    offgrid_marginals: Callable
+    """Compute offgrid_marginals."""
+
+
+def strategy_smoother(prior, correction: _Correction, /) -> _Strategy:
+    """Construct a smoother."""
+    extrapolation_impl = _extra_impl_precon_smoother(*prior)
+    return _strategy(
+        extrapolation_impl,
+        correction,
+        is_suitable_for_save_at=False,
+        is_suitable_for_save_every_step=True,
+        is_suitable_for_offgrid_marginals=True,
+        string_repr=f"<Smoother with {extrapolation_impl}, {correction}>",
+    )
+
+
+def strategy_fixedpoint(prior, correction: _Correction, /) -> _Strategy:
+    """Construct a fixedpoint-smoother."""
+    extrapolation_impl = _extra_impl_precon_fixedpoint(*prior)
+    return _strategy(
+        extrapolation_impl,
+        correction,
+        is_suitable_for_save_at=True,
+        is_suitable_for_save_every_step=False,
+        is_suitable_for_offgrid_marginals=False,
+        string_repr=f"<Fixedpoint smoother with {extrapolation_impl}, {correction}>",
+    )
+
+
+def strategy_filter(prior, correction: _Correction, /) -> _Strategy:
+    """Construct a filter."""
+    extrapolation_impl = _extra_impl_precon_filter(*prior)
+    return _strategy(
+        extrapolation_impl,
+        correction,
+        string_repr=f"<Filter with {extrapolation_impl}, {correction}>",
+        is_suitable_for_save_at=True,
+        is_suitable_for_offgrid_marginals=True,
+        is_suitable_for_save_every_step=True,
+    )
+
+
+def _strategy(
+    extrapolation: _ExtraImpl,
+    correction: _Correction,
+    *,
+    string_repr,
+    is_suitable_for_save_at,
+    is_suitable_for_save_every_step,
+    is_suitable_for_offgrid_marginals,
+):
+    def init(t, posterior, /) -> _StrategyState:
+        rv, extra = extrapolation.init(posterior)
+        rv, corr = correction.init(rv)
+        return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+
+    def initial_condition(taylor_coefficients, /):
+        return extrapolation.initial_condition(taylor_coefficients)
+
+    def begin(state: _StrategyState, /, *, dt, vector_field):
+        hidden, extra = extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
+        t = state.t + dt
+        error, observed, corr = correction.estimate_error(
+            hidden, state.aux_corr, vector_field=vector_field, t=t
+        )
+        state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
+        return error, observed, state
+
+    def complete(state, /, *, output_scale):
+        hidden, extra = extrapolation.complete(
+            state.hidden, state.aux_extra, output_scale=output_scale
+        )
+        hidden, corr = correction.complete(hidden, state.aux_corr)
+        return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
+
+    def extract(state: _StrategyState, /):
+        hidden = correction.extract(state.hidden, state.aux_corr)
+        sol = extrapolation.extract(hidden, state.aux_extra)
+        return state.t, sol
+
+    def case_interpolate_at_t1(state_t1: _StrategyState) -> _InterpRes:
+        _tmp = extrapolation.interpolate_at_t1(state_t1.hidden, state_t1.aux_extra)
+        step_from, solution, interp_from = (
+            _tmp.step_from,
+            _tmp.interpolated,
+            _tmp.interp_from,
+        )
+
+        def _state(x):
+            t = state_t1.t
+            corr_like = tree_util.tree_map(np.empty_like, state_t1.aux_corr)
+            return _StrategyState(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+
+        step_from = _state(step_from)
+        solution = _state(solution)
+        interp_from = _state(interp_from)
+        return _InterpRes(step_from, solution, interp_from)
+
+    def case_interpolate(
+        t, *, s0: _StrategyState, s1: _StrategyState, output_scale
+    ) -> _InterpRes:
+        """Process the solution in case t>t_n."""
+        # Interpolate
+        interp = extrapolation.interpolate(
+            state_t0=(s0.hidden, s0.aux_extra),
+            marginal_t1=s1.hidden,
+            dt0=t - s0.t,
+            dt1=s1.t - t,
+            output_scale=output_scale,
+        )
+
+        # Turn outputs into valid states
+
+        def _state(t_, x):
+            corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
+            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+
+        step_from = _state(s1.t, interp.step_from)
+        interpolated = _state(t, interp.interpolated)
+        interp_from = _state(t, interp.interp_from)
+        return _InterpRes(
+            step_from=step_from, interpolated=interpolated, interp_from=interp_from
+        )
+
+    def offgrid_marginals(*, t, marginals_t1, posterior_t0, t0, t1, output_scale):
+        if not is_suitable_for_offgrid_marginals:
+            raise NotImplementedError
+
+        dt0 = t - t0
+        dt1 = t1 - t
+        state_t0 = init(t0, posterior_t0)
+
+        interp = extrapolation.interpolate(
+            state_t0=(state_t0.hidden, state_t0.aux_extra),
+            marginal_t1=marginals_t1,
+            dt0=dt0,
+            dt1=dt1,
+            output_scale=output_scale,
+        )
+
+        (marginals, _aux) = interp.interpolated
+        u = impl.stats.qoi(marginals)
+        return u, marginals
+
+    return _Strategy(
+        name=string_repr,
+        init=init,
+        initial_condition=initial_condition,
+        begin=begin,
+        complete=complete,
+        extract=extract,
+        case_interpolate_at_t1=case_interpolate_at_t1,
+        case_interpolate=case_interpolate,
+        offgrid_marginals=offgrid_marginals,
+        is_suitable_for_save_at=is_suitable_for_save_at,
+        is_suitable_for_save_every_step=is_suitable_for_save_every_step,
+        num_derivatives=extrapolation.num_derivatives,
+    )
+
+
+def prior_ibm(num_derivatives, output_scale=None):
+    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
+    output_scale = output_scale or np.ones_like(impl.prototypes.output_scale())
+    discretise = impl.conditional.ibm_transitions(num_derivatives, output_scale)
+    return discretise, num_derivatives
+
+
+def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
+    """Compute a time-discretised, multiply-integrated Wiener process."""
+    discretise, _ = prior_ibm(num_derivatives, output_scale=output_scale)
+    transitions, (p, p_inv) = functools.vmap(discretise)(np.diff(ts))
+
+    preconditioner_apply_vmap = functools.vmap(impl.conditional.preconditioner_apply)
+    conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
+
+    output_scale = np.ones_like(impl.prototypes.output_scale())
+    init = impl.normal.standard(num_derivatives + 1, output_scale=output_scale)
+    return stats.MarkovSeq(init, conditionals)
+
+
 @containers.dataclass
 class _Calibration:
     """Calibration implementation."""
@@ -840,9 +839,11 @@ def _calibration_running_mean() -> _Calibration:
 class _Solver:
     """IVP solver."""
 
-    strategy: _Strategy
     string_repr: str
     requires_rescaling: bool
+    error_contraction_rate: int
+    is_suitable_for_save_at: int
+    is_suitable_for_save_every_step: int
 
     initial_condition: Callable
     init: Callable
@@ -850,6 +851,7 @@ class _Solver:
     extract: Callable
     interpolate: Callable
     interpolate_at_t1: Callable
+    offgrid_marginals: Callable
 
 
 class _SolverState(containers.NamedTuple):
@@ -1056,7 +1058,9 @@ def _solver(
         return posterior, output_scale
 
     return _Solver(
-        strategy=strategy,
+        error_contraction_rate=strategy.num_derivatives + 1,
+        is_suitable_for_save_at=strategy.is_suitable_for_save_at,
+        is_suitable_for_save_every_step=strategy.is_suitable_for_save_every_step,
         string_repr=string_repr,
         requires_rescaling=requires_rescaling,
         initial_condition=initial_condition,
@@ -1065,4 +1069,5 @@ def _solver(
         extract=extract,
         interpolate=interpolate,
         interpolate_at_t1=interpolate_at_t1,
+        offgrid_marginals=strategy.offgrid_marginals,
     )
