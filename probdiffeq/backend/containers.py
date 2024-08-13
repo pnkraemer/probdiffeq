@@ -9,8 +9,3 @@ from typing_extensions import dataclass_transform  # new in Python 3.11
 @dataclass_transform()
 def dataclass(*args, **kwargs):
     return dataclasses.dataclass(*args, **kwargs)
-
-
-@dataclass_transform()
-def dataclass_astuple(datacls):
-    return dataclasses.astuple(datacls)

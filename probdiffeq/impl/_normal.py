@@ -18,7 +18,7 @@ class NormalBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def standard(self, num_derivatives_per_ode_dimension, /, output_scale) -> Normal:
+    def standard(self, num, /, output_scale) -> Normal:
         raise NotImplementedError
 
 
