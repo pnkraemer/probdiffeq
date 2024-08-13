@@ -70,7 +70,7 @@ class _ExtraImpl(Generic[T, R, S]):
     """Process the state at checkpoint t=t_n."""
 
 
-def _extrapolation_impl_precon_smoother(discretise, num_derivatives) -> _ExtraImpl:
+def _extra_impl_precon_smoother(discretise, num_derivatives) -> _ExtraImpl:
     def initial_condition(tcoeffs, /):
         rv = impl.normal.from_tcoeffs(tcoeffs, num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
@@ -159,7 +159,7 @@ def _extrapolation_impl_precon_smoother(discretise, num_derivatives) -> _ExtraIm
     )
 
 
-def _extrapolation_impl_precon_fixedpoint(discretise, num_derivatives) -> _ExtraImpl:
+def _extra_impl_precon_fixedpoint(discretise, num_derivatives) -> _ExtraImpl:
     def initial_condition(tcoeffs, /):
         rv = impl.normal.from_tcoeffs(tcoeffs, num_derivatives)
         cond = impl.conditional.identity(len(tcoeffs))
@@ -274,7 +274,7 @@ def _extrapolation_impl_precon_fixedpoint(discretise, num_derivatives) -> _Extra
     )
 
 
-def _extrapolation_impl_precon_filter(discretise, num_derivatives) -> _ExtraImpl:
+def _extra_impl_precon_filter(discretise, num_derivatives) -> _ExtraImpl:
     def init(sol, /):
         return sol, None
 
@@ -381,7 +381,7 @@ class _Strategy:
 
 def strategy_smoother(prior, correction, /) -> _Strategy:
     """Construct a smoother."""
-    extrapolation_impl = _extrapolation_impl_precon_smoother(*prior)
+    extrapolation_impl = _extra_impl_precon_smoother(*prior)
     return _strategy(
         extrapolation_impl,
         correction,
@@ -394,7 +394,7 @@ def strategy_smoother(prior, correction, /) -> _Strategy:
 
 def strategy_fixedpoint(prior, correction, /) -> _Strategy:
     """Construct a fixedpoint-smoother."""
-    extrapolation_impl = _extrapolation_impl_precon_fixedpoint(*prior)
+    extrapolation_impl = _extra_impl_precon_fixedpoint(*prior)
     return _strategy(
         extrapolation_impl,
         correction,
@@ -407,7 +407,7 @@ def strategy_fixedpoint(prior, correction, /) -> _Strategy:
 
 def strategy_filter(prior, correction, /) -> _Strategy:
     """Construct a filter."""
-    extrapolation_impl = _extrapolation_impl_precon_filter(*prior)
+    extrapolation_impl = _extra_impl_precon_filter(*prior)
     return _strategy(
         extrapolation_impl,
         correction,
@@ -837,7 +837,7 @@ def _calibration_running_mean() -> _Calibration:
 
 
 @containers.dataclass
-class _IVPSolver:
+class _Solver:
     """IVP solver."""
 
     strategy: _Strategy
@@ -889,7 +889,7 @@ def solver_mle(strategy):
         state = _SolverState(strategy=state_strategy, output_scale=output_scale)
         return dt * error, state
 
-    return _ivp_solver_calibrated(
+    return _solver_calibrated(
         calibration=_calibration_running_mean(),
         impl_step=step_mle,
         strategy=strategy,
@@ -916,7 +916,7 @@ def solver_dynamic(strategy):
         state = _SolverState(strategy=state_strategy, output_scale=output_scale)
         return dt * error, state
 
-    return _ivp_solver_calibrated(
+    return _solver_calibrated(
         strategy=strategy,
         calibration=_calibration_most_recent(),
         string_repr=string_repr,
@@ -925,9 +925,9 @@ def solver_dynamic(strategy):
     )
 
 
-def _ivp_solver_calibrated(
+def _solver_calibrated(
     *, calibration, impl_step, strategy, string_repr, requires_rescaling
-) -> _IVPSolver:
+) -> _Solver:
     def init(t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
         state_strategy = strategy.init(t, posterior)
@@ -964,7 +964,7 @@ def _ivp_solver_calibrated(
         acc = _SolverState(x.step_from, output_scale=interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
-    return _ivp_solver(
+    return _solver(
         strategy=strategy,
         string_repr=string_repr,
         requires_rescaling=requires_rescaling,
@@ -1022,7 +1022,7 @@ def solver(strategy, /):
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     string_repr = f"<Uncalibrated solver with {strategy}>"
-    return _ivp_solver(
+    return _solver(
         strategy=strategy,
         string_repr=string_repr,
         requires_rescaling=False,
@@ -1034,7 +1034,7 @@ def solver(strategy, /):
     )
 
 
-def _ivp_solver(
+def _solver(
     *,
     strategy,
     string_repr,
@@ -1055,7 +1055,7 @@ def _ivp_solver(
         posterior = strategy.initial_condition(tcoeffs)
         return posterior, output_scale
 
-    return _IVPSolver(
+    return _Solver(
         strategy=strategy,
         string_repr=string_repr,
         requires_rescaling=requires_rescaling,
