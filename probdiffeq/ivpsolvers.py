@@ -587,8 +587,7 @@ class _Strategy:
 
     is_suitable_for_save_at: int
     is_suitable_for_save_every_step: int
-
-    extrapolation: _ExtraImpl
+    num_derivatives: int
 
     initial_condition: Callable
     """Construct an initial condition from a set of Taylor coefficients."""
@@ -767,7 +766,7 @@ def _strategy(
         offgrid_marginals=offgrid_marginals,
         is_suitable_for_save_at=is_suitable_for_save_at,
         is_suitable_for_save_every_step=is_suitable_for_save_every_step,
-        extrapolation=extrapolation,
+        num_derivatives=extrapolation.num_derivatives,
     )
 
 
@@ -840,9 +839,11 @@ def _calibration_running_mean() -> _Calibration:
 class _Solver:
     """IVP solver."""
 
-    strategy: _Strategy
     string_repr: str
     requires_rescaling: bool
+    error_contraction_rate: int
+    is_suitable_for_save_at: int
+    is_suitable_for_save_every_step: int
 
     initial_condition: Callable
     init: Callable
@@ -850,6 +851,7 @@ class _Solver:
     extract: Callable
     interpolate: Callable
     interpolate_at_t1: Callable
+    offgrid_marginals: Callable
 
 
 class _SolverState(containers.NamedTuple):
@@ -1056,7 +1058,9 @@ def _solver(
         return posterior, output_scale
 
     return _Solver(
-        strategy=strategy,
+        error_contraction_rate=strategy.num_derivatives + 1,
+        is_suitable_for_save_at=strategy.is_suitable_for_save_at,
+        is_suitable_for_save_every_step=strategy.is_suitable_for_save_every_step,
         string_repr=string_repr,
         requires_rescaling=requires_rescaling,
         initial_condition=initial_condition,
@@ -1065,4 +1069,5 @@ def _solver(
         extract=extract,
         interpolate=interpolate,
         interpolate_at_t1=interpolate_at_t1,
+        offgrid_marginals=strategy.offgrid_marginals,
     )

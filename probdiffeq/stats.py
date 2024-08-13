@@ -139,7 +139,7 @@ def _offgrid_marginals(t, solution, solver):
     t1 = _extract(solution.t)
     output_scale = _extract(solution.output_scale)
 
-    return solver.strategy.offgrid_marginals(
+    return solver.offgrid_marginals(
         marginals_t1=marginals,
         posterior_t0=posterior_previous,
         t=t,

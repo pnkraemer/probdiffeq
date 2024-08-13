@@ -297,11 +297,10 @@ class _AdaptiveIVPSolver:
         error_normalised = self._normalise_error(error_estimate, u=u)
 
         # Propose a new step
-        error_contraction_rate = self.solver.strategy.extrapolation.num_derivatives + 1
         state_control = self.control.apply(
             state_control,
             error_normalised=error_normalised,
-            error_contraction_rate=error_contraction_rate,
+            error_contraction_rate=self.solver.error_contraction_rate,
         )
         return _RejectionState(
             error_norm_proposed=error_normalised,  # new
@@ -499,9 +498,9 @@ def solve_adaptive_save_at(
         and without any deprecation policy.
 
     """
-    if not adaptive_solver.solver.strategy.is_suitable_for_save_at:
+    if not adaptive_solver.solver.is_suitable_for_save_at:
         msg = (
-            f"Strategy {adaptive_solver.solver.strategy} should not "
+            f"Strategy {adaptive_solver.solver} should not "
             f"be used in solve_adaptive_save_at. "
         )
         warnings.warn(msg, stacklevel=1)
@@ -582,9 +581,9 @@ def solve_adaptive_save_every_step(
     !!! warning
         Not JITable, not reverse-mode-differentiable.
     """
-    if not adaptive_solver.solver.strategy.is_suitable_for_save_every_step:
+    if not adaptive_solver.solver.is_suitable_for_save_every_step:
         msg = (
-            f"Strategy {adaptive_solver.solver.strategy} should not "
+            f"Strategy {adaptive_solver.solver} should not "
             f"be used in solve_adaptive_save_every_step."
         )
         warnings.warn(msg, stacklevel=1)
@@ -597,9 +596,8 @@ def solve_adaptive_save_every_step(
         adaptive_solver=adaptive_solver,
         dt0=dt0,
     )
-    (t, solution_every_step), _dt, num_steps = tree_array_util.tree_stack(
-        list(generator)
-    )
+    tmp = tree_array_util.tree_stack(list(generator))
+    (t, solution_every_step), _dt, num_steps = tmp
 
     # I think the user expects the initial time-point to be part of the grid
     # (Even though t0 is not computed by this function)
