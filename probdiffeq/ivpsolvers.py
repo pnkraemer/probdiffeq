@@ -801,12 +801,8 @@ def _estimate_error(observed, /):
     return output_scale * error_estimate_unscaled
 
 
-_T = TypeVar("_T")
-"""A type-variable for state-types."""
-
-
 @containers.dataclass
-class _IVPSolver(Generic[_T]):
+class _IVPSolver:
     """IVP solver."""
 
     strategy: _Strategy
