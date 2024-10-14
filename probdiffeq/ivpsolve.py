@@ -222,9 +222,8 @@ class _AdaSolver:
         def _normalise_error(error_estimate, *, u):
             error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
             dim = np.atleast_1d(u).size
-            return linalg.vector_norm(error_relative, order=self.norm_ord) / np.sqrt(
-                dim
-            )
+            error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
+            return error_norm / np.sqrt(dim)
 
         def extract(s: _RejectionState) -> _AdaSolver.AdaState:
             num_steps = state0.stats + 1
