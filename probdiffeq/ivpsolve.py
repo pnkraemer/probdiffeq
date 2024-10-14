@@ -169,6 +169,9 @@ class _AdaSolver:
             step_from: Any
 
         def init(s0: _AdaSolver.AdaState) -> _RejectionState:
+            def _inf_like(tree):
+                return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
+
             larger_than_1 = 1.1
             return _RejectionState(
                 error_norm_proposed=larger_than_1,
@@ -262,31 +265,26 @@ class _AdaSolver:
         solution_control = self.control.extract(state.control)
         return state, (solution_solver, solution_control, state.stats)
 
+    @staticmethod
+    def register_pytree_node():
+        def _asolver_flatten(asolver):
+            children = (asolver.atol, asolver.rtol)
+            aux = (asolver.solver, asolver.control, asolver.norm_ord)
+            return children, aux
 
-# Register outside of class to declutter the AdaptiveIVPSolver source code a bit
+        def _asolver_unflatten(aux, children):
+            atol, rtol = children
+            (solver, control, norm_ord) = aux
+            return _AdaSolver(
+                solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+            )
 
-
-def _asolver_flatten(asolver):
-    children = (asolver.atol, asolver.rtol)
-    aux = (asolver.solver, asolver.control, asolver.norm_ord)
-    return children, aux
-
-
-def _asolver_unflatten(aux, children):
-    atol, rtol = children
-    (solver, control, norm_ord) = aux
-    return _AdaSolver(
-        solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
-    )
-
-
-tree_util.register_pytree_node(
-    _AdaSolver, flatten_func=_asolver_flatten, unflatten_func=_asolver_unflatten
-)
+        tree_util.register_pytree_node(
+            _AdaSolver, flatten_func=_asolver_flatten, unflatten_func=_asolver_unflatten
+        )
 
 
-def _inf_like(tree):
-    return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
+_AdaSolver.register_pytree_node()
 
 
 class _Solution:
@@ -342,33 +340,35 @@ class _Solution:
         for i in range(self.t.shape[0]):
             yield self[i]
 
+    @staticmethod
+    def register_pytree_node():
+        def _sol_flatten(sol):
+            children = (
+                sol.t,
+                sol.u,
+                sol.marginals,
+                sol.posterior,
+                sol.output_scale,
+                sol.num_steps,
+            )
+            aux = ()
+            return children, aux
 
-def _sol_flatten(sol):
-    children = (
-        sol.t,
-        sol.u,
-        sol.marginals,
-        sol.posterior,
-        sol.output_scale,
-        sol.num_steps,
-    )
-    aux = ()
-    return children, aux
+        def _sol_unflatten(_aux, children):
+            t, u, marginals, posterior, output_scale, n = children
+            return _Solution(
+                t=t,
+                u=u,
+                marginals=marginals,
+                posterior=posterior,
+                output_scale=output_scale,
+                num_steps=n,
+            )
+
+        tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
 
 
-def _sol_unflatten(_aux, children):
-    t, u, marginals, posterior, output_scale, n = children
-    return _Solution(
-        t=t,
-        u=u,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=n,
-    )
-
-
-tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
+_Solution.register_pytree_node()
 
 
 def solve_adaptive_terminal_values(
