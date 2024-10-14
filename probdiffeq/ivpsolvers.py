@@ -816,7 +816,7 @@ def _calibration_none() -> _Calibration:
     def init(prior):
         return prior
 
-    def update(_state, /, observed):  # noqa: ARG001
+    def update(_state, /, observed):
         raise NotImplementedError
 
     def extract(state, /):
