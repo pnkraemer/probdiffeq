@@ -120,14 +120,15 @@ def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     return _AdaSolver(solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord)
 
 
+class _AdaState(containers.NamedTuple):
+    step_from: Any
+    interp_from: Any
+    control: Any
+    stats: Any
+
+
 class _AdaSolver:
     """Adaptive IVP solvers."""
-
-    class AdaState(containers.NamedTuple):
-        step_from: Any
-        interp_from: Any
-        control: Any
-        stats: Any
 
     def __init__(self, solver, atol, rtol, control, norm_ord):
         self.solver = solver
@@ -148,14 +149,14 @@ class _AdaSolver:
         )
 
     @functools.jit
-    def init(self, t, initial_condition, dt0, num_steps):
+    def init(self, t, initial_condition, dt, num_steps) -> _AdaState:
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
-        state_control = self.control.init(dt0)
-        return _AdaSolver.AdaState(state_solver, state_solver, state_control, num_steps)
+        state_control = self.control.init(dt)
+        return _AdaState(state_solver, state_solver, state_control, num_steps)
 
     @functools.jit
-    def rejection_loop(self, state0, *, vector_field, t1):
+    def rejection_loop(self, state0: _AdaState, *, vector_field, t1) -> _AdaState:
         class _RejectionState(containers.NamedTuple):
             """State for rejection loops.
 
@@ -168,7 +169,7 @@ class _AdaSolver:
             proposed: Any
             step_from: Any
 
-        def init(s0: _AdaSolver.AdaState) -> _RejectionState:
+        def init(s0: _AdaState) -> _RejectionState:
             def _inf_like(tree):
                 return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
 
@@ -225,26 +226,26 @@ class _AdaSolver:
             error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
             return error_norm / np.sqrt(dim)
 
-        def extract(s: _RejectionState) -> _AdaSolver.AdaState:
+        def extract(s: _RejectionState) -> _AdaState:
             num_steps = state0.stats + 1
-            return _AdaSolver.AdaState(s.proposed, s.step_from, s.control, num_steps)
+            return _AdaState(s.proposed, s.step_from, s.control, num_steps)
 
         init_val = init(state0)
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
 
-    def extract_before_t1(self, state):
+    def extract_before_t1(self, state: _AdaState):
         solution_solver = self.solver.extract(state.step_from)
         solution_control = self.control.extract(state.control)
         return solution_solver, solution_control, state.stats
 
-    def extract_at_t1(self, state):
+    def extract_at_t1(self, state: _AdaState):
         # todo: make the "at t1" decision inside interpolate(),
         #  which collapses the next two functions together
         interp = self.solver.interpolate_at_t1(
             interp_from=state.interp_from, interp_to=state.step_from
         )
-        state = _AdaSolver.AdaState(
+        state = _AdaState(
             interp.step_from, interp.interp_from, state.control, state.stats
         )
 
@@ -252,11 +253,11 @@ class _AdaSolver:
         solution_control = self.control.extract(state.control)
         return state, (solution_solver, solution_control, state.stats)
 
-    def extract_after_t1_via_interpolation(self, state, t):
+    def extract_after_t1_via_interpolation(self, state: _AdaState, t):
         interp = self.solver.interpolate(
             t, interp_from=state.interp_from, interp_to=state.step_from
         )
-        state = _AdaSolver.AdaState(
+        state = _AdaState(
             interp.step_from, interp.interp_from, state.control, state.stats
         )
 
