@@ -457,7 +457,7 @@ def _solve_adaptive_save_at(
         adaptive_solver=adaptive_solver,
     )
 
-    state = adaptive_solver.init(t, initial_condition, dt0=dt0, num_steps=0.0)
+    state = adaptive_solver.init(t, initial_condition, dt=dt0, num_steps=0.0)
     _, solution = control_flow.scan(advance_func, init=state, xs=save_at, reverse=False)
     return solution
 
@@ -541,7 +541,7 @@ def _solution_generator(
     vector_field, t, initial_condition, *, dt0, t1, adaptive_solver
 ):
     """Generate a probabilistic IVP solution iteratively."""
-    state = adaptive_solver.init(t, initial_condition, dt0=dt0, num_steps=0)
+    state = adaptive_solver.init(t, initial_condition, dt=dt0, num_steps=0)
 
     while state.step_from.t < t1:
         state = adaptive_solver.rejection_loop(state, vector_field=vector_field, t1=t1)
