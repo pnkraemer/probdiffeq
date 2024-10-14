@@ -34,28 +34,7 @@ class _Controller:
 
 def control_proportional_integral(
     *,
-    safety=0.95,
-    factor_min=0.2,
-    factor_max=10.0,
-    power_integral_unscaled=0.3,
-    power_proportional_unscaled=0.4,
-) -> _Controller:
-    """Construct a proportional-integral-controller."""
-    init = _proportional_integral_init
-    apply = functools.partial(
-        _proportional_integral_apply,
-        safety=safety,
-        factor_min=factor_min,
-        factor_max=factor_max,
-        power_integral_unscaled=power_integral_unscaled,
-        power_proportional_unscaled=power_proportional_unscaled,
-    )
-    extract = _proportional_integral_extract
-    return _Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
-
-
-def control_proportional_integral_clipped(
-    *,
+    clip: bool = False,
     safety=0.95,
     factor_min=0.2,
     factor_max=10.0,
@@ -63,115 +42,74 @@ def control_proportional_integral_clipped(
     power_proportional_unscaled=0.4,
 ) -> _Controller:
     """Construct a proportional-integral-controller with time-clipping."""
-    init = _proportional_integral_init
-    apply = functools.partial(
-        _proportional_integral_apply,
-        safety=safety,
-        factor_min=factor_min,
-        factor_max=factor_max,
-        power_integral_unscaled=power_integral_unscaled,
-        power_proportional_unscaled=power_proportional_unscaled,
-    )
-    extract = _proportional_integral_extract
-    clip = _proportional_integral_clip
-    return _Controller(init=init, apply=apply, extract=extract, clip=clip)
+
+    def init(dt, /):
+        return dt, 1.0
+
+    def apply(
+        state: tuple[float, float], /, error_normalised, error_contraction_rate
+    ) -> tuple[float, float]:
+        dt_proposed, error_norm_previously_accepted = state
+        n1 = power_integral_unscaled / error_contraction_rate
+        n2 = power_proportional_unscaled / error_contraction_rate
+
+        a1 = (1.0 / error_normalised) ** n1
+        a2 = (error_norm_previously_accepted / error_normalised) ** n2
+        scale_factor_unclipped = safety * a1 * a2
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
+        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
+        error_norm_previously_accepted = np.where(
+            error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
+        )
+
+        dt_proposed = scale_factor * dt_proposed
+        return dt_proposed, error_norm_previously_accepted
+
+    def extract(state: tuple[float, float], /):
+        dt_proposed, _error_norm_previously_accepted = state
+        return dt_proposed
+
+    if clip:
+
+        def clip_fun(state: tuple[float, float], /, t, t1) -> tuple[float, float]:
+            dt_proposed, error_norm_previously_accepted = state
+            dt = dt_proposed
+            dt_clipped = np.minimum(dt, t1 - t)
+            return dt_clipped, error_norm_previously_accepted
+
+        return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
+
+    return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
 
 
-def _proportional_integral_apply(
-    state: tuple[float, float],
-    /,
-    error_normalised,
-    *,
-    error_contraction_rate,
-    safety,
-    factor_min,
-    factor_max,
-    power_integral_unscaled,
-    power_proportional_unscaled,
-) -> tuple[float, float]:
-    dt_proposed, error_norm_previously_accepted = state
-    n1 = power_integral_unscaled / error_contraction_rate
-    n2 = power_proportional_unscaled / error_contraction_rate
-
-    a1 = (1.0 / error_normalised) ** n1
-    a2 = (error_norm_previously_accepted / error_normalised) ** n2
-    scale_factor_unclipped = safety * a1 * a2
-
-    scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-    scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-    error_norm_previously_accepted = np.where(
-        error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
-    )
-
-    dt_proposed = scale_factor * dt_proposed
-    return dt_proposed, error_norm_previously_accepted
-
-
-def _proportional_integral_init(dt0, /):
-    return dt0, 1.0
-
-
-def _proportional_integral_clip(
-    state: tuple[float, float], /, t, t1
-) -> tuple[float, float]:
-    dt_proposed, error_norm_previously_accepted = state
-    dt = dt_proposed
-    dt_clipped = np.minimum(dt, t1 - t)
-    return dt_clipped, error_norm_previously_accepted
-
-
-def _proportional_integral_extract(state: tuple[float, float], /):
-    dt_proposed, _error_norm_previously_accepted = state
-    return dt_proposed
-
-
-def control_integral(*, safety=0.95, factor_min=0.2, factor_max=10.0) -> _Controller:
-    """Construct an integral-controller."""
-    init = _integral_init
-    apply = functools.partial(
-        _integral_apply, safety=safety, factor_min=factor_min, factor_max=factor_max
-    )
-    extract = _integral_extract
-    return _Controller(init=init, apply=apply, extract=extract, clip=_no_clip)
-
-
-def control_integral_clipped(
-    *, safety=0.95, factor_min=0.2, factor_max=10.0
+def control_integral(
+    *, clip=False, safety=0.95, factor_min=0.2, factor_max=10.0
 ) -> _Controller:
-    """Construct an integral-controller with time-clipping."""
-    init = functools.partial(_integral_init)
-    apply = functools.partial(
-        _integral_apply, safety=safety, factor_min=factor_min, factor_max=factor_max
-    )
-    extract = functools.partial(_integral_extract)
-    return _Controller(init=init, apply=apply, extract=extract, clip=_integral_clip)
+    """Construct an integral-controller."""
 
+    def init(dt, /):
+        return dt
 
-def _integral_init(dt0, /):
-    return dt0
+    def apply(dt, /, error_normalised, error_contraction_rate):
+        error_power = error_normalised ** (-1.0 / error_contraction_rate)
+        scale_factor_unclipped = safety * error_power
 
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
+        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
+        return scale_factor * dt
 
-def _integral_clip(dt, /, t, t1):
-    return np.minimum(dt, t1 - t)
+    def extract(dt, /):
+        return dt
 
+    if clip:
 
-def _no_clip(dt, /, *_args, **_kwargs):
-    return dt
+        def clip_fun(dt, /, t, t1):
+            return np.minimum(dt, t1 - t)
 
+        return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
 
-def _integral_apply(
-    dt, /, error_normalised, *, error_contraction_rate, safety, factor_min, factor_max
-):
-    error_power = error_normalised ** (-1.0 / error_contraction_rate)
-    scale_factor_unclipped = safety * error_power
-
-    scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-    scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-    return scale_factor * dt
-
-
-def _integral_extract(dt, /):
-    return dt
+    return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
 
 
 def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):

@@ -94,7 +94,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         ts1 = ivpsolvers.correction_ts1()
         strategy = ivpsolvers.strategy_filter(ibm, ts1)
         solver = ivpsolvers.solver_dynamic(strategy)
-        control = ivpsolve.control_proportional_integral_clipped()
+        control = ivpsolve.control_proportional_integral(clip=True)
         adaptive_solver = ivpsolve.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control
         )
