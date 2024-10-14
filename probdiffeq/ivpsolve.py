@@ -43,40 +43,40 @@ def control_proportional_integral(
 ) -> _Controller:
     """Construct a proportional-integral-controller with time-clipping."""
 
-    def init(dt, /):
-        return dt, 1.0
+    class PIState(containers.NamedTuple):
+        dt: float
+        error_norm_previously_accepted: float
 
-    def apply(
-        state: tuple[float, float], /, error_normalised, error_contraction_rate
-    ) -> tuple[float, float]:
-        dt_proposed, error_norm_previously_accepted = state
+    def init(dt: float, /) -> PIState:
+        return PIState(dt, 1.0)
+
+    def apply(state: PIState, /, error_norm, error_contraction_rate) -> PIState:
+        dt_proposed, error_norm_prev = state
         n1 = power_integral_unscaled / error_contraction_rate
         n2 = power_proportional_unscaled / error_contraction_rate
 
-        a1 = (1.0 / error_normalised) ** n1
-        a2 = (error_norm_previously_accepted / error_normalised) ** n2
+        a1 = (1.0 / error_norm) ** n1
+        a2 = (error_norm_prev / error_norm) ** n2
         scale_factor_unclipped = safety * a1 * a2
 
         scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
         scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-        error_norm_previously_accepted = np.where(
-            error_normalised <= 1.0, error_normalised, error_norm_previously_accepted
-        )
+        error_norm_prev = np.where(error_norm <= 1.0, error_norm, error_norm_prev)
 
         dt_proposed = scale_factor * dt_proposed
-        return dt_proposed, error_norm_previously_accepted
+        return PIState(dt_proposed, error_norm_prev)
 
-    def extract(state: tuple[float, float], /):
+    def extract(state: PIState, /) -> float:
         dt_proposed, _error_norm_previously_accepted = state
         return dt_proposed
 
     if clip:
 
-        def clip_fun(state: tuple[float, float], /, t, t1) -> tuple[float, float]:
+        def clip_fun(state: PIState, /, t, t1) -> PIState:
             dt_proposed, error_norm_previously_accepted = state
             dt = dt_proposed
             dt_clipped = np.minimum(dt, t1 - t)
-            return dt_clipped, error_norm_previously_accepted
+            return PIState(dt_clipped, error_norm_previously_accepted)
 
         return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
 
@@ -91,8 +91,8 @@ def control_integral(
     def init(dt, /):
         return dt
 
-    def apply(dt, /, error_normalised, error_contraction_rate):
-        error_power = error_normalised ** (-1.0 / error_contraction_rate)
+    def apply(dt, /, error_norm, error_contraction_rate):
+        error_power = error_norm ** (-1.0 / error_contraction_rate)
         scale_factor_unclipped = safety * error_power
 
         scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
@@ -204,16 +204,16 @@ class _AdaSolver:
             u_proposed = impl.stats.qoi(state_proposed.strategy.hidden)
             u_step_from = impl.stats.qoi(state_proposed.strategy.hidden)
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
-            error_normalised = _normalise_error(error_estimate, u=u)
+            error_norm = _normalise_error(error_estimate, u=u)
 
             # Propose a new step
             state_control = self.control.apply(
                 state_control,
-                error_normalised=error_normalised,
+                error_norm=error_norm,
                 error_contraction_rate=self.solver.error_contraction_rate,
             )
             return _RejectionState(
-                error_norm_proposed=error_normalised,  # new
+                error_norm_proposed=error_norm,  # new
                 proposed=state_proposed,  # new
                 control=state_control,  # new
                 step_from=state.step_from,
