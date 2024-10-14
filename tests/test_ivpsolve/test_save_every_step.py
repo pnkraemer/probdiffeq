@@ -14,7 +14,8 @@ def fixture_python_loop_solution(ssm):
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_filter(ibm, ts0)
     solver = ivpsolvers.solver_mle(strategy)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+    control = ivpsolve.control_proportional_integral(clip=True)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, control=control)
 
     dt0 = ivpsolve.dt0_adaptive(
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
