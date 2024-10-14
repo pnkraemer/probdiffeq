@@ -179,33 +179,17 @@ def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     if control is None:
         control = control_proportional_integral()
 
-    return _AdaptiveIVPSolver(
-        solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
-    )
+    return _AdaSolver(solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord)
 
 
-class _RejectionState(containers.NamedTuple):
-    """State for rejection loops.
-
-    (Keep decreasing step-size until error norm is small.
-    This is one part of an IVP solver step.)
-    """
-
-    error_norm_proposed: float
-    control: Any
-    proposed: Any
-    step_from: Any
-
-
-class _AdaptiveState(containers.NamedTuple):
-    step_from: Any
-    interp_from: Any
-    control: Any
-    stats: Any
-
-
-class _AdaptiveIVPSolver:
+class _AdaSolver:
     """Adaptive IVP solvers."""
+
+    class AdaState(containers.NamedTuple):
+        step_from: Any
+        interp_from: Any
+        control: Any
+        stats: Any
 
     def __init__(self, solver, atol, rtol, control, norm_ord):
         self.solver = solver
@@ -230,17 +214,23 @@ class _AdaptiveIVPSolver:
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt0)
-        return _AdaptiveState(state_solver, state_solver, state_control, num_steps)
+        return _AdaSolver.AdaState(state_solver, state_solver, state_control, num_steps)
 
     @functools.jit
     def rejection_loop(self, state0, *, vector_field, t1):
-        def cond_fn(s):
-            return s.error_norm_proposed > 1.0
+        class _RejectionState(containers.NamedTuple):
+            """State for rejection loops.
 
-        def body_fn(s):
-            return self._attempt_step(state=s, vector_field=vector_field, t1=t1)
+            (Keep decreasing step-size until error norm is small.
+            This is one part of an IVP solver step.)
+            """
 
-        def init(s0):
+            error_norm_proposed: float
+            control: Any
+            proposed: Any
+            step_from: Any
+
+        def init(s0: _AdaSolver.AdaState) -> _RejectionState:
             larger_than_1 = 1.1
             return _RejectionState(
                 error_norm_proposed=larger_than_1,
@@ -249,54 +239,59 @@ class _AdaptiveIVPSolver:
                 step_from=s0.step_from,
             )
 
-        def extract(s):
+        def cond_fn(state: _RejectionState) -> bool:
+            return state.error_norm_proposed > 1.0
+
+        def body_fn(state: _RejectionState) -> _RejectionState:
+            """Attempt a step.
+
+            Perform a step with an IVP solver and
+            propose a future time-step based on tolerances and error estimates.
+            """
+            # Some controllers like to clip the terminal value instead of interpolating.
+            # This must happen _before_ the step.
+            state_control = self.control.clip(state.control, t=state.step_from.t, t1=t1)
+
+            # Perform the actual step.
+            # todo: error estimate should be a tuple (abs, rel)
+            error_estimate, state_proposed = self.solver.step(
+                state=state.step_from,
+                vector_field=vector_field,
+                dt=self.control.extract(state_control),
+            )
+            # Normalise the error
+            u_proposed = impl.stats.qoi(state_proposed.strategy.hidden)
+            u_step_from = impl.stats.qoi(state_proposed.strategy.hidden)
+            u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
+            error_normalised = _normalise_error(error_estimate, u=u)
+
+            # Propose a new step
+            state_control = self.control.apply(
+                state_control,
+                error_normalised=error_normalised,
+                error_contraction_rate=self.solver.error_contraction_rate,
+            )
+            return _RejectionState(
+                error_norm_proposed=error_normalised,  # new
+                proposed=state_proposed,  # new
+                control=state_control,  # new
+                step_from=state.step_from,
+            )
+
+        def _normalise_error(error_estimate, *, u):
+            error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
+            dim = np.atleast_1d(u).size
+            return linalg.vector_norm(error_relative, order=self.norm_ord) / np.sqrt(
+                dim
+            )
+
+        def extract(s: _RejectionState) -> _AdaSolver.AdaState:
             num_steps = state0.stats + 1
-            return _AdaptiveState(s.proposed, s.step_from, s.control, num_steps)
+            return _AdaSolver.AdaState(s.proposed, s.step_from, s.control, num_steps)
 
         init_val = init(state0)
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
-
-    def _attempt_step(self, *, state: _RejectionState, vector_field, t1):
-        """Attempt a step.
-
-        Perform a step with an IVP solver and
-        propose a future time-step based on tolerances and error estimates.
-        """
-        # Some controllers like to clip the terminal value instead of interpolating.
-        # This must happen _before_ the step.
-        state_control = self.control.clip(state.control, t=state.step_from.t, t1=t1)
-
-        # Perform the actual step.
-        # todo: error estimate should be a tuple (abs, rel)
-        error_estimate, state_proposed = self.solver.step(
-            state=state.step_from,
-            vector_field=vector_field,
-            dt=self.control.extract(state_control),
-        )
-        # Normalise the error
-        u_proposed = impl.stats.qoi(state_proposed.strategy.hidden)
-        u_step_from = impl.stats.qoi(state_proposed.strategy.hidden)
-        u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
-        error_normalised = self._normalise_error(error_estimate, u=u)
-
-        # Propose a new step
-        state_control = self.control.apply(
-            state_control,
-            error_normalised=error_normalised,
-            error_contraction_rate=self.solver.error_contraction_rate,
-        )
-        return _RejectionState(
-            error_norm_proposed=error_normalised,  # new
-            proposed=state_proposed,  # new
-            control=state_control,  # new
-            step_from=state.step_from,
-        )
-
-    def _normalise_error(self, error_estimate, *, u):
-        error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
-        dim = np.atleast_1d(u).size
-        return linalg.vector_norm(error_relative, order=self.norm_ord) / np.sqrt(dim)
 
     def extract_before_t1(self, state):
         solution_solver = self.solver.extract(state.step_from)
@@ -309,7 +304,7 @@ class _AdaptiveIVPSolver:
         interp = self.solver.interpolate_at_t1(
             interp_from=state.interp_from, interp_to=state.step_from
         )
-        state = _AdaptiveState(
+        state = _AdaSolver.AdaState(
             interp.step_from, interp.interp_from, state.control, state.stats
         )
 
@@ -321,7 +316,7 @@ class _AdaptiveIVPSolver:
         interp = self.solver.interpolate(
             t, interp_from=state.interp_from, interp_to=state.step_from
         )
-        state = _AdaptiveState(
+        state = _AdaSolver.AdaState(
             interp.step_from, interp.interp_from, state.control, state.stats
         )
 
@@ -342,13 +337,13 @@ def _asolver_flatten(asolver):
 def _asolver_unflatten(aux, children):
     atol, rtol = children
     (solver, control, norm_ord) = aux
-    return _AdaptiveIVPSolver(
+    return _AdaSolver(
         solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
     )
 
 
 tree_util.register_pytree_node(
-    _AdaptiveIVPSolver, flatten_func=_asolver_flatten, unflatten_func=_asolver_unflatten
+    _AdaSolver, flatten_func=_asolver_flatten, unflatten_func=_asolver_unflatten
 )
 
 
