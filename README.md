@@ -70,7 +70,7 @@ The advanced examples show applications of probabilistic numerical solvers, ofte
 For example, [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_1/) shows how to combine ProbDiffEq with [Optax](https://optax.readthedocs.io/en/latest/index.html), and [this notebook](https://pnkraemer.github.io/probdiffeq/advanced_examples/physics_enhanced_regression_2/) does the same with [BlackJAX](https://optax.readthedocs.io/en/latest/index.html).
 
 ## Citing this repository
-If you find Probdiffeq helpful for your research project, please consider citing:
+If you find Probdiffeq helpful for your research, please consider citing:
 
 ```bibtex
 @phdthesis{kramer2024implementing,
@@ -83,9 +83,25 @@ If you find Probdiffeq helpful for your research project, please consider citing
 This thesis contains detailed information about the maths and algorithms behind what is implemented here.
 A PDF is available [at this link](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754).
 
-Probdiffeq's algorithms have been developed over many years and in multiple research papers.
+If you use the solve-and-save-at functionality, please cite
+```bibtex
+@article{krämer2024adaptive,
+    title={Adaptive Probabilistic {ODE} Solvers Without Adaptive Memory Requirements},
+    author={Kr{\"a}mer, Nicholas},
+    year={2024},
+    eprint={2410.10530},
+    archivePrefix={arXiv},
+    url={https://arxiv.org/abs/2410.10530},
+}
+```
+This article introduced the algorithm we use.
+The implementation is slightly different to what we would do for non-probabilistic solvers; see the paper.
+A PDF is available [here](https://arxiv.org/abs/2410.10530) and the paper's experiments are [here](https://github.com/pnkraemer/code-adaptive-prob-ode-solvers).
+
+
+_Probdiffeq's algorithms have been developed over many years and in multiple research papers.
 Linking concrete citation information for specific algorithms is a work in progress.
-Feel free to reach out if you need help determining which works to cite!
+Feel free to reach out if you need help determining which works to cite!_
 
 ## Contributing
 Contributions are welcome!
