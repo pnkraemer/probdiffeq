@@ -27,14 +27,14 @@ def fixture_solver_setup(ssm):
 
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_smoother(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
 
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_every_step(
         solver_setup["vf"],
         init,
@@ -47,7 +47,8 @@ def fixture_solution_smoother(solver_setup):
 
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
     """Test that with save_at=smoother_solution.t, the results should be identical."""
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
@@ -55,9 +56,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
 
     save_at = solution_smoother.t
 
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    init = solver.initial_condition(tcoeffs, output_scale)
-
+    init = solver.initial_condition()
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
         solver_setup["vf"],
         init,
@@ -73,7 +72,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     save_at = solution_smoother.t
 
     # Re-generate the smoothing solver
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_smoother(ibm, ts0)
     solver_smoother = ivpsolvers.solver(strategy)
@@ -85,13 +85,13 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     )
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3)
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
 
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
         solver_setup["vf"], init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1
