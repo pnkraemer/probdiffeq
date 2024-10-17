@@ -82,7 +82,7 @@ def solution_routine():
         )
 
         # Any scalar function of the IVP solution would do
-        return jnp.dot(sol.u, sol.u)
+        return jnp.dot(sol.u[0], sol.u[0])
 
     return simulate, init
 

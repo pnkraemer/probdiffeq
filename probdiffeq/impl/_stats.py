@@ -262,9 +262,6 @@ class IsotropicStats(StatsBackend):
         mean = rv.mean.reshape((-1,), order="F")
         return (mean, cov)
 
-    def qoi(self, rv):
-        return self.qoi_from_sample(rv.mean)
-
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
             return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
@@ -277,6 +274,9 @@ class IsotropicStats(StatsBackend):
         mean = rv.mean[i, :]
         cholesky = cholesky_util.triu_via_qr(rv.cholesky[[i], :].T).T
         return _normal.Normal(mean, cholesky)
+
+    def qoi(self, rv):
+        return self.qoi_from_sample(rv.mean)
 
     def qoi_from_sample(self, sample, /):
         if np.ndim(sample) > 2:
@@ -336,7 +336,7 @@ class BlockDiagStats(StatsBackend):
     def to_multivariate_normal(self, rv):
         mean = np.reshape(rv.mean.T, (-1,), order="F")
         cov = np.block_diag(self._cov_dense(rv.cholesky))
-        return (mean, cov)
+        return mean, cov
 
     def _cov_dense(self, cholesky):
         if cholesky.ndim > 2:
@@ -344,9 +344,12 @@ class BlockDiagStats(StatsBackend):
         return cholesky @ cholesky.T
 
     def qoi(self, rv):
-        if rv.mean.ndim > 2:
-            return functools.vmap(self.qoi)(rv)
-        return self.unravel(rv.mean)
+        return self.qoi_from_sample(rv.mean)
+
+    def qoi_from_sample(self, sample, /):
+        if np.ndim(sample) > 2:
+            return functools.vmap(self.qoi_from_sample)(sample)
+        return self.unravel(sample)
 
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
@@ -363,9 +366,6 @@ class BlockDiagStats(StatsBackend):
         )
         cholesky = np.transpose(cholesky, axes=(0, 2, 1))
         return _normal.Normal(mean, cholesky)
-
-    def qoi_from_sample(self, sample, /):
-        return sample[..., 0]
 
     def update_mean(self, mean, x, /, num):
         if np.ndim(mean) > 0:
