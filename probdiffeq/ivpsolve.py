@@ -12,7 +12,6 @@ from probdiffeq.backend import (
 )
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Callable
-from probdiffeq.impl import impl
 
 
 @containers.dataclass
@@ -380,7 +379,7 @@ _Solution.register_pytree_node()
 
 
 def solve_adaptive_terminal_values(
-    vector_field, initial_condition, t0, t1, adaptive_solver, dt0
+    vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
 ) -> _Solution:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t1])
@@ -400,7 +399,7 @@ def solve_adaptive_terminal_values(
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi(marginals)
     return _Solution(
         t=t1,
         u=u,

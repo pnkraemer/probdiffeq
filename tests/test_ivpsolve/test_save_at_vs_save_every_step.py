@@ -5,7 +5,7 @@ from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
 
-@testing.parametrize("fact", ["dense"])
+@testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
 def test_save_at_result_matches_interpolated_adaptive_result(fact):
     """Test that the save_at result matches the interpolation (using a filter)."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
