@@ -172,6 +172,10 @@ def tile(a, num):
     return jnp.tile(a, num)
 
 
+def repeat(a, num):
+    return jnp.repeat(a, num)
+
+
 def prod_along_axis(arr, /, *, axis):
     return jnp.prod(arr, axis=axis)
 

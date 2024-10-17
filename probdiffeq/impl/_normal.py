@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, containers
+from probdiffeq.backend import abc, containers, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 
@@ -47,8 +47,7 @@ class DenseNormal(NormalBackend):
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
 
-        m0_matrix = np.stack(tcoeffs)
-        m0_corrected = np.reshape(m0_matrix, (-1,), order="F")
+        m0_corrected, _ = tree_util.ravel_pytree(tcoeffs)
 
         (ode_dim,) = self.ode_shape
         ndim = len(tcoeffs) * ode_dim

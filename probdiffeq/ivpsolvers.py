@@ -660,6 +660,7 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
         is_suitable_for_save_at=True,
         is_suitable_for_offgrid_marginals=True,
         is_suitable_for_save_every_step=True,
+        ssm=ssm,
     )
 
 
@@ -671,6 +672,7 @@ def _strategy(
     is_suitable_for_save_at,
     is_suitable_for_save_every_step,
     is_suitable_for_offgrid_marginals,
+    ssm,
 ):
     def init(t, posterior, /) -> _StrategyState:
         rv, extra = extrapolation.init(posterior)
@@ -762,7 +764,7 @@ def _strategy(
         )
 
         (marginals, _aux) = interp.interpolated
-        u = impl.stats.qoi(marginals)
+        u = ssm.stats.qoi(marginals)
         return u, marginals
 
     return _Strategy(

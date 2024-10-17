@@ -26,7 +26,7 @@ class ScalarTransform(TransformBackend):
         return _normal.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
 
     def revert(self, rv, transformation, /):
-        # Assumes that A maps a vector to a scalar...
+        # Assumes that A maps a vector to a impl.stats_...
 
         # Extract information
         A, b = transformation
@@ -308,8 +308,8 @@ class DenseConditional(ConditionalBackend):
         a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
         (d,) = self.ode_shape
         eye_d = np.eye(d)
-        A = np.kron(eye_d, a)
-        Q = np.kron(eye_d, q_sqrtm)
+        A = np.kron(a, eye_d)
+        Q = np.kron(q_sqrtm, eye_d)
 
         ndim = d * (num_derivatives + 1)
         q0 = np.zeros((ndim,))
@@ -319,8 +319,8 @@ class DenseConditional(ConditionalBackend):
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            p = np.tile(p, d)
-            p_inv = np.tile(p_inv, d)
+            p = np.repeat(p, d)
+            p_inv = np.repeat(p_inv, d)
             return Conditional(A, noise), (p, p_inv)
 
         return discretise
@@ -345,10 +345,11 @@ class DenseConditional(ConditionalBackend):
         return Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
-        x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
-        if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
-            raise ValueError
-        return x_reshaped[idx_or_slice]
+        return self.unravel(x)[idx_or_slice]
+        # x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
+        # if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
+        #     raise ValueError
+        # return x_reshaped[idx_or_slice]
 
     @staticmethod
     def _autobatch_linop(fun):

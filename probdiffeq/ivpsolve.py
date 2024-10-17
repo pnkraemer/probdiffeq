@@ -412,7 +412,7 @@ def solve_adaptive_terminal_values(
 
 
 def solve_adaptive_save_at(
-    vector_field, initial_condition, save_at, adaptive_solver, dt0
+    vector_field, initial_condition, save_at, adaptive_solver, dt0, *, ssm
 ) -> _Solution:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -459,7 +459,7 @@ def solve_adaptive_save_at(
     posterior_save_at, output_scale = solution_save_at
     _tmp = _userfriendly_output(posterior=posterior_save_at, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi(marginals)
     return _Solution(
         t=save_at,
         u=u,

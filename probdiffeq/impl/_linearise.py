@@ -45,8 +45,9 @@ class ScalarLinearisation(LinearisationBackend):
 
 
 class DenseLinearisation(LinearisationBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def ode_taylor_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
@@ -58,6 +59,7 @@ class DenseLinearisation(LinearisationBackend):
                 raise ValueError(msg)
 
             fx = self.ts0(fun, a0(mean))
+
             linop = linop_util.parametrised_linop(
                 lambda v, _p: self._autobatch_linop(a1)(v)
             )
@@ -147,9 +149,7 @@ class DenseLinearisation(LinearisationBackend):
         return new
 
     def _select_dy(self, x, idx_or_slice):
-        (d,) = self.ode_shape
-        x_reshaped = np.reshape(x, (-1, d), order="F")
-        return x_reshaped[idx_or_slice, ...]
+        return np.stack(self.unravel(x)[idx_or_slice])
 
     @staticmethod
     def _autobatch_linop(fun):
