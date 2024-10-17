@@ -263,9 +263,7 @@ class IsotropicStats(StatsBackend):
         return (mean, cov)
 
     def qoi(self, rv):
-        if rv.mean.ndim > 2:
-            return functools.vmap(self.qoi)(rv)
-        return self.unravel(rv.mean)
+        return self.qoi_from_sample(rv.mean)
 
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
@@ -281,7 +279,9 @@ class IsotropicStats(StatsBackend):
         return _normal.Normal(mean, cholesky)
 
     def qoi_from_sample(self, sample, /):
-        return sample[0, :]
+        if np.ndim(sample) > 2:
+            return functools.vmap(self.qoi_from_sample)(sample)
+        return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)

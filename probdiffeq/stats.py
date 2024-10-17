@@ -189,7 +189,7 @@ def _condition_and_logpdf(rv, data, model):
     return corrected, logpdf
 
 
-def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
+def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
     """Compute the log-marginal-likelihood of observations of the IVP solution.
 
     !!! note
@@ -218,7 +218,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         )
         raise ValueError(msg)
 
-    if np.ndim(u) < np.ndim(impl.prototypes.qoi()) + 1:
+    if np.ndim(u) < np.ndim(ssm.prototypes.qoi()) + 1:
         msg = (
             f"Time-series solution (ndim=2, shape=(n, m)) expected. "
             f"ndim={np.ndim(u)}, shape={np.shape(u)} received."
@@ -231,14 +231,14 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior):
         raise TypeError(msg1 + msg2)
 
     # Generate an observation-model for the QOI
-    model_fun = functools.vmap(impl.conditional.to_derivative, in_axes=(None, 0))
+    model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0))
     models = model_fun(0, standard_deviation)
 
     # Select the terminal variable
     rv = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
 
     # Run the reverse Kalman filter
-    estimator = filter_util.kalmanfilter_with_marginal_likelihood()
+    estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=ssm)
     (_corrected, _num_data, logpdf), _ = filter_util.estimate_rev(
         u,
         init=rv,
