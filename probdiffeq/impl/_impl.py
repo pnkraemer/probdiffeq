@@ -1,6 +1,6 @@
 """State-space model impl."""
 
-from probdiffeq.backend import containers
+from probdiffeq.backend import containers, functools, tree_util
 from probdiffeq.backend.typing import Optional
 from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
 
@@ -87,7 +87,7 @@ def choose(which: str, /, *, tcoeffs_like) -> FactorisedImpl:
     if which == "dense":
         return _select_dense(tcoeffs_like=tcoeffs_like)
     if which == "isotropic":
-        return _select_isotropic(ode_shape=ode_shape)
+        return _select_isotropic(tcoeffs_like=tcoeffs_like)
     if which == "blockdiag":
         return _select_blockdiag(ode_shape=ode_shape)
 
@@ -115,10 +115,12 @@ def _select_scalar() -> FactorisedImpl:
 
 def _select_dense(*, tcoeffs_like) -> FactorisedImpl:
     ode_shape = tcoeffs_like[0].shape
+    _, unravel = tree_util.ravel_pytree(tcoeffs_like)
+
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     ssm_util = _normal.DenseNormal(ode_shape=ode_shape)
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
-    stats = _stats.DenseStats(ode_shape=ode_shape)
+    stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(ode_shape=ode_shape)
     transform = _conditional.DenseTransform()
     return FactorisedImpl(
@@ -131,10 +133,16 @@ def _select_dense(*, tcoeffs_like) -> FactorisedImpl:
     )
 
 
-def _select_isotropic(*, ode_shape) -> FactorisedImpl:
+def _select_isotropic(*, tcoeffs_like) -> FactorisedImpl:
+    ode_shape = tcoeffs_like[0].shape
+
+    tcoeffs_tree_only = tree_util.tree_map(lambda *a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
+    unravel = functools.vmap(unravel_tree, in_axes=1, out_axes=0)
+
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     ssm_util = _normal.IsotropicNormal(ode_shape=ode_shape)
-    stats = _stats.IsotropicStats(ode_shape=ode_shape)
+    stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional(ode_shape=ode_shape)
     transform = _conditional.IsotropicTransform()

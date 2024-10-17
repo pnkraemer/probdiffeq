@@ -1,18 +1,25 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq.backend import containers, ode, testing
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing
+from probdiffeq.backend.typing import Array
 from probdiffeq.impl import impl
 
 
-@testing.parametrize("fact", ["dense"])
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-    impl.select(fact, tcoeffs_like=tcoeffs)
+    class Taylor(containers.NamedTuple):
+        state: Array
+        velocity: Array
+        acceleration: Array
 
+    tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
+
+    # todo: once all impl.select's take tcoeffs_like, we use
+    impl.select(fact, tcoeffs_like=tcoeffs)
     output_scale = np.ones_like(impl.prototypes.output_scale())
     ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=output_scale)
 
@@ -34,6 +41,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
         *args, **adaptive_kwargs
     )
+    assert isinstance(solution_adaptive.u, Taylor)
 
     grid_adaptive = solution_adaptive.t
     fixed_kwargs = {"grid": grid_adaptive, "solver": solver}

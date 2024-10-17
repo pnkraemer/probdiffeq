@@ -1,5 +1,6 @@
 from probdiffeq.backend import abc, functools, linalg
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
 
@@ -119,8 +120,9 @@ class ScalarStats(StatsBackend):
 
 
 class DenseStats(StatsBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape: tuple, unravel: Callable):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = linalg.solve_triangular(
@@ -167,8 +169,9 @@ class DenseStats(StatsBackend):
     def qoi(self, rv):
         if np.ndim(rv.mean) > 1:
             return functools.vmap(self.qoi)(rv)
-        mean_reshaped = np.reshape(rv.mean, (-1, *self.ode_shape), order="F")
-        return mean_reshaped[0]
+        return self.unravel(rv.mean)
+        # mean_reshaped = np.reshape(rv.mean, (-1, *self.ode_shape), order="F")
+        # return mean_reshaped[0]
 
     def marginal_nth_derivative(self, rv, i):
         if rv.mean.ndim > 1:
@@ -207,8 +210,9 @@ class DenseStats(StatsBackend):
 
 
 class IsotropicStats(StatsBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
@@ -262,7 +266,9 @@ class IsotropicStats(StatsBackend):
         return (mean, cov)
 
     def qoi(self, rv):
-        return rv.mean[..., 0, :]
+        if rv.mean.ndim > 2:
+            return functools.vmap(self.qoi)(rv)
+        return self.unravel(rv.mean)
 
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
