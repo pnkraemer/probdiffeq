@@ -263,17 +263,17 @@ def _extra_impl_precon_smoother(discretize, num_derivatives) -> _ExtraImpl:
     )
 
 
-def _extra_impl_precon_fixedpoint(discretize, num_derivatives) -> _ExtraImpl:
-    def initial_condition(tcoeffs, /):
-        rv = impl.normal.from_tcoeffs(tcoeffs, num_derivatives)
-        cond = impl.conditional.identity(len(tcoeffs))
+def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
+    def initial_condition():
+        rv = impl.normal.from_tcoeffs(prior.tcoeffs, prior.num_derivatives)
+        cond = impl.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(sol: stats.MarkovSeq, /):
         return sol.init, sol.conditional
 
     def begin(rv, extra, /, dt):
-        cond, (p, p_inv) = discretize(dt)
+        cond, (p, p_inv) = prior.discretize(dt)
 
         rv_p = impl.normal.preconditioner_apply(rv, p_inv)
 
@@ -343,7 +343,7 @@ def _extra_impl_precon_fixedpoint(discretize, num_derivatives) -> _ExtraImpl:
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
         extrapolated_t = _extrapolate(*state_t0, dt0, output_scale)
-        conditional_id = impl.conditional.identity(num_derivatives + 1)
+        conditional_id = impl.conditional.identity(prior.num_derivatives + 1)
         previous_new = (extrapolated_t[0], conditional_id)
         extrapolated_t1 = _extrapolate(*previous_new, dt1, output_scale)
 
@@ -363,11 +363,11 @@ def _extra_impl_precon_fixedpoint(discretize, num_derivatives) -> _ExtraImpl:
         return complete(*begun, output_scale=output_scale)
 
     def interpolate_at_t1(rv, extra, /):
-        cond_identity = impl.conditional.identity(num_derivatives + 1)
+        cond_identity = impl.conditional.identity(prior.num_derivatives + 1)
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
     return _ExtraImpl(
-        num_derivatives=num_derivatives,
+        prior=prior,
         init=init,
         initial_condition=initial_condition,
         begin=begin,
@@ -382,8 +382,8 @@ def _extra_impl_precon_filter(prior: _MarkovProcess) -> _ExtraImpl:
     def init(sol, /):
         return sol, None
 
-    def initial_condition(tcoeffs, /):
-        return impl.normal.from_tcoeffs(tcoeffs, prior.num_derivatives)
+    def initial_condition():
+        return impl.normal.from_tcoeffs(prior.tcoeffs, prior.num_derivatives)
 
     def begin(rv, _extra, /, dt):
         cond, (p, p_inv) = prior.discretize(dt)
@@ -680,8 +680,8 @@ def _strategy(
         rv, corr = correction.init(rv)
         return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def initial_condition(taylor_coefficients, /):
-        return extrapolation.initial_condition(taylor_coefficients)
+    def initial_condition():
+        return extrapolation.initial_condition()
 
     def begin(state: _StrategyState, /, *, dt, vector_field):
         hidden, extra = extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
@@ -1021,7 +1021,7 @@ def _solver_calibrated(
 
     def initial_condition():
         """Construct an initial condition."""
-        posterior = strategy.initial_condition(strategy.prior.tcoeffs)
+        posterior = strategy.initial_condition()
         return posterior, strategy.prior.output_scale
 
     return _Solver(
