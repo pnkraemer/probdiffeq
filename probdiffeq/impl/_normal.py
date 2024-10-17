@@ -46,12 +46,7 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs, /, num_derivatives):
-        if len(tcoeffs) != num_derivatives + 1:
-            msg1 = f"The number of Taylor coefficients {len(tcoeffs)} does not match "
-            msg2 = f"the number of derivatives {num_derivatives+1} in the solver."
-            raise ValueError(msg1 + msg2)
-
+    def from_tcoeffs(self, tcoeffs: list):
         if tcoeffs[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
@@ -60,7 +55,7 @@ class DenseNormal(NormalBackend):
         m0_corrected = np.reshape(m0_matrix, (-1,), order="F")
 
         (ode_dim,) = self.ode_shape
-        ndim = (num_derivatives + 1) * ode_dim
+        ndim = len(tcoeffs) * ode_dim
         c_sqrtm0_corrected = np.zeros((ndim, ndim))
 
         return Normal(m0_corrected, c_sqrtm0_corrected)

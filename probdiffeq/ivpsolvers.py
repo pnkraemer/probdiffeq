@@ -174,17 +174,17 @@ class _ExtraImpl(Generic[T, R, S]):
     """Process the state at checkpoint t=t_n."""
 
 
-def _extra_impl_precon_smoother(discretize, num_derivatives) -> _ExtraImpl:
-    def initial_condition(tcoeffs, /):
-        rv = impl.normal.from_tcoeffs(tcoeffs, num_derivatives)
-        cond = impl.conditional.identity(len(tcoeffs))
+def _extra_impl_precon_smoother(prior: _MarkovProcess) -> _ExtraImpl:
+    def initial_condition():
+        rv = impl.normal.from_tcoeffs(prior.tcoeffs)
+        cond = impl.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(sol: stats.MarkovSeq, /):
         return sol.init, sol.conditional
 
     def begin(rv, _extra, /, dt):
-        cond, (p, p_inv) = discretize(dt)
+        cond, (p, p_inv) = prior.discretize(dt)
 
         rv_p = impl.normal.preconditioner_apply(rv, p_inv)
 
@@ -252,7 +252,7 @@ def _extra_impl_precon_smoother(discretize, num_derivatives) -> _ExtraImpl:
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
     return _ExtraImpl(
-        num_derivatives=num_derivatives,
+        prior=prior,
         initial_condition=initial_condition,
         init=init,
         begin=begin,
@@ -265,7 +265,7 @@ def _extra_impl_precon_smoother(discretize, num_derivatives) -> _ExtraImpl:
 
 def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
     def initial_condition():
-        rv = impl.normal.from_tcoeffs(prior.tcoeffs, prior.num_derivatives)
+        rv = impl.normal.from_tcoeffs(prior.tcoeffs)
         cond = impl.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
@@ -383,7 +383,7 @@ def _extra_impl_precon_filter(prior: _MarkovProcess) -> _ExtraImpl:
         return sol, None
 
     def initial_condition():
-        return impl.normal.from_tcoeffs(prior.tcoeffs, prior.num_derivatives)
+        return impl.normal.from_tcoeffs(prior.tcoeffs)
 
     def begin(rv, _extra, /, dt):
         cond, (p, p_inv) = prior.discretize(dt)
