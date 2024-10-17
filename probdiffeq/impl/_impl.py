@@ -46,7 +46,7 @@ class Impl:
     @property
     def normal(self) -> _normal.NormalBackend:
         if self._fact is not None:
-            return self._fact.ssm_util
+            return self._fact.normal
         raise ValueError(self.error_msg())
 
     @property
@@ -69,7 +69,7 @@ class Impl:
 @containers.dataclass
 class FactorisedImpl:
     prototypes: _prototypes.PrototypeBackend
-    ssm_util: _normal.NormalBackend
+    normal: _normal.NormalBackend
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
@@ -98,14 +98,14 @@ def choose(which: str, /, *, tcoeffs_like) -> FactorisedImpl:
 
 def _select_scalar() -> FactorisedImpl:
     prototypes = _prototypes.ScalarPrototype()
-    ssm_util = _normal.ScalarNormal()
+    normal = _normal.ScalarNormal()
     stats = _stats.ScalarStats()
     linearise = _linearise.ScalarLinearisation()
     conditional = _conditional.ScalarConditional()
     transform = _conditional.ScalarTransform()
     return FactorisedImpl(
         prototypes=prototypes,
-        ssm_util=ssm_util,
+        normal=normal,
         stats=stats,
         linearise=linearise,
         conditional=conditional,
@@ -118,7 +118,7 @@ def _select_dense(*, tcoeffs_like) -> FactorisedImpl:
     _, unravel = tree_util.ravel_pytree(tcoeffs_like)
 
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
-    ssm_util = _normal.DenseNormal(ode_shape=ode_shape)
+    normal = _normal.DenseNormal(ode_shape=ode_shape)
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
     stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(ode_shape=ode_shape)
@@ -127,7 +127,7 @@ def _select_dense(*, tcoeffs_like) -> FactorisedImpl:
         linearise=linearise,
         transform=transform,
         conditional=conditional,
-        ssm_util=ssm_util,
+        normal=normal,
         prototypes=prototypes,
         stats=stats,
     )
@@ -141,14 +141,14 @@ def _select_isotropic(*, tcoeffs_like) -> FactorisedImpl:
     unravel = functools.vmap(unravel_tree, in_axes=1, out_axes=0)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
-    ssm_util = _normal.IsotropicNormal(ode_shape=ode_shape)
+    normal = _normal.IsotropicNormal(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional(ode_shape=ode_shape)
     transform = _conditional.IsotropicTransform()
     return FactorisedImpl(
         prototypes=prototypes,
-        ssm_util=ssm_util,
+        normal=normal,
         stats=stats,
         linearise=linearise,
         conditional=conditional,
@@ -164,14 +164,14 @@ def _select_blockdiag(*, tcoeffs_like) -> FactorisedImpl:
     unravel = functools.vmap(unravel_tree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
-    ssm_util = _normal.BlockDiagNormal(ode_shape=ode_shape)
+    normal = _normal.BlockDiagNormal(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.BlockDiagLinearisation()
     conditional = _conditional.BlockDiagConditional(ode_shape=ode_shape)
     transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)
     return FactorisedImpl(
         prototypes=prototypes,
-        ssm_util=ssm_util,
+        normal=normal,
         stats=stats,
         linearise=linearise,
         conditional=conditional,
