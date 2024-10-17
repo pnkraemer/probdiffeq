@@ -2,9 +2,7 @@
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import containers, ode, testing
-from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
-from probdiffeq.impl import impl
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -18,19 +16,13 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
 
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
 
-    # todo: once all impl.select's across Probdiffeq arise next to prior_ibm,
-    #  merge the two functions?
-    ssm = impl.choose(fact, tcoeffs_like=tcoeffs)
-    output_scale = np.ones_like(ssm.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=output_scale, ssm=ssm)
-
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+
     control = ivpsolve.control_integral(clip=True)  # Any clipped controller will do.
-    adaptive_solver = ivpsolve.adaptive(
-        solver, ssm=ssm, atol=1e-2, rtol=1e-2, control=control
-    )
+    asolver = ivpsolve.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2, control=control)
 
     init = solver.initial_condition()
     args = (vf, init)
@@ -39,7 +31,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
         "t0": t0,
         "t1": t1,
         "dt0": 0.1,
-        "adaptive_solver": adaptive_solver,
+        "adaptive_solver": asolver,
         "ssm": ssm,
     }
     solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
