@@ -7,7 +7,6 @@ or to evaluate marginal likelihoods of observations of the solutions.
 from probdiffeq.backend import containers, control_flow, functools, random, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any
-from probdiffeq.impl import impl
 from probdiffeq.util import filter_util
 
 # TODO: the functions in here should only depend on posteriors / strategies!
@@ -254,22 +253,22 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
     return logpdf
 
 
-def calibrate(x, /, output_scale):
+def calibrate(x, /, output_scale, *, ssm):
     """Calibrated a posterior distribution of an IVP solution."""
-    if np.ndim(output_scale) > np.ndim(impl.prototypes.output_scale()):
+    if np.ndim(output_scale) > np.ndim(ssm.prototypes.output_scale()):
         output_scale = output_scale[-1]
     if isinstance(x, MarkovSeq):
-        return _markov_rescale_cholesky(x, output_scale)
-    return impl.stats.rescale_cholesky(x, output_scale)
+        return _markov_rescale_cholesky(x, output_scale, ssm=ssm)
+    return ssm.stats.rescale_cholesky(x, output_scale)
 
 
-def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor) -> MarkovSeq:
+def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor, *, ssm) -> MarkovSeq:
     """Rescale the Cholesky factor of the covariance of a Markov sequence."""
-    init = impl.stats.rescale_cholesky(markov_seq.init, factor)
-    cond = _rescale_cholesky_conditional(markov_seq.conditional, factor)
+    init = ssm.stats.rescale_cholesky(markov_seq.init, factor)
+    cond = _rescale_cholesky_conditional(markov_seq.conditional, factor, ssm=ssm)
     return MarkovSeq(init=init, conditional=cond)
 
 
-def _rescale_cholesky_conditional(conditional, factor, /):
-    noise_new = impl.stats.rescale_cholesky(conditional.noise, factor)
-    return impl.conditional.conditional(conditional.matmul, noise_new)
+def _rescale_cholesky_conditional(conditional, factor, /, *, ssm):
+    noise_new = ssm.stats.rescale_cholesky(conditional.noise, factor)
+    return ssm.conditional.conditional(conditional.matmul, noise_new)
