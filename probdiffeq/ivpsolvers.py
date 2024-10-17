@@ -798,17 +798,17 @@ def prior_ibm(tcoeffs, *, ssm_fact: str, output_scale=None) -> _MarkovProcess:
     return prior, ssm
 
 
-def prior_ibm_discrete(ts, *, tcoeffs_like, output_scale=None):
+def prior_ibm_discrete(ts, *, tcoeffs_like, ssm_fact: str, output_scale=None):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    prior = prior_ibm(tcoeffs_like, output_scale=output_scale)
+    prior, ssm = prior_ibm(tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact)
     transitions, (p, p_inv) = functools.vmap(prior.discretize)(np.diff(ts))
 
-    preconditioner_apply_vmap = functools.vmap(impl.conditional.preconditioner_apply)
+    preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = impl.normal.standard(len(tcoeffs_like), output_scale=output_scale)
-    return stats.MarkovSeq(init, conditionals)
+    output_scale = np.ones_like(ssm.prototypes.output_scale())
+    init = ssm.normal.standard(len(tcoeffs_like), output_scale=output_scale)
+    return stats.MarkovSeq(init, conditionals), ssm
 
 
 @containers.dataclass

@@ -41,7 +41,8 @@ def _sample_shape(markov_seq, *, ssm):
 
 def _transform_unit_sample(markov_seq, base_sample, /, reverse, *, ssm):
     if base_sample.ndim > len(_sample_shape(markov_seq, ssm=ssm)):
-        transform_vmap = functools.vmap(_transform_unit_sample, in_axes=(None, 0, None))
+        transform = functools.partial(_transform_unit_sample, ssm=ssm)
+        transform_vmap = functools.vmap(transform, in_axes=(None, 0, None))
         return transform_vmap(markov_seq, base_sample, reverse)
 
     # Compute a single unit sample.
