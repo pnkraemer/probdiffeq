@@ -38,19 +38,19 @@ def fixture_ssm():
 
     which = os.environ["IMPL"]
     if which in ["dense", "isotropic", "blockdiag"]:
-        impl.select(which, ode_shape=(2,))
+        # impl.select(which, ode_shape=(2,))
 
         # Prepare an RV:
-        output_scale = np.ones_like(impl.prototypes.output_scale())
-        discretise_func = impl.conditional.ibm_transitions(3, output_scale)
-        (_matrix, rv), _pre = discretise_func(0.5)
+        # output_scale = np.ones_like(impl.prototypes.output_scale())
+        # discretise_func = impl.conditional.ibm_transitions(3, output_scale)
+        # (_matrix, rv), _pre = discretise_func(0.5)
 
-        # Prepare an ODE
-        ode_ = ode.ivp_lotka_volterra()
-        ode_affine = ode.ivp_affine_multi_dimensional()
-
-        # Return the SSM config
-        return SSMConfig(default_rv=rv, default_ode=ode_, default_ode_affine=ode_affine)
+        # # Prepare an ODE
+        # ode_ = ode.ivp_lotka_volterra()
+        # ode_affine = ode.ivp_affine_multi_dimensional()
+        #
+        # # Return the SSM config
+        return SSMConfig(default_rv=None, default_ode=None, default_ode_affine=None)
     if which in ["scalar"]:
         impl.select("scalar")
 

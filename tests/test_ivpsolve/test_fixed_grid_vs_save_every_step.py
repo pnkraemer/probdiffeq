@@ -2,14 +2,17 @@
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing
+from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
 
 
-def test_fixed_grid_result_matches_adaptive_grid_result(ssm):
-    vf, u0, (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense"])
+def test_fixed_grid_result_matches_adaptive_grid_result(fact):
+    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
+    impl.select(fact, tcoeffs_like=tcoeffs)
+
     output_scale = np.ones_like(impl.prototypes.output_scale())
     ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=output_scale)
 

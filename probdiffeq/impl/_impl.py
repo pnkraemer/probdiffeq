@@ -76,16 +76,16 @@ class FactorisedImpl:
     transform: _conditional.TransformBackend
 
 
-def choose(which: str, /, *, ode_shape=None) -> FactorisedImpl:
+def choose(which: str, /, *, tcoeffs_like) -> FactorisedImpl:
     if which == "scalar":
         return _select_scalar()
 
-    if ode_shape is None:
-        msg = "Please provide an ODE shape."
-        raise ValueError(msg)
+    # if ode_shape is None:
+    #     msg = "Please provide an ODE shape."
+    #     raise ValueError(msg)
 
     if which == "dense":
-        return _select_dense(ode_shape=ode_shape)
+        return _select_dense(tcoeffs_like=tcoeffs_like)
     if which == "isotropic":
         return _select_isotropic(ode_shape=ode_shape)
     if which == "blockdiag":
@@ -113,7 +113,8 @@ def _select_scalar() -> FactorisedImpl:
     )
 
 
-def _select_dense(*, ode_shape) -> FactorisedImpl:
+def _select_dense(*, tcoeffs_like) -> FactorisedImpl:
+    ode_shape = tcoeffs_like[0].shape
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     ssm_util = _normal.DenseNormal(ode_shape=ode_shape)
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape)
