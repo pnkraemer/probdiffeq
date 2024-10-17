@@ -784,9 +784,8 @@ def _strategy(
     )
 
 
-def prior_ibm(tcoeffs, output_scale=None) -> _MarkovProcess:
+def prior_ibm(tcoeffs, output_scale) -> _MarkovProcess:
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
-    output_scale = output_scale or np.ones_like(impl.prototypes.output_scale())
     discretize = impl.conditional.ibm_transitions(len(tcoeffs) - 1, output_scale)
     return _MarkovProcess(tcoeffs, output_scale, discretize=discretize)
 
