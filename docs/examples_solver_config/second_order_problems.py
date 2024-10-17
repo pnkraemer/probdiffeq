@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -41,7 +40,6 @@ jax.config.update("jax_platform_name", "cpu")
 # Quick refresher: first-order ODEs
 
 # +
-impl.select("isotropic", ode_shape=(4,))
 f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
@@ -52,29 +50,29 @@ def vf_1(y, t):  # noqa: ARG001
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0()
-solver_1st = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
-adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
+solver_1st = ivpsolvers.solver_mle(strategy, ssm=ssm)
+adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5, ssm=ssm)
 
 
 # -
 
 init = solver_1st.initial_condition()
 solution = ivpsolve.solve_adaptive_save_every_step(
-    vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st
+    vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st, ssm=ssm
 )
 
-norm = jnp.linalg.norm((solution.u[-1, ...] - u0) / jnp.abs(1.0 + u0))
-plt.title((solution.u.shape, norm))
-plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
+norm = jnp.linalg.norm((solution.u[0][-1] - u0) / jnp.abs(1.0 + u0))
+plt.title(f"shape={solution.u[0].shape}, error={norm:.3f}")
+plt.plot(solution.u[0][:, 0], solution.u[0][:, 1], marker=".")
 plt.show()
 
 # The default configuration assumes that the ODE to be solved is of first order.
 # Now, the same game with a second-order ODE
 
 # +
-impl.select("isotropic", ode_shape=(2,))
 f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
 
@@ -86,22 +84,23 @@ def vf_2(y, dy, t):  # noqa: ARG001
 
 # One derivative more than above because we don't transform to first order
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0(ode_order=2)
-solver_2nd = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
-adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ode_order=2, ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
+solver_2nd = ivpsolvers.solver_mle(strategy, ssm=ssm)
+adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5, ssm=ssm)
 
 
 init = solver_2nd.initial_condition()
 # -
 
 solution = ivpsolve.solve_adaptive_save_every_step(
-    vf_2, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_2nd
+    vf_2, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_2nd, ssm=ssm
 )
 
-norm = jnp.linalg.norm((solution.u[-1, ...] - u0) / jnp.abs(1.0 + u0))
-plt.title((solution.u.shape, norm))
-plt.plot(solution.u[:, 0], solution.u[:, 1], marker=".")
+norm = jnp.linalg.norm((solution.u[0][-1, ...] - u0) / jnp.abs(1.0 + u0))
+plt.title(f"shape={solution.u[0].shape}, error={norm:.3f}")
+plt.plot(solution.u[0][:, 0], solution.u[0][:, 1], marker=".")
 plt.show()
 
 # The results are indistinguishable from the plot.
