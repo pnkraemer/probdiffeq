@@ -62,15 +62,14 @@ def solution_routine():
     t0, t1 = 0.0, 1.0
     u0 = jnp.asarray([0.1])
 
-    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    ibm = ivpsolvers.prior_ibm(tcoeffs, 1.0)
     ts0 = ivpsolvers.correction_ts0(ode_order=1)
 
     strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
-
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    init = solver.initial_condition(tcoeffs, 1.0)
+    init = solver.initial_condition()
 
     def simulate(init_val):
         """Evaluate the parameter-to-solution function."""

@@ -70,7 +70,11 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
     def loss_fn(parameters):
         """Loss function: log-marginal likelihood of the data."""
         tcoeffs = (*initial_values, vf(*initial_values, t=t0, p=parameters))
-        init = solver.initial_condition(tcoeffs, output_scale=1.0)
+        ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
+        ts0 = ivpsolvers.correction_ts0()
+        strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+        solver_ts0 = ivpsolvers.solver(strategy)
+        init = solver_ts0.initial_condition()
 
         sol = ivpsolve.solve_fixed_grid(
             lambda *a, **kw: vf(*a, **kw, p=parameters), init, grid=grid, solver=solver
@@ -116,15 +120,14 @@ def vf(y, *, t, p):
 
 
 # Make a solver
-ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+tcoeffs = (u0, vf(u0, t=t0, p=f_args))
+ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
 ts0 = ivpsolvers.correction_ts0()
 strategy = ivpsolvers.strategy_smoother(ibm, ts0)
 solver_ts0 = ivpsolvers.solver(strategy)
+init = solver_ts0.initial_condition()
 
 # +
-tcoeffs = (u0, vf(u0, t=t0, p=f_args))
-init = solver_ts0.initial_condition(tcoeffs, output_scale=1.0)
-
 sol = ivpsolve.solve_fixed_grid(
     lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0
 )
@@ -157,8 +160,12 @@ for i in range(chunk_size):
 
 # +
 plt.plot(sol.t, data, "-", linewidth=5, alpha=0.5, label="Data")
-tcoeffs = (u0, vf(u0, t=t0, p=p))
-init = solver_ts0.initial_condition(tcoeffs, output_scale=1.0)
+tcoeffs = (u0, vf(u0, t=t0, p=f_args))
+ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
+ts0 = ivpsolvers.correction_ts0()
+strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+solver_ts0 = ivpsolvers.solver(strategy)
+init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(
     lambda *a, **kw: vf(*a, **kw, p=p), init, grid=grid, solver=solver_ts0
@@ -168,7 +175,11 @@ sol = ivpsolve.solve_fixed_grid(
 plt.plot(sol.t, sol.u, ".-", label="Final guess")
 
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
-init = solver_ts0.initial_condition(tcoeffs, output_scale=1.0)
+ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
+ts0 = ivpsolvers.correction_ts0()
+strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+solver_ts0 = ivpsolvers.solver(strategy)
+init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(
     lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0

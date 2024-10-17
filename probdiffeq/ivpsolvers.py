@@ -787,19 +787,20 @@ def _strategy(
 def prior_ibm(tcoeffs, output_scale) -> _MarkovProcess:
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     discretize = impl.conditional.ibm_transitions(len(tcoeffs) - 1, output_scale)
-    return _MarkovProcess(tcoeffs, output_scale, discretize=discretize)
+    output_scale_uncalib = np.ones_like(impl.prototypes.output_scale())
+    return _MarkovProcess(tcoeffs, output_scale_uncalib, discretize=discretize)
 
 
-def prior_ibm_discrete(ts, *, num_derivatives, output_scale=None):
+def prior_ibm_discrete(ts, *, tcoeffs_like, output_scale=None):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    discretize, _ = prior_ibm(num_derivatives, output_scale=output_scale)
-    transitions, (p, p_inv) = functools.vmap(discretize)(np.diff(ts))
+    prior = prior_ibm(tcoeffs_like, output_scale=output_scale)
+    transitions, (p, p_inv) = functools.vmap(prior.discretize)(np.diff(ts))
 
     preconditioner_apply_vmap = functools.vmap(impl.conditional.preconditioner_apply)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
     output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = impl.normal.standard(num_derivatives + 1, output_scale=output_scale)
+    init = impl.normal.standard(len(tcoeffs_like), output_scale=output_scale)
     return stats.MarkovSeq(init, conditionals)
 
 

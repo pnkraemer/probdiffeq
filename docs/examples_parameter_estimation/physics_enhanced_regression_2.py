@@ -188,15 +188,13 @@ def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
 def solve_fixed(theta, *, ts):
     """Evaluate the parameter-to-solution map, solving on a fixed grid."""
     # Create a probabilistic solver
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
+    output_scale = 10.0
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_filter(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
-
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    output_scale = 10.0
-    init = solver.initial_condition(tcoeffs, output_scale)
-
+    init = solver.initial_condition()
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver)
     return sol[-1]
 
@@ -205,15 +203,15 @@ def solve_fixed(theta, *, ts):
 def solve_adaptive(theta, *, save_at):
     """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
     # Create a probabilistic solver
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
+    output_scale = 10.0
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_filter(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
     adaptive_solver = ivpsolve.adaptive(solver)
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    output_scale = 10.0
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_at(
         vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
     )

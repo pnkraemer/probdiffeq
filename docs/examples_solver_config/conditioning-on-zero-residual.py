@@ -62,9 +62,10 @@ u0 = jnp.asarray([0.1])
 # Assemble the discretised prior (with and without the correct Taylor coefficients)
 
 NUM_DERIVATIVES = 2
+tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 init_raw, transitions = ivpsolvers.prior_ibm_discrete(
-    ts, num_derivatives=NUM_DERIVATIVES, output_scale=100.0
+    ts, tcoeffs_like=tcoeffs_like, output_scale=100.0
 )
 
 markov_seq_prior = stats.MarkovSeq(init_raw, transitions)
@@ -73,20 +74,20 @@ markov_seq_prior = stats.MarkovSeq(init_raw, transitions)
 tcoeffs = taylor.odejet_padded_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
-init_tcoeffs = impl.normal.from_tcoeffs(tcoeffs, num_derivatives=NUM_DERIVATIVES)
+init_tcoeffs = impl.normal.from_tcoeffs(tcoeffs)
 markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 
 # +
 # Compute the posterior
 
 slr1 = ivpsolvers.correction_ts1()
-ibm = ivpsolvers.prior_ibm(num_derivatives=NUM_DERIVATIVES)
+ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
 solver = ivpsolvers.solver(ivpsolvers.strategy_fixedpoint(ibm, slr1))
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-1, rtol=1e-2)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 
-init = solver.initial_condition(tcoeffs, output_scale=1.0)
+init = solver.initial_condition()
 sol = ivpsolve.solve_adaptive_save_at(
     vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver
 )

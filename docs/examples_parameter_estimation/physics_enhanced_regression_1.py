@@ -68,14 +68,14 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
-    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    tcoeffs = (u0, vf(u0, t0, p=p))
+    output_scale = 10.0
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_smoother(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
 
-    tcoeffs = (u0, vf(u0, t0, p=p))
-    output_scale = 10.0
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
         lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver
     )
