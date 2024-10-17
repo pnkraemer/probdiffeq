@@ -405,10 +405,14 @@ def solve_adaptive_terminal_values(
     # I think the user expects marginals, so we compute them here
     posterior, output_scale = solution_save_at
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
-    u = ssm.stats.qoi(marginals)
+
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=t1,
         u=u,
+        u_std=u_std,
+        ssm=ssm,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
