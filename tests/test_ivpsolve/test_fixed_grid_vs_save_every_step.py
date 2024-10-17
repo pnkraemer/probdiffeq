@@ -18,16 +18,19 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
 
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
 
-    # todo: once all impl.select's take tcoeffs_like, we use
-    impl.select(fact, tcoeffs_like=tcoeffs)
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=output_scale)
+    # todo: once all impl.select's across Probdiffeq arise next to prior_ibm,
+    #  merge the two functions?
+    ssm = impl.choose(fact, tcoeffs_like=tcoeffs)
+    output_scale = np.ones_like(ssm.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=output_scale, ssm=ssm)
 
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_filter(ibm, ts0)
-    solver = ivpsolvers.solver_mle(strategy)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
+    solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
     control = ivpsolve.control_integral(clip=True)  # Any clipped controller will do.
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, control=control)
+    adaptive_solver = ivpsolve.adaptive(
+        solver, ssm=ssm, atol=1e-2, rtol=1e-2, control=control
+    )
 
     init = solver.initial_condition()
     args = (vf, init)
@@ -37,6 +40,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
         "t1": t1,
         "dt0": 0.1,
         "adaptive_solver": adaptive_solver,
+        "ssm": ssm,
     }
     solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
         *args, **adaptive_kwargs
@@ -44,6 +48,6 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     assert isinstance(solution_adaptive.u, Taylor)
 
     grid_adaptive = solution_adaptive.t
-    fixed_kwargs = {"grid": grid_adaptive, "solver": solver}
+    fixed_kwargs = {"grid": grid_adaptive, "solver": solver, "ssm": ssm}
     solution_fixed = ivpsolve.solve_fixed_grid(*args, **fixed_kwargs)
     assert testing.tree_all_allclose(solution_adaptive, solution_fixed)

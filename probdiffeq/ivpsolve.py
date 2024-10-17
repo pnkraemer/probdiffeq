@@ -112,12 +112,14 @@ def control_integral(
     return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
 
 
-def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
+def adaptive(solver, *, ssm, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     """Make an IVP solver adaptive."""
     if control is None:
         control = control_proportional_integral()
 
-    return _AdaSolver(solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord)
+    return _AdaSolver(
+        solver, ssm=ssm, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+    )
 
 
 class _AdaState(containers.NamedTuple):
@@ -130,12 +132,13 @@ class _AdaState(containers.NamedTuple):
 class _AdaSolver:
     """Adaptive IVP solvers."""
 
-    def __init__(self, solver, atol, rtol, control, norm_ord):
+    def __init__(self, solver, *, atol, rtol, control, norm_ord, ssm):
         self.solver = solver
         self.atol = atol
         self.rtol = rtol
         self.control = control
         self.norm_ord = norm_ord
+        self.ssm = ssm
 
     def __repr__(self):
         return (
@@ -202,8 +205,8 @@ class _AdaSolver:
                 dt=self.control.extract(state_control),
             )
             # Normalise the error
-            u_proposed = impl.stats.qoi(state_proposed.strategy.hidden)[0]
-            u_step_from = impl.stats.qoi(state_proposed.strategy.hidden)[0]
+            u_proposed = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
+            u_step_from = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
             error_norm = _normalise_error(error_estimate, u=u)
 
@@ -269,14 +272,19 @@ class _AdaSolver:
     def register_pytree_node():
         def _asolver_flatten(asolver):
             children = (asolver.atol, asolver.rtol)
-            aux = (asolver.solver, asolver.control, asolver.norm_ord)
+            aux = (asolver.solver, asolver.control, asolver.norm_ord, asolver.ssm)
             return children, aux
 
         def _asolver_unflatten(aux, children):
             atol, rtol = children
-            (solver, control, norm_ord) = aux
+            (solver, control, norm_ord, ssm) = aux
             return _AdaSolver(
-                solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+                solver=solver,
+                atol=atol,
+                rtol=rtol,
+                control=control,
+                norm_ord=norm_ord,
+                ssm=ssm,
             )
 
         tree_util.register_pytree_node(
@@ -503,7 +511,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
 
 def solve_adaptive_save_every_step(
-    vector_field, initial_condition, t0, t1, adaptive_solver, dt0
+    vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
 ) -> _Solution:
     """Solve an initial value problem and save every step.
 
@@ -540,7 +548,7 @@ def solve_adaptive_save_every_step(
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi(marginals)
     return _Solution(
         t=t,
         u=u,
@@ -573,7 +581,9 @@ def _solution_generator(
     yield solution
 
 
-def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution:
+def solve_fixed_grid(
+    vector_field, initial_condition, grid, solver, *, ssm
+) -> _Solution:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
@@ -591,7 +601,7 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
     marginals, posterior = _tmp
 
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi(marginals)
     return _Solution(
         t=grid,
         u=u,

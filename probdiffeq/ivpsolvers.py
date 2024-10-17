@@ -378,22 +378,22 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
     )
 
 
-def _extra_impl_precon_filter(prior: _MarkovProcess) -> _ExtraImpl:
+def _extra_impl_precon_filter(prior: _MarkovProcess, *, ssm) -> _ExtraImpl:
     def init(sol, /):
         return sol, None
 
     def initial_condition():
-        return impl.normal.from_tcoeffs(prior.tcoeffs)
+        return ssm.normal.from_tcoeffs(prior.tcoeffs)
 
     def begin(rv, _extra, /, dt):
         cond, (p, p_inv) = prior.discretize(dt)
 
-        rv_p = impl.normal.preconditioner_apply(rv, p_inv)
+        rv_p = ssm.normal.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = impl.stats.mean(rv_p)
-        extrapolated_p = impl.conditional.apply(m_ext_p, cond)
+        m_ext_p = ssm.stats.mean(rv_p)
+        extrapolated_p = ssm.conditional.apply(m_ext_p, cond)
 
-        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
+        extrapolated = ssm.normal.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
@@ -405,9 +405,9 @@ def _extra_impl_precon_filter(prior: _MarkovProcess) -> _ExtraImpl:
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = impl.stats.rescale_cholesky(noise, output_scale)
-        extrapolated_p = impl.conditional.marginalise(rv_p, (A, noise))
-        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
+        noise = ssm.stats.rescale_cholesky(noise, output_scale)
+        extrapolated_p = ssm.conditional.marginalise(rv_p, (A, noise))
+        extrapolated = ssm.normal.preconditioner_apply(extrapolated_p, p)
 
         # Gather and return
         return extrapolated, None
@@ -461,12 +461,13 @@ class _Correction:
     """Extract the solution from the state."""
 
 
-def correction_ts0(*, ode_order=1) -> _Correction:
+def correction_ts0(*, ssm, ode_order=1) -> _Correction:
     """Zeroth-order Taylor linearisation."""
     return _correction_constraint_ode_taylor(
+        ssm=ssm,
         ode_order=ode_order,
-        linearise_fun=impl.linearise.ode_taylor_0th(ode_order=ode_order),
-        string_repr=f"<TS0 with ode_order={ode_order}>",
+        linearise_fun=ssm.linearise.ode_taylor_0th(ode_order=ode_order),
+        name=f"<TS0 with ode_order={ode_order}>",
     )
 
 
@@ -475,15 +476,15 @@ def correction_ts1(*, ode_order=1) -> _Correction:
     return _correction_constraint_ode_taylor(
         ode_order=ode_order,
         linearise_fun=impl.linearise.ode_taylor_1st(ode_order=ode_order),
-        string_repr=f"<TS1 with ode_order={ode_order}>",
+        name=f"<TS1 with ode_order={ode_order}>",
     )
 
 
 def _correction_constraint_ode_taylor(
-    ode_order, linearise_fun, string_repr
+    ode_order, linearise_fun, name, *, ssm
 ) -> _Correction:
     def init(ssv, /):
-        obs_like = impl.prototypes.observed()
+        obs_like = ssm.prototypes.observed()
         return ssv, obs_like
 
     def estimate_error(hidden_state, _corr, /, vector_field, t):
@@ -491,14 +492,14 @@ def _correction_constraint_ode_taylor(
             return vector_field(*s, t=t)
 
         A, b = linearise_fun(f_wrapped, hidden_state.mean)
-        observed = impl.transform.marginalise(hidden_state, (A, b))
+        observed = ssm.transform.marginalise(hidden_state, (A, b))
 
-        error_estimate = _estimate_error(observed)
+        error_estimate = _estimate_error(observed, ssm=ssm)
         return error_estimate, observed, (A, b)
 
     def complete(hidden_state, corr, /):
         A, b = corr
-        observed, (_gain, corrected) = impl.transform.revert(hidden_state, (A, b))
+        observed, (_gain, corrected) = ssm.transform.revert(hidden_state, (A, b))
         return corrected, observed
 
     def extract(ssv, _corr, /):
@@ -506,7 +507,7 @@ def _correction_constraint_ode_taylor(
 
     return _Correction(
         ode_order=ode_order,
-        name=string_repr,
+        name=name,
         init=init,
         estimate_error=estimate_error,
         complete=complete,
@@ -518,9 +519,7 @@ def correction_slr0(cubature_fun=cubature_third_order_spherical) -> _Correction:
     """Zeroth-order statistical linear regression."""
     linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
     return _correction_constraint_ode_statistical(
-        ode_order=1,
-        linearise_fun=linearise_fun,
-        string_repr=f"<SLR1 with ode_order={1}>",
+        ode_order=1, linearise_fun=linearise_fun, name=f"<SLR1 with ode_order={1}>"
     )
 
 
@@ -528,14 +527,12 @@ def correction_slr1(cubature_fun=cubature_third_order_spherical) -> _Correction:
     """First-order statistical linear regression."""
     linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
     return _correction_constraint_ode_statistical(
-        ode_order=1,
-        linearise_fun=linearise_fun,
-        string_repr=f"<SLR0 with ode_order={1}>",
+        ode_order=1, linearise_fun=linearise_fun, name=f"<SLR0 with ode_order={1}>"
     )
 
 
 def _correction_constraint_ode_statistical(
-    ode_order, linearise_fun, string_repr
+    ode_order, linearise_fun, name
 ) -> _Correction:
     def init(ssv, /):
         obs_like = impl.prototypes.observed()
@@ -563,7 +560,7 @@ def _correction_constraint_ode_statistical(
 
     return _Correction(
         ode_order=ode_order,
-        name=string_repr,
+        name=name,
         init=init,
         estimate_error=estimate_error,
         complete=complete,
@@ -571,13 +568,13 @@ def _correction_constraint_ode_statistical(
     )
 
 
-def _estimate_error(observed, /):
+def _estimate_error(observed, /, *, ssm):
     # TODO: the functions involved in error estimation are still a bit patchy.
     #  for instance, they assume that they are called in exactly this error estimation
     #  context. Same for prototype_qoi etc.
     zero_data = np.zeros(())
-    output_scale = impl.stats.mahalanobis_norm_relative(zero_data, rv=observed)
-    error_estimate_unscaled = np.squeeze(impl.stats.standard_deviation(observed))
+    output_scale = ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
+    error_estimate_unscaled = np.squeeze(ssm.stats.standard_deviation(observed))
     return output_scale * error_estimate_unscaled
 
 
@@ -636,7 +633,7 @@ def strategy_smoother(prior, correction: _Correction, /) -> _Strategy:
         is_suitable_for_save_at=False,
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
-        string_repr=f"<Smoother with {extrapolation_impl}, {correction}>",
+        name=f"<Smoother with {extrapolation_impl}, {correction}>",
     )
 
 
@@ -649,17 +646,17 @@ def strategy_fixedpoint(prior, correction: _Correction, /) -> _Strategy:
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
-        string_repr=f"<Fixedpoint smoother with {extrapolation_impl}, {correction}>",
+        name=f"<Fixedpoint smoother with {extrapolation_impl}, {correction}>",
     )
 
 
-def strategy_filter(prior, correction: _Correction, /) -> _Strategy:
+def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
     """Construct a filter."""
-    extrapolation_impl = _extra_impl_precon_filter(prior)
+    extrapolation_impl = _extra_impl_precon_filter(prior, ssm=ssm)
     return _strategy(
         extrapolation_impl,
         correction,
-        string_repr=f"<Filter with {extrapolation_impl}, {correction}>",
+        name=f"<Filter with {extrapolation_impl}, {correction}>",
         is_suitable_for_save_at=True,
         is_suitable_for_offgrid_marginals=True,
         is_suitable_for_save_every_step=True,
@@ -670,7 +667,7 @@ def _strategy(
     extrapolation: _ExtraImpl,
     correction: _Correction,
     *,
-    string_repr,
+    name,
     is_suitable_for_save_at,
     is_suitable_for_save_every_step,
     is_suitable_for_offgrid_marginals,
@@ -769,7 +766,7 @@ def _strategy(
         return u, marginals
 
     return _Strategy(
-        name=string_repr,
+        name=name,
         init=init,
         initial_condition=initial_condition,
         begin=begin,
@@ -784,10 +781,10 @@ def _strategy(
     )
 
 
-def prior_ibm(tcoeffs, output_scale) -> _MarkovProcess:
+def prior_ibm(tcoeffs, output_scale, *, ssm) -> _MarkovProcess:
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
-    discretize = impl.conditional.ibm_transitions(len(tcoeffs) - 1, output_scale)
-    output_scale_uncalib = np.ones_like(impl.prototypes.output_scale())
+    discretize = ssm.conditional.ibm_transitions(len(tcoeffs) - 1, output_scale)
+    output_scale_uncalib = np.ones_like(ssm.prototypes.output_scale())
     return _MarkovProcess(tcoeffs, output_scale_uncalib, discretize=discretize)
 
 
@@ -839,7 +836,7 @@ def _calibration_none() -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def _calibration_running_mean() -> _Calibration:
+def _calibration_running_mean(*, ssm) -> _Calibration:
     # TODO: if we pass the mahalanobis_relative term to the update() function,
     #  it reduces to a generic stats() module that can also be used for e.g.
     #  marginal likelihoods.
@@ -851,8 +848,8 @@ def _calibration_running_mean() -> _Calibration:
     def update(state, /, observed):
         prior, calibrated, num_data = state
 
-        new_term = impl.stats.mahalanobis_norm_relative(0.0, observed)
-        calibrated = impl.stats.update_mean(calibrated, new_term, num=num_data)
+        new_term = ssm.stats.mahalanobis_norm_relative(0.0, observed)
+        calibrated = ssm.stats.update_mean(calibrated, new_term, num=num_data)
         return prior, calibrated, num_data + 1.0
 
     def extract(state, /):
@@ -866,7 +863,7 @@ def _calibration_running_mean() -> _Calibration:
 class _Solver:
     """IVP solver."""
 
-    string_repr: str
+    name: str
     requires_rescaling: bool
     error_contraction_rate: int
     is_suitable_for_save_at: int
@@ -892,13 +889,13 @@ class _SolverState(containers.NamedTuple):
         return self.strategy.t
 
 
-def solver_mle(strategy):
+def solver_mle(strategy, *, ssm):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
     Warning: needs to be combined with a call to stats.calibrate()
     after solving if the MLE-calibration shall be *used*.
     """
-    string_repr = f"<MLE-solver with {strategy}>"
+    name = f"<MLE-solver with {strategy}>"
 
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
@@ -919,17 +916,17 @@ def solver_mle(strategy):
         return dt * error, state
 
     return _solver_calibrated(
-        calibration=_calibration_running_mean(),
+        calibration=_calibration_running_mean(ssm=ssm),
         impl_step=step_mle,
         strategy=strategy,
-        string_repr=string_repr,
+        name=name,
         requires_rescaling=True,
     )
 
 
 def solver_dynamic(strategy):
     """Create a solver that calibrates the output scale dynamically."""
-    string_repr = f"<Dynamic solver with {strategy}>"
+    name = f"<Dynamic solver with {strategy}>"
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
         error, observed, state_strategy = strategy.begin(
@@ -948,7 +945,7 @@ def solver_dynamic(strategy):
     return _solver_calibrated(
         strategy=strategy,
         calibration=_calibration_most_recent(),
-        string_repr=string_repr,
+        name=name,
         impl_step=step_dynamic,
         requires_rescaling=False,
     )
@@ -970,18 +967,18 @@ def solver(strategy, /):
         state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
         return dt * error, state
 
-    string_repr = f"<Uncalibrated solver with {strategy}>"
+    name = f"<Uncalibrated solver with {strategy}>"
     return _solver_calibrated(
         strategy=strategy,
         calibration=_calibration_none(),
         impl_step=step,
-        string_repr=string_repr,
+        name=name,
         requires_rescaling=False,
     )
 
 
 def _solver_calibrated(
-    *, calibration, impl_step, strategy, string_repr, requires_rescaling
+    *, calibration, impl_step, strategy, name, requires_rescaling
 ) -> _Solver:
     def init(t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
@@ -1028,7 +1025,7 @@ def _solver_calibrated(
         error_contraction_rate=strategy.num_derivatives + 1,
         is_suitable_for_save_at=strategy.is_suitable_for_save_at,
         is_suitable_for_save_every_step=strategy.is_suitable_for_save_every_step,
-        string_repr=string_repr,
+        name=name,
         requires_rescaling=requires_rescaling,
         initial_condition=initial_condition,
         init=init,

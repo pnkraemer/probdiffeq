@@ -1,8 +1,8 @@
 """State-space model implementations."""
 
-from probdiffeq.impl import _impl
+from probdiffeq.impl import _impl as impl
 
-impl = _impl.Impl()
+# impl = None #_impl.Impl()
 """State-space model implementation.
 
 Refer to the quickstart for information.
