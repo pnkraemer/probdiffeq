@@ -23,7 +23,6 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.impl import impl
 
 jax.config.update("jax_platform_name", "cpu")
 
@@ -44,38 +43,6 @@ u0 = jnp.asarray([0.1])
 t0, t1 = 0.0, 1.0
 # -
 
-#
-# ProbDiffEq contains three levels of implementations:
-#
-# **Low:** Implementations of random-variable-arithmetic
-# (marginalisation, conditioning, etc.)
-#
-# **Medium:** Probabilistic IVP solver components (this is what you're here for.)
-#
-# **High:** ODE-solving routines.
-#
-#
-# There are several random-variable implementations
-# (read: state-space model factorisations)
-# which model different correlations between variables.
-# All factorisations can be used interchangeably,
-# but they have different speed, stability,
-# and uncertainty-quantification properties.
-# Since the chosen implementation powers almost everything,
-# we choose one (and only one) of them,
-# assign it to a global variable, and call it the "impl(ementation)".
-#
-
-# +
-impl.select("dense", ode_shape=(1,))
-# -
-
-# But don't worry, this configuration does not make the library any less light-weight.
-# It merely affects the shapes of the arrays
-# describing means and covariances of Gaussian
-# random variables, and assigns functions that know how to manipulate those parameters.
-#
-
 # Configuring a probabilistic IVP solver is a little more
 # involved than configuring your favourite Runge-Kutta method:
 # we must choose a prior distribution and a correction scheme,
@@ -85,13 +52,12 @@ impl.select("dense", ode_shape=(1,))
 
 # +
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-output_scale = 1.0  # or any other value with the same shape
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-ts0 = ivpsolvers.correction_ts1(ode_order=1)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
+ts0 = ivpsolvers.correction_ts1(ode_order=1, ssm=ssm)
 
-strategy = ivpsolvers.strategy_smoother(ibm, ts0)
-solver = ivpsolvers.solver(strategy)
-adaptive_solver = ivpsolve.adaptive(solver)
+strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
+solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
 # -
 
 
@@ -111,7 +77,7 @@ adaptive_solver = ivpsolve.adaptive(solver)
 init = solver.initial_condition()
 dt0 = 0.1
 solution = ivpsolve.solve_adaptive_save_every_step(
-    vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
+    vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
 )
 # -
 

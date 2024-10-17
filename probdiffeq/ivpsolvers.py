@@ -174,10 +174,10 @@ class _ExtraImpl(Generic[T, R, S]):
     """Process the state at checkpoint t=t_n."""
 
 
-def _extra_impl_precon_smoother(prior: _MarkovProcess) -> _ExtraImpl:
+def _extra_impl_precon_smoother(prior: _MarkovProcess, ssm) -> _ExtraImpl:
     def initial_condition():
-        rv = impl.normal.from_tcoeffs(prior.tcoeffs)
-        cond = impl.conditional.identity(len(prior.tcoeffs))
+        rv = ssm.normal.from_tcoeffs(prior.tcoeffs)
+        cond = ssm.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(sol: stats.MarkovSeq, /):
@@ -186,12 +186,12 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess) -> _ExtraImpl:
     def begin(rv, _extra, /, dt):
         cond, (p, p_inv) = prior.discretize(dt)
 
-        rv_p = impl.normal.preconditioner_apply(rv, p_inv)
+        rv_p = ssm.normal.preconditioner_apply(rv, p_inv)
 
-        m_p = impl.stats.mean(rv_p)
-        extrapolated_p = impl.conditional.apply(m_p, cond)
+        m_p = ssm.stats.mean(rv_p)
+        extrapolated_p = ssm.conditional.apply(m_p, cond)
 
-        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
+        extrapolated = ssm.normal.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p)
         return extrapolated, cache
 
@@ -200,10 +200,10 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess) -> _ExtraImpl:
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = impl.stats.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
-        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
-        cond = impl.conditional.preconditioner_apply(cond_p, p, p_inv)
+        noise = ssm.stats.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = ssm.conditional.revert(rv_p, (A, noise))
+        extrapolated = ssm.normal.preconditioner_apply(extrapolated_p, p)
+        cond = ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
 
         # Gather and return
         return extrapolated, cond
@@ -231,7 +231,7 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess) -> _ExtraImpl:
 
         # Marginalise from t1 to t to obtain the interpolated solution.
         conditional_t1_to_t = extrapolated_t1[1]
-        rv_at_t = impl.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+        rv_at_t = ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
         solution_at_t = (rv_at_t, extrapolated_t[1])
 
         # The state at t1 gets a new backward model; it must remember how to
@@ -471,11 +471,12 @@ def correction_ts0(*, ssm, ode_order=1) -> _Correction:
     )
 
 
-def correction_ts1(*, ode_order=1) -> _Correction:
+def correction_ts1(*, ssm, ode_order=1) -> _Correction:
     """First-order Taylor linearisation."""
     return _correction_constraint_ode_taylor(
+        ssm=ssm,
         ode_order=ode_order,
-        linearise_fun=impl.linearise.ode_taylor_1st(ode_order=ode_order),
+        linearise_fun=ssm.linearise.ode_taylor_1st(ode_order=ode_order),
         name=f"<TS1 with ode_order={ode_order}>",
     )
 
@@ -624,12 +625,13 @@ class _Strategy:
     """Compute offgrid_marginals."""
 
 
-def strategy_smoother(prior, correction: _Correction, /) -> _Strategy:
+def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
     """Construct a smoother."""
-    extrapolation_impl = _extra_impl_precon_smoother(prior)
+    extrapolation_impl = _extra_impl_precon_smoother(prior, ssm=ssm)
     return _strategy(
         extrapolation_impl,
         correction,
+        ssm=ssm,
         is_suitable_for_save_at=False,
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,

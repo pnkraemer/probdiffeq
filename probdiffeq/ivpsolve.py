@@ -555,13 +555,16 @@ def solve_adaptive_save_every_step(
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
     posterior, output_scale = solution_every_step
-    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
+    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
     marginals, posterior = _tmp
 
-    u = ssm.stats.qoi(marginals)
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=t,
         u=u,
+        u_std=u_std,
+        ssm=ssm,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
