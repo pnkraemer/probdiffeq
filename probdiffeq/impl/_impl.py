@@ -89,7 +89,7 @@ def choose(which: str, /, *, tcoeffs_like) -> FactorisedImpl:
     if which == "isotropic":
         return _select_isotropic(tcoeffs_like=tcoeffs_like)
     if which == "blockdiag":
-        return _select_blockdiag(ode_shape=ode_shape)
+        return _select_blockdiag(tcoeffs_like=tcoeffs_like)
 
     msg1 = f"Implementation '{which}' unknown. "
     msg2 = "Choose an implementation out of {scalar, dense, isotropic, blockdiag}."
@@ -156,10 +156,16 @@ def _select_isotropic(*, tcoeffs_like) -> FactorisedImpl:
     )
 
 
-def _select_blockdiag(*, ode_shape) -> FactorisedImpl:
+def _select_blockdiag(*, tcoeffs_like) -> FactorisedImpl:
+    ode_shape = tcoeffs_like[0].shape
+
+    tcoeffs_tree_only = tree_util.tree_map(lambda *a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
+    unravel = functools.vmap(unravel_tree)
+
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     ssm_util = _normal.BlockDiagNormal(ode_shape=ode_shape)
-    stats = _stats.BlockDiagStats(ode_shape=ode_shape)
+    stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.BlockDiagLinearisation()
     conditional = _conditional.BlockDiagConditional(ode_shape=ode_shape)
     transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)

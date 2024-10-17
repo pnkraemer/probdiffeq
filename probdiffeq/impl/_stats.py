@@ -292,8 +292,9 @@ class IsotropicStats(StatsBackend):
 
 
 class BlockDiagStats(StatsBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
         # assumes rv.chol = (d,1,1)
@@ -346,7 +347,9 @@ class BlockDiagStats(StatsBackend):
         return cholesky @ cholesky.T
 
     def qoi(self, rv):
-        return rv.mean[..., 0]
+        if rv.mean.ndim > 2:
+            return functools.vmap(self.qoi)(rv)
+        return self.unravel(rv.mean)
 
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
