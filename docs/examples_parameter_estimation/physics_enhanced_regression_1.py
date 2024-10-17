@@ -35,7 +35,6 @@ import optax
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -51,7 +50,6 @@ jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 # -
 
-impl.select("isotropic", ode_shape=(2,))
 
 # Create a problem and some fake-data:
 
@@ -70,14 +68,16 @@ def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
     output_scale = 10.0
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    ibm, ssm = ivpsolvers.prior_ibm(
+        tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
+    )
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
 
     init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
-        lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver
+        lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver, ssm=ssm
     )
 
 
@@ -87,7 +87,7 @@ parameter_guess = f_args
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 solution_true = solve(parameter_true)
-data = solution_true.u
+data = solution_true.u[0]
 plt.plot(ts, data, "P-")
 plt.show()
 # -
@@ -96,7 +96,7 @@ plt.show()
 
 solution_guess = solve(parameter_guess)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
-plt.plot(ts, solution_guess.u)
+plt.plot(ts, solution_guess.u[0])
 plt.show()
 
 
@@ -116,6 +116,7 @@ def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
         data,
         standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
         posterior=sol_.posterior,
+        ssm=sol_.ssm,
     )
 
 
@@ -169,5 +170,5 @@ for i in range(chunk_size):
 
 solution_better = solve(p)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
-plt.plot(ts, solution_better.u)
+plt.plot(ts, solution_better.u[0])
 plt.show()
