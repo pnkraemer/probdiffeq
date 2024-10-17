@@ -20,54 +20,51 @@ class MarkovSeq(containers.NamedTuple):
     conditional: Any
 
 
-def markov_sample(key, markov_seq: MarkovSeq, *, shape, reverse):
+def markov_sample(key, markov_seq: MarkovSeq, *, reverse, ssm, shape=()):
     """Sample from a Markov sequence."""
     _assert_filtering_solution_removed(markov_seq)
     # A smoother samples on the grid by sampling i.i.d values
     # from the terminal RV x_N and the backward noises z_(1:N)
     # and then combining them backwards as
     # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-    markov_seq_shape = _sample_shape(markov_seq)
+    markov_seq_shape = _sample_shape(markov_seq, ssm=ssm)
     base_samples = random.normal(key, shape=shape + markov_seq_shape)
-    return _transform_unit_sample(markov_seq, base_samples, reverse=reverse)
+    return _transform_unit_sample(markov_seq, base_samples, reverse=reverse, ssm=ssm)
 
 
-def _sample_shape(markov_seq):
+def _sample_shape(markov_seq, *, ssm):
     # The number of samples is one larger than the number of conditionals
     _, noise = markov_seq.conditional
-    n, *shape_single_sample = impl.stats.sample_shape(noise)
+    n, *shape_single_sample = ssm.stats.sample_shape(noise)
     return n + 1, *tuple(shape_single_sample)
 
 
-def _transform_unit_sample(markov_seq, base_sample, /, reverse):
-    if base_sample.ndim > len(_sample_shape(markov_seq)):
+def _transform_unit_sample(markov_seq, base_sample, /, reverse, *, ssm):
+    if base_sample.ndim > len(_sample_shape(markov_seq, ssm=ssm)):
         transform_vmap = functools.vmap(_transform_unit_sample, in_axes=(None, 0, None))
         return transform_vmap(markov_seq, base_sample, reverse)
 
     # Compute a single unit sample.
 
-    def body_fun(carry, conditionals_and_base_samples):
-        _, samp_prev = carry
+    def body_fun(samp_prev, conditionals_and_base_samples):
         conditional, base = conditionals_and_base_samples
 
-        rv = impl.conditional.apply(samp_prev, conditional)
-        smp = impl.stats.transform_unit_sample(base, rv)
-        qoi = impl.stats.qoi_from_sample(smp)
-        return (qoi, smp), (qoi, smp)
+        rv = ssm.conditional.apply(samp_prev, conditional)
+        smp = ssm.stats.transform_unit_sample(base, rv)
+        qoi = ssm.stats.qoi_from_sample(smp)
+        return smp, qoi
 
     base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
 
     # Compute a sample at the terminal value
-    init_sample = impl.stats.transform_unit_sample(base_sample_init, markov_seq.init)
-    init_qoi = impl.stats.qoi_from_sample(init_sample)
-    init_val = (init_qoi, init_sample)
+    init_sample = ssm.stats.transform_unit_sample(base_sample_init, markov_seq.init)
+    init_qoi = ssm.stats.qoi_from_sample(init_sample)
+    init_val = init_sample
 
     # Loop over backward models and the remaining base samples
     xs = (markov_seq.conditional, base_sample_body)
-    _, (qois, samples) = control_flow.scan(
-        body_fun, init=init_val, xs=xs, reverse=reverse
-    )
-    return (qois, samples), (init_qoi, init_sample)
+    _, qois = control_flow.scan(body_fun, init=init_val, xs=xs, reverse=reverse)
+    return qois, init_qoi
 
 
 def markov_select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
@@ -80,12 +77,12 @@ def markov_select_terminal(markov_seq: MarkovSeq) -> MarkovSeq:
     return MarkovSeq(init, markov_seq.conditional)
 
 
-def markov_marginals(markov_seq: MarkovSeq, *, reverse):
+def markov_marginals(markov_seq: MarkovSeq, *, reverse, ssm):
     """Extract the (time-)marginals from a Markov sequence."""
     _assert_filtering_solution_removed(markov_seq)
 
     def step(x, cond):
-        extrapolated = impl.conditional.marginalise(x, cond)
+        extrapolated = ssm.conditional.marginalise(x, cond)
         return extrapolated, extrapolated
 
     init, xs = markov_seq.init, markov_seq.conditional

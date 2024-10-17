@@ -41,6 +41,13 @@ def test_u_inherits_data_structure(approximate_solution):
     assert isinstance(solution_t1.u, Taylor)
 
 
+def test_u_std_inherits_data_structure(approximate_solution):
+    assert isinstance(approximate_solution.u_std, Taylor)
+
+    solution_t1 = approximate_solution[-1]
+    assert isinstance(solution_t1.u_std, Taylor)
+
+
 def test_getitem_possible_for_terminal_values(approximate_solution):
     solution_t1 = approximate_solution[-1]
     assert isinstance(solution_t1, type(approximate_solution))

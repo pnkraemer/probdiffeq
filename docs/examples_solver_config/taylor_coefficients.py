@@ -24,7 +24,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -39,7 +39,7 @@ if not backend.has_been_selected:
 jax.config.update("jax_platform_name", "cpu")
 # -
 
-# LOREM
+# We start by defining an ODE.
 
 # +
 f, u0, (t0, t1), f_args = ivps.rigid_body()
@@ -51,63 +51,78 @@ def vf(*y, t):  # noqa: ARG001
 
 # -
 
+
 # To build a probabilistic solver, we need to build a specific state-space model.
 # To build this specific state-space model, we interact with Taylor coefficients.
 # Taylor coefficients of ODE solutions are computed with the functions in Probdiffeq.
 
+
+# +
+def solve(tc):  # 'tc' = tcoeffs
+    prior, ssm = ivpsolvers.prior_ibm(tc, ssm_fact="dense")
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_fixedpoint(prior, ts0, ssm=ssm)
+    solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+    init = solver.initial_condition()
+
+    ts = jnp.linspace(t0, t1, endpoint=True, num=10)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    return ivpsolve.solve_adaptive_save_at(
+        vf, init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+    )
+
+
+# -
+
+# Enough talking, it's time to solve some ODEs:
+
 # +
 tcoeffs = taylor.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
-print(type(tcoeffs))
+solution = solve(tcoeffs)
+print(jax.tree.map(jnp.shape, solution))
+
 # -
 
-# LOREM
+# The type of solution.u matches that of the initial condition
 
 # +
 
-prior, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
-ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_filter(prior, ts0, ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
-init = solver.initial_condition()
-
-ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-solution = ivpsolve.solve_adaptive_save_at(
-    vf, init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
-)
-print(jax.tree.map(jnp.shape, solution))
-
-# This corresponds to the initial Taylor coefficients:
+print(jax.tree.map(jnp.shape, tcoeffs))
 print(jax.tree.map(jnp.shape, solution.u))
 
 
 # -
 
-# The solution field matches the type of the initial Taylor coeffient:
+# Anything that behaves like a list work.
+# For example, we can use lists or tuples, but also named tuples.
 
 # +
 
-# Anything that behaves like a list works
 Taylor = collections.namedtuple("Taylor", ["state", "velocity", "acceleration"])
-
 tcoeffs = Taylor(*tcoeffs)
-print(jax.tree.map(jnp.shape, solution.u))
+solution = solve(tcoeffs)
 
-
-prior, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
-ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_filter(prior, ts0, ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
-init = solver.initial_condition()
-
-ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-solution = ivpsolve.solve_adaptive_save_at(
-    vf, init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
-)
+print(jax.tree.map(jnp.shape, tcoeffs))
 print(jax.tree.map(jnp.shape, solution))
-
-# This corresponds to the initial Taylor coefficients:
 print(jax.tree.map(jnp.shape, solution.u))
 
-# LOREM
+
+# -
+
+# The same applies to statistical quantities that we can extract from the solution.
+# For example, the standard deviation or samples from the solution object:
+
+# +
+
+key = jax.random.PRNGKey(seed=15)
+posterior = stats.markov_select_terminal(solution.posterior)
+samples, samples_init = stats.markov_sample(
+    key, posterior, reverse=True, ssm=solution.ssm
+)
+
+print(jax.tree.map(jnp.shape, solution.u))
+print(jax.tree.map(jnp.shape, solution.u_std))
+print(jax.tree.map(jnp.shape, samples))
+print(jax.tree.map(jnp.shape, samples_init))
+
+# -

@@ -297,14 +297,16 @@ _AdaSolver.register_pytree_node()
 class _Solution:
     """Estimated initial value problem solution."""
 
-    def __init__(self, t, u, output_scale, marginals, posterior, num_steps):
+    def __init__(self, t, u, u_std, output_scale, marginals, posterior, num_steps, ssm):
         """Construct a solution object."""
         self.t = t
         self.u = u
+        self.u_std = u_std
         self.output_scale = output_scale
-        self.marginals = marginals
+        self.marginals = marginals  # todo: marginals are replaced by "u" and "u_std"
         self.posterior = posterior
         self.num_steps = num_steps
+        self.ssm = ssm
 
     def __repr__(self):
         """Evaluate a string-representation of the solution object."""
@@ -353,23 +355,27 @@ class _Solution:
             children = (
                 sol.t,
                 sol.u,
+                sol.u_std,
                 sol.marginals,
                 sol.posterior,
                 sol.output_scale,
                 sol.num_steps,
             )
-            aux = ()
+            aux = (sol.ssm,)
             return children, aux
 
-        def _sol_unflatten(_aux, children):
-            t, u, marginals, posterior, output_scale, n = children
+        def _sol_unflatten(aux, children):
+            (ssm,) = aux
+            t, u, u_std, marginals, posterior, output_scale, n = children
             return _Solution(
                 t=t,
                 u=u,
+                u_std=u_std,
                 marginals=marginals,
                 posterior=posterior,
                 output_scale=output_scale,
                 num_steps=n,
+                ssm=ssm,
             )
 
         tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
@@ -456,16 +462,21 @@ def solve_adaptive_save_at(
     # (as well as marginals), so we compute those things here
     posterior_t0, *_ = initial_condition
     posterior_save_at, output_scale = solution_save_at
-    _tmp = _userfriendly_output(posterior=posterior_save_at, posterior_t0=posterior_t0)
+    _tmp = _userfriendly_output(
+        posterior=posterior_save_at, posterior_t0=posterior_t0, ssm=ssm
+    )
     marginals, posterior = _tmp
-    u = ssm.stats.qoi(marginals)
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=save_at,
         u=u,
+        u_std=u_std,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
         num_steps=num_steps,
+        ssm=ssm,
     )
 
 
@@ -611,11 +622,13 @@ def solve_fixed_grid(
     )
 
 
-def _userfriendly_output(*, posterior, posterior_t0):
+def _userfriendly_output(*, posterior, posterior_t0, ssm):
     if isinstance(posterior, stats.MarkovSeq):
         # Compute marginals
         posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
-        marginals = stats.markov_marginals(posterior_no_filter_marginals, reverse=True)
+        marginals = stats.markov_marginals(
+            posterior_no_filter_marginals, reverse=True, ssm=ssm
+        )
 
         # Prepend the marginal at t1 to the computed marginals
         marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)

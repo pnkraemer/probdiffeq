@@ -263,10 +263,10 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess) -> _ExtraImpl:
     )
 
 
-def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
+def _extra_impl_precon_fixedpoint(prior: _MarkovProcess, *, ssm) -> _ExtraImpl:
     def initial_condition():
-        rv = impl.normal.from_tcoeffs(prior.tcoeffs)
-        cond = impl.conditional.identity(len(prior.tcoeffs))
+        rv = ssm.normal.from_tcoeffs(prior.tcoeffs)
+        cond = ssm.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(sol: stats.MarkovSeq, /):
@@ -275,12 +275,12 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
     def begin(rv, extra, /, dt):
         cond, (p, p_inv) = prior.discretize(dt)
 
-        rv_p = impl.normal.preconditioner_apply(rv, p_inv)
+        rv_p = ssm.normal.preconditioner_apply(rv, p_inv)
 
-        m_ext_p = impl.stats.mean(rv_p)
-        extrapolated_p = impl.conditional.apply(m_ext_p, cond)
+        m_ext_p = ssm.stats.mean(rv_p)
+        extrapolated_p = ssm.conditional.apply(m_ext_p, cond)
 
-        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
+        extrapolated = ssm.normal.preconditioner_apply(extrapolated_p, p)
         cache = (cond, (p, p_inv), rv_p, extra)
         return extrapolated, cache
 
@@ -292,13 +292,13 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
         A, noise = cond
-        noise = impl.stats.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = impl.conditional.revert(rv_p, (A, noise))
-        extrapolated = impl.normal.preconditioner_apply(extrapolated_p, p)
-        cond = impl.conditional.preconditioner_apply(cond_p, p, p_inv)
+        noise = ssm.stats.rescale_cholesky(noise, output_scale)
+        extrapolated_p, cond_p = ssm.conditional.revert(rv_p, (A, noise))
+        extrapolated = ssm.normal.preconditioner_apply(extrapolated_p, p)
+        cond = ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
 
         # Merge conditionals
-        cond = impl.conditional.merge(bw0, cond)
+        cond = ssm.conditional.merge(bw0, cond)
 
         # Gather and return
         return extrapolated, cond
@@ -343,13 +343,13 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
         extrapolated_t = _extrapolate(*state_t0, dt0, output_scale)
-        conditional_id = impl.conditional.identity(prior.num_derivatives + 1)
+        conditional_id = ssm.conditional.identity(prior.num_derivatives + 1)
         previous_new = (extrapolated_t[0], conditional_id)
         extrapolated_t1 = _extrapolate(*previous_new, dt1, output_scale)
 
         # Marginalise from t1 to t to obtain the interpolated solution.
         conditional_t1_to_t = extrapolated_t1[1]
-        rv_at_t = impl.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+        rv_at_t = ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
         # Return the right combination of marginals and conditionals.
         return _InterpRes(
@@ -363,7 +363,7 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess) -> _ExtraImpl:
         return complete(*begun, output_scale=output_scale)
 
     def interpolate_at_t1(rv, extra, /):
-        cond_identity = impl.conditional.identity(prior.num_derivatives + 1)
+        cond_identity = ssm.conditional.identity(prior.num_derivatives + 1)
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
     return _ExtraImpl(
@@ -637,12 +637,13 @@ def strategy_smoother(prior, correction: _Correction, /) -> _Strategy:
     )
 
 
-def strategy_fixedpoint(prior, correction: _Correction, /) -> _Strategy:
+def strategy_fixedpoint(prior, correction: _Correction, /, ssm) -> _Strategy:
     """Construct a fixedpoint-smoother."""
-    extrapolation_impl = _extra_impl_precon_fixedpoint(prior)
+    extrapolation_impl = _extra_impl_precon_fixedpoint(prior, ssm=ssm)
     return _strategy(
         extrapolation_impl,
         correction,
+        ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,

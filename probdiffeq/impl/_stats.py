@@ -167,11 +167,7 @@ class DenseStats(StatsBackend):
         return rv.mean, rv.cholesky @ rv.cholesky.T
 
     def qoi(self, rv):
-        if np.ndim(rv.mean) > 1:
-            return functools.vmap(self.qoi)(rv)
-        return self.unravel(rv.mean)
-        # mean_reshaped = np.reshape(rv.mean, (-1, *self.ode_shape), order="F")
-        # return mean_reshaped[0]
+        return self.qoi_from_sample(rv.mean)
 
     def marginal_nth_derivative(self, rv, i):
         if rv.mean.ndim > 1:
@@ -185,8 +181,9 @@ class DenseStats(StatsBackend):
         return _normal.Normal(m, c.T)
 
     def qoi_from_sample(self, sample, /):
-        sample_reshaped = np.reshape(sample, (-1, *self.ode_shape), order="F")
-        return sample_reshaped[0]
+        if np.ndim(sample) > 1:
+            return functools.vmap(self.qoi_from_sample)(sample)
+        return self.unravel(sample)
 
     def _select(self, x, /, idx_or_slice):
         x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
