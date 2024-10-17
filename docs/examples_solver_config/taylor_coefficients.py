@@ -13,9 +13,14 @@
 # ---
 
 # # Taylor coefficients all the way up
+#
+# To build a probabilistic solver, we need to build a specific state-space model.
+# To build this specific state-space model, we interact with Taylor coefficients.
+# Here are some examples how Taylor coefficients play a role in Probdiffeq's solution routines.
+
 
 # +
-"""Demonstrate how central Taylor coefficient estimation is."""
+"""Demonstrate how central Taylor coefficient estimation is to Probdiffeq."""
 
 import collections
 
@@ -27,12 +32,9 @@ from diffeqzoo import backend, ivps
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.util.doc_util import notebook
 
-# -
-
 plt.rcParams.update(notebook.plot_style())
 plt.rcParams.update(notebook.plot_sizes())
 
-# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
@@ -52,13 +54,11 @@ def vf(*y, t):  # noqa: ARG001
 # -
 
 
-# To build a probabilistic solver, we need to build a specific state-space model.
-# To build this specific state-space model, we interact with Taylor coefficients.
-# Taylor coefficients of ODE solutions are computed with the functions in Probdiffeq.
+# Here is a wrapper arounds Probdiffeq's solution routine.
 
 
 # +
-def solve(tc):  # 'tc' = tcoeffs
+def solve(tc):
     prior, ssm = ivpsolvers.prior_ibm(tc, ssm_fact="dense")
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(prior, ts0, ssm=ssm)
@@ -74,7 +74,7 @@ def solve(tc):  # 'tc' = tcoeffs
 
 # -
 
-# Enough talking, it's time to solve some ODEs:
+# It's time to solve some ODEs:
 
 # +
 tcoeffs = taylor.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
@@ -83,7 +83,7 @@ print(jax.tree.map(jnp.shape, solution))
 
 # -
 
-# The type of solution.u matches that of the initial condition
+# The type of solution.u matches that of the initial condition.
 
 # +
 
