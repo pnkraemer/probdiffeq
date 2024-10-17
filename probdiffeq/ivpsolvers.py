@@ -820,12 +820,12 @@ class _Calibration:
     extract: Callable
 
 
-def _calibration_most_recent() -> _Calibration:
+def _calibration_most_recent(*, ssm) -> _Calibration:
     def init(prior):
         return prior
 
     def update(_state, /, observed):
-        return impl.stats.mahalanobis_norm_relative(0.0, observed)
+        return ssm.stats.mahalanobis_norm_relative(0.0, observed)
 
     def extract(state, /):
         return state, state
@@ -934,7 +934,7 @@ def solver_mle(strategy, *, ssm):
     )
 
 
-def solver_dynamic(strategy):
+def solver_dynamic(strategy, *, ssm):
     """Create a solver that calibrates the output scale dynamically."""
     name = f"<Dynamic solver with {strategy}>"
 
@@ -954,7 +954,7 @@ def solver_dynamic(strategy):
 
     return _solver_calibrated(
         strategy=strategy,
-        calibration=_calibration_most_recent(),
+        calibration=_calibration_most_recent(ssm=ssm),
         name=name,
         impl_step=step_dynamic,
         requires_rescaling=False,
