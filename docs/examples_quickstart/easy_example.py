@@ -66,7 +66,10 @@ t0, t1 = 0.0, 1.0
 # assign it to a global variable, and call it the "impl(ementation)".
 #
 
+# +
 impl.select("dense", ode_shape=(1,))
+# -
+
 # But don't worry, this configuration does not make the library any less light-weight.
 # It merely affects the shapes of the arrays
 # describing means and covariances of Gaussian
@@ -89,6 +92,7 @@ ts0 = ivpsolvers.correction_ts1(ode_order=1)
 strategy = ivpsolvers.strategy_smoother(ibm, ts0)
 solver = ivpsolvers.solver(strategy)
 adaptive_solver = ivpsolve.adaptive(solver)
+# -
 
 
 # Other software packages that implement
@@ -109,8 +113,11 @@ dt0 = 0.1
 solution = ivpsolve.solve_adaptive_save_every_step(
     vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
 )
+# -
 
 
 # Look at the solution
+# +
 print("u =", solution.u, "\n")
 print("solution =", solution)
+# -
