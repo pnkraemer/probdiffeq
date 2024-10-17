@@ -15,11 +15,16 @@ from probdiffeq.impl import impl
 def case_solve_fixed_grid(ssm):
     vf, u0, (t0, t1) = ssm.default_ode
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+
     output_scale = np.ones_like(impl.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
+    ts0 = ivpsolvers.correction_ts0()
     kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5)}
 
-    def solver_to_solution(solver):
-        init = solver.initial_condition(tcoeffs, output_scale)
+    def solver_to_solution(solver_fun, strategy_fun):
+        strategy = strategy_fun(ibm, ts0)
+        solver = solver_fun(strategy)
+        init = solver.initial_condition()
         return ivpsolve.solve_fixed_grid(vf, init, solver=solver, **kwargs)
 
     return solver_to_solution
@@ -31,10 +36,16 @@ def case_solve_adaptive_save_at(ssm):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
+    ts0 = ivpsolvers.correction_ts0()
+
     kwargs = {"save_at": np.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
 
-    def solver_to_solution(solver):
-        init = solver.initial_condition(tcoeffs, output_scale)
+    def solver_to_solution(solver_fun, strategy_fun):
+        strategy = strategy_fun(ibm, ts0)
+        solver = solver_fun(strategy)
+
+        init = solver.initial_condition()
         adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_save_at(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
@@ -49,10 +60,15 @@ def case_solve_adaptive_save_every_step(ssm):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
+    ts0 = ivpsolvers.correction_ts0()
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
 
-    def solver_to_solution(solver):
-        init = solver.initial_condition(tcoeffs, output_scale)
+    def solver_to_solution(solver_fun, strategy_fun):
+        strategy = strategy_fun(ibm, ts0)
+        solver = solver_fun(strategy)
+
+        init = solver.initial_condition()
         adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_save_every_step(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
@@ -67,10 +83,16 @@ def case_simulate_terminal_values(ssm):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     output_scale = np.ones_like(impl.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
+    ts0 = ivpsolvers.correction_ts0()
+
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
 
-    def solver_to_solution(solver):
-        init = solver.initial_condition(tcoeffs, output_scale)
+    def solver_to_solution(solver_fun, strategy_fun):
+        strategy = strategy_fun(ibm, ts0)
+        solver = solver_fun(strategy)
+
+        init = solver.initial_condition()
         adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
@@ -85,12 +107,8 @@ def case_simulate_terminal_values(ssm):
     "strategy_fun", [ivpsolvers.strategy_filter, ivpsolvers.strategy_fixedpoint]
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
-    ibm = ivpsolvers.prior_ibm(num_derivatives=4)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = strategy_fun(ibm, ts0)
-
-    uncalib = solver_to_solution(ivpsolvers.solver(strategy))
-    mle = solver_to_solution(ivpsolvers.solver_mle(strategy))
+    uncalib = solver_to_solution(ivpsolvers.solver, strategy_fun)
+    mle = solver_to_solution(ivpsolvers.solver_mle, strategy_fun)
     return uncalib, mle
 
 

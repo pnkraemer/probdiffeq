@@ -81,7 +81,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        ibm = ivpsolvers.prior_ibm(num_derivatives=num_derivatives)
+        vf_auto = functools.partial(vf_probdiffeq, t=t0)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
+        ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
         ts0_or_ts1 = ivpsolvers.correction_ts1(ode_order=2)
         strategy = ivpsolvers.strategy_filter(ibm, ts0_or_ts1)
         solver = ivpsolvers.solver_dynamic(strategy)
@@ -91,9 +93,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         )
 
         # Initial state
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
-        init = solver.initial_condition(tcoeffs, output_scale=1.0)
+        init = solver.initial_condition()
 
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))

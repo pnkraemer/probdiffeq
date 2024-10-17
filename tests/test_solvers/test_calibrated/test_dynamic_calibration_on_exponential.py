@@ -14,13 +14,13 @@ from probdiffeq.impl import impl
 def test_exponential_approximated_well(ssm):
     vf, u0, (t0, t1), solution = ssm.default_ode_affine
 
-    ibm = ivpsolvers.prior_ibm(num_derivatives=1)
+    output_scale = np.ones_like(impl.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm((*u0, vf(*u0, t=t0)), output_scale=output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_filter(ibm, ts0)
     solver = ivpsolvers.solver_dynamic(strategy)
 
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = solver.initial_condition((*u0, vf(*u0, t=t0)), output_scale=output_scale)
+    init = solver.initial_condition()
 
     problem_args = (vf, init)
     grid = np.linspace(t0, t1, num=20)

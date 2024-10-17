@@ -18,13 +18,13 @@ def fixture_solver_setup(ssm):
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_filter(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
 
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
         solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver
     )
@@ -32,13 +32,13 @@ def fixture_filter_solution(solver_setup):
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     ts0 = ivpsolvers.correction_ts0()
     strategy = ivpsolvers.strategy_smoother(ibm, ts0)
     solver = ivpsolvers.solver(strategy)
 
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
         solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver
     )

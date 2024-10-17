@@ -51,16 +51,16 @@ def vf_1(y, t):  # noqa: ARG001
     return f(y, *f_args)
 
 
-ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
+ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
 ts0 = ivpsolvers.correction_ts0()
 solver_1st = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
-init = solver_1st.initial_condition(tcoeffs, output_scale=1.0)
 # -
 
+init = solver_1st.initial_condition()
 solution = ivpsolve.solve_adaptive_save_every_step(
     vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st
 )
@@ -85,14 +85,14 @@ def vf_2(y, dy, t):  # noqa: ARG001
 
 
 # One derivative more than above because we don't transform to first order
-ibm = ivpsolvers.prior_ibm(num_derivatives=4)
+tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
 ts0 = ivpsolvers.correction_ts0(ode_order=2)
 solver_2nd = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
 adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5)
 
 
-tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
-init = solver_2nd.initial_condition(tcoeffs, output_scale=1.0)
+init = solver_2nd.initial_condition()
 # -
 
 solution = ivpsolve.solve_adaptive_save_every_step(

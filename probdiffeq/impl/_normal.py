@@ -10,7 +10,7 @@ class Normal(containers.NamedTuple):
 
 class NormalBackend(abc.ABC):
     @abc.abstractmethod
-    def from_tcoeffs(self, tcoeffs, /, num_derivatives) -> Normal:
+    def from_tcoeffs(self, tcoeffs: list):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -23,14 +23,10 @@ class NormalBackend(abc.ABC):
 
 
 class ScalarNormal(NormalBackend):
-    def from_tcoeffs(self, tcoeffs, /, num_derivatives):
-        if len(tcoeffs) != num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
+    def from_tcoeffs(self, tcoeffs: list):
         m0_matrix = np.stack(tcoeffs)
         m0_corrected = np.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = np.zeros((num_derivatives + 1, num_derivatives + 1))
+        c_sqrtm0_corrected = np.zeros((len(tcoeffs), len(tcoeffs)))
         return Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
@@ -46,12 +42,7 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs, /, num_derivatives):
-        if len(tcoeffs) != num_derivatives + 1:
-            msg1 = f"The number of Taylor coefficients {len(tcoeffs)} does not match "
-            msg2 = f"the number of derivatives {num_derivatives+1} in the solver."
-            raise ValueError(msg1 + msg2)
-
+    def from_tcoeffs(self, tcoeffs: list):
         if tcoeffs[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
@@ -60,7 +51,7 @@ class DenseNormal(NormalBackend):
         m0_corrected = np.reshape(m0_matrix, (-1,), order="F")
 
         (ode_dim,) = self.ode_shape
-        ndim = (num_derivatives + 1) * ode_dim
+        ndim = len(tcoeffs) * ode_dim
         c_sqrtm0_corrected = np.zeros((ndim, ndim))
 
         return Normal(m0_corrected, c_sqrtm0_corrected)
@@ -82,13 +73,8 @@ class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs, /, num_derivatives):
-        if len(tcoeffs) != num_derivatives + 1:
-            msg1 = f"The number of Taylor coefficients {len(tcoeffs)} does not match "
-            msg2 = f"the number of derivatives {num_derivatives+1} in the solver."
-            raise ValueError(msg1 + msg2)
-
-        c_sqrtm0_corrected = np.zeros((num_derivatives + 1, num_derivatives + 1))
+    def from_tcoeffs(self, tcoeffs: list):
+        c_sqrtm0_corrected = np.zeros((len(tcoeffs), len(tcoeffs)))
         m0_corrected = np.stack(tcoeffs)
         return Normal(m0_corrected, c_sqrtm0_corrected)
 
@@ -105,13 +91,8 @@ class BlockDiagNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs, /, num_derivatives):
-        if len(tcoeffs) != num_derivatives + 1:
-            msg1 = "The number of Taylor coefficients does not match "
-            msg2 = "the number of derivatives in the implementation."
-            raise ValueError(msg1 + msg2)
-
-        cholesky_shape = (*self.ode_shape, num_derivatives + 1, num_derivatives + 1)
+    def from_tcoeffs(self, tcoeffs: list):
+        cholesky_shape = (*self.ode_shape, len(tcoeffs), len(tcoeffs))
         cholesky = np.zeros(cholesky_shape)
         mean = np.stack(tcoeffs).T
         return Normal(mean, cholesky)

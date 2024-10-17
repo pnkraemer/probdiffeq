@@ -61,16 +61,16 @@ def fixture_solution(ssm, correction_impl):
     if correction_impl == "not_implemented":
         testing.skip(reason="This type of linearisation has not been implemented.")
 
-    ibm = ivpsolvers.prior_ibm(num_derivatives=2)
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
+    output_scale = np.ones_like(impl.prototypes.output_scale())
+    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
     strategy = ivpsolvers.strategy_filter(ibm, correction_impl)
     solver = ivpsolvers.solver_mle(strategy)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1}
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    init = solver.initial_condition(tcoeffs, output_scale)
+    init = solver.initial_condition()
     return ivpsolve.solve_adaptive_terminal_values(
         vf, init, t0=t0, t1=t1, **adaptive_kwargs
     )
