@@ -16,7 +16,8 @@
 #
 # To build a probabilistic solver, we need to build a specific state-space model.
 # To build this specific state-space model, we interact with Taylor coefficients.
-# Here are some examples how Taylor coefficients play a role in Probdiffeq's solution routines.
+# Here are some examples how Taylor coefficients
+# play a role in Probdiffeq's solution routines.
 
 
 # +
@@ -48,6 +49,7 @@ f, u0, (t0, t1), f_args = ivps.rigid_body()
 
 
 def vf(*y, t):  # noqa: ARG001
+    """Evaluate the vector field."""
     return f(*y, *f_args)
 
 
@@ -59,6 +61,7 @@ def vf(*y, t):  # noqa: ARG001
 
 # +
 def solve(tc):
+    """Solve the ODE."""
     prior, ssm = ivpsolvers.prior_ibm(tc, ssm_fact="dense")
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(prior, ts0, ssm=ssm)

@@ -38,7 +38,7 @@ def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimat
     return control_flow.scan(step, init=init, xs=xs, reverse=True)
 
 
-def fixedpointsmoother_precon():
+def fixedpointsmoother_precon(*, ssm):
     """Construct a discrete, preconditioned fixedpoint-smoother."""
 
     class _FPState(containers.NamedTuple):
@@ -79,7 +79,7 @@ def _select(tree, idx_or_slice):
     return tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
 
 
-def kalmanfilter_with_marginal_likelihood(ssm):
+def kalmanfilter_with_marginal_likelihood(*, ssm):
     """Construct a Kalman-filter-implementation of computing the marginal likelihood."""
 
     class _KFState(containers.NamedTuple):
