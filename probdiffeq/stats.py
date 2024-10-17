@@ -146,7 +146,9 @@ def _offgrid_marginals(t, solution, solver):
     )
 
 
-def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posterior):
+def log_marginal_likelihood_terminal_values(
+    u, /, *, standard_deviation, posterior, ssm
+):
     """Compute the log-marginal-likelihood at the terminal value.
 
     Parameters
@@ -167,7 +169,7 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         raise ValueError(msg)
 
     # not valid for scalar or matrix-valued solutions
-    if np.ndim(u) > np.ndim(impl.prototypes.qoi()):
+    if np.ndim(u) > np.ndim(ssm.prototypes.qoi()):
         msg = (
             f"Terminal-value solution (ndim=1, shape=(n,)) expected. "
             f"ndim={np.ndim(u)}, shape={np.shape(u)} received."
@@ -175,17 +177,17 @@ def log_marginal_likelihood_terminal_values(u, /, *, standard_deviation, posteri
         raise ValueError(msg)
 
     # Generate an observation-model for the QOI
-    model = impl.conditional.to_derivative(0, standard_deviation)
+    model = ssm.conditional.to_derivative(0, standard_deviation)
     rv = posterior.init if isinstance(posterior, MarkovSeq) else posterior
 
-    _corrected, logpdf = _condition_and_logpdf(rv, u, model)
+    _corrected, logpdf = _condition_and_logpdf(rv, u, model, ssm=ssm)
     return logpdf
 
 
-def _condition_and_logpdf(rv, data, model):
-    observed, conditional = impl.conditional.revert(rv, model)
-    corrected = impl.conditional.apply(data, conditional)
-    logpdf = impl.stats.logpdf(data, observed)
+def _condition_and_logpdf(rv, data, model, *, ssm):
+    observed, conditional = ssm.conditional.revert(rv, model)
+    corrected = ssm.conditional.apply(data, conditional)
+    logpdf = ssm.stats.logpdf(data, observed)
     return corrected, logpdf
 
 

@@ -133,7 +133,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
 # +
@@ -152,8 +151,6 @@ plt.rcParams.update(notebook.plot_style())
 plt.rcParams.update(notebook.plot_sizes())
 # -
 
-
-impl.select("isotropic", ode_shape=(2,))
 
 # ## Problem setting
 #
@@ -178,9 +175,9 @@ theta_guess = u0  # initial guess
 def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
     """Plot the IVP solution."""
     for d in [0, 1]:
-        ax.plot(sol.t, sol.u[:, d], marker="None", **plotting_kwargs)
-        ax.plot(sol.t[0], sol.u[0, d], marker=marker, **plotting_kwargs)
-        ax.plot(sol.t[-1], sol.u[-1, d], marker=marker, **plotting_kwargs)
+        ax.plot(sol.t, sol.u[0][:, d], marker="None", **plotting_kwargs)
+        ax.plot(sol.t[0], sol.u[0][0, d], marker=marker, **plotting_kwargs)
+        ax.plot(sol.t[-1], sol.u[0][-1, d], marker=marker, **plotting_kwargs)
     return ax
 
 
@@ -190,12 +187,14 @@ def solve_fixed(theta, *, ts):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    ibm, ssm = ivpsolvers.prior_ibm(
+        tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
+    )
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
     init = solver.initial_condition()
-    sol = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver)
+    sol = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver, ssm=ssm)
     return sol[-1]
 
 
@@ -205,15 +204,17 @@ def solve_adaptive(theta, *, save_at):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    ibm, ssm = ivpsolvers.prior_ibm(
+        tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
+    )
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
-    adaptive_solver = ivpsolve.adaptive(solver)
+    adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_at(
-        vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1
+        vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )
 
 
@@ -252,7 +253,7 @@ def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     """Evaluate the logposterior-function of the data."""
     y_T = solve_fixed(theta, ts=ts)
     logpdf_data = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=obs_stdev, posterior=y_T.posterior
+        data, standard_deviation=obs_stdev, posterior=y_T.posterior, ssm=y_T.ssm
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
@@ -262,7 +263,7 @@ def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
 
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
-data = solve_fixed(theta_true, ts=ts).u
+data = solve_fixed(theta_true, ts=ts).u[0]
 
 log_M = functools.partial(logposterior_fn, data=data, ts=ts)
 # -
