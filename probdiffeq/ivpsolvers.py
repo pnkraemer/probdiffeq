@@ -226,8 +226,10 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess, ssm) -> _ExtraImpl:
         Subsequent IVP solver steps continue from the value at 't1'.
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        extrapolated_t = _extrapolate(*state_t0, dt0, output_scale)
-        extrapolated_t1 = _extrapolate(*extrapolated_t, dt1, output_scale)
+        extrapolated_t = _extrapolate(*state_t0, dt=dt0, output_scale=output_scale)
+        extrapolated_t1 = _extrapolate(
+            *extrapolated_t, dt=dt1, output_scale=output_scale
+        )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
         conditional_t1_to_t = extrapolated_t1[1]
@@ -244,7 +246,7 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess, ssm) -> _ExtraImpl:
             interp_from=solution_at_t,
         )
 
-    def _extrapolate(state, extra, /, dt, output_scale):
+    def _extrapolate(state, extra, /, *, dt, output_scale):
         begun = begin(state, extra, dt=dt)
         return complete(*begun, output_scale=output_scale)
 

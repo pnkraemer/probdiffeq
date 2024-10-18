@@ -22,22 +22,6 @@ class NormalBackend(abc.ABC):
         raise NotImplementedError
 
 
-class ScalarNormal(NormalBackend):
-    def from_tcoeffs(self, tcoeffs: list):
-        m0_matrix = np.stack(tcoeffs)
-        m0_corrected = np.reshape(m0_matrix, (-1,), order="F")
-        c_sqrtm0_corrected = np.zeros((len(tcoeffs), len(tcoeffs)))
-        return Normal(m0_corrected, c_sqrtm0_corrected)
-
-    def preconditioner_apply(self, rv, p, /):
-        return Normal(p * rv.mean, p[:, None] * rv.cholesky)
-
-    def standard(self, ndim, /, output_scale):
-        mean = np.zeros((ndim,))
-        cholesky = output_scale * np.eye(ndim)
-        return Normal(mean, cholesky)
-
-
 class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
