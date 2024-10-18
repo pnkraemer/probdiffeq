@@ -1,5 +1,6 @@
 from probdiffeq.backend import abc, functools, linalg
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
 
@@ -22,7 +23,7 @@ class StatsBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -54,73 +55,10 @@ class StatsBackend(abc.ABC):
         raise NotImplementedError
 
 
-class ScalarStats(StatsBackend):
-    def mahalanobis_norm_relative(self, u, /, rv):
-        res_white = (u - rv.mean) / rv.cholesky
-        return np.abs(res_white) / np.sqrt(rv.mean.size)
-
-    def logpdf(self, u, /, rv):
-        dx = u - rv.mean
-        w = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
-
-        maha_term = linalg.vector_dot(w, w)
-
-        diagonal = linalg.diagonal_along_axis(rv.cholesky, axis1=-1, axis2=-2)
-        slogdet = np.sum(np.log(np.abs(diagonal)))
-        logdet_term = 2.0 * slogdet
-        return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
-
-    def standard_deviation(self, rv):
-        if rv.cholesky.ndim > 1:
-            return functools.vmap(self.standard_deviation)(rv)
-
-        return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
-
-    def mean(self, rv):
-        return rv.mean
-
-    def sample_shape(self, rv):
-        return rv.mean.shape
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        return rv.mean + rv.cholesky @ unit_sample
-
-    def rescale_cholesky(self, rv, factor):
-        if np.ndim(factor) > 0:
-            return functools.vmap(self.rescale_cholesky)(rv, factor)
-        return _normal.Normal(rv.mean, factor * rv.cholesky)
-
-    def to_multivariate_normal(self, rv):
-        return rv.mean, rv.cholesky @ rv.cholesky.T
-
-    def qoi(self, rv):
-        return rv.mean[..., 0]
-
-    def marginal_nth_derivative(self, rv, i):
-        if rv.mean.ndim > 1:
-            return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
-                rv, i
-            )
-
-        if i > rv.mean.shape[0]:
-            raise ValueError
-
-        m = rv.mean[i]
-        c = rv.cholesky[[i], :]
-        chol = cholesky_util.triu_via_qr(c.T)
-        return _normal.Normal(np.reshape(m, ()), np.reshape(chol, ()))
-
-    def qoi_from_sample(self, sample, /):
-        return sample[0]
-
-    def update_mean(self, mean, x, /, num):
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
-
-
 class DenseStats(StatsBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape: tuple, unravel: Callable):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = linalg.solve_triangular(
@@ -151,7 +89,7 @@ class DenseStats(StatsBackend):
         diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
         return np.sqrt(diag)
 
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
@@ -165,10 +103,7 @@ class DenseStats(StatsBackend):
         return rv.mean, rv.cholesky @ rv.cholesky.T
 
     def qoi(self, rv):
-        if np.ndim(rv.mean) > 1:
-            return functools.vmap(self.qoi)(rv)
-        mean_reshaped = np.reshape(rv.mean, (-1, *self.ode_shape), order="F")
-        return mean_reshaped[0]
+        return self.qoi_from_sample(rv.mean)
 
     def marginal_nth_derivative(self, rv, i):
         if rv.mean.ndim > 1:
@@ -182,8 +117,9 @@ class DenseStats(StatsBackend):
         return _normal.Normal(m, c.T)
 
     def qoi_from_sample(self, sample, /):
-        sample_reshaped = np.reshape(sample, (-1, *self.ode_shape), order="F")
-        return sample_reshaped[0]
+        if np.ndim(sample) > 1:
+            return functools.vmap(self.qoi_from_sample)(sample)
+        return self.unravel(sample)
 
     def _select(self, x, /, idx_or_slice):
         x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
@@ -207,8 +143,9 @@ class DenseStats(StatsBackend):
 
 
 class IsotropicStats(StatsBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
@@ -244,7 +181,7 @@ class IsotropicStats(StatsBackend):
             return functools.vmap(self.standard_deviation)(rv)
         return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
 
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
@@ -261,9 +198,6 @@ class IsotropicStats(StatsBackend):
         mean = rv.mean.reshape((-1,), order="F")
         return (mean, cov)
 
-    def qoi(self, rv):
-        return rv.mean[..., 0, :]
-
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
             return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
@@ -277,8 +211,13 @@ class IsotropicStats(StatsBackend):
         cholesky = cholesky_util.triu_via_qr(rv.cholesky[[i], :].T).T
         return _normal.Normal(mean, cholesky)
 
+    def qoi(self, rv):
+        return self.qoi_from_sample(rv.mean)
+
     def qoi_from_sample(self, sample, /):
-        return sample[0, :]
+        if np.ndim(sample) > 2:
+            return functools.vmap(self.qoi_from_sample)(sample)
+        return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
@@ -286,8 +225,9 @@ class IsotropicStats(StatsBackend):
 
 
 class BlockDiagStats(StatsBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
         # assumes rv.chol = (d,1,1)
@@ -313,7 +253,7 @@ class BlockDiagStats(StatsBackend):
     def mean(self, rv):
         return rv.mean
 
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         return rv.mean.shape
 
     def standard_deviation(self, rv):
@@ -332,7 +272,7 @@ class BlockDiagStats(StatsBackend):
     def to_multivariate_normal(self, rv):
         mean = np.reshape(rv.mean.T, (-1,), order="F")
         cov = np.block_diag(self._cov_dense(rv.cholesky))
-        return (mean, cov)
+        return mean, cov
 
     def _cov_dense(self, cholesky):
         if cholesky.ndim > 2:
@@ -340,7 +280,12 @@ class BlockDiagStats(StatsBackend):
         return cholesky @ cholesky.T
 
     def qoi(self, rv):
-        return rv.mean[..., 0]
+        return self.qoi_from_sample(rv.mean)
+
+    def qoi_from_sample(self, sample, /):
+        if np.ndim(sample) > 2:
+            return functools.vmap(self.qoi_from_sample)(sample)
+        return self.unravel(sample)
 
     def marginal_nth_derivative(self, rv, i):
         if np.ndim(rv.mean) > 2:
@@ -357,9 +302,6 @@ class BlockDiagStats(StatsBackend):
         )
         cholesky = np.transpose(cholesky, axes=(0, 2, 1))
         return _normal.Normal(mean, cholesky)
-
-    def qoi_from_sample(self, sample, /):
-        return sample[..., 0]
 
     def update_mean(self, mean, x, /, num):
         if np.ndim(mean) > 0:

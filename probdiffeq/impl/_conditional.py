@@ -17,37 +17,6 @@ class TransformBackend(abc.ABC):
         raise NotImplementedError
 
 
-class ScalarTransform(TransformBackend):
-    def marginalise(self, rv, transformation, /):
-        # currently, assumes that A(rv.cholesky) is a vector, not a matrix.
-        matmul, b = transformation
-        cholesky_new = cholesky_util.triu_via_qr(matmul(rv.cholesky)[:, None])
-        cholesky_new_squeezed = np.reshape(cholesky_new, ())
-        return _normal.Normal(matmul(rv.mean) + b, cholesky_new_squeezed)
-
-    def revert(self, rv, transformation, /):
-        # Assumes that A maps a vector to a scalar...
-
-        # Extract information
-        A, b = transformation
-
-        # QR-decomposition
-        # (todo: rename revert_conditional_noisefree
-        #  to transformation_revert_cov_sqrt())
-        r_obs, (r_cor, gain) = cholesky_util.revert_conditional_noisefree(
-            R_X_F=A(rv.cholesky)[:, None], R_X=rv.cholesky.T
-        )
-        cholesky_obs = np.reshape(r_obs, ())
-        cholesky_cor = r_cor.T
-        gain = np.squeeze_along_axis(gain, axis=-1)
-
-        # Gather terms and return
-        m_cor = rv.mean - gain * (A(rv.mean) + b)
-        corrected = _normal.Normal(m_cor, cholesky_cor)
-        observed = _normal.Normal(A(rv.mean) + b, cholesky_obs)
-        return observed, Conditional(gain, corrected)
-
-
 class DenseTransform(TransformBackend):
     def marginalise(self, rv, transformation, /):
         A, b = transformation
@@ -253,8 +222,10 @@ class ScalarConditional(ConditionalBackend):
 
 
 class DenseConditional(ConditionalBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, ode_shape, num_derivatives, unravel):
         self.ode_shape = ode_shape
+        self.num_derivatives = num_derivatives
+        self.unravel = unravel
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
@@ -304,23 +275,24 @@ class DenseConditional(ConditionalBackend):
         C = np.zeros((n, n))
         return Conditional(A, _normal.Normal(m, C))
 
-    def ibm_transitions(self, num_derivatives, output_scale):
-        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
+    def ibm_transitions(self, *, output_scale):
+        a, q_sqrtm = system_matrices_1d(self.num_derivatives, output_scale)
         (d,) = self.ode_shape
-        eye_d = np.eye(d)
-        A = np.kron(eye_d, a)
-        Q = np.kron(eye_d, q_sqrtm)
 
-        ndim = d * (num_derivatives + 1)
+        eye_d = np.eye(d)
+        A = np.kron(a, eye_d)
+        Q = np.kron(q_sqrtm, eye_d)
+
+        ndim = d * (self.num_derivatives + 1)
         q0 = np.zeros((ndim,))
         noise = _normal.Normal(q0, Q)
 
-        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            p = np.tile(p, d)
-            p_inv = np.tile(p_inv, d)
+            p = np.repeat(p, d)
+            p_inv = np.repeat(p_inv, d)
             return Conditional(A, noise), (p, p_inv)
 
         return discretise
@@ -345,10 +317,7 @@ class DenseConditional(ConditionalBackend):
         return Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
-        x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
-        if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
-            raise ValueError
-        return x_reshaped[idx_or_slice]
+        return self.unravel(x)[idx_or_slice]
 
     @staticmethod
     def _autobatch_linop(fun):
@@ -361,8 +330,9 @@ class DenseConditional(ConditionalBackend):
 
 
 class IsotropicConditional(ConditionalBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, *, ode_shape, num_derivatives):
         self.ode_shape = ode_shape
+        self.num_derivatives = num_derivatives
 
     def apply(self, x, conditional, /):
         A, noise = conditional
@@ -416,11 +386,11 @@ class IsotropicConditional(ConditionalBackend):
         matrix = np.eye(num_hidden_states_per_ode_dim)
         return Conditional(matrix, noise)
 
-    def ibm_transitions(self, num_derivatives, output_scale):
-        A, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
-        q0 = np.zeros((num_derivatives + 1, *self.ode_shape))
+    def ibm_transitions(self, *, output_scale):
+        A, q_sqrtm = system_matrices_1d(self.num_derivatives, output_scale)
+        q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         noise = _normal.Normal(q0, q_sqrtm)
-        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
@@ -448,8 +418,9 @@ class IsotropicConditional(ConditionalBackend):
 
 
 class BlockDiagConditional(ConditionalBackend):
-    def __init__(self, ode_shape):
+    def __init__(self, *, ode_shape, num_derivatives):
         self.ode_shape = ode_shape
+        self.num_derivatives = num_derivatives
 
     def apply(self, x, conditional, /):
         if np.ndim(x) == 1:
@@ -512,18 +483,18 @@ class BlockDiagConditional(ConditionalBackend):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return Conditional(matrix, noise)
 
-    def ibm_transitions(self, num_derivatives, output_scale):
+    def ibm_transitions(self, *, output_scale):
         system_matrices = functools.vmap(system_matrices_1d, in_axes=(None, 0))
-        a, q_sqrtm = system_matrices(num_derivatives, output_scale)
+        a, q_sqrtm = system_matrices(self.num_derivatives, output_scale)
 
-        q0 = np.zeros((*self.ode_shape, num_derivatives + 1))
+        q0 = np.zeros((*self.ode_shape, self.num_derivatives + 1))
         noise = _normal.Normal(q0, q_sqrtm)
 
-        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
+        precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
 
         def discretise(dt):
             p, p_inv = precon_fun(dt)
-            return (a, noise), (p, p_inv)
+            return Conditional(a, noise), (p, p_inv)
 
         return discretise
 

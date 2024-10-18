@@ -1,26 +1,24 @@
 """Tests for sampling behaviour."""
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.backend import numpy as np
-from probdiffeq.backend import random, testing, tree_util
-from probdiffeq.impl import impl
+from probdiffeq.backend import ode, random, testing
 
 
 @testing.fixture(name="approximation")
-def fixture_approximation(ssm):
-    vf, (u0,), (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def fixture_approximation(fact):
+    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    output_scale = np.ones_like(impl.prototypes.output_scale())
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_every_step(
-        vf, init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1
+        vf, init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )
 
 
@@ -28,13 +26,10 @@ def fixture_approximation(ssm):
 def test_sample_shape(approximation, shape):
     key = random.prng_key(seed=15)
     posterior = stats.markov_select_terminal(approximation.posterior)
-    (u, samples), (u_init, samples_init) = stats.markov_sample(
-        key, posterior, shape=shape, reverse=True
+    samples, samples_init = stats.markov_sample(
+        key, posterior, shape=shape, reverse=True, ssm=approximation.ssm
     )
-    margs = tree_util.tree_map(lambda x: x[1:], approximation.marginals)
-    assert u.shape == shape + approximation.u[1:].shape
-    assert samples.shape == shape + impl.stats.sample_shape(margs)
 
-    margs = tree_util.tree_map(lambda x: x[0], approximation.marginals)
-    assert u_init.shape == shape + approximation.u[0].shape
-    assert samples_init.shape == shape + impl.stats.sample_shape(margs)
+    for i, s, u in zip(samples_init, samples, approximation.u):
+        assert i.shape == shape + u[-1, ...].shape
+        assert s.shape == shape + u[:-1, ...].shape

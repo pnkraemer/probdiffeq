@@ -21,22 +21,6 @@ class PrototypeBackend(abc.ABC):
         raise NotImplementedError
 
 
-class ScalarPrototype(PrototypeBackend):
-    def qoi(self):
-        return np.empty(())
-
-    def observed(self):
-        mean = np.empty(())
-        cholesky = np.empty(())
-        return _normal.Normal(mean, cholesky)
-
-    def error_estimate(self):
-        return np.empty(())
-
-    def output_scale(self):
-        return np.empty(())
-
-
 class DensePrototype(PrototypeBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape

@@ -6,99 +6,104 @@ After applying stats.calibrate(), the posterior is different.
 """
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq.backend import functools, ode, testing
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing
-from probdiffeq.impl import impl
 
 
 @testing.case()
-def case_solve_fixed_grid(ssm):
-    vf, u0, (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def case_solve_fixed_grid(fact):
+    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5)}
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5), "ssm": ssm}
 
     def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ibm, ts0)
+        strategy = strategy_fun(ibm, ts0, ssm=ssm)
         solver = solver_fun(strategy)
         init = solver.initial_condition()
         return ivpsolve.solve_fixed_grid(vf, init, solver=solver, **kwargs)
 
-    return solver_to_solution
+    return solver_to_solution, ssm
 
 
 @testing.case()
-def case_solve_adaptive_save_at(ssm):
-    vf, u0, (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def case_solve_adaptive_save_at(fact):
+    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
+
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
 
-    kwargs = {"save_at": np.linspace(t0, t1, endpoint=True, num=5), "dt0": dt0}
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+
+    save_at = np.linspace(t0, t1, endpoint=True, num=5)
+    kwargs = {"save_at": save_at, "dt0": dt0, "ssm": ssm}
 
     def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ibm, ts0)
+        strategy = strategy_fun(ibm, ts0, ssm=ssm)
         solver = solver_fun(strategy)
 
         init = solver.initial_condition()
-        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
         return ivpsolve.solve_adaptive_save_at(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 
-    return solver_to_solution
+    return solver_to_solution, ssm
 
 
 @testing.case()
-def case_solve_adaptive_save_every_step(ssm):
-    vf, u0, (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def case_solve_adaptive_save_every_step(fact):
+    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
+
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
+
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    kwargs = {"t0": t0, "t1": t1, "dt0": dt0, "ssm": ssm}
 
     def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ibm, ts0)
+        strategy = strategy_fun(ibm, ts0, ssm=ssm)
         solver = solver_fun(strategy)
 
         init = solver.initial_condition()
-        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
         return ivpsolve.solve_adaptive_save_every_step(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 
-    return solver_to_solution
+    return solver_to_solution, ssm
 
 
 @testing.case()
-def case_simulate_terminal_values(ssm):
-    vf, u0, (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def case_simulate_terminal_values(fact):
+    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
 
-    kwargs = {"t0": t0, "t1": t1, "dt0": dt0}
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+
+    kwargs = {"t0": t0, "t1": t1, "dt0": dt0, "ssm": ssm}
 
     def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ibm, ts0)
+        strategy = strategy_fun(ibm, ts0, ssm=ssm)
         solver = solver_fun(strategy)
 
         init = solver.initial_condition()
-        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
 
-    return solver_to_solution
+    return solver_to_solution, ssm
 
 
 @testing.fixture(name="uncalibrated_and_mle_solution")
@@ -107,16 +112,17 @@ def case_simulate_terminal_values(ssm):
     "strategy_fun", [ivpsolvers.strategy_filter, ivpsolvers.strategy_fixedpoint]
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
-    uncalib = solver_to_solution(ivpsolvers.solver, strategy_fun)
-    mle = solver_to_solution(ivpsolvers.solver_mle, strategy_fun)
-    return uncalib, mle
+    solve, ssm = solver_to_solution
+    uncalib = solve(ivpsolvers.solver, strategy_fun)
+    mle = solve(functools.partial(ivpsolvers.solver_mle, ssm=ssm), strategy_fun)
+    return (uncalib, mle), ssm
 
 
 # fixedpoint-solver in save_every_step gives nonsensical results
 # (which raises a warning), but the test remains valid!
 @testing.filterwarnings("ignore")
 def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
-    uncalibrated_solution, mle_solution = uncalibrated_and_mle_solution
+    (uncalibrated_solution, mle_solution), ssm = uncalibrated_and_mle_solution
 
     posterior_uncalibrated = uncalibrated_solution.posterior
     output_scale_uncalibrated = uncalibrated_solution.output_scale
@@ -129,5 +135,5 @@ def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     assert not np.allclose(output_scale_uncalibrated, output_scale_mle)
 
     # With a call to calibrate(), the posteriors are different.
-    posterior_calibrated = stats.calibrate(posterior_mle, output_scale_mle)
+    posterior_calibrated = stats.calibrate(posterior_mle, output_scale_mle, ssm=ssm)
     assert not testing.tree_all_allclose(posterior_uncalibrated, posterior_calibrated)

@@ -18,7 +18,6 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import info
 
 
@@ -29,11 +28,6 @@ def set_jax_config() -> None:
 
     # CPU
     jax.config.update("jax_platform_name", "cpu")
-
-
-def set_probdiffeq_config() -> None:
-    """Set probdiffeq up."""
-    impl.select("dense", ode_shape=(8,))
 
 
 def print_library_info() -> None:
@@ -92,13 +86,13 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-        ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-        ts1 = ivpsolvers.correction_ts1()
-        strategy = ivpsolvers.strategy_filter(ibm, ts1)
-        solver = ivpsolvers.solver_dynamic(strategy)
+        ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
+        ts1 = ivpsolvers.correction_ts1(ssm=ssm)
+        strategy = ivpsolvers.strategy_filter(ibm, ts1, ssm=ssm)
+        solver = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
         control = ivpsolve.control_proportional_integral(clip=True)
         adaptive_solver = ivpsolve.adaptive(
-            solver, atol=1e-2 * tol, rtol=tol, control=control
+            solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
         )
 
         # Initial state
@@ -107,11 +101,17 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0,))
         solution = ivpsolve.solve_adaptive_terminal_values(
-            vf_probdiffeq, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
+            vf_probdiffeq,
+            init,
+            t0=t0,
+            t1=t1,
+            dt0=dt0,
+            adaptive_solver=adaptive_solver,
+            ssm=ssm,
         )
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u)
+        return jax.block_until_ready(solution.u[0])
 
     return param_to_solution
 
@@ -266,7 +266,6 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
 if __name__ == "__main__":
     # Set up all the configs
     set_jax_config()
-    set_probdiffeq_config()
     print_library_info()
 
     # Simulate once to get plotting code

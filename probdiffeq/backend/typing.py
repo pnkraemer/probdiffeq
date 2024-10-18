@@ -1,5 +1,6 @@
 """Typing module."""
 
+from collections.abc import Sequence  # noqa: F401
 from typing import Any, Callable, Generic, Optional, TypeVar  # noqa: F401
 
 import jax

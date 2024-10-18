@@ -3,50 +3,49 @@
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
-from probdiffeq.impl import impl
 
 
 @testing.fixture(name="solver_setup")
-def fixture_solver_setup(ssm):
-    vf, (u0,), (t0, t1) = ssm.default_ode
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def fixture_solver_setup(fact):
+    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    output_scale = np.ones_like(impl.prototypes.output_scale())
     grid = np.linspace(t0, t1, endpoint=True, num=12)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "output_scale": output_scale}
+    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "fact": fact}
 
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_filter(ibm, ts0)
+    tcoeffs = solver_setup["tcoeffs"]
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=solver_setup["fact"])
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
 
     init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
-        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver
+        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver, ssm=ssm
     )
 
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
-    tcoeffs, output_scale = solver_setup["tcoeffs"], solver_setup["output_scale"]
-    ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+    tcoeffs = solver_setup["tcoeffs"]
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=solver_setup["fact"])
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
 
     init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
-        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver
+        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver, ssm=ssm
     )
 
 
 @testing.fixture(name="reference_solution")
-def fixture_reference_solution(ssm):
-    vf, (u0,), (t0, t1) = ssm.default_ode
+def fixture_reference_solution():
+    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
 
 
@@ -56,8 +55,8 @@ def test_compare_filter_smoother_rmse(
     assert np.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = reference_solution(filter_solution.t)
-    filter_rmse = _rmse(filter_solution.u, reference)
-    smoother_rmse = _rmse(smoother_solution.u, reference)
+    filter_rmse = _rmse(filter_solution.u[0], reference)
+    smoother_rmse = _rmse(smoother_solution.u[0], reference)
 
     # I would like to compare filter & smoother RMSE. but this test is too unreliable,
     # so we simply assert that both are "comparable".

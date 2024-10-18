@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Dynamic and non-dynamic solvers
+# # Choosing between dynamic and non-dynamic solvers
 #
 # You can choose between a `adaptive.solver_calibrationfree()`
 # (which does not calibrate the output-scale),
@@ -40,7 +40,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -56,7 +55,6 @@ if not backend.has_been_selected:
 jax.config.update("jax_platform_name", "cpu")
 # -
 
-impl.select("dense", ode_shape=(1,))
 
 # +
 f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
@@ -72,11 +70,11 @@ def vf(*ys, t):  # noqa: ARG001
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts1 = ivpsolvers.correction_ts1()
-strategy = ivpsolvers.strategy_filter(ibm, ts1)
-dynamic = ivpsolvers.solver_dynamic(strategy)
-mle = ivpsolvers.solver_mle(strategy)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="dense")
+ts1 = ivpsolvers.correction_ts1(ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ibm, ts1, ssm=ssm)
+dynamic = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
+mle = ivpsolvers.solver_mle(strategy, ssm=ssm)
 
 # +
 t0, t1 = 0.0, 3.0
@@ -87,8 +85,10 @@ ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 
 init_mle = mle.initial_condition()
 init_dynamic = dynamic.initial_condition()
-solution_dynamic = ivpsolve.solve_fixed_grid(vf, init_mle, grid=ts, solver=dynamic)
-solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle)
+solution_dynamic = ivpsolve.solve_fixed_grid(
+    vf, init_mle, grid=ts, solver=dynamic, ssm=ssm
+)
+solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle, ssm=ssm)
 # -
 
 # Plot the solution.
@@ -97,8 +97,8 @@ solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle)
 fig, (axes_linear, axes_log) = plt.subplots(ncols=2, nrows=2, sharex=True, sharey="row")
 
 
-u_dynamic = solution_dynamic.u
-u_mle = solution_mle.u
+u_dynamic = solution_dynamic.u[0]
+u_mle = solution_mle.u[0]
 scale_dynamic = solution_dynamic.output_scale
 scale_mle = jnp.ones_like(solution_mle.output_scale) * solution_mle.output_scale[-1]
 

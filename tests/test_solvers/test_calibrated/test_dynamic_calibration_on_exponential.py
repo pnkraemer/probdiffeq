@@ -6,28 +6,28 @@ but not for the dynamic solver.
 """
 
 from probdiffeq import ivpsolve, ivpsolvers
-from probdiffeq.backend import linalg
+from probdiffeq.backend import linalg, ode, testing
 from probdiffeq.backend import numpy as np
-from probdiffeq.impl import impl
 
 
-def test_exponential_approximated_well(ssm):
-    vf, u0, (t0, t1), solution = ssm.default_ode_affine
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def test_exponential_approximated_well(fact):
+    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
-    output_scale = np.ones_like(impl.prototypes.output_scale())
-    ibm = ivpsolvers.prior_ibm((*u0, vf(*u0, t=t0)), output_scale=output_scale)
-    ts0 = ivpsolvers.correction_ts0()
-    strategy = ivpsolvers.strategy_filter(ibm, ts0)
-    solver = ivpsolvers.solver_dynamic(strategy)
+    ibm, ssm = ivpsolvers.prior_ibm((*u0, vf(*u0, t=t0)), ssm_fact=fact)
+    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
+    solver = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
 
     init = solver.initial_condition()
 
     problem_args = (vf, init)
     grid = np.linspace(t0, t1, num=20)
-    solver_kwargs = {"grid": grid, "solver": solver}
+    solver_kwargs = {"grid": grid, "solver": solver, "ssm": ssm}
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
 
-    rmse = _rmse(approximation.u[-1], solution(t1))
+    solution = ode.odeint_dense(vf, u0, t0=t0, t1=t1, atol=1e-5, rtol=1e-5)
+    rmse = _rmse(approximation.u[0][-1], solution(t1))
     assert rmse < 0.1
 
 

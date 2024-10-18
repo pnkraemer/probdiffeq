@@ -5,7 +5,6 @@ Mostly **discrete** filtering and smoothing.
 
 from probdiffeq.backend import containers, control_flow, tree_util
 from probdiffeq.backend.typing import Any
-from probdiffeq.impl import impl
 
 
 # TODO: fixedpointsmoother and kalmanfilter should be estimate()
@@ -39,7 +38,7 @@ def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimat
     return control_flow.scan(step, init=init, xs=xs, reverse=True)
 
 
-def fixedpointsmoother_precon():
+def fixedpointsmoother_precon(*, ssm):
     """Construct a discrete, preconditioned fixedpoint-smoother."""
 
     class _FPState(containers.NamedTuple):
@@ -48,8 +47,8 @@ def fixedpointsmoother_precon():
 
     def _initialise(init, data, observation_model) -> _FPState:
         rv, cond = init
-        _observed, conditional = impl.conditional.revert(rv, observation_model)
-        corrected = impl.conditional.apply(data, conditional)
+        _observed, conditional = ssm.conditional.revert(rv, observation_model)
+        corrected = ssm.conditional.apply(data, conditional)
         return _FPState(corrected, cond)
 
     def _step(state: _FPState, cond_and_data_and_obs) -> tuple[_FPState, _FPState]:
@@ -57,17 +56,17 @@ def fixedpointsmoother_precon():
         rv, conditional_rev = state
 
         # Extrapolate
-        rv = impl.normal.preconditioner_apply(rv, p_inv)
-        rv, conditional_new = impl.conditional.revert(rv, conditional)
-        rv = impl.normal.preconditioner_apply(rv, p)
-        conditional_new = impl.conditional.preconditioner_apply(
+        rv = ssm.normal.preconditioner_apply(rv, p_inv)
+        rv, conditional_new = ssm.conditional.revert(rv, conditional)
+        rv = ssm.normal.preconditioner_apply(rv, p)
+        conditional_new = ssm.conditional.preconditioner_apply(
             conditional_new, p, p_inv
         )
-        conditional_rev_new = impl.conditional.merge(conditional_rev, conditional_new)
+        conditional_rev_new = ssm.conditional.merge(conditional_rev, conditional_new)
 
         # Correct
-        _observed, reverse = impl.conditional.revert(rv, observation)
-        corrected = impl.conditional.apply(data, reverse)
+        _observed, reverse = ssm.conditional.revert(rv, observation)
+        corrected = ssm.conditional.apply(data, reverse)
 
         # Scan-compatible output
         state = _FPState(corrected, conditional_rev_new)
@@ -80,7 +79,7 @@ def _select(tree, idx_or_slice):
     return tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
 
 
-def kalmanfilter_with_marginal_likelihood():
+def kalmanfilter_with_marginal_likelihood(*, ssm):
     """Construct a Kalman-filter-implementation of computing the marginal likelihood."""
 
     class _KFState(containers.NamedTuple):
@@ -89,9 +88,9 @@ def kalmanfilter_with_marginal_likelihood():
         logpdf: float
 
     def _initialise(rv, data, model) -> _KFState:
-        observed, conditional = impl.conditional.revert(rv, model)
-        corrected = impl.conditional.apply(data, conditional)
-        logpdf = impl.stats.logpdf(data, observed)
+        observed, conditional = ssm.conditional.revert(rv, model)
+        corrected = ssm.conditional.apply(data, conditional)
+        logpdf = ssm.stats.logpdf(data, observed)
         return _KFState(corrected, 1.0, logpdf)
 
     def _step(state: _KFState, cond_and_data_and_obs) -> tuple[_KFState, _KFState]:
@@ -99,12 +98,12 @@ def kalmanfilter_with_marginal_likelihood():
         rv, num_data, logpdf = state
 
         # Extrapolate-correct
-        rv = impl.conditional.marginalise(rv, conditional)
-        observed, reverse = impl.conditional.revert(rv, observation)
-        corrected = impl.conditional.apply(data, reverse)
+        rv = ssm.conditional.marginalise(rv, conditional)
+        observed, reverse = ssm.conditional.revert(rv, observation)
+        corrected = ssm.conditional.apply(data, reverse)
 
         # Update logpdf
-        logpdf_new = impl.stats.logpdf(data, observed)
+        logpdf_new = ssm.stats.logpdf(data, observed)
         logpdf_mean = (logpdf * num_data + logpdf_new) / (num_data + 1)
         state = _KFState(corrected, num_data + 1.0, logpdf_mean)
 

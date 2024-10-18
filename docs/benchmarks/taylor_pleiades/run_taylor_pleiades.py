@@ -15,7 +15,6 @@ import jax
 import jax.numpy as jnp
 
 from probdiffeq import taylor
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import info
 
 
@@ -26,11 +25,6 @@ def set_jax_config() -> None:
 
     # CPU
     jax.config.update("jax_platform_name", "cpu")
-
-
-def set_probdiffeq_config() -> None:
-    """Set probdiffeq up."""
-    impl.select("isotropic", ode_shape=(14,))
 
 
 def print_library_info() -> None:

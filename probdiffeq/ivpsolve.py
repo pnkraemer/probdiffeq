@@ -12,7 +12,6 @@ from probdiffeq.backend import (
 )
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Callable
-from probdiffeq.impl import impl
 
 
 @containers.dataclass
@@ -112,12 +111,14 @@ def control_integral(
     return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
 
 
-def adaptive(solver, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
+def adaptive(solver, *, ssm, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     """Make an IVP solver adaptive."""
     if control is None:
         control = control_proportional_integral()
 
-    return _AdaSolver(solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord)
+    return _AdaSolver(
+        solver, ssm=ssm, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+    )
 
 
 class _AdaState(containers.NamedTuple):
@@ -130,12 +131,13 @@ class _AdaState(containers.NamedTuple):
 class _AdaSolver:
     """Adaptive IVP solvers."""
 
-    def __init__(self, solver, atol, rtol, control, norm_ord):
+    def __init__(self, solver, *, atol, rtol, control, norm_ord, ssm):
         self.solver = solver
         self.atol = atol
         self.rtol = rtol
         self.control = control
         self.norm_ord = norm_ord
+        self.ssm = ssm
 
     def __repr__(self):
         return (
@@ -202,8 +204,8 @@ class _AdaSolver:
                 dt=self.control.extract(state_control),
             )
             # Normalise the error
-            u_proposed = impl.stats.qoi(state_proposed.strategy.hidden)
-            u_step_from = impl.stats.qoi(state_proposed.strategy.hidden)
+            u_proposed = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
+            u_step_from = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
             error_norm = _normalise_error(error_estimate, u=u)
 
@@ -269,14 +271,19 @@ class _AdaSolver:
     def register_pytree_node():
         def _asolver_flatten(asolver):
             children = (asolver.atol, asolver.rtol)
-            aux = (asolver.solver, asolver.control, asolver.norm_ord)
+            aux = (asolver.solver, asolver.control, asolver.norm_ord, asolver.ssm)
             return children, aux
 
         def _asolver_unflatten(aux, children):
             atol, rtol = children
-            (solver, control, norm_ord) = aux
+            (solver, control, norm_ord, ssm) = aux
             return _AdaSolver(
-                solver=solver, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+                solver=solver,
+                atol=atol,
+                rtol=rtol,
+                control=control,
+                norm_ord=norm_ord,
+                ssm=ssm,
             )
 
         tree_util.register_pytree_node(
@@ -290,14 +297,16 @@ _AdaSolver.register_pytree_node()
 class _Solution:
     """Estimated initial value problem solution."""
 
-    def __init__(self, t, u, output_scale, marginals, posterior, num_steps):
+    def __init__(self, t, u, u_std, output_scale, marginals, posterior, num_steps, ssm):
         """Construct a solution object."""
         self.t = t
         self.u = u
+        self.u_std = u_std
         self.output_scale = output_scale
-        self.marginals = marginals
+        self.marginals = marginals  # todo: marginals are replaced by "u" and "u_std"
         self.posterior = posterior
         self.num_steps = num_steps
+        self.ssm = ssm
 
     def __repr__(self):
         """Evaluate a string-representation of the solution object."""
@@ -346,23 +355,27 @@ class _Solution:
             children = (
                 sol.t,
                 sol.u,
+                sol.u_std,
                 sol.marginals,
                 sol.posterior,
                 sol.output_scale,
                 sol.num_steps,
             )
-            aux = ()
+            aux = (sol.ssm,)
             return children, aux
 
-        def _sol_unflatten(_aux, children):
-            t, u, marginals, posterior, output_scale, n = children
+        def _sol_unflatten(aux, children):
+            (ssm,) = aux
+            t, u, u_std, marginals, posterior, output_scale, n = children
             return _Solution(
                 t=t,
                 u=u,
+                u_std=u_std,
                 marginals=marginals,
                 posterior=posterior,
                 output_scale=output_scale,
                 num_steps=n,
+                ssm=ssm,
             )
 
         tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
@@ -372,7 +385,7 @@ _Solution.register_pytree_node()
 
 
 def solve_adaptive_terminal_values(
-    vector_field, initial_condition, t0, t1, adaptive_solver, dt0
+    vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
 ) -> _Solution:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t1])
@@ -390,12 +403,17 @@ def solve_adaptive_terminal_values(
     num_steps = tree_util.tree_map(squeeze_fun, num_steps)
 
     # I think the user expects marginals, so we compute them here
+    # todo: do this in _Solution.* methods?
     posterior, output_scale = solution_save_at
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
-    u = impl.stats.qoi(marginals)
+
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=t1,
         u=u,
+        u_std=u_std,
+        ssm=ssm,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
@@ -404,7 +422,7 @@ def solve_adaptive_terminal_values(
 
 
 def solve_adaptive_save_at(
-    vector_field, initial_condition, save_at, adaptive_solver, dt0
+    vector_field, initial_condition, save_at, adaptive_solver, dt0, *, ssm
 ) -> _Solution:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -449,16 +467,21 @@ def solve_adaptive_save_at(
     # (as well as marginals), so we compute those things here
     posterior_t0, *_ = initial_condition
     posterior_save_at, output_scale = solution_save_at
-    _tmp = _userfriendly_output(posterior=posterior_save_at, posterior_t0=posterior_t0)
+    _tmp = _userfriendly_output(
+        posterior=posterior_save_at, posterior_t0=posterior_t0, ssm=ssm
+    )
     marginals, posterior = _tmp
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=save_at,
         u=u,
+        u_std=u_std,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
         num_steps=num_steps,
+        ssm=ssm,
     )
 
 
@@ -503,7 +526,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
 
 def solve_adaptive_save_every_step(
-    vector_field, initial_condition, t0, t1, adaptive_solver, dt0
+    vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
 ) -> _Solution:
     """Solve an initial value problem and save every step.
 
@@ -537,13 +560,16 @@ def solve_adaptive_save_every_step(
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
     posterior, output_scale = solution_every_step
-    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
+    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
     marginals, posterior = _tmp
 
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=t,
         u=u,
+        u_std=u_std,
+        ssm=ssm,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
@@ -573,7 +599,9 @@ def _solution_generator(
     yield solution
 
 
-def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution:
+def solve_fixed_grid(
+    vector_field, initial_condition, grid, solver, *, ssm
+) -> _Solution:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
@@ -588,13 +616,16 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution
 
     # I think the user expects marginals, so we compute them here
     posterior_t0, *_ = initial_condition
-    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0)
+    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
     marginals, posterior = _tmp
 
-    u = impl.stats.qoi(marginals)
+    u = ssm.stats.qoi_from_sample(marginals.mean)
+    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
     return _Solution(
         t=grid,
         u=u,
+        u_std=u_std,
+        ssm=ssm,
         marginals=marginals,
         posterior=posterior,
         output_scale=output_scale,
@@ -602,11 +633,13 @@ def solve_fixed_grid(vector_field, initial_condition, grid, solver) -> _Solution
     )
 
 
-def _userfriendly_output(*, posterior, posterior_t0):
+def _userfriendly_output(*, posterior, posterior_t0, ssm):
     if isinstance(posterior, stats.MarkovSeq):
         # Compute marginals
         posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
-        marginals = stats.markov_marginals(posterior_no_filter_marginals, reverse=True)
+        marginals = stats.markov_marginals(
+            posterior_no_filter_marginals, reverse=True, ssm=ssm
+        )
 
         # Prepend the marginal at t1 to the computed marginals
         marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)

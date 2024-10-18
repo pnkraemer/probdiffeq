@@ -1,5 +1,6 @@
 """PyTree utilities."""
 
+import jax.flatten_util
 import jax.tree_util
 
 
@@ -21,3 +22,7 @@ def tree_map(func, tree, *rest):
 
 def tree_all(tree, /):
     return jax.tree_util.tree_all(tree)
+
+
+def ravel_pytree(tree, /):
+    return jax.flatten_util.ravel_pytree(tree)

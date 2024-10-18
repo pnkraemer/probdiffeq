@@ -14,8 +14,6 @@ import jax.tree_util
 import pytest
 import pytest_cases
 
-from probdiffeq.impl import impl
-
 case = pytest_cases.case
 filterwarnings = pytest.mark.filterwarnings
 parametrize = pytest.mark.parametrize
@@ -45,9 +43,9 @@ def tree_allclose(tree1, tree2, **kwargs):
     return jax.tree_util.tree_map(allclose_partial, tree1, tree2)
 
 
-def marginals_allclose(m1, m2, /):
-    m1, c1 = impl.stats.to_multivariate_normal(m1)
-    m2, c2 = impl.stats.to_multivariate_normal(m2)
+def marginals_allclose(m1, m2, /, *, ssm):
+    m1, c1 = ssm.stats.to_multivariate_normal(m1)
+    m2, c2 = ssm.stats.to_multivariate_normal(m2)
 
     means_allclose = jnp.allclose(m1, m2)
     covs_allclose = jnp.allclose(c1, c2)

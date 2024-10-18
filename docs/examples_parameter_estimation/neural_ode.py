@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Train a Neural ODE with Optax
+# # Training a Neural ODE with Optax
 #
 # We can use the parameter estimation functionality
 # to fit a neural ODE to a time series data set.
@@ -27,7 +27,6 @@ import optax
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -46,7 +45,6 @@ jax.config.update("jax_debug_nans", True)
 jax.config.update("jax_platform_name", "cpu")
 # -
 
-impl.select("isotropic", ode_shape=(1,))
 
 # To keep the problem nice and small, assume that the data set is a
 # trigonometric function (which solve differential equations).
@@ -70,19 +68,26 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
     def loss_fn(parameters):
         """Loss function: log-marginal likelihood of the data."""
         tcoeffs = (*initial_values, vf(*initial_values, t=t0, p=parameters))
-        ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-        ts0 = ivpsolvers.correction_ts0()
-        strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+        ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="isotropic")
+        ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+        strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
         solver_ts0 = ivpsolvers.solver(strategy)
         init = solver_ts0.initial_condition()
 
         sol = ivpsolve.solve_fixed_grid(
-            lambda *a, **kw: vf(*a, **kw, p=parameters), init, grid=grid, solver=solver
+            lambda *a, **kw: vf(*a, **kw, p=parameters),
+            init,
+            grid=grid,
+            solver=solver,
+            ssm=ssm,
         )
 
         observation_std = jnp.ones_like(grid) * standard_deviation
         marginal_likelihood = stats.log_marginal_likelihood(
-            data[:, None], standard_deviation=observation_std, posterior=sol.posterior
+            data[:, None],
+            standard_deviation=observation_std,
+            posterior=sol.posterior,
+            ssm=sol.ssm,
         )
         return -1 * marginal_likelihood
 
@@ -121,18 +126,18 @@ def vf(y, *, t, p):
 
 # Make a solver
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0()
-strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
 solver_ts0 = ivpsolvers.solver(strategy)
 init = solver_ts0.initial_condition()
 
 # +
 sol = ivpsolve.solve_fixed_grid(
-    lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0
+    lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0, ssm=ssm
 )
 
-plt.plot(sol.t, sol.u, ".-", label="Initial estimate")
+plt.plot(sol.t, sol.u[0], ".-", label="Initial estimate")
 plt.plot(grid, data, ".-", label="Data")
 plt.legend()
 plt.show()
@@ -161,30 +166,30 @@ for i in range(chunk_size):
 # +
 plt.plot(sol.t, data, "-", linewidth=5, alpha=0.5, label="Data")
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0()
-strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
 solver_ts0 = ivpsolvers.solver(strategy)
 init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(
-    lambda *a, **kw: vf(*a, **kw, p=p), init, grid=grid, solver=solver_ts0
+    lambda *a, **kw: vf(*a, **kw, p=p), init, grid=grid, solver=solver_ts0, ssm=ssm
 )
 
 
-plt.plot(sol.t, sol.u, ".-", label="Final guess")
+plt.plot(sol.t, sol.u[0], ".-", label="Final guess")
 
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0()
-strategy = ivpsolvers.strategy_smoother(ibm, ts0)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
 solver_ts0 = ivpsolvers.solver(strategy)
 init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(
-    lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0
+    lambda *a, **kw: vf(*a, **kw, p=f_args), init, grid=grid, solver=solver_ts0, ssm=ssm
 )
-plt.plot(sol.t, sol.u, ".-", label="Initial guess")
+plt.plot(sol.t, sol.u[0], ".-", label="Initial guess")
 
 
 plt.legend()

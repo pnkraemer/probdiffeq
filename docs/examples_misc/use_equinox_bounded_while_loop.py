@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Use Equinox's reverse-mode differentiable while-loops
+# # Using Equinox's reverse-mode differentiable while-loops
 #
 # Use [Equinox's](https://docs.kidger.site/equinox/)
 # bounded while loop to enable reverse-mode differentiation of adaptive IVP solvers.
@@ -26,10 +26,8 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import control_flow
-from probdiffeq.impl import impl
 
 jax.config.update("jax_platform_name", "cpu")
-impl.select("dense", ode_shape=(1,))
 
 
 # -
@@ -63,22 +61,28 @@ def solution_routine():
     u0 = jnp.asarray([0.1])
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    ibm = ivpsolvers.prior_ibm(tcoeffs, 1.0)
-    ts0 = ivpsolvers.correction_ts0(ode_order=1)
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="isotropic")
+    ts0 = ivpsolvers.correction_ts0(ode_order=1, ssm=ssm)
 
-    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0)
+    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
-    adaptive_solver = ivpsolve.adaptive(solver)
+    adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
     init = solver.initial_condition()
 
     def simulate(init_val):
         """Evaluate the parameter-to-solution function."""
         sol = ivpsolve.solve_adaptive_terminal_values(
-            vf, init_val, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver
+            vf,
+            init_val,
+            t0=t0,
+            t1=t1,
+            dt0=0.1,
+            adaptive_solver=adaptive_solver,
+            ssm=ssm,
         )
 
         # Any scalar function of the IVP solution would do
-        return jnp.dot(sol.u, sol.u)
+        return jnp.dot(sol.u[0], sol.u[0])
 
     return simulate, init
 

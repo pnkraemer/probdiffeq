@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Posterior uncertainties
+# # Exploring posterior uncertainties
 
 # +
 """Display the marginal uncertainties of filters and smoothers."""
@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import notebook
 
 # -
@@ -38,8 +37,6 @@ if not backend.has_been_selected:
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 # -
-
-impl.select("isotropic", ode_shape=(2,))
 
 # Set an example problem.
 #
@@ -62,10 +59,10 @@ def vf(*ys, t):  # noqa: ARG001
 
 # +
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0()
-solver = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0))
-adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+solver = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm), ssm=ssm)
+adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 
@@ -74,10 +71,10 @@ dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), (u0,))
 
 init = solver.initial_condition()
 sol = ivpsolve.solve_adaptive_save_at(
-    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver
+    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
 )
 
-marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale)
+marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale, ssm=ssm)
 # -
 
 # Plot the solution
@@ -116,26 +113,28 @@ plt.show()
 # ## Smoother
 
 # +
-ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0)
-ts0 = ivpsolvers.correction_ts0()
-solver = ivpsolvers.solver_mle(ivpsolvers.strategy_fixedpoint(ibm, ts0))
-adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+solver = ivpsolvers.solver_mle(
+    ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm), ssm=ssm
+)
+adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 
 # +
 init = solver.initial_condition()
 sol = ivpsolve.solve_adaptive_save_at(
-    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver
+    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
 )
 
-marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale)
-posterior = stats.calibrate(sol.posterior, output_scale=sol.output_scale)
+marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale, ssm=ssm)
+posterior = stats.calibrate(sol.posterior, output_scale=sol.output_scale, ssm=ssm)
 posterior = stats.markov_select_terminal(posterior)
 # -
 
 key = jax.random.PRNGKey(seed=1)
-(qoi, samples), _init = stats.markov_sample(key, posterior, shape=(2,), reverse=True)
+samples, _init = stats.markov_sample(key, posterior, shape=(2,), reverse=True, ssm=ssm)
 
 # +
 _, num_derivatives, _ = marginals.mean.shape
@@ -146,9 +145,9 @@ fig, axes_all = plt.subplots(
 )
 
 for i, axes_cols in enumerate(axes_all.T):
-    ms = marginals.mean[:, i, :]
-    samps = samples[..., i, :]
-    ls = marginals.cholesky[:, i, :]
+    samps = samples[i]
+    ms = ssm.stats.qoi_from_sample(marginals.mean)[i]
+    ls = ssm.stats.qoi_from_sample(marginals.cholesky)[i]
     stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
 
     if i == 1:
