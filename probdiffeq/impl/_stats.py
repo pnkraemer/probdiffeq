@@ -23,7 +23,7 @@ class StatsBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -80,8 +80,8 @@ class ScalarStats(StatsBackend):
     def mean(self, rv):
         return rv.mean
 
-    def sample_shape(self, rv):
-        return rv.mean.shape
+    def hidden_shape(self, rv):
+        return self.unravel(rv.mean).shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + rv.cholesky @ unit_sample
@@ -153,7 +153,7 @@ class DenseStats(StatsBackend):
         diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
         return np.sqrt(diag)
 
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
@@ -245,7 +245,7 @@ class IsotropicStats(StatsBackend):
             return functools.vmap(self.standard_deviation)(rv)
         return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
 
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
@@ -317,7 +317,7 @@ class BlockDiagStats(StatsBackend):
     def mean(self, rv):
         return rv.mean
 
-    def sample_shape(self, rv):
+    def hidden_shape(self, rv):
         return rv.mean.shape
 
     def standard_deviation(self, rv):

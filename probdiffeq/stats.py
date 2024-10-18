@@ -34,7 +34,7 @@ def markov_sample(key, markov_seq: MarkovSeq, *, reverse, ssm, shape=()):
 def _sample_shape(markov_seq, *, ssm):
     # The number of samples is one larger than the number of conditionals
     _, noise = markov_seq.conditional
-    n, *shape_single_sample = ssm.stats.sample_shape(noise)
+    n, *shape_single_sample = ssm.stats.hidden_shape(noise)
     return n + 1, *tuple(shape_single_sample)
 
 
