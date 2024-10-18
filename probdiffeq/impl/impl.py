@@ -18,8 +18,10 @@ class FactImpl:
 
     # To assert a valid tree_equal of solutions, the factorisations
     # must be comparable.
-    def __eq__(self, other: "FactImpl"):
-        return self.name == other.name
+    def __eq__(self, other):
+        if isinstance(other, FactImpl):
+            return self.name == other.name
+        return False
 
 
 def choose(which: str, /, *, tcoeffs_like) -> FactImpl:

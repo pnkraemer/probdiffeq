@@ -3,69 +3,65 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 from probdiffeq.backend import control_flow, functools, itertools, ode, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array, Callable
-from probdiffeq.impl import impl
 from probdiffeq.util import filter_util
 
 
-def runge_kutta_starter(dt, *, atol=1e-12, rtol=1e-10):
+def runge_kutta_starter(dt, *, ssm, atol=1e-12, rtol=1e-10):
     """Create an estimator that uses a Runge-Kutta starter."""
-    # If the accuracy of the initialisation is bad, play around with dt.
-    return functools.partial(_runge_kutta_starter, dt0=dt, atol=atol, rtol=rtol)
 
+    def starter(vf, initial_values, /, num: int, t):
+        # TODO [inaccuracy]: the initial-value uncertainty is discarded
+        # TODO [feature]: allow implementations other than IsoIBM?
+        # TODO [feature]: higher-order ODEs
 
-# atol and rtol must be static bc. of jax.odeint...
-@functools.partial(
-    functools.jit, static_argnums=[0], static_argnames=["num", "atol", "rtol"]
-)
-def _runge_kutta_starter(vf, initial_values, /, num: int, t, dt0, atol, rtol):
-    # TODO [inaccuracy]: the initial-value uncertainty is discarded
-    # TODO [feature]: allow implementations other than IsoIBM?
-    # TODO [feature]: higher-order ODEs
+        # Assertions and early exits
 
-    # Assertions and early exits
+        if len(initial_values) > 1:
+            msg = "Higher-order ODEs are not supported at the moment."
+            raise ValueError(msg)
 
-    if len(initial_values) > 1:
-        msg = "Higher-order ODEs are not supported at the moment."
-        raise ValueError(msg)
+        if num == 0:
+            return initial_values
 
-    if num == 0:
-        return initial_values
+        if num == 1:
+            return *initial_values, vf(*initial_values, t)
 
-    if num == 1:
-        return *initial_values, vf(*initial_values, t)
+        # Generate data
 
-    # Generate data
+        # TODO: allow flexible "solve" method?
+        k = num + 1  # important: k > num
+        ts = np.linspace(t, t + dt * (k - 1), num=k, endpoint=True)
+        ys = ode.odeint_and_save_at(
+            vf, initial_values, save_at=ts, atol=atol, rtol=rtol
+        )
 
-    # TODO: allow flexible "solve" method?
-    k = num + 1  # important: k > num
-    ts = np.linspace(t, t + dt0 * (k - 1), num=k, endpoint=True)
-    ys = ode.odeint_and_save_at(vf, initial_values, save_at=ts, atol=atol, rtol=rtol)
+        # Initial condition
+        rv_t0 = ssm.normal.standard(num + 1, 1.0)
+        estimator = filter_util.fixedpointsmoother_precon(ssm=ssm)
+        conditional_t0 = ssm.conditional.identity(num + 1)
+        init = (rv_t0, conditional_t0)
 
-    # Initial condition
-    estimator = filter_util.fixedpointsmoother_precon()
-    rv_t0 = impl.normal.standard(num + 1, 1.0)
-    conditional_t0 = impl.conditional.identity(num + 1)
-    init = (rv_t0, conditional_t0)
+        # Discretised prior
+        discretise = ssm.conditional.ibm_transitions(output_scale=1.0)
+        ibm_transitions = functools.vmap(discretise)(np.diff(ts))
 
-    # Discretised prior
-    discretise = impl.conditional.ibm_transitions(num, 1.0)
-    ibm_transitions = functools.vmap(discretise)(np.diff(ts))
+        # Generate an observation-model for the QOI
+        # (1e-7 observation noise for nuggets and for reusing existing code)
+        model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0))
+        models = model_fun(0, 1e-7 * np.ones_like(ts))
 
-    # Generate an observation-model for the QOI
-    # (1e-7 observation noise for nuggets and for reusing existing code)
-    model_fun = functools.vmap(impl.conditional.to_derivative, in_axes=(None, 0))
-    models = model_fun(0, 1e-7 * np.ones_like(ts))
+        # Run the preconditioned fixedpoint smoother
+        (corrected, conditional), _ = filter_util.estimate_fwd(
+            ys,
+            init=init,
+            prior_transitions=ibm_transitions,
+            observation_model=models,
+            estimator=estimator,
+        )
+        initial = ssm.conditional.marginalise(corrected, conditional)
+        return tuple(ssm.stats.mean(initial))
 
-    # Run the preconditioned fixedpoint smoother
-    (corrected, conditional), _ = filter_util.estimate_fwd(
-        ys,
-        init=init,
-        prior_transitions=ibm_transitions,
-        observation_model=models,
-        estimator=estimator,
-    )
-    initial = impl.conditional.marginalise(corrected, conditional)
-    return tuple(impl.stats.mean(initial))
+    return starter
 
 
 def odejet_padded_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):

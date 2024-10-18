@@ -6,28 +6,23 @@ from probdiffeq.backend import ode, testing
 from probdiffeq.impl import impl
 
 
-@testing.case()
-def case_runge_kutta_starter():
-    if impl.impl_name != "isotropic":
-        testing.skip(reason="Runge-Kutta starters currently require isotropic SSMs.")
-    return taylor.runge_kutta_starter(dt=0.01)
-
-
-@testing.fixture(name="pb_with_solution")
-def fixture_pb_with_solution():
+@testing.parametrize("num", [1, 4])
+@testing.parametrize("fact", ["isotropic"])
+def test_initialised_correct_shape_and_values(num, fact):
     vf, (u0,), (t0, _) = ode.ivp_lotka_volterra()
 
-    solution = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-    return (vf, (u0,), t0), solution
+    solution = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=num)
 
+    tcoeffs = [np.ones((2,))] * (num + 1)
+    ssm = impl.choose(fact, tcoeffs_like=tcoeffs)
+    rk_starter = taylor.runge_kutta_starter(dt=0.01, ssm=ssm)
+    derivatives = rk_starter(lambda y, t: vf(y, t=t), (u0,), t=t0, num=num)
 
-@testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
-@testing.parametrize("num", [1, 4])
-def test_initialised_correct_shape_and_values(pb_with_solution, taylor_fun, num):
-    (f, init, t0), _solution = pb_with_solution
-    derivatives = taylor_fun(lambda y, t: f(y, t=t), init, t=t0, num=num)
-    assert len(derivatives) == len(init) + num
-    assert derivatives[0].shape == init[0].shape
-    for expected, received in zip(derivatives, _solution):
-        # demand at least ~10% accuracy to warn about the most obvious bugs
-        assert np.allclose(expected, received, rtol=1e-1), (expected, received)
+    assert len(derivatives) == len((u0,)) + num
+    assert derivatives[0].shape == u0.shape
+
+    for i, (expected, received) in enumerate(zip(derivatives, solution)):
+        # Don't compare the highest derivative because the RK starter can't do that
+        if i < len(expected):
+            # demand at least ~10% accuracy to warn about the most obvious bugs
+            assert np.allclose(expected, received, rtol=1e-1), (i, expected, received)
