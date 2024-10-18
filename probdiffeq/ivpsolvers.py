@@ -247,8 +247,8 @@ def _extra_impl_precon_smoother(prior: _MarkovProcess, ssm) -> _ExtraImpl:
         )
 
     def _extrapolate(state, extra, /, *, dt, output_scale):
-        begun = begin(state, extra, dt=dt)
-        return complete(*begun, output_scale=output_scale)
+        state, cache = begin(state, extra, dt=dt)
+        return complete(state, cache, output_scale=output_scale)
 
     def interpolate_at_t1(rv, extra, /):
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
@@ -289,7 +289,7 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess, *, ssm) -> _ExtraImpl:
     def extract(hidden_state, extra, /):
         return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
-    def complete(_rv, extra, /, output_scale):
+    def complete(_rv, extra, /, *, output_scale):
         cond, (p, p_inv), rv_p, bw0 = extra
 
         # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
@@ -344,10 +344,10 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess, *, ssm) -> _ExtraImpl:
         then don't understand why tests fail.)
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        extrapolated_t = _extrapolate(*state_t0, dt0, output_scale)
+        extrapolated_t = _extrapolate(*state_t0, dt=dt0, output_scale=output_scale)
         conditional_id = ssm.conditional.identity(prior.num_derivatives + 1)
         previous_new = (extrapolated_t[0], conditional_id)
-        extrapolated_t1 = _extrapolate(*previous_new, dt1, output_scale)
+        extrapolated_t1 = _extrapolate(*previous_new, dt=dt1, output_scale=output_scale)
 
         # Marginalise from t1 to t to obtain the interpolated solution.
         conditional_t1_to_t = extrapolated_t1[1]
@@ -360,7 +360,7 @@ def _extra_impl_precon_fixedpoint(prior: _MarkovProcess, *, ssm) -> _ExtraImpl:
             interp_from=previous_new,
         )
 
-    def _extrapolate(state, extra, /, dt, output_scale):
+    def _extrapolate(state, extra, /, *, dt, output_scale):
         begun = begin(state, extra, dt=dt)
         return complete(*begun, output_scale=output_scale)
 
