@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Parameter estimation with BlackJAX
+# # Estimating ODE parameters with BlackJAX
 #
 #
 # This tutorial explains how to estimate unknown parameters of

@@ -2,7 +2,7 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 from probdiffeq.backend import control_flow, functools, itertools, ode, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Array, Callable
+from probdiffeq.backend.typing import Array, Callable, Sequence
 from probdiffeq.util import filter_util
 
 
@@ -64,7 +64,7 @@ def runge_kutta_starter(dt, *, ssm, atol=1e-12, rtol=1e-10):
     return starter
 
 
-def odejet_padded_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_padded_scan(vf: Callable, inits: Sequence[Array], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `odejet_unroll()`, this function implements the loop via a scan,
@@ -113,7 +113,7 @@ def odejet_padded_scan(vf: Callable, inits: tuple[Array, ...], /, num: int):
     return taylor_coeffs
 
 
-def odejet_unroll(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `odejet_padded_scan()`, this function does not depend on zero-padding
@@ -168,7 +168,7 @@ def _subsets(x, /, n):
     return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
 
 
-def odejet_via_jvp(vf: Callable, inits: tuple[Array, ...], /, num: int):
+def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -197,9 +197,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree_util.Partial(df)
 
 
-def odejet_doubling_unroll(
-    vf: Callable, inits: tuple[Array, ...], /, num_doublings: int
-):
+def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doublings: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -277,7 +275,7 @@ def _unnormalise(primals, *series):
     return primals, *series_new
 
 
-def odejet_affine(vf: Callable, initial_values: tuple[Array, ...], /, num: int):
+def odejet_affine(vf: Callable, initial_values: Sequence[Array], /, num: int):
     """Evaluate the Taylor series of an affine differential equation.
 
     !!! warning "Compilation time"

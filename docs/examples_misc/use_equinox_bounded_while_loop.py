@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Use Equinox's reverse-mode differentiable while-loops
+# # Using Equinox's reverse-mode differentiable while-loops
 #
 # Use [Equinox's](https://docs.kidger.site/equinox/)
 # bounded while loop to enable reverse-mode differentiation of adaptive IVP solvers.

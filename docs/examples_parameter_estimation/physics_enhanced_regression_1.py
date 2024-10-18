@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Parameter estimation with Optax
+# # Estimating ODE parameters with Optax
 #
 # **Time-series data and optimization with ``optax``**
 #

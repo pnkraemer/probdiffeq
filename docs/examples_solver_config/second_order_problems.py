@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Simulate second-order systems
+# # Simulating second-order systems
 
 # +
 """Demonstrate how to solve second-order IVPs without transforming them first."""

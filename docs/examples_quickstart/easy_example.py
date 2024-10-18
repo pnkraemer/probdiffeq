@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # An easy example
+# # Getting started with ProbDiffEq
 #
 # Let's have a look at an easy example.
 
