@@ -2,10 +2,7 @@ format-and-lint:
 	pre-commit run --all-files
 
 test:
-	IMPL=dense pytest -n auto -v 		# parallelise, verbose output
-	IMPL=isotropic pytest -n auto -v 	# parallelise, verbose output
-	IMPL=blockdiag pytest -n auto -v 	# parallelise, verbose output
-	IMPL=scalar pytest -n auto -v 		# parallelise, verbose output
+	pytest -n auto -v 		# parallelise, verbose output
 
 example:
 	jupytext --quiet --to ipynb --update docs/examples*/*.py

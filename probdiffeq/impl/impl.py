@@ -34,11 +34,15 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
     ode_shape = tcoeffs_like[0].shape
     _, unravel = tree_util.ravel_pytree(tcoeffs_like)
 
+    num_derivatives = len(tcoeffs_like) - 1
+
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     normal = _normal.DenseNormal(ode_shape=ode_shape)
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape, unravel=unravel)
     stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
-    conditional = _conditional.DenseConditional(ode_shape=ode_shape)
+    conditional = _conditional.DenseConditional(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
     transform = _conditional.DenseTransform()
     return FactImpl(
         linearise=linearise,
@@ -52,6 +56,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
 
 def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     ode_shape = tcoeffs_like[0].shape
+    num_derivatives = len(tcoeffs_like) - 1
 
     tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
     _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
@@ -61,7 +66,9 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.IsotropicLinearisation()
-    conditional = _conditional.IsotropicConditional(ode_shape=ode_shape)
+    conditional = _conditional.IsotropicConditional(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
     transform = _conditional.IsotropicTransform()
     return FactImpl(
         prototypes=prototypes,
@@ -75,6 +82,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
 
 def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     ode_shape = tcoeffs_like[0].shape
+    num_derivatives = len(tcoeffs_like) - 1
 
     tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
     _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
@@ -84,7 +92,9 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.BlockDiagLinearisation()
-    conditional = _conditional.BlockDiagConditional(ode_shape=ode_shape)
+    conditional = _conditional.BlockDiagConditional(
+        ode_shape=ode_shape, num_derivatives=num_derivatives
+    )
     transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)
     return FactImpl(
         prototypes=prototypes,

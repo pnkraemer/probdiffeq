@@ -51,10 +51,13 @@ t0, t1 = 0.0, 1.0
 #
 
 # +
+
+# Set up a state-space model
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
-ts0 = ivpsolvers.correction_ts1(ode_order=1, ssm=ssm)
 
+# Build a solver
+ts0 = ivpsolvers.correction_ts1(ode_order=1, ssm=ssm)
 strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
 solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
 adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
@@ -74,16 +77,14 @@ adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
 # From here on, the rest is standard ODE-solver machinery:
 
 # +
+# Solve the ODE
 init = solver.initial_condition()
 dt0 = 0.1
 solution = ivpsolve.solve_adaptive_save_every_step(
     vf, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
 )
-# -
-
 
 # Look at the solution
-# +
-print("u =", solution.u, "\n")
-print("solution =", solution)
+print(f"u = {jax.tree.map(jnp.shape, solution.u)}")  # Taylor coefficients
+print(f"solution = {jax.tree.map(jnp.shape, solution)}")  # IVP solution
 # -
