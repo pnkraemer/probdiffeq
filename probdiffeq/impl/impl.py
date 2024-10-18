@@ -8,12 +8,18 @@ from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _sta
 class FactImpl:
     """Implementation of factorized state-space models."""
 
+    name: str
     prototypes: _prototypes.PrototypeBackend
     normal: _normal.NormalBackend
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
     transform: _conditional.TransformBackend
+
+    # To assert a valid tree_equal of solutions, the factorisations
+    # must be comparable.
+    def __eq__(self, other: "FactImpl"):
+        return self.name == other.name
 
 
 def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
@@ -45,6 +51,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
     )
     transform = _conditional.DenseTransform()
     return FactImpl(
+        name="dense",
         linearise=linearise,
         transform=transform,
         conditional=conditional,
@@ -71,6 +78,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     )
     transform = _conditional.IsotropicTransform()
     return FactImpl(
+        name="isotropic",
         prototypes=prototypes,
         normal=normal,
         stats=stats,
@@ -97,6 +105,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     )
     transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)
     return FactImpl(
+        name="blockdiag",
         prototypes=prototypes,
         normal=normal,
         stats=stats,

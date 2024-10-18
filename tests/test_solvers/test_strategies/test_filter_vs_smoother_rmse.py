@@ -6,18 +6,19 @@ from probdiffeq.backend import numpy as np
 
 
 @testing.fixture(name="solver_setup")
-def fixture_solver_setup():
+@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
+def fixture_solver_setup(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     grid = np.linspace(t0, t1, endpoint=True, num=12)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid}
+    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "fact": fact}
 
 
 @testing.fixture(name="filter_solution")
-def fixture_filter_solution(solver_setup, fact):
+def fixture_filter_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=solver_setup["fact"])
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
@@ -29,9 +30,9 @@ def fixture_filter_solution(solver_setup, fact):
 
 
 @testing.fixture(name="smoother_solution")
-def fixture_smoother_solution(solver_setup, fact):
+def fixture_smoother_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=solver_setup["fact"])
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
     solver = ivpsolvers.solver(strategy)
@@ -48,9 +49,8 @@ def fixture_reference_solution():
     return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
 
 
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def test_compare_filter_smoother_rmse(
-    filter_solution, smoother_solution, reference_solution, fact
+    filter_solution, smoother_solution, reference_solution
 ):
     assert np.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
