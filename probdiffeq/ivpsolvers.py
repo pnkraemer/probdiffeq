@@ -792,7 +792,7 @@ def _strategy(
     )
 
 
-def prior_ibm(tcoeffs, *, ssm_fact: str, output_scale=None) -> _MarkovProcess:
+def prior_ibm(tcoeffs, *, ssm_fact: str, output_scale=None):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
