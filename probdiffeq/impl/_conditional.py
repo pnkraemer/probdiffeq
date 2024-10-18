@@ -253,9 +253,10 @@ class ScalarConditional(ConditionalBackend):
 
 
 class DenseConditional(ConditionalBackend):
-    def __init__(self, ode_shape, num_derivatives):
+    def __init__(self, ode_shape, num_derivatives, unravel):
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
+        self.unravel = unravel
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
