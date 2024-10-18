@@ -19,7 +19,6 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.impl import impl
 from probdiffeq.util.doc_util import info
 
 
@@ -77,17 +76,16 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
 
     @jax.jit
     def param_to_solution(tol):
-        impl.select(implementation, ode_shape=(2,))
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-        output_scale = 1.0 * jnp.ones((2,)) if implementation == "blockdiag" else 1.0
-        ibm = ivpsolvers.prior_ibm(tcoeffs, output_scale)
-        strategy = ivpsolvers.strategy_filter(ibm, correction())
-        solver = ivpsolvers.solver_mle(strategy)
+
+        ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=implementation)
+        strategy = ivpsolvers.strategy_filter(ibm, correction(ssm=ssm), ssm=ssm)
+        solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
         control = ivpsolve.control_proportional_integral()
         adaptive_solver = ivpsolve.adaptive(
-            solver, atol=1e-2 * tol, rtol=tol, control=control
+            solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
         )
 
         # Initial state
@@ -96,11 +94,17 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0,))
         solution = ivpsolve.solve_adaptive_terminal_values(
-            vf_probdiffeq, init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver
+            vf_probdiffeq,
+            init,
+            t0=t0,
+            t1=t1,
+            dt0=dt0,
+            adaptive_solver=adaptive_solver,
+            ssm=ssm,
         )
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u)
+        return jax.block_until_ready(solution.u[0])
 
     return param_to_solution
 
