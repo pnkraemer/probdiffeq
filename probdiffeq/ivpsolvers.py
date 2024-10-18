@@ -516,35 +516,41 @@ def _correction_constraint_ode_taylor(
     )
 
 
-def correction_slr0(cubature_fun=cubature_third_order_spherical) -> _Correction:
+def correction_slr0(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
     """Zeroth-order statistical linear regression."""
-    linearise_fun = impl.linearise.ode_statistical_1st(cubature_fun)
+    linearise_fun = ssm.linearise.ode_statistical_1st(cubature_fun)
     return _correction_constraint_ode_statistical(
-        ode_order=1, linearise_fun=linearise_fun, name=f"<SLR1 with ode_order={1}>"
+        ssm=ssm,
+        ode_order=1,
+        linearise_fun=linearise_fun,
+        name=f"<SLR1 with ode_order={1}>",
     )
 
 
-def correction_slr1(cubature_fun=cubature_third_order_spherical) -> _Correction:
+def correction_slr1(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
     """First-order statistical linear regression."""
-    linearise_fun = impl.linearise.ode_statistical_0th(cubature_fun)
+    linearise_fun = ssm.linearise.ode_statistical_0th(cubature_fun)
     return _correction_constraint_ode_statistical(
-        ode_order=1, linearise_fun=linearise_fun, name=f"<SLR0 with ode_order={1}>"
+        ssm=ssm,
+        ode_order=1,
+        linearise_fun=linearise_fun,
+        name=f"<SLR0 with ode_order={1}>",
     )
 
 
 def _correction_constraint_ode_statistical(
-    ode_order, linearise_fun, name
+    ode_order, linearise_fun, name, *, ssm
 ) -> _Correction:
     def init(ssv, /):
-        obs_like = impl.prototypes.observed()
+        obs_like = ssm.prototypes.observed()
         return ssv, obs_like
 
     def estimate_error(hidden_state, _corr, /, vector_field, t):
         f_wrapped = functools.partial(vector_field, t=t)
         A, b = linearise_fun(f_wrapped, hidden_state)
-        observed = impl.conditional.marginalise(hidden_state, (A, b))
+        observed = ssm.conditional.marginalise(hidden_state, (A, b))
 
-        error_estimate = _estimate_error(observed)
+        error_estimate = _estimate_error(observed, ssm=ssm)
         return error_estimate, observed, (A, b, f_wrapped)
 
     def complete(hidden_state, corr, /):
@@ -553,7 +559,7 @@ def _correction_constraint_ode_statistical(
         A, b = linearise_fun(f_wrapped, hidden_state)
 
         # Condition
-        observed, (_gain, corrected) = impl.conditional.revert(hidden_state, (A, b))
+        observed, (_gain, corrected) = ssm.conditional.revert(hidden_state, (A, b))
         return corrected, observed
 
     def extract(hidden_state, _corr, /):
