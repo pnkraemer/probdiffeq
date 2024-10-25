@@ -24,10 +24,7 @@ class _Controller:
     clip: Callable[[Any, float, float], Any]
     """(Optionally) clip the current step to not exceed t1."""
 
-    apply: Callable[
-        [Any, NamedArg(float, "error_norm"), NamedArg(float, "error_contraction_rate")],
-        Any,
-    ]
+    apply: Callable[[Any, NamedArg(float, "error_power")], Any]
     r"""Propose a time-step $\Delta t$."""
 
     extract: Callable[[Any], float]
@@ -47,25 +44,27 @@ def control_proportional_integral(
 
     class PIState(containers.NamedTuple):
         dt: float
-        error_norm_previously_accepted: float
+        error_power_previously_accepted: float
 
     def init(dt: float, /) -> PIState:
         return PIState(dt, 1.0)
 
-    def apply(state: PIState, /, *, error_norm, error_contraction_rate) -> PIState:
-        dt_proposed, error_norm_prev = state
+    def apply(state: PIState, /, *, error_power) -> PIState:
+        dt_proposed, error_power_prev = state
+        # error_power = error_norm ** (-1.0 / error_contraction_rate)
 
-        x = error_norm ** (-1.0 / error_contraction_rate)
-        a1 = x**power_integral_unscaled
-        a2 = (x / error_norm_prev) ** power_proportional_unscaled
+        a1 = error_power**power_integral_unscaled
+        a2 = (error_power / error_power_prev) ** power_proportional_unscaled
         scale_factor_unclipped = safety * a1 * a2
 
         scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
         scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-        error_norm_prev = np.where(x >= 1.0, x, error_norm_prev)
+
+        # >= 1.0 because error_power is 1/scaled_error_norm
+        error_power_prev = np.where(error_power >= 1.0, error_power, error_power_prev)
 
         dt_proposed = scale_factor * dt_proposed
-        return PIState(dt_proposed, error_norm_prev)
+        return PIState(dt_proposed, error_power_prev)
 
     def extract(state: PIState, /) -> float:
         dt_proposed, _error_norm_previously_accepted = state
@@ -92,8 +91,8 @@ def control_integral(
     def init(dt, /):
         return dt
 
-    def apply(dt, /, *, error_norm, error_contraction_rate):
-        error_power = error_norm ** (-1.0 / error_contraction_rate)
+    def apply(dt, /, *, error_power):
+        # error_power = error_norm ** (-1.0 / error_contraction_rate)
         scale_factor_unclipped = safety * error_power
 
         scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
@@ -212,11 +211,8 @@ class _AdaSolver:
             error_norm = _normalise_error(error_estimate, u=u)
 
             # Propose a new step
-            state_control = self.control.apply(
-                state_control,
-                error_norm=error_norm,
-                error_contraction_rate=self.solver.error_contraction_rate,
-            )
+            error_power = error_norm ** (-1.0 / self.solver.error_contraction_rate)
+            state_control = self.control.apply(state_control, error_power=error_power)
             return _RejectionState(
                 error_norm_proposed=error_norm,  # new
                 proposed=state_proposed,  # new
