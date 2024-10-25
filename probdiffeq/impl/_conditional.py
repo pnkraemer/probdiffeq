@@ -238,9 +238,7 @@ class DenseConditional(ConditionalBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
 
         x = np.zeros(((self.num_derivatives + 1) * d,))
-        linop = _parametrised_linop(
-            lambda s, _p: self._autobatch_linop(a0)(s), inputs=x
-        )
+        linop = _jac_materialize(lambda s, _p: self._autobatch_linop(a0)(s), inputs=x)
         return Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
@@ -342,7 +340,7 @@ class IsotropicConditional(ConditionalBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
 
         m = np.zeros((self.num_derivatives + 1,))
-        linop = _parametrised_linop(lambda s, _p: A(s), inputs=m)
+        linop = _jac_materialize(lambda s, _p: A(s), inputs=m)
         return Conditional(linop, noise)
 
 
@@ -441,7 +439,7 @@ class BlockDiagConditional(ConditionalBackend):
 
         @functools.vmap
         def lo(y):
-            return _parametrised_linop(lambda s, _p: A(s), inputs=y)
+            return _jac_materialize(lambda s, _p: A(s), inputs=y)
 
         x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
         linop = lo(x)
@@ -498,5 +496,5 @@ def _binom(n, k):
     return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
 
 
-def _parametrised_linop(func, /, *, inputs, params=None):
+def _jac_materialize(func, /, *, inputs, params=None):
     return functools.jacrev(lambda v: func(v, params))(inputs)

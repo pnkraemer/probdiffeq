@@ -37,7 +37,7 @@ class DenseLinearisation(LinearisationBackend):
                 raise ValueError(msg)
 
             fx = self.ts0(fun, a0(mean))
-            linop = _parametrised_linop(
+            linop = _jac_materialize(
                 lambda v, _p: self._autobatch_linop(a1)(v), inputs=mean
             )
             return linop, -fx
@@ -61,7 +61,7 @@ class DenseLinearisation(LinearisationBackend):
                 x0 = a0(x)
                 return x1 - jvp(x0)
 
-            linop = _parametrised_linop(lambda v, _p: A(v), inputs=mean)
+            linop = _jac_materialize(lambda v, _p: A(v), inputs=mean)
             return linop, -fx
 
         return new
@@ -90,7 +90,7 @@ class DenseLinearisation(LinearisationBackend):
             def A(x):
                 return a1(x) - J @ a0(x)
 
-            linop = _parametrised_linop(lambda v, _p: A(v), inputs=rv.mean)
+            linop = _jac_materialize(lambda v, _p: A(v), inputs=rv.mean)
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
@@ -120,7 +120,7 @@ class DenseLinearisation(LinearisationBackend):
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            linop = _parametrised_linop(lambda v, _p: a1(v), inputs=rv.mean)
+            linop = _jac_materialize(lambda v, _p: a1(v), inputs=rv.mean)
             return linop, bias
 
         return new
@@ -201,7 +201,7 @@ class IsotropicLinearisation(LinearisationBackend):
     def ode_taylor_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             fx = self.ts0(fun, mean[:ode_order, ...])
-            linop = _parametrised_linop(
+            linop = _jac_materialize(
                 lambda s, _p: s[[ode_order], ...], inputs=mean[:, 0]
             )
             return linop, -fx
@@ -230,7 +230,7 @@ class BlockDiagLinearisation(LinearisationBackend):
 
             @functools.vmap
             def lo(s):
-                return _parametrised_linop(lambda v, _p: a1(v), inputs=s)
+                return _jac_materialize(lambda v, _p: a1(v), inputs=s)
 
             linop = lo(mean)
             return linop, -fx[:, None]
@@ -251,5 +251,5 @@ class BlockDiagLinearisation(LinearisationBackend):
         return fn(m)
 
 
-def _parametrised_linop(func, /, *, inputs, params=None):
+def _jac_materialize(func, /, *, inputs, params=None):
     return functools.jacrev(lambda v: func(v, params))(inputs)
