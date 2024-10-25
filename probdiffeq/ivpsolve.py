@@ -11,7 +11,7 @@ from probdiffeq.backend import (
     warnings,
 )
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Callable
+from probdiffeq.backend.typing import Any, Callable, NamedArg
 
 
 @containers.dataclass
@@ -24,7 +24,10 @@ class _Controller:
     clip: Callable[[Any, float, float], Any]
     """(Optionally) clip the current step to not exceed t1."""
 
-    apply: Callable[[Any, float, float], Any]
+    apply: Callable[
+        [Any, NamedArg(float, "error_norm"), NamedArg(float, "error_contraction_rate")],
+        Any,
+    ]
     r"""Propose a time-step $\Delta t$."""
 
     extract: Callable[[Any], float]
@@ -49,7 +52,7 @@ def control_proportional_integral(
     def init(dt: float, /) -> PIState:
         return PIState(dt, 1.0)
 
-    def apply(state: PIState, /, error_norm, error_contraction_rate) -> PIState:
+    def apply(state: PIState, /, *, error_norm, error_contraction_rate) -> PIState:
         dt_proposed, error_norm_prev = state
 
         # Construct the proportional-integral scale
@@ -92,7 +95,7 @@ def control_integral(
     def init(dt, /):
         return dt
 
-    def apply(dt, /, error_norm, error_contraction_rate):
+    def apply(dt, /, *, error_norm, error_contraction_rate):
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         scale_factor_unclipped = safety * error_power
 
