@@ -37,9 +37,8 @@ class DenseLinearisation(LinearisationBackend):
                 raise ValueError(msg)
 
             fx = self.ts0(fun, a0(mean))
-
             linop = linop_util.parametrised_linop(
-                lambda v, _p: self._autobatch_linop(a1)(v)
+                lambda v, _p: self._autobatch_linop(a1)(v), inputs=mean
             )
             return linop, -fx
 
@@ -62,7 +61,7 @@ class DenseLinearisation(LinearisationBackend):
                 x0 = a0(x)
                 return x1 - jvp(x0)
 
-            linop = linop_util.parametrised_linop(lambda v, _p: A(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: A(v), inputs=mean)
             return linop, -fx
 
         return new
@@ -91,7 +90,7 @@ class DenseLinearisation(LinearisationBackend):
             def A(x):
                 return a1(x) - J @ a0(x)
 
-            linop = linop_util.parametrised_linop(lambda v, _p: A(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: A(v), inputs=rv.mean)
 
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
@@ -121,7 +120,7 @@ class DenseLinearisation(LinearisationBackend):
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
             bias = _normal.Normal(-mean, cov_lower)
-            linop = linop_util.parametrised_linop(lambda v, _p: a1(v))
+            linop = linop_util.parametrised_linop(lambda v, _p: a1(v), inputs=rv.mean)
             return linop, bias
 
         return new
@@ -202,7 +201,9 @@ class IsotropicLinearisation(LinearisationBackend):
     def ode_taylor_0th(self, ode_order):
         def linearise_fun_wrapped(fun, mean):
             fx = self.ts0(fun, mean[:ode_order, ...])
-            linop = linop_util.parametrised_linop(lambda s, _p: s[[ode_order], ...])
+            linop = linop_util.parametrised_linop(
+                lambda s, _p: s[[ode_order], ...], inputs=mean[:, 0]
+            )
             return linop, -fx
 
         return linearise_fun_wrapped
@@ -225,9 +226,14 @@ class BlockDiagLinearisation(LinearisationBackend):
             fx = self.ts0(fun, m0.T)
 
             def a1(s):
-                return s[:, [ode_order], ...]
+                return s[[ode_order], ...]
 
-            return linop_util.parametrised_linop(lambda v, _p: a1(v)), -fx[:, None]
+            @functools.vmap
+            def lo(s):
+                return linop_util.parametrised_linop(lambda v, _p: a1(v), inputs=s)
+
+            linop = lo(mean)
+            return linop, -fx[:, None]
 
         return linearise_fun_wrapped
 
