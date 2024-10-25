@@ -58,6 +58,7 @@ doc = [
     "mkdocstrings-python",
     "mkdocstrings",
     "mkdocs-jupyter",
+    "mypy_extensions",
 ]
 
 
