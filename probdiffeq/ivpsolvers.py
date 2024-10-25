@@ -435,7 +435,7 @@ class _Correction(eqx.Module):
         """Initialise the state from the solution."""
         raise NotImplementedError
 
-    def estimate_error(self, x, cache, /, vector_field, t):
+    def estimate_error(self, x, /, vector_field, t):
         """Perform all elements of the correction until the error estimate."""
         raise NotImplementedError
 
@@ -443,7 +443,7 @@ class _Correction(eqx.Module):
         """Complete what has been left out by `estimate_error`."""
         raise NotImplementedError
 
-    def extract(self, x, cache, /):
+    def extract(self, x, /):
         """Extract the solution from the state."""
         raise NotImplementedError
 
@@ -453,9 +453,7 @@ class _CorrectionTaylor(_Correction):
         y = self.ssm.prototypes.observed()
         return x, y
 
-    def estimate_error(self, x, cache, /, vector_field, t):
-        del cache
-
+    def estimate_error(self, x, /, vector_field, t):
         def f_wrapped(s):
             return vector_field(*s, t=t)
 
@@ -470,8 +468,7 @@ class _CorrectionTaylor(_Correction):
         observed, (_gain, corrected) = self.ssm.transform.revert(x, (A, b))
         return corrected, observed
 
-    def extract(self, x, cache, /):
-        del cache
+    def extract(self, x, /):
         return x
 
 
@@ -480,8 +477,7 @@ class _CorrectionSLR(_Correction):
         y = self.ssm.prototypes.observed()
         return x, y
 
-    def estimate_error(self, x, cache, /, vector_field, t):
-        del cache
+    def estimate_error(self, x, /, vector_field, t):
         f_wrapped = functools.partial(vector_field, t=t)
         A, b = self.linearize(f_wrapped, x)
         observed = self.ssm.conditional.marginalise(x, (A, b))
@@ -498,8 +494,7 @@ class _CorrectionSLR(_Correction):
         observed, (_gain, corrected) = self.ssm.conditional.revert(x, (A, b))
         return corrected, observed
 
-    def extract(self, x, cache, /):
-        del cache
+    def extract(self, x, /):
         return x
 
 
@@ -651,7 +646,7 @@ def _strategy(
         hidden, extra = extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         t = state.t + dt
         error, observed, corr = correction.estimate_error(
-            hidden, state.aux_corr, vector_field=vector_field, t=t
+            hidden, vector_field=vector_field, t=t
         )
         state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
@@ -664,7 +659,7 @@ def _strategy(
         return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
     def extract(state: _StrategyState, /):
-        hidden = correction.extract(state.hidden, state.aux_corr)
+        hidden = correction.extract(state.hidden)
         sol = extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
