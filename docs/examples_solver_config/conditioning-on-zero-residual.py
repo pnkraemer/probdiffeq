@@ -132,11 +132,6 @@ mean_style = {
 }
 
 
-def log_residual(*args):
-    """Evaluate the log-ODE-residual."""
-    return jnp.log10(jnp.abs(residual(*args)))
-
-
 def residual(x, t):
     """Evaluate the ODE residual."""
     return x[1] - jax.vmap(jax.vmap(vector_field), in_axes=(0, None))(x[0], t)

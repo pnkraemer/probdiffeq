@@ -47,3 +47,6 @@ doc:
 	make example
 	make benchmarks-plot-results
 	JUPYTER_PLATFORM_DIRS=1 mkdocs build
+
+find-dead-code:
+	vulture . --ignore-names case*,fixture*,*jvp --exclude probdiffeq/_version.py

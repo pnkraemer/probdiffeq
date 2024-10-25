@@ -7,8 +7,6 @@ from probdiffeq.backend import containers, control_flow, tree_util
 from probdiffeq.backend.typing import Any
 
 
-# TODO: fixedpointsmoother and kalmanfilter should be estimate()
-#  with two different methods. This saves a lot of code.
 def estimate_fwd(data, /, init, prior_transitions, observation_model, *, estimator):
     """Estimate forward-in-time."""
     initialise, step = estimator
@@ -91,7 +89,7 @@ def kalmanfilter_with_marginal_likelihood(*, ssm):
         observed, conditional = ssm.conditional.revert(rv, model)
         corrected = ssm.conditional.apply(data, conditional)
         logpdf = ssm.stats.logpdf(data, observed)
-        return _KFState(corrected, 1.0, logpdf)
+        return _KFState(corrected, num_data_points=0.0, logpdf=logpdf)
 
     def _step(state: _KFState, cond_and_data_and_obs) -> tuple[_KFState, _KFState]:
         conditional, data, observation = cond_and_data_and_obs
@@ -105,7 +103,7 @@ def kalmanfilter_with_marginal_likelihood(*, ssm):
         # Update logpdf
         logpdf_new = ssm.stats.logpdf(data, observed)
         logpdf_mean = (logpdf * num_data + logpdf_new) / (num_data + 1)
-        state = _KFState(corrected, num_data + 1.0, logpdf_mean)
+        state = _KFState(corrected, num_data_points=num_data + 1.0, logpdf=logpdf_mean)
 
         # Scan-compatible output
         return state, state

@@ -49,23 +49,6 @@ def odeint_dense(vf, y0: tuple, /, t0, t1, *, atol, rtol):
     return solution
 
 
-def ivp_logistic():
-    # Local imports because diffeqzoo is not an official dependency
-    from diffeqzoo import backend, ivps
-
-    if not backend.has_been_selected:
-        backend.select("jax")
-
-    f, u0, (t0, _), f_args = ivps.logistic()
-    t1 = 0.75
-
-    @jax.jit
-    def vf(x, *, t):  # noqa: ARG001
-        return f(x, *f_args)
-
-    return vf, (u0,), (t0, t1)
-
-
 def ivp_lotka_volterra():
     # Local imports because diffeqzoo is not an official dependency
     from diffeqzoo import backend, ivps
@@ -81,34 +64,6 @@ def ivp_lotka_volterra():
         return f(x, *f_args)
 
     return vf, (u0,), (t0, t1)
-
-
-def ivp_affine_multi_dimensional():
-    t0, t1 = 0.0, 2.0
-    u0 = jnp.ones((2,))
-
-    @jax.jit
-    def vf(x, *, t):  # noqa: ARG001
-        return 2 * x
-
-    def solution(t):
-        return jnp.exp(2 * t) * jnp.ones((2,))
-
-    return vf, (u0,), (t0, t1), solution
-
-
-def ivp_affine_scalar():
-    t0, t1 = 0.0, 2.0
-    u0 = 1.0
-
-    @jax.jit
-    def vf(x, *, t):  # noqa: ARG001
-        return 2 * x
-
-    def solution(t):
-        return jnp.exp(2 * t)
-
-    return vf, (u0,), (t0, t1), solution
 
 
 def ivp_three_body_1st():
