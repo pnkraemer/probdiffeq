@@ -55,18 +55,16 @@ def control_proportional_integral(
     def apply(state: PIState, /, *, error_norm, error_contraction_rate) -> PIState:
         dt_proposed, error_norm_prev = state
 
-        # Construct the proportional-integral scale
-        error_power = error_norm ** (1.0 / error_contraction_rate)
-        a1 = (1.0 / error_power) ** power_integral_unscaled
-        a2 = (error_norm_prev / error_power) ** power_proportional_unscaled
+        x = error_norm ** (-1 / error_contraction_rate)
+        x_prev = error_norm_prev ** (-1.0 / error_contraction_rate)
+        a1 = x**power_integral_unscaled
+        a2 = (x / x_prev) ** power_proportional_unscaled
         scale_factor_unclipped = safety * a1 * a2
 
-        # Clip to limit maximal changes
         scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
         scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
         error_norm_prev = np.where(error_norm <= 1.0, error_norm, error_norm_prev)
 
-        # Apply the control
         dt_proposed = scale_factor * dt_proposed
         return PIState(dt_proposed, error_norm_prev)
 

@@ -35,6 +35,7 @@ test =[
     "diffeqzoo",
     "diffrax",
     "equinox",
+    "mypy_extensions",
 ]
 format-and-lint =[
     "pre-commit",
