@@ -448,7 +448,7 @@ class _Correction(eqx.Module):
         raise NotImplementedError
 
 
-class _CorrectionTaylor(_Correction):
+class _CorrectionTS(_Correction):
     def init(self, x, /):
         y = self.ssm.prototypes.observed()
         return x, y
@@ -501,17 +501,13 @@ class _CorrectionSLR(_Correction):
 def correction_ts0(*, ssm, ode_order=1) -> _Correction:
     """Zeroth-order Taylor linearisation."""
     linearize = ssm.linearise.ode_taylor_0th(ode_order=ode_order)
-    return _CorrectionTaylor(
-        name="TS0", ode_order=ode_order, ssm=ssm, linearize=linearize
-    )
+    return _CorrectionTS(name="TS0", ode_order=ode_order, ssm=ssm, linearize=linearize)
 
 
 def correction_ts1(*, ssm, ode_order=1) -> _Correction:
     """First-order Taylor linearisation."""
     linearize = ssm.linearise.ode_taylor_1st(ode_order=ode_order)
-    return _CorrectionTaylor(
-        name="TS1", ode_order=ode_order, ssm=ssm, linearize=linearize
-    )
+    return _CorrectionTS(name="TS1", ode_order=ode_order, ssm=ssm, linearize=linearize)
 
 
 def correction_slr0(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
