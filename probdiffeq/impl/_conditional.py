@@ -4,7 +4,7 @@ from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util, linop_util
+from probdiffeq.util import cholesky_util
 
 
 class TransformBackend(abc.ABC):
@@ -238,7 +238,7 @@ class DenseConditional(ConditionalBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
 
         x = np.zeros(((self.num_derivatives + 1) * d,))
-        linop = linop_util.parametrised_linop(
+        linop = _parametrised_linop(
             lambda s, _p: self._autobatch_linop(a0)(s), inputs=x
         )
         return Conditional(linop, noise)
@@ -342,7 +342,7 @@ class IsotropicConditional(ConditionalBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
 
         m = np.zeros((self.num_derivatives + 1,))
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s), inputs=m)
+        linop = _parametrised_linop(lambda s, _p: A(s), inputs=m)
         return Conditional(linop, noise)
 
 
@@ -441,7 +441,7 @@ class BlockDiagConditional(ConditionalBackend):
 
         @functools.vmap
         def lo(y):
-            return linop_util.parametrised_linop(lambda s, _p: A(s), inputs=y)
+            return _parametrised_linop(lambda s, _p: A(s), inputs=y)
 
         x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
         linop = lo(x)
@@ -496,3 +496,7 @@ def _batch_gram(k, /):
 
 def _binom(n, k):
     return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
+
+
+def _parametrised_linop(func, /, *, inputs, params=None):
+    return functools.jacrev(lambda v: func(v, params))(inputs)
