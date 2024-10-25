@@ -807,6 +807,10 @@ class _ProbabilisticSolver:
     requires_rescaling: bool
 
     @property
+    def offgrid_marginals(self):
+        return self.strategy.offgrid_marginals
+
+    @property
     def error_contraction_rate(self):
         return self.strategy.num_derivatives + 1
 
