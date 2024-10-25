@@ -1,7 +1,5 @@
 """Probabilistic IVP solvers."""
 
-import equinox as eqx
-
 from probdiffeq import stats
 from probdiffeq.backend import containers, functools, special, tree_util
 from probdiffeq.backend import numpy as np
@@ -423,7 +421,8 @@ class _ExtraImplFixedPoint(_ExtraImpl):
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
-class _Correction(eqx.Module):
+@containers.dataclass
+class _Correction:
     """Correction model interface."""
 
     name: str
@@ -448,6 +447,7 @@ class _Correction(eqx.Module):
         raise NotImplementedError
 
 
+@containers.dataclass
 class _CorrectionTS(_Correction):
     def init(self, x, /):
         y = self.ssm.prototypes.observed()
@@ -472,6 +472,7 @@ class _CorrectionTS(_Correction):
         return x
 
 
+@containers.dataclass
 class _CorrectionSLR(_Correction):
     def init(self, x, /):
         y = self.ssm.prototypes.observed()
