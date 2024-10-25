@@ -50,8 +50,8 @@ def control_proportional_integral(
         return PIState(dt, 1.0)
 
     def apply(state: PIState, /, *, error_power) -> PIState:
-        dt_proposed, error_power_prev = state
         # error_power = error_norm ** (-1.0 / error_contraction_rate)
+        dt_proposed, error_power_prev = state
 
         a1 = error_power**power_integral_unscaled
         a2 = (error_power / error_power_prev) ** power_proportional_unscaled
@@ -176,16 +176,17 @@ class _AdaSolver:
             def _inf_like(tree):
                 return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
 
-            larger_than_1 = 1.1
+            smaller_than_1 = 1.0 / 1.1  # the cond() must return True
             return _RejectionState(
-                error_norm_proposed=larger_than_1,
+                error_norm_proposed=smaller_than_1,
                 control=s0.control,
                 proposed=_inf_like(s0.step_from),
                 step_from=s0.step_from,
             )
 
         def cond_fn(state: _RejectionState) -> bool:
-            return state.error_norm_proposed > 1.0
+            # error_norm_proposed is EEst ** (-1/rate), thus "<"
+            return state.error_norm_proposed < 1.0
 
         def body_fn(state: _RejectionState) -> _RejectionState:
             """Attempt a step.
@@ -208,13 +209,12 @@ class _AdaSolver:
             u_proposed = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
             u_step_from = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
-            error_norm = _normalise_error(error_estimate, u=u)
+            error_power = _normalise_error(error_estimate, u=u)
 
             # Propose a new step
-            error_power = error_norm ** (-1.0 / self.solver.error_contraction_rate)
             state_control = self.control.apply(state_control, error_power=error_power)
             return _RejectionState(
-                error_norm_proposed=error_norm,  # new
+                error_norm_proposed=error_power,  # new
                 proposed=state_proposed,  # new
                 control=state_control,  # new
                 step_from=state.step_from,
@@ -224,7 +224,8 @@ class _AdaSolver:
             error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
             dim = np.atleast_1d(u).size
             error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
-            return error_norm / np.sqrt(dim)
+            error_norm_rel = error_norm / np.sqrt(dim)
+            return error_norm_rel ** (-1.0 / self.solver.error_contraction_rate)
 
         def extract(s: _RejectionState) -> _AdaState:
             num_steps = state0.stats + 1
