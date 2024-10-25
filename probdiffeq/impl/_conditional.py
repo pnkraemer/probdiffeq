@@ -4,7 +4,7 @@ from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util, linop_util
+from probdiffeq.util import cholesky_util
 
 
 class TransformBackend(abc.ABC):
@@ -80,7 +80,8 @@ class BlockDiagTransform(TransformBackend):
 
         A_cholesky = A @ cholesky
         cholesky = functools.vmap(cholesky_util.triu_via_qr)(_transpose(A_cholesky))
-        mean = A @ mean + b
+
+        mean = functools.vmap(lambda x, y, z: x @ y + z)(A, mean, b)
         return _normal.Normal(mean, cholesky)
 
     def revert(self, rv, transformation, /):
@@ -94,7 +95,7 @@ class BlockDiagTransform(TransformBackend):
         cholesky_cor = _transpose(r_cor)
 
         # Gather terms and return
-        mean_observed = (A @ rv.mean) + bias
+        mean_observed = functools.vmap(lambda x, y, z: x @ y + z)(A, rv.mean, bias)
         m_cor = rv.mean - (gain * (mean_observed[..., None]))[..., 0]
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
@@ -143,82 +144,6 @@ class ConditionalBackend(abc.ABC):
     @abc.abstractmethod
     def to_derivative(self, i, standard_deviation):
         raise NotImplementedError
-
-
-class ScalarConditional(ConditionalBackend):
-    def marginalise(self, rv, conditional, /):
-        matrix, noise = conditional
-
-        mean = matrix @ rv.mean + noise.mean
-        R_stack = ((matrix @ rv.cholesky).T, noise.cholesky.T)
-        cholesky_T = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack)
-        return _normal.Normal(mean, cholesky_T.T)
-
-    def revert(self, rv, conditional, /):
-        matrix, noise = conditional
-
-        r_ext, (r_bw_p, g_bw_p) = cholesky_util.revert_conditional(
-            R_X_F=(matrix @ rv.cholesky).T, R_X=rv.cholesky.T, R_YX=noise.cholesky.T
-        )
-        m_ext = matrix @ rv.mean + noise.mean
-        m_cond = rv.mean - g_bw_p @ m_ext
-
-        marginal = _normal.Normal(m_ext, r_ext.T)
-        noise = _normal.Normal(m_cond, r_bw_p.T)
-        return marginal, Conditional(g_bw_p, noise)
-
-    def apply(self, x, conditional, /):
-        matrix, noise = conditional
-        matrix = np.squeeze(matrix)
-        return _normal.Normal(linalg.vector_dot(matrix, x) + noise.mean, noise.cholesky)
-
-    def merge(self, previous, incoming, /):
-        A, b = previous
-        C, d = incoming
-
-        g = A @ C
-        xi = A @ d.mean + b.mean
-        R_stack = ((A @ d.cholesky).T, b.cholesky.T)
-        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-
-        noise = _normal.Normal(xi, Xi)
-        return Conditional(g, noise)
-
-    def identity(self, ndim, /) -> Conditional:
-        transition = np.eye(ndim)
-        mean = np.zeros((ndim,))
-        cov_sqrtm = np.zeros((ndim, ndim))
-        noise = _normal.Normal(mean, cov_sqrtm)
-        return Conditional(transition, noise)
-
-    def ibm_transitions(self, num_derivatives, output_scale=1.0):
-        a, q_sqrtm = system_matrices_1d(num_derivatives, output_scale)
-        q0 = np.zeros((num_derivatives + 1,))
-        noise = _normal.Normal(q0, q_sqrtm)
-
-        precon_fun = preconditioner_prepare(num_derivatives=num_derivatives)
-
-        def discretise(dt):
-            p, p_inv = precon_fun(dt)
-            return Conditional(a, noise), (p, p_inv)
-
-        return discretise
-
-    def preconditioner_apply(self, cond, p, p_inv, /):
-        A, noise = cond
-        A = p[:, None] * A * p_inv[None, :]
-        noise = _normal.Normal(p * noise.mean, p[:, None] * noise.cholesky)
-        return Conditional(A, noise)
-
-    def to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[[i], ...]
-
-        bias = np.zeros(())
-        eye = np.eye(1)
-        noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
-        return Conditional(linop, noise)
 
 
 class DenseConditional(ConditionalBackend):
@@ -311,9 +236,9 @@ class DenseConditional(ConditionalBackend):
         bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(
-            lambda s, _p: self._autobatch_linop(a0)(s)
-        )
+
+        x = np.zeros(((self.num_derivatives + 1) * d,))
+        linop = _jac_materialize(lambda s, _p: self._autobatch_linop(a0)(s), inputs=x)
         return Conditional(linop, noise)
 
     def _select(self, x, /, idx_or_slice):
@@ -413,7 +338,9 @@ class IsotropicConditional(ConditionalBackend):
         bias = np.zeros(self.ode_shape)
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+
+        m = np.zeros((self.num_derivatives + 1,))
+        linop = _jac_materialize(lambda s, _p: A(s), inputs=m)
         return Conditional(linop, noise)
 
 
@@ -508,12 +435,19 @@ class BlockDiagConditional(ConditionalBackend):
 
     def to_derivative(self, i, standard_deviation):
         def A(x):
-            return x[:, [i], ...]
+            return x[[i], ...]
+
+        @functools.vmap
+        def lo(y):
+            return _jac_materialize(lambda s, _p: A(s), inputs=y)
+
+        x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
+        linop = lo(x)
 
         bias = np.zeros((*self.ode_shape, 1))
         eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = linop_util.parametrised_linop(lambda s, _p: A(s))
+
         return Conditional(linop, noise)
 
 
@@ -560,3 +494,7 @@ def _batch_gram(k, /):
 
 def _binom(n, k):
     return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
+
+
+def _jac_materialize(func, /, *, inputs, params=None):
+    return functools.jacrev(lambda v: func(v, params))(inputs)
