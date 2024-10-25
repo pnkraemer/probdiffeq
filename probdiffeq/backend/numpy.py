@@ -44,10 +44,6 @@ def diff(arr, /):
     return jnp.diff(arr)
 
 
-def diff_along_axis(arr, /, *, axis):
-    return jnp.diff(arr, axis=axis)
-
-
 def reshape(arr, /, new_shape, order="C"):
     return jnp.reshape(arr, new_shape, order=order)
 
