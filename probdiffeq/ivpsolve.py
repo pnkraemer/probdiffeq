@@ -199,7 +199,6 @@ class _AdaSolver:
             state_control = self.control.clip(state.control, t=state.step_from.t, t1=t1)
 
             # Perform the actual step.
-            # todo: error estimate should be a tuple (abs, rel)
             error_estimate, state_proposed = self.solver.step(
                 state=state.step_from,
                 vector_field=vector_field,
@@ -209,7 +208,7 @@ class _AdaSolver:
             u_proposed = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
             u_step_from = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
-            error_power = _normalise_error(error_estimate, u=u)
+            error_power = _error_scale_and_normalize(error_estimate, u=u)
 
             # Propose a new step
             state_control = self.control.apply(state_control, error_power=error_power)
@@ -220,7 +219,7 @@ class _AdaSolver:
                 step_from=state.step_from,
             )
 
-        def _normalise_error(error_estimate, *, u):
+        def _error_scale_and_normalize(error_estimate, *, u):
             error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
             dim = np.atleast_1d(u).size
             error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
