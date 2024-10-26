@@ -696,16 +696,16 @@ class _Strategy:
 
 def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
     """Construct a smoother."""
-    extrapolation = _ExtraImplSmoother(prior=prior, name="Smoother", ssm=ssm)
-    strategy = _Strategy(
-        extrapolation=extrapolation,
+    extrapolation = _ExtraImplSmoother(
         prior=prior,
+        name="Smoother",
         ssm=ssm,
         is_suitable_for_save_at=False,
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
     )
-    return strategy, correction
+    strategy = _Strategy()
+    return strategy, correction, extrapolation, prior
 
 
 def strategy_fixedpoint(prior, correction: _Correction, /, ssm) -> _Strategy:
