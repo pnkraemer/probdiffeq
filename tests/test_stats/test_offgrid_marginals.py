@@ -13,8 +13,8 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     tcoeffs = (u0, vf(u0, t=t0))
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     init = solver.initial_condition()
     grid = np.linspace(t0, t1, endpoint=True, num=5)
@@ -37,8 +37,8 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     init = solver.initial_condition()
     grid = np.linspace(t0, t1, endpoint=True, num=5)
