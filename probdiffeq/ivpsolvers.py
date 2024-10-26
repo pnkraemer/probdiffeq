@@ -573,7 +573,6 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    extrapolation: _ExtraImpl
     ssm: Any
 
     is_suitable_for_offgrid_marginals: int
@@ -583,19 +582,21 @@ class _Strategy:
     def num_derivatives(self):
         return self.prior.num_derivatives
 
-    def init(self, t, posterior, /, correction) -> _StrategyState:
+    def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
         """Initialise a state from a posterior."""
-        rv, extra = self.extrapolation.init(posterior)
+        rv, extra = extrapolation.init(posterior)
         rv, corr = correction.init(rv)
         return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def initial_condition(self):
+    def initial_condition(self, *, extrapolation):
         """Construct an initial condition from a set of Taylor coefficients."""
-        return self.extrapolation.initial_condition()
+        return extrapolation.initial_condition()
 
-    def begin(self, state: _StrategyState, /, *, dt, vector_field, correction):
+    def begin(
+        self, state: _StrategyState, /, *, dt, vector_field, extrapolation, correction
+    ):
         """Predict the error of an upcoming step."""
-        hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
+        hidden, extra = extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
         t = state.t + dt
         error, observed, corr = correction.estimate_error(
             hidden, vector_field=vector_field, t=t
@@ -603,23 +604,25 @@ class _Strategy:
         state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
         return error, observed, state
 
-    def complete(self, state, /, *, output_scale, correction):
+    def complete(self, state, /, *, output_scale, extrapolation, correction):
         """Complete the step after the error has been predicted."""
-        hidden, extra = self.extrapolation.complete(
+        hidden, extra = extrapolation.complete(
             state.hidden, state.aux_extra, output_scale=output_scale
         )
         hidden, corr = correction.complete(hidden, state.aux_corr)
         return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
 
-    def extract(self, state: _StrategyState, /, *, correction):
+    def extract(self, state: _StrategyState, /, *, extrapolation, correction):
         """Extract the solution from a state."""
         hidden = correction.extract(state.hidden)
-        sol = self.extrapolation.extract(hidden, state.aux_extra)
+        sol = extrapolation.extract(hidden, state.aux_extra)
         return state.t, sol
 
-    def case_interpolate_at_t1(self, state_t1: _StrategyState) -> _InterpRes:
+    def case_interpolate_at_t1(
+        self, state_t1: _StrategyState, *, extrapolation
+    ) -> _InterpRes:
         """Process the solution in case t=t_n."""
-        _tmp = self.extrapolation.interpolate_at_t1(state_t1.hidden, state_t1.aux_extra)
+        _tmp = extrapolation.interpolate_at_t1(state_t1.hidden, state_t1.aux_extra)
         step_from, solution, interp_from = (
             _tmp.step_from,
             _tmp.interpolated,
@@ -637,11 +640,11 @@ class _Strategy:
         return _InterpRes(step_from, solution, interp_from)
 
     def case_interpolate(
-        self, t, *, s0: _StrategyState, s1: _StrategyState, output_scale
+        self, t, *, s0: _StrategyState, s1: _StrategyState, output_scale, extrapolation
     ) -> _InterpRes:
         """Process the solution in case t>t_n."""
         # Interpolate
-        interp = self.extrapolation.interpolate(
+        interp = extrapolation.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
             marginal_t1=s1.hidden,
             dt0=t - s0.t,
@@ -663,7 +666,16 @@ class _Strategy:
         )
 
     def offgrid_marginals(
-        self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale, correction
+        self,
+        *,
+        t,
+        marginals_t1,
+        posterior_t0,
+        t0,
+        t1,
+        output_scale,
+        extrapolation,
+        correction,
     ):
         """Compute offgrid_marginals."""
         if not self.is_suitable_for_offgrid_marginals:
@@ -671,9 +683,11 @@ class _Strategy:
 
         dt0 = t - t0
         dt1 = t1 - t
-        state_t0 = self.init(t0, posterior_t0, correction=correction)
+        state_t0 = self.init(
+            t0, posterior_t0, extrapolation=extrapolation, correction=correction
+        )
 
-        interp = self.extrapolation.interpolate(
+        interp = extrapolation.interpolate(
             state_t0=(state_t0.hidden, state_t0.aux_extra),
             marginal_t1=marginals_t1,
             dt0=dt0,
@@ -725,12 +739,7 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=True,
     )
-    strategy = _Strategy(
-        prior=prior,
-        extrapolation=extrapolation,
-        is_suitable_for_offgrid_marginals=True,
-        ssm=ssm,
-    )
+    strategy = _Strategy(prior=prior, is_suitable_for_offgrid_marginals=True, ssm=ssm)
     return strategy, correction, extrapolation
 
 
@@ -768,7 +777,10 @@ class _ProbabilisticSolver:
 
     def offgrid_marginals(self, *args, **kwargs):
         return self.strategy.offgrid_marginals(
-            *args, **kwargs, correction=self.correction
+            *args,
+            **kwargs,
+            extrapolation=self.extrapolation,
+            correction=self.correction,
         )
 
     @property
@@ -785,7 +797,9 @@ class _ProbabilisticSolver:
 
     def init(self, t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
-        state_strategy = self.strategy.init(t, posterior, correction=self.correction)
+        state_strategy = self.strategy.init(
+            t, posterior, correction=self.correction, extrapolation=self.extrapolation
+        )
         calib_state = self.calibration.init(output_scale)
         return _SolverState(strategy=state_strategy, output_scale=calib_state)
 
@@ -795,7 +809,9 @@ class _ProbabilisticSolver:
         )
 
     def extract(self, state: _SolverState, /):
-        t, posterior = self.strategy.extract(state.strategy, correction=self.correction)
+        t, posterior = self.strategy.extract(
+            state.strategy, extrapolation=self.extrapolation, correction=self.correction
+        )
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
@@ -804,7 +820,11 @@ class _ProbabilisticSolver:
     ) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
         interp = self.strategy.case_interpolate(
-            t, s0=interp_from.strategy, s1=interp_to.strategy, output_scale=output_scale
+            t,
+            s0=interp_from.strategy,
+            s1=interp_to.strategy,
+            output_scale=output_scale,
+            extrapolation=self.extrapolation,
         )
         prev = _SolverState(interp.interp_from, output_scale=interp_from.output_scale)
         sol = _SolverState(interp.interpolated, output_scale=interp_to.output_scale)
@@ -812,7 +832,9 @@ class _ProbabilisticSolver:
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        x = self.strategy.case_interpolate_at_t1(interp_to.strategy)
+        x = self.strategy.case_interpolate_at_t1(
+            interp_to.strategy, extrapolation=self.extrapolation
+        )
 
         prev = _SolverState(x.interp_from, output_scale=interp_from.output_scale)
         sol = _SolverState(x.interpolated, output_scale=interp_to.output_scale)
@@ -821,7 +843,7 @@ class _ProbabilisticSolver:
 
     def initial_condition(self):
         """Construct an initial condition."""
-        posterior = self.strategy.initial_condition()
+        posterior = self.strategy.initial_condition(extrapolation=self.extrapolation)
         return posterior, self.strategy.prior.output_scale
 
 
@@ -836,11 +858,18 @@ def solver_mle(inputs, *, ssm):
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
         error, _, state_strategy = strategy.begin(
-            state.strategy, dt=dt, vector_field=vector_field, correction=correction
+            state.strategy,
+            dt=dt,
+            vector_field=vector_field,
+            extrapolation=extrapolation,
+            correction=correction,
         )
 
         state_strategy = strategy.complete(
-            state_strategy, output_scale=output_scale_prior, correction=correction
+            state_strategy,
+            output_scale=output_scale_prior,
+            extrapolation=extrapolation,
+            correction=correction,
         )
         observed = state_strategy.aux_corr
 
@@ -932,10 +961,17 @@ def solver(inputs, /):
         del calibration  # unused
 
         error, _observed, state_strategy = strategy.begin(
-            state.strategy, dt=dt, vector_field=vector_field, correction=correction
+            state.strategy,
+            dt=dt,
+            vector_field=vector_field,
+            extrapolation=extrapolation,
+            correction=correction,
         )
         state_strategy = strategy.complete(
-            state_strategy, output_scale=state.output_scale, correction=correction
+            state_strategy,
+            output_scale=state.output_scale,
+            extrapolation=extrapolation,
+            correction=correction,
         )
         # Extract and return solution
         state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
