@@ -577,7 +577,6 @@ def _estimate_error(observed, /, *, ssm):
 
 # TODO = (
 #     "Next up: "
-#     "Then slowly migrate the strategy-state attributes to the solver state. "
 #     "Then update the signature of strategy_* functions "
 #     "by removing correction, prior, and so on and fix all tests"
 #  )
@@ -840,9 +839,7 @@ def solver_dynamic(inputs, *, ssm):
     def step_dynamic(state, /, *, dt, vector_field, calibration):
         prior_discretized = prior.discretize(dt)
         hidden, extra = extrapolation.begin(
-            state.strategy.hidden,
-            state.strategy.aux_extra,
-            prior_discretized=prior_discretized,
+            state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
         error, observed, corr = correction.estimate_error(
