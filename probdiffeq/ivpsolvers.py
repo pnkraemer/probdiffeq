@@ -586,11 +586,12 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
-        """Initialise a state from a posterior."""
-        rv, extra = extrapolation.init(posterior)
-        rv, corr = correction.init(rv)
-        return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+    #
+    # def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
+    #     """Initialise a state from a posterior."""
+    #     rv, extra = extrapolation.init(posterior)
+    #     rv, corr = correction.init(rv)
+    #     return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
     def begin(
         self,
@@ -686,45 +687,6 @@ class _Strategy:
             step_from=step_from, interpolated=interpolated, interp_from=interp_from
         )
 
-    def offgrid_marginals(
-        self,
-        *,
-        t,
-        marginals_t1,
-        posterior_t0,
-        t0,
-        t1,
-        output_scale,
-        extrapolation,
-        correction,
-        prior,
-        ssm,
-        is_suitable_for_offgrid_marginals,
-    ):
-        """Compute offgrid_marginals."""
-        if not is_suitable_for_offgrid_marginals:
-            raise NotImplementedError
-
-        dt0 = t - t0
-        dt1 = t1 - t
-        state_t0 = self.init(
-            t0, posterior_t0, extrapolation=extrapolation, correction=correction
-        )
-
-        # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
-        interp = extrapolation.interpolate(
-            state_t0=(state_t0.hidden, state_t0.aux_extra),
-            marginal_t1=marginals_t1,
-            dt0=dt0,
-            dt1=dt1,
-            output_scale=output_scale,
-            prior=prior,
-        )
-
-        (marginals, _aux) = interp.interpolated
-        u = ssm.stats.qoi(marginals)
-        return u, marginals
-
 
 def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
     """Construct a smoother."""
@@ -799,16 +761,31 @@ class _ProbabilisticSolver:
     correction: _Correction
     strategy: _Strategy
 
-    def offgrid_marginals(self, *args, **kwargs):
-        return self.strategy.offgrid_marginals(
-            *args,
-            **kwargs,
-            ssm=self.ssm,
-            extrapolation=self.extrapolation,
-            correction=self.correction,
-            is_suitable_for_offgrid_marginals=self.is_suitable_for_offgrid_marginals,
+    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
+        """Compute offgrid_marginals."""
+        if not self.is_suitable_for_offgrid_marginals:
+            raise NotImplementedError
+
+        dt0 = t - t0
+        dt1 = t1 - t
+
+        rv, extra = self.extrapolation.init(posterior_t0)
+        rv, corr = self.correction.init(rv)
+        state_t0 = _StrategyState(t=t0, hidden=rv, aux_extra=extra, aux_corr=corr)
+
+        # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
+        interp = self.extrapolation.interpolate(
+            state_t0=(state_t0.hidden, state_t0.aux_extra),
+            marginal_t1=marginals_t1,
+            dt0=dt0,
+            dt1=dt1,
+            output_scale=output_scale,
             prior=self.prior,
         )
+
+        (marginals, _aux) = interp.interpolated
+        u = self.ssm.stats.qoi(marginals)
+        return u, marginals
 
     @property
     def error_contraction_rate(self):
@@ -826,11 +803,20 @@ class _ProbabilisticSolver:
     def is_suitable_for_save_every_step(self):
         return self.extrapolation.is_suitable_for_save_every_step
 
+    #
+    # def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
+    #     """Initialise a state from a posterior."""
+    #     rv, extra = extrapolation.init(posterior)
+    #     rv, corr = correction.init(rv)
+    #     return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+
     def init(self, t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
-        state_strategy = self.strategy.init(
-            t, posterior, correction=self.correction, extrapolation=self.extrapolation
-        )
+
+        rv, extra = self.extrapolation.init(posterior)
+        rv, corr = self.correction.init(rv)
+        state_strategy = _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+
         calib_state = self.calibration.init(output_scale)
         return _SolverState(strategy=state_strategy, output_scale=calib_state)
 
