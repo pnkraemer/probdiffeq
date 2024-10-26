@@ -574,12 +574,6 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    prior: _MarkovProcess
-
-    @property
-    def num_derivatives(self):
-        return self.prior.num_derivatives
-
     def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
         """Initialise a state from a posterior."""
         rv, extra = extrapolation.init(posterior)
@@ -717,17 +711,15 @@ def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
 def strategy_fixedpoint(prior, correction: _Correction, /, ssm) -> _Strategy:
     """Construct a fixedpoint-smoother."""
     extrapolation = _ExtraImplFixedPoint(
-        prior=prior, name="Fixed-point smoother", ssm=ssm
-    )
-    strategy = _Strategy(
-        extrapolation=extrapolation,
-        ssm=ssm,
         prior=prior,
+        name="Fixed-point smoother",
+        ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
     )
-    return strategy, correction
+    strategy = _Strategy()
+    return strategy, correction, extrapolation, prior
 
 
 def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
@@ -740,8 +732,8 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
     )
-    strategy = _Strategy(prior=prior)
-    return strategy, correction, extrapolation
+    strategy = _Strategy()
+    return strategy, correction, extrapolation, prior
 
 
 @containers.dataclass
@@ -771,6 +763,7 @@ class _ProbabilisticSolver:
 
     step_implementation: Callable
 
+    prior: _MarkovProcess
     ssm: Any
     extrapolation: _ExtraImpl
     calibration: _Calibration
@@ -789,7 +782,7 @@ class _ProbabilisticSolver:
 
     @property
     def error_contraction_rate(self):
-        return self.strategy.num_derivatives + 1
+        return self.prior.num_derivatives + 1
 
     @property
     def is_suitable_for_offgrid_marginals(self):
@@ -852,7 +845,7 @@ class _ProbabilisticSolver:
     def initial_condition(self):
         """Construct an initial condition."""
         posterior = self.strategy.initial_condition(extrapolation=self.extrapolation)
-        return posterior, self.strategy.prior.output_scale
+        return posterior, self.prior.output_scale
 
 
 def solver_mle(inputs, *, ssm):
@@ -861,7 +854,7 @@ def solver_mle(inputs, *, ssm):
     Warning: needs to be combined with a call to stats.calibrate()
     after solving if the MLE-calibration shall be *used*.
     """
-    strategy, correction, extrapolation = inputs
+    strategy, correction, extrapolation, prior = inputs
 
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
@@ -891,6 +884,7 @@ def solver_mle(inputs, *, ssm):
     return _ProbabilisticSolver(
         ssm=ssm,
         name="Probabilistic solver with MLE calibration",
+        prior=prior,
         calibration=_calibration_running_mean(ssm=ssm),
         step_implementation=step_mle,
         extrapolation=extrapolation,
@@ -964,7 +958,7 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
 
 def solver(inputs, /, *, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
-    strategy, correction, extrapolation = inputs
+    strategy, correction, extrapolation, prior = inputs
 
     def step(state: _SolverState, *, vector_field, dt, calibration):
         del calibration  # unused
@@ -989,6 +983,7 @@ def solver(inputs, /, *, ssm):
     return _ProbabilisticSolver(
         strategy=strategy,
         ssm=ssm,
+        prior=prior,
         extrapolation=extrapolation,
         correction=correction,
         calibration=_calibration_none(),

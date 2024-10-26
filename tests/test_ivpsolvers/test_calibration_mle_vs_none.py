@@ -6,8 +6,8 @@ After applying stats.calibrate(), the posterior is different.
 """
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.backend import functools, ode, testing
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import ode, testing
 
 
 @testing.case()
@@ -22,7 +22,7 @@ def case_solve_fixed_grid(fact):
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ibm, ts0, ssm=ssm)
-        solver = solver_fun(strategy)
+        solver = solver_fun(strategy, ssm=ssm)
         init = solver.initial_condition()
         return ivpsolve.solve_fixed_grid(vf, init, solver=solver, **kwargs)
 
@@ -45,7 +45,7 @@ def case_solve_adaptive_save_at(fact):
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ibm, ts0, ssm=ssm)
-        solver = solver_fun(strategy)
+        solver = solver_fun(strategy, ssm=ssm)
 
         init = solver.initial_condition()
         adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
@@ -70,7 +70,7 @@ def case_solve_adaptive_save_every_step(fact):
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ibm, ts0, ssm=ssm)
-        solver = solver_fun(strategy)
+        solver = solver_fun(strategy, ssm=ssm)
 
         init = solver.initial_condition()
         adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
@@ -95,7 +95,7 @@ def case_simulate_terminal_values(fact):
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ibm, ts0, ssm=ssm)
-        solver = solver_fun(strategy)
+        solver = solver_fun(strategy, ssm=ssm)
 
         init = solver.initial_condition()
         adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2)
@@ -114,7 +114,7 @@ def case_simulate_terminal_values(fact):
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     solve, ssm = solver_to_solution
     uncalib = solve(ivpsolvers.solver, strategy_fun)
-    mle = solve(functools.partial(ivpsolvers.solver_mle, ssm=ssm), strategy_fun)
+    mle = solve(ivpsolvers.solver_mle, strategy_fun)
     return (uncalib, mle), ssm
 
 
