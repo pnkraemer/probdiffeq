@@ -586,40 +586,6 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    def case_interpolate(
-        self,
-        t,
-        *,
-        s0: _StrategyState,
-        s1: _StrategyState,
-        output_scale,
-        extrapolation,
-        prior,
-    ) -> _InterpRes:
-        """Process the solution in case t>t_n."""
-        # Interpolate
-        interp = extrapolation.interpolate(
-            state_t0=(s0.hidden, s0.aux_extra),
-            marginal_t1=s1.hidden,
-            dt0=t - s0.t,
-            dt1=s1.t - t,
-            output_scale=output_scale,
-            prior=prior,
-        )
-
-        # Turn outputs into valid states
-
-        def _state(t_, x):
-            corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
-            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
-
-        step_from = _state(s1.t, interp.step_from)
-        interpolated = _state(t, interp.interpolated)
-        interp_from = _state(t, interp.interp_from)
-        return _InterpRes(
-            step_from=step_from, interpolated=interpolated, interp_from=interp_from
-        )
-
 
 def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
     """Construct a smoother."""
@@ -763,18 +729,40 @@ class _ProbabilisticSolver:
         self, t, *, interp_from: _SolverState, interp_to: _SolverState
     ) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
-        interp = self.strategy.case_interpolate(
-            t,
-            s0=interp_from.strategy,
-            s1=interp_to.strategy,
-            output_scale=output_scale,
-            extrapolation=self.extrapolation,
-            prior=self.prior,
+        interp = self._case_interpolate(
+            t, s0=interp_from.strategy, s1=interp_to.strategy, output_scale=output_scale
         )
         prev = _SolverState(interp.interp_from, output_scale=interp_from.output_scale)
         sol = _SolverState(interp.interpolated, output_scale=interp_to.output_scale)
         acc = _SolverState(interp.step_from, output_scale=interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
+
+    def _case_interpolate(
+        self, t, *, s0: _StrategyState, s1: _StrategyState, output_scale
+    ) -> _InterpRes:
+        """Process the solution in case t>t_n."""
+        # Interpolate
+        interp = self.extrapolation.interpolate(
+            state_t0=(s0.hidden, s0.aux_extra),
+            marginal_t1=s1.hidden,
+            dt0=t - s0.t,
+            dt1=s1.t - t,
+            output_scale=output_scale,
+            prior=self.prior,
+        )
+
+        # Turn outputs into valid states
+
+        def _state(t_, x):
+            corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
+            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+
+        step_from = _state(s1.t, interp.step_from)
+        interpolated = _state(t, interp.interpolated)
+        interp_from = _state(t, interp.interp_from)
+        return _InterpRes(
+            step_from=step_from, interpolated=interpolated, interp_from=interp_from
+        )
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
         """Process the solution in case t=t_n."""
