@@ -575,19 +575,17 @@ def _estimate_error(observed, /, *, ssm):
     return output_scale * error_estimate_unscaled
 
 
-class _StrategyState(containers.NamedTuple):
-    t: Any
-    hidden: Any
-    aux_extra: Any
-    aux_corr: Any
+# msg = (
+#     "Next up: "
+#     "Delete the _Strategy."
+#     "Then slowly migrate the strategy-state attributes to the solver state. "
+#     "Then update the signature of strategy_* functions "
+#     "by removing correction, prior, and so on and fix all tests"
+# )
+# raise RuntimeError(msg)
 
 
-@containers.dataclass
-class _Strategy:
-    """Estimation strategy."""
-
-
-def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
+def strategy_smoother(prior, correction: _Correction, /, ssm):
     """Construct a smoother."""
     extrapolation = _ExtraImplSmoother(
         name="Smoother",
@@ -596,11 +594,11 @@ def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
     )
-    strategy = _Strategy()
+    strategy = None
     return strategy, correction, extrapolation, prior
 
 
-def strategy_fixedpoint(prior, correction: _Correction, /, ssm) -> _Strategy:
+def strategy_fixedpoint(prior, correction: _Correction, /, ssm):
     """Construct a fixedpoint-smoother."""
     extrapolation = _ExtraImplFixedPoint(
         name="Fixed-point smoother",
@@ -609,11 +607,11 @@ def strategy_fixedpoint(prior, correction: _Correction, /, ssm) -> _Strategy:
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
     )
-    strategy = _Strategy()
+    strategy = None
     return strategy, correction, extrapolation, prior
 
 
-def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
+def strategy_filter(prior, correction: _Correction, /, *, ssm):
     """Construct a filter."""
     extrapolation = _ExtraImplFilter(
         name="Filter",
@@ -622,7 +620,7 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
     )
-    strategy = _Strategy()
+    strategy = None
     return strategy, correction, extrapolation, prior
 
 
@@ -633,6 +631,13 @@ class _Calibration:
     init: Callable
     update: Callable
     extract: Callable
+
+
+class _StrategyState(containers.NamedTuple):
+    t: Any
+    hidden: Any
+    aux_extra: Any
+    aux_corr: Any
 
 
 class _SolverState(containers.NamedTuple):
@@ -658,7 +663,6 @@ class _ProbabilisticSolver:
     extrapolation: _ExtraImpl
     calibration: _Calibration
     correction: _Correction
-    strategy: _Strategy
 
     def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
         """Compute offgrid_marginals."""
@@ -842,7 +846,6 @@ def solver_mle(inputs, *, ssm):
         step_implementation=step_mle,
         extrapolation=extrapolation,
         correction=correction,
-        strategy=strategy,
         requires_rescaling=True,
     )
 
@@ -870,25 +873,40 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver_dynamic(strategy, *, ssm):
+def solver_dynamic(inputs, *, ssm):
     """Create a solver that calibrates the output scale dynamically."""
+    strategy, correction, extrapolation, prior = inputs
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
-        error, observed, state_strategy = strategy.begin(
-            state.strategy, dt=dt, vector_field=vector_field
+        prior_discretized = prior.discretize(dt)
+        hidden, extra = extrapolation.begin(
+            state.strategy.hidden,
+            state.strategy.aux_extra,
+            prior_discretized=prior_discretized,
+        )
+        t = state.t + dt
+        error, observed, corr = correction.estimate_error(
+            hidden, vector_field=vector_field, t=t
         )
 
         output_scale = calibration.update(state.output_scale, observed=observed)
 
-        prior, _calibrated = calibration.extract(output_scale)
-        state_strategy = strategy.complete(state_strategy, output_scale=prior)
+        prior_, _calibrated = calibration.extract(output_scale)
+        hidden, extra = extrapolation.complete(hidden, extra, output_scale=prior_)
+        hidden, corr = correction.complete(hidden, corr)
+        state_strategy = _StrategyState(
+            t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
+        )
 
         # Return solution
         state = _SolverState(strategy=state_strategy, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
-        strategy=strategy,
+        prior=prior,
+        ssm=ssm,
+        extrapolation=extrapolation,
+        correction=correction,
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
         step_implementation=step_dynamic,
@@ -940,7 +958,6 @@ def solver(inputs, /, *, ssm):
         return dt * error, state
 
     return _ProbabilisticSolver(
-        strategy=strategy,
         ssm=ssm,
         prior=prior,
         extrapolation=extrapolation,
