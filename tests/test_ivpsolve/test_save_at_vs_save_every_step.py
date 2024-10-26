@@ -16,7 +16,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
     init = solver.initial_condition()

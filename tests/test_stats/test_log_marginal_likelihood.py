@@ -15,7 +15,7 @@ def fixture_solution(fact):
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
     init = solver.initial_condition()
@@ -97,7 +97,7 @@ def test_raises_error_for_filter(fact):
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=3)
     init = solver.initial_condition()

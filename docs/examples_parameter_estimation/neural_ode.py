@@ -71,7 +71,7 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
         ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="isotropic")
         ts0 = ivpsolvers.correction_ts0(ssm=ssm)
         strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-        solver_ts0 = ivpsolvers.solver(strategy)
+        solver_ts0 = ivpsolvers.solver(strategy, ssm=ssm)
         init = solver_ts0.initial_condition()
 
         sol = ivpsolve.solve_fixed_grid(
@@ -129,7 +129,7 @@ tcoeffs = (u0, vf(u0, t=t0, p=f_args))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver_ts0 = ivpsolvers.solver(strategy)
+solver_ts0 = ivpsolvers.solver(strategy, ssm=ssm)
 init = solver_ts0.initial_condition()
 
 # +
@@ -169,7 +169,7 @@ tcoeffs = (u0, vf(u0, t=t0, p=f_args))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver_ts0 = ivpsolvers.solver(strategy)
+solver_ts0 = ivpsolvers.solver(strategy, ssm=ssm)
 init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(
@@ -183,7 +183,7 @@ tcoeffs = (u0, vf(u0, t=t0, p=f_args))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver_ts0 = ivpsolvers.solver(strategy)
+solver_ts0 = ivpsolvers.solver(strategy, ssm=ssm)
 init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(

@@ -192,7 +192,7 @@ def solve_fixed(theta, *, ts):
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
     init = solver.initial_condition()
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver, ssm=ssm)
     return sol[-1]
@@ -209,7 +209,7 @@ def solve_adaptive(theta, *, save_at):
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
 
     init = solver.initial_condition()

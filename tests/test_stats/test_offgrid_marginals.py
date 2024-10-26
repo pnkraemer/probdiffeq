@@ -14,7 +14,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
 
     init = solver.initial_condition()
     grid = np.linspace(t0, t1, endpoint=True, num=5)
@@ -38,7 +38,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
 
     init = solver.initial_condition()
     grid = np.linspace(t0, t1, endpoint=True, num=5)

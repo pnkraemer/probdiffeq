@@ -73,7 +73,7 @@ def solve(p):
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    solver = ivpsolvers.solver(strategy, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(

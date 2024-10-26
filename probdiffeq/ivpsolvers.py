@@ -179,6 +179,7 @@ class _ExtraImpl:
 
     is_suitable_for_save_at: int
     is_suitable_for_save_every_step: int
+    is_suitable_for_offgrid_marginals: int
 
     def initial_condition(self):
         """Compute an initial condition from a set of Taylor coefficients."""
@@ -573,9 +574,6 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    ssm: Any
-
-    is_suitable_for_offgrid_marginals: int
     prior: _MarkovProcess
 
     @property
@@ -676,9 +674,11 @@ class _Strategy:
         output_scale,
         extrapolation,
         correction,
+        ssm,
+        is_suitable_for_offgrid_marginals,
     ):
         """Compute offgrid_marginals."""
-        if not self.is_suitable_for_offgrid_marginals:
+        if not is_suitable_for_offgrid_marginals:
             raise NotImplementedError
 
         dt0 = t - t0
@@ -696,7 +696,7 @@ class _Strategy:
         )
 
         (marginals, _aux) = interp.interpolated
-        u = self.ssm.stats.qoi(marginals)
+        u = ssm.stats.qoi(marginals)
         return u, marginals
 
 
@@ -738,8 +738,9 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
         ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=True,
+        is_suitable_for_offgrid_marginals=True,
     )
-    strategy = _Strategy(prior=prior, is_suitable_for_offgrid_marginals=True, ssm=ssm)
+    strategy = _Strategy(prior=prior)
     return strategy, correction, extrapolation
 
 
@@ -770,6 +771,7 @@ class _ProbabilisticSolver:
 
     step_implementation: Callable
 
+    ssm: Any
     extrapolation: _ExtraImpl
     calibration: _Calibration
     correction: _Correction
@@ -779,13 +781,19 @@ class _ProbabilisticSolver:
         return self.strategy.offgrid_marginals(
             *args,
             **kwargs,
+            ssm=self.ssm,
             extrapolation=self.extrapolation,
             correction=self.correction,
+            is_suitable_for_offgrid_marginals=self.is_suitable_for_offgrid_marginals,
         )
 
     @property
     def error_contraction_rate(self):
         return self.strategy.num_derivatives + 1
+
+    @property
+    def is_suitable_for_offgrid_marginals(self):
+        return self.extrapolation.is_suitable_for_offgrid_marginals
 
     @property
     def is_suitable_for_save_at(self):
@@ -881,6 +889,7 @@ def solver_mle(inputs, *, ssm):
         return dt * error, state
 
     return _ProbabilisticSolver(
+        ssm=ssm,
         name="Probabilistic solver with MLE calibration",
         calibration=_calibration_running_mean(ssm=ssm),
         step_implementation=step_mle,
@@ -953,7 +962,7 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver(inputs, /):
+def solver(inputs, /, *, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
     strategy, correction, extrapolation = inputs
 
@@ -979,6 +988,7 @@ def solver(inputs, /):
 
     return _ProbabilisticSolver(
         strategy=strategy,
+        ssm=ssm,
         extrapolation=extrapolation,
         correction=correction,
         calibration=_calibration_none(),
