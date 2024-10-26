@@ -575,14 +575,12 @@ def _estimate_error(observed, /, *, ssm):
     return output_scale * error_estimate_unscaled
 
 
-# msg = (
+# TODO = (
 #     "Next up: "
-#     "Delete the _Strategy."
 #     "Then slowly migrate the strategy-state attributes to the solver state. "
 #     "Then update the signature of strategy_* functions "
 #     "by removing correction, prior, and so on and fix all tests"
-# )
-# raise RuntimeError(msg)
+#  )
 
 
 def strategy_smoother(prior, correction: _Correction, /, ssm):
@@ -631,7 +629,6 @@ class _Calibration:
 
 
 class _StrategyState(containers.NamedTuple):
-    t: Any
     hidden: Any
     aux_extra: Any
     aux_corr: Any
@@ -640,12 +637,9 @@ class _StrategyState(containers.NamedTuple):
 class _SolverState(containers.NamedTuple):
     """Solver state."""
 
+    t: Any
     strategy: Any
     output_scale: Any
-
-    @property
-    def t(self):
-        return self.strategy.t
 
 
 @containers.dataclass
@@ -671,7 +665,7 @@ class _ProbabilisticSolver:
 
         rv, extra = self.extrapolation.init(posterior_t0)
         rv, corr = self.correction.init(rv)
-        state_t0 = _StrategyState(t=t0, hidden=rv, aux_extra=extra, aux_corr=corr)
+        state_t0 = _StrategyState(hidden=rv, aux_extra=extra, aux_corr=corr)
 
         # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
         interp = self.extrapolation.interpolate(
@@ -708,10 +702,10 @@ class _ProbabilisticSolver:
 
         rv, extra = self.extrapolation.init(posterior)
         rv, corr = self.correction.init(rv)
-        state_strategy = _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
+        state_strategy = _StrategyState(hidden=rv, aux_extra=extra, aux_corr=corr)
 
         calib_state = self.calibration.init(output_scale)
-        return _SolverState(strategy=state_strategy, output_scale=calib_state)
+        return _SolverState(t=t, strategy=state_strategy, output_scale=calib_state)
 
     def step(self, state: _SolverState, *, vector_field, dt) -> _SolverState:
         return self.step_implementation(
@@ -721,7 +715,7 @@ class _ProbabilisticSolver:
     def extract(self, state: _SolverState, /):
         hidden = self.correction.extract(state.strategy.hidden)
         posterior = self.extrapolation.extract(hidden, state.strategy.aux_extra)
-        t = state.strategy.t
+        t = state.t
 
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
@@ -731,36 +725,49 @@ class _ProbabilisticSolver:
     ) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
         interp = self._case_interpolate(
-            t, s0=interp_from.strategy, s1=interp_to.strategy, output_scale=output_scale
+            t,
+            t0=interp_from.t,
+            t1=interp_to.t,
+            s0=interp_from.strategy,
+            s1=interp_to.strategy,
+            output_scale=output_scale,
         )
-        prev = _SolverState(interp.interp_from, output_scale=interp_from.output_scale)
-        sol = _SolverState(interp.interpolated, output_scale=interp_to.output_scale)
-        acc = _SolverState(interp.step_from, output_scale=interp_to.output_scale)
+        prev = _SolverState(
+            t=t, strategy=interp.interp_from, output_scale=interp_from.output_scale
+        )
+        sol = _SolverState(
+            t=t, strategy=interp.interpolated, output_scale=interp_to.output_scale
+        )
+        acc = _SolverState(
+            t=interp_to.t,
+            strategy=interp.step_from,
+            output_scale=interp_to.output_scale,
+        )
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def _case_interpolate(
-        self, t, *, s0: _StrategyState, s1: _StrategyState, output_scale
+        self, t, *, t0, t1, s0: _StrategyState, s1: _StrategyState, output_scale
     ) -> _InterpRes:
         """Process the solution in case t>t_n."""
         # Interpolate
         interp = self.extrapolation.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
             marginal_t1=s1.hidden,
-            dt0=t - s0.t,
-            dt1=s1.t - t,
+            dt0=t - t0,
+            dt1=t1 - t,
             output_scale=output_scale,
             prior=self.prior,
         )
 
         # Turn outputs into valid states
 
-        def _state(t_, x):
+        def _state(x):
             corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
-            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+            return _StrategyState(hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
 
-        step_from = _state(s1.t, interp.step_from)
-        interpolated = _state(t, interp.interpolated)
-        interp_from = _state(t, interp.interp_from)
+        step_from = _state(interp.step_from)
+        interpolated = _state(interp.interpolated)
+        interp_from = _state(interp.interp_from)
         return _InterpRes(
             step_from=step_from, interpolated=interpolated, interp_from=interp_from
         )
@@ -777,18 +784,24 @@ class _ProbabilisticSolver:
         )
 
         def _state(s):
-            t = interp_to.strategy.t
             corr_like = tree_util.tree_map(np.empty_like, interp_to.strategy.aux_corr)
-            return _StrategyState(t=t, hidden=s[0], aux_extra=s[1], aux_corr=corr_like)
+            return _StrategyState(hidden=s[0], aux_extra=s[1], aux_corr=corr_like)
 
         step_from_ = _state(step_from_)
         solution_ = _state(solution_)
         interp_from_ = _state(interp_from_)
         x = _InterpRes(step_from_, solution_, interp_from_)
 
-        prev = _SolverState(x.interp_from, output_scale=interp_from.output_scale)
-        sol = _SolverState(x.interpolated, output_scale=interp_to.output_scale)
-        acc = _SolverState(x.step_from, output_scale=interp_to.output_scale)
+        t = interp_to.t
+        prev = _SolverState(
+            t=t, strategy=x.interp_from, output_scale=interp_from.output_scale
+        )
+        sol = _SolverState(
+            t=t, strategy=x.interpolated, output_scale=interp_to.output_scale
+        )
+        acc = _SolverState(
+            t=t, strategy=x.step_from, output_scale=interp_to.output_scale
+        )
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def initial_condition(self):
@@ -823,16 +836,14 @@ def solver_mle(inputs, *, ssm):
             hidden, extra, output_scale=output_scale_prior
         )
         hidden, corr = correction.complete(hidden, corr)
-        state_strategy = _StrategyState(
-            t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
-        )
+        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra, aux_corr=corr)
         observed = state_strategy.aux_corr
 
         # Calibrate
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         # Return
-        state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+        state = _SolverState(t=t, strategy=state_strategy, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
@@ -891,12 +902,10 @@ def solver_dynamic(inputs, *, ssm):
         prior_, _calibrated = calibration.extract(output_scale)
         hidden, extra = extrapolation.complete(hidden, extra, output_scale=prior_)
         hidden, corr = correction.complete(hidden, corr)
-        state_strategy = _StrategyState(
-            t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
-        )
+        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra, aux_corr=corr)
 
         # Return solution
-        state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+        state = _SolverState(t=t, strategy=state_strategy, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
@@ -946,12 +955,12 @@ def solver(inputs, /, *, ssm):
             hidden, extra, output_scale=state.output_scale
         )
         hidden, corr = correction.complete(hidden, corr)
-        state_strategy = _StrategyState(
-            t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
-        )
+        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra, aux_corr=corr)
 
         # Extract and return solution
-        state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
+        state = _SolverState(
+            t=t, strategy=state_strategy, output_scale=state.output_scale
+        )
         return dt * error, state
 
     return _ProbabilisticSolver(
