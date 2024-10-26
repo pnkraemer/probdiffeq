@@ -80,7 +80,6 @@ version_file = "probdiffeq/_version.py"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["dist", "build", "dev", "typings"]
-addopts = ["--cov=probdiffeq", "--cov-report=html"]
 
 
 [tool.ruff]
