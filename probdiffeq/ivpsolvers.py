@@ -696,7 +696,7 @@ class _ProbabilisticSolver:
         calib_state = self.calibration.init(output_scale)
         return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
 
-    def step(self, state: _State, *, vector_field, dt) -> _State:
+    def step(self, state: _State, *, vector_field, dt):
         return self.step_implementation(
             state, vector_field=vector_field, dt=dt, calibration=self.calibration
         )
@@ -927,111 +927,13 @@ def _calibration_none() -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-@containers.dataclass
-class _Controller:
-    """Control algorithm."""
-
-    init: Callable[[float], Any]
-    """Initialise the controller state."""
-
-    clip: Callable[[Any, float, float], Any]
-    """(Optionally) clip the current step to not exceed t1."""
-
-    apply: Callable[[Any, NamedArg(float, "error_power")], Any]
-    r"""Propose a time-step $\Delta t$."""
-
-    extract: Callable[[Any], float]
-    """Extract the time-step from the controller state."""
-
-
-def control_proportional_integral(
-    *,
-    clip: bool = False,
-    safety=0.95,
-    factor_min=0.2,
-    factor_max=10.0,
-    power_integral_unscaled=0.3,
-    power_proportional_unscaled=0.4,
-) -> _Controller:
-    """Construct a proportional-integral-controller with time-clipping."""
-
-    class PIState(containers.NamedTuple):
-        dt: float
-        error_power_previously_accepted: float
-
-    def init(dt: float, /) -> PIState:
-        return PIState(dt, 1.0)
-
-    def apply(state: PIState, /, *, error_power) -> PIState:
-        # error_power = error_norm ** (-1.0 / error_contraction_rate)
-        dt_proposed, error_power_prev = state
-
-        a1 = error_power**power_integral_unscaled
-        a2 = (error_power / error_power_prev) ** power_proportional_unscaled
-        scale_factor_unclipped = safety * a1 * a2
-
-        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-
-        # >= 1.0 because error_power is 1/scaled_error_norm
-        error_power_prev = np.where(error_power >= 1.0, error_power, error_power_prev)
-
-        dt_proposed = scale_factor * dt_proposed
-        return PIState(dt_proposed, error_power_prev)
-
-    def extract(state: PIState, /) -> float:
-        dt_proposed, _error_norm_previously_accepted = state
-        return dt_proposed
-
-    if clip:
-
-        def clip_fun(state: PIState, /, t, t1) -> PIState:
-            dt_proposed, error_norm_previously_accepted = state
-            dt = dt_proposed
-            dt_clipped = np.minimum(dt, t1 - t)
-            return PIState(dt_clipped, error_norm_previously_accepted)
-
-        return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
-
-    return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
-
-
-def control_integral(
-    *, clip=False, safety=0.95, factor_min=0.2, factor_max=10.0
-) -> _Controller:
-    """Construct an integral-controller."""
-
-    def init(dt, /):
-        return dt
-
-    def apply(dt, /, *, error_power):
-        # error_power = error_norm ** (-1.0 / error_contraction_rate)
-        scale_factor_unclipped = safety * error_power
-
-        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-        return scale_factor * dt
-
-    def extract(dt, /):
-        return dt
-
-    if clip:
-
-        def clip_fun(dt, /, t, t1):
-            return np.minimum(dt, t1 - t)
-
-        return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
-
-    return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
-
-
-def adaptive(solver, *, ssm, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
+def adaptive(slvr, /, *, ssm, atol=1e-4, rtol=1e-2, control=None, norm_ord=None):
     """Make an IVP solver adaptive."""
     if control is None:
         control = control_proportional_integral()
 
     return _AdaSolver(
-        solver, ssm=ssm, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
+        slvr, ssm=ssm, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord
     )
 
 
@@ -1045,8 +947,10 @@ class _AdaState(containers.NamedTuple):
 class _AdaSolver:
     """Adaptive IVP solvers."""
 
-    def __init__(self, solver, *, atol, rtol, control, norm_ord, ssm):
-        self.solver = solver
+    def __init__(
+        self, slvr: _ProbabilisticSolver, /, *, atol, rtol, control, norm_ord, ssm
+    ):
+        self.solver = slvr
         self.atol = atol
         self.rtol = rtol
         self.control = control
@@ -1187,14 +1091,9 @@ class _AdaSolver:
 
         def _asolver_unflatten(aux, children):
             atol, rtol = children
-            (solver, control, norm_ord, ssm) = aux
+            (slvr, control, norm_ord, ssm) = aux
             return _AdaSolver(
-                solver=solver,
-                atol=atol,
-                rtol=rtol,
-                control=control,
-                norm_ord=norm_ord,
-                ssm=ssm,
+                slvr, atol=atol, rtol=rtol, control=control, norm_ord=norm_ord, ssm=ssm
             )
 
         tree_util.register_pytree_node(
@@ -1203,3 +1102,101 @@ class _AdaSolver:
 
 
 _AdaSolver.register_pytree_node()
+
+
+@containers.dataclass
+class _Controller:
+    """Control algorithm."""
+
+    init: Callable[[float], Any]
+    """Initialise the controller state."""
+
+    clip: Callable[[Any, float, float], Any]
+    """(Optionally) clip the current step to not exceed t1."""
+
+    apply: Callable[[Any, NamedArg(float, "error_power")], Any]
+    r"""Propose a time-step $\Delta t$."""
+
+    extract: Callable[[Any], float]
+    """Extract the time-step from the controller state."""
+
+
+def control_proportional_integral(
+    *,
+    clip: bool = False,
+    safety=0.95,
+    factor_min=0.2,
+    factor_max=10.0,
+    power_integral_unscaled=0.3,
+    power_proportional_unscaled=0.4,
+) -> _Controller:
+    """Construct a proportional-integral-controller with time-clipping."""
+
+    class PIState(containers.NamedTuple):
+        dt: float
+        error_power_previously_accepted: float
+
+    def init(dt: float, /) -> PIState:
+        return PIState(dt, 1.0)
+
+    def apply(state: PIState, /, *, error_power) -> PIState:
+        # error_power = error_norm ** (-1.0 / error_contraction_rate)
+        dt_proposed, error_power_prev = state
+
+        a1 = error_power**power_integral_unscaled
+        a2 = (error_power / error_power_prev) ** power_proportional_unscaled
+        scale_factor_unclipped = safety * a1 * a2
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
+        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
+
+        # >= 1.0 because error_power is 1/scaled_error_norm
+        error_power_prev = np.where(error_power >= 1.0, error_power, error_power_prev)
+
+        dt_proposed = scale_factor * dt_proposed
+        return PIState(dt_proposed, error_power_prev)
+
+    def extract(state: PIState, /) -> float:
+        dt_proposed, _error_norm_previously_accepted = state
+        return dt_proposed
+
+    if clip:
+
+        def clip_fun(state: PIState, /, t, t1) -> PIState:
+            dt_proposed, error_norm_previously_accepted = state
+            dt = dt_proposed
+            dt_clipped = np.minimum(dt, t1 - t)
+            return PIState(dt_clipped, error_norm_previously_accepted)
+
+        return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
+
+    return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
+
+
+def control_integral(
+    *, clip=False, safety=0.95, factor_min=0.2, factor_max=10.0
+) -> _Controller:
+    """Construct an integral-controller."""
+
+    def init(dt, /):
+        return dt
+
+    def apply(dt, /, *, error_power):
+        # error_power = error_norm ** (-1.0 / error_contraction_rate)
+        scale_factor_unclipped = safety * error_power
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
+        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
+        return scale_factor * dt
+
+    def extract(dt, /):
+        return dt
+
+    if clip:
+
+        def clip_fun(dt, /, t, t1):
+            return np.minimum(dt, t1 - t)
+
+        return _Controller(init=init, apply=apply, extract=extract, clip=clip_fun)
+
+    return _Controller(init=init, apply=apply, extract=extract, clip=lambda v, **_kw: v)
