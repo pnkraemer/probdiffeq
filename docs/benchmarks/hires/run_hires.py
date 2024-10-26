@@ -88,8 +88,8 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
         ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
         ts1 = ivpsolvers.correction_ts1(ssm=ssm)
-        strategy = ivpsolvers.strategy_filter(ibm, ts1, ssm=ssm)
-        solver = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
+        strategy = ivpsolvers.strategy_filter(ssm=ssm)
+        solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
         control = ivpsolve.control_proportional_integral(clip=True)
         adaptive_solver = ivpsolve.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
