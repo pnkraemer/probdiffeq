@@ -586,16 +586,15 @@ def strategy_smoother(*, ssm):
     )
 
 
-def strategy_fixedpoint(prior, correction: _Correction, /, ssm):
+def strategy_fixedpoint(*, ssm):
     """Construct a fixedpoint-smoother."""
-    extrapolation = _ExtraImplFixedPoint(
+    return _ExtraImplFixedPoint(
         name="Fixed-point smoother",
         ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
     )
-    return correction, extrapolation, prior
 
 
 def strategy_filter(*, ssm):
@@ -822,9 +821,8 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver_dynamic(inputs, *, ssm):
+def solver_dynamic(extrapolation, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
-    correction, extrapolation, prior = inputs
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
         prior_discretized = prior.discretize(dt)

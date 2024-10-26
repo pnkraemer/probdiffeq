@@ -22,8 +22,8 @@ def fixture_solution_smoother(solver_setup):
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
 
     init = solver.initial_condition()
@@ -43,8 +43,8 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
 
     save_at = solution_smoother.t
@@ -69,8 +69,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-    solver_smoother = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+    solver_smoother = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
@@ -82,8 +82,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
     init = solver.initial_condition()
 
