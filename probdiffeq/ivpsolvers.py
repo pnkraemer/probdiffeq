@@ -586,36 +586,6 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    #
-    # def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
-    #     """Initialise a state from a posterior."""
-    #     rv, extra = extrapolation.init(posterior)
-    #     rv, corr = correction.init(rv)
-    #     return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
-
-    def begin(
-        self,
-        state: _StrategyState,
-        /,
-        *,
-        dt,
-        vector_field,
-        prior,
-        extrapolation,
-        correction,
-    ):
-        """Predict the error of an upcoming step."""
-        prior_discretized = prior.discretize(dt)
-        hidden, extra = extrapolation.begin(
-            state.hidden, state.aux_extra, prior_discretized=prior_discretized
-        )
-        t = state.t + dt
-        error, observed, corr = correction.estimate_error(
-            hidden, vector_field=vector_field, t=t
-        )
-        state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
-        return error, observed, state
-
     def complete(self, state, /, *, output_scale, extrapolation, correction):
         """Complete the step after the error has been predicted."""
         hidden, extra = extrapolation.complete(
@@ -803,13 +773,6 @@ class _ProbabilisticSolver:
     def is_suitable_for_save_every_step(self):
         return self.extrapolation.is_suitable_for_save_every_step
 
-    #
-    # def init(self, t, posterior, /, *, extrapolation, correction) -> _StrategyState:
-    #     """Initialise a state from a posterior."""
-    #     rv, extra = extrapolation.init(posterior)
-    #     rv, corr = correction.init(rv)
-    #     return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
-
     def init(self, t, initial_condition) -> _SolverState:
         posterior, output_scale = initial_condition
 
@@ -875,13 +838,19 @@ def solver_mle(inputs, *, ssm):
 
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-        error, _, state_strategy = strategy.begin(
-            state.strategy,
-            dt=dt,
-            vector_field=vector_field,
-            extrapolation=extrapolation,
-            correction=correction,
-            prior=prior,
+
+        prior_discretized = prior.discretize(dt)
+        hidden, extra = extrapolation.begin(
+            state.strategy.hidden,
+            state.strategy.aux_extra,
+            prior_discretized=prior_discretized,
+        )
+        t = state.t + dt
+        error, _, corr = correction.estimate_error(
+            hidden, vector_field=vector_field, t=t
+        )
+        state_strategy = _StrategyState(
+            t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
         )
 
         state_strategy = strategy.complete(
@@ -981,14 +950,20 @@ def solver(inputs, /, *, ssm):
     def step(state: _SolverState, *, vector_field, dt, calibration):
         del calibration  # unused
 
-        error, _observed, state_strategy = strategy.begin(
-            state.strategy,
-            dt=dt,
-            vector_field=vector_field,
-            extrapolation=extrapolation,
-            correction=correction,
-            prior=prior,
+        prior_discretized = prior.discretize(dt)
+        hidden, extra = extrapolation.begin(
+            state.strategy.hidden,
+            state.strategy.aux_extra,
+            prior_discretized=prior_discretized,
         )
+        t = state.t + dt
+        error, _, corr = correction.estimate_error(
+            hidden, vector_field=vector_field, t=t
+        )
+        state_strategy = _StrategyState(
+            t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
+        )
+
         state_strategy = strategy.complete(
             state_strategy,
             output_scale=state.output_scale,
