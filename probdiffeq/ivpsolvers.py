@@ -586,19 +586,12 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    def complete(self, state, /, *, output_scale, extrapolation, correction):
-        """Complete the step after the error has been predicted."""
-        hidden, extra = extrapolation.complete(
-            state.hidden, state.aux_extra, output_scale=output_scale
-        )
-        hidden, corr = correction.complete(hidden, state.aux_corr)
-        return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
-
-    def extract(self, state: _StrategyState, /, *, extrapolation, correction):
-        """Extract the solution from a state."""
-        hidden = correction.extract(state.hidden)
-        sol = extrapolation.extract(hidden, state.aux_extra)
-        return state.t, sol
+    #
+    # def extract(self, state: _StrategyState, /, *, extrapolation, correction):
+    #     """Extract the solution from a state."""
+    #     hidden = correction.extract(state.hidden)
+    #     sol = extrapolation.extract(hidden, state.aux_extra)
+    #     return state.t, sol
 
     def case_interpolate_at_t1(
         self, state_t1: _StrategyState, *, extrapolation, prior
@@ -789,9 +782,10 @@ class _ProbabilisticSolver:
         )
 
     def extract(self, state: _SolverState, /):
-        t, posterior = self.strategy.extract(
-            state.strategy, extrapolation=self.extrapolation, correction=self.correction
-        )
+        hidden = self.correction.extract(state.strategy.hidden)
+        posterior = self.extrapolation.extract(hidden, state.strategy.aux_extra)
+        t = state.strategy.t
+
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
@@ -849,15 +843,13 @@ def solver_mle(inputs, *, ssm):
         error, _, corr = correction.estimate_error(
             hidden, vector_field=vector_field, t=t
         )
+
+        hidden, extra = extrapolation.complete(
+            hidden, extra, output_scale=output_scale_prior
+        )
+        hidden, corr = correction.complete(hidden, corr)
         state_strategy = _StrategyState(
             t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
-        )
-
-        state_strategy = strategy.complete(
-            state_strategy,
-            output_scale=output_scale_prior,
-            extrapolation=extrapolation,
-            correction=correction,
         )
         observed = state_strategy.aux_corr
 
@@ -960,16 +952,15 @@ def solver(inputs, /, *, ssm):
         error, _, corr = correction.estimate_error(
             hidden, vector_field=vector_field, t=t
         )
+
+        hidden, extra = extrapolation.complete(
+            hidden, extra, output_scale=state.output_scale
+        )
+        hidden, corr = correction.complete(hidden, corr)
         state_strategy = _StrategyState(
             t=t, hidden=hidden, aux_extra=extra, aux_corr=corr
         )
 
-        state_strategy = strategy.complete(
-            state_strategy,
-            output_scale=state.output_scale,
-            extrapolation=extrapolation,
-            correction=correction,
-        )
         # Extract and return solution
         state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
         return dt * error, state
