@@ -631,7 +631,6 @@ class _Calibration:
 class _StrategyState(containers.NamedTuple):
     hidden: Any
     aux_extra: Any
-    aux_corr: Any
 
 
 class _SolverState(containers.NamedTuple):
@@ -665,7 +664,7 @@ class _ProbabilisticSolver:
 
         rv, extra = self.extrapolation.init(posterior_t0)
         rv, corr = self.correction.init(rv)
-        state_t0 = _StrategyState(hidden=rv, aux_extra=extra, aux_corr=corr)
+        state_t0 = _StrategyState(hidden=rv, aux_extra=extra)
 
         # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
         interp = self.extrapolation.interpolate(
@@ -702,7 +701,7 @@ class _ProbabilisticSolver:
 
         rv, extra = self.extrapolation.init(posterior)
         rv, corr = self.correction.init(rv)
-        state_strategy = _StrategyState(hidden=rv, aux_extra=extra, aux_corr=corr)
+        state_strategy = _StrategyState(hidden=rv, aux_extra=extra)
 
         calib_state = self.calibration.init(output_scale)
         return _SolverState(t=t, strategy=state_strategy, output_scale=calib_state)
@@ -762,8 +761,7 @@ class _ProbabilisticSolver:
         # Turn outputs into valid states
 
         def _state(x):
-            corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
-            return _StrategyState(hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
+            return _StrategyState(hidden=x[0], aux_extra=x[1])
 
         step_from = _state(interp.step_from)
         interpolated = _state(interp.interpolated)
@@ -784,8 +782,7 @@ class _ProbabilisticSolver:
         )
 
         def _state(s):
-            corr_like = tree_util.tree_map(np.empty_like, interp_to.strategy.aux_corr)
-            return _StrategyState(hidden=s[0], aux_extra=s[1], aux_corr=corr_like)
+            return _StrategyState(hidden=s[0], aux_extra=s[1])
 
         step_from_ = _state(step_from_)
         solution_ = _state(solution_)
@@ -835,9 +832,8 @@ def solver_mle(inputs, *, ssm):
         hidden, extra = extrapolation.complete(
             hidden, extra, output_scale=output_scale_prior
         )
-        hidden, corr = correction.complete(hidden, corr)
-        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra, aux_corr=corr)
-        observed = state_strategy.aux_corr
+        hidden, observed = correction.complete(hidden, corr)
+        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra)
 
         # Calibrate
         output_scale = calibration.update(state.output_scale, observed=observed)
@@ -902,7 +898,7 @@ def solver_dynamic(inputs, *, ssm):
         prior_, _calibrated = calibration.extract(output_scale)
         hidden, extra = extrapolation.complete(hidden, extra, output_scale=prior_)
         hidden, corr = correction.complete(hidden, corr)
-        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra, aux_corr=corr)
+        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra)
 
         # Return solution
         state = _SolverState(t=t, strategy=state_strategy, output_scale=output_scale)
@@ -955,7 +951,7 @@ def solver(inputs, /, *, ssm):
             hidden, extra, output_scale=state.output_scale
         )
         hidden, corr = correction.complete(hidden, corr)
-        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra, aux_corr=corr)
+        state_strategy = _StrategyState(hidden=hidden, aux_extra=extra)
 
         # Extract and return solution
         state = _SolverState(
