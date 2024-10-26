@@ -586,36 +586,6 @@ class _StrategyState(containers.NamedTuple):
 class _Strategy:
     """Estimation strategy."""
 
-    #
-    # def extract(self, state: _StrategyState, /, *, extrapolation, correction):
-    #     """Extract the solution from a state."""
-    #     hidden = correction.extract(state.hidden)
-    #     sol = extrapolation.extract(hidden, state.aux_extra)
-    #     return state.t, sol
-
-    def case_interpolate_at_t1(
-        self, state_t1: _StrategyState, *, extrapolation, prior
-    ) -> _InterpRes:
-        """Process the solution in case t=t_n."""
-        tmp = extrapolation.interpolate_at_t1(
-            state_t1.hidden, state_t1.aux_extra, prior=prior
-        )
-        step_from, solution, interp_from = (
-            tmp.step_from,
-            tmp.interpolated,
-            tmp.interp_from,
-        )
-
-        def _state(x):
-            t = state_t1.t
-            corr_like = tree_util.tree_map(np.empty_like, state_t1.aux_corr)
-            return _StrategyState(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
-
-        step_from = _state(step_from)
-        solution = _state(solution)
-        interp_from = _state(interp_from)
-        return _InterpRes(step_from, solution, interp_from)
-
     def case_interpolate(
         self,
         t,
@@ -807,9 +777,25 @@ class _ProbabilisticSolver:
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        x = self.strategy.case_interpolate_at_t1(
-            interp_to.strategy, extrapolation=self.extrapolation, prior=self.prior
+        """Process the solution in case t=t_n."""
+        tmp = self.extrapolation.interpolate_at_t1(
+            interp_to.strategy.hidden, interp_to.strategy.aux_extra, prior=self.prior
         )
+        step_from_, solution_, interp_from_ = (
+            tmp.step_from,
+            tmp.interpolated,
+            tmp.interp_from,
+        )
+
+        def _state(s):
+            t = interp_to.strategy.t
+            corr_like = tree_util.tree_map(np.empty_like, interp_to.strategy.aux_corr)
+            return _StrategyState(t=t, hidden=s[0], aux_extra=s[1], aux_corr=corr_like)
+
+        step_from_ = _state(step_from_)
+        solution_ = _state(solution_)
+        interp_from_ = _state(interp_from_)
+        x = _InterpRes(step_from_, solution_, interp_from_)
 
         prev = _SolverState(x.interp_from, output_scale=interp_from.output_scale)
         sol = _SolverState(x.interpolated, output_scale=interp_to.output_scale)
