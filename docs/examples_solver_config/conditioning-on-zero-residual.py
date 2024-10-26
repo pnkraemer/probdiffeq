@@ -78,9 +78,9 @@ markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 # Compute the posterior
 
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="dense")
-slr1 = ivpsolvers.correction_ts1(ssm=ssm)
-strategy = ivpsolvers.strategy_fixedpoint(ibm, slr1, ssm=ssm)
-solver = ivpsolvers.solver(strategy, ssm=ssm)
+ts1 = ivpsolvers.correction_ts1(ssm=ssm)
+strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-1, rtol=1e-2, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))

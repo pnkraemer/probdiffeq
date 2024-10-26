@@ -72,8 +72,8 @@ def solve(p):
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(

@@ -64,8 +64,8 @@ def solve(tc):
     """Solve the ODE."""
     prior, ssm = ivpsolvers.prior_ibm(tc, ssm_fact="dense")
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(prior, ts0, ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+    solver = ivpsolvers.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
     init = solver.initial_condition()
 
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)

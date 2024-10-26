@@ -52,8 +52,8 @@ def vf_1(y, t):  # noqa: ARG001
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-solver_1st = ivpsolvers.solver_mle(strategy, ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ssm=ssm)
+solver_1st = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 adaptive_solver_1st = ivpsolve.adaptive(solver_1st, atol=1e-5, rtol=1e-5, ssm=ssm)
 
 
@@ -86,8 +86,8 @@ def vf_2(y, dy, t):  # noqa: ARG001
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ode_order=2, ssm=ssm)
-strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-solver_2nd = ivpsolvers.solver_mle(strategy, ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ssm=ssm)
+solver_2nd = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 adaptive_solver_2nd = ivpsolve.adaptive(solver_2nd, atol=1e-5, rtol=1e-5, ssm=ssm)
 
 
