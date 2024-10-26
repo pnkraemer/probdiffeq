@@ -628,7 +628,7 @@ class _Calibration:
     extract: Callable
 
 
-class _SolverState(containers.NamedTuple):
+class _State(containers.NamedTuple):
     """Solver state."""
 
     t: Any
@@ -691,21 +691,21 @@ class _ProbabilisticSolver:
     def is_suitable_for_save_every_step(self):
         return self.extrapolation.is_suitable_for_save_every_step
 
-    def init(self, t, initial_condition) -> _SolverState:
+    def init(self, t, initial_condition) -> _State:
         posterior, output_scale = initial_condition
 
         rv, extra = self.extrapolation.init(posterior)
         rv, corr = self.correction.init(rv)
 
         calib_state = self.calibration.init(output_scale)
-        return _SolverState(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
+        return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
 
-    def step(self, state: _SolverState, *, vector_field, dt) -> _SolverState:
+    def step(self, state: _State, *, vector_field, dt) -> _State:
         return self.step_implementation(
             state, vector_field=vector_field, dt=dt, calibration=self.calibration
         )
 
-    def extract(self, state: _SolverState, /):
+    def extract(self, state: _State, /):
         hidden = self.correction.extract(state.hidden)
         posterior = self.extrapolation.extract(hidden, state.aux_extra)
         t = state.t
@@ -713,25 +713,11 @@ class _ProbabilisticSolver:
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
-    def interpolate(
-        self, t, *, interp_from: _SolverState, interp_to: _SolverState
-    ) -> _InterpRes:
+    def interpolate(self, t, *, interp_from: _State, interp_to: _State) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
         return self._case_interpolate(
             t, s0=interp_from, s1=interp_to, output_scale=output_scale
         )
-        # prev = _SolverState(
-        #     t=t, strategy=interp.interp_from, output_scale=interp_from.output_scale
-        # )
-        # sol = _SolverState(
-        #     t=t, strategy=interp.interpolated, output_scale=interp_to.output_scale
-        # )
-        # acc = _SolverState(
-        #     t=interp_to.t,
-        #     strategy=interp.step_from,
-        #     output_scale=interp_to.output_scale,
-        # )
-        # return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def _case_interpolate(self, t, *, s0, s1, output_scale) -> _InterpRes:
         """Process the solution in case t>t_n."""
@@ -748,7 +734,7 @@ class _ProbabilisticSolver:
         # Turn outputs into valid states
 
         def _state(t_, x, scale):
-            return _SolverState(t=t_, hidden=x[0], aux_extra=x[1], output_scale=scale)
+            return _State(t=t_, hidden=x[0], aux_extra=x[1], output_scale=scale)
 
         step_from = _state(s1.t, interp.step_from, s1.output_scale)
         interpolated = _state(t, interp.interpolated, s1.output_scale)
@@ -769,24 +755,12 @@ class _ProbabilisticSolver:
         )
 
         def _state(t_, s, scale):
-            return _SolverState(t=t_, hidden=s[0], aux_extra=s[1], output_scale=scale)
+            return _State(t=t_, hidden=s[0], aux_extra=s[1], output_scale=scale)
 
         t = interp_to.t
         prev = _state(t, interp_from_, interp_from.output_scale)
         sol = _state(t, solution_, interp_to.output_scale)
         acc = _state(t, step_from_, interp_to.output_scale)
-        # x = _InterpRes(step_from_, solution_, interp_from_)
-        #
-        # t = interp_to.t
-        # prev = _SolverState(
-        #     t=t, strategy=x.interp_from, output_scale=interp_from.output_scale
-        # )
-        # sol = _SolverState(
-        #     t=t, strategy=x.interpolated, output_scale=interp_to.output_scale
-        # )
-        # acc = _SolverState(
-        #     t=t, strategy=x.step_from, output_scale=interp_to.output_scale
-        # )
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def initial_condition(self):
@@ -820,13 +794,8 @@ def solver_mle(inputs, *, ssm):
         )
         hidden, observed = correction.complete(hidden, corr)
 
-        # Calibrate
         output_scale = calibration.update(state.output_scale, observed=observed)
-
-        # Return
-        state = _SolverState(
-            t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale
-        )
+        state = _State(t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
@@ -887,9 +856,7 @@ def solver_dynamic(inputs, *, ssm):
         hidden, corr = correction.complete(hidden, corr)
 
         # Return solution
-        state = _SolverState(
-            t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale
-        )
+        state = _State(t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
@@ -921,7 +888,7 @@ def solver(inputs, /, *, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
     correction, extrapolation, prior = inputs
 
-    def step(state: _SolverState, *, vector_field, dt, calibration):
+    def step(state: _State, *, vector_field, dt, calibration):
         del calibration  # unused
 
         prior_discretized = prior.discretize(dt)
@@ -939,7 +906,7 @@ def solver(inputs, /, *, ssm):
         hidden, corr = correction.complete(hidden, corr)
 
         # Extract and return solution
-        state = _SolverState(
+        state = _State(
             t=t, hidden=hidden, aux_extra=extra, output_scale=state.output_scale
         )
         return dt * error, state
