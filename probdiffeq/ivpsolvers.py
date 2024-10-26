@@ -19,6 +19,31 @@ class _MarkovProcess(containers.NamedTuple):
         return len(self.tcoeffs) - 1
 
 
+def prior_ibm(tcoeffs, *, ssm_fact: str, output_scale=None):
+    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
+    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+
+    output_scale_user = output_scale or np.ones_like(ssm.prototypes.output_scale())
+    discretize = ssm.conditional.ibm_transitions(output_scale=output_scale_user)
+
+    output_scale_calib = np.ones_like(ssm.prototypes.output_scale())
+    prior = _MarkovProcess(tcoeffs, output_scale_calib, discretize=discretize)
+    return prior, ssm
+
+
+def prior_ibm_discrete(ts, *, tcoeffs_like, ssm_fact: str, output_scale=None):
+    """Compute a time-discretized, multiply-integrated Wiener process."""
+    prior, ssm = prior_ibm(tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact)
+    transitions, (p, p_inv) = functools.vmap(prior.discretize)(np.diff(ts))
+
+    preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
+    conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
+
+    output_scale = np.ones_like(ssm.prototypes.output_scale())
+    init = ssm.normal.standard(len(tcoeffs_like), output_scale=output_scale)
+    return stats.MarkovSeq(init, conditionals), ssm
+
+
 @containers.dataclass
 class _InterpRes(Generic[R]):
     step_from: R
@@ -704,31 +729,6 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
     )
 
 
-def prior_ibm(tcoeffs, *, ssm_fact: str, output_scale=None):
-    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
-    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
-
-    output_scale_user = output_scale or np.ones_like(ssm.prototypes.output_scale())
-    discretize = ssm.conditional.ibm_transitions(output_scale=output_scale_user)
-
-    output_scale_calib = np.ones_like(ssm.prototypes.output_scale())
-    prior = _MarkovProcess(tcoeffs, output_scale_calib, discretize=discretize)
-    return prior, ssm
-
-
-def prior_ibm_discrete(ts, *, tcoeffs_like, ssm_fact: str, output_scale=None):
-    """Compute a time-discretized, multiply-integrated Wiener process."""
-    prior, ssm = prior_ibm(tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact)
-    transitions, (p, p_inv) = functools.vmap(prior.discretize)(np.diff(ts))
-
-    preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
-    conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
-
-    output_scale = np.ones_like(ssm.prototypes.output_scale())
-    init = ssm.normal.standard(len(tcoeffs_like), output_scale=output_scale)
-    return stats.MarkovSeq(init, conditionals), ssm
-
-
 @containers.dataclass
 class _Calibration:
     """Calibration implementation."""
@@ -736,55 +736,6 @@ class _Calibration:
     init: Callable
     update: Callable
     extract: Callable
-
-
-def _calibration_most_recent(*, ssm) -> _Calibration:
-    def init(prior):
-        return prior
-
-    def update(_state, /, observed):
-        return ssm.stats.mahalanobis_norm_relative(0.0, observed)
-
-    def extract(state, /):
-        return state, state
-
-    return _Calibration(init=init, update=update, extract=extract)
-
-
-def _calibration_none() -> _Calibration:
-    def init(prior):
-        return prior
-
-    def update(_state, /, observed):
-        raise NotImplementedError
-
-    def extract(state, /):
-        return state, state
-
-    return _Calibration(init=init, update=update, extract=extract)
-
-
-def _calibration_running_mean(*, ssm) -> _Calibration:
-    # TODO: if we pass the mahalanobis_relative term to the update() function,
-    #  it reduces to a generic stats() module that can also be used for e.g.
-    #  marginal likelihoods.
-    #  In this case, the _calibration_most_recent() stuff becomes void.
-
-    def init(prior):
-        return prior, prior, 0.0
-
-    def update(state, /, observed):
-        prior, calibrated, num_data = state
-
-        new_term = ssm.stats.mahalanobis_norm_relative(0.0, observed)
-        calibrated = ssm.stats.update_mean(calibrated, new_term, num=num_data)
-        return prior, calibrated, num_data + 1.0
-
-    def extract(state, /):
-        prior, calibrated, _num_data = state
-        return prior, calibrated
-
-    return _Calibration(init=init, update=update, extract=extract)
 
 
 class _SolverState(containers.NamedTuple):
@@ -898,6 +849,29 @@ def solver_mle(strategy, *, ssm):
     )
 
 
+def _calibration_running_mean(*, ssm) -> _Calibration:
+    # TODO: if we pass the mahalanobis_relative term to the update() function,
+    #  it reduces to a generic stats() module that can also be used for e.g.
+    #  marginal likelihoods.
+    #  In this case, the _calibration_most_recent() stuff becomes void.
+
+    def init(prior):
+        return prior, prior, 0.0
+
+    def update(state, /, observed):
+        prior, calibrated, num_data = state
+
+        new_term = ssm.stats.mahalanobis_norm_relative(0.0, observed)
+        calibrated = ssm.stats.update_mean(calibrated, new_term, num=num_data)
+        return prior, calibrated, num_data + 1.0
+
+    def extract(state, /):
+        prior, calibrated, _num_data = state
+        return prior, calibrated
+
+    return _Calibration(init=init, update=update, extract=extract)
+
+
 def solver_dynamic(strategy, *, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
@@ -924,6 +898,19 @@ def solver_dynamic(strategy, *, ssm):
     )
 
 
+def _calibration_most_recent(*, ssm) -> _Calibration:
+    def init(prior):
+        return prior
+
+    def update(_state, /, observed):
+        return ssm.stats.mahalanobis_norm_relative(0.0, observed)
+
+    def extract(state, /):
+        return state, state
+
+    return _Calibration(init=init, update=update, extract=extract)
+
+
 def solver(strategy, /):
     """Create a solver that does not calibrate the output scale automatically."""
 
@@ -947,3 +934,16 @@ def solver(strategy, /):
         name="Probabilistic solver",
         requires_rescaling=False,
     )
+
+
+def _calibration_none() -> _Calibration:
+    def init(prior):
+        return prior
+
+    def update(_state, /, observed):
+        raise NotImplementedError
+
+    def extract(state, /):
+        return state, state
+
+    return _Calibration(init=init, update=update, extract=extract)
