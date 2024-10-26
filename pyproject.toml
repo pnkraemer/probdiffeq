@@ -31,7 +31,6 @@ test =[
     "pytest",
     "pytest-xdist",
     "pytest-cases",
-    "pytest-cov",
     "diffeqzoo",
     "diffrax",
     "equinox",
