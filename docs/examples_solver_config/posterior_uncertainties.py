@@ -61,7 +61,8 @@ def vf(*ys, t):  # noqa: ARG001
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-solver = ivpsolvers.solver_mle(ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm), ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ssm=ssm)
+solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
@@ -115,9 +116,8 @@ plt.show()
 # +
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-solver = ivpsolvers.solver_mle(
-    ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm), ssm=ssm
-)
+strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)

@@ -70,8 +70,8 @@ def build_loss_fn(vf, initial_values, solver, *, standard_deviation=1e-2):
         tcoeffs = (*initial_values, vf(*initial_values, t=t0, p=parameters))
         ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="isotropic")
         ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-        strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-        solver_ts0 = ivpsolvers.solver(strategy)
+        strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+        solver_ts0 = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
         init = solver_ts0.initial_condition()
 
         sol = ivpsolve.solve_fixed_grid(
@@ -128,8 +128,8 @@ def vf(y, *, t, p):
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver_ts0 = ivpsolvers.solver(strategy)
+strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+solver_ts0 = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 init = solver_ts0.initial_condition()
 
 # +
@@ -168,8 +168,8 @@ plt.plot(sol.t, data, "-", linewidth=5, alpha=0.5, label="Data")
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver_ts0 = ivpsolvers.solver(strategy)
+strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+solver_ts0 = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(
@@ -182,8 +182,8 @@ plt.plot(sol.t, sol.u[0], ".-", label="Final guess")
 tcoeffs = (u0, vf(u0, t=t0, p=f_args))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver_ts0 = ivpsolvers.solver(strategy)
+strategy = ivpsolvers.strategy_smoother(ssm=ssm)
+solver_ts0 = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 init = solver_ts0.initial_condition()
 
 sol = ivpsolve.solve_fixed_grid(

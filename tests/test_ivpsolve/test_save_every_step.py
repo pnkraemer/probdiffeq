@@ -24,8 +24,8 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = strategy_fun(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+    strategy = strategy_fun(ssm=ssm)
+    solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     # clip=False because we need to test adaptive-step-interpolation
     #  for smoothers

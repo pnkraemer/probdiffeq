@@ -72,9 +72,9 @@ num_derivatives = 1
 tcoeffs = (u0, vf(u0, t=t0))
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="dense")
 ts1 = ivpsolvers.correction_ts1(ssm=ssm)
-strategy = ivpsolvers.strategy_filter(ibm, ts1, ssm=ssm)
-dynamic = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
-mle = ivpsolvers.solver_mle(strategy, ssm=ssm)
+strategy = ivpsolvers.strategy_filter(ssm=ssm)
+dynamic = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
+mle = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts1, ssm=ssm)
 
 # +
 t0, t1 = 0.0, 3.0

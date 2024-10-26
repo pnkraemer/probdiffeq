@@ -81,8 +81,9 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
         ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=implementation)
-        strategy = ivpsolvers.strategy_filter(ibm, correction(ssm=ssm), ssm=ssm)
-        solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+        strategy = ivpsolvers.strategy_filter(ssm=ssm)
+        corr = correction(ssm=ssm)
+        solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
         control = ivpsolve.control_proportional_integral()
         adaptive_solver = ivpsolve.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm

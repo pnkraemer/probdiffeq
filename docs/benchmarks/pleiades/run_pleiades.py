@@ -101,8 +101,10 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
 
         ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="isotropic")
         ts0_or_ts1 = correction_fun(ssm=ssm, ode_order=2)
-        strategy = ivpsolvers.strategy_filter(ibm, ts0_or_ts1, ssm=ssm)
-        solver = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
+        strategy = ivpsolvers.strategy_filter(ssm=ssm)
+        solver = ivpsolvers.solver_dynamic(
+            strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
+        )
         control = ivpsolve.control_proportional_integral()
         adaptive_solver = ivpsolve.adaptive(
             solver, atol=1e-3 * tol, rtol=tol, control=control, ssm=ssm

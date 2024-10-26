@@ -16,8 +16,8 @@ def test_exponential_approximated_well(fact):
 
     ibm, ssm = ivpsolvers.prior_ibm((*u0, vf(*u0, t=t0)), ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver_dynamic(strategy, ssm=ssm)
+    strategy = ivpsolvers.strategy_filter(ssm=ssm)
+    solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     init = solver.initial_condition()
 

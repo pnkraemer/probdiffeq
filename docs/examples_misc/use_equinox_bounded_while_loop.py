@@ -64,8 +64,8 @@ def solution_routine():
     ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="isotropic")
     ts0 = ivpsolvers.correction_ts0(ode_order=1, ssm=ssm)
 
-    strategy = ivpsolvers.strategy_fixedpoint(ibm, ts0, ssm=ssm)
-    solver = ivpsolvers.solver(strategy)
+    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
     init = solver.initial_condition()
 

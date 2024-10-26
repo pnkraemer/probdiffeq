@@ -173,10 +173,14 @@ def _tensor_points(x, /, *, d):
 class _ExtraImpl:
     """Extrapolation model interface."""
 
-    prior: _MarkovProcess
+    name: str
     ssm: Any
 
-    def initial_condition(self):
+    is_suitable_for_save_at: int
+    is_suitable_for_save_every_step: int
+    is_suitable_for_offgrid_marginals: int
+
+    def initial_condition(self, *, prior):
         """Compute an initial condition from a set of Taylor coefficients."""
         raise NotImplementedError
 
@@ -184,7 +188,7 @@ class _ExtraImpl:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def begin(self, rv, _extra, /, dt):
+    def begin(self, rv, _extra, /, *, prior_discretized):
         """Begin the extrapolation."""
         raise NotImplementedError
 
@@ -196,27 +200,27 @@ class _ExtraImpl:
         """Extract a solution from a state."""
         raise NotImplementedError
 
-    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
         """Interpolate."""
         raise NotImplementedError
 
-    def interpolate_at_t1(self, rv, extra, /):
+    def interpolate_at_t1(self, rv, extra, /, *, prior):
         """Process the state at checkpoint t=t_n."""
         raise NotImplementedError
 
 
 @containers.dataclass
 class _ExtraImplSmoother(_ExtraImpl):
-    def initial_condition(self):
-        rv = self.ssm.normal.from_tcoeffs(self.prior.tcoeffs)
-        cond = self.ssm.conditional.identity(len(self.prior.tcoeffs))
+    def initial_condition(self, *, prior):
+        rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
+        cond = self.ssm.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(self, sol: stats.MarkovSeq, /):
         return sol.init, sol.conditional
 
-    def begin(self, rv, _extra, /, dt):
-        cond, (p, p_inv) = self.prior.discretize(dt)
+    def begin(self, rv, _extra, /, *, prior_discretized):
+        cond, (p, p_inv) = prior_discretized
 
         rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
 
@@ -243,7 +247,7 @@ class _ExtraImplSmoother(_ExtraImpl):
     def extract(self, hidden_state, extra, /):
         return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
-    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
         """Interpolate.
 
         A smoother interpolates by_
@@ -258,9 +262,14 @@ class _ExtraImplSmoother(_ExtraImpl):
         Subsequent IVP solver steps continue from the value at 't1'.
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        extrapolated_t = self._extrapolate(*state_t0, dt=dt0, output_scale=output_scale)
+        prior0 = prior.discretize(dt0)
+        extrapolated_t = self._extrapolate(
+            *state_t0, output_scale=output_scale, prior_discretized=prior0
+        )
+
+        prior1 = prior.discretize(dt1)
         extrapolated_t1 = self._extrapolate(
-            *extrapolated_t, dt=dt1, output_scale=output_scale
+            *extrapolated_t, output_scale=output_scale, prior_discretized=prior1
         )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
@@ -278,11 +287,12 @@ class _ExtraImplSmoother(_ExtraImpl):
             interp_from=solution_at_t,
         )
 
-    def _extrapolate(self, state, extra, /, *, dt, output_scale):
-        state, cache = self.begin(state, extra, dt=dt)
+    def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
+        state, cache = self.begin(state, extra, prior_discretized=prior_discretized)
         return self.complete(state, cache, output_scale=output_scale)
 
-    def interpolate_at_t1(self, rv, extra, /):
+    def interpolate_at_t1(self, rv, extra, /, *, prior):
+        del prior
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
@@ -291,11 +301,11 @@ class _ExtraImplFilter(_ExtraImpl):
     def init(self, sol, /):
         return sol, None
 
-    def initial_condition(self):
-        return self.ssm.normal.from_tcoeffs(self.prior.tcoeffs)
+    def initial_condition(self, *, prior):
+        return self.ssm.normal.from_tcoeffs(prior.tcoeffs)
 
-    def begin(self, rv, _extra, /, dt):
-        cond, (p, p_inv) = self.prior.discretize(dt)
+    def begin(self, rv, _extra, /, prior_discretized):
+        cond, (p, p_inv) = prior_discretized
 
         rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
 
@@ -321,13 +331,14 @@ class _ExtraImplFilter(_ExtraImpl):
         # Gather and return
         return extrapolated, None
 
-    def interpolate(self, state_t0, marginal_t1, dt0, dt1, output_scale):
+    def interpolate(self, state_t0, marginal_t1, dt0, dt1, output_scale, *, prior):
         # todo: by ditching marginal_t1 and dt1, this function _extrapolates
         #  (no *inter*polation happening)
         del dt1
 
         hidden, extra = state_t0
-        hidden, extra = self.begin(hidden, extra, dt=dt0)
+        prior0 = prior.discretize(dt0)
+        hidden, extra = self.begin(hidden, extra, prior_discretized=prior0)
         hidden, extra = self.complete(hidden, extra, output_scale=output_scale)
 
         # Consistent state-types in interpolation result.
@@ -335,22 +346,23 @@ class _ExtraImplFilter(_ExtraImpl):
         step_from = (marginal_t1, None)
         return _InterpRes(step_from=step_from, interpolated=interp, interp_from=interp)
 
-    def interpolate_at_t1(self, rv, extra, /):
+    def interpolate_at_t1(self, rv, extra, /, *, prior):
+        del prior
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
 @containers.dataclass
 class _ExtraImplFixedPoint(_ExtraImpl):
-    def initial_condition(self):
-        rv = self.ssm.normal.from_tcoeffs(self.prior.tcoeffs)
-        cond = self.ssm.conditional.identity(len(self.prior.tcoeffs))
+    def initial_condition(self, prior):
+        rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
+        cond = self.ssm.conditional.identity(len(prior.tcoeffs))
         return stats.MarkovSeq(init=rv, conditional=cond)
 
     def init(self, sol: stats.MarkovSeq, /):
         return sol.init, sol.conditional
 
-    def begin(self, rv, extra, /, dt):
-        cond, (p, p_inv) = self.prior.discretize(dt)
+    def begin(self, rv, extra, /, prior_discretized):
+        cond, (p, p_inv) = prior_discretized
 
         rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
 
@@ -380,7 +392,7 @@ class _ExtraImplFixedPoint(_ExtraImpl):
         # Gather and return
         return extrapolated, cond
 
-    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale):
+    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
         """Interpolate.
 
         A fixed-point smoother interpolates by
@@ -419,11 +431,16 @@ class _ExtraImplFixedPoint(_ExtraImpl):
         then don't understand why tests fail.)
         """
         # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        extrapolated_t = self._extrapolate(*state_t0, dt=dt0, output_scale=output_scale)
-        conditional_id = self.ssm.conditional.identity(self.prior.num_derivatives + 1)
+        prior0 = prior.discretize(dt0)
+        extrapolated_t = self._extrapolate(
+            *state_t0, output_scale=output_scale, prior_discretized=prior0
+        )
+        conditional_id = self.ssm.conditional.identity(prior.num_derivatives + 1)
         previous_new = (extrapolated_t[0], conditional_id)
+
+        prior1 = prior.discretize(dt1)
         extrapolated_t1 = self._extrapolate(
-            *previous_new, dt=dt1, output_scale=output_scale
+            *previous_new, output_scale=output_scale, prior_discretized=prior1
         )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
@@ -437,12 +454,12 @@ class _ExtraImplFixedPoint(_ExtraImpl):
             interp_from=previous_new,
         )
 
-    def _extrapolate(self, state, extra, /, *, dt, output_scale):
-        x, cache = self.begin(state, extra, dt=dt)
+    def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
+        x, cache = self.begin(state, extra, prior_discretized=prior_discretized)
         return self.complete(x, cache, output_scale=output_scale)
 
-    def interpolate_at_t1(self, rv, extra, /):
-        cond_identity = self.ssm.conditional.identity(self.prior.num_derivatives + 1)
+    def interpolate_at_t1(self, rv, extra, /, *, prior):
+        cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
@@ -558,174 +575,36 @@ def _estimate_error(observed, /, *, ssm):
     return output_scale * error_estimate_unscaled
 
 
-class _StrategyState(containers.NamedTuple):
-    t: Any
-    hidden: Any
-    aux_extra: Any
-    aux_corr: Any
-
-
-@containers.dataclass
-class _Strategy:
-    """Estimation strategy."""
-
-    name: str
-    extrapolation: _ExtraImpl
-    correction: _Correction
-    ssm: Any
-
-    is_suitable_for_save_at: int
-    is_suitable_for_offgrid_marginals: int
-    is_suitable_for_save_every_step: int
-    prior: _MarkovProcess
-
-    @property
-    def num_derivatives(self):
-        return self.prior.num_derivatives
-
-    def init(self, t, posterior, /) -> _StrategyState:
-        """Initialise a state from a posterior."""
-        rv, extra = self.extrapolation.init(posterior)
-        rv, corr = self.correction.init(rv)
-        return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
-
-    def initial_condition(self):
-        """Construct an initial condition from a set of Taylor coefficients."""
-        return self.extrapolation.initial_condition()
-
-    def begin(self, state: _StrategyState, /, *, dt, vector_field):
-        """Predict the error of an upcoming step."""
-        hidden, extra = self.extrapolation.begin(state.hidden, state.aux_extra, dt=dt)
-        t = state.t + dt
-        error, observed, corr = self.correction.estimate_error(
-            hidden, vector_field=vector_field, t=t
-        )
-        state = _StrategyState(t=t, hidden=hidden, aux_extra=extra, aux_corr=corr)
-        return error, observed, state
-
-    def complete(self, state, /, *, output_scale):
-        """Complete the step after the error has been predicted."""
-        hidden, extra = self.extrapolation.complete(
-            state.hidden, state.aux_extra, output_scale=output_scale
-        )
-        hidden, corr = self.correction.complete(hidden, state.aux_corr)
-        return _StrategyState(t=state.t, hidden=hidden, aux_extra=extra, aux_corr=corr)
-
-    def extract(self, state: _StrategyState, /):
-        """Extract the solution from a state."""
-        hidden = self.correction.extract(state.hidden)
-        sol = self.extrapolation.extract(hidden, state.aux_extra)
-        return state.t, sol
-
-    def case_interpolate_at_t1(self, state_t1: _StrategyState) -> _InterpRes:
-        """Process the solution in case t=t_n."""
-        _tmp = self.extrapolation.interpolate_at_t1(state_t1.hidden, state_t1.aux_extra)
-        step_from, solution, interp_from = (
-            _tmp.step_from,
-            _tmp.interpolated,
-            _tmp.interp_from,
-        )
-
-        def _state(x):
-            t = state_t1.t
-            corr_like = tree_util.tree_map(np.empty_like, state_t1.aux_corr)
-            return _StrategyState(t=t, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
-
-        step_from = _state(step_from)
-        solution = _state(solution)
-        interp_from = _state(interp_from)
-        return _InterpRes(step_from, solution, interp_from)
-
-    def case_interpolate(
-        self, t, *, s0: _StrategyState, s1: _StrategyState, output_scale
-    ) -> _InterpRes:
-        """Process the solution in case t>t_n."""
-        # Interpolate
-        interp = self.extrapolation.interpolate(
-            state_t0=(s0.hidden, s0.aux_extra),
-            marginal_t1=s1.hidden,
-            dt0=t - s0.t,
-            dt1=s1.t - t,
-            output_scale=output_scale,
-        )
-
-        # Turn outputs into valid states
-
-        def _state(t_, x):
-            corr_like = tree_util.tree_map(np.empty_like, s0.aux_corr)
-            return _StrategyState(t=t_, hidden=x[0], aux_extra=x[1], aux_corr=corr_like)
-
-        step_from = _state(s1.t, interp.step_from)
-        interpolated = _state(t, interp.interpolated)
-        interp_from = _state(t, interp.interp_from)
-        return _InterpRes(
-            step_from=step_from, interpolated=interpolated, interp_from=interp_from
-        )
-
-    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
-        """Compute offgrid_marginals."""
-        if not self.is_suitable_for_offgrid_marginals:
-            raise NotImplementedError
-
-        dt0 = t - t0
-        dt1 = t1 - t
-        state_t0 = self.init(t0, posterior_t0)
-
-        interp = self.extrapolation.interpolate(
-            state_t0=(state_t0.hidden, state_t0.aux_extra),
-            marginal_t1=marginals_t1,
-            dt0=dt0,
-            dt1=dt1,
-            output_scale=output_scale,
-        )
-
-        (marginals, _aux) = interp.interpolated
-        u = self.ssm.stats.qoi(marginals)
-        return u, marginals
-
-
-def strategy_smoother(prior, correction: _Correction, /, ssm) -> _Strategy:
+def strategy_smoother(*, ssm):
     """Construct a smoother."""
-    extrapolation = _ExtraImplSmoother(prior, ssm=ssm)
-    return _Strategy(
-        extrapolation=extrapolation,
-        correction=correction,
-        prior=prior,
+    return _ExtraImplSmoother(
+        name="Smoother",
         ssm=ssm,
         is_suitable_for_save_at=False,
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
-        name="Smoother",
     )
 
 
-def strategy_fixedpoint(prior, correction: _Correction, /, ssm) -> _Strategy:
+def strategy_fixedpoint(*, ssm):
     """Construct a fixedpoint-smoother."""
-    extrapolation = _ExtraImplFixedPoint(prior, ssm=ssm)
-    return _Strategy(
-        extrapolation=extrapolation,
-        correction=correction,
+    return _ExtraImplFixedPoint(
+        name="Fixed-point smoother",
         ssm=ssm,
-        prior=prior,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
-        name="Fixed-point smoother",
     )
 
 
-def strategy_filter(prior, correction: _Correction, /, *, ssm) -> _Strategy:
+def strategy_filter(*, ssm):
     """Construct a filter."""
-    extrapolation = _ExtraImplFilter(prior, ssm=ssm)
-    return _Strategy(
+    return _ExtraImplFilter(
         name="Filter",
-        prior=prior,
-        extrapolation=extrapolation,
-        correction=correction,
-        is_suitable_for_save_at=True,
-        is_suitable_for_offgrid_marginals=True,
-        is_suitable_for_save_every_step=True,
         ssm=ssm,
+        is_suitable_for_save_at=True,
+        is_suitable_for_save_every_step=True,
+        is_suitable_for_offgrid_marginals=True,
     )
 
 
@@ -738,84 +617,148 @@ class _Calibration:
     extract: Callable
 
 
-class _SolverState(containers.NamedTuple):
+class _State(containers.NamedTuple):
     """Solver state."""
 
-    strategy: Any
+    t: Any
+    hidden: Any
+    aux_extra: Any
     output_scale: Any
-
-    @property
-    def t(self):
-        return self.strategy.t
 
 
 @containers.dataclass
 class _ProbabilisticSolver:
     name: str
-    calibration: _Calibration
-    step_implementation: Callable
-    strategy: _Strategy
     requires_rescaling: bool
 
-    @property
-    def offgrid_marginals(self):
-        return self.strategy.offgrid_marginals
+    step_implementation: Callable
+
+    prior: _MarkovProcess
+    ssm: Any
+    extrapolation: _ExtraImpl
+    calibration: _Calibration
+    correction: _Correction
+
+    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
+        """Compute offgrid_marginals."""
+        if not self.is_suitable_for_offgrid_marginals:
+            raise NotImplementedError
+
+        dt0 = t - t0
+        dt1 = t1 - t
+
+        rv, extra = self.extrapolation.init(posterior_t0)
+        rv, corr = self.correction.init(rv)
+
+        # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
+        interp = self.extrapolation.interpolate(
+            state_t0=(rv, extra),
+            marginal_t1=marginals_t1,
+            dt0=dt0,
+            dt1=dt1,
+            output_scale=output_scale,
+            prior=self.prior,
+        )
+
+        (marginals, _aux) = interp.interpolated
+        u = self.ssm.stats.qoi(marginals)
+        return u, marginals
 
     @property
     def error_contraction_rate(self):
-        return self.strategy.num_derivatives + 1
+        return self.prior.num_derivatives + 1
+
+    @property
+    def is_suitable_for_offgrid_marginals(self):
+        return self.extrapolation.is_suitable_for_offgrid_marginals
 
     @property
     def is_suitable_for_save_at(self):
-        return self.strategy.is_suitable_for_save_at
+        return self.extrapolation.is_suitable_for_save_at
 
     @property
     def is_suitable_for_save_every_step(self):
-        return self.strategy.is_suitable_for_save_every_step
+        return self.extrapolation.is_suitable_for_save_every_step
 
-    def init(self, t, initial_condition) -> _SolverState:
+    def init(self, t, initial_condition) -> _State:
         posterior, output_scale = initial_condition
-        state_strategy = self.strategy.init(t, posterior)
-        calib_state = self.calibration.init(output_scale)
-        return _SolverState(strategy=state_strategy, output_scale=calib_state)
 
-    def step(self, state: _SolverState, *, vector_field, dt) -> _SolverState:
+        rv, extra = self.extrapolation.init(posterior)
+        rv, corr = self.correction.init(rv)
+
+        calib_state = self.calibration.init(output_scale)
+        return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
+
+    def step(self, state: _State, *, vector_field, dt) -> _State:
         return self.step_implementation(
             state, vector_field=vector_field, dt=dt, calibration=self.calibration
         )
 
-    def extract(self, state: _SolverState, /):
-        t, posterior = self.strategy.extract(state.strategy)
+    def extract(self, state: _State, /):
+        hidden = self.correction.extract(state.hidden)
+        posterior = self.extrapolation.extract(hidden, state.aux_extra)
+        t = state.t
+
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
-    def interpolate(
-        self, t, *, interp_from: _SolverState, interp_to: _SolverState
-    ) -> _InterpRes:
+    def interpolate(self, t, *, interp_from: _State, interp_to: _State) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
-        interp = self.strategy.case_interpolate(
-            t, s0=interp_from.strategy, s1=interp_to.strategy, output_scale=output_scale
+        return self._case_interpolate(
+            t, s0=interp_from, s1=interp_to, output_scale=output_scale
         )
-        prev = _SolverState(interp.interp_from, output_scale=interp_from.output_scale)
-        sol = _SolverState(interp.interpolated, output_scale=interp_to.output_scale)
-        acc = _SolverState(interp.step_from, output_scale=interp_to.output_scale)
-        return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
+
+    def _case_interpolate(self, t, *, s0, s1, output_scale) -> _InterpRes:
+        """Process the solution in case t>t_n."""
+        # Interpolate
+        interp = self.extrapolation.interpolate(
+            state_t0=(s0.hidden, s0.aux_extra),
+            marginal_t1=s1.hidden,
+            dt0=t - s0.t,
+            dt1=s1.t - t,
+            output_scale=output_scale,
+            prior=self.prior,
+        )
+
+        # Turn outputs into valid states
+
+        def _state(t_, x, scale):
+            return _State(t=t_, hidden=x[0], aux_extra=x[1], output_scale=scale)
+
+        step_from = _state(s1.t, interp.step_from, s1.output_scale)
+        interpolated = _state(t, interp.interpolated, s1.output_scale)
+        interp_from = _state(t, interp.interp_from, s0.output_scale)
+        return _InterpRes(
+            step_from=step_from, interpolated=interpolated, interp_from=interp_from
+        )
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
-        x = self.strategy.case_interpolate_at_t1(interp_to.strategy)
+        """Process the solution in case t=t_n."""
+        tmp = self.extrapolation.interpolate_at_t1(
+            interp_to.hidden, interp_to.aux_extra, prior=self.prior
+        )
+        step_from_, solution_, interp_from_ = (
+            tmp.step_from,
+            tmp.interpolated,
+            tmp.interp_from,
+        )
 
-        prev = _SolverState(x.interp_from, output_scale=interp_from.output_scale)
-        sol = _SolverState(x.interpolated, output_scale=interp_to.output_scale)
-        acc = _SolverState(x.step_from, output_scale=interp_to.output_scale)
+        def _state(t_, s, scale):
+            return _State(t=t_, hidden=s[0], aux_extra=s[1], output_scale=scale)
+
+        t = interp_to.t
+        prev = _state(t, interp_from_, interp_from.output_scale)
+        sol = _state(t, solution_, interp_to.output_scale)
+        acc = _state(t, step_from_, interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
     def initial_condition(self):
         """Construct an initial condition."""
-        posterior = self.strategy.initial_condition()
-        return posterior, self.strategy.prior.output_scale
+        posterior = self.extrapolation.initial_condition(prior=self.prior)
+        return posterior, self.prior.output_scale
 
 
-def solver_mle(strategy, *, ssm):
+def solver_mle(extrapolation, /, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
     Warning: needs to be combined with a call to stats.calibrate()
@@ -824,27 +767,33 @@ def solver_mle(strategy, *, ssm):
 
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-        error, _, state_strategy = strategy.begin(
-            state.strategy, dt=dt, vector_field=vector_field
+
+        prior_discretized = prior.discretize(dt)
+        hidden, extra = extrapolation.begin(
+            state.hidden, state.aux_extra, prior_discretized=prior_discretized
+        )
+        t = state.t + dt
+        error, _, corr = correction.estimate_error(
+            hidden, vector_field=vector_field, t=t
         )
 
-        state_strategy = strategy.complete(
-            state_strategy, output_scale=output_scale_prior
+        hidden, extra = extrapolation.complete(
+            hidden, extra, output_scale=output_scale_prior
         )
-        observed = state_strategy.aux_corr
+        hidden, observed = correction.complete(hidden, corr)
 
-        # Calibrate
         output_scale = calibration.update(state.output_scale, observed=observed)
-
-        # Return
-        state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+        state = _State(t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
+        ssm=ssm,
         name="Probabilistic solver with MLE calibration",
+        prior=prior,
         calibration=_calibration_running_mean(ssm=ssm),
         step_implementation=step_mle,
-        strategy=strategy,
+        extrapolation=extrapolation,
+        correction=correction,
         requires_rescaling=True,
     )
 
@@ -872,25 +821,34 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver_dynamic(strategy, *, ssm):
+def solver_dynamic(extrapolation, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
-        error, observed, state_strategy = strategy.begin(
-            state.strategy, dt=dt, vector_field=vector_field
+        prior_discretized = prior.discretize(dt)
+        hidden, extra = extrapolation.begin(
+            state.hidden, state.aux_extra, prior_discretized=prior_discretized
+        )
+        t = state.t + dt
+        error, observed, corr = correction.estimate_error(
+            hidden, vector_field=vector_field, t=t
         )
 
         output_scale = calibration.update(state.output_scale, observed=observed)
 
-        prior, _calibrated = calibration.extract(output_scale)
-        state_strategy = strategy.complete(state_strategy, output_scale=prior)
+        prior_, _calibrated = calibration.extract(output_scale)
+        hidden, extra = extrapolation.complete(hidden, extra, output_scale=prior_)
+        hidden, corr = correction.complete(hidden, corr)
 
         # Return solution
-        state = _SolverState(strategy=state_strategy, output_scale=output_scale)
+        state = _State(t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
-        strategy=strategy,
+        prior=prior,
+        ssm=ssm,
+        extrapolation=extrapolation,
+        correction=correction,
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
         step_implementation=step_dynamic,
@@ -911,24 +869,37 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver(strategy, /):
+def solver(extrapolation, /, *, correction, prior, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
 
-    def step(state: _SolverState, *, vector_field, dt, calibration):
+    def step(state: _State, *, vector_field, dt, calibration):
         del calibration  # unused
 
-        error, _observed, state_strategy = strategy.begin(
-            state.strategy, dt=dt, vector_field=vector_field
+        prior_discretized = prior.discretize(dt)
+        hidden, extra = extrapolation.begin(
+            state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
-        state_strategy = strategy.complete(
-            state_strategy, output_scale=state.output_scale
+        t = state.t + dt
+        error, _, corr = correction.estimate_error(
+            hidden, vector_field=vector_field, t=t
         )
+
+        hidden, extra = extrapolation.complete(
+            hidden, extra, output_scale=state.output_scale
+        )
+        hidden, corr = correction.complete(hidden, corr)
+
         # Extract and return solution
-        state = _SolverState(strategy=state_strategy, output_scale=state.output_scale)
+        state = _State(
+            t=t, hidden=hidden, aux_extra=extra, output_scale=state.output_scale
+        )
         return dt * error, state
 
     return _ProbabilisticSolver(
-        strategy=strategy,
+        ssm=ssm,
+        prior=prior,
+        extrapolation=extrapolation,
+        correction=correction,
         calibration=_calibration_none(),
         step_implementation=step,
         name="Probabilistic solver",

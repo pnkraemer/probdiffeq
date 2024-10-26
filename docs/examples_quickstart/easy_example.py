@@ -55,11 +55,11 @@ t0, t1 = 0.0, 1.0
 # Set up a state-space model
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
+ts0 = ivpsolvers.correction_ts1(ode_order=1, ssm=ssm)
+strategy = ivpsolvers.strategy_smoother(ssm=ssm)
 
 # Build a solver
-ts0 = ivpsolvers.correction_ts1(ode_order=1, ssm=ssm)
-strategy = ivpsolvers.strategy_smoother(ibm, ts0, ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, ssm=ssm)
+solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
 # -
 
