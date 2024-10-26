@@ -48,7 +48,7 @@ def case_solve_adaptive_save_at(fact):
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
         init = solver.initial_condition()
-        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+        adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
         return ivpsolve.solve_adaptive_save_at(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
@@ -73,7 +73,7 @@ def case_solve_adaptive_save_every_step(fact):
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
         init = solver.initial_condition()
-        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+        adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
         return ivpsolve.solve_adaptive_save_every_step(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )
@@ -98,7 +98,7 @@ def case_simulate_terminal_values(fact):
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
         init = solver.initial_condition()
-        adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2)
+        adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
         )

@@ -29,8 +29,8 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
 
     # clip=False because we need to test adaptive-step-interpolation
     #  for smoothers
-    control = ivpsolve.control_proportional_integral(clip=False)
-    adaptive_solver = ivpsolve.adaptive(
+    control = ivpsolvers.control_proportional_integral(clip=False)
+    adaptive_solver = ivpsolvers.adaptive(
         solver, atol=1e-2, rtol=1e-2, control=control, ssm=ssm
     )
 

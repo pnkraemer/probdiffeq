@@ -210,7 +210,7 @@ def solve_adaptive(theta, *, save_at):
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_at(

@@ -26,7 +26,7 @@ def fixture_approximate_solution(fact):
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    asolver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    asolver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_every_step(
@@ -90,7 +90,7 @@ def fixture_approximate_solution_batched(fact):
         ts0 = ivpsolvers.correction_ts0(ssm=ssm)
         strategy = ivpsolvers.strategy_filter(ssm=ssm)
         solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+        adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
         initcond = solver.initial_condition()
         return ivpsolve.solve_adaptive_save_at(

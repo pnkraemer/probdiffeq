@@ -60,7 +60,7 @@ strategy = ivpsolvers.strategy_smoother(ssm=ssm)
 
 # Build a solver
 solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
+adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
 # -
 
 

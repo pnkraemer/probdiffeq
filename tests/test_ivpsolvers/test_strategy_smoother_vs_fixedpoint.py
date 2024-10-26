@@ -24,7 +24,7 @@ def fixture_solution_smoother(solver_setup):
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
 
     init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_every_step(
@@ -45,7 +45,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
 
     save_at = solution_smoother.t
 
@@ -84,7 +84,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
     init = solver.initial_condition()
 
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(

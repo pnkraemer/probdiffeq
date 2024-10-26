@@ -66,7 +66,7 @@ def solution_routine():
 
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
     init = solver.initial_condition()
 
     def simulate(init_val):
