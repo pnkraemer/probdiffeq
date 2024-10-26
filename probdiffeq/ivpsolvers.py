@@ -594,8 +594,7 @@ def strategy_smoother(prior, correction: _Correction, /, ssm):
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
     )
-    strategy = None
-    return strategy, correction, extrapolation, prior
+    return correction, extrapolation, prior
 
 
 def strategy_fixedpoint(prior, correction: _Correction, /, ssm):
@@ -607,8 +606,7 @@ def strategy_fixedpoint(prior, correction: _Correction, /, ssm):
         is_suitable_for_save_every_step=False,
         is_suitable_for_offgrid_marginals=False,
     )
-    strategy = None
-    return strategy, correction, extrapolation, prior
+    return correction, extrapolation, prior
 
 
 def strategy_filter(prior, correction: _Correction, /, *, ssm):
@@ -620,8 +618,7 @@ def strategy_filter(prior, correction: _Correction, /, *, ssm):
         is_suitable_for_save_every_step=True,
         is_suitable_for_offgrid_marginals=True,
     )
-    strategy = None
-    return strategy, correction, extrapolation, prior
+    return correction, extrapolation, prior
 
 
 @containers.dataclass
@@ -806,7 +803,7 @@ def solver_mle(inputs, *, ssm):
     Warning: needs to be combined with a call to stats.calibrate()
     after solving if the MLE-calibration shall be *used*.
     """
-    strategy, correction, extrapolation, prior = inputs
+    correction, extrapolation, prior = inputs
 
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
@@ -875,7 +872,7 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
 
 def solver_dynamic(inputs, *, ssm):
     """Create a solver that calibrates the output scale dynamically."""
-    strategy, correction, extrapolation, prior = inputs
+    correction, extrapolation, prior = inputs
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
         prior_discretized = prior.discretize(dt)
@@ -929,7 +926,7 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
 
 def solver(inputs, /, *, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
-    strategy, correction, extrapolation, prior = inputs
+    correction, extrapolation, prior = inputs
 
     def step(state: _SolverState, *, vector_field, dt, calibration):
         del calibration  # unused
