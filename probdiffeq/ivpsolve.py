@@ -205,8 +205,8 @@ class _AdaSolver:
                 dt=self.control.extract(state_control),
             )
             # Normalise the error
-            u_proposed = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
-            u_step_from = self.ssm.stats.qoi(state_proposed.strategy.hidden)[0]
+            u_proposed = self.ssm.stats.qoi(state_proposed.hidden)[0]
+            u_step_from = self.ssm.stats.qoi(state_proposed.hidden)[0]
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
             error_power = _error_scale_and_normalize(error_estimate, u=u)
 
