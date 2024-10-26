@@ -592,10 +592,6 @@ class _Strategy:
         rv, corr = correction.init(rv)
         return _StrategyState(t=t, hidden=rv, aux_extra=extra, aux_corr=corr)
 
-    def initial_condition(self, *, extrapolation, prior):
-        """Construct an initial condition from a set of Taylor coefficients."""
-        return extrapolation.initial_condition(prior=prior)
-
     def begin(
         self,
         state: _StrategyState,
@@ -879,9 +875,7 @@ class _ProbabilisticSolver:
 
     def initial_condition(self):
         """Construct an initial condition."""
-        posterior = self.strategy.initial_condition(
-            prior=self.prior, extrapolation=self.extrapolation
-        )
+        posterior = self.extrapolation.initial_condition(prior=self.prior)
         return posterior, self.prior.output_scale
 
 
