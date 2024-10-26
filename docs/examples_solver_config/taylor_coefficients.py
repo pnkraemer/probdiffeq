@@ -69,7 +69,7 @@ def solve(tc):
     init = solver.initial_condition()
 
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
     return ivpsolve.solve_adaptive_save_at(
         vf, init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )

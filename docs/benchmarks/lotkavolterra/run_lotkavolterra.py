@@ -84,8 +84,8 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         strategy = ivpsolvers.strategy_filter(ssm=ssm)
         corr = correction(ssm=ssm)
         solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-        control = ivpsolve.control_proportional_integral()
-        adaptive_solver = ivpsolve.adaptive(
+        control = ivpsolvers.control_proportional_integral()
+        adaptive_solver = ivpsolvers.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
         )
 

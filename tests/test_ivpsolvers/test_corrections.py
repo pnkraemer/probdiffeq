@@ -48,7 +48,7 @@ def fixture_solution(correction_impl, fact):
 
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1, "ssm": ssm}
 

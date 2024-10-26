@@ -31,7 +31,7 @@ def fixture_solution(strategy_func, fact):
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = strategy_func(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
     init = solver.initial_condition()
     sol = ivpsolve.solve_adaptive_terminal_values(

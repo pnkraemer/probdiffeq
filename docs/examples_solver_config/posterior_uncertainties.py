@@ -63,7 +63,7 @@ ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 strategy = ivpsolvers.strategy_filter(ssm=ssm)
 solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 
@@ -118,7 +118,7 @@ ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
 solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-adaptive_solver = ivpsolve.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
 ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
 
