@@ -43,10 +43,6 @@ class StatsBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def marginal_nth_derivative(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def qoi_from_sample(self, sample, /):
         raise NotImplementedError
 
@@ -105,36 +101,10 @@ class DenseStats(StatsBackend):
     def qoi(self, rv):
         return self.qoi_from_sample(rv.mean)
 
-    def marginal_nth_derivative(self, rv, i):
-        if rv.mean.ndim > 1:
-            return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
-                rv, i
-            )
-
-        m = self._select(rv.mean, i)
-        c = functools.vmap(self._select, in_axes=(1, None), out_axes=1)(rv.cholesky, i)
-        c = cholesky_util.triu_via_qr(c.T)
-        return _normal.Normal(m, c.T)
-
     def qoi_from_sample(self, sample, /):
         if np.ndim(sample) > 1:
             return functools.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
-
-    def _select(self, x, /, idx_or_slice):
-        x_reshaped = np.reshape(x, (-1, *self.ode_shape), order="F")
-        if isinstance(idx_or_slice, int) and idx_or_slice > x_reshaped.shape[0]:
-            raise ValueError
-        return x_reshaped[idx_or_slice]
-
-    @staticmethod
-    def _autobatch_linop(fun):
-        def fun_(x):
-            if np.ndim(x) > 1:
-                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
-            return fun(x)
-
-        return fun_
 
     def update_mean(self, mean, x, /, num):
         nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
@@ -197,19 +167,6 @@ class IsotropicStats(StatsBackend):
         cov = np.kron(eye_d, cov)
         mean = rv.mean.reshape((-1,), order="F")
         return (mean, cov)
-
-    def marginal_nth_derivative(self, rv, i):
-        if np.ndim(rv.mean) > 2:
-            return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
-                rv, i
-            )
-
-        if i > np.shape(rv.mean)[0]:
-            raise ValueError
-
-        mean = rv.mean[i, :]
-        cholesky = cholesky_util.triu_via_qr(rv.cholesky[[i], :].T).T
-        return _normal.Normal(mean, cholesky)
 
     def qoi(self, rv):
         return self.qoi_from_sample(rv.mean)
@@ -286,22 +243,6 @@ class BlockDiagStats(StatsBackend):
         if np.ndim(sample) > 2:
             return functools.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
-
-    def marginal_nth_derivative(self, rv, i):
-        if np.ndim(rv.mean) > 2:
-            return functools.vmap(self.marginal_nth_derivative, in_axes=(0, None))(
-                rv, i
-            )
-
-        if i > np.shape(rv.mean)[0]:
-            raise ValueError
-
-        mean = rv.mean[:, i]
-        cholesky = functools.vmap(cholesky_util.triu_via_qr)(
-            (rv.cholesky[:, i, :])[..., None]
-        )
-        cholesky = np.transpose(cholesky, axes=(0, 2, 1))
-        return _normal.Normal(mean, cholesky)
 
     def update_mean(self, mean, x, /, num):
         if np.ndim(mean) > 0:
