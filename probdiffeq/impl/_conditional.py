@@ -207,8 +207,7 @@ class DenseConditional(ConditionalBackend):
         A = np.kron(a, eye_d)
         Q = np.kron(q_sqrtm, eye_d)
 
-        ndim = d * (self.num_derivatives + 1)
-        q0 = np.zeros((ndim,))
+        q0 = np.zeros(self.flat_shape)
         noise = _normal.Normal(q0, Q)
 
         precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
@@ -234,18 +233,20 @@ class DenseConditional(ConditionalBackend):
         def select(a):
             return self.unravel(a)[i]
 
+        linop = functools.jacrev(select)(x)
+
         (d,) = self.ode_shape
         bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        linop = functools.jacrev(select)(x)
         return Conditional(linop, noise)
 
 
 class IsotropicConditional(ConditionalBackend):
-    def __init__(self, *, ode_shape, num_derivatives):
+    def __init__(self, *, ode_shape, num_derivatives, unravel_tree):
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
+        self.unravel_tree = unravel_tree
 
     def apply(self, x, conditional, /):
         A, noise = conditional
@@ -320,22 +321,24 @@ class IsotropicConditional(ConditionalBackend):
         return Conditional(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[[i], ...]
+        def select(a):
+            return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
+
+        m = np.zeros((self.num_derivatives + 1,))
+        linop = functools.jacrev(select)(m)
 
         bias = np.zeros(self.ode_shape)
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
 
-        m = np.zeros((self.num_derivatives + 1,))
-        linop = _jac_materialize(lambda s, _p: A(s), inputs=m)
         return Conditional(linop, noise)
 
 
 class BlockDiagConditional(ConditionalBackend):
-    def __init__(self, *, ode_shape, num_derivatives):
+    def __init__(self, *, ode_shape, num_derivatives, unravel_tree):
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
+        self.unravel_tree = unravel_tree
 
     def apply(self, x, conditional, /):
         if np.ndim(x) == 1:
@@ -422,15 +425,11 @@ class BlockDiagConditional(ConditionalBackend):
         return Conditional(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
-        def A(x):
-            return x[[i], ...]
-
-        @functools.vmap
-        def lo(y):
-            return _jac_materialize(lambda s, _p: A(s), inputs=y)
+        def select(a):
+            return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
-        linop = lo(x)
+        linop = functools.vmap(functools.jacrev(select))(x)
 
         bias = np.zeros((*self.ode_shape, 1))
         eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
@@ -482,7 +481,3 @@ def _batch_gram(k, /):
 
 def _binom(n, k):
     return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
-
-
-def _jac_materialize(func, /, *, inputs, params=None):
-    return functools.jacrev(lambda v: func(v, params))(inputs)

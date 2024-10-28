@@ -79,7 +79,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.IsotropicLinearisation()
     conditional = _conditional.IsotropicConditional(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
+        ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
     transform = _conditional.IsotropicTransform()
     return FactImpl(
@@ -106,7 +106,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
     linearise = _linearise.BlockDiagLinearisation()
     conditional = _conditional.BlockDiagConditional(
-        ode_shape=ode_shape, num_derivatives=num_derivatives
+        ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
     transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)
     return FactImpl(
