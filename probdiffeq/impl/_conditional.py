@@ -147,10 +147,11 @@ class ConditionalBackend(abc.ABC):
 
 
 class DenseConditional(ConditionalBackend):
-    def __init__(self, ode_shape, num_derivatives, unravel):
+    def __init__(self, ode_shape, num_derivatives, unravel, flat_shape):
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
         self.unravel = unravel
+        self.flat_shape = flat_shape
 
     def apply(self, x, conditional, /):
         matrix, noise = conditional
@@ -178,8 +179,6 @@ class DenseConditional(ConditionalBackend):
         mean, cholesky = rv.mean, rv.cholesky
 
         # QR-decomposition
-        # (todo: rename revert_conditional_noisefree to
-        #   revert_transformation_cov_sqrt())
         r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
             R_X_F=(matrix @ cholesky).T, R_X=cholesky.T, R_YX=noise.cholesky.T
         )
@@ -230,28 +229,17 @@ class DenseConditional(ConditionalBackend):
         return Conditional(A, noise)
 
     def to_derivative(self, i, standard_deviation):
-        a0 = functools.partial(self._select, idx_or_slice=i)
+        x = np.zeros(self.flat_shape)
+
+        def select(a):
+            return self.unravel(a)[i]
 
         (d,) = self.ode_shape
         bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-
-        x = np.zeros(((self.num_derivatives + 1) * d,))
-        linop = _jac_materialize(lambda s, _p: self._autobatch_linop(a0)(s), inputs=x)
+        linop = functools.jacrev(select)(x)
         return Conditional(linop, noise)
-
-    def _select(self, x, /, idx_or_slice):
-        return self.unravel(x)[idx_or_slice]
-
-    @staticmethod
-    def _autobatch_linop(fun):
-        def fun_(x):
-            if np.ndim(x) > 1:
-                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
-            return fun(x)
-
-        return fun_
 
 
 class IsotropicConditional(ConditionalBackend):

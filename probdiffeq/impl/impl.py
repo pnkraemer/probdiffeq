@@ -40,7 +40,7 @@ def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
 
 def _select_dense(*, tcoeffs_like) -> FactImpl:
     ode_shape = tcoeffs_like[0].shape
-    _, unravel = tree_util.ravel_pytree(tcoeffs_like)
+    flat, unravel = tree_util.ravel_pytree(tcoeffs_like)
 
     num_derivatives = len(tcoeffs_like) - 1
 
@@ -49,7 +49,10 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
     linearise = _linearise.DenseLinearisation(ode_shape=ode_shape, unravel=unravel)
     stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(
-        ode_shape=ode_shape, num_derivatives=num_derivatives, unravel=unravel
+        ode_shape=ode_shape,
+        num_derivatives=num_derivatives,
+        unravel=unravel,
+        flat_shape=flat.shape,
     )
     transform = _conditional.DenseTransform()
     return FactImpl(
