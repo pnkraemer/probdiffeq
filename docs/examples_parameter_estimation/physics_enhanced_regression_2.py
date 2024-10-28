@@ -172,12 +172,12 @@ theta_guess = u0  # initial guess
 
 
 # +
-def plot_solution(sol, *, ax, marker=".", **plotting_kwargs):
+def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
     """Plot the IVP solution."""
     for d in [0, 1]:
-        ax.plot(sol.t, sol.u[0][:, d], marker="None", **plotting_kwargs)
-        ax.plot(sol.t[0], sol.u[0][0, d], marker=marker, **plotting_kwargs)
-        ax.plot(sol.t[-1], sol.u[0][-1, d], marker=marker, **plotting_kwargs)
+        ax.plot(t, u[:, d], marker="None", **plotting_kwargs)
+        ax.plot(t[0], u[0, d], marker=marker, **plotting_kwargs)
+        ax.plot(t[-1], u[-1, d], marker=marker, **plotting_kwargs)
     return ax
 
 
@@ -194,8 +194,7 @@ def solve_fixed(theta, *, ts):
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     init = solver.initial_condition()
-    sol = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver, ssm=ssm)
-    return sol[-1]
+    return ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver, ssm=ssm)
 
 
 @jax.jit
@@ -229,12 +228,12 @@ fig, ax = plt.subplots(figsize=(5, 3))
 data_kwargs = {"alpha": 0.5, "color": "gray"}
 ax.annotate("Data", (13.0, 30.0), **data_kwargs)
 sol = solve_save_at(theta_true)
-ax = plot_solution(sol, ax=ax, **data_kwargs)
+ax = plot_solution(sol.t, sol.u[0], ax=ax, **data_kwargs)
 
 guess_kwargs = {"color": "C3"}
 ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
 sol = solve_save_at(theta_guess)
-ax = plot_solution(sol, ax=ax, **guess_kwargs)
+ax = plot_solution(sol.t, sol.u[0], ax=ax, **guess_kwargs)
 plt.show()
 # -
 
@@ -251,9 +250,10 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 @jax.jit
 def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     """Evaluate the logposterior-function of the data."""
-    y_T = solve_fixed(theta, ts=ts)
+    solution = solve_fixed(theta, ts=ts)
+    y_T = jax.tree.map(lambda s: s[-1], solution.posterior)
     logpdf_data = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=obs_stdev, posterior=y_T.posterior, ssm=y_T.ssm
+        data, standard_deviation=obs_stdev, posterior=y_T, ssm=solution.ssm
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
@@ -263,7 +263,7 @@ def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
 
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
-data = solve_fixed(theta_true, ts=ts).u[0]
+data = solve_fixed(theta_true, ts=ts).u[0][-1]
 
 log_M = functools.partial(logposterior_fn, data=data, ts=ts)
 # -
@@ -330,18 +330,20 @@ fig, ax = plt.subplots()
 
 sample_kwargs = {"color": "C0"}
 ax.annotate("Samples", (2.75, 31.0), **sample_kwargs)
-for sol in solution_samples:
-    ax = plot_solution(sol, ax=ax, linewidth=0.1, alpha=0.75, **sample_kwargs)
+for ts, us in zip(solution_samples.t, solution_samples.u[0]):
+    ax = plot_solution(ts, us, ax=ax, linewidth=0.1, alpha=0.75, **sample_kwargs)
 
 data_kwargs = {"color": "gray"}
 ax.annotate("Data", (18.25, 40.0), **data_kwargs)
 sol = solve_save_at(theta_true)
-ax = plot_solution(sol, ax=ax, linewidth=4, alpha=0.5, **data_kwargs)
+ax = plot_solution(sol.t, sol.u[0], ax=ax, linewidth=4, alpha=0.5, **data_kwargs)
 
 guess_kwargs = {"color": "gray"}
 ax.annotate("Initial guess", (6.0, 12.0), **guess_kwargs)
 sol = solve_save_at(theta_guess)
-ax = plot_solution(sol, ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs)
+ax = plot_solution(
+    sol.t, sol.u[0], ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs
+)
 plt.show()
 # -
 
@@ -361,8 +363,8 @@ plt.show()
 # the sampler covers the entire region of interest.
 
 # +
-xlim = 17, jnp.amax(states.position[:, 0]) + 0.5
-ylim = 17, jnp.amax(states.position[:, 1]) + 0.5
+xlim = 14, jnp.amax(states.position[:, 0]) + 0.5
+ylim = 14, jnp.amax(states.position[:, 1]) + 0.5
 
 xs = jnp.linspace(*xlim, endpoint=True, num=300)
 ys = jnp.linspace(*ylim, endpoint=True, num=300)

@@ -2,6 +2,7 @@
 
 from probdiffeq import stats
 from probdiffeq.backend import (
+    containers,
     control_flow,
     functools,
     linalg,
@@ -10,62 +11,21 @@ from probdiffeq.backend import (
     warnings,
 )
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Any, Array
 
 
+@containers.dataclass
 class _Solution:
     """Estimated initial value problem solution."""
 
-    def __init__(self, t, u, u_std, output_scale, marginals, posterior, num_steps, ssm):
-        """Construct a solution object."""
-        self.t = t
-        self.u = u
-        self.u_std = u_std
-        self.output_scale = output_scale
-        self.marginals = marginals  # todo: marginals are replaced by "u" and "u_std"
-        self.posterior = posterior
-        self.num_steps = num_steps
-        self.ssm = ssm
-
-    def __repr__(self):
-        """Evaluate a string-representation of the solution object."""
-        return (
-            f"{self.__class__.__name__}("
-            f"t={self.t},"
-            f"u={self.u},"
-            f"output_scale={self.output_scale},"
-            f"marginals={self.marginals},"
-            f"posterior={self.posterior},"
-            f"num_steps={self.num_steps},"
-            ")"
-        )
-
-    def __len__(self):
-        """Evaluate the length of a solution."""
-        if np.ndim(self.t) < 1:
-            msg = "Solution object not batched :("
-            raise ValueError(msg)
-        return self.t.shape[0]
-
-    def __getitem__(self, item):
-        """Access a single item of the solution."""
-        if np.ndim(self.t) < 1:
-            msg = "Solution object not batched :("
-            raise ValueError(msg)
-
-        if np.ndim(self.t) == 1 and item != -1:
-            msg = "Access to non-terminal states is not available."
-            raise ValueError(msg)
-
-        return tree_util.tree_map(lambda s: s[item, ...], self)
-
-    def __iter__(self):
-        """Iterate through the solution."""
-        if np.ndim(self.t) <= 1:
-            msg = "Solution object not batched :("
-            raise ValueError(msg)
-
-        for i in range(self.t.shape[0]):
-            yield self[i]
+    t: Array
+    u: Array
+    u_std: Array
+    output_scale: Array
+    marginals: Any
+    posterior: Any
+    num_steps: Array
+    ssm: Any
 
     @staticmethod
     def register_pytree_node():
