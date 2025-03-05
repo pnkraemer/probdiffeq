@@ -163,7 +163,7 @@ for i in range(chunk_size):
     for _ in range(chunk_size):
         p, state = update_fn(p, state)
 
-    print(f"After {(i+1)*chunk_size} iterations:", p)
+    print(f"After {(i + 1) * chunk_size} iterations:", p)
 # -
 
 # The solution looks much better:

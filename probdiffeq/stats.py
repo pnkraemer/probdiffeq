@@ -216,7 +216,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
             f"Observation-noise shape {np.shape(standard_deviation)} "
             f"does not match the observation shape {np.shape(u)}. "
             f"Expected observation-noise shape: "
-            f"{np.shape(u)[0],} != {np.shape(standard_deviation)}. "
+            f"{(np.shape(u)[0],)} != {np.shape(standard_deviation)}. "
         )
         raise ValueError(msg)
 

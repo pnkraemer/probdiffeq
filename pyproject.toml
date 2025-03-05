@@ -134,6 +134,8 @@ ignore = [
     "B905",
     # Magic methods don't need a docstring:
     "D105",
+    # Some backend's names shadow builtins, eg backend.abc. Ignore the warnings.
+    "A005",
 ]
 
 [tool.ruff.lint.isort]
