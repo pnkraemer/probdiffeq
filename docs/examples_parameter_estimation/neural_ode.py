@@ -159,7 +159,7 @@ for i in range(chunk_size):
         p, state = update_fn(p, state)
     print(
         "Negative log-marginal-likelihood after "
-        f"{(i+1)*chunk_size**2}/{chunk_size**3} steps:",
+        f"{(i + 1) * chunk_size**2}/{chunk_size**3} steps:",
         loss_fn(p),
     )
 

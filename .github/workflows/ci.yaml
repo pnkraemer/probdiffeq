@@ -1,10 +1,8 @@
 ---
 name: ci
 # We test as follows:
-# - Execute tests on Python 3.9, 3.10, 3.11
-# - Lint, dry-run benchmarks, build docs on Python 3.10.
-#     Why on Python 3.10?
-#     Because I currently work with 3.10 and this causes the least friction.
+# - Execute tests on Python 3.10, 3.11, 3.12, 3.13
+# - Lint, dry-run benchmarks, build docs on Python 3.11.
 on:
   push:
     branches: [main]
@@ -18,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.12']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.12']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +80,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.12']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
