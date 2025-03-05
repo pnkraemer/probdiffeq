@@ -1,0 +1,13 @@
+---
+changelog:
+  categories:
+    - title: Breaking changes
+      labels: [breaking-change]
+    - title: New features
+      labels: [enhancement]
+    - title: Improvements to the documentation
+      labels: [documentation]
+    - title: Internals
+      labels: [internals]
+    - title: Other Changes
+      labels: ['*']
