@@ -2,7 +2,7 @@
 changelog:
   categories:
     - title: Breaking changes
-      labels: [breaking-change]
+      labels: [breaking]
     - title: New features
       labels: [enhancement]
     - title: Improvements to the documentation
