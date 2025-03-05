@@ -140,6 +140,9 @@ ignore = [
 split-on-trailing-comma = false
 
 [tool.ruff.lint.per-file-ignores]
+# The typing-backend mainly consists of import statements
+# so we ignore 'unused import' in this file
+"probdiffeq/backend/typing*" = ["F401"]
 # Auxiliary functions and tests don't need docstring-enforcement:
 "probdiffeq/util/*" = ["D102", "D103"]
 "probdiffeq/impl/*" = ["D102"]

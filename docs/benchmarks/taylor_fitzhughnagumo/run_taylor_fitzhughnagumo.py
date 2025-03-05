@@ -9,7 +9,7 @@ import os
 import statistics
 import time
 import timeit
-from typing import Callable
+from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp

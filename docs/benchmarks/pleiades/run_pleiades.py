@@ -8,7 +8,7 @@ import functools
 import os
 import statistics
 import timeit
-from typing import Callable
+from collections.abc import Callable
 
 import diffrax
 import jax

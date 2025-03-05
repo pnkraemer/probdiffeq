@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 
 def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
-    assert isinstance(y0, (tuple, list))
+    assert isinstance(y0, tuple | list)
     assert len(y0) == 1
 
     def vf_wrapped(y, t):
@@ -19,7 +19,7 @@ def odeint_dense(vf, y0: tuple, /, t0, t1, *, atol, rtol):
     # Local import because diffrax is not an official dependency
     import diffrax
 
-    assert isinstance(y0, (tuple, list))
+    assert isinstance(y0, tuple | list)
     assert len(y0) == 1
 
     @diffrax.ODETerm

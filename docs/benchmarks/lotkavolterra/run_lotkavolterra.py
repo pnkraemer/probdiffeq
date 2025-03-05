@@ -9,7 +9,7 @@ import os
 import statistics
 import timeit
 import warnings
-from typing import Callable
+from collections.abc import Callable
 
 import diffrax
 import jax
