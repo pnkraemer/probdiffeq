@@ -22,4 +22,4 @@ def plot_style():
 
 
 def plot_sizes():
-    return fontsizes.beamer_moml()
+    return fontsizes.beamer()
