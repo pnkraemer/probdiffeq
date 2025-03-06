@@ -15,20 +15,43 @@ from probdiffeq.backend.typing import Any, Array
 
 
 @containers.dataclass
-class _Solution:
-    """Estimated initial value problem solution."""
+class IVPSolution:
+    """The probabilistic numerical solution of an initial value problem (IVP).
+
+    This class stores the computed solution,
+    its uncertainty estimates, and details of the probabilistic model
+    used in probabilistic numerical integration.
+    """
 
     t: Array
+    """Time points at which the IVP solution has been computed."""
+
     u: Array
+    """The mean of the IVP solution at each computed time point."""
+
     u_std: Array
+    """The standard deviation of the IVP solution, indicating uncertainty."""
+
     output_scale: Array
+    """The calibrated output scale of the probabilistic model."""
+
     marginals: Any
+    """Marginal distributions for each time point in the posterior distribution."""
+
     posterior: Any
+    """A the full posterior distribution of the probabilistic numerical solution.
+
+    Typically, a backward factorisation of the posterior.
+    """
+
     num_steps: Array
+    """The number of solver steps taken at each time point."""
+
     ssm: Any
+    """State-space model implementation used by the solver."""
 
     @staticmethod
-    def register_pytree_node():
+    def _register_pytree_node():
         def _sol_flatten(sol):
             children = (
                 sol.t,
@@ -45,7 +68,7 @@ class _Solution:
         def _sol_unflatten(aux, children):
             (ssm,) = aux
             t, u, u_std, marginals, posterior, output_scale, n = children
-            return _Solution(
+            return IVPSolution(
                 t=t,
                 u=u,
                 u_std=u_std,
@@ -56,15 +79,15 @@ class _Solution:
                 ssm=ssm,
             )
 
-        tree_util.register_pytree_node(_Solution, _sol_flatten, _sol_unflatten)
+        tree_util.register_pytree_node(IVPSolution, _sol_flatten, _sol_unflatten)
 
 
-_Solution.register_pytree_node()
+IVPSolution._register_pytree_node()
 
 
 def solve_adaptive_terminal_values(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
-) -> _Solution:
+) -> IVPSolution:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t1])
     (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
@@ -81,14 +104,14 @@ def solve_adaptive_terminal_values(
     num_steps = tree_util.tree_map(squeeze_fun, num_steps)
 
     # I think the user expects marginals, so we compute them here
-    # todo: do this in _Solution.* methods?
+    # todo: do this in IVPSolution.* methods?
     posterior, output_scale = solution_save_at
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
 
     u = ssm.stats.qoi_from_sample(marginals.mean)
     std = ssm.stats.standard_deviation(marginals)
     u_std = ssm.stats.qoi_from_sample(std)
-    return _Solution(
+    return IVPSolution(
         t=t1,
         u=u,
         u_std=u_std,
@@ -102,7 +125,7 @@ def solve_adaptive_terminal_values(
 
 def solve_adaptive_save_at(
     vector_field, initial_condition, save_at, adaptive_solver, dt0, *, ssm
-) -> _Solution:
+) -> IVPSolution:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
     This algorithm implements the method by Krämer (2024).
@@ -153,7 +176,7 @@ def solve_adaptive_save_at(
     u = ssm.stats.qoi_from_sample(marginals.mean)
     std = ssm.stats.standard_deviation(marginals)
     u_std = ssm.stats.qoi_from_sample(std)
-    return _Solution(
+    return IVPSolution(
         t=save_at,
         u=u,
         u_std=u_std,
@@ -207,7 +230,7 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
 
 def solve_adaptive_save_every_step(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
-) -> _Solution:
+) -> IVPSolution:
     """Solve an initial value problem and save every step.
 
     This function uses a native-Python while loop.
@@ -246,7 +269,7 @@ def solve_adaptive_save_every_step(
     u = ssm.stats.qoi_from_sample(marginals.mean)
     std = ssm.stats.standard_deviation(marginals)
     u_std = ssm.stats.qoi_from_sample(std)
-    return _Solution(
+    return IVPSolution(
         t=t,
         u=u,
         u_std=u_std,
@@ -261,7 +284,6 @@ def solve_adaptive_save_every_step(
 def _solution_generator(
     vector_field, t, initial_condition, *, dt0, t1, adaptive_solver
 ):
-    """Generate a probabilistic IVP solution iteratively."""
     state = adaptive_solver.init(t, initial_condition, dt=dt0, num_steps=0)
 
     while state.step_from.t < t1:
@@ -282,7 +304,7 @@ def _solution_generator(
 
 def solve_fixed_grid(
     vector_field, initial_condition, grid, solver, *, ssm
-) -> _Solution:
+) -> IVPSolution:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
@@ -303,7 +325,7 @@ def solve_fixed_grid(
     u = ssm.stats.qoi_from_sample(marginals.mean)
     std = ssm.stats.standard_deviation(marginals)
     u_std = ssm.stats.qoi_from_sample(std)
-    return _Solution(
+    return IVPSolution(
         t=grid,
         u=u,
         u_std=u_std,
