@@ -1,6 +1,7 @@
 """Compare simulate_terminal_values to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing, tree_util
 
 
@@ -28,3 +29,9 @@ def test_terminal_values_identical(fact):
 
     received = ivpsolve.solve_adaptive_terminal_values(*args, **kwargs)
     assert testing.tree_all_allclose(received, expected)
+
+    # Assert u and u_std have matching shapes (that was wrong before)
+    u_shape = tree_util.tree_map(np.shape, received.u)
+    u_std_shape = tree_util.tree_map(np.shape, received.u_std)
+    match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    assert tree_util.tree_all(match)

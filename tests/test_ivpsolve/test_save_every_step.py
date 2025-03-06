@@ -2,7 +2,7 @@
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing
+from probdiffeq.backend import ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -15,6 +15,12 @@ def test_python_loop_output_matches_reference(fact, strategy):
     received = python_loop_solution(ivp, fact=fact, strategy_fun=strategy)
     expected = reference_solution(ivp, received.t)
     assert np.allclose(received.u[0], expected, rtol=1e-2)
+
+    # Assert u and u_std have matching shapes (that was wrong before)
+    u_shape = tree_util.tree_map(np.shape, received.u)
+    u_std_shape = tree_util.tree_map(np.shape, received.u_std)
+    match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    assert tree_util.tree_all(match)
 
 
 def python_loop_solution(ivp, *, fact, strategy_fun):

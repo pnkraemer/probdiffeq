@@ -49,3 +49,9 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = functools.vmap(marginals_allclose_func)
     assert np.all(marginals_allclose_func(marginals_interp, marginals_save_at))
+
+    # Assert u and u_std have matching shapes (that was wrong before)
+    u_shape = tree_util.tree_map(np.shape, solution_save_at.u)
+    u_std_shape = tree_util.tree_map(np.shape, solution_save_at.u_std)
+    match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    assert tree_util.tree_all(match)
