@@ -149,7 +149,8 @@ class IsotropicStats(StatsBackend):
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
             return functools.vmap(self.standard_deviation)(rv)
-        return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+        std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+        return std[..., None] @ np.ones((1, rv.mean.shape[-1]))
 
     def hidden_shape(self, rv):
         return rv.mean.shape

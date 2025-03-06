@@ -1,4 +1,4 @@
-"""Tests for interaction with the solution object."""
+"""Tests for interaction with the solution API."""
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import containers, ode, testing
@@ -13,9 +13,9 @@ class Taylor(containers.NamedTuple):
     acceleration: Array
 
 
-@testing.fixture(name="approximate_solution")
+@testing.fixture(name="pn_solution")
 @testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
-def fixture_approximate_solution(fact):
+def fixture_pn_solution(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
@@ -33,9 +33,9 @@ def fixture_approximate_solution(fact):
     )
 
 
-def test_u_inherits_data_structure(approximate_solution):
-    assert isinstance(approximate_solution.u, Taylor)
+def test_u_inherits_data_structure(pn_solution):
+    assert isinstance(pn_solution.u, Taylor)
 
 
-def test_u_std_inherits_data_structure(approximate_solution):
-    assert isinstance(approximate_solution.u_std, Taylor)
+def test_u_std_inherits_data_structure(pn_solution):
+    assert isinstance(pn_solution.u_std, Taylor)

@@ -86,7 +86,8 @@ def solve_adaptive_terminal_values(
     marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
 
     u = ssm.stats.qoi_from_sample(marginals.mean)
-    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
+    std = ssm.stats.standard_deviation(marginals)
+    u_std = ssm.stats.qoi_from_sample(std)
     return _Solution(
         t=t1,
         u=u,
@@ -150,7 +151,8 @@ def solve_adaptive_save_at(
     )
     marginals, posterior = _tmp
     u = ssm.stats.qoi_from_sample(marginals.mean)
-    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
+    std = ssm.stats.standard_deviation(marginals)
+    u_std = ssm.stats.qoi_from_sample(std)
     return _Solution(
         t=save_at,
         u=u,
@@ -242,7 +244,8 @@ def solve_adaptive_save_every_step(
     marginals, posterior = _tmp
 
     u = ssm.stats.qoi_from_sample(marginals.mean)
-    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
+    std = ssm.stats.standard_deviation(marginals)
+    u_std = ssm.stats.qoi_from_sample(std)
     return _Solution(
         t=t,
         u=u,
@@ -298,7 +301,8 @@ def solve_fixed_grid(
     marginals, posterior = _tmp
 
     u = ssm.stats.qoi_from_sample(marginals.mean)
-    u_std = ssm.stats.qoi_from_sample(marginals.cholesky)
+    std = ssm.stats.standard_deviation(marginals)
+    u_std = ssm.stats.qoi_from_sample(std)
     return _Solution(
         t=grid,
         u=u,

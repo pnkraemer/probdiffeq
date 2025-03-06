@@ -1,7 +1,8 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.backend import containers, ode, testing
+from probdiffeq.backend import containers, ode, testing, tree_util
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 
 
@@ -45,3 +46,9 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     fixed_kwargs = {"grid": grid_adaptive, "solver": solver, "ssm": ssm}
     solution_fixed = ivpsolve.solve_fixed_grid(*args, **fixed_kwargs)
     assert testing.tree_all_allclose(solution_adaptive, solution_fixed)
+
+    # Assert u and u_std have matching shapes (that was wrong before)
+    u_shape = tree_util.tree_map(np.shape, solution_fixed.u)
+    u_std_shape = tree_util.tree_map(np.shape, solution_fixed.u_std)
+    match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    assert tree_util.tree_all(match)
