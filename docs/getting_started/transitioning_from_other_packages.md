@@ -54,16 +54,13 @@ ProbNumDiffEq.jl has been around for a while now (and successfully so), embeds i
 It might be the most performant probabilistic-IVP-solver library to date.
 But there are some neat little features that ProbDiffEq provides that are unavailable in ProbNumDiffEq.jl.
 
-Ignoring that ProbNumDiffEq.jl is written in Julia and that ProbDiffEq builds on JAX, the two packages are very similar.
-Both packages should be more or less equally efficient for small(ish) problems. 
-For high-dimensional differential equations, the state-space model factorisations in ProbDiffEq are expected to yield significant advantages. 
-(Benchmarks incoming?).
+Ignoring that ProbNumDiffEq.jl is written in Julia and that ProbDiffEq builds on JAX, the two packages are very similar, and 
+both packages should be more or less equally efficient. 
 
 The most apparent feature differences between ProbNumDiffEq.jl and ProbDiffEq are (at the time of this writing):
 
 * ProbNumDiffEq.jl can solve mass-matrix problems, which ProbDiffEq does not yet do.
 * ProbNumDiffEq.jl allows callbacks, which ProbDiffEq does not yet do.
-* ProbDiffEq uses state-space model factorisations not yet implemented in ProbNumDiffEq.jl. These factorisations are crucial for high-dimensional problems.
 * ProbDiffEq has a few methods that are not in ProbNumDiffEq.jl, e.g., statistical linearisation solvers.
 
 Both packages are still evolving, so this list may not remain up-to-date. When in doubt, consult each package's API documentation.
@@ -76,11 +73,10 @@ To translate between the two packages, consider the following:
 * ProbNumDiffEq.jl refers to `ibm_adaptive(output_scale=x)` as `IWP(diffusion=x^2)`. They are the same processes. 
 * ProbNumDiffEq.jl switches between filtering and smoothing with a `smooth=true/false` flag. ProbDiffEq uses different strategies to distinguish these strategies and offers a third one (fixedpoint-smoothing). 
 * Initialisation schemes like those in `ProbNumDiffEq` are in `probdiffeq/taylor/*.py`. ProbDiffEq offers some rules for high-order differential equations and some unique methods (e.g. doubling). But the feature lists are relatively similar.
-* The features in [Fenrir.jl](https://github.com/nathanaelbosch/Fenrir.jl), which extends ProbNumDiffEq.jl, should be more or less readily available via `probdiffeq/solution.py`. Check out the tutorial notebooks!
 
 Should I replace ProbNumDiffEq.jl with ProbDiffEq?
 Short answer: No. 
-Long answer: Use ProbNumDiffEq.jl in Julia and ProbDiffEq in JAX. Use the Julia code for funky problems like mass-matrix IVPs, and use ProbDiffEq for high-dimensional differential equations (or if you need statistical linearisation).
+Long answer: Use ProbNumDiffEq.jl in Julia and ProbDiffEq in JAX. 
 
 
 
