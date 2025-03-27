@@ -23,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dynamic = ["version"]
+dependencies = ["mypy_extensions"]
 
 [project.optional-dependencies]
 cpu = [
@@ -35,7 +36,6 @@ test =[
     "diffeqzoo",
     "diffrax",
     "equinox",
-    "mypy_extensions",
 ]
 format-and-lint =[
     "pre-commit",
