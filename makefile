@@ -4,6 +4,13 @@ format-and-lint:
 test:
 	pytest -n auto -v 		# parallelise, verbose output
 
+quickstart:
+	# Run some code without installing any of the optional dependencies
+	# Otherwise, it's unclear whether the listed main dependencies
+	# are specified correctly. This avoids issues like
+	# https://github.com/pnkraemer/probdiffeq/issues/810
+	python docs/examples_quickstart/*.py
+
 example:
 	jupytext --quiet --to ipynb --update docs/examples*/*.py
 	jupytext --execute docs/examples*/*.ipynb
