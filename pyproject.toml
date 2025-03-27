@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dynamic = ["version"]
-dependencies = ["mypy_extensions"]
+dependencies = ["mypy_extensions", "typing_extensions"]
 
 [project.optional-dependencies]
 cpu = [
@@ -58,7 +58,6 @@ doc = [
     "mkdocstrings-python",
     "mkdocstrings",
     "mkdocs-jupyter",
-    "mypy_extensions",
 ]
 
 
