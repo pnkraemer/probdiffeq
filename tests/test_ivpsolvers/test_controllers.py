@@ -2,9 +2,13 @@
 
 from probdiffeq import ivpsolvers
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import testing
 
 
-def test_equivalence_pi_vs_i(dt=0.1428, error_power=3.142, num_applies=4):
+@testing.parametrize("dt", [0.1428])
+@testing.parametrize("error_power", [3.142])
+@testing.parametrize("num_applies", [4])
+def test_equivalence_pi_vs_i(dt, error_power, num_applies):
     ctrl_pi = ivpsolvers.control_proportional_integral(
         power_integral_unscaled=1.0, power_proportional_unscaled=0.0
     )
