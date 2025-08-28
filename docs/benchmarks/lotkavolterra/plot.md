@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.2
+      jupytext_version: 1.17.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -71,7 +71,6 @@ def plot_results(axis, results):
     axis.set_ylabel("Work [wall time, s]")
     axis.grid()
     axis.legend(loc="upper center", ncols=3, mode="expand", facecolor="ghostwhite")
-    axis.set_ylim((1e-5, 1e1))
     return axis
 
 
@@ -88,7 +87,6 @@ def plot_solution(axis, ts, ys, yscale="linear"):
         axis.plot(ts[0], y[0], linestyle="None", marker=".", markersize=4, **kwargs)
         axis.plot(ts[-1], y[-1], linestyle="None", marker=".", markersize=4, **kwargs)
 
-    axis.set_ylim((-1, 27))
     axis.legend(facecolor="ghostwhite", ncols=2, loc="lower center", mode="expand")
 
     axis.set_xlabel("Time $t$")
