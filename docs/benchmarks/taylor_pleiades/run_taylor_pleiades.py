@@ -58,7 +58,7 @@ def taylor_mode_scan() -> Callable:
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num)
-        return jax.block_until_ready(tcoeffs)
+        return jnp.asarray(tcoeffs)
 
     return estimate
 
@@ -70,7 +70,7 @@ def taylor_mode_unroll() -> Callable:
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
         tcoeffs = taylor.odejet_unroll(vf_auto, (u0, du0), num=num)
-        return jax.block_until_ready(tcoeffs)
+        return jnp.asarray(tcoeffs)
 
     return estimate
 
@@ -82,7 +82,7 @@ def odejet_via_jvp() -> Callable:
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
         tcoeffs = taylor.odejet_via_jvp(vf_auto, (u0, du0), num=num)
-        return jax.block_until_ready(tcoeffs)
+        return jnp.asarray(tcoeffs)
 
     return estimate
 
@@ -130,20 +130,20 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
     t0 = time.perf_counter()
     arg = 1
     while (elapsed := time.perf_counter() - t0) < max_time:
-        print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
+        print(f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}")
         t0 = time.perf_counter()
-        _ = fun(arg)
+        _ = fun(arg).block_until_ready()
         t1 = time.perf_counter()
         time_compile = t1 - t0
 
-        time_execute = timeit_fun(lambda: fun(arg))  # noqa: B023
+        time_execute = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
 
         arguments.append(arg + 1)  # plus one, because second-order problem
         work_compile.append(time_compile)
         work_mean.append(statistics.mean(time_execute))
         work_std.append(statistics.stdev(time_execute))
         arg += 1
-    print("num =", arg, "| elapsed =", elapsed, "| max_time =", max_time)
+    print(f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}")
     return {
         "work_mean": jnp.asarray(work_mean),
         "work_std": jnp.asarray(work_std),

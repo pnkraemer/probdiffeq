@@ -224,7 +224,7 @@ def solver_scipy(*, method: str, use_numba: bool) -> Callable:
             rtol=tol,
             method=method,
         )
-        return solution.y[:14, -1]
+        return jnp.asarray(solution.y[:14, -1])
 
     return param_to_solution
 
@@ -295,8 +295,8 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         works_std = []
         precisions = []
         for arg in list_of_args:
-            precision = precision_fun(fun(arg))
-            times = timeit_fun(lambda: fun(arg))  # noqa: B023
+            precision = precision_fun(fun(arg).block_until_ready())
+            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
 
             precisions.append(precision)
             works_mean.append(statistics.mean(times))
@@ -325,18 +325,18 @@ if __name__ == "__main__":
 
     # Assemble algorithms
     algorithms = {
-        "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
-        "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
-        "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
-        "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
-        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
             num_derivatives=5, correction_fun=ivpsolvers.correction_ts0
         ),
         r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
             num_derivatives=8, correction_fun=ivpsolvers.correction_ts0
         ),
+        "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
+        "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
+        "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
+        "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
+        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
     }
 
     # Compute a reference solution

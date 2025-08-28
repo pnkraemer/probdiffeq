@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.2
+      jupytext_version: 1.17.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -58,7 +58,7 @@ def choose_style(label):
 
 def plot_results(axis, results):
     """Plot the results."""
-    axis.set_title("Benchmark")
+    axis.set_title("Benchmark") 
     for label, wp in results.items():
         style = choose_style(label)
 
@@ -79,7 +79,6 @@ def plot_results(axis, results):
         mode="expand",
         facecolor="ghostwhite",
     )
-    axis.set_ylim((1e-3, 2e0))
     return axis
 
 

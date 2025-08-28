@@ -43,6 +43,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--stop", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--save", action=argparse.BooleanOptionalAction)
+    parser.add_argument(
+        "--diffrax", action=argparse.BooleanOptionalAction
+    )  # TODO: temporary
     return parser.parse_args()
 
 
@@ -164,7 +167,7 @@ def solver_scipy(method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return solution.y[0, -1]
+        return jnp.asarray(solution.y[0, -1])
 
     return param_to_solution
 
@@ -213,8 +216,8 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         works_std = []
         precisions = []
         for arg in list_of_args:
-            precision = precision_fun(fun(arg))
-            times = timeit_fun(lambda: fun(arg))  # noqa: B023
+            precision = precision_fun(fun(arg).block_until_ready())
+            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
 
             precisions.append(precision)
             works_mean.append(statistics.mean(times))
@@ -245,11 +248,16 @@ if __name__ == "__main__":
     algorithms = {
         "SciPy: 'Radau'": solver_scipy(method="Radau"),
         "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
-        "Diffrax: Kvaerno5()": solver_diffrax(solver=diffrax.Kvaerno5()),
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS1($4$)": solver_probdiffeq(num_derivatives=4),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
     }
+    if args.diffrax:
+        # TODO: this is a temporary fix because Diffrax doesn't work with JAX >= 0.7.0
+        # Revisit in the near future.
+        algorithms["Diffrax: Kvaerno5()"] = solver_diffrax(solver=diffrax.Kvaerno5())
+    else:
+        print("\nSkipped Diffrax.\n")
 
     # Compute a reference solution
     reference = solver_probdiffeq(num_derivatives=4)(1e-10)
