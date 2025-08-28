@@ -1,0 +1,67 @@
+:root {
+  --gray-dark: #222222;
+  --gray: #333333;
+  --gray-medium: #999999;
+  --gray-light: #EEEEEE;
+  --gray-light-almost-white: #FFFFFF;
+
+  /* Eggshell */
+  --vegas-gold: #c5b358;
+  --eggshell-light: #f5f1e4;
+  --eggshell-light-almost-white: #fbf9f3;
+
+  /* A type of blue */
+  --lapis-lazuli-dark-almost-black: #13304d;
+  --lapis-lazuli-dark: #1e4d7c;
+  --lapis-lazuli: #22578c;
+  --lapis-lazuli-original: #26619c;
+
+  /* Select colors */
+  --darkest: var(--gray-dark);
+  --dark: var(--gray);
+  --light: var(--gray-light);
+  --lightest: var(--gray-light-almost-white);
+  --accent: var(--vegas-gold);
+  --medium: var(--gray-medium);
+}
+
+/* Light header; super-light body; super-dark font. */
+[data-md-color-scheme="probdiffeq-light"] {
+  /* Counterintuitively, primary-bg determines the *font* color in the header*/
+  --md-primary-fg-color: var(--light);
+  --md-primary-bg-color: var(--darkest);
+
+  /* Default background, and font colors */
+  --md-default-bg-color: var(--lightest);
+  --md-typeset-a-color: var(--darkest);
+
+  /* Accent */
+  --md-accent-fg-color: var(--accent);
+
+  /* Code snippets */
+  --md-code-fg-color: var(--darkest);
+  --md-code-bg-color: var(--light);
+}
+
+/* Super-dark header; dark body; super-light font. */
+[data-md-color-scheme="probdiffeq-dark"] {
+  /* Counterintuitively, primary-bg determines the *font* color in the header*/
+  --md-primary-fg-color: var(--darkest);
+  --md-primary-bg-color: var(--light);
+
+  /* Default background, and font colors */
+  --md-default-bg-color: var(--dark);
+  --md-default-fg-color: var(--light);
+  --md-default-fg-color--light: var(--light);
+  --md-default-fg-color--lighter: var(--darkest);
+  --md-typeset-color: var(--light);
+  --md-typeset-a-color: var(--light);
+  --md-typeset-mark-color: var(--light);
+
+  /* Accent */
+  --md-accent-fg-color: var(--accent);
+
+  /* Code snippets */
+  --md-code-fg-color: var(--darkest);
+  --md-code-bg-color: var(--medium);
+}
