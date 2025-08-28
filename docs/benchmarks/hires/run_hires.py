@@ -43,6 +43,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--stop", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--save", action=argparse.BooleanOptionalAction)
+    parser.add_argument(
+        "--diffrax", action=argparse.BooleanOptionalAction
+    )  # TODO: temporary
     return parser.parse_args()
 
 
@@ -280,11 +283,17 @@ if __name__ == "__main__":
     algorithms = {
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
-        "Diffrax: Kvaerno3()": solver_diffrax(solver=diffrax.Kvaerno3()),
-        "Diffrax: Kvaerno5()": solver_diffrax(solver=diffrax.Kvaerno5()),
         "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
         "SciPy: 'Radau'": solver_scipy(method="Radau"),
     }
+
+    if args.diffrax:
+        # TODO: this is a temporary fix because Diffrax doesn't work with JAX >= 0.7.0
+        # Revisit in the near future.
+        algorithms["Diffrax: Kvaerno3()"] = solver_diffrax(solver=diffrax.Kvaerno3())
+        algorithms["Diffrax: Kvaerno5()"] = solver_diffrax(solver=diffrax.Kvaerno5())
+    else:
+        print("\nSkipped Diffrax.\n")
 
     # Compute a reference solution
     reference = solver_scipy(method="BDF")(1e-13)
