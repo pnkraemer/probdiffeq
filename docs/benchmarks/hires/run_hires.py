@@ -191,7 +191,7 @@ def solver_scipy(*, method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return solution.y[:, -1]
+        return jnp.asarray(solution.y[:, -1])
 
     return param_to_solution
 
@@ -251,8 +251,8 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         works_std = []
         precisions = []
         for arg in list_of_args:
-            precision = precision_fun(fun(arg))
-            times = timeit_fun(lambda: fun(arg))  # noqa: B023
+            precision = precision_fun(fun(arg).block_until_ready())
+            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
 
             precisions.append(precision)
             works_mean.append(statistics.mean(times))

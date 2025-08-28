@@ -22,12 +22,12 @@ benchmarks-plot-results:
 
 benchmarks-run:
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 7  --save
-	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 9 --repeats 3  --save  --no-diffrax  # Skip Diffrax for now
+	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 8 --repeats 3  --save  --no-diffrax  # Skip Diffrax for now
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 11 --repeats 3  --save
 	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 9 --repeats 7  --save  --no-diffrax  # Skip Diffrax for now
-	time python docs/benchmarks/taylor_node/run_taylor_node.py --max_time 10 --repeats 3 --save
-	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 10 --repeats 3 --save
-	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 10 --repeats 3 --save
+	time python docs/benchmarks/taylor_node/run_taylor_node.py --max_time 8 --repeats 3 --save
+	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 8 --repeats 3 --save
+	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 8 --repeats 3 --save
 	make benchmarks-plot-results
 
 benchmarks-dry-run:

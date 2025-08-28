@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.15.2
+      jupytext_version: 1.17.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -79,7 +79,6 @@ def plot_results(axis, results):
         facecolor="ghostwhite",
     )
     axis.grid()
-    axis.set_ylim((1e-3, 3e1))
     return axis
 
 
