@@ -6,7 +6,8 @@ from probdiffeq.backend import testing
 
 
 @testing.parametrize("num", [1, 2, 4])
-def test_affine_recursion(num, num_derivatives_max=5):
+@testing.parametrize("num_derivatives_max", [5])
+def test_affine_recursion(num, num_derivatives_max):
     """The approximation should coincide with the reference."""
     f, init, solution = _affine_problem(num_derivatives_max)
 

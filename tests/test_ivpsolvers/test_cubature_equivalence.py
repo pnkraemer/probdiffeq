@@ -2,6 +2,7 @@
 
 from probdiffeq import ivpsolvers
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend import testing
 
 
 def test_third_order_spherical_vs_unscented_transform_scalar_input():
@@ -16,7 +17,8 @@ def test_third_order_spherical_vs_unscented_transform_scalar_input():
         assert np.allclose(x[2:], y[1:])
 
 
-def test_third_order_spherical_vs_unscented_transform(n=4):
+@testing.parametrize("n", [4])
+def test_third_order_spherical_vs_unscented_transform(n):
     """Assert that UT with r=0 equals the third-order spherical rule."""
     tos = ivpsolvers.cubature_third_order_spherical(input_shape=(n,))
     ut = ivpsolvers.cubature_unscented_transform(input_shape=(n,), r=0.0)
