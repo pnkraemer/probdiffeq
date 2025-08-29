@@ -1,6 +1,7 @@
 """State-space model implementations."""
 
 from probdiffeq.backend import containers, functools, tree_util
+from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
 
 
@@ -26,6 +27,12 @@ class FactImpl:
 
 def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
     """Choose a state-space model implementation."""
+    u0 = np.asarray(tcoeffs_like[0])
+    if u0.ndim != 1:
+        msg = "'tcoeffs' expected to have shape=(d,), "
+        msg += f"but shape={u0.shape} received."
+        raise ValueError(msg)
+
     if which == "dense":
         return _select_dense(tcoeffs_like=tcoeffs_like)
     if which == "isotropic":
