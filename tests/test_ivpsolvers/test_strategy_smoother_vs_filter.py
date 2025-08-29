@@ -43,18 +43,10 @@ def fixture_smoother_solution(solver_setup):
     )
 
 
-@testing.fixture(name="reference_solution")
-def fixture_reference_solution():
-    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
-    return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
-
-
-def test_compare_filter_smoother_rmse(
-    filter_solution, smoother_solution, reference_solution
-):
+def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
     assert np.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
-    reference = reference_solution(filter_solution.t)
+    reference = _reference_solution(filter_solution.t)
     filter_rmse = _rmse(filter_solution.u[0], reference)
     smoother_rmse = _rmse(smoother_solution.u[0], reference)
 
@@ -64,6 +56,11 @@ def test_compare_filter_smoother_rmse(
 
     # The error should be small, otherwise the test makes little sense
     assert filter_rmse < 0.01
+
+
+def _reference_solution(ts):
+    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
+    return ode.odeint_and_save_at(vf, (u0,), save_at=ts, atol=1e-10, rtol=1e-10)
 
 
 def _rmse(a, b):

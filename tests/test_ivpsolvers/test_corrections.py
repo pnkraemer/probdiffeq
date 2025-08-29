@@ -58,14 +58,15 @@ def fixture_solution(correction_impl, fact):
     )
 
 
-@testing.fixture(name="reference_solution")
-def fixture_reference_solution():
-    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
-    return ode.odeint_dense(vf, (u0,), t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
-
-
-def test_terminal_value_simulation_matches_reference(solution, reference_solution):
+def test_terminal_value_simulation_matches_reference(solution):
     expected = reference_solution(solution.t)
     received = solution.u[0]
-
     assert np.allclose(received, expected, rtol=1e-2)
+
+
+@functools.jit
+def reference_solution(t1):
+    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
+    ts = np.asarray([t0, t1])
+    sol = ode.odeint_and_save_at(vf, (u0,), save_at=ts, atol=1e-10, rtol=1e-10)
+    return sol[-1]

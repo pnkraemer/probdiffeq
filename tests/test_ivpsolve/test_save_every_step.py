@@ -59,5 +59,4 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
 
 def reference_solution(ivp, ts):
     vf, u0, (t0, t1) = ivp
-    sol = ode.odeint_dense(vf, u0, t0=t0, t1=t1, atol=1e-10, rtol=1e-10)
-    return sol(ts)
+    return ode.odeint_and_save_at(vf, u0, save_at=ts, atol=1e-10, rtol=1e-10)
