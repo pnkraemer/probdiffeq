@@ -36,11 +36,11 @@ jax.config.update("jax_platform_name", "cpu")
 @jax.jit
 def vf(y, *, t):  # noqa: ARG001
     """Evaluate the vector field."""
-    return 0.5 * y * (1 - y)
+    return 2.0 * y * (1 - y)
 
 
 u0 = jnp.asarray([0.1])
-t0, t1 = 0.0, 1.0
+t0, t1 = 0.0, 5.0
 # -
 
 # Configuring a probabilistic IVP solver is a little more

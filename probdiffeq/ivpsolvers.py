@@ -766,7 +766,7 @@ class _ProbabilisticSolver:
         return posterior, self.prior.output_scale
 
 
-def solver_mle(extrapolation, /, *, correction, prior, ssm):
+def solver_mle(strategy, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
     Warning: needs to be combined with a call to stats.calibrate()
@@ -777,7 +777,7 @@ def solver_mle(extrapolation, /, *, correction, prior, ssm):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
 
         prior_discretized = prior.discretize(dt)
-        hidden, extra = extrapolation.begin(
+        hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
@@ -785,7 +785,7 @@ def solver_mle(extrapolation, /, *, correction, prior, ssm):
             hidden, vector_field=vector_field, t=t
         )
 
-        hidden, extra = extrapolation.complete(
+        hidden, extra = strategy.complete(
             hidden, extra, output_scale=output_scale_prior
         )
         hidden, observed = correction.complete(hidden, corr)
@@ -800,7 +800,7 @@ def solver_mle(extrapolation, /, *, correction, prior, ssm):
         prior=prior,
         calibration=_calibration_running_mean(ssm=ssm),
         step_implementation=step_mle,
-        extrapolation=extrapolation,
+        extrapolation=strategy,
         correction=correction,
         requires_rescaling=True,
     )
@@ -829,12 +829,12 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver_dynamic(extrapolation, *, correction, prior, ssm):
+def solver_dynamic(strategy, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
         prior_discretized = prior.discretize(dt)
-        hidden, extra = extrapolation.begin(
+        hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
@@ -845,7 +845,7 @@ def solver_dynamic(extrapolation, *, correction, prior, ssm):
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         prior_, _calibrated = calibration.extract(output_scale)
-        hidden, extra = extrapolation.complete(hidden, extra, output_scale=prior_)
+        hidden, extra = strategy.complete(hidden, extra, output_scale=prior_)
         hidden, corr = correction.complete(hidden, corr)
 
         # Return solution
@@ -855,7 +855,7 @@ def solver_dynamic(extrapolation, *, correction, prior, ssm):
     return _ProbabilisticSolver(
         prior=prior,
         ssm=ssm,
-        extrapolation=extrapolation,
+        extrapolation=strategy,
         correction=correction,
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
@@ -877,14 +877,14 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver(extrapolation, /, *, correction, prior, ssm):
+def solver(strategy, *, correction, prior, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
 
     def step(state: _State, *, vector_field, dt, calibration):
         del calibration  # unused
 
         prior_discretized = prior.discretize(dt)
-        hidden, extra = extrapolation.begin(
+        hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
@@ -892,7 +892,7 @@ def solver(extrapolation, /, *, correction, prior, ssm):
             hidden, vector_field=vector_field, t=t
         )
 
-        hidden, extra = extrapolation.complete(
+        hidden, extra = strategy.complete(
             hidden, extra, output_scale=state.output_scale
         )
         hidden, corr = correction.complete(hidden, corr)
@@ -906,7 +906,7 @@ def solver(extrapolation, /, *, correction, prior, ssm):
     return _ProbabilisticSolver(
         ssm=ssm,
         prior=prior,
-        extrapolation=extrapolation,
+        extrapolation=strategy,
         correction=correction,
         calibration=_calibration_none(),
         step_implementation=step,

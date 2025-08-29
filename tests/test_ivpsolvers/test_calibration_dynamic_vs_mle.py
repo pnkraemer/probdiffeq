@@ -26,8 +26,10 @@ def test_exponential_approximated_well(fact):
     solver_kwargs = {"grid": grid, "solver": solver, "ssm": ssm}
     approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
 
-    solution = ode.odeint_dense(vf, u0, t0=t0, t1=t1, atol=1e-5, rtol=1e-5)
-    rmse = _rmse(approximation.u[0][-1], solution(t1))
+    solution = ode.odeint_and_save_at(
+        vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5
+    )
+    rmse = _rmse(approximation.u[0][-1], solution[-1])
     assert rmse < 0.1
 
 
