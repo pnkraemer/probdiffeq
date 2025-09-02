@@ -1,6 +1,13 @@
 """Conditionals."""
 
-from probdiffeq.backend import abc, containers, functools, linalg, tree_util
+from probdiffeq.backend import (
+    abc,
+    containers,
+    control_flow,
+    functools,
+    linalg,
+    tree_util,
+)
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array
 from probdiffeq.impl import _normal
@@ -447,8 +454,85 @@ def system_matrices_1d(num_derivatives, output_scale):
     x = np.arange(0, num_derivatives + 1)
 
     A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
-    Q_1d = np.flip(_hilbert(x))
-    return A_1d, output_scale * linalg.cholesky_factor(Q_1d)
+
+    # Cholesky factor of flip(hilbert(n))
+    Q_1d = cholesky_hilbert(num_derivatives + 1)
+    Q_1d_flipped = np.flip(Q_1d, axis=0)
+    Q_1d = linalg.qr_r(Q_1d_flipped.T).T
+    return A_1d, output_scale * Q_1d
+
+
+def cholesky_hilbert(n: int, K: int = 0):
+    """Compute the Cholesky factor of a Hilbert matrix.
+
+    This routine implements W. Kahan's stable recurrence (see "Hilbert Matrices",
+    Math H110 notes) to construct a Cholesky factor.
+
+    Parameters
+    ----------
+    n
+        Size of the Hilbert matrix (``n x n``).
+    K
+        Shift parameter. ``K = 0`` gives the classical Hilbert matrix.
+        Increasing ``K`` produces related matrices with entries
+        ``1 / (i + j + K - 1)``. Default is 0.
+
+    Returns
+    -------
+    Lower-triangular Cholesky factor of the Hilbert matrix.
+
+
+    Notes
+    -----
+    - Hilbert matrices are notoriously ill-conditioned; even with float64,
+      the factorization loses accuracy for moderately large ``n`` (≈15 or more).
+
+    References
+    ----------
+    W. Kahan, *Hilbert Matrices*,
+    https://people.eecs.berkeley.edu/~wkahan/MathH110/HilbMats.pdf
+    """
+    Kf = np.asarray(K)
+
+    odds = np.arange(K + 1, K + 2 * n, step=2)  # length n
+    dr = np.sqrt(odds)  # shape (n,)
+
+    f = np.ones((n,)) * (1.0 + Kf)
+
+    def f_body(idx, f):
+        prev = f[idx - 1]
+        idxf = np.asarray(idx)
+        val = (((prev / idxf) * (Kf + 2.0 * idxf)) / (Kf + idxf)) * (
+            Kf + 2.0 * idxf + 1.0
+        )
+        return f.at[idx].set(val)
+
+    f = control_flow.fori_loop(1, n, f_body, f)
+    f = 1.0 / f
+
+    U = np.eye(n)
+
+    def body_j(j_idx, U):
+        # compute column j_idx (0-based) of U using downward recurrence
+        g = U[:, j_idx]
+
+        def inner_body(k, g):
+            # k runs 0..j_idx-1, we want i = j_idx-1-k (descend j-1 .. 0)
+            i = j_idx - 1 - k
+            denom = np.asarray(j_idx - i)  # == k+1
+            factor = Kf + np.asarray(i + 1) + np.asarray(j_idx + 1)
+            newval = (g[i + 1] / denom) * factor
+            return g.at[i].set(newval)
+
+        g = control_flow.fori_loop(0, j_idx, inner_body, g)
+        return U.at[:, j_idx].set(g)
+
+    U = control_flow.fori_loop(1, n, body_j, U)
+
+    # scale columns: U = U .* (dr * f_row)
+    U = U * (dr[:, None] * f[None, :])
+
+    return np.tril(U.T)
 
 
 def preconditioner_diagonal(dt, *, scales, powers):

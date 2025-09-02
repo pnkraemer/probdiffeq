@@ -48,8 +48,8 @@ def reshape(arr, /, new_shape, order="C"):
     return jnp.reshape(arr, new_shape, order=order)
 
 
-def flip(arr, /):
-    return jnp.flip(arr)
+def flip(arr, /, axis=None):
+    return jnp.flip(arr, axis=axis)
 
 
 def asarray(x, /):
@@ -214,3 +214,7 @@ def isnan(arr, /):
 
 def linspace(start, stop, *, num=50, endpoint=True):
     return jnp.linspace(start, stop, num=num, endpoint=endpoint)
+
+
+def tril(arr, /):
+    return jnp.tril(arr)

@@ -31,6 +31,10 @@ def scan(step_func, /, init, xs, *, reverse=False, length=None):
     return _jax_scan(step_func, init=init, xs=xs, reverse=reverse, length=length)
 
 
+def fori_loop(lower, upper, step_func, /, init):
+    return jax.lax.fori_loop(lower, upper, step_func, init)
+
+
 @contextlib.contextmanager
 def context_overwrite_while_loop(func, /):
     """Overwrite the while_loop() function.
