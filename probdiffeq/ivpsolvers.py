@@ -563,13 +563,13 @@ def correction_ts1(*, ssm, ode_order=1) -> _Correction:
 
 def correction_slr0(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
     """Zeroth-order statistical linear regression."""
-    linearize = ssm.linearise.ode_statistical_1st(cubature_fun)
+    linearize = ssm.linearise.ode_statistical_0th(cubature_fun)
     return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR0")
 
 
 def correction_slr1(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
     """First-order statistical linear regression."""
-    linearize = ssm.linearise.ode_statistical_0th(cubature_fun)
+    linearize = ssm.linearise.ode_statistical_1st(cubature_fun)
     return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR1")
 
 
