@@ -41,7 +41,7 @@ def fixture_solution(correction_impl, fact):
     try:
         tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
         ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
-        corr = correction_impl(ssm=ssm, damp=0.0)
+        corr = correction_impl(ssm=ssm, damp=1e-9)
 
     except NotImplementedError:
         testing.skip(reason="This type of linearisation has not been implemented.")

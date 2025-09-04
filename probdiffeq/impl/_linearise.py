@@ -46,7 +46,7 @@ class DenseLinearisation(LinearisationBackend):
 
         return linearise_fun_wrapped
 
-    def ode_taylor_1st(self, ode_order):
+    def ode_taylor_1st(self, ode_order, damp):
         def new(fun, mean, /):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
@@ -64,11 +64,13 @@ class DenseLinearisation(LinearisationBackend):
                 return x1 - jvp(x0)
 
             linop = _jac_materialize(lambda v, _p: A(v), inputs=mean)
-            return linop, -fx
+            cov_lower = damp * np.eye(len(fx))
+            bias = _normal.Normal(-fx, cov_lower)
+            return linop, bias
 
         return new
 
-    def ode_statistical_1st(self, cubature_fun):
+    def ode_statistical_1st(self, cubature_fun, damp: float):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         linearise_fun = functools.partial(self.slr1, cubature_rule=cubature_rule)
 
@@ -93,14 +95,18 @@ class DenseLinearisation(LinearisationBackend):
                 return a1(x) - J @ a0(x)
 
             linop = _jac_materialize(lambda v, _p: A(v), inputs=rv.mean)
-
             mean, cov_lower = noise.mean, noise.cholesky
+
+            # Include the damping term. (TODO: use a single qr?)
+            damping = damp * np.eye(len(cov_lower))
+            stack = np.concatenate((cov_lower.T, damping.T))
+            cov_lower = cholesky_util.triu_via_qr(stack).T
             bias = _normal.Normal(-mean, cov_lower)
             return linop, bias
 
         return new
 
-    def ode_statistical_0th(self, cubature_fun):
+    def ode_statistical_0th(self, cubature_fun, damp: float):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         linearise_fun = functools.partial(self.slr0, cubature_rule=cubature_rule)
 
@@ -121,6 +127,12 @@ class DenseLinearisation(LinearisationBackend):
             # Gather the variables and return
             noise = linearise_fun(fun, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
+
+            # Include the damping term. (TODO: use a single qr?)
+            damping = damp * np.eye(len(cov_lower))
+            stack = np.concatenate((cov_lower.T, damping.T))
+            cov_lower = cholesky_util.triu_via_qr(stack).T
+
             bias = _normal.Normal(-mean, cov_lower)
             linop = _jac_materialize(lambda v, _p: a1(v), inputs=rv.mean)
             return linop, bias
@@ -197,7 +209,7 @@ class DenseLinearisation(LinearisationBackend):
 
 
 class IsotropicLinearisation(LinearisationBackend):
-    def ode_taylor_1st(self, ode_order):
+    def ode_taylor_1st(self, ode_order, damp: float):
         raise NotImplementedError
 
     def ode_taylor_0th(self, ode_order, damp: float):
@@ -212,10 +224,10 @@ class IsotropicLinearisation(LinearisationBackend):
 
         return linearise_fun_wrapped
 
-    def ode_statistical_0th(self, cubature_fun):
+    def ode_statistical_0th(self, cubature_fun, damp: float):
         raise NotImplementedError
 
-    def ode_statistical_1st(self, cubature_fun):
+    def ode_statistical_1st(self, cubature_fun, damp: float):
         raise NotImplementedError
 
     @staticmethod
@@ -244,13 +256,13 @@ class BlockDiagLinearisation(LinearisationBackend):
 
         return linearise_fun_wrapped
 
-    def ode_taylor_1st(self, ode_order):
+    def ode_taylor_1st(self, ode_order, damp: float):
         raise NotImplementedError
 
-    def ode_statistical_0th(self, cubature_fun):
+    def ode_statistical_0th(self, cubature_fun, damp: float):
         raise NotImplementedError
 
-    def ode_statistical_1st(self, cubature_fun):
+    def ode_statistical_1st(self, cubature_fun, damp: float):
         raise NotImplementedError
 
     @staticmethod

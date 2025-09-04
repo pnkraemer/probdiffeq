@@ -555,21 +555,21 @@ def correction_ts0(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     return _CorrectionTS(name="TS0", ode_order=ode_order, ssm=ssm, linearize=linearize)
 
 
-def correction_ts1(*, ssm, ode_order=1) -> _Correction:
+def correction_ts1(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """First-order Taylor linearisation."""
-    linearize = ssm.linearise.ode_taylor_1st(ode_order=ode_order)
+    linearize = ssm.linearise.ode_taylor_1st(ode_order=ode_order, damp=damp)
     return _CorrectionTS(name="TS1", ode_order=ode_order, ssm=ssm, linearize=linearize)
 
 
-def correction_slr0(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
+def correction_slr0(*, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0) -> _Correction:
     """Zeroth-order statistical linear regression."""
-    linearize = ssm.linearise.ode_statistical_0th(cubature_fun)
+    linearize = ssm.linearise.ode_statistical_0th(cubature_fun, damp=damp)
     return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR0")
 
 
-def correction_slr1(*, ssm, cubature_fun=cubature_third_order_spherical) -> _Correction:
+def correction_slr1(*, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0) -> _Correction:
     """First-order statistical linear regression."""
-    linearize = ssm.linearise.ode_statistical_1st(cubature_fun)
+    linearize = ssm.linearise.ode_statistical_1st(cubature_fun, damp=damp)
     return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR1")
 
 
