@@ -304,6 +304,17 @@ class _ExtraImplSmoother(_ExtraImpl):
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
 
+def strategy_smoother(*, ssm):
+    """Construct a smoother."""
+    return _ExtraImplSmoother(
+        name="Smoother",
+        ssm=ssm,
+        is_suitable_for_save_at=False,
+        is_suitable_for_save_every_step=True,
+        is_suitable_for_offgrid_marginals=True,
+    )
+
+
 @containers.dataclass
 class _ExtraImplFilter(_ExtraImpl):
     def init(self, sol, /):
@@ -357,6 +368,17 @@ class _ExtraImplFilter(_ExtraImpl):
     def interpolate_at_t1(self, rv, extra, /, *, prior):
         del prior
         return _InterpRes((rv, extra), (rv, extra), (rv, extra))
+
+
+def strategy_filter(*, ssm):
+    """Construct a filter."""
+    return _ExtraImplFilter(
+        name="Filter",
+        ssm=ssm,
+        is_suitable_for_save_at=True,
+        is_suitable_for_save_every_step=True,
+        is_suitable_for_offgrid_marginals=True,
+    )
 
 
 @containers.dataclass
@@ -471,6 +493,17 @@ class _ExtraImplFixedPoint(_ExtraImpl):
         return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
 
+def strategy_fixedpoint(*, ssm):
+    """Construct a fixedpoint-smoother."""
+    return _ExtraImplFixedPoint(
+        name="Fixed-point smoother",
+        ssm=ssm,
+        is_suitable_for_save_at=True,
+        is_suitable_for_save_every_step=False,
+        is_suitable_for_offgrid_marginals=False,
+    )
+
+
 @containers.dataclass
 class _Correction:
     """Correction model interface."""
@@ -506,9 +539,8 @@ class _Correction:
         #  context. Same for prototype_qoi etc.
         zero_data = np.zeros(())
         output_scale = self.ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
-        error_estimate_unscaled = np.squeeze(
-            self.ssm.stats.standard_deviation(observed)
-        )
+        stdev = self.ssm.stats.standard_deviation(observed)
+        error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, observed, (A, b, f_wrapped)
 
@@ -519,10 +551,6 @@ class _Correction:
             A, b = self.linearize(f_wrapped, rv)
         observed, (_gain, corrected) = self.ssm.conditional.revert(rv, (A, b))
         return corrected, observed
-
-    def extract(self, x, /):
-        """Extract the solution from the state."""
-        return x
 
 
 def correction_ts0(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
@@ -578,39 +606,6 @@ def correction_slr1(
         name="SLR1",
         use_re_linearize=True,
         can_handle_higher_order=False,  # TODO: implement this
-    )
-
-
-def strategy_smoother(*, ssm):
-    """Construct a smoother."""
-    return _ExtraImplSmoother(
-        name="Smoother",
-        ssm=ssm,
-        is_suitable_for_save_at=False,
-        is_suitable_for_save_every_step=True,
-        is_suitable_for_offgrid_marginals=True,
-    )
-
-
-def strategy_fixedpoint(*, ssm):
-    """Construct a fixedpoint-smoother."""
-    return _ExtraImplFixedPoint(
-        name="Fixed-point smoother",
-        ssm=ssm,
-        is_suitable_for_save_at=True,
-        is_suitable_for_save_every_step=False,
-        is_suitable_for_offgrid_marginals=False,
-    )
-
-
-def strategy_filter(*, ssm):
-    """Construct a filter."""
-    return _ExtraImplFilter(
-        name="Filter",
-        ssm=ssm,
-        is_suitable_for_save_at=True,
-        is_suitable_for_save_every_step=True,
-        is_suitable_for_offgrid_marginals=True,
     )
 
 
@@ -701,7 +696,7 @@ class _ProbabilisticSolver:
         )
 
     def extract(self, state: _State, /):
-        hidden = self.correction.extract(state.hidden)
+        hidden = state.hidden
         posterior = self.extrapolation.extract(hidden, state.aux_extra)
         t = state.t
 
