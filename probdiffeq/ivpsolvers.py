@@ -503,19 +503,19 @@ class _CorrectionTS(_Correction):
         y = self.ssm.prototypes.observed()
         return x, y
 
-    def estimate_error(self, x, /, vector_field, t):
+    def estimate_error(self, rv, /, vector_field, t):
         def f_wrapped(s):
             return vector_field(*s, t=t)
 
-        A, b = self.linearize(f_wrapped, x.mean)
-        observed = self.ssm.conditional.marginalise(x, (A, b))
+        A, b = self.linearize(f_wrapped, rv)
+        observed = self.ssm.conditional.marginalise(rv, (A, b))
 
         error_estimate = _estimate_error(observed, ssm=self.ssm)
         return error_estimate, observed, {"linearization": (A, b)}
 
-    def complete(self, x, cache, /):
+    def complete(self, rv, cache, /):
         A, b = cache["linearization"]
-        observed, (_gain, corrected) = self.ssm.conditional.revert(x, (A, b))
+        observed, (_gain, corrected) = self.ssm.conditional.revert(rv, (A, b))
         return corrected, observed
 
     def extract(self, x, /):
@@ -561,13 +561,17 @@ def correction_ts1(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     return _CorrectionTS(name="TS1", ode_order=ode_order, ssm=ssm, linearize=linearize)
 
 
-def correction_slr0(*, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0) -> _Correction:
+def correction_slr0(
+    *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
+) -> _Correction:
     """Zeroth-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_0th(cubature_fun, damp=damp)
     return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR0")
 
 
-def correction_slr1(*, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0) -> _Correction:
+def correction_slr1(
+    *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
+) -> _Correction:
     """First-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_1st(cubature_fun, damp=damp)
     return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR1")

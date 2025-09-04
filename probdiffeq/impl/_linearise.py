@@ -15,11 +15,15 @@ class LinearisationBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_1st(self, cubature_fun: Callable, damp: float) -> _normal.Normal:
+    def ode_statistical_1st(
+        self, cubature_fun: Callable, damp: float
+    ) -> _normal.Normal:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_0th(self, cubature_fun: Callable, damp: float) -> _normal.Normal:
+    def ode_statistical_0th(
+        self, cubature_fun: Callable, damp: float
+    ) -> _normal.Normal:
         raise NotImplementedError
 
 
@@ -29,7 +33,8 @@ class DenseLinearisation(LinearisationBackend):
         self.unravel = unravel
 
     def ode_taylor_0th(self, ode_order, damp: float):
-        def linearise_fun_wrapped(fun, mean):
+        def linearise_fun_wrapped(fun, rv):
+            mean = rv.mean
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
@@ -48,7 +53,8 @@ class DenseLinearisation(LinearisationBackend):
         return linearise_fun_wrapped
 
     def ode_taylor_1st(self, ode_order, damp):
-        def new(fun, mean, /):
+        def new(fun, rv, /):
+            mean = rv.mean
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
@@ -214,7 +220,8 @@ class IsotropicLinearisation(LinearisationBackend):
         raise NotImplementedError
 
     def ode_taylor_0th(self, ode_order, damp: float):
-        def linearise_fun_wrapped(fun, mean):
+        def linearise_fun_wrapped(fun, rv):
+            mean = rv.mean
             fx = self.ts0(fun, mean[:ode_order, ...])
             linop = _jac_materialize(
                 lambda s, _p: s[[ode_order], ...], inputs=mean[:, 0]
@@ -238,7 +245,8 @@ class IsotropicLinearisation(LinearisationBackend):
 
 class BlockDiagLinearisation(LinearisationBackend):
     def ode_taylor_0th(self, ode_order, damp: float):
-        def linearise_fun_wrapped(fun, mean):
+        def linearise_fun_wrapped(fun, rv):
+            mean = rv.mean
             m0 = mean[:, :ode_order]
             fx = self.ts0(fun, m0.T)
 
@@ -252,7 +260,7 @@ class BlockDiagLinearisation(LinearisationBackend):
             linop = lo(mean)
             d, *_ = linop.shape
             cov_lower = damp * np.ones((d, 1, 1))
-            bias =  _normal.Normal(-fx[:, None], cov_lower)
+            bias = _normal.Normal(-fx[:, None], cov_lower)
             return linop, bias
 
         return linearise_fun_wrapped
