@@ -480,85 +480,75 @@ class _Correction:
     ssm: Any
     linearize: Callable
 
+    use_re_linearize: bool
+    can_handle_higher_order: bool
+
     def init(self, x, /):
         """Initialise the state from the solution."""
-        raise NotImplementedError
-
-    def estimate_error(self, x, /, vector_field, t):
-        """Perform all elements of the correction until the error estimate."""
-        raise NotImplementedError
-
-    def complete(self, x, cache, /):
-        """Complete what has been left out by `estimate_error`."""
-        raise NotImplementedError
-
-    def extract(self, x, /):
-        """Extract the solution from the state."""
-        raise NotImplementedError
-
-
-@containers.dataclass
-class _CorrectionTS(_Correction):
-    def init(self, x, /):
         y = self.ssm.prototypes.observed()
         return x, y
 
     def estimate_error(self, rv, /, vector_field, t):
-        def f_wrapped(s):
-            return vector_field(*s, t=t)
+        """Perform all elements of the correction until the error estimate."""
+        if self.can_handle_higher_order:
+
+            def f_wrapped(s):
+                return vector_field(*s, t=t)
+        else:
+            f_wrapped = functools.partial(vector_field, t=t)
 
         A, b = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, (A, b))
 
-        error_estimate = _estimate_error(observed, ssm=self.ssm)
-        return error_estimate, observed, {"linearization": (A, b)}
+        # TODO: the functions involved in error estimation are still a bit patchy.
+        #  for instance, they assume that they are called
+        #  in exactly this error estimation
+        #  context. Same for prototype_qoi etc.
+        zero_data = np.zeros(())
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
+        error_estimate_unscaled = np.squeeze(
+            self.ssm.stats.standard_deviation(observed)
+        )
+        error_estimate = output_scale * error_estimate_unscaled
+        return error_estimate, observed, (A, b, f_wrapped)
 
     def complete(self, rv, cache, /):
-        A, b = cache["linearization"]
+        """Complete what has been left out by `estimate_error`."""
+        A, b, f_wrapped = cache
+        if self.use_re_linearize:
+            A, b = self.linearize(f_wrapped, rv)
         observed, (_gain, corrected) = self.ssm.conditional.revert(rv, (A, b))
         return corrected, observed
 
     def extract(self, x, /):
-        return x
-
-
-@containers.dataclass
-class _CorrectionSLR(_Correction):
-    def init(self, x, /):
-        y = self.ssm.prototypes.observed()
-        return x, y
-
-    def estimate_error(self, x, /, vector_field, t):
-        f_wrapped = functools.partial(vector_field, t=t)
-        A, b = self.linearize(f_wrapped, x)
-        observed = self.ssm.conditional.marginalise(x, (A, b))
-
-        error_estimate = _estimate_error(observed, ssm=self.ssm)
-        return error_estimate, observed, (A, b, f_wrapped)
-
-    def complete(self, x, cache, /):
-        # Re-linearise (because the linearisation point changed)
-        *_, f_wrapped = cache
-        A, b = self.linearize(f_wrapped, x)
-
-        # Condition
-        observed, (_gain, corrected) = self.ssm.conditional.revert(x, (A, b))
-        return corrected, observed
-
-    def extract(self, x, /):
+        """Extract the solution from the state."""
         return x
 
 
 def correction_ts0(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """Zeroth-order Taylor linearisation."""
     linearize = ssm.linearise.ode_taylor_0th(ode_order=ode_order, damp=damp)
-    return _CorrectionTS(name="TS0", ode_order=ode_order, ssm=ssm, linearize=linearize)
+    return _Correction(
+        name="TS0",
+        ode_order=ode_order,
+        ssm=ssm,
+        linearize=linearize,
+        use_re_linearize=False,
+        can_handle_higher_order=True,
+    )
 
 
 def correction_ts1(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """First-order Taylor linearisation."""
     linearize = ssm.linearise.ode_taylor_1st(ode_order=ode_order, damp=damp)
-    return _CorrectionTS(name="TS1", ode_order=ode_order, ssm=ssm, linearize=linearize)
+    return _Correction(
+        name="TS1",
+        ode_order=ode_order,
+        ssm=ssm,
+        linearize=linearize,
+        use_re_linearize=False,
+        can_handle_higher_order=True,
+    )
 
 
 def correction_slr0(
@@ -566,7 +556,14 @@ def correction_slr0(
 ) -> _Correction:
     """Zeroth-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_0th(cubature_fun, damp=damp)
-    return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR0")
+    return _Correction(
+        ssm=ssm,
+        ode_order=1,
+        linearize=linearize,
+        name="SLR0",
+        use_re_linearize=True,
+        can_handle_higher_order=False,
+    )
 
 
 def correction_slr1(
@@ -574,17 +571,14 @@ def correction_slr1(
 ) -> _Correction:
     """First-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_1st(cubature_fun, damp=damp)
-    return _CorrectionSLR(ssm=ssm, ode_order=1, linearize=linearize, name="SLR1")
-
-
-def _estimate_error(observed, /, *, ssm):
-    # TODO: the functions involved in error estimation are still a bit patchy.
-    #  for instance, they assume that they are called in exactly this error estimation
-    #  context. Same for prototype_qoi etc.
-    zero_data = np.zeros(())
-    output_scale = ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
-    error_estimate_unscaled = np.squeeze(ssm.stats.standard_deviation(observed))
-    return output_scale * error_estimate_unscaled
+    return _Correction(
+        ssm=ssm,
+        ode_order=1,
+        linearize=linearize,
+        name="SLR1",
+        use_re_linearize=True,
+        can_handle_higher_order=False,
+    )
 
 
 def strategy_smoother(*, ssm):
