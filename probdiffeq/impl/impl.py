@@ -15,7 +15,6 @@ class FactImpl:
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
-    transform: _conditional.TransformBackend
 
     # To assert a valid tree_equal of solutions, the factorisations
     # must be comparable.
@@ -61,11 +60,9 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
         unravel=unravel,
         flat_shape=flat.shape,
     )
-    transform = _conditional.DenseTransform()
     return FactImpl(
         name="dense",
         linearise=linearise,
-        transform=transform,
         conditional=conditional,
         normal=normal,
         prototypes=prototypes,
@@ -88,7 +85,6 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     conditional = _conditional.IsotropicConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
-    transform = _conditional.IsotropicTransform()
     return FactImpl(
         name="isotropic",
         prototypes=prototypes,
@@ -96,7 +92,6 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         stats=stats,
         linearise=linearise,
         conditional=conditional,
-        transform=transform,
     )
 
 
@@ -115,7 +110,6 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     conditional = _conditional.BlockDiagConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
-    transform = _conditional.BlockDiagTransform(ode_shape=ode_shape)
     return FactImpl(
         name="blockdiag",
         prototypes=prototypes,
@@ -123,5 +117,4 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
         stats=stats,
         linearise=linearise,
         conditional=conditional,
-        transform=transform,
     )

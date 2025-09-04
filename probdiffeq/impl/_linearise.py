@@ -1,24 +1,25 @@
 from probdiffeq.backend import abc, functools
 from probdiffeq.backend import numpy as np
+from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
 
 
 class LinearisationBackend(abc.ABC):
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order):
+    def ode_taylor_0th(self, ode_order: int, damp: float) -> _normal.Normal:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, ode_order):
+    def ode_taylor_1st(self, ode_order: int, damp: float) -> _normal.Normal:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_1st(self, cubature_fun):  # ode_order > 1 not supported
+    def ode_statistical_1st(self, cubature_fun: Callable, damp: float) -> _normal.Normal:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_0th(self, cubature_fun):  # ode_order > 1 not supported
+    def ode_statistical_0th(self, cubature_fun: Callable, damp: float) -> _normal.Normal:
         raise NotImplementedError
 
 
