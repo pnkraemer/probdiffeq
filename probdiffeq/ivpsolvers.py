@@ -562,7 +562,7 @@ def correction_slr0(
         linearize=linearize,
         name="SLR0",
         use_re_linearize=True,
-        can_handle_higher_order=False,
+        can_handle_higher_order=False,  # TODO: implement this
     )
 
 
@@ -577,7 +577,7 @@ def correction_slr1(
         linearize=linearize,
         name="SLR1",
         use_re_linearize=True,
-        can_handle_higher_order=False,
+        can_handle_higher_order=False,  # TODO: implement this
     )
 
 
