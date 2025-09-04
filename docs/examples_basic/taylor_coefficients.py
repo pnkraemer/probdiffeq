@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Understanding the role of Taylor coefficients
+# # Taylor coefficients
 #
 # To build a probabilistic solver, we need to build a specific state-space model.
 # To build this specific state-space model, we interact with Taylor coefficients.

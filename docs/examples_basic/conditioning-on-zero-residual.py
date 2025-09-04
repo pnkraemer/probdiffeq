@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Understanding probabilistic solvers as collocation methods
+# # How probabilistic solvers work
 #
 # Probabilistic solvers condition a prior distribution
 # on satisfying a zero-ODE-residual on a specified grid.

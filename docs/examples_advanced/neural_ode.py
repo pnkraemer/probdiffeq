@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Training a Neural ODE with Optax
+# # Neural ODEs
 #
 # We can use the parameter estimation functionality
 # to fit a neural ODE to a time series data set.

@@ -1,4 +1,4 @@
-# Transitioning from other packages
+# Transitioning
 
 Here is how you get started with ProbDiffEq for solving ordinary differential equations (ODEs) 
 if you already have experience with other (probabilistic) ODE solver packages in Python and Julia.
