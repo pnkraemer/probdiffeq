@@ -75,22 +75,20 @@ extra:
 nav:
   - Probabilistic solvers for differential equations in JAX: index.md
   - An easy example: examples_quickstart/easy_example.ipynb
-  - 'FAQ: PROBDIFFEQ 101':
-      - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
-      - Choosing a solver: getting_started/choosing_a_solver.md
-      - Troubleshooting: getting_started/troubleshooting.md
-  - SOLVER CONFIGURATION:
-      - examples_solver_config/conditioning-on-zero-residual.ipynb
-      - examples_solver_config/posterior_uncertainties.ipynb
-      - examples_solver_config/dynamic_output_scales.ipynb
-      - examples_solver_config/second_order_problems.ipynb
-      - examples_solver_config/taylor_coefficients.ipynb
-  - PARAMETER ESTIMATION:
-      - Parameter estimation with Optax: examples_parameter_estimation/physics_enhanced_regression_1.ipynb
-      - Parameter estimation with BlackJAX: examples_parameter_estimation/physics_enhanced_regression_2.ipynb
-      - Neural ODEs with Optax: examples_parameter_estimation/neural_ode.ipynb
-  - MISCELLANEOUS EXAMPLES:
-      - examples_misc/use_equinox_bounded_while_loop.ipynb
+  - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
+  - Choosing a solver: getting_started/choosing_a_solver.md
+  - Troubleshooting: getting_started/troubleshooting.md
+  - EXAMPLES | BASIC:
+      - examples_basic/conditioning-on-zero-residual.ipynb
+      - examples_basic/posterior_uncertainties.ipynb
+      - examples_basic/dynamic_output_scales.ipynb
+      - examples_basic/second_order_problems.ipynb
+      - examples_basic/taylor_coefficients.ipynb
+  - EXAMPLES | ADVANCED:
+      - examples_advanced/physics_enhanced_regression_1.ipynb
+      - examples_advanced/physics_enhanced_regression_2.ipynb
+      - examples_advanced/neural_ode.ipynb
+      - examples_advanced/use_equinox_bounded_while_loop.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md
@@ -106,6 +104,7 @@ nav:
       - benchmarks/pleiades/plot.ipynb
       - benchmarks/hires/plot.ipynb
       - benchmarks/vanderpol/plot.ipynb
-      - benchmarks/taylor_pleiades/plot.ipynb
-      - benchmarks/taylor_fitzhughnagumo/plot.ipynb
-      - benchmarks/taylor_node/plot.ipynb
+      - Taylor coefficients:
+          - benchmarks/taylor_pleiades/plot.ipynb
+          - benchmarks/taylor_fitzhughnagumo/plot.ipynb
+          - benchmarks/taylor_node/plot.ipynb

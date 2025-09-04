@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Exploring posterior uncertainties
+# # Posterior uncertainties
 
 # +
 """Display the marginal uncertainties of filters and smoothers."""

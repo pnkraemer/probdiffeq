@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# # Choosing between dynamic and non-dynamic solvers
+# # Solver types
 #
 # You can choose between a `adaptive.solver_calibrationfree()`
 # (which does not calibrate the output-scale),

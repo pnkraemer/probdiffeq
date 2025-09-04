@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# Taylor-series: Neural ODE problem
+# Neural ODE
 
 ```python
 """Benchmark all Taylor-series estimators on a Neural ODE."""

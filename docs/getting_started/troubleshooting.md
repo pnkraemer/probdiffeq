@@ -15,15 +15,13 @@ This is because, during solver initialization, it computes the Cholesky factor o
 
 If a solution routine takes an unexpectedly long time to compile but runs quickly afterward, the issue might be related to how Taylor coefficients are computed. 
 Some functions in `probdiffeq.taylor` unroll a small loop, which can slow down compilation.  
-
-To avoid this, try using `probdiffeq.taylor.taylor.odejet_padded_scan()`, which replaces loop unrolling with a scan.  
-
+To avoid this, try using the padded scan, which replaces loop unrolling with a scan.  
 If the problem persists, consider:  
 
 - Reducing the number of derivatives (if appropriate for your problem).  
-- Switching to a different Taylor-coefficient routine, such as a Runge-Kutta starter with `probdiffeq.taylor.taylor.runge_kutta_starter()`.  
+- Switching to a different Taylor-coefficient routine, such as a Runge-Kutta starter.
 
-For $\nu < 5$, using a Runge-Kutta starter should maintain solver performance. However, for higher-order methods (e.g., \(\nu = 9\)), `taylor_fn=taylor.odejet_fn` appears to be the best choice.  
+For $\nu < 5$, using a Runge-Kutta starter should maintain solver performance. However, for higher-order methods (e.g., \(\nu = 9\)), Taylor-mode ("jets") appears to be the best choice.  
 
 
 ## Taylor-derivative routines yield NaNs

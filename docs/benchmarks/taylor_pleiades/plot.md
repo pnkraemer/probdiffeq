@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# Taylor-series: Pleiades
+# Pleiades
 
 The Pleiades problem is a common non-stiff differential equation.
 

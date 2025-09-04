@@ -13,7 +13,7 @@ jupyter:
     name: python3
 ---
 
-# Taylor-series: FitzHugh-Nagumo
+# FitzHugh-Nagumo
 
 The FHN problem is a common non-stiff differential equation.
 
