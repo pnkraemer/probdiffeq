@@ -27,7 +27,7 @@ class DenseLinearisation(LinearisationBackend):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order):
+    def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, mean):
             a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
             a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
@@ -40,7 +40,9 @@ class DenseLinearisation(LinearisationBackend):
             linop = _jac_materialize(
                 lambda v, _p: self._autobatch_linop(a1)(v), inputs=mean
             )
-            return linop, -fx
+            cov_lower = damp * np.eye(len(fx))
+            bias = _normal.Normal(-fx, cov_lower)
+            return linop, bias
 
         return linearise_fun_wrapped
 
@@ -198,13 +200,15 @@ class IsotropicLinearisation(LinearisationBackend):
     def ode_taylor_1st(self, ode_order):
         raise NotImplementedError
 
-    def ode_taylor_0th(self, ode_order):
+    def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, mean):
             fx = self.ts0(fun, mean[:ode_order, ...])
             linop = _jac_materialize(
                 lambda s, _p: s[[ode_order], ...], inputs=mean[:, 0]
             )
-            return linop, -fx
+            cov_lower = damp * np.eye(1)
+            bias = _normal.Normal(-fx, cov_lower)
+            return linop, bias
 
         return linearise_fun_wrapped
 
@@ -220,7 +224,7 @@ class IsotropicLinearisation(LinearisationBackend):
 
 
 class BlockDiagLinearisation(LinearisationBackend):
-    def ode_taylor_0th(self, ode_order):
+    def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, mean):
             m0 = mean[:, :ode_order]
             fx = self.ts0(fun, m0.T)
@@ -233,7 +237,10 @@ class BlockDiagLinearisation(LinearisationBackend):
                 return _jac_materialize(lambda v, _p: a1(v), inputs=s)
 
             linop = lo(mean)
-            return linop, -fx[:, None]
+            d, *_ = linop.shape
+            cov_lower = damp * np.ones((d, 1, 1))
+            bias =  _normal.Normal(-fx[:, None], cov_lower)
+            return linop, bias
 
         return linearise_fun_wrapped
 

@@ -508,14 +508,14 @@ class _CorrectionTS(_Correction):
             return vector_field(*s, t=t)
 
         A, b = self.linearize(f_wrapped, x.mean)
-        observed = self.ssm.transform.marginalise(x, (A, b))
+        observed = self.ssm.conditional.marginalise(x, (A, b))
 
         error_estimate = _estimate_error(observed, ssm=self.ssm)
         return error_estimate, observed, {"linearization": (A, b)}
 
     def complete(self, x, cache, /):
         A, b = cache["linearization"]
-        observed, (_gain, corrected) = self.ssm.transform.revert(x, (A, b))
+        observed, (_gain, corrected) = self.ssm.conditional.revert(x, (A, b))
         return corrected, observed
 
     def extract(self, x, /):
@@ -549,9 +549,9 @@ class _CorrectionSLR(_Correction):
         return x
 
 
-def correction_ts0(*, ssm, ode_order=1) -> _Correction:
+def correction_ts0(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """Zeroth-order Taylor linearisation."""
-    linearize = ssm.linearise.ode_taylor_0th(ode_order=ode_order)
+    linearize = ssm.linearise.ode_taylor_0th(ode_order=ode_order, damp=damp)
     return _CorrectionTS(name="TS0", ode_order=ode_order, ssm=ssm, linearize=linearize)
 
 
