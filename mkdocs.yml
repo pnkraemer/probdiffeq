@@ -78,13 +78,13 @@ nav:
   - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
   - Choosing a solver: getting_started/choosing_a_solver.md
   - Troubleshooting: getting_started/troubleshooting.md
-  - "EXAMPLES | BASIC":
+  - EXAMPLES | BASIC:
       - examples_basic/conditioning-on-zero-residual.ipynb
       - examples_basic/posterior_uncertainties.ipynb
       - examples_basic/dynamic_output_scales.ipynb
       - examples_basic/second_order_problems.ipynb
       - examples_basic/taylor_coefficients.ipynb
-  - "EXAMPLES | ADVANCED":
+  - EXAMPLES | ADVANCED:
       - examples_advanced/physics_enhanced_regression_1.ipynb
       - examples_advanced/physics_enhanced_regression_2.ipynb
       - examples_advanced/neural_ode.ipynb
@@ -105,6 +105,6 @@ nav:
       - benchmarks/hires/plot.ipynb
       - benchmarks/vanderpol/plot.ipynb
       - Taylor coefficients:
-        - benchmarks/taylor_pleiades/plot.ipynb
-        - benchmarks/taylor_fitzhughnagumo/plot.ipynb
-        - benchmarks/taylor_node/plot.ipynb
+          - benchmarks/taylor_pleiades/plot.ipynb
+          - benchmarks/taylor_fitzhughnagumo/plot.ipynb
+          - benchmarks/taylor_node/plot.ipynb
