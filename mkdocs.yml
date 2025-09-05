@@ -73,7 +73,7 @@ extra:
       name: pnkraemer
   generator: false
 nav:
-  - Probabilistic solvers for differential equations in JAX: index.md
+  - index.md
   - An easy example: examples_quickstart/quickstart.ipynb
   - Migration guide: migration_guide.md
   - Choosing a solver: choosing_a_solver.md
