@@ -75,9 +75,9 @@ extra:
 nav:
   - Probabilistic solvers for differential equations in JAX: index.md
   - An easy example: examples_quickstart/easy_example.ipynb
-  - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
-  - Choosing a solver: getting_started/choosing_a_solver.md
-  - Troubleshooting: getting_started/troubleshooting.md
+  - Transitioning from other packages: transitioning_from_other_packages.md
+  - Choosing a solver: choosing_a_solver.md
+  - Troubleshooting: troubleshooting.md
   - EXAMPLES | BASIC:
       - examples_basic/conditioning-on-zero-residual.ipynb
       - examples_basic/posterior_uncertainties.ipynb
