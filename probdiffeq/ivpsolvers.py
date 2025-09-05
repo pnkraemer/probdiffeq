@@ -16,6 +16,13 @@ from probdiffeq.impl import impl
 R = TypeVar("R")
 
 
+# TODO (internal implementations):
+# - No more begin() and complete() steps. Replace with something less ambiguous.
+# - No more extract(). Replace with
+#   iterating on solution (the result of extract) + solver_state (everything else)
+# - Make interpolation decision (before, at, after t1) on the lowest level possible
+
+
 class _MarkovProcess(containers.NamedTuple):
     tcoeffs: Any
     output_scale: Any
