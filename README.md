@@ -7,8 +7,7 @@
 
 ## Probabilistic ODE solvers in JAX
 
-**Probdiffeq** implements adaptive probabilistic numerical solvers for initial value problems (IVPs).  
-It is built on [JAX](https://jax.readthedocs.io/en/latest/), inheriting **automatic differentiation**, **vectorisation**, and **GPU acceleration**.
+**Probdiffeq** implements adaptive probabilistic numerical solvers for ordinary differential equations (ODEs). It builds on [JAX](https://jax.readthedocs.io/en/latest/), thus inheriting **automatic differentiation**, **vectorisation**, and **GPU acceleration**.
 
 ## Features
 
@@ -19,7 +18,7 @@ It is built on [JAX](https://jax.readthedocs.io/en/latest/), inheriting **automa
 - ⚡ Parameter estimation
 - ⚡ Taylor-series estimation with and without Jets  
 - ⚡ Seamless interoperability with [Optax](https://optax.readthedocs.io/en/latest/index.html), [BlackJAX](https://blackjax-devs.github.io/blackjax/), and other JAX-based libraries  
-- ⚡ Numerous tutorials (basic and advanced) — see the [documentation](https://pnkraemer.github.io/probdiffeq/)  
+- ⚡ Numerous tutorials (basic and advanced) -- see the [documentation](https://pnkraemer.github.io/probdiffeq/)  
 
 ---
 
