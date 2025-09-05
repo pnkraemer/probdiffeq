@@ -22,10 +22,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
-    control = ivpsolvers.control_integral(clip=True)  # Any clipped controller will do.
-    asolver = ivpsolvers.adaptive(
-        solver, ssm=ssm, atol=1e-2, rtol=1e-2, control=control
-    )
+    asolver = ivpsolvers.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2, clip_dt=True)
 
     init = solver.initial_condition()
     args = (vf, init)

@@ -15,12 +15,12 @@ def test_equivalence_pi_vs_i(dt, error_power, num_applies):
     ctrl_i = ivpsolvers.control_integral()
 
     x_pi = ctrl_pi.init(dt)
+    dt_pi = dt
     for _ in range(num_applies):
-        x_pi = ctrl_pi.apply(x_pi, error_power=error_power)
-    x_pi = ctrl_pi.extract(x_pi)
+        dt_pi, x_pi = ctrl_pi.apply(dt_pi, x_pi, error_power=error_power)
 
     x_i = ctrl_i.init(dt)
+    dt_i = dt
     for _ in range(num_applies):
-        x_i = ctrl_i.apply(x_i, error_power=error_power)
-    x_i = ctrl_i.extract(x_i)
-    assert np.allclose(x_i, x_pi)
+        dt_i, x_i = ctrl_i.apply(dt_i, x_i, error_power=error_power)
+    assert np.allclose(dt_i, dt_pi)
