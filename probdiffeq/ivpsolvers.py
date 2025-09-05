@@ -1000,7 +1000,13 @@ class _AdaSolver:
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt)
-        return _AdaState(dt, state_solver, state_solver, state_control, num_steps)
+        return _AdaState(
+            dt=dt,
+            step_from=state_solver,
+            interp_from=state_solver,
+            control=state_control,
+            stats=num_steps,
+        )
 
     @functools.jit
     def rejection_loop(self, state0: _AdaState, *, vector_field, t1) -> _AdaState:
@@ -1078,7 +1084,13 @@ class _AdaSolver:
 
         def extract(s: _RejectionState) -> _AdaState:
             num_steps = state0.stats + 1.0  # TODO: track step attempts as well
-            return _AdaState(s.dt, s.proposed, s.step_from, s.control, num_steps)
+            return _AdaState(
+                dt=s.dt,
+                step_from=s.proposed,
+                interp_from=s.step_from,
+                control=s.control,
+                stats=num_steps,
+            )
 
         init_val = init(state0)
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
@@ -1094,19 +1106,21 @@ class _AdaSolver:
         interp = self.solver.interpolate_at_t1(
             interp_from=state.interp_from, interp_to=state.step_from
         )
-        state = _AdaState(
-            state.dt, interp.step_from, interp.interp_from, state.control, state.stats
-        )
-
-        solution_solver = self.solver.extract(interp.interpolated)
-        return state, (solution_solver, (state.dt, state.control), state.stats)
+        return self._extract_interpolate(interp, state)
 
     def extract_after_t1_via_interpolation(self, state: _AdaState, t):
         interp = self.solver.interpolate(
             t, interp_from=state.interp_from, interp_to=state.step_from
         )
+        return self._extract_interpolate(interp, state)
+
+    def _extract_interpolate(self, interp, state):
         state = _AdaState(
-            state.dt, interp.step_from, interp.interp_from, state.control, state.stats
+            dt=state.dt,
+            step_from=interp.step_from,
+            interp_from=interp.interp_from,
+            control=state.control,
+            stats=state.stats,
         )
 
         solution_solver = self.solver.extract(interp.interpolated)
