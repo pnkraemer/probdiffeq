@@ -20,164 +20,76 @@
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.util.doc_util import notebook
-
-# -
-
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
-
-# +
-if not backend.has_been_selected:
-    backend.select("jax")  # ivp examples in jax
-
-jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_platform_name", "cpu")
-# -
-
-# Set an example problem.
-#
-# Solve the problem on a low resolution and
-# short time-span to achieve large uncertainty.
-
-# +
-f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
-@jax.jit
-def vf(*ys, t):  # noqa: ARG001
+# Set up the ODE
+
+
+def vf(y, *, t):  # noqa: ARG001
     """Evaluate the Lotka-Volterra vector field."""
-    return f(*ys, *f_args)
+    y0, y1 = y[0], y[1]
+
+    y0_new = 0.5 * y0 - 0.05 * y0 * y1
+    y1_new = -0.5 * y1 + 0.05 * y0 * y1
+    return jnp.asarray([y0_new, y1_new])
 
 
-# -
+t0 = 0.0
+t1 = 2.0
+u0 = jnp.asarray([20.0, 20.0])
 
-# ## Filter
 
-# +
-tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
-ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_filter(ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+# Set up a solver
+# To all users: Try replacing the fixedpoint-smoother with a filter!
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=5)
+ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
+ts = ivpsolvers.correction_ts1(ssm=ssm)
+strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
+adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
 
-ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
-
-# +
-dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), (u0,))
-
+# Solve the ODE
+ts = jnp.linspace(t0, t1, endpoint=True, num=50)
 init = solver.initial_condition()
 sol = ivpsolve.solve_adaptive_save_at(
-    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
+    vf, init, save_at=ts, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )
 
+# Calibrate
 marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale, ssm=ssm)
-# -
+std = ssm.stats.standard_deviation(marginals)
+u_std = ssm.stats.qoi_from_sample(std)
 
 # Plot the solution
-
-# +
-_, num_derivatives, _ = marginals.mean.shape
-
-
-fig, axes_all = plt.subplots(
-    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
-)
-
-for i, axes_cols in enumerate(axes_all.T):
-    ms = marginals.mean[:, i, :]
-    ls = marginals.cholesky[:, i, :]
-    stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
-
-    if i == 1:
-        axes_cols[0].set_title(f"{i}st deriv.")
+fig, axes = plt.subplots(nrows=2, ncols=len(tcoeffs), tight_layout=True, figsize=(8, 3))
+for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, u_std, axes.T)):
+    # Set up titles and axis descriptions
+    if i == 0:
+        ax_i[0].set_title("State")
+        ax_i[0].set_ylabel("Predators")
+        ax_i[1].set_ylabel("Prey")
+    elif i == 1:
+        ax_i[0].set_title(f"{i}st deriv.")
     elif i == 2:
-        axes_cols[0].set_title(f"{i}nd deriv.")
+        ax_i[0].set_title(f"{i}nd deriv.")
     elif i == 3:
-        axes_cols[0].set_title(f"{i}rd deriv.")
+        ax_i[0].set_title(f"{i}rd deriv.")
     else:
-        axes_cols[0].set_title(f"{i}th deriv.")
+        ax_i[0].set_title(f"{i}th deriv.")
 
-    axes_cols[0].plot(sol.t, ms, marker="None")
-    for m in ms.T:
-        axes_cols[0].fill_between(sol.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
+    ax_i[1].set_xlabel("Time")
 
-    axes_cols[1].semilogy(sol.t, stds, marker="None")
+    for m, std, ax in zip(u_i.T, std_i.T, ax_i):
+        # Plot the mean
+        ax.plot(sol.t, m)
+        ax.set_ylim((-30, 30))
 
+        # Plot the standard deviation
+        lower, upper = m - 1.96 * std, m + 1.96 * std
+        ax.fill_between(sol.t, lower, upper, alpha=0.3)
+        ax.set_xlim((jnp.amin(ts), jnp.amax(ts)))
+
+fig.align_ylabels()
 plt.show()
-# -
-
-# ## Smoother
-
-# +
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
-ts0 = ivpsolvers.correction_ts0(ssm=ssm)
-strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-
-ts = jnp.linspace(t0, t0 + 2.0, endpoint=True, num=500)
-
-# +
-init = solver.initial_condition()
-sol = ivpsolve.solve_adaptive_save_at(
-    vf, init, save_at=ts, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-)
-
-marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale, ssm=ssm)
-posterior = stats.calibrate(sol.posterior, output_scale=sol.output_scale, ssm=ssm)
-posterior = stats.markov_select_terminal(posterior)
-# -
-
-key = jax.random.PRNGKey(seed=1)
-samples, _init = stats.markov_sample(key, posterior, shape=(2,), reverse=True, ssm=ssm)
-
-# +
-_, num_derivatives, _ = marginals.mean.shape
-
-
-fig, axes_all = plt.subplots(
-    nrows=2, ncols=num_derivatives, sharex=True, tight_layout=True, figsize=(8, 3)
-)
-
-for i, axes_cols in enumerate(axes_all.T):
-    samps = samples[i]
-    ms = ssm.stats.qoi_from_sample(marginals.mean)[i]
-    ls = ssm.stats.qoi_from_sample(marginals.cholesky)[i]
-    stds = jnp.sqrt(jnp.einsum("jn,jn->j", ls, ls))
-
-    if i == 1:
-        axes_cols[0].set_title(f"{i}st deriv.")
-    elif i == 2:
-        axes_cols[0].set_title(f"{i}nd deriv.")
-    elif i == 3:
-        axes_cols[0].set_title(f"{i}rd deriv.")
-    else:
-        axes_cols[0].set_title(f"{i}th deriv.")
-
-    axes_cols[0].plot(sol.t, ms, marker="None")
-    for s in samps:
-        axes_cols[0].plot(
-            sol.t[:-1], s[..., 0], color="C0", linewidth=0.35, marker="None"
-        )
-        axes_cols[0].plot(
-            sol.t[:-1], s[..., 1], color="C1", linewidth=0.35, marker="None"
-        )
-    for m in ms.T:
-        axes_cols[0].fill_between(sol.t, m - 1.96 * stds, m + 1.96 * stds, alpha=0.3)
-
-    axes_cols[1].semilogy(sol.t, stds, marker="None")
-
-plt.show()
-# -
-
-# The marginal standard deviations (bottom row)
-# show how the filter is forward-only,
-# whereas the smoother is a global estimate.
-#
-# This is why you should use a filter for
-# terminal-value simulation and a smoother if you want "global" solutions.
