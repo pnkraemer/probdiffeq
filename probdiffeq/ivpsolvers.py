@@ -1096,11 +1096,14 @@ class _AdaSolver:
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
 
-    def extract_before_t1(self, state: _AdaState):
+    def extract_before_t1(self, state: _AdaState, t):
+        del t
         solution_solver = self.solver.extract(state.step_from)
-        return solution_solver, (state.dt, state.control), state.stats
+        extracted = solution_solver, (state.dt, state.control), state.stats
+        return state, extracted
 
-    def extract_at_t1(self, state: _AdaState):
+    def extract_at_t1(self, state: _AdaState, t):
+        del t
         # todo: make the "at t1" decision inside interpolate(),
         #  which collapses the next two functions together
         interp = self.solver.interpolate_at_t1(
@@ -1108,7 +1111,7 @@ class _AdaSolver:
         )
         return self._extract_interpolate(interp, state)
 
-    def extract_after_t1_via_interpolation(self, state: _AdaState, t):
+    def extract_after_t1(self, state: _AdaState, t):
         interp = self.solver.interpolate(
             t, interp_from=state.interp_from, interp_to=state.step_from
         )

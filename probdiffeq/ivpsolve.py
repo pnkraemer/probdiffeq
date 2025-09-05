@@ -221,10 +221,11 @@ def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
     state = control_flow.while_loop(cond_fun, body_fun, init=state)
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
+    is_after_t1 = state.step_from.t > t_next + 10 * np.finfo_eps(t_next.dtype)
     state, solution = control_flow.cond(
-        state.step_from.t > t_next + 10 * np.finfo_eps(float),
-        adaptive_solver.extract_after_t1_via_interpolation,
-        lambda s, _t: adaptive_solver.extract_at_t1(s),
+        is_after_t1,
+        adaptive_solver.extract_after_t1,
+        adaptive_solver.extract_at_t1,
         state,
         t_next,
     )
@@ -293,14 +294,15 @@ def _solution_generator(
         state = adaptive_solver.rejection_loop(state, vector_field=vector_field, t1=t1)
 
         if state.step_from.t < t1:
-            solution = adaptive_solver.extract_before_t1(state)
+            _, solution = adaptive_solver.extract_before_t1(state, t=t1)
             yield solution
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
-    if state.step_from.t > t1:
-        _, solution = adaptive_solver.extract_after_t1_via_interpolation(state, t=t1)
+    is_after_t1 = state.step_from.t > t1 + 10 * np.finfo_eps(state.step_from.t.dtype)
+    if is_after_t1:
+        _, solution = adaptive_solver.extract_after_t1(state, t=t1)
     else:
-        _, solution = adaptive_solver.extract_at_t1(state)
+        _, solution = adaptive_solver.extract_at_t1(state, t=t1)
 
     yield solution
 
