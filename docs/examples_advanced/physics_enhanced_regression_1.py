@@ -35,12 +35,6 @@ import optax
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats
-from probdiffeq.util.doc_util import notebook
-
-# -
-
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
 
 # +
 if not backend.has_been_selected:

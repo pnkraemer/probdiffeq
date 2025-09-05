@@ -21,10 +21,9 @@
 
 import jax
 import jax.numpy as jnp
-
-from probdiffeq import ivpsolve, ivpsolvers, taylor
 import matplotlib.pyplot as plt
 
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 
 # Define a differential equation
 
@@ -55,13 +54,7 @@ adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
 # To all users: Try different solution routines.
 init = solver.initial_condition()
 solution = ivpsolve.solve_adaptive_save_every_step(
-    vf,
-    init,
-    t0=t0,
-    t1=t1,
-    dt0=0.1,
-    adaptive_solver=adaptive_solver,
-    ssm=ssm,
+    vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )
 
 # Look at the solution

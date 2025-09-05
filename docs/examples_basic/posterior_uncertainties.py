@@ -17,12 +17,10 @@
 # +
 """Display the marginal uncertainties of filters and smoothers."""
 
-import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-
 
 # Set up the ODE
 

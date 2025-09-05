@@ -27,6 +27,7 @@ from probdiffeq import ivpsolve, ivpsolvers, stats
 
 
 def main(num_data=100, epochs=1_000, print_every=100, hidden=(20,), lr=0.2):
+    """Train a neural ODE using diffusion tempering."""
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)
     data = jnp.sin(2.5 * jnp.pi * grid) * jnp.pi * grid
@@ -70,7 +71,8 @@ def main(num_data=100, epochs=1_000, print_every=100, hidden=(20,), lr=0.2):
             print(f"...{(i + 1)} epochs: loss={info['loss']:.3e}")
 
         # Diffusion tempering: https://arxiv.org/abs/2402.12231
-        # To all users: Adjust this tempering and see how it affects parameter estimation.
+        # To all users: Adjust this tempering and
+        # see how it affects parameter estimation.
         if i % 100 == 0:
             output_scale /= 10.0
 
@@ -92,21 +94,15 @@ def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
     def vf(y, *, t, p):
         """Evaluate the neural ODE vector field."""
         y_and_t = jnp.concatenate([y, t[None]])
-        fx = mlp(p, y_and_t)
-        return fx
+        return mlp(p, y_and_t)
 
     return vf, (u0,), (t0, t1), f_args
 
 
 def model_mlp(
-    *,
-    hidden: tuple,
-    shape_in: tuple = (),
-    shape_out: tuple = (),
-    activation=jnp.tanh,
+    *, hidden: tuple, shape_in: tuple = (), shape_out: tuple = (), activation=jnp.tanh
 ):
     """Construct an MLP."""
-
     assert len(shape_in) <= 1
     assert len(shape_out) <= 1
 
