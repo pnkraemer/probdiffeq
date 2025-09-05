@@ -74,10 +74,10 @@ extra:
   generator: false
 nav:
   - Probabilistic solvers for differential equations in JAX: index.md
-  - An easy example: examples_quickstart/easy_example.ipynb
-  - Transitioning from other packages: getting_started/transitioning_from_other_packages.md
-  - Choosing a solver: getting_started/choosing_a_solver.md
-  - Troubleshooting: getting_started/troubleshooting.md
+  - An easy example: examples_quickstart/quickstart.ipynb
+  - Migration guide: migration_guide.md
+  - Choosing a solver: choosing_a_solver.md
+  - Troubleshooting: troubleshooting.md
   - EXAMPLES | BASIC:
       - examples_basic/conditioning-on-zero-residual.ipynb
       - examples_basic/posterior_uncertainties.ipynb
@@ -85,10 +85,10 @@ nav:
       - examples_basic/second_order_problems.ipynb
       - examples_basic/taylor_coefficients.ipynb
   - EXAMPLES | ADVANCED:
-      - examples_advanced/physics_enhanced_regression_1.ipynb
-      - examples_advanced/physics_enhanced_regression_2.ipynb
+      - examples_advanced/parameter_estimation_optax.ipynb
+      - examples_advanced/parameter_estimation_blackjax.ipynb
       - examples_advanced/neural_ode.ipynb
-      - examples_advanced/use_equinox_bounded_while_loop.ipynb
+      - examples_advanced/equinox_while_loop.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md

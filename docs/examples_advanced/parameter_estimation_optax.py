@@ -14,16 +14,13 @@
 
 # # Parameter estimation (Optax)
 #
-# **Time-series data and optimization with ``optax``**
-#
-# We create some fake-observational data,
-# compute the marginal likelihood of this fake data _under the ODE posterior_
+# We create some data,
+# compute the marginal likelihood of this data _under the ODE posterior_
 # (which is something you cannot do with non-probabilistic solvers!),
 # and optimize the parameters with `optax`.
 #
+# Link to paper: https://arxiv.org/abs/2202.01287
 #
-# Tronarp, Bosch, and Hennig call this "physics-enhanced regression"
-# ([link to paper](https://arxiv.org/abs/2202.01287)).
 
 # +
 """Estimate ODE parameters with ProbDiffEq and Optax."""
@@ -35,12 +32,6 @@ import optax
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats
-from probdiffeq.util.doc_util import notebook
-
-# -
-
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
 
 # +
 if not backend.has_been_selected:

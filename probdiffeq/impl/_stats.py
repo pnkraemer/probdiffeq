@@ -245,7 +245,7 @@ class BlockDiagStats(StatsBackend):
             return functools.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
 
-    def update_mean(self, mean, x, /, num):
+    def update_mean(self, mean, x, /, num):  # TODO rename: update_mean_estimate
         if np.ndim(mean) > 0:
             assert np.shape(mean) == np.shape(x)
             return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)

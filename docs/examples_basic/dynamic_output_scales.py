@@ -40,12 +40,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers
-from probdiffeq.util.doc_util import notebook
-
-# -
-
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
 
 # +
 if not backend.has_been_selected:
