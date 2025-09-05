@@ -197,11 +197,11 @@ class _Strategy:
         raise NotImplementedError
 
     def begin(self, rv, _extra, /, *, prior_discretized):
-        """Begin the extrapolation."""
+        """Begin the strategy."""
         raise NotImplementedError
 
     def complete(self, _ssv, extra, /, output_scale):
-        """Complete the extrapolation."""
+        """Complete the strategy."""
         raise NotImplementedError
 
     def extract(self, hidden_state, extra, /):
@@ -428,6 +428,10 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
+        def interpolate_at_t1(self, rv, extra, /, *, prior):
+            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
+
         def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
             """Interpolate.
 
@@ -496,10 +500,6 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
         def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
             x, cache = self.begin(state, extra, prior_discretized=prior_discretized)
             return self.complete(x, cache, output_scale=output_scale)
-
-        def interpolate_at_t1(self, rv, extra, /, *, prior):
-            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
-            return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
     return FixedPoint(
         name="Fixed-point smoother",
@@ -642,7 +642,7 @@ class _ProbabilisticSolver:
 
     prior: _MarkovProcess
     ssm: Any
-    extrapolation: _Strategy
+    strategy: _Strategy
     calibration: _Calibration
     correction: _Correction
 
@@ -654,11 +654,11 @@ class _ProbabilisticSolver:
         dt0 = t - t0
         dt1 = t1 - t
 
-        rv, extra = self.extrapolation.init(posterior_t0)
+        rv, extra = self.strategy.init(posterior_t0)
         rv, corr = self.correction.init(rv)
 
         # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
-        interp = self.extrapolation.interpolate(
+        interp = self.strategy.interpolate(
             state_t0=(rv, extra),
             marginal_t1=marginals_t1,
             dt0=dt0,
@@ -677,20 +677,20 @@ class _ProbabilisticSolver:
 
     @property
     def is_suitable_for_offgrid_marginals(self):
-        return self.extrapolation.is_suitable_for_offgrid_marginals
+        return self.strategy.is_suitable_for_offgrid_marginals
 
     @property
     def is_suitable_for_save_at(self):
-        return self.extrapolation.is_suitable_for_save_at
+        return self.strategy.is_suitable_for_save_at
 
     @property
     def is_suitable_for_save_every_step(self):
-        return self.extrapolation.is_suitable_for_save_every_step
+        return self.strategy.is_suitable_for_save_every_step
 
     def init(self, t, initial_condition) -> _State:
         posterior, output_scale = initial_condition
 
-        rv, extra = self.extrapolation.init(posterior)
+        rv, extra = self.strategy.init(posterior)
         rv, corr = self.correction.init(rv)
 
         calib_state = self.calibration.init(output_scale)
@@ -703,7 +703,7 @@ class _ProbabilisticSolver:
 
     def extract(self, state: _State, /):
         hidden = state.hidden
-        posterior = self.extrapolation.extract(hidden, state.aux_extra)
+        posterior = self.strategy.extract(hidden, state.aux_extra)
         t = state.t
 
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
@@ -718,7 +718,7 @@ class _ProbabilisticSolver:
     def _case_interpolate(self, t, *, s0, s1, output_scale) -> _InterpRes:
         """Process the solution in case t>t_n."""
         # Interpolate
-        interp = self.extrapolation.interpolate(
+        interp = self.strategy.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
             marginal_t1=s1.hidden,
             dt0=t - s0.t,
@@ -741,7 +741,7 @@ class _ProbabilisticSolver:
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
         """Process the solution in case t=t_n."""
-        tmp = self.extrapolation.interpolate_at_t1(
+        tmp = self.strategy.interpolate_at_t1(
             interp_to.hidden, interp_to.aux_extra, prior=self.prior
         )
         step_from_, solution_, interp_from_ = (
@@ -761,7 +761,7 @@ class _ProbabilisticSolver:
 
     def initial_condition(self):
         """Construct an initial condition."""
-        posterior = self.extrapolation.initial_condition(prior=self.prior)
+        posterior = self.strategy.initial_condition(prior=self.prior)
         return posterior, self.prior.output_scale
 
 
@@ -799,7 +799,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
         prior=prior,
         calibration=_calibration_running_mean(ssm=ssm),
         step_implementation=step_mle,
-        extrapolation=strategy,
+        strategy=strategy,
         correction=correction,
         requires_rescaling=True,
     )
@@ -854,7 +854,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
     return _ProbabilisticSolver(
         prior=prior,
         ssm=ssm,
-        extrapolation=strategy,
+        strategy=strategy,
         correction=correction,
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
@@ -905,7 +905,7 @@ def solver(strategy, *, correction, prior, ssm):
     return _ProbabilisticSolver(
         ssm=ssm,
         prior=prior,
-        extrapolation=strategy,
+        strategy=strategy,
         correction=correction,
         calibration=_calibration_none(),
         step_implementation=step,
