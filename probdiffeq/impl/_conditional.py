@@ -17,7 +17,7 @@ from probdiffeq.util import cholesky_util
 class Conditional(containers.NamedTuple):
     """Conditional distributions."""
 
-    matmul: Array  # or anything with a __matmul__ implementation
+    matmul: Array
     noise: Any  # Usually a random-variable type
 
 

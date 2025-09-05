@@ -75,7 +75,7 @@ extra:
 nav:
   - Probabilistic solvers for differential equations in JAX: index.md
   - An easy example: examples_quickstart/easy_example.ipynb
-  - Transitioning from other packages: transitioning_from_other_packages.md
+  - Migration guide: migration_guide.md
   - Choosing a solver: choosing_a_solver.md
   - Troubleshooting: troubleshooting.md
   - EXAMPLES | BASIC:
