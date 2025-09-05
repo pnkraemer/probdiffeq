@@ -21,7 +21,6 @@
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 
@@ -60,12 +59,3 @@ solution = ivpsolve.solve_adaptive_save_every_step(
 # Look at the solution
 print(f"\ninitial = {jax.tree.map(jnp.shape, init)}")
 print(f"\nsolution = {jax.tree.map(jnp.shape, solution)}")
-
-
-fig, ax = plt.subplots(figsize=(5, 3))
-ax.plot(solution.t, solution.u[0])
-ax.set_xlabel("Time")
-ax.set_ylabel("ODE solution")
-ax.set_xlim((t0, t1))
-plt.tight_layout()
-plt.show()
