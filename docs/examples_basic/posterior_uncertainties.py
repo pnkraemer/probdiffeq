@@ -43,7 +43,7 @@ u0 = jnp.asarray([20.0, 20.0])
 
 # Set up a solver
 # To all users: Try replacing the fixedpoint-smoother with a filter!
-tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=5)
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
 ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
 ts = ivpsolvers.correction_ts1(ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
@@ -84,7 +84,6 @@ for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, u_std, axes.T)):
     for m, std, ax in zip(u_i.T, std_i.T, ax_i):
         # Plot the mean
         ax.plot(sol.t, m)
-        ax.set_ylim((-30, 30))
 
         # Plot the standard deviation
         lower, upper = m - 1.96 * std, m + 1.96 * std

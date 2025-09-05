@@ -52,6 +52,7 @@ adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
 
 
 # Solve the ODE
+# To all users: Try different solution routines.
 init = solver.initial_condition()
 solution = ivpsolve.solve_adaptive_save_every_step(
     vf,
