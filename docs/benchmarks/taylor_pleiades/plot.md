@@ -24,7 +24,6 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import jax
 
-from probdiffeq.util.doc_util import notebook
 
 jax.config.update("jax_platform_name", "cpu")
 ```
@@ -64,11 +63,6 @@ def plot_results(axis_compile, axis_perform, results):
         axis_perform.fill_between(inputs, range_lower, range_upper, alpha=0.3, **style)
 
     return axis_compile, axis_perform
-```
-
-```python
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
 ```
 
 ```python

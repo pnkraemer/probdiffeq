@@ -22,8 +22,6 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import jax
 
-from probdiffeq.util.doc_util import notebook
-
 jax.config.update("jax_platform_name", "cpu")
 ```
 
@@ -85,10 +83,6 @@ def _adaptive_repeat(xs, ys):
     return jnp.asarray(zs)
 ```
 
-```python
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
-```
 
 ```python
 fig, (axis_perform, axis_compile) = plt.subplots(

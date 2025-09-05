@@ -24,7 +24,6 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import jax
 
-from probdiffeq.util.doc_util import notebook
 
 jax.config.update("jax_platform_name", "cpu")
 ```
@@ -89,11 +88,6 @@ def plot_solution(axis, ts, ys, yscale="linear"):
     axis.set_ylabel("Solution $y$")
     axis.set_yscale(yscale)
     return axis
-```
-
-```python
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
 ```
 
 ```python

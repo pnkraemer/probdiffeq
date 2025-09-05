@@ -133,7 +133,6 @@ import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.util.doc_util import notebook
 
 # +
 # x64 precision
@@ -146,9 +145,6 @@ jax.config.update("jax_platform_name", "cpu")
 if not backend.has_been_selected:
     backend.select("jax")
 
-# Nice-looking plots
-plt.rcParams.update(notebook.plot_style())
-plt.rcParams.update(notebook.plot_sizes())
 # -
 
 
