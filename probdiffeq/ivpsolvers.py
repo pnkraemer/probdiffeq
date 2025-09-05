@@ -162,8 +162,8 @@ def cubature_gauss_hermite(input_shape, degree=5) -> _PositiveCubatureRule:
     return _PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
 
 
-# how does this generalise to an input_shape instead of an input_dimension?
-# via tree_map(lambda s: _tensor_points(x, s), input_shape)?
+# TODO: how does this generalise to an input_shape instead of an input_dimension?
+#  via tree_map(lambda s: _tensor_points(x, s), input_shape)?
 
 
 def _tensor_weights(*args, **kwargs):
@@ -178,8 +178,8 @@ def _tensor_points(x, /, *, d):
 
 
 @containers.dataclass
-class _ExtraImpl:
-    """Extrapolation model interface."""
+class _Strategy:
+    """Estimation-strategy interface."""
 
     name: str
     ssm: Any
@@ -217,96 +217,97 @@ class _ExtraImpl:
         raise NotImplementedError
 
 
-@containers.dataclass
-class _ExtraImplSmoother(_ExtraImpl):
-    def initial_condition(self, *, prior):
-        rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-        cond = self.ssm.conditional.identity(len(prior.tcoeffs))
-        return stats.MarkovSeq(init=rv, conditional=cond)
-
-    def init(self, sol: stats.MarkovSeq, /):
-        return sol.init, sol.conditional
-
-    def begin(self, rv, _extra, /, *, prior_discretized):
-        cond, (p, p_inv) = prior_discretized
-
-        rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-        m_p = self.ssm.stats.mean(rv_p)
-        extrapolated_p = self.ssm.conditional.apply(m_p, cond)
-
-        extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        cache = (cond, (p, p_inv), rv_p)
-        return extrapolated, cache
-
-    def complete(self, _ssv, extra, /, output_scale):
-        cond, (p, p_inv), rv_p = extra
-
-        # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-        A, noise = cond
-        noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, (A, noise))
-        extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-        # Gather and return
-        return extrapolated, cond
-
-    def extract(self, hidden_state, extra, /):
-        return stats.MarkovSeq(init=hidden_state, conditional=extra)
-
-    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
-        """Interpolate.
-
-        A smoother interpolates by_
-        * Extrapolating from t0 to t, which gives the "filtering" marginal
-          and the backward transition from t to t0.
-        * Extrapolating from t to t1, which gives another "filtering" marginal
-          and the backward transition from t1 to t.
-        * Applying the new t1-to-t backward transition to compute the interpolation.
-          This intermediate result is informed about its "right-hand side" datum.
-
-        Subsequent interpolations continue from the value at 't'.
-        Subsequent IVP solver steps continue from the value at 't1'.
-        """
-        # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        prior0 = prior.discretize(dt0)
-        extrapolated_t = self._extrapolate(
-            *state_t0, output_scale=output_scale, prior_discretized=prior0
-        )
-
-        prior1 = prior.discretize(dt1)
-        extrapolated_t1 = self._extrapolate(
-            *extrapolated_t, output_scale=output_scale, prior_discretized=prior1
-        )
-
-        # Marginalise from t1 to t to obtain the interpolated solution.
-        conditional_t1_to_t = extrapolated_t1[1]
-        rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
-        solution_at_t = (rv_at_t, extrapolated_t[1])
-
-        # The state at t1 gets a new backward model; it must remember how to
-        # get back to t, not to t0.
-        solution_at_t1 = (marginal_t1, conditional_t1_to_t)
-
-        return _InterpRes(
-            step_from=solution_at_t1,
-            interpolated=solution_at_t,
-            interp_from=solution_at_t,
-        )
-
-    def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
-        state, cache = self.begin(state, extra, prior_discretized=prior_discretized)
-        return self.complete(state, cache, output_scale=output_scale)
-
-    def interpolate_at_t1(self, rv, extra, /, *, prior):
-        del prior
-        return _InterpRes((rv, extra), (rv, extra), (rv, extra))
-
-
-def strategy_smoother(*, ssm):
+def strategy_smoother(*, ssm) -> _Strategy:
     """Construct a smoother."""
-    return _ExtraImplSmoother(
+
+    @containers.dataclass
+    class Smoother(_Strategy):
+        def initial_condition(self, *, prior):
+            rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
+            cond = self.ssm.conditional.identity(len(prior.tcoeffs))
+            return stats.MarkovSeq(init=rv, conditional=cond)
+
+        def init(self, sol: stats.MarkovSeq, /):
+            return sol.init, sol.conditional
+
+        def begin(self, rv, _extra, /, *, prior_discretized):
+            cond, (p, p_inv) = prior_discretized
+
+            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
+
+            m_p = self.ssm.stats.mean(rv_p)
+            extrapolated_p = self.ssm.conditional.apply(m_p, cond)
+
+            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            cache = (cond, (p, p_inv), rv_p)
+            return extrapolated, cache
+
+        def complete(self, _ssv, extra, /, output_scale):
+            cond, (p, p_inv), rv_p = extra
+
+            # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
+            A, noise = cond
+            noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
+            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, (A, noise))
+            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
+
+            # Gather and return
+            return extrapolated, cond
+
+        def extract(self, hidden_state, extra, /):
+            return stats.MarkovSeq(init=hidden_state, conditional=extra)
+
+        def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
+            """Interpolate.
+
+            A smoother interpolates by_
+            * Extrapolating from t0 to t, which gives the "filtering" marginal
+            and the backward transition from t to t0.
+            * Extrapolating from t to t1, which gives another "filtering" marginal
+            and the backward transition from t1 to t.
+            * Applying the new t1-to-t backward transition to compute the interpolation.
+            This intermediate result is informed about its "right-hand side" datum.
+
+            Subsequent interpolations continue from the value at 't'.
+            Subsequent IVP solver steps continue from the value at 't1'.
+            """
+            # Extrapolate from t0 to t, and from t to t1.
+            # This yields all building blocks.
+            prior0 = prior.discretize(dt0)
+            extrapolated_t = self._extrapolate(
+                *state_t0, output_scale=output_scale, prior_discretized=prior0
+            )
+
+            prior1 = prior.discretize(dt1)
+            extrapolated_t1 = self._extrapolate(
+                *extrapolated_t, output_scale=output_scale, prior_discretized=prior1
+            )
+
+            # Marginalise from t1 to t to obtain the interpolated solution.
+            conditional_t1_to_t = extrapolated_t1[1]
+            rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+            solution_at_t = (rv_at_t, extrapolated_t[1])
+
+            # The state at t1 gets a new backward model; it must remember how to
+            # get back to t, not to t0.
+            solution_at_t1 = (marginal_t1, conditional_t1_to_t)
+
+            return _InterpRes(
+                step_from=solution_at_t1,
+                interpolated=solution_at_t,
+                interp_from=solution_at_t,
+            )
+
+        def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
+            state, cache = self.begin(state, extra, prior_discretized=prior_discretized)
+            return self.complete(state, cache, output_scale=output_scale)
+
+        def interpolate_at_t1(self, rv, extra, /, *, prior):
+            del prior
+            return _InterpRes((rv, extra), (rv, extra), (rv, extra))
+
+    return Smoother(
         name="Smoother",
         ssm=ssm,
         is_suitable_for_save_at=False,
@@ -315,64 +316,66 @@ def strategy_smoother(*, ssm):
     )
 
 
-@containers.dataclass
-class _ExtraImplFilter(_ExtraImpl):
-    def init(self, sol, /):
-        return sol, None
-
-    def initial_condition(self, *, prior):
-        return self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-
-    def begin(self, rv, _extra, /, prior_discretized):
-        cond, (p, p_inv) = prior_discretized
-
-        rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-        m_ext_p = self.ssm.stats.mean(rv_p)
-        extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-
-        extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        cache = (cond, (p, p_inv), rv_p)
-        return extrapolated, cache
-
-    def extract(self, hidden_state, _extra, /):
-        return hidden_state
-
-    def complete(self, _ssv, extra, /, output_scale):
-        cond, (p, p_inv), rv_p = extra
-
-        # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-        A, noise = cond
-        noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
-        extrapolated_p = self.ssm.conditional.marginalise(rv_p, (A, noise))
-        extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-
-        # Gather and return
-        return extrapolated, None
-
-    def interpolate(self, state_t0, marginal_t1, dt0, dt1, output_scale, *, prior):
-        # todo: by ditching marginal_t1 and dt1, this function _extrapolates
-        #  (no *inter*polation happening)
-        del dt1
-
-        hidden, extra = state_t0
-        prior0 = prior.discretize(dt0)
-        hidden, extra = self.begin(hidden, extra, prior_discretized=prior0)
-        hidden, extra = self.complete(hidden, extra, output_scale=output_scale)
-
-        # Consistent state-types in interpolation result.
-        interp = (hidden, extra)
-        step_from = (marginal_t1, None)
-        return _InterpRes(step_from=step_from, interpolated=interp, interp_from=interp)
-
-    def interpolate_at_t1(self, rv, extra, /, *, prior):
-        del prior
-        return _InterpRes((rv, extra), (rv, extra), (rv, extra))
-
-
-def strategy_filter(*, ssm):
+def strategy_filter(*, ssm) -> _Strategy:
     """Construct a filter."""
-    return _ExtraImplFilter(
+
+    @containers.dataclass
+    class Filter(_Strategy):
+        def init(self, sol, /):
+            return sol, None
+
+        def initial_condition(self, *, prior):
+            return self.ssm.normal.from_tcoeffs(prior.tcoeffs)
+
+        def begin(self, rv, _extra, /, prior_discretized):
+            cond, (p, p_inv) = prior_discretized
+
+            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
+
+            m_ext_p = self.ssm.stats.mean(rv_p)
+            extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
+
+            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            cache = (cond, (p, p_inv), rv_p)
+            return extrapolated, cache
+
+        def extract(self, hidden_state, _extra, /):
+            return hidden_state
+
+        def complete(self, _ssv, extra, /, output_scale):
+            cond, (p, p_inv), rv_p = extra
+
+            # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
+            A, noise = cond
+            noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
+            extrapolated_p = self.ssm.conditional.marginalise(rv_p, (A, noise))
+            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+
+            # Gather and return
+            return extrapolated, None
+
+        def interpolate(self, state_t0, marginal_t1, dt0, dt1, output_scale, *, prior):
+            # todo: by ditching marginal_t1 and dt1, this function _extrapolates
+            #  (no *inter*polation happening)
+            del dt1
+
+            hidden, extra = state_t0
+            prior0 = prior.discretize(dt0)
+            hidden, extra = self.begin(hidden, extra, prior_discretized=prior0)
+            hidden, extra = self.complete(hidden, extra, output_scale=output_scale)
+
+            # Consistent state-types in interpolation result.
+            interp = (hidden, extra)
+            step_from = (marginal_t1, None)
+            return _InterpRes(
+                step_from=step_from, interpolated=interp, interp_from=interp
+            )
+
+        def interpolate_at_t1(self, rv, extra, /, *, prior):
+            del prior
+            return _InterpRes((rv, extra), (rv, extra), (rv, extra))
+
+    return Filter(
         name="Filter",
         ssm=ssm,
         is_suitable_for_save_at=True,
@@ -381,121 +384,124 @@ def strategy_filter(*, ssm):
     )
 
 
-@containers.dataclass
-class _ExtraImplFixedPoint(_ExtraImpl):
-    def initial_condition(self, prior):
-        rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-        cond = self.ssm.conditional.identity(len(prior.tcoeffs))
-        return stats.MarkovSeq(init=rv, conditional=cond)
-
-    def init(self, sol: stats.MarkovSeq, /):
-        return sol.init, sol.conditional
-
-    def begin(self, rv, extra, /, prior_discretized):
-        cond, (p, p_inv) = prior_discretized
-
-        rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-        m_ext_p = self.ssm.stats.mean(rv_p)
-        extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-
-        extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        cache = (cond, (p, p_inv), rv_p, extra)
-        return extrapolated, cache
-
-    def extract(self, hidden_state, extra, /):
-        return stats.MarkovSeq(init=hidden_state, conditional=extra)
-
-    def complete(self, _rv, extra, /, output_scale):
-        cond, (p, p_inv), rv_p, bw0 = extra
-
-        # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-        A, noise = cond
-        noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
-        extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, (A, noise))
-        extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-        # Merge conditionals
-        cond = self.ssm.conditional.merge(bw0, cond)
-
-        # Gather and return
-        return extrapolated, cond
-
-    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
-        """Interpolate.
-
-        A fixed-point smoother interpolates by
-
-        * Extrapolating from t0 to t, which gives the "filtering" marginal
-          and the backward transition from t to t0.
-        * Extrapolating from t to t1, which gives another "filtering" marginal
-          and the backward transition from t1 to t.
-        * Applying the t1-to-t backward transition to compute the interpolation result.
-          This intermediate result is informed about its "right-hand side" datum.
-
-        The difference to smoother-interpolation is quite subtle:
-
-        * The backward transition of the solution at 't' is merged with that at 't0'.
-          The reason is that the backward transition at 't0' knows
-          "how to get to the quantity of interest",
-          and this is precisely what we want to interpolate.
-        * Subsequent interpolations do not continue from the value at 't', but
-          from a very similar value where the backward transition
-          is replaced with an identity. The reason is that the interpolated solution
-          becomes the new quantity of interest, and subsequent interpolations
-          need to learn how to get here.
-        * Subsequent solver steps do not continue from the value at 't1',
-          but the value at 't1' where the backward model is replaced by
-          the 't1-to-t' backward model. The reason is similar to the above:
-          future steps need to know "how to get back to the quantity of interest",
-          which is the interpolated solution.
-
-        These distinctions are precisely why we need three fields
-        in every interpolation result:
-            the solution,
-            the continue-interpolation-from-here,
-            and the continue-stepping-from-here.
-        All three are different for fixed point smoothers.
-        (Really, I try removing one of them monthly and
-        then don't understand why tests fail.)
-        """
-        # Extrapolate from t0 to t, and from t to t1. This yields all building blocks.
-        prior0 = prior.discretize(dt0)
-        extrapolated_t = self._extrapolate(
-            *state_t0, output_scale=output_scale, prior_discretized=prior0
-        )
-        conditional_id = self.ssm.conditional.identity(prior.num_derivatives + 1)
-        previous_new = (extrapolated_t[0], conditional_id)
-
-        prior1 = prior.discretize(dt1)
-        extrapolated_t1 = self._extrapolate(
-            *previous_new, output_scale=output_scale, prior_discretized=prior1
-        )
-
-        # Marginalise from t1 to t to obtain the interpolated solution.
-        conditional_t1_to_t = extrapolated_t1[1]
-        rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
-
-        # Return the right combination of marginals and conditionals.
-        return _InterpRes(
-            step_from=(marginal_t1, conditional_t1_to_t),
-            interpolated=(rv_at_t, extrapolated_t[1]),
-            interp_from=previous_new,
-        )
-
-    def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
-        x, cache = self.begin(state, extra, prior_discretized=prior_discretized)
-        return self.complete(x, cache, output_scale=output_scale)
-
-    def interpolate_at_t1(self, rv, extra, /, *, prior):
-        cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
-        return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
-
-
-def strategy_fixedpoint(*, ssm):
+def strategy_fixedpoint(*, ssm) -> _Strategy:
     """Construct a fixedpoint-smoother."""
-    return _ExtraImplFixedPoint(
+
+    @containers.dataclass
+    class FixedPoint(_Strategy):
+        def initial_condition(self, prior):
+            rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
+            cond = self.ssm.conditional.identity(len(prior.tcoeffs))
+            return stats.MarkovSeq(init=rv, conditional=cond)
+
+        def init(self, sol: stats.MarkovSeq, /):
+            return sol.init, sol.conditional
+
+        def begin(self, rv, extra, /, prior_discretized):
+            cond, (p, p_inv) = prior_discretized
+
+            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
+
+            m_ext_p = self.ssm.stats.mean(rv_p)
+            extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
+
+            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            cache = (cond, (p, p_inv), rv_p, extra)
+            return extrapolated, cache
+
+        def extract(self, hidden_state, extra, /):
+            return stats.MarkovSeq(init=hidden_state, conditional=extra)
+
+        def complete(self, _rv, extra, /, output_scale):
+            cond, (p, p_inv), rv_p, bw0 = extra
+
+            # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
+            A, noise = cond
+            noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
+            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, (A, noise))
+            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
+
+            # Merge conditionals
+            cond = self.ssm.conditional.merge(bw0, cond)
+
+            # Gather and return
+            return extrapolated, cond
+
+        def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
+            """Interpolate.
+
+            A fixed-point smoother interpolates by
+
+            * Extrapolating from t0 to t, which gives the "filtering" marginal
+            and the backward transition from t to t0.
+            * Extrapolating from t to t1, which gives another "filtering" marginal
+            and the backward transition from t1 to t.
+            * Applying the t1-to-t backward transition
+            to compute the interpolation result.
+            This intermediate result is informed about its "right-hand side" datum.
+
+            The difference to smoother-interpolation is quite subtle:
+
+            * The backward transition of the solution at 't'
+            is merged with that at 't0'.
+            The reason is that the backward transition at 't0' knows
+            "how to get to the quantity of interest",
+            and this is precisely what we want to interpolate.
+            * Subsequent interpolations do not continue from the value at 't', but
+            from a very similar value where the backward transition
+            is replaced with an identity. The reason is that the interpolated solution
+            becomes the new quantity of interest, and subsequent interpolations
+            need to learn how to get here.
+            * Subsequent solver steps do not continue from the value at 't1',
+            but the value at 't1' where the backward model is replaced by
+            the 't1-to-t' backward model. The reason is similar to the above:
+            future steps need to know "how to get back to the quantity of interest",
+            which is the interpolated solution.
+
+            These distinctions are precisely why we need three fields
+            in every interpolation result:
+                the solution,
+                the continue-interpolation-from-here,
+                and the continue-stepping-from-here.
+            All three are different for fixed point smoothers.
+            (Really, I try removing one of them monthly and
+            then don't understand why tests fail.)
+            """
+            # Extrapolate from t0 to t, and from t to t1.
+            # This yields all building blocks.
+            prior0 = prior.discretize(dt0)
+            extrapolated_t = self._extrapolate(
+                *state_t0, output_scale=output_scale, prior_discretized=prior0
+            )
+            conditional_id = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            previous_new = (extrapolated_t[0], conditional_id)
+
+            prior1 = prior.discretize(dt1)
+            extrapolated_t1 = self._extrapolate(
+                *previous_new, output_scale=output_scale, prior_discretized=prior1
+            )
+
+            # Marginalise from t1 to t to obtain the interpolated solution.
+            conditional_t1_to_t = extrapolated_t1[1]
+            rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+
+            # Return the right combination of marginals and conditionals.
+            return _InterpRes(
+                step_from=(marginal_t1, conditional_t1_to_t),
+                interpolated=(rv_at_t, extrapolated_t[1]),
+                interp_from=previous_new,
+            )
+
+        def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
+            x, cache = self.begin(state, extra, prior_discretized=prior_discretized)
+            return self.complete(x, cache, output_scale=output_scale)
+
+        def interpolate_at_t1(self, rv, extra, /, *, prior):
+            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
+
+    return FixedPoint(
         name="Fixed-point smoother",
         ssm=ssm,
         is_suitable_for_save_at=True,
@@ -636,7 +642,7 @@ class _ProbabilisticSolver:
 
     prior: _MarkovProcess
     ssm: Any
-    extrapolation: _ExtraImpl
+    extrapolation: _Strategy
     calibration: _Calibration
     correction: _Correction
 
