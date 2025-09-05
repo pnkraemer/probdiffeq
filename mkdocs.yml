@@ -85,10 +85,10 @@ nav:
       - examples_basic/second_order_problems.ipynb
       - examples_basic/taylor_coefficients.ipynb
   - EXAMPLES | ADVANCED:
-      - examples_advanced/physics_enhanced_regression_1.ipynb
-      - examples_advanced/physics_enhanced_regression_2.ipynb
+      - examples_advanced/parameter_estimation_optax.ipynb
+      - examples_advanced/parameter_estimation_blackjax.ipynb
       - examples_advanced/neural_ode.ipynb
-      - examples_advanced/use_equinox_bounded_while_loop.ipynb
+      - examples_advanced/equinox_while_loop.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md
