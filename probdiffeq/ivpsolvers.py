@@ -16,13 +16,6 @@ from probdiffeq.impl import impl
 R = TypeVar("R")
 
 
-# TODO (internal implementations):
-# - No more begin() and complete() steps. Replace with something less ambiguous.
-# - No more extract(). Replace with
-#   iterating on solution (the result of extract) + solver_state (everything else)
-# - Make interpolation decision (before, at, after t1) on the lowest level possible
-
-
 class _MarkovProcess(containers.NamedTuple):
     tcoeffs: Any
     output_scale: Any
@@ -1046,7 +1039,7 @@ class _AdaSolver:
             def _inf_like(tree):
                 return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
 
-            smaller_than_1 = 1.0 / 1.1  # the cond() must return True
+            smaller_than_1 = 0.9  # the cond() must return True
             return _RejectionState(
                 error_norm_proposed=smaller_than_1,
                 dt=s0.dt,
@@ -1210,7 +1203,7 @@ def control_proportional_integral(
         return 1.0
 
     def apply(dt: float, error_power_prev: float, /, *, error_power):
-        # error_power = error_norm ** (-1.0 / error_contraction_rate)
+        # Equivalent: error_power = error_norm ** (-1.0 / error_contraction_rate)
         a1 = error_power**power_integral_unscaled
         a2 = (error_power / error_power_prev) ** power_proportional_unscaled
         scale_factor_unclipped = safety * a1 * a2

@@ -296,7 +296,6 @@ def solve_fixed_grid(
     _t, (posterior, output_scale) = solver.extract(result_state)
 
     # I think the user expects marginals, so we compute them here
-    # posterior_t0, *_ = initial_condition
     posterior_t0 = initial_condition.posterior
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
     marginals, posterior = _tmp
