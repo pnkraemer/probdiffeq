@@ -944,6 +944,7 @@ def adaptive(
     control=None,
     norm_ord=None,
     clip_dt: bool = False,
+    eps: float = 0.0,
 ):
     """Make an IVP solver adaptive."""
     if control is None:
@@ -957,6 +958,7 @@ def adaptive(
         control=control,
         norm_ord=norm_ord,
         clip_dt=clip_dt,
+        eps=eps,
     )
 
 
@@ -982,6 +984,7 @@ class _AdaSolver:
         norm_ord,
         ssm,
         clip_dt: bool,
+        eps: float,
     ):
         self.solver = slvr
         self.atol = atol
@@ -990,6 +993,7 @@ class _AdaSolver:
         self.norm_ord = norm_ord
         self.ssm = ssm
         self.clip_dt = clip_dt
+        self.eps = eps
 
     def __repr__(self):
         return (
@@ -1139,7 +1143,7 @@ class _AdaSolver:
     @staticmethod
     def register_pytree_node():
         def _asolver_flatten(asolver):
-            children = (asolver.atol, asolver.rtol)
+            children = (asolver.atol, asolver.rtol, asolver.eps)
             aux = (
                 asolver.solver,
                 asolver.control,
@@ -1150,7 +1154,7 @@ class _AdaSolver:
             return children, aux
 
         def _asolver_unflatten(aux, children):
-            atol, rtol = children
+            atol, rtol, eps = children
             (slvr, control, norm_ord, ssm, clip_dt) = aux
             return _AdaSolver(
                 slvr,
@@ -1160,6 +1164,7 @@ class _AdaSolver:
                 norm_ord=norm_ord,
                 ssm=ssm,
                 clip_dt=clip_dt,
+                eps=eps,
             )
 
         tree_util.register_pytree_node(
