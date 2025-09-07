@@ -397,8 +397,9 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             cond = self.ssm.conditional.identity(len(prior.tcoeffs))
             return stats.MarkovSeq(init=rv, conditional=cond)
 
-        def init(self, sol: stats.MarkovSeq, /):
-            return sol.init, sol.conditional
+        def init(self, sol, /):
+            cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
+            return sol, cond
 
         def begin(self, rv, extra, /, prior_discretized):
             cond, (p, p_inv) = prior_discretized
@@ -432,7 +433,7 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             return extrapolated, cond
 
         def interpolate_at_t1(self, rv, extra, /, *, prior):
-            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
         def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
@@ -477,14 +478,14 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             """
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
-            prior0 = prior.discretize(dt0)
+            prior0 = prior(dt0)
             extrapolated_t = self._extrapolate(
                 *state_t0, output_scale=output_scale, prior_discretized=prior0
             )
-            conditional_id = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            conditional_id = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             previous_new = (extrapolated_t[0], conditional_id)
 
-            prior1 = prior.discretize(dt1)
+            prior1 = prior(dt1)
             extrapolated_t1 = self._extrapolate(
                 *previous_new, output_scale=output_scale, prior_discretized=prior1
             )
@@ -843,7 +844,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
-        prior_discretized = prior.discretize(dt)
+        prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
@@ -875,8 +876,8 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
 
 
 def _calibration_most_recent(*, ssm) -> _Calibration:
-    def init(prior):
-        return prior
+    def init():
+        return ssm.prototypes.output_scale()
 
     def update(_state, /, observed):
         return ssm.stats.mahalanobis_norm_relative(0.0, observed)
