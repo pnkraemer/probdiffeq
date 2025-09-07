@@ -1,6 +1,6 @@
 """Probabilistic IVP solvers."""
 
-from probdiffeq import ivpsolve, stats
+from probdiffeq import stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -192,10 +192,6 @@ class _Strategy:
     is_suitable_for_save_every_step: int
     is_suitable_for_offgrid_marginals: int
 
-    def initial_condition(self, *, prior):
-        """Compute an initial condition from a set of Taylor coefficients."""
-        raise NotImplementedError
-
     def init(self, sol: stats.MarkovSeq, /):
         """Initialise a state from a solution."""
         raise NotImplementedError
@@ -226,11 +222,6 @@ def strategy_smoother(*, ssm) -> _Strategy:
 
     @containers.dataclass
     class Smoother(_Strategy):
-        def initial_condition(self, *, prior):
-            rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-            cond = self.ssm.conditional.identity(len(prior.tcoeffs))
-            return stats.MarkovSeq(init=rv, conditional=cond)
-
         def init(self, sol, /):
             # Special case for implementing offgrid-marginals...
             if isinstance(sol, stats.MarkovSeq):
@@ -335,9 +326,6 @@ def strategy_filter(*, ssm) -> _Strategy:
         def init(self, sol, /):
             return sol, None
 
-        def initial_condition(self, *, prior):
-            return self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-
         def begin(self, rv, _extra, /, prior_discretized):
             cond, (p, p_inv) = prior_discretized
 
@@ -400,11 +388,6 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
 
     @containers.dataclass
     class FixedPoint(_Strategy):
-        def initial_condition(self, prior):
-            rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-            cond = self.ssm.conditional.identity(len(prior.tcoeffs))
-            return stats.MarkovSeq(init=rv, conditional=cond)
-
         def init(self, sol, /):
             cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return sol, cond
@@ -649,7 +632,6 @@ class _State(containers.NamedTuple):
 @containers.dataclass
 class _ProbabilisticSolver:
     name: str
-    requires_rescaling: bool
 
     step_implementation: Callable
 
@@ -698,20 +680,6 @@ class _ProbabilisticSolver:
     @property
     def is_suitable_for_save_every_step(self):
         return self.strategy.is_suitable_for_save_every_step
-
-    def initial_condition(self) -> ivpsolve.IVPSolution:
-        """Construct an initial condition."""
-        posterior = self.strategy.initial_condition(prior=self.prior)
-        return ivpsolve.IVPSolution(
-            t=None,
-            u=None,
-            u_std=None,
-            output_scale=self.prior.output_scale,
-            marginals=None,
-            posterior=posterior,
-            num_steps=None,
-            ssm=None,
-        )
 
     def init(self, t, init) -> _State:
         rv, extra = self.strategy.init(init)
@@ -820,7 +788,6 @@ def solver_mle(strategy, *, correction, prior, ssm):
         step_implementation=step_mle,
         strategy=strategy,
         correction=correction,
-        requires_rescaling=True,
     )
 
 
@@ -879,7 +846,6 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
         step_implementation=step_dynamic,
-        requires_rescaling=False,
     )
 
 
@@ -930,7 +896,6 @@ def solver(strategy, *, correction, prior, ssm):
         calibration=_calibration_none(ssm=ssm),
         step_implementation=step,
         name="Probabilistic solver",
-        requires_rescaling=False,
     )
 
 
