@@ -944,12 +944,13 @@ def adaptive(
     control=None,
     norm_ord=None,
     clip_dt: bool = False,
-    eps: float = 0.0,
+    eps: float | None = None,
 ):
     """Make an IVP solver adaptive."""
     if control is None:
         control = control_proportional_integral()
-
+    if eps is None:
+        eps = 10 * np.finfo_eps(float)
     return _AdaSolver(
         slvr,
         ssm=ssm,
