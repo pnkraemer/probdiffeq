@@ -1,6 +1,6 @@
 """Probabilistic IVP solvers."""
 
-from probdiffeq import stats
+from probdiffeq import ivpsolve, stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -197,11 +197,11 @@ class _Strategy:
         raise NotImplementedError
 
     def begin(self, rv, _extra, /, *, prior_discretized):
-        """Begin the extrapolation."""
+        """Begin the strategy."""
         raise NotImplementedError
 
     def complete(self, _ssv, extra, /, output_scale):
-        """Complete the extrapolation."""
+        """Complete the strategy."""
         raise NotImplementedError
 
     def extract(self, hidden_state, extra, /):
@@ -428,6 +428,10 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
+        def interpolate_at_t1(self, rv, extra, /, *, prior):
+            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
+
         def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
             """Interpolate.
 
@@ -496,10 +500,6 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
         def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
             x, cache = self.begin(state, extra, prior_discretized=prior_discretized)
             return self.complete(x, cache, output_scale=output_scale)
-
-        def interpolate_at_t1(self, rv, extra, /, *, prior):
-            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
-            return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
     return FixedPoint(
         name="Fixed-point smoother",
@@ -642,7 +642,7 @@ class _ProbabilisticSolver:
 
     prior: _MarkovProcess
     ssm: Any
-    extrapolation: _Strategy
+    strategy: _Strategy
     calibration: _Calibration
     correction: _Correction
 
@@ -654,11 +654,11 @@ class _ProbabilisticSolver:
         dt0 = t - t0
         dt1 = t1 - t
 
-        rv, extra = self.extrapolation.init(posterior_t0)
+        rv, extra = self.strategy.init(posterior_t0)
         rv, corr = self.correction.init(rv)
 
         # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
-        interp = self.extrapolation.interpolate(
+        interp = self.strategy.interpolate(
             state_t0=(rv, extra),
             marginal_t1=marginals_t1,
             dt0=dt0,
@@ -677,23 +677,35 @@ class _ProbabilisticSolver:
 
     @property
     def is_suitable_for_offgrid_marginals(self):
-        return self.extrapolation.is_suitable_for_offgrid_marginals
+        return self.strategy.is_suitable_for_offgrid_marginals
 
     @property
     def is_suitable_for_save_at(self):
-        return self.extrapolation.is_suitable_for_save_at
+        return self.strategy.is_suitable_for_save_at
 
     @property
     def is_suitable_for_save_every_step(self):
-        return self.extrapolation.is_suitable_for_save_every_step
+        return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, initial_condition) -> _State:
-        posterior, output_scale = initial_condition
+    def initial_condition(self) -> ivpsolve.IVPSolution:
+        """Construct an initial condition."""
+        posterior = self.strategy.initial_condition(prior=self.prior)
+        return ivpsolve.IVPSolution(
+            t=None,
+            u=None,
+            u_std=None,
+            output_scale=self.prior.output_scale,
+            marginals=None,
+            posterior=posterior,
+            num_steps=None,
+            ssm=None,
+        )
 
-        rv, extra = self.extrapolation.init(posterior)
+    def init(self, t, initial_condition: ivpsolve.IVPSolution) -> _State:
+        rv, extra = self.strategy.init(initial_condition.posterior)
         rv, corr = self.correction.init(rv)
 
-        calib_state = self.calibration.init(output_scale)
+        calib_state = self.calibration.init(initial_condition.output_scale)
         return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
 
     def step(self, state: _State, *, vector_field, dt):
@@ -703,7 +715,7 @@ class _ProbabilisticSolver:
 
     def extract(self, state: _State, /):
         hidden = state.hidden
-        posterior = self.extrapolation.extract(hidden, state.aux_extra)
+        posterior = self.strategy.extract(hidden, state.aux_extra)
         t = state.t
 
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
@@ -718,7 +730,7 @@ class _ProbabilisticSolver:
     def _case_interpolate(self, t, *, s0, s1, output_scale) -> _InterpRes:
         """Process the solution in case t>t_n."""
         # Interpolate
-        interp = self.extrapolation.interpolate(
+        interp = self.strategy.interpolate(
             state_t0=(s0.hidden, s0.aux_extra),
             marginal_t1=s1.hidden,
             dt0=t - s0.t,
@@ -741,7 +753,7 @@ class _ProbabilisticSolver:
 
     def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
         """Process the solution in case t=t_n."""
-        tmp = self.extrapolation.interpolate_at_t1(
+        tmp = self.strategy.interpolate_at_t1(
             interp_to.hidden, interp_to.aux_extra, prior=self.prior
         )
         step_from_, solution_, interp_from_ = (
@@ -758,11 +770,6 @@ class _ProbabilisticSolver:
         sol = _state(t, solution_, interp_to.output_scale)
         acc = _state(t, step_from_, interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
-
-    def initial_condition(self):
-        """Construct an initial condition."""
-        posterior = self.extrapolation.initial_condition(prior=self.prior)
-        return posterior, self.prior.output_scale
 
 
 def solver_mle(strategy, *, correction, prior, ssm):
@@ -799,7 +806,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
         prior=prior,
         calibration=_calibration_running_mean(ssm=ssm),
         step_implementation=step_mle,
-        extrapolation=strategy,
+        strategy=strategy,
         correction=correction,
         requires_rescaling=True,
     )
@@ -854,7 +861,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
     return _ProbabilisticSolver(
         prior=prior,
         ssm=ssm,
-        extrapolation=strategy,
+        strategy=strategy,
         correction=correction,
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
@@ -905,7 +912,7 @@ def solver(strategy, *, correction, prior, ssm):
     return _ProbabilisticSolver(
         ssm=ssm,
         prior=prior,
-        extrapolation=strategy,
+        strategy=strategy,
         correction=correction,
         calibration=_calibration_none(),
         step_implementation=step,
@@ -937,11 +944,13 @@ def adaptive(
     control=None,
     norm_ord=None,
     clip_dt: bool = False,
+    eps: float | None = None,
 ):
     """Make an IVP solver adaptive."""
     if control is None:
         control = control_proportional_integral()
-
+    if eps is None:
+        eps = 10 * np.finfo_eps(float)
     return _AdaSolver(
         slvr,
         ssm=ssm,
@@ -950,6 +959,7 @@ def adaptive(
         control=control,
         norm_ord=norm_ord,
         clip_dt=clip_dt,
+        eps=eps,
     )
 
 
@@ -975,6 +985,7 @@ class _AdaSolver:
         norm_ord,
         ssm,
         clip_dt: bool,
+        eps: float,
     ):
         self.solver = slvr
         self.atol = atol
@@ -983,6 +994,7 @@ class _AdaSolver:
         self.norm_ord = norm_ord
         self.ssm = ssm
         self.clip_dt = clip_dt
+        self.eps = eps
 
     def __repr__(self):
         return (
@@ -1000,7 +1012,13 @@ class _AdaSolver:
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt)
-        return _AdaState(dt, state_solver, state_solver, state_control, num_steps)
+        return _AdaState(
+            dt=dt,
+            step_from=state_solver,
+            interp_from=state_solver,
+            control=state_control,
+            stats=num_steps,
+        )
 
     @functools.jit
     def rejection_loop(self, state0: _AdaState, *, vector_field, t1) -> _AdaState:
@@ -1021,7 +1039,7 @@ class _AdaSolver:
             def _inf_like(tree):
                 return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
 
-            smaller_than_1 = 1.0 / 1.1  # the cond() must return True
+            smaller_than_1 = 0.9  # the cond() must return True
             return _RejectionState(
                 error_norm_proposed=smaller_than_1,
                 dt=s0.dt,
@@ -1078,35 +1096,46 @@ class _AdaSolver:
 
         def extract(s: _RejectionState) -> _AdaState:
             num_steps = state0.stats + 1.0  # TODO: track step attempts as well
-            return _AdaState(s.dt, s.proposed, s.step_from, s.control, num_steps)
+            return _AdaState(
+                dt=s.dt,
+                step_from=s.proposed,
+                interp_from=s.step_from,
+                control=s.control,
+                stats=num_steps,
+            )
 
         init_val = init(state0)
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
 
-    def extract_before_t1(self, state: _AdaState):
+    def extract_before_t1(self, state: _AdaState, t):
+        del t
         solution_solver = self.solver.extract(state.step_from)
-        return solution_solver, (state.dt, state.control), state.stats
+        extracted = solution_solver, (state.dt, state.control), state.stats
+        return state, extracted
 
-    def extract_at_t1(self, state: _AdaState):
+    def extract_at_t1(self, state: _AdaState, t):
+        del t
         # todo: make the "at t1" decision inside interpolate(),
         #  which collapses the next two functions together
         interp = self.solver.interpolate_at_t1(
             interp_from=state.interp_from, interp_to=state.step_from
         )
-        state = _AdaState(
-            state.dt, interp.step_from, interp.interp_from, state.control, state.stats
-        )
+        return self._extract_interpolate(interp, state)
 
-        solution_solver = self.solver.extract(interp.interpolated)
-        return state, (solution_solver, (state.dt, state.control), state.stats)
-
-    def extract_after_t1_via_interpolation(self, state: _AdaState, t):
+    def extract_after_t1(self, state: _AdaState, t):
         interp = self.solver.interpolate(
             t, interp_from=state.interp_from, interp_to=state.step_from
         )
+        return self._extract_interpolate(interp, state)
+
+    def _extract_interpolate(self, interp, state):
         state = _AdaState(
-            state.dt, interp.step_from, interp.interp_from, state.control, state.stats
+            dt=state.dt,
+            step_from=interp.step_from,
+            interp_from=interp.interp_from,
+            control=state.control,
+            stats=state.stats,
         )
 
         solution_solver = self.solver.extract(interp.interpolated)
@@ -1115,7 +1144,7 @@ class _AdaSolver:
     @staticmethod
     def register_pytree_node():
         def _asolver_flatten(asolver):
-            children = (asolver.atol, asolver.rtol)
+            children = (asolver.atol, asolver.rtol, asolver.eps)
             aux = (
                 asolver.solver,
                 asolver.control,
@@ -1126,7 +1155,7 @@ class _AdaSolver:
             return children, aux
 
         def _asolver_unflatten(aux, children):
-            atol, rtol = children
+            atol, rtol, eps = children
             (slvr, control, norm_ord, ssm, clip_dt) = aux
             return _AdaSolver(
                 slvr,
@@ -1136,6 +1165,7 @@ class _AdaSolver:
                 norm_ord=norm_ord,
                 ssm=ssm,
                 clip_dt=clip_dt,
+                eps=eps,
             )
 
         tree_util.register_pytree_node(
@@ -1173,7 +1203,7 @@ def control_proportional_integral(
         return 1.0
 
     def apply(dt: float, error_power_prev: float, /, *, error_power):
-        # error_power = error_norm ** (-1.0 / error_contraction_rate)
+        # Equivalent: error_power = error_norm ** (-1.0 / error_contraction_rate)
         a1 = error_power**power_integral_unscaled
         a2 = (error_power / error_power_prev) ** power_proportional_unscaled
         scale_factor_unclipped = safety * a1 * a2
