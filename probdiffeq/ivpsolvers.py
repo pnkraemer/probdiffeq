@@ -41,17 +41,19 @@ def prior_wiener_integrated(tcoeffs, *, ssm_fact: str, output_scale=None):
     # return prior, ssm
 
 
-def prior_ibm_discrete(ts, *, tcoeffs_like, ssm_fact: str, output_scale=None):
+def prior_wiener_integrated_discretised(
+    ts, *, tcoeffs_like, ssm_fact: str, output_scale=None
+):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    prior, ssm = prior_ibm(tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact)
-    transitions, (p, p_inv) = functools.vmap(prior.discretize)(np.diff(ts))
+    init, discretize, ssm = prior_wiener_integrated(
+        tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact
+    )
+    transitions, (p, p_inv) = functools.vmap(discretize)(np.diff(ts))
 
     preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
-    output_scale = np.ones_like(ssm.prototypes.output_scale())
-    init = ssm.normal.standard(len(tcoeffs_like), output_scale=output_scale)
-    return stats.MarkovSeq(init, conditionals), ssm
+    return init, conditionals, ssm
 
 
 @containers.dataclass
@@ -439,6 +441,7 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             return extrapolated, cond
 
         def interpolate_at_t1(self, rv, extra, /, *, prior):
+            del prior
             cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 

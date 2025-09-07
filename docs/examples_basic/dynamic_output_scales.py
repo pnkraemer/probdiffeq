@@ -64,7 +64,9 @@ def vf(*ys, t):  # noqa: ARG001
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="dense")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    tcoeffs, output_scale=1.0, ssm_fact="dense"
+)
 ts1 = ivpsolvers.correction_ts1(ssm=ssm)
 strategy = ivpsolvers.strategy_filter(ssm=ssm)
 dynamic = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
@@ -77,12 +79,8 @@ num_pts = 200
 ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 
 
-init_mle = mle.initial_condition()
-init_dynamic = dynamic.initial_condition()
-solution_dynamic = ivpsolve.solve_fixed_grid(
-    vf, init_mle, grid=ts, solver=dynamic, ssm=ssm
-)
-solution_mle = ivpsolve.solve_fixed_grid(vf, init_dynamic, grid=ts, solver=mle, ssm=ssm)
+solution_dynamic = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=dynamic, ssm=ssm)
+solution_mle = ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=mle, ssm=ssm)
 # -
 
 # Plot the solution.

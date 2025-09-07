@@ -149,7 +149,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        ibm, ssm = ivpsolvers.prior_ibm(
+        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
             tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
         )
         ts0 = ivpsolvers.correction_ts0(ssm=ssm)
@@ -157,7 +157,6 @@ def loss_log_marginal_likelihood(vf, *, t0):
         solver_ts0 = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
         # Solve
-        init = solver_ts0.initial_condition()
         sol = ivpsolve.solve_fixed_grid(
             lambda *a, **kw: vf(*a, **kw, p=p),
             init,

@@ -55,7 +55,7 @@ u0 = jnp.asarray([0.1])
 NUM_DERIVATIVES = 2
 tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-(init_raw, transitions), ssm = ivpsolvers.prior_ibm_discrete(
+init_raw, transitions, ssm = ivpsolvers.prior_wiener_integrated_discretised(
     ts, tcoeffs_like=tcoeffs_like, output_scale=100.0, ssm_fact="dense"
 )
 
@@ -71,19 +71,18 @@ markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 # +
 # Compute the posterior
 
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="dense")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    tcoeffs, output_scale=1.0, ssm_fact="dense"
+)
 ts1 = ivpsolvers.correction_ts1(ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
 solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
 adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-2, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
-
-init = solver.initial_condition()
 sol = ivpsolve.solve_adaptive_save_at(
     vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver, ssm=ssm
 )
-# posterior = stats.calibrate(sol.posterior, sol.output_scale)
 markov_seq_posterior = stats.markov_select_terminal(sol.posterior)
 
 # +

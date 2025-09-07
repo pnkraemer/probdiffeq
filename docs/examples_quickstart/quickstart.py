@@ -39,7 +39,7 @@ t0, t1 = 0.0, 5.0
 
 # Set up a state-space model
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver
@@ -51,7 +51,6 @@ adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
 
 # Solve the ODE
 # To all users: Try different solution routines.
-init = solver.initial_condition()
 solution = ivpsolve.solve_adaptive_save_every_step(
     vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )
