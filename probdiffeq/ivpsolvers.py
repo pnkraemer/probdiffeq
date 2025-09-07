@@ -36,12 +36,8 @@ def prior_wiener_integrated(tcoeffs, *, ssm_fact: str, output_scale=None):
     init = ssm.normal.from_tcoeffs(tcoeffs)
     return init, discretize, ssm
 
-    # output_scale_calib = np.ones_like(ssm.prototypes.output_scale())
-    # prior = _MarkovProcess(tcoeffs, output_scale_calib, discretize=discretize)
-    # return prior, ssm
 
-
-def prior_wiener_integrated_discretised(
+def prior_wiener_integrated_discrete(
     ts, *, tcoeffs_like, ssm_fact: str, output_scale=None
 ):
     """Compute a time-discretized, multiply-integrated Wiener process."""

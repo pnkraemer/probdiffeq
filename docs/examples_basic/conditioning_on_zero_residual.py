@@ -55,7 +55,7 @@ u0 = jnp.asarray([0.1])
 NUM_DERIVATIVES = 2
 tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-init_raw, transitions, ssm = ivpsolvers.prior_wiener_integrated_discretised(
+init_raw, transitions, ssm = ivpsolvers.prior_wiener_integrated_discrete(
     ts, tcoeffs_like=tcoeffs_like, output_scale=100.0, ssm_fact="dense"
 )
 
