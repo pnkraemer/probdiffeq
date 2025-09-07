@@ -4,7 +4,6 @@ from probdiffeq import stats
 from probdiffeq.backend import (
     containers,
     control_flow,
-    functools,
     linalg,
     tree_array_util,
     tree_util,
@@ -89,42 +88,21 @@ def solve_adaptive_terminal_values(
     vector_field, initial_condition, t0, t1, adaptive_solver, dt0, *, ssm
 ) -> IVPSolution:
     """Simulate the terminal values of an initial value problem."""
-    save_at = np.asarray([t1])
-    (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
-        tree_util.Partial(vector_field),
-        t0,
+    save_at = np.asarray([t0, t1])
+    solution = solve_adaptive_save_at(
+        vector_field,
         initial_condition,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
         dt0=dt0,
-    )
-    # "squeeze"-type functionality (there is only a single state!)
-    squeeze_fun = functools.partial(np.squeeze_along_axis, axis=0)
-    solution_save_at = tree_util.tree_map(squeeze_fun, solution_save_at)
-    num_steps = tree_util.tree_map(squeeze_fun, num_steps)
-
-    # I think the user expects marginals, so we compute them here
-    # todo: do this in IVPSolution.* methods?
-    posterior, output_scale = solution_save_at
-    marginals = posterior.init if isinstance(posterior, stats.MarkovSeq) else posterior
-
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
-    return IVPSolution(
-        t=t1,
-        u=u,
-        u_std=u_std,
         ssm=ssm,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=num_steps,
+        warn=False,  # Turn off warnings because any solver goes for terminal values
     )
+    return tree_util.tree_map(lambda s: s[-1], solution)
 
 
 def solve_adaptive_save_at(
-    vector_field, initial_condition, save_at, adaptive_solver, dt0, *, ssm
+    vector_field, initial_condition, save_at, adaptive_solver, dt0, *, ssm, warn=True
 ) -> IVPSolution:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -152,7 +130,7 @@ def solve_adaptive_save_at(
         }
         ```
     """
-    if not adaptive_solver.solver.is_suitable_for_save_at:
+    if not adaptive_solver.solver.is_suitable_for_save_at and warn:
         msg = (
             f"Strategy {adaptive_solver.solver} should not "
             f"be used in solve_adaptive_save_at. "
