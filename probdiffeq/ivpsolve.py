@@ -194,42 +194,37 @@ def solve_adaptive_save_at(
 def _solve_adaptive_save_at(
     vector_field, t, initial_condition, *, save_at, adaptive_solver, dt0
 ):
-    advance_func = functools.partial(
-        _advance_and_interpolate,
-        vector_field=vector_field,
-        adaptive_solver=adaptive_solver,
-    )
+    def advance(state, t_next):
+        # Advance until accepted.t >= t_next.
+        # Note: This could already be the case and we may not loop (just interpolate)
+        def cond_fun(s):
+            # Terminate the loop if
+            # the difference from s.t to t_next is smaller than a constant factor
+            # (which is a "small" multiple of the current machine precision)
+            # or if s.t > t_next holds.
+            return s.step_from.t + adaptive_solver.eps < t_next
+
+        def body_fun(s):
+            return adaptive_solver.rejection_loop(
+                s, vector_field=vector_field, t1=t_next
+            )
+
+        state = control_flow.while_loop(cond_fun, body_fun, init=state)
+
+        # Either interpolate (t > t_next) or "finalise" (t == t_next)
+        is_after_t1 = state.step_from.t > t_next + adaptive_solver.eps
+        state, solution = control_flow.cond(
+            is_after_t1,
+            adaptive_solver.extract_after_t1,
+            adaptive_solver.extract_at_t1,
+            state,
+            t_next,
+        )
+        return state, solution
 
     state = adaptive_solver.init(t, initial_condition, dt=dt0, num_steps=0.0)
-    _, solution = control_flow.scan(advance_func, init=state, xs=save_at, reverse=False)
+    _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
     return solution
-
-
-def _advance_and_interpolate(state, t_next, *, vector_field, adaptive_solver):
-    # Advance until accepted.t >= t_next.
-    # Note: This could already be the case and we may not loop (just interpolate)
-    def cond_fun(s):
-        # Terminate the loop if
-        # the difference from s.t to t_next is smaller than a constant factor
-        # (which is a "small" multiple of the current machine precision)
-        # or if s.t > t_next holds.
-        return s.step_from.t + adaptive_solver.eps < t_next
-
-    def body_fun(s):
-        return adaptive_solver.rejection_loop(s, vector_field=vector_field, t1=t_next)
-
-    state = control_flow.while_loop(cond_fun, body_fun, init=state)
-
-    # Either interpolate (t > t_next) or "finalise" (t == t_next)
-    is_after_t1 = state.step_from.t > t_next + adaptive_solver.eps
-    state, solution = control_flow.cond(
-        is_after_t1,
-        adaptive_solver.extract_after_t1,
-        adaptive_solver.extract_at_t1,
-        state,
-        t_next,
-    )
-    return state, solution
 
 
 def solve_adaptive_save_every_step(
