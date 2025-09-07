@@ -230,8 +230,14 @@ def strategy_smoother(*, ssm) -> _Strategy:
             return stats.MarkovSeq(init=rv, conditional=cond)
 
         def init(self, sol, /):
-            cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
-            return sol, cond
+            # Special case for implementing offgrid-marginals...
+            if isinstance(sol, stats.MarkovSeq):
+                rv = sol.init
+                cond = sol.conditional
+            else:
+                rv = sol
+                cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
+            return rv, cond
 
         def begin(self, rv, _extra, /, *, prior_discretized):
             cond, (p, p_inv) = prior_discretized
@@ -657,7 +663,6 @@ class _ProbabilisticSolver:
 
         dt0 = t - t0
         dt1 = t1 - t
-
         rv, extra = self.strategy.init(posterior_t0)
         rv, corr = self.correction.init(rv)
 

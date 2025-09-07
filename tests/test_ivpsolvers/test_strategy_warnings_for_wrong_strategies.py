@@ -10,14 +10,12 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-
-    init = solver.initial_condition()
 
     with testing.warns():
         _ = ivpsolve.solve_adaptive_save_every_step(
@@ -30,14 +28,11 @@ def test_warning_for_smoother_in_save_at_mode(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-
-    init = solver.initial_condition()
-
     with testing.warns():
         _ = ivpsolve.solve_adaptive_save_at(
             vf,

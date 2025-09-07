@@ -11,12 +11,10 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (u0, vf(u0, t=t0))
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-    init = solver.initial_condition()
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver, ssm=ssm)
 
@@ -35,12 +33,11 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
-    init = solver.initial_condition()
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver, ssm=ssm)
     # Extrapolate from the left: close-to-left boundary must be similar,
