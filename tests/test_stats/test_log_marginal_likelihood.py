@@ -11,15 +11,12 @@ def fixture_solution(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-
-    init = solver.initial_condition()
-
     save_at = np.linspace(t0, t1, endpoint=True, num=4)
     sol = ivpsolve.solve_adaptive_save_at(
         vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
@@ -93,14 +90,13 @@ def test_raises_error_for_filter(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=3)
-    init = solver.initial_condition()
     sol = ivpsolve.solve_fixed_grid(vf, init, grid=grid, solver=solver, ssm=ssm)
 
     data = sol.u[0] + 0.1

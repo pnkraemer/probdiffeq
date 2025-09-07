@@ -57,12 +57,10 @@ def vf(*y, t):  # noqa: ARG001
 # +
 def solve(tc):
     """Solve the ODE."""
-    prior, ssm = ivpsolvers.prior_ibm(tc, ssm_fact="dense")
+    init, prior, ssm = ivpsolvers.prior_wiener_integrated(tc, ssm_fact="dense")
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
-    init = solver.initial_condition()
-
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
     adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
     return ivpsolve.solve_adaptive_save_at(

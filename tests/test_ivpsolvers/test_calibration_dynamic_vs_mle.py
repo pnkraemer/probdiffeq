@@ -14,12 +14,11 @@ from probdiffeq.backend import numpy as np
 def test_exponential_approximated_well(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
-    ibm, ssm = ivpsolvers.prior_ibm((*u0, vf(*u0, t=t0)), ssm_fact=fact)
+    tcoeffs = (*u0, vf(*u0, t=t0))
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-    init = solver.initial_condition()
 
     problem_args = (vf, init)
     grid = np.linspace(t0, t1, num=20)

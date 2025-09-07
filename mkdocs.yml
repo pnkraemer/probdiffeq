@@ -79,7 +79,7 @@ nav:
   - Choosing a solver: choosing_a_solver.md
   - Troubleshooting: troubleshooting.md
   - EXAMPLES | BASIC:
-      - examples_basic/conditioning-on-zero-residual.ipynb
+      - examples_basic/conditioning_on_zero_residual.ipynb
       - examples_basic/posterior_uncertainties.ipynb
       - examples_basic/dynamic_output_scales.ipynb
       - examples_basic/second_order_problems.ipynb

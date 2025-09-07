@@ -17,14 +17,13 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
 
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
 
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     asolver = ivpsolvers.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2, clip_dt=True)
 
-    init = solver.initial_condition()
     args = (vf, init)
 
     adaptive_kwargs = {

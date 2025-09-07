@@ -26,18 +26,18 @@ class DensePrototype(PrototypeBackend):
         self.ode_shape = ode_shape
 
     def qoi(self):
-        return np.empty(self.ode_shape)
+        return np.ones(self.ode_shape)
 
     def observed(self):
-        mean = np.empty(self.ode_shape)
-        cholesky = np.empty(self.ode_shape + self.ode_shape)
+        mean = np.ones(self.ode_shape)
+        cholesky = np.ones(self.ode_shape + self.ode_shape)
         return _normal.Normal(mean, cholesky)
 
     def error_estimate(self):
-        return np.empty(self.ode_shape)
+        return np.ones(self.ode_shape)
 
     def output_scale(self):
-        return np.empty(())
+        return np.ones(())
 
 
 class IsotropicPrototype(PrototypeBackend):
@@ -45,18 +45,18 @@ class IsotropicPrototype(PrototypeBackend):
         self.ode_shape = ode_shape
 
     def qoi(self):
-        return np.empty(self.ode_shape)
+        return np.ones(self.ode_shape)
 
     def observed(self):
-        mean = np.empty((1, *self.ode_shape))
-        cholesky = np.empty(())
+        mean = np.ones((1, *self.ode_shape))
+        cholesky = np.ones(())
         return _normal.Normal(mean, cholesky)
 
     def error_estimate(self):
-        return np.empty(())
+        return np.ones(())
 
     def output_scale(self):
-        return np.empty(())
+        return np.ones(())
 
 
 class BlockDiagPrototype(PrototypeBackend):
@@ -64,15 +64,15 @@ class BlockDiagPrototype(PrototypeBackend):
         self.ode_shape = ode_shape
 
     def qoi(self):
-        return np.empty(self.ode_shape)
+        return np.ones(self.ode_shape)
 
     def observed(self):
-        mean = np.empty((*self.ode_shape, 1))
-        cholesky = np.empty((*self.ode_shape, 1, 1))
+        mean = np.ones((*self.ode_shape, 1))
+        cholesky = np.ones((*self.ode_shape, 1, 1))
         return _normal.Normal(mean, cholesky)
 
     def error_estimate(self):
-        return np.empty(self.ode_shape)
+        return np.ones(self.ode_shape)
 
     def output_scale(self):
-        return np.empty(self.ode_shape)
+        return np.ones(self.ode_shape)

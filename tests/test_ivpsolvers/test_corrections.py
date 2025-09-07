@@ -40,7 +40,7 @@ def fixture_solution(correction_impl, fact):
 
     try:
         tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-        ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
         corr = correction_impl(ssm=ssm, damp=1e-9)
 
     except NotImplementedError:
@@ -52,7 +52,6 @@ def fixture_solution(correction_impl, fact):
 
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1, "ssm": ssm}
 
-    init = solver.initial_condition()
     return ivpsolve.solve_adaptive_terminal_values(
         vf, init, t0=t0, t1=t1, **adaptive_kwargs
     )

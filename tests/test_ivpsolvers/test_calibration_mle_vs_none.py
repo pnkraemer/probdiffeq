@@ -16,14 +16,13 @@ def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     kwargs = {"grid": np.linspace(t0, t1, endpoint=True, num=5), "ssm": ssm}
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        init = solver.initial_condition()
         return ivpsolve.solve_fixed_grid(vf, init, solver=solver, **kwargs)
 
     return solver_to_solution, ssm
@@ -37,7 +36,7 @@ def case_solve_adaptive_save_at(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 
     save_at = np.linspace(t0, t1, endpoint=True, num=5)
@@ -46,8 +45,6 @@ def case_solve_adaptive_save_at(fact):
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-        init = solver.initial_condition()
         adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
         return ivpsolve.solve_adaptive_save_at(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
@@ -64,15 +61,13 @@ def case_solve_adaptive_save_every_step(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0, "ssm": ssm}
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-        init = solver.initial_condition()
         adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
         return ivpsolve.solve_adaptive_save_every_step(
             vf, init, adaptive_solver=adaptive_solver, **kwargs
@@ -88,7 +83,7 @@ def case_simulate_terminal_values(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 
     kwargs = {"t0": t0, "t1": t1, "dt0": dt0, "ssm": ssm}
@@ -96,8 +91,6 @@ def case_simulate_terminal_values(fact):
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-        init = solver.initial_condition()
         adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2)
         return ivpsolve.solve_adaptive_terminal_values(
             vf, init, adaptive_solver=adaptive_solver, **kwargs

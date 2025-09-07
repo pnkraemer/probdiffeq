@@ -183,13 +183,12 @@ def solve_fixed(theta, *, ts):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
-    ibm, ssm = ivpsolvers.prior_ibm(
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver, ssm=ssm)
 
 
@@ -199,15 +198,13 @@ def solve_adaptive(theta, *, save_at):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
-    ibm, ssm = ivpsolvers.prior_ibm(
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
-
-    init = solver.initial_condition()
     return ivpsolve.solve_adaptive_save_at(
         vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )

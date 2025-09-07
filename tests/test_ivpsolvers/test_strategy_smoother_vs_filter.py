@@ -18,12 +18,12 @@ def fixture_solver_setup(fact):
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=solver_setup["fact"])
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        tcoeffs, ssm_fact=solver_setup["fact"]
+    )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
         solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver, ssm=ssm
     )
@@ -32,12 +32,12 @@ def fixture_filter_solution(solver_setup):
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=solver_setup["fact"])
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        tcoeffs, ssm_fact=solver_setup["fact"]
+    )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
         solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver, ssm=ssm
     )

@@ -1,6 +1,6 @@
 """Probabilistic IVP solvers."""
 
-from probdiffeq import ivpsolve, stats
+from probdiffeq import stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -26,30 +26,30 @@ class _MarkovProcess(containers.NamedTuple):
         return len(self.tcoeffs) - 1
 
 
-def prior_ibm(tcoeffs, *, ssm_fact: str, output_scale=None):
+def prior_wiener_integrated(tcoeffs, *, ssm_fact: str, output_scale=None):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
     discretize = ssm.conditional.ibm_transitions(output_scale=output_scale)
-
-    output_scale_calib = np.ones_like(ssm.prototypes.output_scale())
-    prior = _MarkovProcess(tcoeffs, output_scale_calib, discretize=discretize)
-    return prior, ssm
+    init = ssm.normal.from_tcoeffs(tcoeffs)
+    return init, discretize, ssm
 
 
-def prior_ibm_discrete(ts, *, tcoeffs_like, ssm_fact: str, output_scale=None):
+def prior_wiener_integrated_discrete(
+    ts, *, tcoeffs_like, ssm_fact: str, output_scale=None
+):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    prior, ssm = prior_ibm(tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact)
-    transitions, (p, p_inv) = functools.vmap(prior.discretize)(np.diff(ts))
+    init, discretize, ssm = prior_wiener_integrated(
+        tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact
+    )
+    transitions, (p, p_inv) = functools.vmap(discretize)(np.diff(ts))
 
     preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
 
-    output_scale = np.ones_like(ssm.prototypes.output_scale())
-    init = ssm.normal.standard(len(tcoeffs_like), output_scale=output_scale)
-    return stats.MarkovSeq(init, conditionals), ssm
+    return init, conditionals, ssm
 
 
 @containers.dataclass
@@ -188,10 +188,6 @@ class _Strategy:
     is_suitable_for_save_every_step: int
     is_suitable_for_offgrid_marginals: int
 
-    def initial_condition(self, *, prior):
-        """Compute an initial condition from a set of Taylor coefficients."""
-        raise NotImplementedError
-
     def init(self, sol: stats.MarkovSeq, /):
         """Initialise a state from a solution."""
         raise NotImplementedError
@@ -222,13 +218,15 @@ def strategy_smoother(*, ssm) -> _Strategy:
 
     @containers.dataclass
     class Smoother(_Strategy):
-        def initial_condition(self, *, prior):
-            rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-            cond = self.ssm.conditional.identity(len(prior.tcoeffs))
-            return stats.MarkovSeq(init=rv, conditional=cond)
-
-        def init(self, sol: stats.MarkovSeq, /):
-            return sol.init, sol.conditional
+        def init(self, sol, /):
+            # Special case for implementing offgrid-marginals...
+            if isinstance(sol, stats.MarkovSeq):
+                rv = sol.init
+                cond = sol.conditional
+            else:
+                rv = sol
+                cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
+            return rv, cond
 
         def begin(self, rv, _extra, /, *, prior_discretized):
             cond, (p, p_inv) = prior_discretized
@@ -274,12 +272,12 @@ def strategy_smoother(*, ssm) -> _Strategy:
             """
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
-            prior0 = prior.discretize(dt0)
+            prior0 = prior(dt0)
             extrapolated_t = self._extrapolate(
                 *state_t0, output_scale=output_scale, prior_discretized=prior0
             )
 
-            prior1 = prior.discretize(dt1)
+            prior1 = prior(dt1)
             extrapolated_t1 = self._extrapolate(
                 *extrapolated_t, output_scale=output_scale, prior_discretized=prior1
             )
@@ -324,9 +322,6 @@ def strategy_filter(*, ssm) -> _Strategy:
         def init(self, sol, /):
             return sol, None
 
-        def initial_condition(self, *, prior):
-            return self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-
         def begin(self, rv, _extra, /, prior_discretized):
             cond, (p, p_inv) = prior_discretized
 
@@ -360,7 +355,7 @@ def strategy_filter(*, ssm) -> _Strategy:
             del dt1
 
             hidden, extra = state_t0
-            prior0 = prior.discretize(dt0)
+            prior0 = prior(dt0)
             hidden, extra = self.begin(hidden, extra, prior_discretized=prior0)
             hidden, extra = self.complete(hidden, extra, output_scale=output_scale)
 
@@ -389,13 +384,9 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
 
     @containers.dataclass
     class FixedPoint(_Strategy):
-        def initial_condition(self, prior):
-            rv = self.ssm.normal.from_tcoeffs(prior.tcoeffs)
-            cond = self.ssm.conditional.identity(len(prior.tcoeffs))
-            return stats.MarkovSeq(init=rv, conditional=cond)
-
-        def init(self, sol: stats.MarkovSeq, /):
-            return sol.init, sol.conditional
+        def init(self, sol, /):
+            cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
+            return sol, cond
 
         def begin(self, rv, extra, /, prior_discretized):
             cond, (p, p_inv) = prior_discretized
@@ -429,7 +420,8 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             return extrapolated, cond
 
         def interpolate_at_t1(self, rv, extra, /, *, prior):
-            cond_identity = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            del prior
+            cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
         def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
@@ -474,14 +466,14 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             """
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
-            prior0 = prior.discretize(dt0)
+            prior0 = prior(dt0)
             extrapolated_t = self._extrapolate(
                 *state_t0, output_scale=output_scale, prior_discretized=prior0
             )
-            conditional_id = self.ssm.conditional.identity(prior.num_derivatives + 1)
+            conditional_id = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             previous_new = (extrapolated_t[0], conditional_id)
 
-            prior1 = prior.discretize(dt1)
+            prior1 = prior(dt1)
             extrapolated_t1 = self._extrapolate(
                 *previous_new, output_scale=output_scale, prior_discretized=prior1
             )
@@ -636,7 +628,6 @@ class _State(containers.NamedTuple):
 @containers.dataclass
 class _ProbabilisticSolver:
     name: str
-    requires_rescaling: bool
 
     step_implementation: Callable
 
@@ -653,7 +644,6 @@ class _ProbabilisticSolver:
 
         dt0 = t - t0
         dt1 = t1 - t
-
         rv, extra = self.strategy.init(posterior_t0)
         rv, corr = self.correction.init(rv)
 
@@ -673,7 +663,7 @@ class _ProbabilisticSolver:
 
     @property
     def error_contraction_rate(self):
-        return self.prior.num_derivatives + 1
+        return self.ssm.num_derivatives + 1
 
     @property
     def is_suitable_for_offgrid_marginals(self):
@@ -687,25 +677,11 @@ class _ProbabilisticSolver:
     def is_suitable_for_save_every_step(self):
         return self.strategy.is_suitable_for_save_every_step
 
-    def initial_condition(self) -> ivpsolve.IVPSolution:
-        """Construct an initial condition."""
-        posterior = self.strategy.initial_condition(prior=self.prior)
-        return ivpsolve.IVPSolution(
-            t=None,
-            u=None,
-            u_std=None,
-            output_scale=self.prior.output_scale,
-            marginals=None,
-            posterior=posterior,
-            num_steps=None,
-            ssm=None,
-        )
-
-    def init(self, t, initial_condition: ivpsolve.IVPSolution) -> _State:
-        rv, extra = self.strategy.init(initial_condition.posterior)
+    def init(self, t, init) -> _State:
+        rv, extra = self.strategy.init(init)
         rv, corr = self.correction.init(rv)
 
-        calib_state = self.calibration.init(initial_condition.output_scale)
+        calib_state = self.calibration.init()
         return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
 
     def step(self, state: _State, *, vector_field, dt):
@@ -782,7 +758,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
     def step_mle(state, /, *, dt, vector_field, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
 
-        prior_discretized = prior.discretize(dt)
+        prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
@@ -808,7 +784,6 @@ def solver_mle(strategy, *, correction, prior, ssm):
         step_implementation=step_mle,
         strategy=strategy,
         correction=correction,
-        requires_rescaling=True,
     )
 
 
@@ -818,7 +793,8 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
     #  marginal likelihoods.
     #  In this case, the _calibration_most_recent() stuff becomes void.
 
-    def init(prior):
+    def init():
+        prior = ssm.prototypes.output_scale()
         return prior, prior, 0.0
 
     def update(state, /, observed):
@@ -839,7 +815,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
     def step_dynamic(state, /, *, dt, vector_field, calibration):
-        prior_discretized = prior.discretize(dt)
+        prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
@@ -866,13 +842,12 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         calibration=_calibration_most_recent(ssm=ssm),
         name="Dynamic probabilistic solver",
         step_implementation=step_dynamic,
-        requires_rescaling=False,
     )
 
 
 def _calibration_most_recent(*, ssm) -> _Calibration:
-    def init(prior):
-        return prior
+    def init():
+        return ssm.prototypes.output_scale()
 
     def update(_state, /, observed):
         return ssm.stats.mahalanobis_norm_relative(0.0, observed)
@@ -889,7 +864,7 @@ def solver(strategy, *, correction, prior, ssm):
     def step(state: _State, *, vector_field, dt, calibration):
         del calibration  # unused
 
-        prior_discretized = prior.discretize(dt)
+        prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
@@ -914,16 +889,15 @@ def solver(strategy, *, correction, prior, ssm):
         prior=prior,
         strategy=strategy,
         correction=correction,
-        calibration=_calibration_none(),
+        calibration=_calibration_none(ssm=ssm),
         step_implementation=step,
         name="Probabilistic solver",
-        requires_rescaling=False,
     )
 
 
-def _calibration_none() -> _Calibration:
-    def init(prior):
-        return prior
+def _calibration_none(*, ssm) -> _Calibration:
+    def init():
+        return ssm.prototypes.output_scale()
 
     def update(_state, /, observed):
         raise NotImplementedError

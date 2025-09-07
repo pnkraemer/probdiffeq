@@ -59,14 +59,12 @@ def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
     output_scale = 10.0
-    ibm, ssm = ivpsolvers.prior_ibm(
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
-    init = solver.initial_condition()
     return ivpsolve.solve_fixed_grid(
         lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver, ssm=ssm
     )

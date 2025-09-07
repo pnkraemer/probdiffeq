@@ -44,7 +44,9 @@ def vf_1(y, t):  # noqa: ARG001
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    tcoeffs, output_scale=1.0, ssm_fact="isotropic"
+)
 ts0 = ivpsolvers.correction_ts0(ssm=ssm)
 strategy = ivpsolvers.strategy_filter(ssm=ssm)
 solver_1st = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
@@ -53,7 +55,6 @@ adaptive_solver_1st = ivpsolvers.adaptive(solver_1st, atol=1e-5, rtol=1e-5, ssm=
 
 # -
 
-init = solver_1st.initial_condition()
 solution = ivpsolve.solve_adaptive_save_every_step(
     vf_1, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver_1st, ssm=ssm
 )
@@ -78,14 +79,14 @@ def vf_2(y, dy, t):  # noqa: ARG001
 
 # One derivative more than above because we don't transform to first order
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
-ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, output_scale=1.0, ssm_fact="isotropic")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    tcoeffs, output_scale=1.0, ssm_fact="isotropic"
+)
 ts0 = ivpsolvers.correction_ts0(ode_order=2, ssm=ssm)
 strategy = ivpsolvers.strategy_filter(ssm=ssm)
 solver_2nd = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
 adaptive_solver_2nd = ivpsolvers.adaptive(solver_2nd, atol=1e-5, rtol=1e-5, ssm=ssm)
 
-
-init = solver_2nd.initial_condition()
 # -
 
 solution = ivpsolve.solve_adaptive_save_every_step(
