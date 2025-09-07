@@ -148,7 +148,7 @@ def solve_adaptive_save_at(
 
     # I think the user expects the initial condition to be part of the state
     # (as well as marginals), so we compute those things here
-    posterior_t0, *_ = initial_condition
+    posterior_t0 = initial_condition.posterior
     posterior_save_at, output_scale = solution_save_at
     _tmp = _userfriendly_output(
         posterior=posterior_save_at, posterior_t0=posterior_t0, ssm=ssm
@@ -238,7 +238,7 @@ def solve_adaptive_save_every_step(
     t = np.concatenate((np.atleast_1d(t0), t))
 
     # I think the user expects marginals, so we compute them here
-    posterior_t0, *_ = initial_condition
+    posterior_t0 = initial_condition.posterior
     posterior, output_scale = solution_every_step
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
     marginals, posterior = _tmp
@@ -296,7 +296,8 @@ def solve_fixed_grid(
     _t, (posterior, output_scale) = solver.extract(result_state)
 
     # I think the user expects marginals, so we compute them here
-    posterior_t0, *_ = initial_condition
+    # posterior_t0, *_ = initial_condition
+    posterior_t0 = initial_condition.posterior
     _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
     marginals, posterior = _tmp
 

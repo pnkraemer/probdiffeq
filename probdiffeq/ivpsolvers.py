@@ -1,6 +1,6 @@
 """Probabilistic IVP solvers."""
 
-from probdiffeq import stats
+from probdiffeq import ivpsolve, stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -694,13 +694,25 @@ class _ProbabilisticSolver:
     def is_suitable_for_save_every_step(self):
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, initial_condition) -> _State:
-        posterior, output_scale = initial_condition
+    def initial_condition(self) -> ivpsolve.IVPSolution:
+        """Construct an initial condition."""
+        posterior = self.strategy.initial_condition(prior=self.prior)
+        return ivpsolve.IVPSolution(
+            t=None,
+            u=None,
+            u_std=None,
+            output_scale=self.prior.output_scale,
+            marginals=None,
+            posterior=posterior,
+            num_steps=None,
+            ssm=None,
+        )
 
-        rv, extra = self.strategy.init(posterior)
+    def init(self, t, initial_condition: ivpsolve.IVPSolution) -> _State:
+        rv, extra = self.strategy.init(initial_condition.posterior)
         rv, corr = self.correction.init(rv)
 
-        calib_state = self.calibration.init(output_scale)
+        calib_state = self.calibration.init(initial_condition.output_scale)
         return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
 
     def step(self, state: _State, *, vector_field, dt):
@@ -765,11 +777,6 @@ class _ProbabilisticSolver:
         sol = _state(t, solution_, interp_to.output_scale)
         acc = _state(t, step_from_, interp_to.output_scale)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
-
-    def initial_condition(self):
-        """Construct an initial condition."""
-        posterior = self.strategy.initial_condition(prior=self.prior)
-        return posterior, self.prior.output_scale
 
 
 def solver_mle(strategy, *, correction, prior, ssm):
