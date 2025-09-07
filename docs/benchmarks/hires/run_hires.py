@@ -89,7 +89,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-        ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact="dense")
+        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
         ts1 = ivpsolvers.correction_ts1(ssm=ssm)
         strategy = ivpsolvers.strategy_filter(ssm=ssm)
         solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
@@ -97,9 +97,6 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         adaptive_solver = ivpsolvers.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm, clip_dt=True
         )
-
-        # Initial state
-        init = solver.initial_condition()
 
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0,))
