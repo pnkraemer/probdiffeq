@@ -148,11 +148,9 @@ def solve_adaptive_save_at(
 
     # I think the user expects the initial condition to be part of the state
     # (as well as marginals), so we compute those things here
-    posterior_t0 = initial_condition.posterior
+    init_t0 = initial_condition
     posterior_save_at, output_scale = solution_save_at
-    _tmp = _userfriendly_output(
-        posterior=posterior_save_at, posterior_t0=posterior_t0, ssm=ssm
-    )
+    _tmp = _userfriendly_output(posterior=posterior_save_at, init_t0=init_t0, ssm=ssm)
     marginals, posterior = _tmp
     u = ssm.stats.qoi_from_sample(marginals.mean)
     std = ssm.stats.standard_deviation(marginals)
@@ -238,9 +236,9 @@ def solve_adaptive_save_every_step(
     t = np.concatenate((np.atleast_1d(t0), t))
 
     # I think the user expects marginals, so we compute them here
-    posterior_t0 = initial_condition.posterior
+    init_t0 = initial_condition
     posterior, output_scale = solution_every_step
-    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
+    _tmp = _userfriendly_output(posterior=posterior, init_t0=init_t0, ssm=ssm)
     marginals, posterior = _tmp
 
     u = ssm.stats.qoi_from_sample(marginals.mean)
@@ -296,8 +294,8 @@ def solve_fixed_grid(
     _t, (posterior, output_scale) = solver.extract(result_state)
 
     # I think the user expects marginals, so we compute them here
-    posterior_t0 = initial_condition.posterior
-    _tmp = _userfriendly_output(posterior=posterior, posterior_t0=posterior_t0, ssm=ssm)
+    init_t0 = initial_condition
+    _tmp = _userfriendly_output(posterior=posterior, init_t0=init_t0, ssm=ssm)
     marginals, posterior = _tmp
 
     u = ssm.stats.qoi_from_sample(marginals.mean)
@@ -315,7 +313,7 @@ def solve_fixed_grid(
     )
 
 
-def _userfriendly_output(*, posterior, posterior_t0, ssm):
+def _userfriendly_output(*, posterior, init_t0, ssm):
     if isinstance(posterior, stats.MarkovSeq):
         # Compute marginals
         posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
@@ -328,11 +326,10 @@ def _userfriendly_output(*, posterior, posterior_t0, ssm):
         marginals = tree_array_util.tree_append(marginals, marginal_t1)
 
         # Prepend the marginal at t1 to the inits
-        init_t0 = posterior_t0.init
         init = tree_array_util.tree_prepend(init_t0, posterior.init)
         posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
     else:
-        posterior = tree_array_util.tree_prepend(posterior_t0, posterior)
+        posterior = tree_array_util.tree_prepend(init_t0, posterior)
         marginals = posterior
     return marginals, posterior
 

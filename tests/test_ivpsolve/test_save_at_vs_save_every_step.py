@@ -12,13 +12,12 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
 
     # Generate a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
 
-    init = solver.initial_condition()
     problem_args = (vf, init)
     adaptive_kwargs = {"adaptive_solver": adaptive_solver, "dt0": 0.1, "ssm": ssm}
 

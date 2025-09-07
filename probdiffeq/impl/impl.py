@@ -15,6 +15,7 @@ class FactImpl:
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
+    num_derivatives: int
 
     # To assert a valid tree_equal of solutions, the factorisations
     # must be comparable.
@@ -67,6 +68,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
         normal=normal,
         prototypes=prototypes,
         stats=stats,
+        num_derivatives=len(tcoeffs_like) - 1,
     )
 
 
@@ -92,6 +94,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         stats=stats,
         linearise=linearise,
         conditional=conditional,
+        num_derivatives=len(tcoeffs_like) - 1,
     )
 
 
@@ -117,4 +120,5 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
         stats=stats,
         linearise=linearise,
         conditional=conditional,
+        num_derivatives=len(tcoeffs_like) - 1,
     )

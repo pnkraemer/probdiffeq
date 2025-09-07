@@ -27,11 +27,11 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     vf, u0, (t0, t1) = ivp
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    ibm, ssm = ivpsolvers.prior_ibm(tcoeffs, ssm_fact=fact)
+    init, transition, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = ivpsolvers.correction_ts0(ssm=ssm)
     strategy = strategy_fun(ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    solver = ivpsolvers.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
 
     # clip=False because we need to test adaptive-step-interpolation
     #  for smoothers
@@ -42,9 +42,6 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     dt0 = ivpsolve.dt0_adaptive(
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
     )
-
-    init = solver.initial_condition()
-
     args = (vf, init)
     kwargs = {
         "t0": t0,
