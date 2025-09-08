@@ -22,7 +22,7 @@ def prior_wiener_integrated(
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
     if output_scale is None:
-        output_scale = ssm.prototypes.output_scale()
+        output_scale = np.ones_like(ssm.prototypes.output_scale())
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
     init = ssm.normal.from_tcoeffs(tcoeffs)
     return init, discretize, ssm
@@ -35,7 +35,10 @@ def prior_wiener_integrated_discrete(
     init, discretize, ssm = prior_wiener_integrated(
         tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact
     )
-    transitions, (p, p_inv) = functools.vmap(discretize)(np.diff(ts))
+
+    scales = np.ones_like(ssm.prototypes.output_scale())
+    discretize_vmap = functools.vmap(discretize, in_axes=(0, None))
+    transitions, (p, p_inv) = discretize_vmap(np.diff(ts), scales)
 
     preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
     conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
@@ -798,7 +801,7 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
     #  In this case, the _calibration_most_recent() stuff becomes void.
 
     def init():
-        prior = ssm.prototypes.output_scale()
+        prior = np.ones_like(ssm.prototypes.output_scale())
         return prior, prior, 0.0
 
     def update(state, /, observed):
@@ -820,7 +823,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
 
     def step_dynamic(state, /, *, dt, calibration):
         # Estimate error and calibrate the output scale
-        ones = ssm.prototypes.output_scale()
+        ones = np.ones_like(ssm.prototypes.output_scale())
         transition = prior(dt, ones)
         hidden = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
@@ -855,7 +858,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
 
 def _calibration_most_recent(*, ssm) -> _Calibration:
     def init():
-        return ssm.prototypes.output_scale()
+        return np.ones_like(ssm.prototypes.output_scale())
 
     def update(_state, /, observed):
         return ssm.stats.mahalanobis_norm_relative(0.0, observed)
@@ -906,7 +909,7 @@ def solver(strategy, *, correction, prior, ssm):
 
 def _calibration_none(*, ssm) -> _Calibration:
     def init():
-        return ssm.prototypes.output_scale()
+        return np.ones_like(ssm.prototypes.output_scale())
 
     def update(_state, /, observed):
         raise NotImplementedError

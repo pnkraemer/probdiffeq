@@ -42,8 +42,11 @@ def runge_kutta_starter(dt, *, ssm, atol=1e-12, rtol=1e-10):
         init = (rv_t0, conditional_t0)
 
         # Discretised prior
-        discretise = ssm.conditional.ibm_transitions(output_scale=1.0)
-        ibm_transitions = functools.vmap(discretise)(np.diff(ts))
+        scale = ssm.prototypes.output_scale()
+        discretise = ssm.conditional.ibm_transitions(scale)
+        ibm_transitions = functools.vmap(discretise, in_axes=(0, None))(
+            np.diff(ts), scale
+        )
 
         # Generate an observation-model for the QOI
         # (1e-7 observation noise for nuggets and for reusing existing code)
