@@ -48,7 +48,11 @@ class DenseLinearisation(LinearisationBackend):
             )
             cov_lower = damp * np.eye(len(fx))
             bias = _normal.Normal(-fx, cov_lower)
-            return _conditional.LatentCond(linop, bias)
+            to_latent = np.ones(linop.shape[1])
+            to_observed = np.ones(linop.shape[0])
+            return _conditional.LatentCond(
+                linop, bias, to_latent=to_latent, to_observed=to_observed
+            )
 
         return linearise_fun_wrapped
 
@@ -228,7 +232,12 @@ class IsotropicLinearisation(LinearisationBackend):
             )
             cov_lower = damp * np.eye(1)
             bias = _normal.Normal(-fx, cov_lower)
-            return _conditional.LatentCond(linop, bias)
+
+            to_latent = np.ones((linop.shape[1],))
+            to_observed = np.ones((linop.shape[0],))
+            return _conditional.LatentCond(
+                linop, bias, to_latent=to_latent, to_observed=to_observed
+            )
 
         return linearise_fun_wrapped
 
@@ -261,7 +270,12 @@ class BlockDiagLinearisation(LinearisationBackend):
             d, *_ = linop.shape
             cov_lower = damp * np.ones((d, 1, 1))
             bias = _normal.Normal(-fx[:, None], cov_lower)
-            return _conditional.LatentCond(linop, bias)
+
+            to_latent = np.ones((linop.shape[2],))
+            to_observed = np.ones((linop.shape[1],))
+            return _conditional.LatentCond(
+                linop, bias, to_latent=to_latent, to_observed=to_observed
+            )
 
         return linearise_fun_wrapped
 

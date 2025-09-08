@@ -3,7 +3,9 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 
 
-class Normal(containers.NamedTuple):
+@tree_util.register_dataclass
+@containers.dataclass
+class Normal:
     mean: Array
     cholesky: Array
 

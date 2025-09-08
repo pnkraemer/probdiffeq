@@ -10,10 +10,19 @@ from probdiffeq.util import cholesky_util
 @tree_util.register_dataclass
 @containers.dataclass
 class LatentCond:
-    """LatentCond distributions."""
+    """Conditional distributions in latent space."""
 
     A: Array
+    """Linear operator in latent space."""
+
     noise: _normal.Normal
+    """Additive Gaussian noise in latent space."""
+
+    to_latent: Array
+    """Pull an observed vector into the latent space."""
+
+    to_observed: Array
+    """Push a latent vector into the observed space."""
 
 
 class ConditionalBackend(abc.ABC):
@@ -65,39 +74,70 @@ class DenseConditional(ConditionalBackend):
         self.flat_shape = flat_shape
 
     def apply(self, x, cond, /):
-        return _normal.Normal(cond.A @ x + cond.noise.mean, cond.noise.cholesky)
+        x = cond.to_latent * x
+        mean = cond.to_observed * (cond.A @ x + cond.noise.mean)
+        cholesky = cond.to_observed[:, None] * cond.noise.cholesky
+        return _normal.Normal(mean, cholesky)
 
     def marginalise(self, rv, cond, /):
-        R_stack = ((cond.A @ rv.cholesky).T, cond.noise.cholesky.T)
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
+
+        R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky.T)
         cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-        return _normal.Normal(cond.A @ rv.mean + cond.noise.mean, cholesky_new)
 
-    def merge(self, cond1, cond2, /):
-        A, b = cond1.A, cond1.noise
-        C, d = cond2.A, cond2.noise
+        mean_new = cond.to_observed * (cond.A @ mean + cond.noise.mean)
+        cholesky_new = cond.to_observed[:, None] * cholesky_new
+        return _normal.Normal(mean_new, cholesky_new)
 
-        g = A @ C
-        xi = A @ d.mean + b.mean
-        Xi = cholesky_util.sum_of_sqrtm_factors(
-            R_stack=((A @ d.cholesky).T, b.cholesky.T)
+    def merge(self, cond1: LatentCond, cond2: LatentCond, /) -> LatentCond:
+        # Transform: latent (2) to latent (1)
+        T = cond1.to_latent * cond2.to_observed
+
+        # Linear operator
+        g = cond1.A @ (T[:, None] * cond2.A)
+
+        # Combined mean
+        xi = cond1.A @ (T * cond2.noise.mean) + cond1.noise.mean
+
+        # Cholesky factor of combined covariance
+        R1 = (cond1.A @ (T[:, None] * cond2.noise.cholesky)).T
+        R2 = cond1.noise.cholesky.T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
+
+        # Gather and return
+        noise = _normal.Normal(xi, Xi.T)
+        return LatentCond(
+            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
-        return LatentCond(g, _normal.Normal(xi, Xi.T))
 
-    def revert(self, rv, cond, /):
-        matrix, noise = cond.A, cond.noise
-        mean, cholesky = rv.mean, rv.cholesky
+    def revert(self, rv: _normal.Normal, cond: LatentCond, /):
+        # Pull RV into the latent space
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
 
         # QR-decomposition
-        r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
-            R_X_F=(matrix @ cholesky).T, R_X=cholesky.T, R_YX=noise.cholesky.T
+        R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky.T
+        tmp = cholesky_util.revert_conditional(R_X_F=R_X_F, R_X=R_X, R_YX=R_YX)
+        r_obs, (r_cor, gain) = tmp
+
+        # Push correction into observed space
+        mean_observed = cond.A @ mean + cond.noise.mean
+        mean_corrected = mean - gain @ mean_observed
+        cholesky_corrected = r_cor.T
+        corrected = _normal.Normal(mean_corrected, cholesky_corrected)
+        cond_new = LatentCond(
+            gain,
+            corrected,
+            to_latent=1 / cond.to_observed,
+            to_observed=1 / cond.to_latent,
         )
 
-        # Gather terms and return
-        mean_observed = matrix @ mean + noise.mean
-        m_cor = mean - gain @ mean_observed
-        corrected = _normal.Normal(m_cor, r_cor.T)
-        observed = _normal.Normal(mean_observed, r_obs.T)
-        return observed, LatentCond(gain, corrected)
+        # Gather the observed variable
+        mean = cond.to_observed * mean_observed
+        cholesky = cond.to_observed[:, None] * r_obs.T
+        observed = _normal.Normal(mean, cholesky)
+        return observed, cond_new
 
     def identity(self, ndim, /) -> LatentCond:
         (d,) = self.ode_shape
@@ -106,10 +146,12 @@ class DenseConditional(ConditionalBackend):
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        return LatentCond(A, _normal.Normal(m, C))
+        noise = _normal.Normal(m, C)
+        ones = np.ones((n,))
+        return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
     def ibm_transitions(self, base_scale):
-        a, q_sqrtm = system_matrices_1d(self.num_derivatives)
+        a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         (d,) = self.ode_shape
 
         eye_d = np.eye(d)
@@ -118,7 +160,7 @@ class DenseConditional(ConditionalBackend):
 
         q0 = np.zeros(self.flat_shape)
 
-        precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
         def discretise(dt, output_scale):
             scale = base_scale * output_scale
@@ -127,17 +169,19 @@ class DenseConditional(ConditionalBackend):
             p_inv = np.repeat(p_inv, d)
 
             noise = _normal.Normal(q0, scale * Q)
-            return LatentCond(A, noise), (p, p_inv)
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
 
     def preconditioner_apply(self, cond, p, p_inv, /):
+        assert False
         normal = _normal.DenseNormal(ode_shape=self.ode_shape)
         noise = normal.preconditioner_apply(cond.noise, p)
         A = p[:, None] * cond.A * p_inv[None, :]
         return LatentCond(A, noise)
 
     def to_derivative(self, i, standard_deviation):
+        assert False
         x = np.zeros(self.flat_shape)
 
         def select(a):
@@ -156,7 +200,9 @@ class DenseConditional(ConditionalBackend):
         noise = cond.noise
         stats = _stats.DenseStats(ode_shape=self.ode_shape, unravel=self.unravel)
         noise_new = stats.rescale_cholesky(noise, scale)
-        return LatentCond(A, noise_new)
+        return LatentCond(
+            A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
+        )
 
 
 class IsotropicConditional(ConditionalBackend):
@@ -166,23 +212,30 @@ class IsotropicConditional(ConditionalBackend):
         self.unravel_tree = unravel_tree
 
     def apply(self, x, cond, /):
-        A, noise = cond.A, cond.noise
+        # TODO: is this still relevant?
         # if the gain is qoi-to-hidden, the data is a (d,) array.
         # this is problematic for the isotropic model unless we explicitly broadcast.
         if np.ndim(x) == 1:
             x = x[None, :]
-        return _normal.Normal(A @ x + noise.mean, noise.cholesky)
+
+        x = cond.to_latent[:, None] * x
+        mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean
+        cholesky_new = cond.to_observed[:, None] * cond.noise.cholesky
+        return _normal.Normal(mean_new, cholesky_new)
 
     def marginalise(self, rv, cond, /):
-        matrix, noise = cond.A, cond.noise
+        mean = cond.to_latent[:, None] * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
 
-        mean = matrix @ rv.mean + noise.mean
+        R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky.T)
+        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
-        R_stack = ((matrix @ rv.cholesky).T, noise.cholesky.T)
-        cholesky = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-        return _normal.Normal(mean, cholesky)
+        mean_new = cond.to_observed[:, None] * (cond.A @ mean + cond.noise.mean)
+        cholesky_new = cond.to_observed[:, None] * cholesky_new
+        return _normal.Normal(mean_new, cholesky_new)
 
     def merge(self, cond1, cond2, /):
+        assert False
         A, b = cond1.A, cond1.noise
         C, d = cond2.A, cond2.noise
 
@@ -195,42 +248,56 @@ class IsotropicConditional(ConditionalBackend):
         return LatentCond(g, noise)
 
     def revert(self, rv, cond, /):
-        matrix, noise = cond.A, cond.noise
+        # Pull RV into the latent space
+        mean = cond.to_latent[:, None] * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
 
-        r_ext_p, (r_bw_p, gain) = cholesky_util.revert_conditional(
-            R_X_F=(matrix @ rv.cholesky).T, R_X=rv.cholesky.T, R_YX=noise.cholesky.T
+        # QR-decomposition
+        R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky.T
+        tmp = cholesky_util.revert_conditional(R_X_F=R_X_F, R_X=R_X, R_YX=R_YX)
+        r_obs, (r_cor, gain) = tmp
+
+        # Push correction into observed space
+        mean_observed = cond.A @ mean + cond.noise.mean
+        mean_corrected = mean - gain @ mean_observed
+        cholesky_corrected = r_cor.T
+        corrected = _normal.Normal(mean_corrected, cholesky_corrected)
+        cond_new = LatentCond(
+            gain,
+            corrected,
+            to_latent=1 / cond.to_observed,
+            to_observed=1 / cond.to_latent,
         )
-        extrapolated_cholesky = r_ext_p.T
-        corrected_cholesky = r_bw_p.T
 
-        extrapolated_mean = matrix @ rv.mean + noise.mean
-        corrected_mean = rv.mean - gain @ extrapolated_mean
+        # Gather the observed variable
+        mean = cond.to_observed[:, None] * mean_observed
+        cholesky = cond.to_observed[:, None] * r_obs.T
+        observed = _normal.Normal(mean, cholesky)
+        return observed, cond_new
 
-        extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
-        corrected = _normal.Normal(corrected_mean, corrected_cholesky)
-        return extrapolated, LatentCond(gain, corrected)
-
-    def identity(self, num_hidden_states_per_ode_dim, /) -> LatentCond:
-        m0 = np.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
-        c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
+    def identity(self, num, /) -> LatentCond:
+        m0 = np.zeros((num, *self.ode_shape))
+        c0 = np.zeros((num, num))
         noise = _normal.Normal(m0, c0)
-        matrix = np.eye(num_hidden_states_per_ode_dim)
-        return LatentCond(matrix, noise)
+        matrix = np.eye(num)
+        ones = np.ones((num,))
+        return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
     def ibm_transitions(self, base_scale):
-        A, q_sqrtm = system_matrices_1d(self.num_derivatives)
+        A, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
-        precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
         def discretise(dt, output_scale):
             scale = base_scale * output_scale
             p, p_inv = precon_fun(dt)
             noise = _normal.Normal(q0, scale * q_sqrtm)
-            return LatentCond(A, noise), (p, p_inv)
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
 
     def preconditioner_apply(self, cond, p, p_inv, /):
+        assert False
         A, noise = cond.A, cond.noise
 
         A_new = p[:, None] * A * p_inv[None, :]
@@ -239,6 +306,8 @@ class IsotropicConditional(ConditionalBackend):
         return LatentCond(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
+        assert False
+
         def select(a):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
@@ -252,6 +321,7 @@ class IsotropicConditional(ConditionalBackend):
         return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
+        assert False
         A = cond.A
         noise = cond.noise
         stats = _stats.IsotropicStats(
@@ -272,7 +342,10 @@ class BlockDiagConditional(ConditionalBackend):
             x = x[..., None]
 
         def apply_unbatch(m, s, n):
-            return _normal.Normal(m @ s + n.mean, n.cholesky)
+            s = cond.to_latent * s
+            m_new = cond.to_observed * (m @ s + n.mean)
+            c_new = cond.to_observed[:, None] * n.cholesky
+            return _normal.Normal(m_new, c_new)
 
         matrix, noise = cond.A, cond.noise
         return functools.vmap(apply_unbatch)(matrix, x, noise)
@@ -280,16 +353,23 @@ class BlockDiagConditional(ConditionalBackend):
     def marginalise(self, rv, cond, /):
         matrix, noise = cond.A, cond.noise
         assert matrix.ndim == 3
+        mean = cond.to_latent[None, :] * rv.mean
+        cholesky = cond.to_latent[None, :, None] * rv.cholesky
 
-        mean = np.einsum("ijk,ik->ij", matrix, rv.mean) + noise.mean
+        mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean
+        # assert False
 
-        chol1 = _transpose(matrix @ rv.cholesky)
+        chol1 = _transpose(matrix @ cholesky)
         chol2 = _transpose(noise.cholesky)
         R_stack = (chol1, chol2)
         cholesky = functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
-        return _normal.Normal(mean, _transpose(cholesky))
+
+        mean_new = cond.to_observed[None, :] * mean_marg
+        cholesky_new = cond.to_observed[None, :, None] * _transpose(cholesky)
+        return _normal.Normal(mean_new, cholesky_new)
 
     def merge(self, cond1, cond2, /):
+        assert False
         A, b = cond1.A, cond1.noise
         C, d = cond2.A, cond2.noise
 
@@ -302,6 +382,8 @@ class BlockDiagConditional(ConditionalBackend):
         return LatentCond(g, noise)
 
     def revert(self, rv, cond, /):
+        # TODO: continue here... I need a break.
+        assert False
         A, noise = cond.A, cond.noise
         rv_chol_upper = np.transpose(rv.cholesky, axes=(0, 2, 1))
         noise_chol_upper = np.transpose(noise.cholesky, axes=(0, 2, 1))
@@ -321,6 +403,7 @@ class BlockDiagConditional(ConditionalBackend):
         return observed, LatentCond(gain, corrected)
 
     def identity(self, ndim, /) -> LatentCond:
+        assert False
         m0 = np.zeros((*self.ode_shape, ndim))
         c0 = np.zeros((*self.ode_shape, ndim, ndim))
         noise = _normal.Normal(m0, c0)
@@ -329,23 +412,24 @@ class BlockDiagConditional(ConditionalBackend):
         return LatentCond(matrix, noise)
 
     def ibm_transitions(self, base_scale):
-        a, q_sqrtm = system_matrices_1d(self.num_derivatives)
+        a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
-        precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
         def discretise(dt, output_scale):
             p, p_inv = precon_fun(dt)
             scale = base_scale * output_scale
-            cond = functools.vmap(discretise_1d)(scale)
-            return cond, (p, p_inv)
+            A_batch, noise_batch = functools.vmap(discretise_1d)(scale)
+            return LatentCond(A_batch, noise_batch, to_latent=p_inv, to_observed=p)
 
         def discretise_1d(scale):
             noise = _normal.Normal(q0, scale * q_sqrtm)
-            return LatentCond(a, noise)
+            return a, noise
 
         return discretise
 
     def preconditioner_apply(self, cond, p, p_inv, /):
+        assert False
         A_new = p[None, :, None] * cond.A * p_inv[None, None, :]
 
         normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
@@ -353,6 +437,8 @@ class BlockDiagConditional(ConditionalBackend):
         return LatentCond(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
+        assert False
+
         def select(a):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
@@ -366,6 +452,7 @@ class BlockDiagConditional(ConditionalBackend):
         return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
+        assert False
         A = cond.A
         noise = cond.noise
         stats = _stats.BlockDiagStats(
@@ -379,7 +466,7 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-def system_matrices_1d(num_derivatives):
+def wiener_integrated_system_matrices_1d(num_derivatives):
     """Construct the IBM system matrices."""
     x = np.arange(0, num_derivatives + 1)
 
@@ -392,19 +479,19 @@ def system_matrices_1d(num_derivatives):
     return A_1d, Q_1d
 
 
-def preconditioner_diagonal(dt, *, scales, powers):
-    """Construct the diagonal IBM preconditioner."""
-    dt_abs = np.abs(dt)
-    scaling_vector = np.power(dt_abs, powers) / scales
-    scaling_vector_inv = np.power(dt_abs, -powers) * scales
-    return scaling_vector, scaling_vector_inv
-
-
-def preconditioner_prepare(*, num_derivatives):
+def preconditioner_taylor(*, num_derivatives):
+    """Construct the diagonal preconditioner for Taylor-coefficient state spaces."""
     powers = np.arange(num_derivatives, -1.0, step=-1.0)
     scales = np.factorial(powers)
     powers = powers + 0.5
-    return tree_util.Partial(preconditioner_diagonal, scales=scales, powers=powers)
+
+    def precon(dt):
+        dt_abs = np.abs(dt)
+        scaling_vector = np.power(dt_abs, powers) / scales
+        scaling_vector_inv = np.power(dt_abs, -powers) * scales
+        return scaling_vector, scaling_vector_inv
+
+    return precon
 
 
 def _pascal(a, /):

@@ -225,25 +225,11 @@ def strategy_smoother(*, ssm) -> _Strategy:
 
         def extrapolate(self, rv, aux, /, *, transition):
             del aux
-            cond, (p, p_inv) = transition
-
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-            # Gather and return
-            return extrapolated, cond
+            return self.ssm.conditional.revert(rv, transition)
 
         def extrapolate_mean(self, rv, /, *, transition):
-            cond, (p, p_inv) = transition
-
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-            m_p = self.ssm.stats.mean(rv_p)
-            extrapolated_p = self.ssm.conditional.apply(m_p, cond)
-
-            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            mean = self.ssm.stats.mean(rv)
+            return self.ssm.conditional.apply(mean, transition)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
@@ -315,20 +301,13 @@ def strategy_filter(*, ssm) -> _Strategy:
 
         def extrapolate(self, rv, aux, /, *, transition):
             del aux
-            cond, (p, p_inv) = transition
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            extrapolated_p = self.ssm.conditional.marginalise(rv_p, cond)
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            return extrapolated, None
+            rv = self.ssm.conditional.marginalise(rv, transition)
+
+            return rv, None
 
         def extrapolate_mean(self, rv, /, *, transition):
-            cond, (p, p_inv) = transition
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            m_ext_p = self.ssm.stats.mean(rv_p)
-            print(m_ext_p)
-            print(cond)
-            extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            mean = self.ssm.stats.mean(rv)
+            return self.ssm.conditional.apply(mean, transition)
 
         def extract(self, hidden_state, _extra, /):
             return hidden_state
@@ -380,11 +359,13 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             return sol, cond
 
         def extrapolate(self, rv, bw0, /, *, transition):
-            cond, (p, p_inv) = transition
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
+            extrapolated, cond = self.ssm.conditional.revert(rv, transition)
+
+            # cond, (p, p_inv) = transition
+            # rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
+            # extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
+            # extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            # cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
 
             # Merge conditionals
             cond = self.ssm.conditional.merge(bw0, cond)
@@ -393,14 +374,8 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             return extrapolated, cond
 
         def extrapolate_mean(self, rv, /, *, transition):
-            cond, (p, p_inv) = transition
-
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-            m_ext_p = self.ssm.stats.mean(rv_p)
-            extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-
-            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            mean = self.ssm.stats.mean(rv)
+            return self.ssm.conditional.apply(mean, transition)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
