@@ -16,16 +16,6 @@ from probdiffeq.impl import impl
 R = TypeVar("R")
 
 
-class _MarkovProcess(containers.NamedTuple):
-    tcoeffs: Any
-    output_scale: Any
-    discretize: Callable
-
-    @property
-    def num_derivatives(self):
-        return len(self.tcoeffs) - 1
-
-
 def prior_wiener_integrated(tcoeffs, *, ssm_fact: str, output_scale=None):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
@@ -640,7 +630,7 @@ class _ProbabilisticSolver:
 
     step_implementation: Callable
 
-    prior: _MarkovProcess
+    prior: Callable
     ssm: Any
     strategy: _Strategy
     calibration: _Calibration
