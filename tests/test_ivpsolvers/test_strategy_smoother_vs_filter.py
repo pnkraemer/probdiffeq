@@ -21,11 +21,11 @@ def fixture_filter_solution(solver_setup):
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, ssm_fact=solver_setup["fact"]
     )
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     return ivpsolve.solve_fixed_grid(
-        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver, ssm=ssm
+        init, grid=solver_setup["grid"], solver=solver, ssm=ssm
     )
 
 
@@ -35,11 +35,11 @@ def fixture_smoother_solution(solver_setup):
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, ssm_fact=solver_setup["fact"]
     )
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     return ivpsolve.solve_fixed_grid(
-        solver_setup["vf"], init, grid=solver_setup["grid"], solver=solver, ssm=ssm
+        init, grid=solver_setup["grid"], solver=solver, ssm=ssm
     )
 
 

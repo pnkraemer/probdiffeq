@@ -74,14 +74,14 @@ markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = ivpsolvers.correction_ts1(ssm=ssm)
+ts1 = ivpsolvers.correction_ts1(vector_field, ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
 solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
 adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-2, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 sol = ivpsolve.solve_adaptive_save_at(
-    vector_field, init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver, ssm=ssm
+    init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver, ssm=ssm
 )
 markov_seq_posterior = stats.markov_select_terminal(sol.posterior)
 

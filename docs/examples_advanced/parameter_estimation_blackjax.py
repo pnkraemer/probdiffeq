@@ -186,10 +186,10 @@ def solve_fixed(theta, *, ts):
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    return ivpsolve.solve_fixed_grid(vf, init, grid=ts, solver=solver, ssm=ssm)
+    return ivpsolve.solve_fixed_grid(init, grid=ts, solver=solver, ssm=ssm)
 
 
 @jax.jit
@@ -201,12 +201,12 @@ def solve_adaptive(theta, *, save_at):
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
     return ivpsolve.solve_adaptive_save_at(
-        vf, init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+        init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )
 
 

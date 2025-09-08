@@ -16,14 +16,12 @@ def test_exponential_approximated_well(fact):
 
     tcoeffs = (*u0, vf(*u0, t=t0))
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
-    problem_args = (vf, init)
     grid = np.linspace(t0, t1, num=20)
-    solver_kwargs = {"grid": grid, "solver": solver, "ssm": ssm}
-    approximation = ivpsolve.solve_fixed_grid(*problem_args, **solver_kwargs)
+    approximation = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver, ssm=ssm)
 
     solution = ode.odeint_and_save_at(
         vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5

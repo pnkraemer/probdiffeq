@@ -62,12 +62,10 @@ def solve(p):
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    return ivpsolve.solve_fixed_grid(
-        lambda y, t: vf(y, t, p=p), init, grid=ts, solver=solver, ssm=ssm
-    )
+    return ivpsolve.solve_fixed_grid(init, grid=ts, solver=solver, ssm=ssm)
 
 
 parameter_true = f_args + 0.05

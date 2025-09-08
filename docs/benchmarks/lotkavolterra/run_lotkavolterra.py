@@ -84,7 +84,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
             tcoeffs, ssm_fact=implementation
         )
         strategy = ivpsolvers.strategy_filter(ssm=ssm)
-        corr = correction(ssm=ssm)
+        corr = correction(vf_probdiffeq, ssm=ssm)
         solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
         control = ivpsolvers.control_proportional_integral()
         adaptive_solver = ivpsolvers.adaptive(
@@ -94,13 +94,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0,))
         solution = ivpsolve.solve_adaptive_terminal_values(
-            vf_probdiffeq,
-            init,
-            t0=t0,
-            t1=t1,
-            dt0=dt0,
-            adaptive_solver=adaptive_solver,
-            ssm=ssm,
+            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
         )
 
         # Return the terminal value

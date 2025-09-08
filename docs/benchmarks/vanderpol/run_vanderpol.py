@@ -82,7 +82,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
         init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts0_or_ts1 = ivpsolvers.correction_ts1(ode_order=2, ssm=ssm)
+        ts0_or_ts1 = ivpsolvers.correction_ts1(vf_probdiffeq, ode_order=2, ssm=ssm)
         strategy = ivpsolvers.strategy_filter(ssm=ssm)
 
         solver = ivpsolvers.solver_dynamic(
@@ -96,13 +96,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
         solution = ivpsolve.solve_adaptive_terminal_values(
-            vf_probdiffeq,
-            init,
-            t0=t0,
-            t1=t1,
-            dt0=dt0,
-            adaptive_solver=adaptive_solver,
-            ssm=ssm,
+            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
         )
 
         # Return the terminal value
