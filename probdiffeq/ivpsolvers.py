@@ -234,9 +234,8 @@ def strategy_smoother(*, ssm) -> _Strategy:
             cond, (p, p_inv), rv_p = extra
 
             # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-            A, noise = cond
-            noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
-            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, (A, noise))
+            cond = self.ssm.conditional.rescale_noise(cond, output_scale)
+            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
             cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
 
@@ -331,9 +330,8 @@ def strategy_filter(*, ssm) -> _Strategy:
             cond, (p, p_inv), rv_p = extra
 
             # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-            A, noise = cond
-            noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
-            extrapolated_p = self.ssm.conditional.marginalise(rv_p, (A, noise))
+            cond = self.ssm.conditional.rescale_noise(cond, output_scale)
+            extrapolated_p = self.ssm.conditional.marginalise(rv_p, cond)
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
 
             # Gather and return
@@ -397,9 +395,8 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             cond, (p, p_inv), rv_p, bw0 = extra
 
             # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-            A, noise = cond
-            noise = self.ssm.stats.rescale_cholesky(noise, output_scale)
-            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, (A, noise))
+            cond = self.ssm.conditional.rescale_noise(cond, output_scale)
+            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
             cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
 
@@ -513,8 +510,8 @@ class _Correction:
     def estimate_error(self, rv, /, t):
         """Perform all elements of the correction until the error estimate."""
         f_wrapped = self._parametrize_vector_field(t=t)
-        A, b = self.linearize(f_wrapped, rv)
-        observed = self.ssm.conditional.marginalise(rv, (A, b))
+        cond = self.linearize(f_wrapped, rv)
+        observed = self.ssm.conditional.marginalise(rv, cond)
 
         # TODO: the functions involved in error estimation are still a bit patchy.
         #  for instance, they assume that they are called
@@ -525,7 +522,7 @@ class _Correction:
         stdev = self.ssm.stats.standard_deviation(observed)
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed, (A, b, f_wrapped)
+        return error_estimate, observed, (cond, f_wrapped)
 
     def _parametrize_vector_field(self, *, t):
         if self.can_handle_higher_order:
@@ -539,10 +536,11 @@ class _Correction:
 
     def complete(self, rv, cache, /):
         """Complete what has been left out by `estimate_error`."""
-        A, b, f_wrapped = cache
+        cond, f_wrapped = cache
         if self.use_re_linearize:
-            A, b = self.linearize(f_wrapped, rv)
-        observed, (_gain, corrected) = self.ssm.conditional.revert(rv, (A, b))
+            cond = self.linearize(f_wrapped, rv)
+        observed, reverted = self.ssm.conditional.revert(rv, cond)
+        corrected = reverted.noise
         return corrected, observed
 
 

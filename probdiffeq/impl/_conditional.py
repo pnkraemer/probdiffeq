@@ -9,16 +9,18 @@ from probdiffeq.backend import (
     tree_util,
 )
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Array
-from probdiffeq.impl import _normal
+from probdiffeq.backend.typing import Array
+from probdiffeq.impl import _normal, _stats
 from probdiffeq.util import cholesky_util
 
 
-class Conditional(containers.NamedTuple):
+@tree_util.register_dataclass
+@containers.dataclass
+class Conditional:
     """Conditional distributions."""
 
-    matmul: Array
-    noise: Any  # Usually a random-variable type
+    A: Array
+    noise: _normal.Normal
 
 
 class ConditionalBackend(abc.ABC):
@@ -57,6 +59,10 @@ class ConditionalBackend(abc.ABC):
     def to_derivative(self, i, standard_deviation):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def rescale_noise(self, cond, scale):
+        raise NotImplementedError
+
 
 class DenseConditional(ConditionalBackend):
     def __init__(self, ode_shape, num_derivatives, unravel, flat_shape):
@@ -65,19 +71,17 @@ class DenseConditional(ConditionalBackend):
         self.unravel = unravel
         self.flat_shape = flat_shape
 
-    def apply(self, x, conditional, /):
-        matrix, noise = conditional
-        return _normal.Normal(matrix @ x + noise.mean, noise.cholesky)
+    def apply(self, x, cond, /):
+        return _normal.Normal(cond.A @ x + cond.noise.mean, cond.noise.cholesky)
 
-    def marginalise(self, rv, conditional, /):
-        matmul, noise = conditional
-        R_stack = ((matmul @ rv.cholesky).T, noise.cholesky.T)
+    def marginalise(self, rv, cond, /):
+        R_stack = ((cond.A @ rv.cholesky).T, cond.noise.cholesky.T)
         cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-        return _normal.Normal(matmul @ rv.mean + noise.mean, cholesky_new)
+        return _normal.Normal(cond.A @ rv.mean + cond.noise.mean, cholesky_new)
 
     def merge(self, cond1, cond2, /):
-        A, b = cond1
-        C, d = cond2
+        A, b = cond1.A, cond1.noise
+        C, d = cond2.A, cond2.noise
 
         g = A @ C
         xi = A @ d.mean + b.mean
@@ -86,8 +90,8 @@ class DenseConditional(ConditionalBackend):
         )
         return Conditional(g, _normal.Normal(xi, Xi.T))
 
-    def revert(self, rv, conditional, /):
-        matrix, noise = conditional
+    def revert(self, rv, cond, /):
+        matrix, noise = cond.A, cond.noise
         mean, cholesky = rv.mean, rv.cholesky
 
         # QR-decomposition
@@ -133,10 +137,9 @@ class DenseConditional(ConditionalBackend):
         return discretise
 
     def preconditioner_apply(self, cond, p, p_inv, /):
-        A, noise = cond
         normal = _normal.DenseNormal(ode_shape=self.ode_shape)
-        noise = normal.preconditioner_apply(noise, p)
-        A = p[:, None] * A * p_inv[None, :]
+        noise = normal.preconditioner_apply(cond.noise, p)
+        A = p[:, None] * cond.A * p_inv[None, :]
         return Conditional(A, noise)
 
     def to_derivative(self, i, standard_deviation):
@@ -153,6 +156,13 @@ class DenseConditional(ConditionalBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
         return Conditional(linop, noise)
 
+    def rescale_noise(self, cond, scale):
+        A = cond.A
+        noise = cond.noise
+        stats = _stats.DenseStats(ode_shape=self.ode_shape, unravel=self.unravel)
+        noise_new = stats.rescale_cholesky(noise, scale)
+        return Conditional(A, noise_new)
+
 
 class IsotropicConditional(ConditionalBackend):
     def __init__(self, *, ode_shape, num_derivatives, unravel_tree):
@@ -160,16 +170,16 @@ class IsotropicConditional(ConditionalBackend):
         self.num_derivatives = num_derivatives
         self.unravel_tree = unravel_tree
 
-    def apply(self, x, conditional, /):
-        A, noise = conditional
+    def apply(self, x, cond, /):
+        A, noise = cond.A, cond.noise
         # if the gain is qoi-to-hidden, the data is a (d,) array.
         # this is problematic for the isotropic model unless we explicitly broadcast.
         if np.ndim(x) == 1:
             x = x[None, :]
         return _normal.Normal(A @ x + noise.mean, noise.cholesky)
 
-    def marginalise(self, rv, conditional, /):
-        matrix, noise = conditional
+    def marginalise(self, rv, cond, /):
+        matrix, noise = cond.A, cond.noise
 
         mean = matrix @ rv.mean + noise.mean
 
@@ -178,8 +188,8 @@ class IsotropicConditional(ConditionalBackend):
         return _normal.Normal(mean, cholesky)
 
     def merge(self, cond1, cond2, /):
-        A, b = cond1
-        C, d = cond2
+        A, b = cond1.A, cond1.noise
+        C, d = cond2.A, cond2.noise
 
         g = A @ C
         xi = A @ d.mean + b.mean
@@ -189,8 +199,8 @@ class IsotropicConditional(ConditionalBackend):
         noise = _normal.Normal(xi, Xi)
         return Conditional(g, noise)
 
-    def revert(self, rv, conditional, /):
-        matrix, noise = conditional
+    def revert(self, rv, cond, /):
+        matrix, noise = cond.A, cond.noise
 
         r_ext_p, (r_bw_p, gain) = cholesky_util.revert_conditional(
             R_X_F=(matrix @ rv.cholesky).T, R_X=rv.cholesky.T, R_YX=noise.cholesky.T
@@ -225,7 +235,7 @@ class IsotropicConditional(ConditionalBackend):
         return discretise
 
     def preconditioner_apply(self, cond, p, p_inv, /):
-        A, noise = cond
+        A, noise = cond.A, cond.noise
 
         A_new = p[:, None] * A * p_inv[None, :]
 
@@ -245,6 +255,15 @@ class IsotropicConditional(ConditionalBackend):
 
         return Conditional(linop, noise)
 
+    def rescale_noise(self, cond, scale):
+        A = cond.A
+        noise = cond.noise
+        stats = _stats.IsotropicStats(
+            ode_shape=self.ode_shape, unravel=self.unravel_tree
+        )
+        noise_new = stats.rescale_cholesky(noise, scale)
+        return Conditional(A, noise_new)
+
 
 class BlockDiagConditional(ConditionalBackend):
     def __init__(self, *, ode_shape, num_derivatives, unravel_tree):
@@ -252,18 +271,18 @@ class BlockDiagConditional(ConditionalBackend):
         self.num_derivatives = num_derivatives
         self.unravel_tree = unravel_tree
 
-    def apply(self, x, conditional, /):
+    def apply(self, x, cond, /):
         if np.ndim(x) == 1:
             x = x[..., None]
 
         def apply_unbatch(m, s, n):
             return _normal.Normal(m @ s + n.mean, n.cholesky)
 
-        matrix, noise = conditional
+        matrix, noise = cond.A, cond.noise
         return functools.vmap(apply_unbatch)(matrix, x, noise)
 
-    def marginalise(self, rv, conditional, /):
-        matrix, noise = conditional
+    def marginalise(self, rv, cond, /):
+        matrix, noise = cond.A, cond.noise
         assert matrix.ndim == 3
 
         mean = np.einsum("ijk,ik->ij", matrix, rv.mean) + noise.mean
@@ -275,8 +294,8 @@ class BlockDiagConditional(ConditionalBackend):
         return _normal.Normal(mean, _transpose(cholesky))
 
     def merge(self, cond1, cond2, /):
-        A, b = cond1
-        C, d = cond2
+        A, b = cond1.A, cond1.noise
+        C, d = cond2.A, cond2.noise
 
         g = A @ C
         xi = (A @ d.mean[..., None])[..., 0] + b.mean
@@ -286,8 +305,8 @@ class BlockDiagConditional(ConditionalBackend):
         noise = _normal.Normal(xi, Xi)
         return Conditional(g, noise)
 
-    def revert(self, rv, conditional, /):
-        A, noise = conditional
+    def revert(self, rv, cond, /):
+        A, noise = cond.A, cond.noise
         rv_chol_upper = np.transpose(rv.cholesky, axes=(0, 2, 1))
         noise_chol_upper = np.transpose(noise.cholesky, axes=(0, 2, 1))
         A_rv_chol_upper = np.transpose(A @ rv.cholesky, axes=(0, 2, 1))
@@ -329,11 +348,10 @@ class BlockDiagConditional(ConditionalBackend):
         return discretise
 
     def preconditioner_apply(self, cond, p, p_inv, /):
-        A, noise = cond
-        A_new = p[None, :, None] * A * p_inv[None, None, :]
+        A_new = p[None, :, None] * cond.A * p_inv[None, None, :]
 
         normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
-        noise = normal.preconditioner_apply(noise, p)
+        noise = normal.preconditioner_apply(cond.noise, p)
         return Conditional(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
@@ -348,6 +366,15 @@ class BlockDiagConditional(ConditionalBackend):
         noise = _normal.Normal(bias, standard_deviation * eye)
 
         return Conditional(linop, noise)
+
+    def rescale_noise(self, cond, scale):
+        A = cond.A
+        noise = cond.noise
+        stats = _stats.BlockDiagStats(
+            ode_shape=self.ode_shape, unravel=self.unravel_tree
+        )
+        noise_new = stats.rescale_cholesky(noise, scale)
+        return Conditional(A, noise_new)
 
 
 def _transpose(matrix):

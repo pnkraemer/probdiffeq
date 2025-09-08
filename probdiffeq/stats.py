@@ -33,7 +33,7 @@ def markov_sample(key, markov_seq: MarkovSeq, *, reverse, ssm, shape=()):
 
 def _sample_shape(markov_seq, *, ssm):
     # The number of samples is one larger than the number of conditionals
-    _, noise = markov_seq.conditional
+    noise = markov_seq.conditional.noise
     n, *shape_single_sample = ssm.stats.hidden_shape(noise)
     return n + 1, *tuple(shape_single_sample)
 
@@ -265,10 +265,5 @@ def calibrate(x, /, output_scale, *, ssm):
 def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor, *, ssm) -> MarkovSeq:
     """Rescale the Cholesky factor of the covariance of a Markov sequence."""
     init = ssm.stats.rescale_cholesky(markov_seq.init, factor)
-    cond = _rescale_cholesky_conditional(markov_seq.conditional, factor, ssm=ssm)
+    cond = ssm.conditional.rescale_noise(markov_seq.conditional, factor)
     return MarkovSeq(init=init, conditional=cond)
-
-
-def _rescale_cholesky_conditional(conditional, factor, /, *, ssm):
-    noise_new = ssm.stats.rescale_cholesky(conditional.noise, factor)
-    return ssm.conditional.conditional(conditional.matmul, noise_new)
