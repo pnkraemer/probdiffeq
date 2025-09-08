@@ -510,6 +510,7 @@ class _Correction:
     ode_order: int
     ssm: Any
     linearize: Callable
+    vector_field: Callable
 
     use_re_linearize: bool
     can_handle_higher_order: bool
@@ -519,15 +520,9 @@ class _Correction:
         y = self.ssm.prototypes.observed()
         return x, y
 
-    def estimate_error(self, rv, /, vector_field, t):
+    def estimate_error(self, rv, /, t):
         """Perform all elements of the correction until the error estimate."""
-        if self.can_handle_higher_order:
-
-            def f_wrapped(s):
-                return vector_field(*s, t=t)
-        else:
-            f_wrapped = functools.partial(vector_field, t=t)
-
+        f_wrapped = self._parametrize_vector_field(t=t)
         A, b = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, (A, b))
 
@@ -542,6 +537,16 @@ class _Correction:
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, observed, (A, b, f_wrapped)
 
+    def _parametrize_vector_field(self, *, t):
+        if self.can_handle_higher_order:
+
+            def f_wrapped(s):
+                return self.vector_field(*s, t=t)
+
+            return f_wrapped
+
+        return functools.partial(self.vector_field, t=t)
+
     def complete(self, rv, cache, /):
         """Complete what has been left out by `estimate_error`."""
         A, b, f_wrapped = cache
@@ -551,11 +556,12 @@ class _Correction:
         return corrected, observed
 
 
-def correction_ts0(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
+def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """Zeroth-order Taylor linearisation."""
     linearize = ssm.linearise.ode_taylor_0th(ode_order=ode_order, damp=damp)
     return _Correction(
         name="TS0",
+        vector_field=vector_field,
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
@@ -564,11 +570,12 @@ def correction_ts0(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     )
 
 
-def correction_ts1(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
+def correction_ts1(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """First-order Taylor linearisation."""
     linearize = ssm.linearise.ode_taylor_1st(ode_order=ode_order, damp=damp)
     return _Correction(
         name="TS1",
+        vector_field=vector_field,
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
@@ -578,12 +585,13 @@ def correction_ts1(*, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
 
 
 def correction_slr0(
-    *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
+    vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
 ) -> _Correction:
     """Zeroth-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_0th(cubature_fun, damp=damp)
     return _Correction(
         ssm=ssm,
+        vector_field=vector_field,
         ode_order=1,
         linearize=linearize,
         name="SLR0",
@@ -593,12 +601,13 @@ def correction_slr0(
 
 
 def correction_slr1(
-    *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
+    vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
 ) -> _Correction:
     """First-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_1st(cubature_fun, damp=damp)
     return _Correction(
         ssm=ssm,
+        vector_field=vector_field,
         ode_order=1,
         linearize=linearize,
         name="SLR1",
@@ -684,10 +693,8 @@ class _ProbabilisticSolver:
         calib_state = self.calibration.init()
         return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
 
-    def step(self, state: _State, *, vector_field, dt):
-        return self.step_implementation(
-            state, vector_field=vector_field, dt=dt, calibration=self.calibration
-        )
+    def step(self, state: _State, *, dt):
+        return self.step_implementation(state, dt=dt, calibration=self.calibration)
 
     def extract(self, state: _State, /):
         hidden = state.hidden
@@ -755,7 +762,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
     after solving if the MLE-calibration shall be *used*.
     """
 
-    def step_mle(state, /, *, dt, vector_field, calibration):
+    def step_mle(state, /, *, dt, calibration):
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
 
         prior_discretized = prior(dt)
@@ -763,9 +770,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
-        error, _, corr = correction.estimate_error(
-            hidden, vector_field=vector_field, t=t
-        )
+        error, _, corr = correction.estimate_error(hidden, t=t)
 
         hidden, extra = strategy.complete(
             hidden, extra, output_scale=output_scale_prior
@@ -814,15 +819,13 @@ def _calibration_running_mean(*, ssm) -> _Calibration:
 def solver_dynamic(strategy, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
-    def step_dynamic(state, /, *, dt, vector_field, calibration):
+    def step_dynamic(state, /, *, dt, calibration):
         prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
-        error, observed, corr = correction.estimate_error(
-            hidden, vector_field=vector_field, t=t
-        )
+        error, observed, corr = correction.estimate_error(hidden, t=t)
 
         output_scale = calibration.update(state.output_scale, observed=observed)
 
@@ -861,7 +864,7 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
 def solver(strategy, *, correction, prior, ssm):
     """Create a solver that does not calibrate the output scale automatically."""
 
-    def step(state: _State, *, vector_field, dt, calibration):
+    def step(state: _State, *, dt, calibration):
         del calibration  # unused
 
         prior_discretized = prior(dt)
@@ -869,9 +872,7 @@ def solver(strategy, *, correction, prior, ssm):
             state.hidden, state.aux_extra, prior_discretized=prior_discretized
         )
         t = state.t + dt
-        error, _, corr = correction.estimate_error(
-            hidden, vector_field=vector_field, t=t
-        )
+        error, _, corr = correction.estimate_error(hidden, t=t)
 
         hidden, extra = strategy.complete(
             hidden, extra, output_scale=state.output_scale
@@ -995,7 +996,7 @@ class _AdaSolver:
         )
 
     @functools.jit
-    def rejection_loop(self, state0: _AdaState, *, vector_field, t1) -> _AdaState:
+    def rejection_loop(self, state0: _AdaState, *, t1) -> _AdaState:
         class _RejectionState(containers.NamedTuple):
             """State for rejection loops.
 
@@ -1041,7 +1042,7 @@ class _AdaSolver:
 
             # Perform the actual step.
             error_estimate, state_proposed = self.solver.step(
-                state=state.step_from, vector_field=vector_field, dt=dt
+                state=state.step_from, dt=dt
             )
             # Normalise the error
             u_proposed = self.ssm.stats.qoi(state_proposed.hidden)[0]

@@ -85,12 +85,11 @@ IVPSolution._register_pytree_node()
 
 
 def solve_adaptive_terminal_values(
-    vector_field, ssm_init, t0, t1, adaptive_solver, dt0, *, ssm
+    ssm_init, /, *, t0, t1, adaptive_solver, dt0, ssm
 ) -> IVPSolution:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t0, t1])
     solution = solve_adaptive_save_at(
-        vector_field,
         ssm_init,
         save_at=save_at,
         adaptive_solver=adaptive_solver,
@@ -102,7 +101,7 @@ def solve_adaptive_terminal_values(
 
 
 def solve_adaptive_save_at(
-    vector_field, ssm_init, save_at, adaptive_solver, dt0, *, ssm, warn=True
+    ssm_init, /, *, save_at, adaptive_solver, dt0, ssm, warn=True
 ) -> IVPSolution:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -138,7 +137,6 @@ def solve_adaptive_save_at(
         warnings.warn(msg, stacklevel=1)
 
     (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
-        tree_util.Partial(vector_field),
         save_at[0],
         ssm_init,
         save_at=save_at[1:],
@@ -166,9 +164,7 @@ def solve_adaptive_save_at(
     )
 
 
-def _solve_adaptive_save_at(
-    vector_field, t, ssm_init, *, save_at, adaptive_solver, dt0
-):
+def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
     def advance(state, t_next):
         # Advance until accepted.t >= t_next.
         # Note: This could already be the case and we may not loop (just interpolate)
@@ -180,9 +176,7 @@ def _solve_adaptive_save_at(
             return s.step_from.t + adaptive_solver.eps < t_next
 
         def body_fun(s):
-            return adaptive_solver.rejection_loop(
-                s, vector_field=vector_field, t1=t_next
-            )
+            return adaptive_solver.rejection_loop(s, t1=t_next)
 
         state = control_flow.while_loop(cond_fun, body_fun, init=state)
 
@@ -203,7 +197,7 @@ def _solve_adaptive_save_at(
 
 
 def solve_adaptive_save_every_step(
-    vector_field, ssm_init, t0, t1, adaptive_solver, dt0, *, ssm
+    ssm_init, /, *, t0, t1, adaptive_solver, dt0, ssm
 ) -> IVPSolution:
     """Solve an initial value problem and save every step.
 
@@ -220,12 +214,7 @@ def solve_adaptive_save_every_step(
         warnings.warn(msg, stacklevel=1)
 
     generator = _solution_generator(
-        tree_util.Partial(vector_field),
-        t0,
-        ssm_init,
-        t1=t1,
-        adaptive_solver=adaptive_solver,
-        dt0=dt0,
+        t0, ssm_init, t1=t1, adaptive_solver=adaptive_solver, dt0=dt0
     )
     tmp = tree_array_util.tree_stack(list(generator))
     (t, solution_every_step), _dt, num_steps = tmp
@@ -254,11 +243,11 @@ def solve_adaptive_save_every_step(
     )
 
 
-def _solution_generator(vector_field, t, ssm_init, *, dt0, t1, adaptive_solver):
+def _solution_generator(t, ssm_init, *, dt0, t1, adaptive_solver):
     state = adaptive_solver.init(t, ssm_init, dt=dt0, num_steps=0)
 
     while state.step_from.t < t1:
-        state = adaptive_solver.rejection_loop(state, vector_field=vector_field, t1=t1)
+        state = adaptive_solver.rejection_loop(state, t1=t1)
 
         if state.step_from.t + adaptive_solver.eps < t1:
             _, solution = adaptive_solver.extract_before_t1(state, t=t1)
@@ -274,12 +263,12 @@ def _solution_generator(vector_field, t, ssm_init, *, dt0, t1, adaptive_solver):
     yield solution
 
 
-def solve_fixed_grid(vector_field, ssm_init, grid, solver, *, ssm) -> IVPSolution:
+def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
     def body_fn(s, dt):
-        _error, s_new = solver.step(state=s, vector_field=vector_field, dt=dt)
+        _error, s_new = solver.step(state=s, dt=dt)
         return s_new, s_new
 
     t0 = grid[0]
