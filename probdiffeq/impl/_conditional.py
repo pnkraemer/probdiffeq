@@ -115,8 +115,8 @@ class DenseConditional(ConditionalBackend):
         C = np.zeros((n, n))
         return Conditional(A, _normal.Normal(m, C))
 
-    def ibm_transitions(self, *, output_scale):
-        a, q_sqrtm = system_matrices_1d(self.num_derivatives, output_scale)
+    def ibm_transitions(self, base_scale):
+        a, q_sqrtm = system_matrices_1d(self.num_derivatives)
         (d,) = self.ode_shape
 
         eye_d = np.eye(d)
@@ -124,14 +124,16 @@ class DenseConditional(ConditionalBackend):
         Q = np.kron(q_sqrtm, eye_d)
 
         q0 = np.zeros(self.flat_shape)
-        noise = _normal.Normal(q0, Q)
 
         precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
 
-        def discretise(dt):
+        def discretise(dt, output_scale):
+            scale = base_scale * output_scale
             p, p_inv = precon_fun(dt)
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
+
+            noise = _normal.Normal(q0, scale * Q)
             return Conditional(A, noise), (p, p_inv)
 
         return discretise
@@ -222,14 +224,15 @@ class IsotropicConditional(ConditionalBackend):
         matrix = np.eye(num_hidden_states_per_ode_dim)
         return Conditional(matrix, noise)
 
-    def ibm_transitions(self, *, output_scale):
-        A, q_sqrtm = system_matrices_1d(self.num_derivatives, output_scale)
+    def ibm_transitions(self, base_scale):
+        A, q_sqrtm = system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
-        noise = _normal.Normal(q0, q_sqrtm)
         precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
 
-        def discretise(dt):
+        def discretise(dt, output_scale):
+            scale = base_scale * output_scale
             p, p_inv = precon_fun(dt)
+            noise = _normal.Normal(q0, scale * q_sqrtm)
             return Conditional(A, noise), (p, p_inv)
 
         return discretise
@@ -332,18 +335,20 @@ class BlockDiagConditional(ConditionalBackend):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return Conditional(matrix, noise)
 
-    def ibm_transitions(self, *, output_scale):
-        system_matrices = functools.vmap(system_matrices_1d, in_axes=(None, 0))
-        a, q_sqrtm = system_matrices(self.num_derivatives, output_scale)
-
-        q0 = np.zeros((*self.ode_shape, self.num_derivatives + 1))
-        noise = _normal.Normal(q0, q_sqrtm)
-
+    def ibm_transitions(self, base_scale):
+        a, q_sqrtm = system_matrices_1d(self.num_derivatives)
+        q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_prepare(num_derivatives=self.num_derivatives)
 
-        def discretise(dt):
+        def discretise(dt, output_scale):
             p, p_inv = precon_fun(dt)
-            return Conditional(a, noise), (p, p_inv)
+            scale = base_scale * output_scale
+            cond = functools.vmap(discretise_1d)(scale)
+            return cond, (p, p_inv)
+
+        def discretise_1d(scale):
+            noise = _normal.Normal(q0, scale * q_sqrtm)
+            return Conditional(a, noise)
 
         return discretise
 
@@ -381,7 +386,7 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-def system_matrices_1d(num_derivatives, output_scale):
+def system_matrices_1d(num_derivatives):
     """Construct the IBM system matrices."""
     x = np.arange(0, num_derivatives + 1)
 
@@ -391,7 +396,7 @@ def system_matrices_1d(num_derivatives, output_scale):
     Q_1d = cholesky_hilbert(num_derivatives + 1)
     Q_1d_flipped = np.flip(Q_1d, axis=0)
     Q_1d = linalg.qr_r(Q_1d_flipped.T).T
-    return A_1d, output_scale * Q_1d
+    return A_1d, Q_1d
 
 
 def cholesky_hilbert(n: int, K: int = 0):

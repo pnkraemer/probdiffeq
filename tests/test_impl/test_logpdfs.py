@@ -35,6 +35,6 @@ def random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
     ssm = impl.choose(fact, tcoeffs_like=tcoeffs)
     output_scale = np.ones_like(ssm.prototypes.output_scale())
-    discretize = ssm.conditional.ibm_transitions(output_scale=output_scale)
-    rv = discretize(0.1)
+    discretize = ssm.conditional.ibm_transitions(output_scale)
+    rv = discretize(0.1, output_scale)
     return rv[0].noise, ssm
