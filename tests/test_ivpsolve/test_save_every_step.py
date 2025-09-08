@@ -29,7 +29,7 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, transition, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = strategy_fun(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
 
@@ -42,15 +42,9 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     dt0 = ivpsolve.dt0_adaptive(
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
     )
-    args = (vf, init)
-    kwargs = {
-        "t0": t0,
-        "t1": t1,
-        "adaptive_solver": adaptive_solver,
-        "dt0": dt0,
-        "ssm": ssm,
-    }
-    return ivpsolve.solve_adaptive_save_every_step(*args, **kwargs)
+    return ivpsolve.solve_adaptive_save_every_step(
+        init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=dt0, ssm=ssm
+    )
 
 
 def reference_solution(ivp, ts):

@@ -18,29 +18,20 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
 
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-
     asolver = ivpsolvers.adaptive(solver, ssm=ssm, atol=1e-2, rtol=1e-2, clip_dt=True)
 
-    args = (vf, init)
-
-    adaptive_kwargs = {
-        "t0": t0,
-        "t1": t1,
-        "dt0": 0.1,
-        "adaptive_solver": asolver,
-        "ssm": ssm,
-    }
     solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
-        *args, **adaptive_kwargs
+        init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=asolver, ssm=ssm
     )
     assert isinstance(solution_adaptive.u, Taylor)
 
     grid_adaptive = solution_adaptive.t
-    fixed_kwargs = {"grid": grid_adaptive, "solver": solver, "ssm": ssm}
-    solution_fixed = ivpsolve.solve_fixed_grid(*args, **fixed_kwargs)
+    solution_fixed = ivpsolve.solve_fixed_grid(
+        init, grid=grid_adaptive, solver=solver, ssm=ssm
+    )
     assert testing.tree_all_allclose(solution_adaptive, solution_fixed)
 
     # Assert u and u_std have matching shapes (that was wrong before)
