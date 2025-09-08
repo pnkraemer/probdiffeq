@@ -694,18 +694,13 @@ class _ProbabilisticSolver:
 
     def interpolate(self, *, t, interp_from: _State, interp_to: _State) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
-        return self._case_interpolate(
-            t, s0=interp_from, s1=interp_to, output_scale=output_scale
-        )
 
-    def _case_interpolate(self, t, *, s0, s1, output_scale) -> _InterpRes:
-        """Process the solution in case t>t_n."""
         # Interpolate
         interp = self.strategy.interpolate(
-            state_t0=(s0.hidden, s0.aux_extra),
-            marginal_t1=s1.hidden,
-            dt0=t - s0.t,
-            dt1=s1.t - t,
+            state_t0=(interp_from.hidden, interp_from.aux_extra),
+            marginal_t1=interp_to.hidden,
+            dt0=t - interp_from.t,
+            dt1=interp_to.t - t,
             output_scale=output_scale,
             prior=self.prior,
         )
@@ -715,14 +710,16 @@ class _ProbabilisticSolver:
         def _state(t_, x, scale):
             return _State(t=t_, hidden=x[0], aux_extra=x[1], output_scale=scale)
 
-        step_from = _state(s1.t, interp.step_from, s1.output_scale)
-        interpolated = _state(t, interp.interpolated, s1.output_scale)
-        interp_from = _state(t, interp.interp_from, s0.output_scale)
+        step_from = _state(interp_to.t, interp.step_from, interp_to.output_scale)
+        interpolated = _state(t, interp.interpolated, interp_to.output_scale)
+        interp_from = _state(t, interp.interp_from, interp_from.output_scale)
         return _InterpRes(
             step_from=step_from, interpolated=interpolated, interp_from=interp_from
         )
 
-    def interpolate_at_t1(self, *, t, interp_from, interp_to) -> _InterpRes:
+    def interpolate_at_t1(
+        self, *, t, interp_from: _State, interp_to: _State
+    ) -> _InterpRes:
         """Process the solution in case t=t_n."""
         del t
         tmp = self.strategy.interpolate_at_t1(
