@@ -182,12 +182,12 @@ class _Strategy:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def begin(self, rv, aux, /, *, prior_discretized, output_scale):
+    def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
         """Begin the strategy."""
         raise NotImplementedError
 
-    def complete(self, rv, aux, /, *, prior_discretized, output_scale):
-        """Complete the strategy."""
+    def extrapolate(self, rv, aux, /, *, prior_discretized, output_scale):
+        """Begin the strategy."""
         raise NotImplementedError
 
     def extract(self, rv, aux, /):
@@ -231,8 +231,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
-        def begin(self, rv, aux, /, *, prior_discretized, output_scale):
-            del aux
+        def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
             del output_scale
             cond, (p, p_inv) = prior_discretized
 
@@ -241,24 +240,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
             m_p = self.ssm.stats.mean(rv_p)
             extrapolated_p = self.ssm.conditional.apply(m_p, cond)
 
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cache = (cond, (p, p_inv), rv_p)
-            return extrapolated, cache
-
-        # def complete(self, rv, aux, /, *, prior_discretized, output_scale):
-        #     del rv
-        #     del prior_discretized
-
-        #     cond, (p, p_inv), rv_p = aux
-
-        #     # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-        #     cond = self.ssm.conditional.rescale_noise(cond, output_scale)
-        #     extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-        #     extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        #     cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-        #     # Gather and return
-        #     return extrapolated, cond
+            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
@@ -344,8 +326,7 @@ def strategy_filter(*, ssm) -> _Strategy:
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
             return extrapolated, None
 
-        def begin(self, rv, aux, /, *, prior_discretized, output_scale):
-            del aux
+        def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
             del output_scale
             cond, (p, p_inv) = prior_discretized
 
@@ -353,28 +334,10 @@ def strategy_filter(*, ssm) -> _Strategy:
             m_ext_p = self.ssm.stats.mean(rv_p)
             extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
 
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cache = (cond, (p, p_inv), rv_p)
-            return extrapolated, cache
+            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
 
         def extract(self, hidden_state, _extra, /):
             return hidden_state
-
-        # def complete(self, rv, aux, /, prior_discretized, output_scale):
-        #     raise RuntimeError
-
-        #     del rv
-        #     del prior_discretized
-
-        #     cond, (p, p_inv), rv_p = aux
-
-        #     # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-        #     cond = self.ssm.conditional.rescale_noise(cond, output_scale)
-        #     extrapolated_p = self.ssm.conditional.marginalise(rv_p, cond)
-        #     extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-
-        #     # Gather and return
-        #     return extrapolated, None
 
         def interpolate(self, state_t0, state_t1, dt0, dt1, output_scale, *, prior):
             # todo: by ditching marginal_t1 and dt1, this function _extrapolates
@@ -438,7 +401,7 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
-        def begin(self, rv, aux, /, *, prior_discretized, output_scale):
+        def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
             del output_scale
 
             cond, (p, p_inv) = prior_discretized
@@ -448,32 +411,10 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             m_ext_p = self.ssm.stats.mean(rv_p)
             extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
 
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cache = (cond, (p, p_inv), rv_p, aux)
-            return extrapolated, cache
+            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
-
-        # def complete(self, rv, aux, /, *, prior_discretized, output_scale):
-        #     del rv
-        #     del prior_discretized
-
-        #     raise RuntimeError
-
-        #     cond, (p, p_inv), rv_p, bw0 = aux
-
-        #     # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
-        #     cond = self.ssm.conditional.rescale_noise(cond, output_scale)
-        #     extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-        #     extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-        #     cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-        #     # Merge conditionals
-        #     cond = self.ssm.conditional.merge(bw0, cond)
-
-        #     # Gather and return
-        #     return extrapolated, cond
 
         def interpolate_at_t1(
             self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
@@ -829,14 +770,11 @@ def solver_mle(strategy, *, correction, prior, ssm):
         # Estimate the error
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
         prior_discretized = prior(dt)
-        hidden, extra = strategy.begin(
-            state.rv,
-            state.strategy_state,
-            prior_discretized=prior_discretized,
-            output_scale=None,
+        mean_extra = strategy.extrapolate_mean(
+            state.rv, prior_discretized=prior_discretized, output_scale=None
         )
         t = state.t + dt
-        error, *_ = correction.estimate_error(hidden, t=t)
+        error, *_ = correction.estimate_error(mean_extra, t=t)
 
         # TODO (next): give strategy and correction a step() function that does both.
         #  Then, see whether begin and complete are called separately anywhere else.
@@ -902,7 +840,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
     def step_dynamic(state, /, *, dt, calibration):
         # Estimate error and calibrate the output scale
         prior_discretized = prior(dt)
-        hidden, extra = strategy.begin(
+        hidden, extra = strategy.extrapolate_mean(
             state.rv,
             state.strategy_state,
             prior_discretized=prior_discretized,
@@ -921,7 +859,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
             prior_discretized=prior_discretized,
             output_scale=scale,
         )
-        # hidden, extra = strategy.begin(
+        # hidden, extra = strategy.extrapolate_mean(
         #     state.rv,
         #     state.strategy_state,
         #     prior_discretized=prior_discretized,
@@ -971,11 +909,8 @@ def solver(strategy, *, correction, prior, ssm):
 
         # Estimate the error
         prior_discretized = prior(dt)
-        hidden, extra = strategy.begin(
-            state.rv,
-            state.strategy_state,
-            prior_discretized=prior_discretized,
-            output_scale=None,
+        hidden = strategy.extrapolate_mean(
+            state.rv, prior_discretized=prior_discretized, output_scale=None
         )
         t = state.t + dt
         error, *_ = correction.estimate_error(hidden, t=t)
