@@ -194,11 +194,11 @@ class _Strategy:
         """Extract a solution from a state."""
         raise NotImplementedError
 
-    def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
+    def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
         """Interpolate."""
         raise NotImplementedError
 
-    def interpolate_at_t1(self, rv, extra, /, *, prior):
+    def interpolate_at_t1(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
         """Process the state at checkpoint t=t_n."""
         raise NotImplementedError
 
@@ -245,7 +245,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
-        def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
+        def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
             """Interpolate.
 
             A smoother interpolates by_
@@ -259,6 +259,8 @@ def strategy_smoother(*, ssm) -> _Strategy:
             Subsequent interpolations continue from the value at 't'.
             Subsequent IVP solver steps continue from the value at 't1'.
             """
+            marginal_t1, _ = state_t1
+
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
             prior0 = prior(dt0)
@@ -290,8 +292,15 @@ def strategy_smoother(*, ssm) -> _Strategy:
             state, cache = self.begin(state, extra, prior_discretized=prior_discretized)
             return self.complete(state, cache, output_scale=output_scale)
 
-        def interpolate_at_t1(self, rv, extra, /, *, prior):
+        def interpolate_at_t1(
+            self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
+        ):
             del prior
+            del state_t0
+            del dt0
+            del dt1
+            del output_scale
+            rv, extra = state_t1
             return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
     return Smoother(
@@ -337,10 +346,11 @@ def strategy_filter(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, None
 
-        def interpolate(self, state_t0, marginal_t1, dt0, dt1, output_scale, *, prior):
+        def interpolate(self, state_t0, state_t1, dt0, dt1, output_scale, *, prior):
             # todo: by ditching marginal_t1 and dt1, this function _extrapolates
             #  (no *inter*polation happening)
             del dt1
+            marginal_t1, _ = state_t1
 
             hidden, extra = state_t0
             prior0 = prior(dt0)
@@ -354,8 +364,15 @@ def strategy_filter(*, ssm) -> _Strategy:
                 step_from=step_from, interpolated=interp, interp_from=interp
             )
 
-        def interpolate_at_t1(self, rv, extra, /, *, prior):
+        def interpolate_at_t1(
+            self, state_t0, state_t1, dt0, dt1, output_scale, *, prior
+        ):
             del prior
+            del state_t0
+            del dt0
+            del dt1
+            del output_scale
+            rv, extra = state_t1
             return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
     return Filter(
@@ -406,12 +423,19 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
-        def interpolate_at_t1(self, rv, extra, /, *, prior):
+        def interpolate_at_t1(
+            self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
+        ):
             del prior
+            del state_t0
+            del dt0
+            del dt1
+            del output_scale
+            rv, extra = state_t1
             cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
 
-        def interpolate(self, state_t0, marginal_t1, *, dt0, dt1, output_scale, prior):
+        def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
             """Interpolate.
 
             A fixed-point smoother interpolates by
@@ -451,6 +475,7 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             (Really, I try removing one of them monthly and
             then don't understand why tests fail.)
             """
+            marginal_t1, _ = state_t1
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
             prior0 = prior(dt0)
@@ -647,7 +672,7 @@ class _ProbabilisticSolver:
         # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
         interp = self.strategy.interpolate(
             state_t0=(rv, extra),
-            marginal_t1=marginals_t1,
+            state_t1=(marginals_t1, None),
             dt0=dt0,
             dt1=dt1,
             output_scale=output_scale,
@@ -698,7 +723,8 @@ class _ProbabilisticSolver:
         # Interpolate
         interp = self.strategy.interpolate(
             state_t0=(interp_from.hidden, interp_from.aux_extra),
-            marginal_t1=interp_to.hidden,
+            state_t1=(interp_to.hidden, interp_to.aux_extra),
+            # marginal_t1=interp_to.hidden,
             dt0=t - interp_from.t,
             dt1=interp_to.t - t,
             output_scale=output_scale,
@@ -723,7 +749,12 @@ class _ProbabilisticSolver:
         """Process the solution in case t=t_n."""
         del t
         tmp = self.strategy.interpolate_at_t1(
-            interp_to.hidden, interp_to.aux_extra, prior=self.prior
+            state_t0=None,
+            dt0=None,
+            dt1=None,
+            output_scale=None,
+            state_t1=(interp_to.hidden, interp_to.aux_extra),
+            prior=self.prior,
         )
         step_from_, solution_, interp_from_ = (
             tmp.step_from,
