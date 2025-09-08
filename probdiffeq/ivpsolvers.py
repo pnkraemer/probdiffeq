@@ -262,28 +262,24 @@ def strategy_smoother(*, ssm) -> _Strategy:
             Subsequent interpolations continue from the value at 't'.
             Subsequent IVP solver steps continue from the value at 't1'.
             """
-            marginal_t1, _ = state_t1
-
-            # Extrapolate from t0 to t, and from t to t1.
-            # This yields all building blocks.
-            prior0 = prior(dt0, output_scale)
-            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
-
             # TODO: if we pass prior1 and prior2, then
             #       we don't have to pass dt0, dt1, output_scale, and prior...
 
+            # Extrapolate from t0 to t, and from t to t1.
+            prior0 = prior(dt0, output_scale)
+            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
             prior1 = prior(dt1, output_scale)
             extrapolated_t1 = self.extrapolate(*extrapolated_t, transition=prior1)
 
             # Marginalise from t1 to t to obtain the interpolated solution.
+            marginal_t1, _ = state_t1
             conditional_t1_to_t = extrapolated_t1[1]
             rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
             solution_at_t = (rv_at_t, extrapolated_t[1])
 
-            # The state at t1 gets a new backward model; it must remember how to
-            # get back to t, not to t0.
+            # The state at t1 gets a new backward model;
+            # (it must remember how to get back to t, not to t0).
             solution_at_t1 = (marginal_t1, conditional_t1_to_t)
-
             return _InterpRes(
                 step_from=solution_at_t1,
                 interpolated=solution_at_t,
@@ -298,8 +294,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
             del dt0
             del dt1
             del output_scale
-            rv, extra = state_t1
-            return _InterpRes((rv, extra), (rv, extra), (rv, extra))
+            return _InterpRes(state_t1, state_t1, state_t1)
 
     return Smoother(
         name="Smoother",
