@@ -692,7 +692,7 @@ class _ProbabilisticSolver:
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
-    def interpolate(self, t, *, interp_from: _State, interp_to: _State) -> _InterpRes:
+    def interpolate(self, *, t, interp_from: _State, interp_to: _State) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
         return self._case_interpolate(
             t, s0=interp_from, s1=interp_to, output_scale=output_scale
@@ -722,8 +722,9 @@ class _ProbabilisticSolver:
             step_from=step_from, interpolated=interpolated, interp_from=interp_from
         )
 
-    def interpolate_at_t1(self, *, interp_from, interp_to) -> _InterpRes:
+    def interpolate_at_t1(self, *, t, interp_from, interp_to) -> _InterpRes:
         """Process the solution in case t=t_n."""
+        del t
         tmp = self.strategy.interpolate_at_t1(
             interp_to.hidden, interp_to.aux_extra, prior=self.prior
         )
@@ -1078,17 +1079,16 @@ class _AdaSolver:
         return state, extracted
 
     def extract_at_t1(self, state: _AdaState, t):
-        del t
         # todo: make the "at t1" decision inside interpolate(),
         #  which collapses the next two functions together
         interp = self.solver.interpolate_at_t1(
-            interp_from=state.interp_from, interp_to=state.step_from
+            t=t, interp_from=state.interp_from, interp_to=state.step_from
         )
         return self._extract_interpolate(interp, state)
 
     def extract_after_t1(self, state: _AdaState, t):
         interp = self.solver.interpolate(
-            t, interp_from=state.interp_from, interp_to=state.step_from
+            t=t, interp_from=state.interp_from, interp_to=state.step_from
         )
         return self._extract_interpolate(interp, state)
 
