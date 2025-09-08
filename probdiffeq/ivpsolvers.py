@@ -16,13 +16,14 @@ from probdiffeq.impl import impl
 R = TypeVar("R")
 
 
-def prior_wiener_integrated(tcoeffs, *, ssm_fact: str, output_scale=None):
+def prior_wiener_integrated(
+    tcoeffs, *, ssm_fact: str, output_scale: Array | None = None
+):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
-
     if output_scale is None:
-        output_scale = np.ones_like(ssm.prototypes.output_scale())
-    discretize = ssm.conditional.ibm_transitions(output_scale=output_scale)
+        output_scale = ssm.prototypes.output_scale()
+    discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
     init = ssm.normal.from_tcoeffs(tcoeffs)
     return init, discretize, ssm
 
@@ -178,19 +179,19 @@ class _Strategy:
     is_suitable_for_save_every_step: int
     is_suitable_for_offgrid_marginals: int
 
-    def init(self, sol: stats.MarkovSeq, /):
+    def init(self, sol, /):
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
+    def extrapolate_mean(self, rv, /, *, transition):
         """Begin the strategy."""
         raise NotImplementedError
 
-    def extrapolate(self, rv, aux, /, *, prior_discretized, output_scale):
+    def extrapolate(self, rv, strategy_state, /, *, transition):
         """Begin the strategy."""
         raise NotImplementedError
 
-    def extract(self, rv, aux, /):
+    def extract(self, rv, strategy_state, /):
         """Extract a solution from a state."""
         raise NotImplementedError
 
@@ -218,12 +219,11 @@ def strategy_smoother(*, ssm) -> _Strategy:
                 cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return rv, cond
 
-        def extrapolate(self, rv, aux, /, *, prior_discretized, output_scale):
+        def extrapolate(self, rv, aux, /, *, transition):
             del aux
-            cond, (p, p_inv) = prior_discretized
+            cond, (p, p_inv) = transition
 
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            cond = self.ssm.conditional.rescale_noise(cond, output_scale)
             extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
             cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
@@ -231,9 +231,8 @@ def strategy_smoother(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
-        def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
-            del output_scale
-            cond, (p, p_inv) = prior_discretized
+        def extrapolate_mean(self, rv, /, *, transition):
+            cond, (p, p_inv) = transition
 
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
 
@@ -263,15 +262,14 @@ def strategy_smoother(*, ssm) -> _Strategy:
 
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
-            prior0 = prior(dt0)
-            extrapolated_t = self.extrapolate(
-                *state_t0, output_scale=output_scale, prior_discretized=prior0
-            )
+            prior0 = prior(dt0, output_scale)
+            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
 
-            prior1 = prior(dt1)
-            extrapolated_t1 = self.extrapolate(
-                *extrapolated_t, output_scale=output_scale, prior_discretized=prior1
-            )
+            # TODO: if we pass prior1 and prior2, then
+            #       we don't have to pass dt0, dt1, output_scale, and prior...
+
+            prior1 = prior(dt1, output_scale)
+            extrapolated_t1 = self.extrapolate(*extrapolated_t, transition=prior1)
 
             # Marginalise from t1 to t to obtain the interpolated solution.
             conditional_t1_to_t = extrapolated_t1[1]
@@ -316,24 +314,21 @@ def strategy_filter(*, ssm) -> _Strategy:
         def init(self, sol, /):
             return sol, None
 
-        def extrapolate(self, rv, aux, /, *, prior_discretized, output_scale):
+        def extrapolate(self, rv, aux, /, *, transition):
             del aux
-            cond, (p, p_inv) = prior_discretized
-            cond = self.ssm.conditional.rescale_noise(cond, output_scale)
-
+            cond, (p, p_inv) = transition
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
             extrapolated_p = self.ssm.conditional.marginalise(rv_p, cond)
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
             return extrapolated, None
 
-        def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
-            del output_scale
-            cond, (p, p_inv) = prior_discretized
-
+        def extrapolate_mean(self, rv, /, *, transition):
+            cond, (p, p_inv) = transition
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
             m_ext_p = self.ssm.stats.mean(rv_p)
+            print(m_ext_p)
+            print(cond)
             extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-
             return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
 
         def extract(self, hidden_state, _extra, /):
@@ -346,10 +341,8 @@ def strategy_filter(*, ssm) -> _Strategy:
             marginal_t1, _ = state_t1
 
             hidden, extra = state_t0
-            prior0 = prior(dt0)
-            hidden, extra = self.extrapolate(
-                hidden, extra, prior_discretized=prior0, output_scale=output_scale
-            )
+            prior0 = prior(dt0, output_scale)
+            hidden, extra = self.extrapolate(hidden, extra, transition=prior0)
 
             # Consistent state-types in interpolation result.
             interp = (hidden, extra)
@@ -387,9 +380,8 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return sol, cond
 
-        def extrapolate(self, rv, bw0, /, *, prior_discretized, output_scale):
-            cond, (p, p_inv) = prior_discretized
-            cond = self.ssm.conditional.rescale_noise(cond, output_scale)
+        def extrapolate(self, rv, bw0, /, *, transition):
+            cond, (p, p_inv) = transition
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
             extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
@@ -401,10 +393,8 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             # Gather and return
             return extrapolated, cond
 
-        def extrapolate_mean(self, rv, /, *, prior_discretized, output_scale):
-            del output_scale
-
-            cond, (p, p_inv) = prior_discretized
+        def extrapolate_mean(self, rv, /, *, transition):
+            cond, (p, p_inv) = transition
 
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
 
@@ -471,17 +461,13 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             marginal_t1, _ = state_t1
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
-            prior0 = prior(dt0)
-            extrapolated_t = self.extrapolate(
-                *state_t0, output_scale=output_scale, prior_discretized=prior0
-            )
+            prior0 = prior(dt0, output_scale)
+            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
             conditional_id = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             previous_new = (extrapolated_t[0], conditional_id)
 
-            prior1 = prior(dt1)
-            extrapolated_t1 = self.extrapolate(
-                *previous_new, output_scale=output_scale, prior_discretized=prior1
-            )
+            prior1 = prior(dt1, output_scale)
+            extrapolated_t1 = self.extrapolate(*previous_new, transition=prior1)
 
             # Marginalise from t1 to t to obtain the interpolated solution.
             conditional_t1_to_t = extrapolated_t1[1]
@@ -769,25 +755,20 @@ def solver_mle(strategy, *, correction, prior, ssm):
     def step_mle(state, /, *, dt, calibration):
         # Estimate the error
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-        prior_discretized = prior(dt)
-        mean_extra = strategy.extrapolate_mean(
-            state.rv, prior_discretized=prior_discretized, output_scale=None
-        )
+        transition = prior(dt, output_scale_prior)
+        mean_extra = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
         error, *_ = correction.estimate_error(mean_extra, t=t)
 
-        # TODO (next): give strategy and correction a step() function that does both.
-        #  Then, see whether begin and complete are called separately anywhere else.
-        #  Then, move output scale arguments to prior evaluation.
-        #  Then, done?
+        # TODO (next):
+        #  - Give correction a step() function that does both.
+        #  - Then, see whether begin and complete are called separately anywhere else.
+        #  - Then, move output scale arguments to prior evaluation.
+        #  - Then, done?
 
-        # Do the full prediction step
-        prior_discretized = prior(dt)
+        # Do the full prediction step (reuse previous discretisation)
         hidden, extra = strategy.extrapolate(
-            state.rv,
-            state.strategy_state,
-            prior_discretized=prior_discretized,
-            output_scale=output_scale_prior,
+            state.rv, state.strategy_state, transition=transition
         )
 
         # Do the full correction step
@@ -839,35 +820,19 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
 
     def step_dynamic(state, /, *, dt, calibration):
         # Estimate error and calibrate the output scale
-        prior_discretized = prior(dt)
-        hidden, extra = strategy.extrapolate_mean(
-            state.rv,
-            state.strategy_state,
-            prior_discretized=prior_discretized,
-            output_scale=None,
-        )
+        ones = ssm.prototypes.output_scale()
+        transition = prior(dt, ones)
+        hidden = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
         error, observed, _ = correction.estimate_error(hidden, t=t)
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         # Do the full extrapolation with the calibrated output scale
         scale, _ = calibration.extract(output_scale)
-        prior_discretized = prior(dt)
+        transition = prior(dt, scale)
         hidden, extra = strategy.extrapolate(
-            state.rv,
-            state.strategy_state,
-            prior_discretized=prior_discretized,
-            output_scale=scale,
+            state.rv, state.strategy_state, transition=transition
         )
-        # hidden, extra = strategy.extrapolate_mean(
-        #     state.rv,
-        #     state.strategy_state,
-        #     prior_discretized=prior_discretized,
-        #     output_scale=None,
-        # )
-        # hidden, extra = strategy.complete(
-        #     hidden, extra, output_scale=scale, prior_discretized=None
-        # )
 
         # Do the full correction step
         *_, corr = correction.estimate_error(hidden, t=t)
@@ -908,20 +873,14 @@ def solver(strategy, *, correction, prior, ssm):
         del calibration  # unused
 
         # Estimate the error
-        prior_discretized = prior(dt)
-        hidden = strategy.extrapolate_mean(
-            state.rv, prior_discretized=prior_discretized, output_scale=None
-        )
+        transition = prior(dt, state.output_scale)
+        hidden = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
         error, *_ = correction.estimate_error(hidden, t=t)
 
-        # Do the full extrapolation step
-        prior_discretized = prior(dt)
+        # Do the full extrapolation step (reuse the transition)
         hidden, extra = strategy.extrapolate(
-            state.rv,
-            state.strategy_state,
-            prior_discretized=prior_discretized,
-            output_scale=state.output_scale,
+            state.rv, state.strategy_state, transition=transition
         )
 
         # Do the full correction step
