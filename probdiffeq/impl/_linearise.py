@@ -48,7 +48,7 @@ class DenseLinearisation(LinearisationBackend):
             )
             cov_lower = damp * np.eye(len(fx))
             bias = _normal.Normal(-fx, cov_lower)
-            return _conditional.Conditional(linop, bias)
+            return _conditional.LatentCond(linop, bias)
 
         return linearise_fun_wrapped
 
@@ -73,7 +73,7 @@ class DenseLinearisation(LinearisationBackend):
             linop = _jac_materialize(lambda v, _p: A(v), inputs=mean)
             cov_lower = damp * np.eye(len(fx))
             bias = _normal.Normal(-fx, cov_lower)
-            return _conditional.Conditional(linop, bias)
+            return _conditional.LatentCond(linop, bias)
 
         return new
 
@@ -109,7 +109,7 @@ class DenseLinearisation(LinearisationBackend):
             stack = np.concatenate((cov_lower.T, damping.T))
             cov_lower = cholesky_util.triu_via_qr(stack).T
             bias = _normal.Normal(-mean, cov_lower)
-            return _conditional.Conditional(linop, bias)
+            return _conditional.LatentCond(linop, bias)
 
         return new
 
@@ -142,7 +142,7 @@ class DenseLinearisation(LinearisationBackend):
 
             bias = _normal.Normal(-mean, cov_lower)
             linop = _jac_materialize(lambda v, _p: a1(v), inputs=rv.mean)
-            return _conditional.Conditional(linop, bias)
+            return _conditional.LatentCond(linop, bias)
 
         return new
 
@@ -228,7 +228,7 @@ class IsotropicLinearisation(LinearisationBackend):
             )
             cov_lower = damp * np.eye(1)
             bias = _normal.Normal(-fx, cov_lower)
-            return _conditional.Conditional(linop, bias)
+            return _conditional.LatentCond(linop, bias)
 
         return linearise_fun_wrapped
 
@@ -261,7 +261,7 @@ class BlockDiagLinearisation(LinearisationBackend):
             d, *_ = linop.shape
             cov_lower = damp * np.ones((d, 1, 1))
             bias = _normal.Normal(-fx[:, None], cov_lower)
-            return _conditional.Conditional(linop, bias)
+            return _conditional.LatentCond(linop, bias)
 
         return linearise_fun_wrapped
 

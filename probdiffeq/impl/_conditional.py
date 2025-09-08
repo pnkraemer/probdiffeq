@@ -1,13 +1,6 @@
-"""Conditionals."""
+"""LatentConds."""
 
-from probdiffeq.backend import (
-    abc,
-    containers,
-    control_flow,
-    functools,
-    linalg,
-    tree_util,
-)
+from probdiffeq.backend import abc, containers, functools, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 from probdiffeq.impl import _normal, _stats
@@ -16,8 +9,8 @@ from probdiffeq.util import cholesky_util
 
 @tree_util.register_dataclass
 @containers.dataclass
-class Conditional:
-    """Conditional distributions."""
+class LatentCond:
+    """LatentCond distributions."""
 
     A: Array
     noise: _normal.Normal
@@ -41,7 +34,7 @@ class ConditionalBackend(abc.ABC):
         raise NotImplementedError
 
     def conditional(self, matmul, noise):
-        return Conditional(matmul, noise)
+        return LatentCond(matmul, noise)
 
     @abc.abstractmethod
     def identity(self, ndim, /):
@@ -88,7 +81,7 @@ class DenseConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(
             R_stack=((A @ d.cholesky).T, b.cholesky.T)
         )
-        return Conditional(g, _normal.Normal(xi, Xi.T))
+        return LatentCond(g, _normal.Normal(xi, Xi.T))
 
     def revert(self, rv, cond, /):
         matrix, noise = cond.A, cond.noise
@@ -104,16 +97,16 @@ class DenseConditional(ConditionalBackend):
         m_cor = mean - gain @ mean_observed
         corrected = _normal.Normal(m_cor, r_cor.T)
         observed = _normal.Normal(mean_observed, r_obs.T)
-        return observed, Conditional(gain, corrected)
+        return observed, LatentCond(gain, corrected)
 
-    def identity(self, ndim, /) -> Conditional:
+    def identity(self, ndim, /) -> LatentCond:
         (d,) = self.ode_shape
         n = ndim * d
 
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        return Conditional(A, _normal.Normal(m, C))
+        return LatentCond(A, _normal.Normal(m, C))
 
     def ibm_transitions(self, base_scale):
         a, q_sqrtm = system_matrices_1d(self.num_derivatives)
@@ -134,7 +127,7 @@ class DenseConditional(ConditionalBackend):
             p_inv = np.repeat(p_inv, d)
 
             noise = _normal.Normal(q0, scale * Q)
-            return Conditional(A, noise), (p, p_inv)
+            return LatentCond(A, noise), (p, p_inv)
 
         return discretise
 
@@ -142,7 +135,7 @@ class DenseConditional(ConditionalBackend):
         normal = _normal.DenseNormal(ode_shape=self.ode_shape)
         noise = normal.preconditioner_apply(cond.noise, p)
         A = p[:, None] * cond.A * p_inv[None, :]
-        return Conditional(A, noise)
+        return LatentCond(A, noise)
 
     def to_derivative(self, i, standard_deviation):
         x = np.zeros(self.flat_shape)
@@ -156,14 +149,14 @@ class DenseConditional(ConditionalBackend):
         bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        return Conditional(linop, noise)
+        return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
         A = cond.A
         noise = cond.noise
         stats = _stats.DenseStats(ode_shape=self.ode_shape, unravel=self.unravel)
         noise_new = stats.rescale_cholesky(noise, scale)
-        return Conditional(A, noise_new)
+        return LatentCond(A, noise_new)
 
 
 class IsotropicConditional(ConditionalBackend):
@@ -199,7 +192,7 @@ class IsotropicConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack).T
 
         noise = _normal.Normal(xi, Xi)
-        return Conditional(g, noise)
+        return LatentCond(g, noise)
 
     def revert(self, rv, cond, /):
         matrix, noise = cond.A, cond.noise
@@ -215,14 +208,14 @@ class IsotropicConditional(ConditionalBackend):
 
         extrapolated = _normal.Normal(extrapolated_mean, extrapolated_cholesky)
         corrected = _normal.Normal(corrected_mean, corrected_cholesky)
-        return extrapolated, Conditional(gain, corrected)
+        return extrapolated, LatentCond(gain, corrected)
 
-    def identity(self, num_hidden_states_per_ode_dim, /) -> Conditional:
+    def identity(self, num_hidden_states_per_ode_dim, /) -> LatentCond:
         m0 = np.zeros((num_hidden_states_per_ode_dim, *self.ode_shape))
         c0 = np.zeros((num_hidden_states_per_ode_dim, num_hidden_states_per_ode_dim))
         noise = _normal.Normal(m0, c0)
         matrix = np.eye(num_hidden_states_per_ode_dim)
-        return Conditional(matrix, noise)
+        return LatentCond(matrix, noise)
 
     def ibm_transitions(self, base_scale):
         A, q_sqrtm = system_matrices_1d(self.num_derivatives)
@@ -233,7 +226,7 @@ class IsotropicConditional(ConditionalBackend):
             scale = base_scale * output_scale
             p, p_inv = precon_fun(dt)
             noise = _normal.Normal(q0, scale * q_sqrtm)
-            return Conditional(A, noise), (p, p_inv)
+            return LatentCond(A, noise), (p, p_inv)
 
         return discretise
 
@@ -243,7 +236,7 @@ class IsotropicConditional(ConditionalBackend):
         A_new = p[:, None] * A * p_inv[None, :]
 
         noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return Conditional(A_new, noise)
+        return LatentCond(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
         def select(a):
@@ -256,7 +249,7 @@ class IsotropicConditional(ConditionalBackend):
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
 
-        return Conditional(linop, noise)
+        return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
         A = cond.A
@@ -265,7 +258,7 @@ class IsotropicConditional(ConditionalBackend):
             ode_shape=self.ode_shape, unravel=self.unravel_tree
         )
         noise_new = stats.rescale_cholesky(noise, scale)
-        return Conditional(A, noise_new)
+        return LatentCond(A, noise_new)
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -306,7 +299,7 @@ class BlockDiagConditional(ConditionalBackend):
         Xi = _transpose(functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack))
 
         noise = _normal.Normal(xi, Xi)
-        return Conditional(g, noise)
+        return LatentCond(g, noise)
 
     def revert(self, rv, cond, /):
         A, noise = cond.A, cond.noise
@@ -325,15 +318,15 @@ class BlockDiagConditional(ConditionalBackend):
         m_cor = rv.mean - (gain @ (mean_observed[..., None]))[..., 0]
         corrected = _normal.Normal(m_cor, cholesky_cor)
         observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, Conditional(gain, corrected)
+        return observed, LatentCond(gain, corrected)
 
-    def identity(self, ndim, /) -> Conditional:
+    def identity(self, ndim, /) -> LatentCond:
         m0 = np.zeros((*self.ode_shape, ndim))
         c0 = np.zeros((*self.ode_shape, ndim, ndim))
         noise = _normal.Normal(m0, c0)
 
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return Conditional(matrix, noise)
+        return LatentCond(matrix, noise)
 
     def ibm_transitions(self, base_scale):
         a, q_sqrtm = system_matrices_1d(self.num_derivatives)
@@ -348,7 +341,7 @@ class BlockDiagConditional(ConditionalBackend):
 
         def discretise_1d(scale):
             noise = _normal.Normal(q0, scale * q_sqrtm)
-            return Conditional(a, noise)
+            return LatentCond(a, noise)
 
         return discretise
 
@@ -357,7 +350,7 @@ class BlockDiagConditional(ConditionalBackend):
 
         normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
         noise = normal.preconditioner_apply(cond.noise, p)
-        return Conditional(A_new, noise)
+        return LatentCond(A_new, noise)
 
     def to_derivative(self, i, standard_deviation):
         def select(a):
@@ -370,7 +363,7 @@ class BlockDiagConditional(ConditionalBackend):
         eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
         noise = _normal.Normal(bias, standard_deviation * eye)
 
-        return Conditional(linop, noise)
+        return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
         A = cond.A
@@ -379,7 +372,7 @@ class BlockDiagConditional(ConditionalBackend):
             ode_shape=self.ode_shape, unravel=self.unravel_tree
         )
         noise_new = stats.rescale_cholesky(noise, scale)
-        return Conditional(A, noise_new)
+        return LatentCond(A, noise_new)
 
 
 def _transpose(matrix):
@@ -393,83 +386,10 @@ def system_matrices_1d(num_derivatives):
     A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
 
     # Cholesky factor of flip(hilbert(n))
-    Q_1d = cholesky_hilbert(num_derivatives + 1)
+    Q_1d = cholesky_util.cholesky_hilbert(num_derivatives + 1)
     Q_1d_flipped = np.flip(Q_1d, axis=0)
     Q_1d = linalg.qr_r(Q_1d_flipped.T).T
     return A_1d, Q_1d
-
-
-def cholesky_hilbert(n: int, K: int = 0):
-    """Compute the Cholesky factor of a Hilbert matrix.
-
-    This routine implements W. Kahan's stable recurrence (see "Hilbert Matrices",
-    Math H110 notes) to construct a Cholesky factor.
-
-    Parameters
-    ----------
-    n
-        Size of the Hilbert matrix (``n x n``).
-    K
-        Shift parameter. ``K = 0`` gives the classical Hilbert matrix.
-        Increasing ``K`` produces related matrices with entries
-        ``1 / (i + j + K - 1)``. Default is 0.
-
-    Returns
-    -------
-    Lower-triangular Cholesky factor of the Hilbert matrix.
-
-
-    Notes
-    -----
-    - Hilbert matrices are notoriously ill-conditioned; even with float64,
-      the factorization loses accuracy for moderately large ``n`` (≈15 or more).
-
-    References
-    ----------
-    W. Kahan, *Hilbert Matrices*,
-    https://people.eecs.berkeley.edu/~wkahan/MathH110/HilbMats.pdf
-    """
-    Kf = np.asarray(K)
-
-    odds = np.arange(K + 1, K + 2 * n, step=2)  # length n
-    dr = np.sqrt(odds)  # shape (n,)
-
-    f = np.ones((n,)) * (1.0 + Kf)
-
-    def f_body(idx, f):
-        prev = f[idx - 1]
-        idxf = np.asarray(idx)
-        val = (((prev / idxf) * (Kf + 2.0 * idxf)) / (Kf + idxf)) * (
-            Kf + 2.0 * idxf + 1.0
-        )
-        return f.at[idx].set(val)
-
-    f = control_flow.fori_loop(1, n, f_body, f)
-    f = 1.0 / f
-
-    U = np.eye(n)
-
-    def body_j(j_idx, U):
-        # compute column j_idx (0-based) of U using downward recurrence
-        g = U[:, j_idx]
-
-        def inner_body(k, g):
-            # k runs 0..j_idx-1, we want i = j_idx-1-k (descend j-1 .. 0)
-            i = j_idx - 1 - k
-            denom = np.asarray(j_idx - i)  # == k+1
-            factor = Kf + np.asarray(i + 1) + np.asarray(j_idx + 1)
-            newval = (g[i + 1] / denom) * factor
-            return g.at[i].set(newval)
-
-        g = control_flow.fori_loop(0, j_idx, inner_body, g)
-        return U.at[:, j_idx].set(g)
-
-    U = control_flow.fori_loop(1, n, body_j, U)
-
-    # scale columns: U = U .* (dr * f_row)
-    U = U * (dr[:, None] * f[None, :])
-
-    return np.tril(U.T)
 
 
 def preconditioner_diagonal(dt, *, scales, powers):
