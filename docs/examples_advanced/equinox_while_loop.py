@@ -62,7 +62,7 @@ def solution_routine():
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    ts0 = ivpsolvers.correction_ts0(ode_order=1, ssm=ssm)
+    ts0 = ivpsolvers.correction_ts0(vf, ode_order=1, ssm=ssm)
 
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
@@ -71,13 +71,7 @@ def solution_routine():
     def simulate(init_val):
         """Evaluate the parameter-to-solution function."""
         sol = ivpsolve.solve_adaptive_terminal_values(
-            vf,
-            init_val,
-            t0=t0,
-            t1=t1,
-            dt0=0.1,
-            adaptive_solver=adaptive_solver,
-            ssm=ssm,
+            init_val, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
         )
 
         # Any scalar function of the IVP solution would do

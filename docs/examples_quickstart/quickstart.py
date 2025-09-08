@@ -43,7 +43,7 @@ init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver
-ts = ivpsolvers.correction_ts1(ssm=ssm, ode_order=1)
+ts = ivpsolvers.correction_ts1(vf, ssm=ssm, ode_order=1)
 strategy = ivpsolvers.strategy_filter(ssm=ssm)
 solver = ivpsolvers.solver_mle(ssm=ssm, strategy=strategy, prior=ibm, correction=ts)
 adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
@@ -52,7 +52,7 @@ adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
 # Solve the ODE
 # To all users: Try different solution routines.
 solution = ivpsolve.solve_adaptive_save_every_step(
-    vf, init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
+    init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )
 
 # Look at the solution
