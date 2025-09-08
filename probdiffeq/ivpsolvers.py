@@ -21,6 +21,7 @@ def prior_wiener_integrated(
 ):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+    # TODO: should the output_scale be an argument to solve?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
@@ -636,7 +637,7 @@ class _ProbabilisticSolver:
         rv, extra = self.strategy.init(posterior_t0)
         rv, corr = self.correction.init(rv)
 
-        # TODO: Replace dt0, dt1, and prior with prior_dt0, and prior_dt1
+        # TODO: Replace dt0, dt1, prior, and output_scale with prior_dt0, and prior_dt1
         interp = self.strategy.interpolate(
             state_t0=(rv, extra),
             state_t1=(marginals_t1, None),
@@ -670,6 +671,8 @@ class _ProbabilisticSolver:
         rv, extra = self.strategy.init(init)
         rv, corr = self.correction.init(rv)
 
+        # TODO: make the init() and extract() an interface,
+        #       since then, lots of calibration logic simplifies considerably.
         calib_state = self.calibration.init()
         return _State(t=t, rv=rv, strategy_state=extra, output_scale=calib_state)
 
@@ -777,11 +780,6 @@ def solver_mle(strategy, *, correction, prior, ssm):
 
 
 def _calibration_running_mean(*, ssm) -> _Calibration:
-    # TODO: if we pass the mahalanobis_relative term to the update() function,
-    #  it reduces to a generic stats() module that can also be used for e.g.
-    #  marginal likelihoods.
-    #  In this case, the _calibration_most_recent() stuff becomes void.
-
     def init():
         prior = np.ones_like(ssm.prototypes.output_scale())
         return prior, prior, 0.0
