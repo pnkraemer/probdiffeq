@@ -182,15 +182,15 @@ class _Strategy:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def begin(self, rv, _extra, /, *, prior_discretized):
+    def begin(self, rv, aux, /, *, prior_discretized, output_scale):
         """Begin the strategy."""
         raise NotImplementedError
 
-    def complete(self, _ssv, extra, /, output_scale):
+    def complete(self, rv, aux, /, *, prior_discretized, output_scale):
         """Complete the strategy."""
         raise NotImplementedError
 
-    def extract(self, hidden_state, extra, /):
+    def extract(self, rv, aux, /):
         """Extract a solution from a state."""
         raise NotImplementedError
 
@@ -218,7 +218,9 @@ def strategy_smoother(*, ssm) -> _Strategy:
                 cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return rv, cond
 
-        def begin(self, rv, _extra, /, *, prior_discretized):
+        def begin(self, rv, aux, /, *, prior_discretized, output_scale):
+            del aux
+            del output_scale
             cond, (p, p_inv) = prior_discretized
 
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
@@ -230,8 +232,11 @@ def strategy_smoother(*, ssm) -> _Strategy:
             cache = (cond, (p, p_inv), rv_p)
             return extrapolated, cache
 
-        def complete(self, _ssv, extra, /, output_scale):
-            cond, (p, p_inv), rv_p = extra
+        def complete(self, rv, aux, /, *, prior_discretized, output_scale):
+            del rv
+            del prior_discretized
+
+            cond, (p, p_inv), rv_p = aux
 
             # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
             cond = self.ssm.conditional.rescale_noise(cond, output_scale)
@@ -289,8 +294,12 @@ def strategy_smoother(*, ssm) -> _Strategy:
             )
 
         def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
-            state, cache = self.begin(state, extra, prior_discretized=prior_discretized)
-            return self.complete(state, cache, output_scale=output_scale)
+            state, cache = self.begin(
+                state, extra, prior_discretized=prior_discretized, output_scale=None
+            )
+            return self.complete(
+                state, cache, output_scale=output_scale, prior_discretized=None
+            )
 
         def interpolate_at_t1(
             self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
@@ -320,7 +329,9 @@ def strategy_filter(*, ssm) -> _Strategy:
         def init(self, sol, /):
             return sol, None
 
-        def begin(self, rv, _extra, /, prior_discretized):
+        def begin(self, rv, aux, /, *, prior_discretized, output_scale):
+            del aux
+            del output_scale
             cond, (p, p_inv) = prior_discretized
 
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
@@ -335,8 +346,10 @@ def strategy_filter(*, ssm) -> _Strategy:
         def extract(self, hidden_state, _extra, /):
             return hidden_state
 
-        def complete(self, _ssv, extra, /, output_scale):
-            cond, (p, p_inv), rv_p = extra
+        def complete(self, rv, aux, /, prior_discretized, output_scale):
+            del rv
+            del prior_discretized
+            cond, (p, p_inv), rv_p = aux
 
             # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
             cond = self.ssm.conditional.rescale_noise(cond, output_scale)
@@ -354,8 +367,12 @@ def strategy_filter(*, ssm) -> _Strategy:
 
             hidden, extra = state_t0
             prior0 = prior(dt0)
-            hidden, extra = self.begin(hidden, extra, prior_discretized=prior0)
-            hidden, extra = self.complete(hidden, extra, output_scale=output_scale)
+            hidden, extra = self.begin(
+                hidden, extra, prior_discretized=prior0, output_scale=None
+            )
+            hidden, extra = self.complete(
+                hidden, extra, output_scale=output_scale, prior_discretized=None
+            )
 
             # Consistent state-types in interpolation result.
             interp = (hidden, extra)
@@ -393,7 +410,9 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             return sol, cond
 
-        def begin(self, rv, extra, /, prior_discretized):
+        def begin(self, rv, aux, /, *, prior_discretized, output_scale):
+            del output_scale
+
             cond, (p, p_inv) = prior_discretized
 
             rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
@@ -402,14 +421,16 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
 
             extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cache = (cond, (p, p_inv), rv_p, extra)
+            cache = (cond, (p, p_inv), rv_p, aux)
             return extrapolated, cache
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
-        def complete(self, _rv, extra, /, output_scale):
-            cond, (p, p_inv), rv_p, bw0 = extra
+        def complete(self, rv, aux, /, *, prior_discretized, output_scale):
+            del rv
+            del prior_discretized
+            cond, (p, p_inv), rv_p, bw0 = aux
 
             # Extrapolate the Cholesky factor (re-extrapolate the mean for simplicity)
             cond = self.ssm.conditional.rescale_noise(cond, output_scale)
@@ -502,8 +523,12 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             )
 
         def _extrapolate(self, state, extra, /, *, output_scale, prior_discretized):
-            x, cache = self.begin(state, extra, prior_discretized=prior_discretized)
-            return self.complete(x, cache, output_scale=output_scale)
+            x, cache = self.begin(
+                state, extra, prior_discretized=prior_discretized, output_scale=None
+            )
+            return self.complete(
+                x, cache, output_scale=output_scale, prior_discretized=None
+            )
 
     return FixedPoint(
         name="Fixed-point smoother",
@@ -642,8 +667,8 @@ class _State(containers.NamedTuple):
     """Solver state."""
 
     t: Any
-    hidden: Any
-    aux_extra: Any
+    rv: Any
+    strategy_state: Any
     output_scale: Any
 
 
@@ -704,14 +729,13 @@ class _ProbabilisticSolver:
         rv, corr = self.correction.init(rv)
 
         calib_state = self.calibration.init()
-        return _State(t=t, hidden=rv, aux_extra=extra, output_scale=calib_state)
+        return _State(t=t, rv=rv, strategy_state=extra, output_scale=calib_state)
 
     def step(self, state: _State, *, dt):
         return self.step_implementation(state, dt=dt, calibration=self.calibration)
 
     def extract(self, state: _State, /):
-        hidden = state.hidden
-        posterior = self.strategy.extract(hidden, state.aux_extra)
+        posterior = self.strategy.extract(state.rv, state.strategy_state)
         t = state.t
 
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
@@ -722,8 +746,8 @@ class _ProbabilisticSolver:
 
         # Interpolate
         interp = self.strategy.interpolate(
-            state_t0=(interp_from.hidden, interp_from.aux_extra),
-            state_t1=(interp_to.hidden, interp_to.aux_extra),
+            state_t0=(interp_from.rv, interp_from.strategy_state),
+            state_t1=(interp_to.rv, interp_to.strategy_state),
             # marginal_t1=interp_to.hidden,
             dt0=t - interp_from.t,
             dt1=interp_to.t - t,
@@ -734,7 +758,7 @@ class _ProbabilisticSolver:
         # Turn outputs into valid states
 
         def _state(t_, x, scale):
-            return _State(t=t_, hidden=x[0], aux_extra=x[1], output_scale=scale)
+            return _State(t=t_, rv=x[0], strategy_state=x[1], output_scale=scale)
 
         step_from = _state(interp_to.t, interp.step_from, interp_to.output_scale)
         interpolated = _state(t, interp.interpolated, interp_to.output_scale)
@@ -753,7 +777,7 @@ class _ProbabilisticSolver:
             dt0=None,
             dt1=None,
             output_scale=None,
-            state_t1=(interp_to.hidden, interp_to.aux_extra),
+            state_t1=(interp_to.rv, interp_to.strategy_state),
             prior=self.prior,
         )
         step_from_, solution_, interp_from_ = (
@@ -763,7 +787,7 @@ class _ProbabilisticSolver:
         )
 
         def _state(t_, s, scale):
-            return _State(t=t_, hidden=s[0], aux_extra=s[1], output_scale=scale)
+            return _State(t=t_, rv=s[0], strategy_state=s[1], output_scale=scale)
 
         t = interp_to.t
         prev = _state(t, interp_from_, interp_from.output_scale)
@@ -784,18 +808,21 @@ def solver_mle(strategy, *, correction, prior, ssm):
 
         prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
-            state.hidden, state.aux_extra, prior_discretized=prior_discretized
+            state.hidden,
+            state.aux_extra,
+            prior_discretized=prior_discretized,
+            output_scale=None,
         )
         t = state.t + dt
         error, _, corr = correction.estimate_error(hidden, t=t)
 
         hidden, extra = strategy.complete(
-            hidden, extra, output_scale=output_scale_prior
+            hidden, extra, output_scale=output_scale_prior, prior_discretized=None
         )
         hidden, observed = correction.complete(hidden, corr)
 
         output_scale = calibration.update(state.output_scale, observed=observed)
-        state = _State(t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale)
+        state = _State(t=t, rv=hidden, strategy_state=extra, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
@@ -838,8 +865,12 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
 
     def step_dynamic(state, /, *, dt, calibration):
         prior_discretized = prior(dt)
+
         hidden, extra = strategy.begin(
-            state.hidden, state.aux_extra, prior_discretized=prior_discretized
+            state.rv,
+            state.strategy_state,
+            prior_discretized=prior_discretized,
+            output_scale=None,
         )
         t = state.t + dt
         error, observed, corr = correction.estimate_error(hidden, t=t)
@@ -847,11 +878,13 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         prior_, _calibrated = calibration.extract(output_scale)
-        hidden, extra = strategy.complete(hidden, extra, output_scale=prior_)
+        hidden, extra = strategy.complete(
+            hidden, extra, output_scale=prior_, prior_discretized=None
+        )
         hidden, corr = correction.complete(hidden, corr)
 
         # Return solution
-        state = _State(t=t, hidden=hidden, aux_extra=extra, output_scale=output_scale)
+        state = _State(t=t, rv=hidden, strategy_state=extra, output_scale=output_scale)
         return dt * error, state
 
     return _ProbabilisticSolver(
@@ -886,19 +919,22 @@ def solver(strategy, *, correction, prior, ssm):
 
         prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
-            state.hidden, state.aux_extra, prior_discretized=prior_discretized
+            state.rv,
+            state.strategy_state,
+            prior_discretized=prior_discretized,
+            output_scale=None,
         )
         t = state.t + dt
         error, _, corr = correction.estimate_error(hidden, t=t)
 
         hidden, extra = strategy.complete(
-            hidden, extra, output_scale=state.output_scale
+            hidden, extra, output_scale=state.output_scale, prior_discretized=None
         )
         hidden, corr = correction.complete(hidden, corr)
 
         # Extract and return solution
         state = _State(
-            t=t, hidden=hidden, aux_extra=extra, output_scale=state.output_scale
+            t=t, rv=hidden, strategy_state=extra, output_scale=state.output_scale
         )
         return dt * error, state
 
@@ -1107,7 +1143,7 @@ class _AdaSolver:
         return state, extracted
 
     def extract_at_t1(self, state: _AdaState, t):
-        # todo: make the "at t1" decision inside interpolate(),
+        # todo: make the "at t1" decision inside solver.interpolate(),
         #  which collapses the next two functions together
         interp = self.solver.interpolate_at_t1(
             t=t, interp_from=state.interp_from, interp_to=state.step_from
