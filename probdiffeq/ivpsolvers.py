@@ -502,7 +502,6 @@ class _Correction:
     linearize: Callable
     vector_field: Callable
 
-    use_re_linearize: bool
     can_handle_higher_order: bool
 
     def init(self, x, /):
@@ -510,22 +509,25 @@ class _Correction:
         y = self.ssm.prototypes.observed()
         return x, y
 
+    def correct(self, rv, /, t):
+        f_wrapped = self._parametrize_vector_field(t=t)
+        cond = self.linearize(f_wrapped, rv)
+        observed, reverted = self.ssm.conditional.revert(rv, cond)
+        corrected = reverted.noise
+        return corrected, observed
+
     def estimate_error(self, rv, /, t):
         """Perform all elements of the correction until the error estimate."""
         f_wrapped = self._parametrize_vector_field(t=t)
         cond = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, cond)
 
-        # TODO: the functions involved in error estimation are still a bit patchy.
-        #  for instance, they assume that they are called
-        #  in exactly this error estimation
-        #  context. Same for prototype_qoi etc.
         zero_data = np.zeros(())
         output_scale = self.ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
         stdev = self.ssm.stats.standard_deviation(observed)
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed, (cond, f_wrapped)
+        return error_estimate, observed
 
     def _parametrize_vector_field(self, *, t):
         if self.can_handle_higher_order:
@@ -537,15 +539,6 @@ class _Correction:
 
         return functools.partial(self.vector_field, t=t)
 
-    def complete(self, rv, cache, /):
-        """Complete what has been left out by `estimate_error`."""
-        cond, f_wrapped = cache
-        if self.use_re_linearize:
-            cond = self.linearize(f_wrapped, rv)
-        observed, reverted = self.ssm.conditional.revert(rv, cond)
-        corrected = reverted.noise
-        return corrected, observed
-
 
 def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """Zeroth-order Taylor linearisation."""
@@ -556,7 +549,6 @@ def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
-        use_re_linearize=False,
         can_handle_higher_order=True,
     )
 
@@ -570,7 +562,6 @@ def correction_ts1(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
-        use_re_linearize=False,
         can_handle_higher_order=True,
     )
 
@@ -586,7 +577,6 @@ def correction_slr0(
         ode_order=1,
         linearize=linearize,
         name="SLR0",
-        use_re_linearize=True,
         can_handle_higher_order=False,  # TODO: implement this
     )
 
@@ -602,7 +592,6 @@ def correction_slr1(
         ode_order=1,
         linearize=linearize,
         name="SLR1",
-        use_re_linearize=True,
         can_handle_higher_order=False,  # TODO: implement this
     )
 
@@ -761,13 +750,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
         transition = prior(dt, output_scale_prior)
         mean_extra = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
-        error, *_ = correction.estimate_error(mean_extra, t=t)
-
-        # TODO (next):
-        #  - Give correction a step() function that does both.
-        #  - Then, see whether begin and complete are called separately anywhere else.
-        #  - Then, move output scale arguments to prior evaluation.
-        #  - Then, done?
+        error, _ = correction.estimate_error(mean_extra, t=t)
 
         # Do the full prediction step (reuse previous discretisation)
         hidden, extra = strategy.extrapolate(
@@ -775,8 +758,7 @@ def solver_mle(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        *_, corr = correction.estimate_error(hidden, t=t)
-        hidden, observed = correction.complete(hidden, corr)
+        hidden, observed = correction.correct(hidden, t=t)
 
         # Calibrate the output scale
         output_scale = calibration.update(state.output_scale, observed=observed)
@@ -827,7 +809,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         transition = prior(dt, ones)
         hidden = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
-        error, observed, _ = correction.estimate_error(hidden, t=t)
+        error, observed = correction.estimate_error(hidden, t=t)
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         # Do the full extrapolation with the calibrated output scale
@@ -838,8 +820,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        *_, corr = correction.estimate_error(hidden, t=t)
-        hidden, corr = correction.complete(hidden, corr)
+        hidden, corr = correction.correct(hidden, t=t)
 
         # Return solution
         state = _State(t=t, rv=hidden, strategy_state=extra, output_scale=output_scale)
@@ -879,7 +860,7 @@ def solver(strategy, *, correction, prior, ssm):
         transition = prior(dt, state.output_scale)
         hidden = strategy.extrapolate_mean(state.rv, transition=transition)
         t = state.t + dt
-        error, *_ = correction.estimate_error(hidden, t=t)
+        error, _ = correction.estimate_error(hidden, t=t)
 
         # Do the full extrapolation step (reuse the transition)
         hidden, extra = strategy.extrapolate(
@@ -887,8 +868,7 @@ def solver(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        *_, corr = correction.estimate_error(hidden, t=t)
-        hidden, corr = correction.complete(hidden, corr)
+        hidden, corr = correction.correct(hidden, t=t)
 
         # Extract and return solution
         state = _State(
