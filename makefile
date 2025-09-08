@@ -54,5 +54,14 @@ doc:
 	make benchmarks-plot-results
 	JUPYTER_PLATFORM_DIRS=1 mkdocs build
 
+doc-serve:
+	# The readme is the landing page of the docs:
+	cp README.md docs/index.md
+	# Execute the examples manually and not via mkdocs-jupyter
+	# to gain clear error messages.
+	make example
+	make benchmarks-plot-results
+	JUPYTER_PLATFORM_DIRS=1 mkdocs serve
+
 find-dead-code:
 	vulture . --ignore-names case*,fixture*,*jvp --exclude probdiffeq/_version.py

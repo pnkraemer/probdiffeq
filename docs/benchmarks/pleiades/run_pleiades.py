@@ -102,7 +102,7 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
         init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
             tcoeffs, ssm_fact="isotropic"
         )
-        ts0_or_ts1 = correction_fun(ssm=ssm, ode_order=2)
+        ts0_or_ts1 = correction_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
         strategy = ivpsolvers.strategy_filter(ssm=ssm)
         solver = ivpsolvers.solver_dynamic(
             strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
@@ -115,13 +115,7 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
         solution = ivpsolve.solve_adaptive_terminal_values(
-            vf_probdiffeq,
-            init,
-            t0=t0,
-            t1=t1,
-            dt0=dt0,
-            adaptive_solver=adaptive_solver,
-            ssm=ssm,
+            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
         )
 
         # Return the terminal value
