@@ -748,7 +748,6 @@ class _ProbabilisticSolver:
         interp = self.strategy.interpolate(
             state_t0=(interp_from.rv, interp_from.strategy_state),
             state_t1=(interp_to.rv, interp_to.strategy_state),
-            # marginal_t1=interp_to.hidden,
             dt0=t - interp_from.t,
             dt1=interp_to.t - t,
             output_scale=output_scale,
@@ -804,23 +803,35 @@ def solver_mle(strategy, *, correction, prior, ssm):
     """
 
     def step_mle(state, /, *, dt, calibration):
+        # Estimate the error
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-
         prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
-            state.hidden,
-            state.aux_extra,
+            state.rv,
+            state.strategy_state,
             prior_discretized=prior_discretized,
             output_scale=None,
         )
         t = state.t + dt
-        error, _, corr = correction.estimate_error(hidden, t=t)
+        error, *_ = correction.estimate_error(hidden, t=t)
 
+        # Do the full prediction step
+        prior_discretized = prior(dt)
+        hidden, extra = strategy.begin(
+            state.rv,
+            state.strategy_state,
+            prior_discretized=prior_discretized,
+            output_scale=None,
+        )
         hidden, extra = strategy.complete(
             hidden, extra, output_scale=output_scale_prior, prior_discretized=None
         )
+
+        # Do the full correction step
+        *_, corr = correction.estimate_error(hidden, t=t)
         hidden, observed = correction.complete(hidden, corr)
 
+        # Calibrate the output scale
         output_scale = calibration.update(state.output_scale, observed=observed)
         state = _State(t=t, rv=hidden, strategy_state=extra, output_scale=output_scale)
         return dt * error, state
@@ -864,8 +875,8 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
     """Create a solver that calibrates the output scale dynamically."""
 
     def step_dynamic(state, /, *, dt, calibration):
+        # Estimate error and calibrate the output scale
         prior_discretized = prior(dt)
-
         hidden, extra = strategy.begin(
             state.rv,
             state.strategy_state,
@@ -873,14 +884,24 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
             output_scale=None,
         )
         t = state.t + dt
-        error, observed, corr = correction.estimate_error(hidden, t=t)
-
+        error, observed, _ = correction.estimate_error(hidden, t=t)
         output_scale = calibration.update(state.output_scale, observed=observed)
 
-        prior_, _calibrated = calibration.extract(output_scale)
-        hidden, extra = strategy.complete(
-            hidden, extra, output_scale=prior_, prior_discretized=None
+        # Do the full extrapolation with the calibrated output scale
+        scale, _ = calibration.extract(output_scale)
+        prior_discretized = prior(dt)
+        hidden, extra = strategy.begin(
+            state.rv,
+            state.strategy_state,
+            prior_discretized=prior_discretized,
+            output_scale=None,
         )
+        hidden, extra = strategy.complete(
+            hidden, extra, output_scale=scale, prior_discretized=None
+        )
+
+        # Do the full correction step
+        *_, corr = correction.estimate_error(hidden, t=t)
         hidden, corr = correction.complete(hidden, corr)
 
         # Return solution
@@ -917,6 +938,7 @@ def solver(strategy, *, correction, prior, ssm):
     def step(state: _State, *, dt, calibration):
         del calibration  # unused
 
+        # Estimate the error
         prior_discretized = prior(dt)
         hidden, extra = strategy.begin(
             state.rv,
@@ -925,11 +947,22 @@ def solver(strategy, *, correction, prior, ssm):
             output_scale=None,
         )
         t = state.t + dt
-        error, _, corr = correction.estimate_error(hidden, t=t)
+        error, *_ = correction.estimate_error(hidden, t=t)
 
+        # Do the full extrapolation step
+        prior_discretized = prior(dt)
+        hidden, extra = strategy.begin(
+            state.rv,
+            state.strategy_state,
+            prior_discretized=prior_discretized,
+            output_scale=None,
+        )
         hidden, extra = strategy.complete(
             hidden, extra, output_scale=state.output_scale, prior_discretized=None
         )
+
+        # Do the full correction step
+        *_, corr = correction.estimate_error(hidden, t=t)
         hidden, corr = correction.complete(hidden, corr)
 
         # Extract and return solution
@@ -1098,8 +1131,8 @@ class _AdaSolver:
                 state=state.step_from, dt=dt
             )
             # Normalise the error
-            u_proposed = self.ssm.stats.qoi(state_proposed.hidden)[0]
-            u_step_from = self.ssm.stats.qoi(state_proposed.hidden)[0]
+            u_proposed = self.ssm.stats.qoi(state_proposed.rv)[0]
+            u_step_from = self.ssm.stats.qoi(state_proposed.rv)[0]
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
             error_power = _error_scale_and_normalize(error_estimate, u=u)
 
