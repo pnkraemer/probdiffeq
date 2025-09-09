@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, functools
+from probdiffeq.backend import abc, functools, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _normal
@@ -35,17 +35,13 @@ class DenseLinearisation(LinearisationBackend):
     def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, rv):
             mean = rv.mean
-            a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
-            a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
-            if np.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
-                msg = f"{np.shape(a0(mean))} != {expected_shape}"
-                raise ValueError(msg)
+            def a1(m):
+                return tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
 
-            fx = self.ts0(fun, a0(mean))
-            linop = _jac_materialize(
-                lambda v, _p: self._autobatch_linop(a1)(v), inputs=mean
-            )
+            fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
+            linop = functools.jacrev(a1)(mean)
+
             cov_lower = damp * np.eye(len(fx))
             bias = _normal.Normal(-fx, cov_lower)
             to_latent = np.ones(linop.shape[1])

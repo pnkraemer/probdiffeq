@@ -470,13 +470,6 @@ class _Correction:
         return error_estimate, observed
 
     def _parametrize_vector_field(self, *, t):
-        if self.can_handle_higher_order:
-
-            def f_wrapped(s):
-                return self.vector_field(*s, t=t)
-
-            return f_wrapped
-
         return functools.partial(self.vector_field, t=t)
 
 
@@ -977,8 +970,13 @@ class _AdaSolver:
                 state=state.step_from, dt=dt
             )
             # Normalise the error
-            u_proposed = self.ssm.stats.qoi(state_proposed.rv)[0]
-            u_step_from = self.ssm.stats.qoi(state_proposed.rv)[0]
+            u_proposed = tree_util.ravel_pytree(
+                self.ssm.unravel(state_proposed.rv.mean)[0]
+            )[0]
+            u_step_from = tree_util.ravel_pytree(
+                self.ssm.unravel(state.step_from.rv.mean)[0]
+            )[0]
+
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
             error_power = _error_scale_and_normalize(error_estimate, u=u)
 
@@ -994,7 +992,7 @@ class _AdaSolver:
                 step_from=state.step_from,
             )
 
-        def _error_scale_and_normalize(error_estimate, *, u):
+        def _error_scale_and_normalize(error_estimate, u):
             error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
             dim = np.atleast_1d(u).size
             error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
