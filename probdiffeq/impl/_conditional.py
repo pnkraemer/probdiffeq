@@ -235,17 +235,25 @@ class IsotropicConditional(ConditionalBackend):
         return _normal.Normal(mean_new, cholesky_new)
 
     def merge(self, cond1, cond2, /):
-        assert False
-        A, b = cond1.A, cond1.noise
-        C, d = cond2.A, cond2.noise
+        # Transform: latent (2) to latent (1)
+        T = cond1.to_latent * cond2.to_observed
 
-        g = A @ C
-        xi = A @ d.mean + b.mean
-        R_stack = ((A @ d.cholesky).T, b.cholesky.T)
-        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack).T
+        # Linear operator
+        g = cond1.A @ (T[:, None] * cond2.A)
 
-        noise = _normal.Normal(xi, Xi)
-        return LatentCond(g, noise)
+        # Combined mean
+        xi = cond1.A @ (T[:, None] * cond2.noise.mean) + cond1.noise.mean
+
+        # Cholesky factor of combined covariance
+        R1 = (cond1.A @ (T[:, None] * cond2.noise.cholesky)).T
+        R2 = cond1.noise.cholesky.T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
+
+        # Gather and return
+        noise = _normal.Normal(xi, Xi.T)
+        return LatentCond(
+            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
+        )
 
     def revert(self, rv, cond, /):
         # Pull RV into the latent space
@@ -321,14 +329,13 @@ class IsotropicConditional(ConditionalBackend):
         return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
-        assert False
-        A = cond.A
-        noise = cond.noise
         stats = _stats.IsotropicStats(
             ode_shape=self.ode_shape, unravel=self.unravel_tree
         )
-        noise_new = stats.rescale_cholesky(noise, scale)
-        return LatentCond(A, noise_new)
+        noise_new = stats.rescale_cholesky(cond.noise, scale)
+        return LatentCond(
+            cond.A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
+        )
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -357,7 +364,6 @@ class BlockDiagConditional(ConditionalBackend):
         cholesky = cond.to_latent[None, :, None] * rv.cholesky
 
         mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean
-        # assert False
 
         chol1 = _transpose(matrix @ cholesky)
         chol2 = _transpose(noise.cholesky)
@@ -369,47 +375,68 @@ class BlockDiagConditional(ConditionalBackend):
         return _normal.Normal(mean_new, cholesky_new)
 
     def merge(self, cond1, cond2, /):
-        assert False
-        A, b = cond1.A, cond1.noise
-        C, d = cond2.A, cond2.noise
+        # Transform: latent (2) to latent (1)
+        T = cond1.to_latent * cond2.to_observed
 
-        g = A @ C
-        xi = (A @ d.mean[..., None])[..., 0] + b.mean
-        R_stack = (_transpose(A @ d.cholesky), _transpose(b.cholesky))
-        Xi = _transpose(functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack))
+        # Linear operator
+        A1, A2 = cond1.A, T[None, :, None] * cond2.A
+        g = functools.vmap(lambda a, b: a @ b)(A1, A2)
 
+        # Combined mean
+        m1, m2 = T[None, :] * cond2.noise.mean, cond1.noise.mean
+        xi = functools.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
+
+        # Cholesky factor of combined covariance
+        C1, C2 = cond1.noise.cholesky, T[None, :, None] * cond2.noise.cholesky
+        R1 = _transpose(functools.vmap(lambda a, b: a @ b)(A1, C2))
+        R2 = _transpose(C1)
+        Xi = functools.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
+        Xi = _transpose(Xi)
+
+        # Gather and return
         noise = _normal.Normal(xi, Xi)
-        return LatentCond(g, noise)
+        return LatentCond(
+            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
+        )
 
     def revert(self, rv, cond, /):
-        # TODO: continue here... I need a break.
-        assert False
-        A, noise = cond.A, cond.noise
-        rv_chol_upper = np.transpose(rv.cholesky, axes=(0, 2, 1))
-        noise_chol_upper = np.transpose(noise.cholesky, axes=(0, 2, 1))
-        A_rv_chol_upper = np.transpose(A @ rv.cholesky, axes=(0, 2, 1))
+        # Pull RV into latent space
+        mean = cond.to_latent[None, :] * rv.mean
+        cholesky = cond.to_latent[None, :, None] * rv.cholesky
 
+        # QR decomposition
+        rv_chol_upper = _transpose(cholesky)
+        noise_chol_upper = _transpose(cond.noise.cholesky)
+        A_rv_chol_upper = _transpose(cond.A @ cholesky)
         revert = functools.vmap(cholesky_util.revert_conditional)
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
-
         cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
         cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
 
-        # Gather terms and return
-        mean_observed = (A @ rv.mean[..., None])[..., 0] + noise.mean
-        m_cor = rv.mean - (gain @ (mean_observed[..., None]))[..., 0]
-        corrected = _normal.Normal(m_cor, cholesky_cor)
-        observed = _normal.Normal(mean_observed, cholesky_obs)
-        return observed, LatentCond(gain, corrected)
+        # New backward conditional
+        mean_observed = (cond.A @ mean[..., None])[..., 0] + cond.noise.mean
+        mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
+        corrected = _normal.Normal(mean_corrected, cholesky_cor)
+        bwd = LatentCond(
+            gain,
+            corrected,
+            to_latent=1 / cond.to_observed,
+            to_observed=1 / cond.to_latent,
+        )
+
+        # Gather observed RV
+        mean_observed = cond.to_observed[None, :] * mean_observed
+        cholesky_observed = cond.to_observed[None, :, None] * cholesky_obs
+        observed = _normal.Normal(mean_observed, cholesky_observed)
+        return observed, bwd
 
     def identity(self, ndim, /) -> LatentCond:
-        assert False
         m0 = np.zeros((*self.ode_shape, ndim))
         c0 = np.zeros((*self.ode_shape, ndim, ndim))
         noise = _normal.Normal(m0, c0)
-
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return LatentCond(matrix, noise)
+        ones = np.ones((ndim,))
+        return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
     def ibm_transitions(self, base_scale):
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
@@ -452,14 +479,13 @@ class BlockDiagConditional(ConditionalBackend):
         return LatentCond(linop, noise)
 
     def rescale_noise(self, cond, scale):
-        assert False
-        A = cond.A
-        noise = cond.noise
         stats = _stats.BlockDiagStats(
             ode_shape=self.ode_shape, unravel=self.unravel_tree
         )
-        noise_new = stats.rescale_cholesky(noise, scale)
-        return LatentCond(A, noise_new)
+        noise_new = stats.rescale_cholesky(cond.noise, scale)
+        return LatentCond(
+            cond.A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
+        )
 
 
 def _transpose(matrix):
