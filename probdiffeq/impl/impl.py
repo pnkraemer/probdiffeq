@@ -1,6 +1,7 @@
 """State-space model implementations."""
 
 from probdiffeq.backend import containers, functools, tree_util
+from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
 
 
@@ -14,7 +15,9 @@ class FactImpl:
     stats: _stats.StatsBackend
     linearise: _linearise.LinearisationBackend
     conditional: _conditional.ConditionalBackend
+
     num_derivatives: int
+    unravel: Callable
 
     # To assert a valid tree_equal of solutions, the factorisations
     # must be comparable.
@@ -45,17 +48,17 @@ def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
 
 
 def _select_dense(*, tcoeffs_like) -> FactImpl:
-    ode_size = tcoeffs_like[0].size
+    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
     flat, unravel = tree_util.ravel_pytree(tcoeffs_like)
 
     num_derivatives = len(tcoeffs_like) - 1
 
-    prototypes = _prototypes.DensePrototype(ode_shape=(ode_size,))
-    normal = _normal.DenseNormal(ode_shape=(ode_size,))
-    linearise = _linearise.DenseLinearisation(ode_shape=(ode_size,), unravel=unravel)
-    stats = _stats.DenseStats(ode_shape=(ode_size,), unravel=unravel)
+    prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
+    normal = _normal.DenseNormal(ode_shape=ode_shape)
+    linearise = _linearise.DenseLinearisation(ode_shape=ode_shape, unravel=unravel)
+    stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(
-        ode_size=ode_size,
+        ode_shape=ode_shape,
         num_derivatives=num_derivatives,
         unravel=unravel,
         flat_shape=flat.shape,
@@ -68,6 +71,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
         prototypes=prototypes,
         stats=stats,
         num_derivatives=len(tcoeffs_like) - 1,
+        unravel=unravel,
     )
 
 
@@ -94,11 +98,12 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         linearise=linearise,
         conditional=conditional,
         num_derivatives=len(tcoeffs_like) - 1,
+        unravel=unravel,
     )
 
 
 def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tcoeffs_like[0].shape
+    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
     num_derivatives = len(tcoeffs_like) - 1
 
     tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
@@ -120,4 +125,5 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
         linearise=linearise,
         conditional=conditional,
         num_derivatives=len(tcoeffs_like) - 1,
+        unravel=unravel,
     )
