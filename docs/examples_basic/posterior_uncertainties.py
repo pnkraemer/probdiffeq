@@ -43,13 +43,13 @@ u0 = jnp.asarray([20.0, 20.0])
 # To all users: Try replacing the fixedpoint-smoother with a filter!
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
 init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-ts = ivpsolvers.correction_(vf, ssm=ssm)
+ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
 solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
 adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
 
 # Solve the ODE
-ts = jnp.linspace(t0, t1, endpoint=True, num=100)
+ts = jnp.linspace(t0, t1, endpoint=True, num=150)
 sol = ivpsolve.solve_adaptive_save_at(
     init, save_at=ts, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )

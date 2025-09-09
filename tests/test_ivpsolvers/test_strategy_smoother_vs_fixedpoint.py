@@ -48,7 +48,22 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
         init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )
-    assert testing.tree_all_allclose(solution_fixedpoint, solution_smoother)
+
+    sol_fp, sol_sm = solution_fixedpoint, solution_smoother  # alias for brevity
+    assert testing.tree_all_allclose(sol_fp.t, sol_sm.t)
+    assert testing.tree_all_allclose(sol_fp.u, sol_sm.u)
+    assert testing.tree_all_allclose(sol_fp.u_std, sol_sm.u_std)
+    assert testing.tree_all_allclose(sol_fp.marginals, sol_sm.marginals)
+    assert testing.tree_all_allclose(sol_fp.output_scale, sol_sm.output_scale)
+    assert testing.tree_all_allclose(sol_fp.num_steps, sol_sm.num_steps)
+    assert testing.tree_all_allclose(sol_fp.posterior.init, sol_sm.posterior.init)
+
+    # The backward conditionals use different parametrisations
+    # but implement the same transitions
+    cond_fp, cond_sm = sol_fp.posterior.conditional, sol_sm.posterior.conditional
+    cond_fp = functools.vmap(sol_fp.ssm.conditional.preconditioner_apply)(cond_fp)
+    cond_sm = functools.vmap(sol_sm.ssm.conditional.preconditioner_apply)(cond_sm)
+    assert testing.tree_all_allclose(cond_fp, cond_sm)
 
 
 def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_smoother):

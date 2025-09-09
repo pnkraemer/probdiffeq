@@ -13,38 +13,36 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, NamedArg, TypeVar
 from probdiffeq.impl import impl
 
-R = TypeVar("R")
-
 
 def prior_wiener_integrated(
-    tcoeffs, *, ssm_fact: str, output_scale: Array | None = None
+    tcoeffs, *, ssm_fact: str, output_scale: Array | None = None, damp: float = 0.0
 ):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
-    # TODO: should the output_scale be an argument to solve?
+
+    # TODO: should the output_scale be an argument to solve()?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
+
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
-    init = ssm.normal.from_tcoeffs(tcoeffs)
+
+    # Increase damping to get visually more pleasing uncertainties
+    #  and more numerical robustness for
+    #  high-order solvers in low precision arithmetic
+    init = ssm.normal.from_tcoeffs(tcoeffs, damp=damp)
     return init, discretize, ssm
 
 
-def prior_wiener_integrated_discrete(
-    ts, *, tcoeffs_like, ssm_fact: str, output_scale=None
-):
+def prior_wiener_integrated_discrete(ts, *args, **kwargs):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    init, discretize, ssm = prior_wiener_integrated(
-        tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact
-    )
-
+    init, discretize, ssm = prior_wiener_integrated(*args, **kwargs)
     scales = np.ones_like(ssm.prototypes.output_scale())
     discretize_vmap = functools.vmap(discretize, in_axes=(0, None))
-    transitions, (p, p_inv) = discretize_vmap(np.diff(ts), scales)
-
-    preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
-    conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
-
+    conditionals = discretize_vmap(np.diff(ts), scales)
     return init, conditionals, ssm
+
+
+R = TypeVar("R")
 
 
 @containers.dataclass
@@ -204,7 +202,7 @@ class _Strategy:
         raise NotImplementedError
 
     def interpolate_at_t1(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
-        """Process the state at checkpoint t=t_n."""
+        """Process the state at a checkpoint."""
         raise NotImplementedError
 
 

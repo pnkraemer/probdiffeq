@@ -50,16 +50,11 @@ def fixedpointsmoother_precon(*, ssm):
         return _FPState(corrected, cond)
 
     def _step(state: _FPState, cond_and_data_and_obs) -> tuple[_FPState, _FPState]:
-        (conditional, (p, p_inv)), data, observation = cond_and_data_and_obs
+        conditional, data, observation = cond_and_data_and_obs
         rv, conditional_rev = state
 
         # Extrapolate
-        rv = ssm.normal.preconditioner_apply(rv, p_inv)
         rv, conditional_new = ssm.conditional.revert(rv, conditional)
-        rv = ssm.normal.preconditioner_apply(rv, p)
-        conditional_new = ssm.conditional.preconditioner_apply(
-            conditional_new, p, p_inv
-        )
         conditional_rev_new = ssm.conditional.merge(conditional_rev, conditional_new)
 
         # Correct

@@ -56,7 +56,7 @@ NUM_DERIVATIVES = 2
 tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 init_raw, transitions, ssm = ivpsolvers.prior_wiener_integrated_discrete(
-    ts, tcoeffs_like=tcoeffs_like, output_scale=100.0, ssm_fact="dense"
+    ts, tcoeffs_like, output_scale=100.0, ssm_fact="dense"
 )
 
 markov_seq_prior = stats.MarkovSeq(init_raw, transitions)

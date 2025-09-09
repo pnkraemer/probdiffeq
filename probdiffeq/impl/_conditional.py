@@ -42,9 +42,6 @@ class ConditionalBackend(abc.ABC):
     def merge(self, cond1, cond2, /):
         raise NotImplementedError
 
-    def conditional(self, matmul, noise):
-        return LatentCond(matmul, noise)
-
     @abc.abstractmethod
     def identity(self, ndim, /):
         raise NotImplementedError
@@ -54,7 +51,7 @@ class ConditionalBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def preconditioner_apply(self, cond, p, p_inv, /):
+    def preconditioner_apply(self, cond, /):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -173,15 +170,17 @@ class DenseConditional(ConditionalBackend):
 
         return discretise
 
-    def preconditioner_apply(self, cond, p, p_inv, /):
-        assert False
-        normal = _normal.DenseNormal(ode_shape=self.ode_shape)
-        noise = normal.preconditioner_apply(cond.noise, p)
-        A = p[:, None] * cond.A * p_inv[None, :]
-        return LatentCond(A, noise)
+    def preconditioner_apply(self, cond, /):
+        A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
+        mean = cond.to_observed * cond.noise.mean
+        cholesky = cond.to_observed[:, None] * cond.noise.cholesky
+        noise = _normal.Normal(mean, cholesky)
+
+        to_observed = np.ones_like(cond.to_observed)
+        to_latent = np.ones_like(cond.to_latent)
+        return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
     def to_derivative(self, i, standard_deviation):
-        assert False
         x = np.zeros(self.flat_shape)
 
         def select(a):
@@ -193,7 +192,9 @@ class DenseConditional(ConditionalBackend):
         bias = np.zeros((d,))
         eye = np.eye(d)
         noise = _normal.Normal(bias, standard_deviation * eye)
-        return LatentCond(linop, noise)
+        to_latent = np.ones(linop.shape[1])
+        to_observed = np.ones(linop.shape[0])
+        return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         A = cond.A
@@ -304,18 +305,16 @@ class IsotropicConditional(ConditionalBackend):
 
         return discretise
 
-    def preconditioner_apply(self, cond, p, p_inv, /):
-        assert False
-        A, noise = cond.A, cond.noise
-
-        A_new = p[:, None] * A * p_inv[None, :]
-
-        noise = _normal.Normal(p[:, None] * noise.mean, p[:, None] * noise.cholesky)
-        return LatentCond(A_new, noise)
+    def preconditioner_apply(self, cond, /):
+        A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
+        mean = cond.to_observed[:, None] * cond.noise.mean
+        cholesky = cond.to_observed[:, None] * cond.noise.cholesky
+        noise = _normal.Normal(mean, cholesky)
+        to_observed = np.ones_like(cond.to_observed)
+        to_latent = np.ones_like(cond.to_latent)
+        return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
     def to_derivative(self, i, standard_deviation):
-        assert False
-
         def select(a):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
@@ -326,7 +325,9 @@ class IsotropicConditional(ConditionalBackend):
         eye = np.eye(1)
         noise = _normal.Normal(bias, standard_deviation * eye)
 
-        return LatentCond(linop, noise)
+        to_latent = np.ones(linop.shape[1])
+        to_observed = np.ones(linop.shape[0])
+        return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.IsotropicStats(
@@ -455,17 +456,16 @@ class BlockDiagConditional(ConditionalBackend):
 
         return discretise
 
-    def preconditioner_apply(self, cond, p, p_inv, /):
-        assert False
-        A_new = p[None, :, None] * cond.A * p_inv[None, None, :]
-
-        normal = _normal.BlockDiagNormal(ode_shape=self.ode_shape)
-        noise = normal.preconditioner_apply(cond.noise, p)
-        return LatentCond(A_new, noise)
+    def preconditioner_apply(self, cond, /):
+        A = cond.to_observed[None, :, None] * cond.A * cond.to_latent[None, None, :]
+        mean = cond.to_observed[None, :] * cond.noise.mean
+        cholesky = cond.to_observed[None, :, None] * cond.noise.cholesky
+        noise = _normal.Normal(mean, cholesky)
+        to_observed = np.ones_like(cond.to_observed)
+        to_latent = np.ones_like(cond.to_latent)
+        return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
     def to_derivative(self, i, standard_deviation):
-        assert False
-
         def select(a):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
@@ -475,8 +475,9 @@ class BlockDiagConditional(ConditionalBackend):
         bias = np.zeros((*self.ode_shape, 1))
         eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
         noise = _normal.Normal(bias, standard_deviation * eye)
-
-        return LatentCond(linop, noise)
+        to_latent = np.ones((linop.shape[2],))
+        to_observed = np.ones((linop.shape[1],))
+        return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.BlockDiagStats(

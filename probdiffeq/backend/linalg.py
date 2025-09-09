@@ -67,5 +67,9 @@ def diagonal(arr, /):
     return jnp.diagonal(arr)
 
 
+def diagonal_matrix(arr, /):
+    return jnp.diag(arr)
+
+
 def triu(arr, /):
     return jnp.triu(arr)
