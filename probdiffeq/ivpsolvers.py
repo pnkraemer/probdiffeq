@@ -459,6 +459,7 @@ class _Correction:
         return x, y
 
     def correct(self, rv, /, t):
+        """Perform the correction step."""
         f_wrapped = self._parametrize_vector_field(t=t)
         cond = self.linearize(f_wrapped, rv)
         observed, reverted = self.ssm.conditional.revert(rv, cond)
@@ -466,7 +467,7 @@ class _Correction:
         return corrected, observed
 
     def estimate_error(self, rv, /, t):
-        """Perform all elements of the correction until the error estimate."""
+        """Estimate the error."""
         f_wrapped = self._parametrize_vector_field(t=t)
         cond = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, cond)
@@ -619,8 +620,8 @@ class _ProbabilisticSolver:
         rv, extra = self.strategy.init(init)
         rv, corr = self.correction.init(rv)
 
-        # TODO: make the init() and extract() an interface,
-        #       since then, lots of calibration logic simplifies considerably.
+        # TODO: make the init() and extract() an interface.
+        #       Then, lots of calibration logic simplifies considerably.
         calib_state = self.calibration.init()
         return _State(t=t, rv=rv, strategy_state=extra, output_scale=calib_state)
 
