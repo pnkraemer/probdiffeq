@@ -49,7 +49,7 @@ solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
 adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
 
 # Solve the ODE
-ts = jnp.linspace(t0, t1, endpoint=True, num=150)
+ts = jnp.linspace(t0, t1, endpoint=True, num=50)
 sol = ivpsolve.solve_adaptive_save_at(
     init, save_at=ts, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )

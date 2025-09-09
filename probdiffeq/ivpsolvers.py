@@ -343,17 +343,7 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
 
         def extrapolate(self, rv, bw0, /, *, transition):
             extrapolated, cond = self.ssm.conditional.revert(rv, transition)
-
-            # cond, (p, p_inv) = transition
-            # rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            # extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-            # extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            # cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-            # Merge conditionals
             cond = self.ssm.conditional.merge(bw0, cond)
-
-            # Gather and return
             return extrapolated, cond
 
         def extract(self, hidden_state, extra, /):
