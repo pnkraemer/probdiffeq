@@ -1,16 +1,18 @@
-from probdiffeq.backend import abc, containers, tree_util
+from probdiffeq.backend import abc, containers, linalg, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 
 
-class Normal(containers.NamedTuple):
+@tree_util.register_dataclass
+@containers.dataclass
+class Normal:
     mean: Array
     cholesky: Array
 
 
 class NormalBackend(abc.ABC):
     @abc.abstractmethod
-    def from_tcoeffs(self, tcoeffs: list):
+    def from_tcoeffs(self, tcoeffs: list, damp: float = 0.0):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -26,7 +28,7 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs: list):
+    def from_tcoeffs(self, tcoeffs: list, damp: float = 0.0):
         if tcoeffs[0].shape != self.ode_shape:
             msg = "The solver's ODE dimension does not match the initial condition."
             raise ValueError(msg)
@@ -35,9 +37,10 @@ class DenseNormal(NormalBackend):
 
         (ode_dim,) = self.ode_shape
         ndim = len(tcoeffs) * ode_dim
-        c_sqrtm0_corrected = np.zeros((ndim, ndim))
+        powers = 1 / np.arange(1, ndim + 1)
+        cholesky = linalg.diagonal_matrix(damp**powers)
 
-        return Normal(m0_corrected, c_sqrtm0_corrected)
+        return Normal(m0_corrected, cholesky)
 
     def preconditioner_apply(self, rv, p, /):
         mean = p * rv.mean
@@ -56,8 +59,9 @@ class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs: list):
-        c_sqrtm0_corrected = np.zeros((len(tcoeffs), len(tcoeffs)))
+    def from_tcoeffs(self, tcoeffs: list, damp: float = 0.0):
+        powers = 1 / np.arange(1, len(tcoeffs) + 1)
+        c_sqrtm0_corrected = linalg.diagonal_matrix(damp**powers)
         m0_corrected = np.stack(tcoeffs)
         return Normal(m0_corrected, c_sqrtm0_corrected)
 
@@ -74,9 +78,10 @@ class BlockDiagNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, tcoeffs: list):
-        cholesky_shape = (*self.ode_shape, len(tcoeffs), len(tcoeffs))
-        cholesky = np.zeros(cholesky_shape)
+    def from_tcoeffs(self, tcoeffs: list, damp: float = 0.0):
+        powers = 1 / np.arange(1, len(tcoeffs) + 1)
+        cholesky = linalg.diagonal_matrix(damp**powers)
+        cholesky = np.ones((*self.ode_shape, 1, 1)) * cholesky[None, ...]
         mean = np.stack(tcoeffs).T
         return Normal(mean, cholesky)
 

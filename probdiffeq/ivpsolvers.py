@@ -13,38 +13,36 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, NamedArg, TypeVar
 from probdiffeq.impl import impl
 
-R = TypeVar("R")
-
 
 def prior_wiener_integrated(
-    tcoeffs, *, ssm_fact: str, output_scale: Array | None = None
+    tcoeffs, *, ssm_fact: str, output_scale: Array | None = None, damp: float = 0.0
 ):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
-    # TODO: should the output_scale be an argument to solve?
+
+    # TODO: should the output_scale be an argument to solve()?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
+
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
-    init = ssm.normal.from_tcoeffs(tcoeffs)
+
+    # Increase damping to get visually more pleasing uncertainties
+    #  and more numerical robustness for
+    #  high-order solvers in low precision arithmetic
+    init = ssm.normal.from_tcoeffs(tcoeffs, damp=damp)
     return init, discretize, ssm
 
 
-def prior_wiener_integrated_discrete(
-    ts, *, tcoeffs_like, ssm_fact: str, output_scale=None
-):
+def prior_wiener_integrated_discrete(ts, *args, **kwargs):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    init, discretize, ssm = prior_wiener_integrated(
-        tcoeffs_like, output_scale=output_scale, ssm_fact=ssm_fact
-    )
-
+    init, discretize, ssm = prior_wiener_integrated(*args, **kwargs)
     scales = np.ones_like(ssm.prototypes.output_scale())
     discretize_vmap = functools.vmap(discretize, in_axes=(0, None))
-    transitions, (p, p_inv) = discretize_vmap(np.diff(ts), scales)
-
-    preconditioner_apply_vmap = functools.vmap(ssm.conditional.preconditioner_apply)
-    conditionals = preconditioner_apply_vmap(transitions, p, p_inv)
-
+    conditionals = discretize_vmap(np.diff(ts), scales)
     return init, conditionals, ssm
+
+
+R = TypeVar("R")
 
 
 @containers.dataclass
@@ -176,7 +174,6 @@ def _tensor_points(x, /, *, d):
 class _Strategy:
     """Estimation-strategy interface."""
 
-    name: str
     ssm: Any
 
     is_suitable_for_save_at: int
@@ -187,12 +184,8 @@ class _Strategy:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def extrapolate_mean(self, rv, /, *, transition):
-        """Begin the strategy."""
-        raise NotImplementedError
-
     def extrapolate(self, rv, strategy_state, /, *, transition):
-        """Begin the strategy."""
+        """Extrapolate (also known as prediction)."""
         raise NotImplementedError
 
     def extract(self, rv, strategy_state, /):
@@ -204,7 +197,7 @@ class _Strategy:
         raise NotImplementedError
 
     def interpolate_at_t1(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
-        """Process the state at checkpoint t=t_n."""
+        """Process the state at a checkpoint."""
         raise NotImplementedError
 
 
@@ -225,25 +218,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
 
         def extrapolate(self, rv, aux, /, *, transition):
             del aux
-            cond, (p, p_inv) = transition
-
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-            # Gather and return
-            return extrapolated, cond
-
-        def extrapolate_mean(self, rv, /, *, transition):
-            cond, (p, p_inv) = transition
-
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-            m_p = self.ssm.stats.mean(rv_p)
-            extrapolated_p = self.ssm.conditional.apply(m_p, cond)
-
-            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            return self.ssm.conditional.revert(rv, transition)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
@@ -262,28 +237,24 @@ def strategy_smoother(*, ssm) -> _Strategy:
             Subsequent interpolations continue from the value at 't'.
             Subsequent IVP solver steps continue from the value at 't1'.
             """
-            marginal_t1, _ = state_t1
-
-            # Extrapolate from t0 to t, and from t to t1.
-            # This yields all building blocks.
-            prior0 = prior(dt0, output_scale)
-            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
-
             # TODO: if we pass prior1 and prior2, then
             #       we don't have to pass dt0, dt1, output_scale, and prior...
 
+            # Extrapolate from t0 to t, and from t to t1.
+            prior0 = prior(dt0, output_scale)
+            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
             prior1 = prior(dt1, output_scale)
             extrapolated_t1 = self.extrapolate(*extrapolated_t, transition=prior1)
 
             # Marginalise from t1 to t to obtain the interpolated solution.
+            marginal_t1, _ = state_t1
             conditional_t1_to_t = extrapolated_t1[1]
             rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
             solution_at_t = (rv_at_t, extrapolated_t[1])
 
-            # The state at t1 gets a new backward model; it must remember how to
-            # get back to t, not to t0.
+            # The state at t1 gets a new backward model;
+            # (it must remember how to get back to t, not to t0).
             solution_at_t1 = (marginal_t1, conditional_t1_to_t)
-
             return _InterpRes(
                 step_from=solution_at_t1,
                 interpolated=solution_at_t,
@@ -298,11 +269,9 @@ def strategy_smoother(*, ssm) -> _Strategy:
             del dt0
             del dt1
             del output_scale
-            rv, extra = state_t1
-            return _InterpRes((rv, extra), (rv, extra), (rv, extra))
+            return _InterpRes(state_t1, state_t1, state_t1)
 
     return Smoother(
-        name="Smoother",
         ssm=ssm,
         is_suitable_for_save_at=False,
         is_suitable_for_save_every_step=True,
@@ -320,20 +289,9 @@ def strategy_filter(*, ssm) -> _Strategy:
 
         def extrapolate(self, rv, aux, /, *, transition):
             del aux
-            cond, (p, p_inv) = transition
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            extrapolated_p = self.ssm.conditional.marginalise(rv_p, cond)
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            return extrapolated, None
+            rv = self.ssm.conditional.marginalise(rv, transition)
 
-        def extrapolate_mean(self, rv, /, *, transition):
-            cond, (p, p_inv) = transition
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            m_ext_p = self.ssm.stats.mean(rv_p)
-            print(m_ext_p)
-            print(cond)
-            extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
+            return rv, None
 
         def extract(self, hidden_state, _extra, /):
             return hidden_state
@@ -367,7 +325,6 @@ def strategy_filter(*, ssm) -> _Strategy:
             return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
     return Filter(
-        name="Filter",
         ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=True,
@@ -385,27 +342,9 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             return sol, cond
 
         def extrapolate(self, rv, bw0, /, *, transition):
-            cond, (p, p_inv) = transition
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-            extrapolated_p, cond_p = self.ssm.conditional.revert(rv_p, cond)
-            extrapolated = self.ssm.normal.preconditioner_apply(extrapolated_p, p)
-            cond = self.ssm.conditional.preconditioner_apply(cond_p, p, p_inv)
-
-            # Merge conditionals
+            extrapolated, cond = self.ssm.conditional.revert(rv, transition)
             cond = self.ssm.conditional.merge(bw0, cond)
-
-            # Gather and return
             return extrapolated, cond
-
-        def extrapolate_mean(self, rv, /, *, transition):
-            cond, (p, p_inv) = transition
-
-            rv_p = self.ssm.normal.preconditioner_apply(rv, p_inv)
-
-            m_ext_p = self.ssm.stats.mean(rv_p)
-            extrapolated_p = self.ssm.conditional.apply(m_ext_p, cond)
-
-            return self.ssm.normal.preconditioner_apply(extrapolated_p, p)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
@@ -485,7 +424,6 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             )
 
     return FixedPoint(
-        name="Fixed-point smoother",
         ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
@@ -511,6 +449,7 @@ class _Correction:
         return x, y
 
     def correct(self, rv, /, t):
+        """Perform the correction step."""
         f_wrapped = self._parametrize_vector_field(t=t)
         cond = self.linearize(f_wrapped, rv)
         observed, reverted = self.ssm.conditional.revert(rv, cond)
@@ -518,7 +457,7 @@ class _Correction:
         return corrected, observed
 
     def estimate_error(self, rv, /, t):
-        """Perform all elements of the correction until the error estimate."""
+        """Estimate the error."""
         f_wrapped = self._parametrize_vector_field(t=t)
         cond = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, cond)
@@ -671,8 +610,8 @@ class _ProbabilisticSolver:
         rv, extra = self.strategy.init(init)
         rv, corr = self.correction.init(rv)
 
-        # TODO: make the init() and extract() an interface,
-        #       since then, lots of calibration logic simplifies considerably.
+        # TODO: make the init() and extract() an interface.
+        #       Then, lots of calibration logic simplifies considerably.
         calib_state = self.calibration.init()
         return _State(t=t, rv=rv, strategy_state=extra, output_scale=calib_state)
 
@@ -751,7 +690,8 @@ def solver_mle(strategy, *, correction, prior, ssm):
         # Estimate the error
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
         transition = prior(dt, output_scale_prior)
-        mean_extra = strategy.extrapolate_mean(state.rv, transition=transition)
+        mean = ssm.stats.mean(state.rv)
+        mean_extra = ssm.conditional.apply(mean, transition)
         t = state.t + dt
         error, _ = correction.estimate_error(mean_extra, t=t)
 
@@ -805,7 +745,9 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         # Estimate error and calibrate the output scale
         ones = np.ones_like(ssm.prototypes.output_scale())
         transition = prior(dt, ones)
-        hidden = strategy.extrapolate_mean(state.rv, transition=transition)
+        mean = ssm.stats.mean(state.rv)
+        hidden = ssm.conditional.apply(mean, transition)
+
         t = state.t + dt
         error, observed = correction.estimate_error(hidden, t=t)
         output_scale = calibration.update(state.output_scale, observed=observed)
@@ -856,7 +798,8 @@ def solver(strategy, *, correction, prior, ssm):
 
         # Estimate the error
         transition = prior(dt, state.output_scale)
-        hidden = strategy.extrapolate_mean(state.rv, transition=transition)
+        mean = ssm.stats.mean(state.rv)
+        hidden = ssm.conditional.apply(mean, transition)
         t = state.t + dt
         error, _ = correction.estimate_error(hidden, t=t)
 

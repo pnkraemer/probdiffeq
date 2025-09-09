@@ -37,4 +37,4 @@ def random_variable(fact):
     output_scale = np.ones_like(ssm.prototypes.output_scale())
     discretize = ssm.conditional.ibm_transitions(output_scale)
     rv = discretize(0.1, output_scale)
-    return rv[0].noise, ssm
+    return rv.noise, ssm

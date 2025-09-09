@@ -28,5 +28,9 @@ def ravel_pytree(tree, /):
     return jax.flatten_util.ravel_pytree(tree)
 
 
+def tree_flatten(tree, /):
+    return jax.tree_util.tree_flatten(tree)
+
+
 def register_dataclass(datacls):
     return jax.tree_util.register_dataclass(datacls)
