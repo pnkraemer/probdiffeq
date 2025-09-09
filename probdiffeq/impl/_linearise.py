@@ -55,24 +55,18 @@ class DenseLinearisation(LinearisationBackend):
     def ode_taylor_1st(self, ode_order, damp):
         def new(fun, rv, /):
             mean = rv.mean
-            a0 = functools.partial(self._select_dy, idx_or_slice=slice(0, ode_order))
-            a1 = functools.partial(self._select_dy, idx_or_slice=ode_order)
 
-            if np.shape(a0(mean)) != (expected_shape := (ode_order, *self.ode_shape)):
-                msg = f"{np.shape(a0(mean))} != {expected_shape}"
-                raise ValueError(msg)
+            def constraint(m):
+                a1 = tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
+                a0 = tree_util.ravel_pytree(fun(*self.unravel(m)[:ode_order]))[0]
+                return a1 - a0
 
-            jvp, fx = self.ts1(fun, a0(mean))
+            fx = constraint(mean)
+            linop = functools.jacrev(constraint)(mean)
+            fx = fx - linop @ mean
 
-            @self._autobatch_linop
-            def A(x):
-                x1 = a1(x)
-                x0 = a0(x)
-                return x1 - jvp(x0)
-
-            linop = _jac_materialize(lambda v, _p: A(v), inputs=mean)
             cov_lower = damp * np.eye(len(fx))
-            bias = _normal.Normal(-fx, cov_lower)
+            bias = _normal.Normal(fx, cov_lower)
             to_latent = np.ones(linop.shape[1])
             to_observed = np.ones(linop.shape[0])
             return _conditional.LatentCond(
@@ -126,6 +120,7 @@ class DenseLinearisation(LinearisationBackend):
         linearise_fun = functools.partial(self.slr0, cubature_rule=cubature_rule)
 
         def new(fun, rv, /):
+            raise RuntimeError("TODO: continue here...")
             # Projection functions
             a0 = self._autobatch_linop(
                 functools.partial(self._select_dy, idx_or_slice=0)
@@ -169,15 +164,6 @@ class DenseLinearisation(LinearisationBackend):
             return fun(x)
 
         return fun_
-
-    @staticmethod
-    def ts0(fn, m):
-        return fn(m)
-
-    @staticmethod
-    def ts1(fn, m):
-        b, jvp = functools.linearize(fn, m)
-        return jvp, b - jvp(m)
 
     @staticmethod
     def slr1(fn, x, *, cubature_rule):

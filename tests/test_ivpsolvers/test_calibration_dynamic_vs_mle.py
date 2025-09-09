@@ -6,7 +6,7 @@ but not for the dynamic solver.
 """
 
 from probdiffeq import ivpsolve, ivpsolvers
-from probdiffeq.backend import linalg, ode, testing
+from probdiffeq.backend import functools, linalg, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
 
@@ -26,7 +26,9 @@ def test_exponential_approximated_well(fact):
     solution = ode.odeint_and_save_at(
         vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5
     )
-    rmse = _rmse(approximation.u[0][-1], solution[-1])
+    u = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(approximation.u[0])
+    sol = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(solution)
+    rmse = _rmse(u[-1], sol[-1])
     assert rmse < 0.1
 
 

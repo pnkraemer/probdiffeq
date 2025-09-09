@@ -1,7 +1,7 @@
 """Assert that every recipe yields a decent ODE approximation."""
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.backend import functools, ode, testing
+from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
 
@@ -57,7 +57,7 @@ def fixture_solution(correction_impl, fact):
 def test_terminal_value_simulation_matches_reference(solution):
     expected = reference_solution(solution.t)
     received = solution.u[0]
-    assert np.allclose(received, expected, rtol=1e-2)
+    assert testing.tree_all_allclose(received, expected, rtol=1e-2)
 
 
 @functools.jit
@@ -65,4 +65,4 @@ def reference_solution(t1):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     ts = np.asarray([t0, t1])
     sol = ode.odeint_and_save_at(vf, (u0,), save_at=ts, atol=1e-10, rtol=1e-10)
-    return sol[-1]
+    return tree_util.tree_map(lambda s: s[-1], sol)

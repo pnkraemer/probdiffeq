@@ -14,7 +14,7 @@ def test_python_loop_output_matches_reference(fact, strategy):
 
     received = python_loop_solution(ivp, fact=fact, strategy_fun=strategy)
     expected = reference_solution(ivp, received.t)
-    assert np.allclose(received.u[0], expected, rtol=1e-2)
+    assert testing.tree_all_allclose(received.u[0], expected, rtol=1e-2)
 
     # Assert u and u_std have matching shapes (that was wrong before)
     u_shape = tree_util.tree_map(np.shape, received.u)
