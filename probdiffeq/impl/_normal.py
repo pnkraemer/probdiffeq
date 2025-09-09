@@ -62,7 +62,9 @@ class IsotropicNormal(NormalBackend):
     def from_tcoeffs(self, tcoeffs: list, damp: float = 0.0):
         powers = 1 / np.arange(1, len(tcoeffs) + 1)
         c_sqrtm0_corrected = linalg.diagonal_matrix(damp**powers)
-        m0_corrected = np.stack(tcoeffs)
+
+        leaves, structure = tree_util.tree_flatten(tcoeffs)
+        m0_corrected = np.stack(leaves)
         return Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):

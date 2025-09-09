@@ -1,8 +1,8 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 from probdiffeq import taylor
+from probdiffeq.backend import functools, ode, testing
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing
 
 
 @testing.case()
@@ -23,9 +23,10 @@ def case_taylor_mode_unroll():
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
+    vf = functools.partial(vf, t=t0)
 
     solution = np.load("./tests/test_taylor/data/three_body_first_solution.npy")
-    return (lambda y: vf(y, t=t0), (u0,)), solution
+    return (vf, (u0,)), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
@@ -35,8 +36,7 @@ def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num)
 
     derivatives = taylor_fun(f, init, num=num)
     assert len(derivatives) == num + 1
-    for dy, dy_ref in zip(derivatives, solution):
-        assert np.allclose(dy, dy_ref)
+    assert testing.tree_all_allclose(derivatives, list(solution[: len(derivatives)]))
 
 
 @testing.parametrize("num_doublings", [1, 2])
@@ -46,5 +46,4 @@ def test_approximation_identical_to_reference_doubling(pb_with_solution, num_dou
 
     derivatives = taylor.odejet_doubling_unroll(f, init, num_doublings=num_doublings)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
-    for dy, dy_ref in zip(derivatives, solution):
-        assert np.allclose(dy, dy_ref)
+    assert testing.tree_all_allclose(derivatives, list(solution[: len(derivatives)]))

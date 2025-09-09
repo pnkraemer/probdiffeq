@@ -1,7 +1,6 @@
 """State-space model implementations."""
 
 from probdiffeq.backend import containers, functools, tree_util
-from probdiffeq.backend import numpy as np
 from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
 
 
@@ -27,11 +26,11 @@ class FactImpl:
 
 def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
     """Choose a state-space model implementation."""
-    u0 = np.asarray(tcoeffs_like[0])
-    if u0.ndim != 1:
-        msg = "'tcoeffs' expected to have shape=(d,), "
-        msg += f"but shape={u0.shape} received."
-        raise ValueError(msg)
+    # u0 = np.asarray(tcoeffs_like[0])
+    # if u0.ndim != 1:
+    #     msg = "'tcoeffs' expected to have shape=(d,), "
+    #     msg += f"but shape={u0.shape} received."
+    #     raise ValueError(msg)
 
     if which == "dense":
         return _select_dense(tcoeffs_like=tcoeffs_like)
@@ -46,17 +45,17 @@ def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
 
 
 def _select_dense(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tcoeffs_like[0].shape
+    ode_size = tcoeffs_like[0].size
     flat, unravel = tree_util.ravel_pytree(tcoeffs_like)
 
     num_derivatives = len(tcoeffs_like) - 1
 
-    prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
-    normal = _normal.DenseNormal(ode_shape=ode_shape)
-    linearise = _linearise.DenseLinearisation(ode_shape=ode_shape, unravel=unravel)
-    stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
+    prototypes = _prototypes.DensePrototype(ode_shape=(ode_size,))
+    normal = _normal.DenseNormal(ode_shape=(ode_size,))
+    linearise = _linearise.DenseLinearisation(ode_shape=(ode_size,), unravel=unravel)
+    stats = _stats.DenseStats(ode_shape=(ode_size,), unravel=unravel)
     conditional = _conditional.DenseConditional(
-        ode_shape=ode_shape,
+        ode_size=ode_size,
         num_derivatives=num_derivatives,
         unravel=unravel,
         flat_shape=flat.shape,
@@ -73,7 +72,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
 
 
 def _select_isotropic(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tcoeffs_like[0].shape
+    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
     num_derivatives = len(tcoeffs_like) - 1
 
     tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)

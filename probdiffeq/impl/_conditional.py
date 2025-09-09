@@ -64,8 +64,8 @@ class ConditionalBackend(abc.ABC):
 
 
 class DenseConditional(ConditionalBackend):
-    def __init__(self, ode_shape, num_derivatives, unravel, flat_shape):
-        self.ode_shape = ode_shape
+    def __init__(self, ode_size, num_derivatives, unravel, flat_shape):
+        self.ode_size = ode_size
         self.num_derivatives = num_derivatives
         self.unravel = unravel
         self.flat_shape = flat_shape
@@ -149,7 +149,7 @@ class DenseConditional(ConditionalBackend):
 
     def ibm_transitions(self, base_scale):
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
-        (d,) = self.ode_shape
+        d = self.ode_size
 
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)

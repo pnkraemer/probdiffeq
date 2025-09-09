@@ -133,11 +133,11 @@ def eye(n, m=None, /):
 
 
 def save(path, arr, /):
-    return jnp.save(path, arr)
+    return jnp.save(path, arr, allow_pickle=True)
 
 
 def load(path, /):
-    return jnp.load(path)
+    return jnp.load(path, allow_pickle=True)
 
 
 def allclose(a, b, *, atol=1e-8, rtol=1e-5):
