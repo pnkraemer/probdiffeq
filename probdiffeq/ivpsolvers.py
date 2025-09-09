@@ -174,7 +174,6 @@ def _tensor_points(x, /, *, d):
 class _Strategy:
     """Estimation-strategy interface."""
 
-    name: str
     ssm: Any
 
     is_suitable_for_save_at: int
@@ -273,7 +272,6 @@ def strategy_smoother(*, ssm) -> _Strategy:
             return _InterpRes(state_t1, state_t1, state_t1)
 
     return Smoother(
-        name="Smoother",
         ssm=ssm,
         is_suitable_for_save_at=False,
         is_suitable_for_save_every_step=True,
@@ -327,7 +325,6 @@ def strategy_filter(*, ssm) -> _Strategy:
             return _InterpRes((rv, extra), (rv, extra), (rv, extra))
 
     return Filter(
-        name="Filter",
         ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=True,
@@ -437,7 +434,6 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             )
 
     return FixedPoint(
-        name="Fixed-point smoother",
         ssm=ssm,
         is_suitable_for_save_at=True,
         is_suitable_for_save_every_step=False,
