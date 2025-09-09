@@ -185,12 +185,8 @@ class _Strategy:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def extrapolate_mean(self, rv, /, *, transition):
-        """Begin the strategy."""
-        raise NotImplementedError
-
     def extrapolate(self, rv, strategy_state, /, *, transition):
-        """Begin the strategy."""
+        """Extrapolate (also known as prediction)."""
         raise NotImplementedError
 
     def extract(self, rv, strategy_state, /):
@@ -224,10 +220,6 @@ def strategy_smoother(*, ssm) -> _Strategy:
         def extrapolate(self, rv, aux, /, *, transition):
             del aux
             return self.ssm.conditional.revert(rv, transition)
-
-        def extrapolate_mean(self, rv, /, *, transition):
-            mean = self.ssm.stats.mean(rv)
-            return self.ssm.conditional.apply(mean, transition)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
@@ -303,10 +295,6 @@ def strategy_filter(*, ssm) -> _Strategy:
 
             return rv, None
 
-        def extrapolate_mean(self, rv, /, *, transition):
-            mean = self.ssm.stats.mean(rv)
-            return self.ssm.conditional.apply(mean, transition)
-
         def extract(self, hidden_state, _extra, /):
             return hidden_state
 
@@ -370,10 +358,6 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
 
             # Gather and return
             return extrapolated, cond
-
-        def extrapolate_mean(self, rv, /, *, transition):
-            mean = self.ssm.stats.mean(rv)
-            return self.ssm.conditional.apply(mean, transition)
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
@@ -719,7 +703,8 @@ def solver_mle(strategy, *, correction, prior, ssm):
         # Estimate the error
         output_scale_prior, _calibrated = calibration.extract(state.output_scale)
         transition = prior(dt, output_scale_prior)
-        mean_extra = strategy.extrapolate_mean(state.rv, transition=transition)
+        mean = ssm.stats.mean(state.rv)
+        mean_extra = ssm.conditional.apply(mean, transition)
         t = state.t + dt
         error, _ = correction.estimate_error(mean_extra, t=t)
 
@@ -773,7 +758,9 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         # Estimate error and calibrate the output scale
         ones = np.ones_like(ssm.prototypes.output_scale())
         transition = prior(dt, ones)
-        hidden = strategy.extrapolate_mean(state.rv, transition=transition)
+        mean = ssm.stats.mean(state.rv)
+        hidden = ssm.conditional.apply(mean, transition)
+
         t = state.t + dt
         error, observed = correction.estimate_error(hidden, t=t)
         output_scale = calibration.update(state.output_scale, observed=observed)
@@ -824,7 +811,8 @@ def solver(strategy, *, correction, prior, ssm):
 
         # Estimate the error
         transition = prior(dt, state.output_scale)
-        hidden = strategy.extrapolate_mean(state.rv, transition=transition)
+        mean = ssm.stats.mean(state.rv)
+        hidden = ssm.conditional.apply(mean, transition)
         t = state.t + dt
         error, _ = correction.estimate_error(hidden, t=t)
 
