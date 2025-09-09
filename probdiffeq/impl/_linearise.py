@@ -80,27 +80,32 @@ class DenseLinearisation(LinearisationBackend):
         linearise_fun = functools.partial(self.slr1, cubature_rule=cubature_rule)
 
         def new(fun, rv, /):
-            # Projection functions
-            a0 = self._autobatch_linop(
-                functools.partial(self._select_dy, idx_or_slice=0)
-            )
-            a1 = self._autobatch_linop(
-                functools.partial(self._select_dy, idx_or_slice=1)
-            )
+            def select_0(s):
+                return tree_util.ravel_pytree(self.unravel(s)[0])
 
-            # Extract the linearisation point
-            m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
+            def select_1(s):
+                return tree_util.ravel_pytree(self.unravel(s)[1])
+
+            m0, unravel = select_0(rv.mean)
+
+            extract_ = functools.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
+            r_0_nonsquare = extract_(rv.cholesky)
+
+            # # Extract the linearisation point
             r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
+            def vf_flat(u):
+                return tree_util.ravel_pytree(fun(unravel(u)))[0]
+
             # Gather the variables and return
-            J, noise = linearise_fun(fun, linearisation_pt)
+            J, noise = linearise_fun(vf_flat, linearisation_pt)
+            mean, cov_lower = noise.mean, noise.cholesky
 
             def A(x):
-                return a1(x) - J @ a0(x)
+                return select_1(x)[0] - J @ select_0(x)[0]
 
-            linop = _jac_materialize(lambda v, _p: A(v), inputs=rv.mean)
-            mean, cov_lower = noise.mean, noise.cholesky
+            linop = functools.jacrev(A)(rv.mean)
 
             # Include the damping term. (TODO: use a single qr?)
             damping = damp * np.eye(len(cov_lower))
@@ -120,22 +125,23 @@ class DenseLinearisation(LinearisationBackend):
         linearise_fun = functools.partial(self.slr0, cubature_rule=cubature_rule)
 
         def new(fun, rv, /):
-            raise RuntimeError("TODO: continue here...")
-            # Projection functions
-            a0 = self._autobatch_linop(
-                functools.partial(self._select_dy, idx_or_slice=0)
-            )
-            a1 = self._autobatch_linop(
-                functools.partial(self._select_dy, idx_or_slice=1)
-            )
+            def select_0(s):
+                return tree_util.ravel_pytree(self.unravel(s)[0])
 
-            # Extract the linearisation point
-            m0, r_0_nonsquare = a0(rv.mean), a0(rv.cholesky)
+            m0, unravel = select_0(rv.mean)
+
+            extract_ = functools.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
+            r_0_nonsquare = extract_(rv.cholesky)
+
+            # # Extract the linearisation point
             r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
             linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
+            def vf_flat(u):
+                return tree_util.ravel_pytree(fun(unravel(u)))[0]
+
             # Gather the variables and return
-            noise = linearise_fun(fun, linearisation_pt)
+            noise = linearise_fun(vf_flat, linearisation_pt)
             mean, cov_lower = noise.mean, noise.cholesky
 
             # Include the damping term. (TODO: use a single qr?)
@@ -143,8 +149,11 @@ class DenseLinearisation(LinearisationBackend):
             stack = np.concatenate((cov_lower.T, damping.T))
             cov_lower = cholesky_util.triu_via_qr(stack).T
 
+            def select_1(s):
+                return tree_util.ravel_pytree(self.unravel(s)[1])
+
+            linop = functools.jacrev(lambda s: select_1(s)[0])(rv.mean)
             bias = _normal.Normal(-mean, cov_lower)
-            linop = _jac_materialize(lambda v, _p: a1(v), inputs=rv.mean)
             to_latent = np.ones(linop.shape[1])
             to_observed = np.ones(linop.shape[0])
             return _conditional.LatentCond(
@@ -152,18 +161,6 @@ class DenseLinearisation(LinearisationBackend):
             )
 
         return new
-
-    def _select_dy(self, x, idx_or_slice):
-        return np.stack(self.unravel(x)[idx_or_slice])
-
-    @staticmethod
-    def _autobatch_linop(fun):
-        def fun_(x):
-            if np.ndim(x) > 1:
-                return functools.vmap(fun_, in_axes=1, out_axes=1)(x)
-            return fun(x)
-
-        return fun_
 
     @staticmethod
     def slr1(fn, x, *, cubature_rule):
