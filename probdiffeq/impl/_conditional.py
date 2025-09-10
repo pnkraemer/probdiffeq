@@ -180,18 +180,18 @@ class DenseConditional(ConditionalBackend):
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
-    def to_derivative(self, i, standard_deviation):
-        x = np.zeros(self.flat_shape)
-
+    def to_derivative(self, i, u, standard_deviation):
         def select(a):
             return tree_util.ravel_pytree(self.unravel(a)[i])[0]
 
+        x = np.zeros(self.flat_shape)
         linop = functools.jacrev(select)(x)
 
-        (d,) = self.ode_shape
-        bias = np.zeros((d,))
-        eye = np.eye(d)
-        noise = _normal.Normal(bias, standard_deviation * eye)
+        u_flat, _ = tree_util.ravel_pytree(u)
+        stdev, _ = tree_util.ravel_pytree(standard_deviation)
+        cholesky = linalg.diagonal_matrix(stdev)
+        noise = _normal.Normal(-u_flat, cholesky)
+
         to_latent = np.ones(linop.shape[1])
         to_observed = np.ones(linop.shape[0])
         return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)

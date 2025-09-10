@@ -2,7 +2,7 @@
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing
+from probdiffeq.backend import ode, testing, tree_util
 
 
 @testing.case()
@@ -44,10 +44,14 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
     See also: issue #477 (closed).
     """
     sol, ssm = solution
-    data = sol.u[0] + 0.1
+
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
+    std = tree_util.tree_map(lambda s: 1e-2 * np.ones_like(s), sol.u[0])
+
     mll = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=np.asarray(1e-2), posterior=sol.posterior, ssm=ssm
+        data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
     )
+
     assert mll.shape == ()
     assert not np.isnan(mll)
     assert not np.isinf(mll)
@@ -55,7 +59,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
 
 def test_terminal_values_error_for_wrong_shapes(solution):
     sol, ssm = solution
-    data = sol.u[0] + 0.005
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
 
     # Non-scalar observation std
     with testing.raises(ValueError, match="expected"):

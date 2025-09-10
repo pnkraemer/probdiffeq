@@ -200,30 +200,36 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
 
     Parameters
     ----------
-    standard_deviation
-        Standard deviation of the observation. Expected to be have shape (n,).
     u
-        Observation. Expected to have shape (n, d) for an ODE with shape (d,).
+        Observation. Expected to match the ODE's type/shape.
+    standard_deviation
+        Standard deviation of the observation. Expected to match u's type/shape.
     posterior
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
     """
-    # TODO: complain if it is used with a filter, not a smoother?
-    # TODO: allow option for log-posterior
+    [u_leaves], u_structure = tree_util.tree_flatten(u)
+    [std_leaves], std_structure = tree_util.tree_flatten(standard_deviation)
 
-    if np.shape(standard_deviation) != np.shape(u)[:1]:
+    if np.shape(std_leaves) != np.shape(u_leaves):
         msg = (
-            f"Observation-noise shape {np.shape(standard_deviation)} "
-            f"does not match the observation shape {np.shape(u)}. "
-            f"Expected observation-noise shape: "
-            f"{(np.shape(u)[0],)} != {np.shape(standard_deviation)}. "
+            f"Observation-noise shape {np.shape(std_leaves)} "
+            f"does not match the observation shape {np.shape(u_leaves)}. "
         )
         raise ValueError(msg)
 
-    if np.ndim(u) < np.ndim(ssm.prototypes.qoi()) + 1:
+    if u_structure != std_structure:
         msg = (
-            f"Time-series solution (ndim=2, shape=(n, m)) expected. "
-            f"ndim={np.ndim(u)}, shape={np.shape(u)} received."
+            f"Observation-noise tree structure {std_structre} "
+            f"does not match the observation structure {u_structure}. "
+        )
+        raise ValueError(msg)
+
+    qoi_flat, _ = tree_util.ravel_pytree(ssm.prototypes.qoi())
+    if np.ndim(u_leaves) != np.ndim(qoi_flat) + 1:
+        msg = (
+            f"Time-series solution expected. "
+            f"ndim={np.ndim(u_leaves)}, shape={np.shape(u_leaves)} received."
         )
         raise ValueError(msg)
 
@@ -233,8 +239,9 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
         raise TypeError(msg1 + msg2)
 
     # Generate an observation-model for the QOI
-    model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0))
-    models = model_fun(0, standard_deviation)
+
+    model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
+    models = model_fun(0, u, standard_deviation)
 
     # Select the terminal variable
     rv = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
@@ -242,7 +249,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
     # Run the reverse Kalman filter
     estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=ssm)
     (_corrected, _num_data, logpdf), _ = filter_util.estimate_rev(
-        u,
+        np.zeros_like(u_leaves),
         init=rv,
         prior_transitions=posterior.conditional,
         observation_model=models,
