@@ -50,7 +50,7 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
         # Generate an observation-model for the QOI
         # (1e-7 observation noise for nuggets and for reusing existing code)
         model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
-        std = tree_util.tree_map(lambda s: 1e-7 * np.ones_like(s), ys)
+        std = tree_util.tree_map(lambda s: 1e-7 * np.ones((len(s),)), ys)
         models = model_fun(0, ys, std)
 
         zeros = np.zeros_like(models.noise.mean)

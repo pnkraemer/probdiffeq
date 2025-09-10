@@ -181,11 +181,6 @@ class DenseConditional(ConditionalBackend):
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
     def to_derivative(self, i, u, standard_deviation):
-        def promote(a, b):
-            return a * np.ones_like(b)
-
-        standard_deviation = tree_util.tree_map(promote, standard_deviation, u)
-
         def select(a):
             return tree_util.ravel_pytree(self.unravel(a)[i])[0]
 
@@ -194,8 +189,10 @@ class DenseConditional(ConditionalBackend):
 
         u_flat, _ = tree_util.ravel_pytree(u)
         stdev, _ = tree_util.ravel_pytree(standard_deviation)
+        assert stdev.shape == (1,)
 
-        cholesky = linalg.diagonal_matrix(stdev)
+        (s,) = stdev
+        cholesky = np.eye(len(u_flat)) * s
         noise = _normal.Normal(-u_flat, cholesky)
 
         to_latent = np.ones(linop.shape[1])
@@ -337,20 +334,6 @@ class IsotropicConditional(ConditionalBackend):
         to_latent = np.ones(linop.shape[1])
         to_observed = np.ones(linop.shape[0])
         return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
-
-        # def select(a):
-        #     return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
-
-        # m = np.zeros((self.num_derivatives + 1,))
-        # linop = functools.jacrev(select)(m)
-
-        # bias = np.zeros(self.ode_shape)
-        # eye = np.eye(1)
-        # noise = _normal.Normal(bias, standard_deviation * eye)
-
-        # to_latent = np.ones(linop.shape[1])
-        # to_observed = np.ones(linop.shape[0])
-        # return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.IsotropicStats(
