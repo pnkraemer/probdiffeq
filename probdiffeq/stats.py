@@ -161,26 +161,22 @@ def log_marginal_likelihood_terminal_values(
         Posterior distribution.
         Expected to correspond to a solution of an ODE with shape (d,).
     """
-    if np.shape(standard_deviation) != ():
-        msg = (
-            f"Scalar observation noise expected. "
-            f"Shape {np.shape(standard_deviation)} received."
-        )
-        raise ValueError(msg)
+    [u_leaves], u_structure = tree_util.tree_flatten(u)
+    [std_leaves], std_structure = tree_util.tree_flatten(standard_deviation)
 
-    # not valid for scalar or matrix-valued solutions
-    if np.ndim(u) > np.ndim(ssm.prototypes.qoi()):
+    if u_structure != std_structure:
         msg = (
-            f"Terminal-value solution (ndim=1, shape=(n,)) expected. "
-            f"ndim={np.ndim(u)}, shape={np.shape(u)} received."
+            f"Observation-noise tree structure {std_structure} "
+            f"does not match the observation structure {u_structure}. "
         )
         raise ValueError(msg)
 
     # Generate an observation-model for the QOI
-    model = ssm.conditional.to_derivative(0, standard_deviation)
+    model = ssm.conditional.to_derivative(0, u, standard_deviation)
     rv = posterior.init if isinstance(posterior, MarkovSeq) else posterior
 
-    _corrected, logpdf = _condition_and_logpdf(rv, u, model, ssm=ssm)
+    data = np.zeros_like(u_leaves)  # 'u' is baked into the observation model
+    _corrected, logpdf = _condition_and_logpdf(rv, data, model, ssm=ssm)
     return logpdf
 
 
@@ -215,13 +211,6 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
         msg = (
             f"Observation-noise shape {np.shape(std_leaves)} "
             f"does not match the observation shape {np.shape(u_leaves)}. "
-        )
-        raise ValueError(msg)
-
-    if u_structure != std_structure:
-        msg = (
-            f"Observation-noise tree structure {std_structre} "
-            f"does not match the observation structure {u_structure}. "
         )
         raise ValueError(msg)
 

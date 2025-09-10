@@ -181,6 +181,11 @@ class DenseConditional(ConditionalBackend):
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
     def to_derivative(self, i, u, standard_deviation):
+        def promote(a, b):
+            return a * np.ones_like(b)
+
+        standard_deviation = tree_util.tree_map(promote, standard_deviation, u)
+
         def select(a):
             return tree_util.ravel_pytree(self.unravel(a)[i])[0]
 
@@ -189,6 +194,10 @@ class DenseConditional(ConditionalBackend):
 
         u_flat, _ = tree_util.ravel_pytree(u)
         stdev, _ = tree_util.ravel_pytree(standard_deviation)
+
+        if stdev.shape == ():
+            stdev = stdev * np.ones_like(u_flat)
+
         cholesky = linalg.diagonal_matrix(stdev)
         noise = _normal.Normal(-u_flat, cholesky)
 
