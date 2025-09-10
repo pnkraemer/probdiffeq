@@ -38,5 +38,3 @@ if __name__ == "__main__":
 
     solution2 = van_der_pol_second()
     np.save("./tests/test_taylor/data/van_der_pol_second_solution.npy", solution2)
-
-    print("Saving successful.")

@@ -30,8 +30,5 @@ def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num)
     (f, init), solution = pb_with_solution
 
     derivatives = taylor_fun(f, init, num=num)
-    print(derivatives)
-    print()
-    print("sol", solution)
     assert len(derivatives) == num + 2
     assert testing.tree_all_allclose(derivatives, list(solution[: len(derivatives)]))

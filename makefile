@@ -2,7 +2,7 @@ format-and-lint:
 	pre-commit run --all-files
 
 test:
-	pytest -n auto -v -Werror -s		# parallelise, verbose output, warnings as errors
+	pytest -n auto -v -Werror		# parallelise, verbose output, warnings as errors
 
 quickstart:
 	# Run some code without installing any of the optional dependencies
