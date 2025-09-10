@@ -49,14 +49,15 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
 
         # Generate an observation-model for the QOI
         # (1e-7 observation noise for nuggets and for reusing existing code)
-        model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0))
-        models = model_fun(0, 1e-7 * np.ones_like(ts))
+        model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
+        std = tree_util.tree_map(lambda s: 1e-7 * np.ones_like(s), ys)
+        models = model_fun(0, ys, std)
 
-        ys = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(ys)
+        zeros = np.zeros_like(models.noise.mean)
 
         # Run the preconditioned fixedpoint smoother
         (corrected, conditional), _ = filter_util.estimate_fwd(
-            ys,
+            zeros,
             init=init,
             prior_transitions=ibm_transitions,
             observation_model=models,
