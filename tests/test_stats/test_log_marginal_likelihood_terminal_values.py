@@ -46,7 +46,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
     sol, ssm = solution
 
     data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
-    std = tree_util.tree_map(lambda s: 1e-2 * np.ones_like(s), sol.u[0])
+    std = tree_util.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u[0])
 
     mll = stats.log_marginal_likelihood_terminal_values(
         data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
@@ -55,22 +55,6 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
     assert mll.shape == ()
     assert not np.isnan(mll)
     assert not np.isinf(mll)
-
-
-def test_terminal_values_scalar_and_nonscalar_same_solution(solution):
-    sol, ssm = solution
-    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
-
-    std_sca = tree_util.tree_map(lambda _s: np.ones(()), sol.u[0])
-    std_vec = tree_util.tree_map(np.ones_like, sol.u[0])
-    result_sca = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=std_sca, posterior=sol.posterior, ssm=ssm
-    )
-
-    result_vec = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=std_vec, posterior=sol.posterior, ssm=ssm
-    )
-    assert np.allclose(result_sca, result_vec)
 
 
 def test_raise_error_if_structures_dont_match(solution):

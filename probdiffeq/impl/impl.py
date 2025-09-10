@@ -86,7 +86,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
-    linearise = _linearise.IsotropicLinearisation()
+    linearise = _linearise.IsotropicLinearisation(unravel=unravel)
     conditional = _conditional.IsotropicConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )

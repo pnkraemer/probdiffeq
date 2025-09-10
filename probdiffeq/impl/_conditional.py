@@ -195,9 +195,6 @@ class DenseConditional(ConditionalBackend):
         u_flat, _ = tree_util.ravel_pytree(u)
         stdev, _ = tree_util.ravel_pytree(standard_deviation)
 
-        if stdev.shape == ():
-            stdev = stdev * np.ones_like(u_flat)
-
         cholesky = linalg.diagonal_matrix(stdev)
         noise = _normal.Normal(-u_flat, cholesky)
 
@@ -236,7 +233,6 @@ class IsotropicConditional(ConditionalBackend):
     def marginalise(self, rv, cond, /):
         mean = cond.to_latent[:, None] * rv.mean
         cholesky = cond.to_latent[:, None] * rv.cholesky
-
         R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky.T)
         cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
@@ -323,20 +319,38 @@ class IsotropicConditional(ConditionalBackend):
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
-    def to_derivative(self, i, standard_deviation):
+    def to_derivative(self, i, u, standard_deviation):
         def select(a):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         m = np.zeros((self.num_derivatives + 1,))
         linop = functools.jacrev(select)(m)
 
-        bias = np.zeros(self.ode_shape)
-        eye = np.eye(1)
-        noise = _normal.Normal(bias, standard_deviation * eye)
+        u_flat, _ = tree_util.ravel_pytree(u)
+
+        stdev, _ = tree_util.ravel_pytree(standard_deviation)
+
+        assert stdev.shape == (1,)
+        cholesky = linalg.diagonal_matrix(stdev)
+        noise = _normal.Normal(-u_flat, cholesky)
 
         to_latent = np.ones(linop.shape[1])
         to_observed = np.ones(linop.shape[0])
         return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
+
+        # def select(a):
+        #     return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
+
+        # m = np.zeros((self.num_derivatives + 1,))
+        # linop = functools.jacrev(select)(m)
+
+        # bias = np.zeros(self.ode_shape)
+        # eye = np.eye(1)
+        # noise = _normal.Normal(bias, standard_deviation * eye)
+
+        # to_latent = np.ones(linop.shape[1])
+        # to_observed = np.ones(linop.shape[0])
+        # return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.IsotropicStats(
