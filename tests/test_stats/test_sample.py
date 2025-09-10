@@ -1,7 +1,7 @@
 """Tests for sampling behaviour."""
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
-from probdiffeq.backend import ode, random, testing
+from probdiffeq.backend import ode, random, testing, tree_util
 
 
 @testing.fixture(name="approximation")
@@ -29,5 +29,10 @@ def test_sample_shape(approximation, shape):
     )
 
     for i, s, u in zip(samples_init, samples, approximation.u):
-        assert i.shape == shape + u[-1, ...].shape
-        assert s.shape == shape + u[:-1, ...].shape
+        i_shape = tree_util.tree_map(lambda x: x.shape, i)
+        s_shape = tree_util.tree_map(lambda x: x.shape, s)
+        u_terminal_shape = tree_util.tree_map(lambda x: shape + x[-1].shape, u)
+        u_inner_shape = tree_util.tree_map(lambda x: shape + x[:-1].shape, u)
+
+        assert testing.tree_all_allclose(i_shape, u_terminal_shape)
+        assert testing.tree_all_allclose(s_shape, u_inner_shape)
