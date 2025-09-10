@@ -441,8 +441,6 @@ class _Correction:
     linearize: Callable
     vector_field: Callable
 
-    can_handle_higher_order: bool
-
     def init(self, x, /):
         """Initialise the state from the solution."""
         y = self.ssm.prototypes.observed()
@@ -450,7 +448,7 @@ class _Correction:
 
     def correct(self, rv, /, t):
         """Perform the correction step."""
-        f_wrapped = self._parametrize_vector_field(t=t)
+        f_wrapped = functools.partial(self.vector_field, t=t)
         cond = self.linearize(f_wrapped, rv)
         observed, reverted = self.ssm.conditional.revert(rv, cond)
         corrected = reverted.noise
@@ -458,7 +456,7 @@ class _Correction:
 
     def estimate_error(self, rv, /, t):
         """Estimate the error."""
-        f_wrapped = self._parametrize_vector_field(t=t)
+        f_wrapped = functools.partial(self.vector_field, t=t)
         cond = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, cond)
 
@@ -468,9 +466,6 @@ class _Correction:
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, observed
-
-    def _parametrize_vector_field(self, *, t):
-        return functools.partial(self.vector_field, t=t)
 
 
 def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
@@ -482,7 +477,6 @@ def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
-        can_handle_higher_order=True,
     )
 
 
@@ -495,7 +489,6 @@ def correction_ts1(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
-        can_handle_higher_order=True,
     )
 
 
@@ -510,7 +503,6 @@ def correction_slr0(
         ode_order=1,
         linearize=linearize,
         name="SLR0",
-        can_handle_higher_order=False,  # TODO: implement this
     )
 
 
@@ -525,7 +517,6 @@ def correction_slr1(
         ode_order=1,
         linearize=linearize,
         name="SLR1",
-        can_handle_higher_order=False,  # TODO: implement this
     )
 
 

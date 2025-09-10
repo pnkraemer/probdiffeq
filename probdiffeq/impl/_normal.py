@@ -60,7 +60,7 @@ class IsotropicNormal(NormalBackend):
         powers = 1 / np.arange(1, len(tcoeffs) + 1)
         c_sqrtm0_corrected = linalg.diagonal_matrix(damp**powers)
 
-        leaves, structure = tree_util.tree_flatten(tcoeffs)
+        leaves, _ = tree_util.tree_flatten(tcoeffs)
         m0_corrected = np.stack(leaves)
         return Normal(m0_corrected, c_sqrtm0_corrected)
 
@@ -82,7 +82,7 @@ class BlockDiagNormal(NormalBackend):
         cholesky = linalg.diagonal_matrix(damp**powers)
         cholesky = np.ones((*self.ode_shape, 1, 1)) * cholesky[None, ...]
 
-        leaves, structure = tree_util.tree_flatten(tcoeffs)
+        leaves, _ = tree_util.tree_flatten(tcoeffs)
         mean = np.stack(leaves).T
         return Normal(mean, cholesky)
 
