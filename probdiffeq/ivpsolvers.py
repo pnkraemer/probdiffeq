@@ -995,7 +995,7 @@ class _AdaSolver:
             )
 
             # Propose a new step
-            error_power = _error_scale_and_normalize(error_estimate)
+            error_power = self._error_scale_and_normalize(error_estimate)
             dt, state_control = self.control.apply(
                 dt, state.control, error_power=error_power
             )
@@ -1006,16 +1006,6 @@ class _AdaSolver:
                 control=state_control,  # new
                 step_from=state.step_from,
             )
-
-        def _error_scale_and_normalize(error: _ErrorEstimate):
-            assert isinstance(error, _ErrorEstimate)
-            normalize = self.atol + self.rtol * np.abs(error.reference)
-            error_relative = error.estimate / normalize
-
-            dim = np.atleast_1d(error.reference).size
-            error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
-            error_norm_rel = error_norm / np.sqrt(dim)
-            return error_norm_rel ** (-1.0 / self.solver.error_contraction_rate)
 
         def extract(s: _RejectionState) -> _AdaState:
             num_steps = state0.stats + 1.0  # TODO: track step attempts as well
@@ -1030,6 +1020,16 @@ class _AdaSolver:
         init_val = init(state0)
         state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
         return extract(state_new)
+
+    def _error_scale_and_normalize(self, error: _ErrorEstimate):
+        assert isinstance(error, _ErrorEstimate)
+        normalize = self.atol + self.rtol * np.abs(error.reference)
+        error_relative = error.estimate / normalize
+
+        dim = np.atleast_1d(error.reference).size
+        error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
+        error_norm_rel = error_norm / np.sqrt(dim)
+        return error_norm_rel ** (-1.0 / self.solver.error_contraction_rate)
 
     def extract_before_t1(self, state: _AdaState, t):
         del t
