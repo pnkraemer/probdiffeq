@@ -40,7 +40,7 @@ jax.config.update("jax_platform_name", "cpu")
 # We start by defining an ODE.
 
 # +
-f, u0, (t0, t1), f_args = ivps.rigid_body()
+f, u0, (t0, t1), f_args = ivps.logistic()
 
 
 def vf(*y, t):  # noqa: ARG001
