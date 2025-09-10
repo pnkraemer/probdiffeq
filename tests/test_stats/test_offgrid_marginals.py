@@ -2,7 +2,7 @@
 
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing
+from probdiffeq.backend import ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
@@ -23,8 +23,13 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
     u, _ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
     for u1, u2 in zip(u, sol.u):
-        assert np.allclose(u1[0], u2[-2], atol=1e-3, rtol=1e-3)
-        assert not np.allclose(u1[-1], u2[-1], atol=1e-3, rtol=1e-3)
+        u1_ = tree_util.tree_map(lambda s: s[0], u1)
+        u2_ = tree_util.tree_map(lambda s: s[-2], u2)
+        assert testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
+
+        u1_ = tree_util.tree_map(lambda s: s[-1], u1)
+        u2_ = tree_util.tree_map(lambda s: s[-1], u2)
+        assert not testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
@@ -46,5 +51,10 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     u, _ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
 
     for u1, u2 in zip(u, sol.u):
-        assert np.allclose(u1[0], u2[-2], atol=1e-3, rtol=1e-3)
-        assert np.allclose(u1[-1], u2[-1], atol=1e-3, rtol=1e-3)
+        u1_ = tree_util.tree_map(lambda s: s[0], u1)
+        u2_ = tree_util.tree_map(lambda s: s[-2], u2)
+        assert testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
+
+        u1_ = tree_util.tree_map(lambda s: s[-1], u1)
+        u2_ = tree_util.tree_map(lambda s: s[-1], u2)
+        assert testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)

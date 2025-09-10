@@ -441,8 +441,6 @@ class _Correction:
     linearize: Callable
     vector_field: Callable
 
-    can_handle_higher_order: bool
-
     def init(self, x, /):
         """Initialise the state from the solution."""
         y = self.ssm.prototypes.observed()
@@ -450,7 +448,7 @@ class _Correction:
 
     def correct(self, rv, /, t):
         """Perform the correction step."""
-        f_wrapped = self._parametrize_vector_field(t=t)
+        f_wrapped = functools.partial(self.vector_field, t=t)
         cond = self.linearize(f_wrapped, rv)
         observed, reverted = self.ssm.conditional.revert(rv, cond)
         corrected = reverted.noise
@@ -458,7 +456,7 @@ class _Correction:
 
     def estimate_error(self, rv, /, t):
         """Estimate the error."""
-        f_wrapped = self._parametrize_vector_field(t=t)
+        f_wrapped = functools.partial(self.vector_field, t=t)
         cond = self.linearize(f_wrapped, rv)
         observed = self.ssm.conditional.marginalise(rv, cond)
 
@@ -468,16 +466,6 @@ class _Correction:
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, observed
-
-    def _parametrize_vector_field(self, *, t):
-        if self.can_handle_higher_order:
-
-            def f_wrapped(s):
-                return self.vector_field(*s, t=t)
-
-            return f_wrapped
-
-        return functools.partial(self.vector_field, t=t)
 
 
 def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
@@ -489,7 +477,6 @@ def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
-        can_handle_higher_order=True,
     )
 
 
@@ -502,7 +489,6 @@ def correction_ts1(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
-        can_handle_higher_order=True,
     )
 
 
@@ -517,7 +503,6 @@ def correction_slr0(
         ode_order=1,
         linearize=linearize,
         name="SLR0",
-        can_handle_higher_order=False,  # TODO: implement this
     )
 
 
@@ -532,7 +517,6 @@ def correction_slr1(
         ode_order=1,
         linearize=linearize,
         name="SLR1",
-        can_handle_higher_order=False,  # TODO: implement this
     )
 
 
@@ -977,8 +961,13 @@ class _AdaSolver:
                 state=state.step_from, dt=dt
             )
             # Normalise the error
-            u_proposed = self.ssm.stats.qoi(state_proposed.rv)[0]
-            u_step_from = self.ssm.stats.qoi(state_proposed.rv)[0]
+            u_proposed = tree_util.ravel_pytree(
+                self.ssm.unravel(state_proposed.rv.mean)[0]
+            )[0]
+            u_step_from = tree_util.ravel_pytree(
+                self.ssm.unravel(state.step_from.rv.mean)[0]
+            )[0]
+
             u = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
             error_power = _error_scale_and_normalize(error_estimate, u=u)
 
@@ -994,7 +983,7 @@ class _AdaSolver:
                 step_from=state.step_from,
             )
 
-        def _error_scale_and_normalize(error_estimate, *, u):
+        def _error_scale_and_normalize(error_estimate, u):
             error_relative = error_estimate / (self.atol + self.rtol * np.abs(u))
             dim = np.atleast_1d(u).size
             error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)

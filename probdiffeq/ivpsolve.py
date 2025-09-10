@@ -321,6 +321,9 @@ def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
     u0, *_ = initial_values
     f0 = vf_autonomous(*initial_values)
 
+    u0, _ = tree_util.ravel_pytree(u0)
+    f0, _ = tree_util.ravel_pytree(f0)
+
     norm_y0 = linalg.vector_norm(u0)
     norm_dy0 = linalg.vector_norm(f0) + nugget
 
@@ -342,13 +345,18 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
     y0 = initial_values[0]
 
     f0 = vf(y0, t=t0)
+
+    y0, unravel = tree_util.ravel_pytree(y0)
+    f0, _ = tree_util.ravel_pytree(f0)
+
     scale = atol + np.abs(y0) * rtol
     d0, d1 = linalg.vector_norm(y0), linalg.vector_norm(f0)
 
     dt0 = np.where((d0 < 1e-5) | (d1 < 1e-5), 1e-6, 0.01 * d0 / d1)
 
     y1 = y0 + dt0 * f0
-    f1 = vf(y1, t=t0 + dt0)
+    f1 = vf(unravel(y1), t=t0 + dt0)
+    f1, _ = tree_util.ravel_pytree(f1)
     d2 = linalg.vector_norm((f1 - f0) / scale) / dt0
 
     dt1 = np.where(

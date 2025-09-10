@@ -11,9 +11,9 @@ def estimate_fwd(data, /, init, prior_transitions, observation_model, *, estimat
     """Estimate forward-in-time."""
     initialise, step = estimator
 
-    # Incorporate final data point
-    information_terminal = _select((data, observation_model), idx_or_slice=0)
-    init = initialise(init, *information_terminal)
+    # Incorporate initial data point
+    information_init = _select((data, observation_model), idx_or_slice=0)
+    init = initialise(init, *information_init)
 
     # Scan over the remaining data points
     idx_or_slice = slice(1, len(data), 1)

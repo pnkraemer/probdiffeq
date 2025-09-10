@@ -24,11 +24,12 @@ def ivp_lotka_volterra():
     f, u0, (t0, _), f_args = ivps.lotka_volterra()
     t1 = 2.0  # Short time-intervals are sufficient for this test.
 
+    # Dictionary to ensure pytree compatibility
     @jax.jit
     def vf(x, *, t):  # noqa: ARG001
-        return f(x, *f_args)
+        return {"u": f(x["u"], *f_args)}
 
-    return vf, (u0,), (t0, t1)
+    return vf, ({"u": u0},), (t0, t1)
 
 
 def ivp_three_body_1st():
@@ -40,10 +41,11 @@ def ivp_three_body_1st():
 
     f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
+    # Dictionary to ensure pytree compatibility
     def vf(u, *, t):  # noqa: ARG001
-        return f(u, *f_args)
+        return {"u": f(u["u"], *f_args)}
 
-    return vf, (u0,), (t0, t1)
+    return vf, ({"u": u0},), (t0, t1)
 
 
 def ivp_van_der_pol_2nd():
@@ -56,6 +58,6 @@ def ivp_van_der_pol_2nd():
     f, (u0, du0), (t0, t1), f_args = ivps.van_der_pol()
 
     def vf(u, du, *, t):  # noqa: ARG001
-        return f(u, du, *f_args)
+        return {"u": f(u["u"], du["u"], *f_args)}
 
-    return vf, (u0, du0), (t0, t1)
+    return vf, ({"u": u0}, {"u": du0}), (t0, t1)

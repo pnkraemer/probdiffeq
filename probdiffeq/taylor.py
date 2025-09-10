@@ -2,17 +2,16 @@ r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
 from probdiffeq.backend import control_flow, functools, itertools, ode, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Array, Callable, Sequence
+from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 from probdiffeq.util import filter_util
 
 
-def runge_kutta_starter(dt, *, ssm, atol=1e-12, rtol=1e-10):
+def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
     """Create an estimator that uses a Runge-Kutta starter."""
 
-    def starter(vf, initial_values, /, num: int, t):
-        # TODO [inaccuracy]: the initial-value uncertainty is discarded
-        # TODO [feature]: allow implementations other than IsoIBM?
-        # TODO [feature]: higher-order ODEs
+    def starter(vf, initial_values: tuple, /, t):
+        # TODO: higher-order ODEs
+        # TODO: allow flexible "solve" method?
 
         # Assertions and early exits
 
@@ -21,14 +20,13 @@ def runge_kutta_starter(dt, *, ssm, atol=1e-12, rtol=1e-10):
             raise ValueError(msg)
 
         if num == 0:
-            return initial_values
+            return [*initial_values]
 
         if num == 1:
-            return *initial_values, vf(*initial_values, t)
+            return [*initial_values, vf(*initial_values, t=t)]
 
         # Generate data
 
-        # TODO: allow flexible "solve" method?
         k = num + 1  # important: k > num
         ts = np.linspace(t, t + dt * (k - 1), num=k, endpoint=True)
         ys = ode.odeint_and_save_at(
@@ -36,33 +34,36 @@ def runge_kutta_starter(dt, *, ssm, atol=1e-12, rtol=1e-10):
         )
 
         # Initial condition
-        rv_t0 = ssm.normal.standard(num + 1, 1.0)
+        scale = ssm.prototypes.output_scale()
+        rv_t0 = ssm.normal.standard(num + 1, scale)
         estimator = filter_util.fixedpointsmoother_precon(ssm=ssm)
         conditional_t0 = ssm.conditional.identity(num + 1)
         init = (rv_t0, conditional_t0)
 
         # Discretised prior
         scale = ssm.prototypes.output_scale()
-        discretise = ssm.conditional.ibm_transitions(scale)
-        ibm_transitions = functools.vmap(discretise, in_axes=(0, None))(
-            np.diff(ts), scale
-        )
+        prior_vmap = functools.vmap(prior, in_axes=(0, None))
+        ibm_transitions = prior_vmap(np.diff(ts), scale)
 
         # Generate an observation-model for the QOI
         # (1e-7 observation noise for nuggets and for reusing existing code)
-        model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0))
-        models = model_fun(0, 1e-7 * np.ones_like(ts))
+        model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
+        std = tree_util.tree_map(lambda s: 1e-7 * np.ones((len(s),)), ys)
+        models = model_fun(0, ys, std)
+
+        zeros = np.zeros_like(models.noise.mean)
 
         # Run the preconditioned fixedpoint smoother
         (corrected, conditional), _ = filter_util.estimate_fwd(
-            ys,
+            zeros,
             init=init,
             prior_transitions=ibm_transitions,
             observation_model=models,
             estimator=estimator,
         )
         initial = ssm.conditional.marginalise(corrected, conditional)
-        return tuple(ssm.stats.mean(initial))
+        mean = ssm.stats.mean(initial)
+        return ssm.unravel(mean)
 
     return starter
 
@@ -78,6 +79,17 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[Array], /, num: int):
     The differences should be small.
     Consult the benchmarks if performance is critical.
     """
+    if not isinstance(inits[0], ArrayLike):
+        _, unravel = tree_util.ravel_pytree(inits[0])
+        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+
+        def vf_wrapped(*ys, **kwargs):
+            ys = tree_util.tree_map(unravel, ys)
+            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+
+        tcoeffs = odejet_padded_scan(vf_wrapped, inits_flat, num=num)
+        return tree_util.tree_map(unravel, tcoeffs)
+
     # Number of positional arguments in f
     num_arguments = len(inits)
 
@@ -131,6 +143,17 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
+    if not isinstance(inits[0], ArrayLike):
+        _, unravel = tree_util.ravel_pytree(inits[0])
+        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+
+        def vf_wrapped(*ys, **kwargs):
+            ys = tree_util.tree_map(unravel, ys)
+            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+
+        tcoeffs = odejet_unroll(vf_wrapped, inits_flat, num=num)
+        return tree_util.tree_map(unravel, tcoeffs)
+
     # Number of positional arguments in f
     num_arguments = len(inits)
 
@@ -178,6 +201,17 @@ def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
+    if not isinstance(inits[0], ArrayLike):
+        _, unravel = tree_util.ravel_pytree(inits[0])
+        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+
+        def vf_wrapped(*ys, **kwargs):
+            ys = tree_util.tree_map(unravel, ys)
+            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+
+        tcoeffs = odejet_via_jvp(vf_wrapped, inits_flat, num=num)
+        return tree_util.tree_map(unravel, tcoeffs)
+
     g_n, g_0 = vf, vf
     taylor_coeffs = [*inits, vf(*inits)]
     for _ in range(num - 1):
@@ -213,6 +247,19 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
         JIT-compiling this function unrolls a loop.
 
     """
+    if not isinstance(inits[0], ArrayLike):
+        _, unravel = tree_util.ravel_pytree(inits[0])
+        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+
+        def vf_wrapped(*ys, **kwargs):
+            ys = tree_util.tree_map(unravel, ys)
+            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+
+        tcoeffs = odejet_doubling_unroll(
+            vf_wrapped, inits_flat, num_doublings=num_doublings
+        )
+        return tree_util.tree_map(unravel, tcoeffs)
+
     (u0,) = inits
     zeros = np.zeros_like(u0)
 
@@ -269,16 +316,16 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
 def _normalise(primals, *series):
     """Un-normalised Taylor series to normalised Taylor series."""
     series_new = [s / np.factorial(i + 1) for i, s in enumerate(series)]
-    return primals, *series_new
+    return [primals, *series_new]
 
 
 def _unnormalise(primals, *series):
     """Normalised Taylor series to un-normalised Taylor series."""
     series_new = [s * np.factorial(i + 1) for i, s in enumerate(series)]
-    return primals, *series_new
+    return [primals, *series_new]
 
 
-def odejet_affine(vf: Callable, initial_values: Sequence[Array], /, num: int):
+def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     """Evaluate the Taylor series of an affine differential equation.
 
     !!! warning "Compilation time"
@@ -286,10 +333,21 @@ def odejet_affine(vf: Callable, initial_values: Sequence[Array], /, num: int):
 
     """
     if num == 0:
-        return initial_values
+        return inits
 
-    fx, jvp_fn = functools.linearize(vf, *initial_values)
+    if not isinstance(inits[0], ArrayLike):
+        _, unravel = tree_util.ravel_pytree(inits[0])
+        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+
+        def vf_wrapped(*ys, **kwargs):
+            ys = tree_util.tree_map(unravel, ys)
+            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+
+        tcoeffs = odejet_affine(vf_wrapped, inits_flat, num=num)
+        return tree_util.tree_map(unravel, tcoeffs)
+
+    fx, jvp_fn = functools.linearize(vf, *inits)
 
     tmp = fx
     fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
-    return [*initial_values, fx, *fx_evaluations]
+    return [*inits, fx, *fx_evaluations]

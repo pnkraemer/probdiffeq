@@ -57,9 +57,8 @@ class DenseStats(StatsBackend):
         self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
-        residual_white = linalg.solve_triangular(
-            rv.cholesky.T, u - rv.mean, lower=False, trans="T"
-        )
+        dx = u - rv.mean
+        residual_white = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
         mahalanobis = linalg.qr_r(residual_white[:, None])
         return np.reshape(np.abs(mahalanobis) / np.sqrt(rv.mean.size), ())
 
