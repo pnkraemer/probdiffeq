@@ -113,7 +113,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
-    linearise = _linearise.BlockDiagLinearisation()
+    linearise = _linearise.BlockDiagLinearisation(unravel=unravel)
     conditional = _conditional.BlockDiagConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )

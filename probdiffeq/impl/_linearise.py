@@ -246,20 +246,19 @@ class IsotropicLinearisation(LinearisationBackend):
 
 
 class BlockDiagLinearisation(LinearisationBackend):
+    def __init__(self, unravel):
+        self.unravel = unravel
+
     def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, rv):
             mean = rv.mean
-            m0 = mean[:, :ode_order]
-            fx = self.ts0(fun, m0.T)
+            fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
 
             def a1(s):
                 return s[[ode_order], ...]
 
-            @functools.vmap
-            def lo(s):
-                return _jac_materialize(lambda v, _p: a1(v), inputs=s)
+            linop = functools.vmap(functools.jacrev(a1))(mean)
 
-            linop = lo(mean)
             d, *_ = linop.shape
             cov_lower = damp * np.ones((d, 1, 1))
             bias = _normal.Normal(-fx[:, None], cov_lower)
@@ -280,11 +279,3 @@ class BlockDiagLinearisation(LinearisationBackend):
 
     def ode_statistical_1st(self, cubature_fun, damp: float):
         raise NotImplementedError
-
-    @staticmethod
-    def ts0(fn, m):
-        return fn(m)
-
-
-def _jac_materialize(func, /, *, inputs, params=None):
-    return functools.jacrev(lambda v: func(v, params))(inputs)
