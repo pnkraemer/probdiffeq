@@ -207,7 +207,18 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
     [u_leaves], u_structure = tree_util.tree_flatten(u)
     [std_leaves], std_structure = tree_util.tree_flatten(standard_deviation)
 
-    if np.shape(std_leaves) != np.shape(u_leaves):
+    if np.ndim(std_leaves) < 1:
+        msg = "A vector of standard deviations must be provided."
+        raise ValueError(msg)
+
+    if u_structure != std_structure:
+        msg = (
+            f"Observation-noise tree structure {std_structure} "
+            f"does not match the observation structure {u_structure}. "
+        )
+        raise ValueError(msg)
+
+    if len(u_leaves) != len(np.asarray(std_leaves)):
         msg = (
             f"Observation-noise shape {np.shape(std_leaves)} "
             f"does not match the observation shape {np.shape(u_leaves)}. "

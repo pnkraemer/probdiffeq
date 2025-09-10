@@ -51,21 +51,6 @@ def test_that_function_raises_error_for_wrong_std_shape_too_many(solution):
         )
 
 
-def test_that_function_raises_error_for_wrong_std_shape_wrong_ndim(solution):
-    """Test that the log-marginal-likelihood function complains about the wrong shape.
-
-    Specifically, about receiving scalar standard-deviations.
-    """
-    sol, ssm = solution
-    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
-    std = tree_util.tree_map(lambda s: np.ones((len(s),)), sol.u[0])
-
-    with testing.raises(ValueError, match="does not match"):
-        _ = stats.log_marginal_likelihood(
-            data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
-        )
-
-
 def test_raises_error_for_terminal_values(solution):
     """Test that the log-marginal-likelihood function complains when called incorrectly.
 
@@ -101,6 +86,43 @@ def test_raises_error_for_filter(fact):
     data = sol.u[0] + 0.1
     std = np.ones((sol.u[0].shape[0],))  # values irrelevant
     with testing.raises(TypeError, match="ilter"):
+        _ = stats.log_marginal_likelihood(
+            data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
+        )
+
+
+def test_terminal_values_scalar_and_nonscalar_same_solution(solution):
+    sol, ssm = solution
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
+
+    std_sca = tree_util.tree_map(lambda s: np.ones((len(s),)), sol.u[0])
+    std_vec = tree_util.tree_map(np.ones_like, sol.u[0])
+    result_sca = stats.log_marginal_likelihood(
+        data, standard_deviation=std_sca, posterior=sol.posterior, ssm=ssm
+    )
+    result_vec = stats.log_marginal_likelihood(
+        data, standard_deviation=std_vec, posterior=sol.posterior, ssm=ssm
+    )
+    assert np.allclose(result_sca, result_vec)
+
+
+def test_raise_error_non_vector_std(solution):
+    sol, ssm = solution
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
+    std = tree_util.tree_map(lambda _s: np.ones(()), sol.u[0])
+
+    with testing.raises(ValueError, match="vector"):
+        _ = stats.log_marginal_likelihood(
+            data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
+        )
+
+
+def test_raise_error_if_structures_dont_match(solution):
+    sol, ssm = solution
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
+    std = np.ones_like(sol.t)  # not the correct pytree
+
+    with testing.raises(ValueError, match="tree structure"):
         _ = stats.log_marginal_likelihood(
             data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
         )
