@@ -10,9 +10,8 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
     """Create an estimator that uses a Runge-Kutta starter."""
 
     def starter(vf, initial_values: tuple, /, t):
-        # TODO [inaccuracy]: the initial-value uncertainty is discarded
-        # TODO [feature]: allow implementations other than IsoIBM?
-        # TODO [feature]: higher-order ODEs
+        # TODO: higher-order ODEs
+        # TODO: allow flexible "solve" method?
 
         # Assertions and early exits
 
@@ -28,7 +27,6 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
 
         # Generate data
 
-        # TODO: allow flexible "solve" method?
         k = num + 1  # important: k > num
         ts = np.linspace(t, t + dt * (k - 1), num=k, endpoint=True)
         ys = ode.odeint_and_save_at(
