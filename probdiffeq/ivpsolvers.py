@@ -28,6 +28,8 @@ def prior_wiener_integrated(
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
     # TODO: should the output_scale be an argument to solve()?
+    # TODO: should the output scale (and all 'damp'-like factors)
+    #       mirror the pytree structure of 'tcoeffs'?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
 
@@ -455,6 +457,7 @@ class _Correction:
 
     def correct(self, rv, /, t):
         """Perform the correction step."""
+        print(f"\nt = {t}")
         f_wrapped = functools.partial(self.vector_field, t=t)
         cond = self.linearize(f_wrapped, rv)
         observed, reverted = self.ssm.conditional.revert(rv, cond)

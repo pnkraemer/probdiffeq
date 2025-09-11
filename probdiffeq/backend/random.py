@@ -9,3 +9,7 @@ def prng_key(*, seed):
 
 def normal(key, /, shape):
     return jax.random.normal(key, shape=shape)
+
+
+def rademacher(key, /, shape, dtype):
+    return jax.random.rademacher(key, shape=shape, dtype=dtype)

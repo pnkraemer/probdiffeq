@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, functools, tree_util
+from probdiffeq.backend import abc, functools, linalg, random, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _normal
@@ -34,14 +34,12 @@ class DenseLinearisation(LinearisationBackend):
 
     def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, rv):
-            mean = rv.mean
-
             def a1(m):
+                """Select the 'n'-th derivative."""
                 return tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
 
-            fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
-            linop = functools.jacrev(a1)(mean)
-
+            fx = tree_util.ravel_pytree(fun(*self.unravel(rv.mean)[:ode_order]))[0]
+            linop = functools.jacrev(a1)(rv.mean)
             cov_lower = damp * np.eye(len(fx))
             bias = _normal.Normal(-fx, cov_lower)
             to_latent = np.ones(linop.shape[1])
@@ -56,6 +54,8 @@ class DenseLinearisation(LinearisationBackend):
         def new(fun, rv, /):
             mean = rv.mean
 
+            # TODO: expose this function somehow. This way, we can
+            #       implement custom information operators easily.
             def constraint(m):
                 a1 = tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
                 a0 = tree_util.ravel_pytree(fun(*self.unravel(m)[:ode_order]))[0]
@@ -80,6 +80,8 @@ class DenseLinearisation(LinearisationBackend):
         linearise_fun = functools.partial(self.slr1, cubature_rule=cubature_rule)
 
         def new(fun, rv, /):
+            # TODO: we can make this a lot more general (yet a little less efficient)
+            #       if we mirror the TS1 implementation more closely.
             def select_0(s):
                 return tree_util.ravel_pytree(self.unravel(s)[0])
 
@@ -215,7 +217,50 @@ class IsotropicLinearisation(LinearisationBackend):
         self.unravel = unravel
 
     def ode_taylor_1st(self, ode_order, damp: float):
-        raise NotImplementedError
+        if ode_order > 1:
+            raise ValueError
+
+        def linearise_fun_wrapped(fun, rv):
+            mean = rv.mean
+
+            def a1(m):
+                return m[[ode_order], ...]
+
+            linop = functools.jacrev(a1)(mean[..., 0])
+
+            def vf_flat(u):
+                return tree_util.ravel_pytree(fun(unravel(u)))[0]
+
+            def select_0(s):
+                return tree_util.ravel_pytree(self.unravel(s)[0])
+
+            m0, unravel = select_0(rv.mean)
+            fx, Jvp = functools.linearize(vf_flat, m0)
+
+            key = random.prng_key(seed=2)
+            v = random.rademacher(key, shape=(10, *m0.shape), dtype=m0.dtype)
+
+            J = functools.jacrev(Jvp)(m0)
+            J_trace = functools.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
+            J_trace = J_trace.mean(axis=0)
+            print(linalg.trace(J), J_trace)
+
+            E0 = functools.jacrev(lambda s: s[[0], ...])(mean[..., 0])
+            linop = linop - J_trace * E0
+
+            fx = mean[1, ...] - fx
+            fx = fx - linop @ mean
+
+            cov_lower = damp * np.eye(1)
+            bias = _normal.Normal(fx, cov_lower)
+
+            to_latent = np.ones((linop.shape[1],))
+            to_observed = np.ones((linop.shape[0],))
+            return _conditional.LatentCond(
+                linop, bias, to_latent=to_latent, to_observed=to_observed
+            )
+
+        return linearise_fun_wrapped
 
     def ode_taylor_0th(self, ode_order, damp: float):
         def linearise_fun_wrapped(fun, rv):

@@ -67,6 +67,10 @@ def diagonal(arr, /):
     return jnp.diagonal(arr)
 
 
+def trace(arr, /):
+    return jnp.trace(arr)
+
+
 def diagonal_matrix(arr, /):
     return jnp.diag(arr)
 
