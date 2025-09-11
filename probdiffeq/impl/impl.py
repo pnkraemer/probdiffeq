@@ -75,7 +75,13 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
 
     tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
     _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
-    unravel = functools.vmap(unravel_tree, in_axes=1, out_axes=0)
+
+    leaves, _ = tree_util.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
+
+    def unravel(z):
+        tree = functools.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
+        return tree_util.tree_map(unravel_leaf, tree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
@@ -102,7 +108,13 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
 
     tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
     _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
-    unravel = functools.vmap(unravel_tree)
+
+    leaves, _ = tree_util.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
+
+    def unravel(z):
+        tree = functools.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
+        return tree_util.tree_map(unravel_leaf, tree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)

@@ -346,6 +346,7 @@ class BlockDiagLinearisation(LinearisationBackend):
 
         def step(fun, rv, state):
             del state
+
             mean = rv.mean
             fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
 
