@@ -449,19 +449,12 @@ class _Correction:
     ssm: Any
     linearize: Any
     vector_field: Callable
+    re_linearize: bool
 
     def init(self, x, /):
         """Initialise the state from the solution."""
         jac = self.linearize.init()
         return x, jac
-
-    def correct(self, rv, correction_state, /, t):
-        """Perform the correction step."""
-        f_wrapped = functools.partial(self.vector_field, t=t)
-        cond, correction_state = self.linearize.update(f_wrapped, rv, correction_state)
-        observed, reverted = self.ssm.conditional.revert(rv, cond)
-        corrected = reverted.noise
-        return corrected, observed, correction_state
 
     def estimate_error(self, rv, correction_state, /, t):
         """Estimate the error."""
@@ -474,7 +467,21 @@ class _Correction:
         stdev = self.ssm.stats.standard_deviation(observed)
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed, correction_state
+        return error_estimate, observed, (correction_state, cond)
+
+    def correct(self, rv, correction_state, /, t):
+        """Perform the correction step."""
+        linearization_state, cond = correction_state
+
+        if self.re_linearize:
+            f_wrapped = functools.partial(self.vector_field, t=t)
+            cond, linearization_state = self.linearize.update(
+                f_wrapped, rv, linearization_state
+            )
+
+        observed, reverted = self.ssm.conditional.revert(rv, cond)
+        corrected = reverted.noise
+        return corrected, observed, linearization_state
 
 
 def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
@@ -486,6 +493,7 @@ def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
+        re_linearize=False,
     )
 
 
@@ -512,6 +520,7 @@ def correction_ts1(
         ode_order=ode_order,
         ssm=ssm,
         linearize=linearize,
+        re_linearize=False,
     )
 
 
@@ -526,6 +535,7 @@ def correction_slr0(
         ode_order=1,
         linearize=linearize,
         name="SLR0",
+        re_linearize=True,
     )
 
 
@@ -540,6 +550,7 @@ def correction_slr1(
         ode_order=1,
         linearize=linearize,
         name="SLR1",
+        re_linearize=True,
     )
 
 
