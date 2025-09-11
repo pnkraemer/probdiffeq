@@ -30,7 +30,7 @@ jax.config.update("jax_enable_x64", True)
 def main():
     """Simulate a PDE."""
     key = jax.random.PRNGKey(1)
-    f, (u0,), (t0, t1) = fhn_2d(key, dx=0.025, t1=10.0)
+    f, (u0,), (t0, t1) = fhn_2d(key, num=50, t1=10.0)
 
     @jax.jit
     def vf(y, *, t):  # noqa: ARG001
@@ -91,7 +91,7 @@ def simulator(save_at, adaptive_solver, ssm):
     return solve
 
 
-def fhn_2d(prng_key, *, dx, t1, t0=0.0, a=2.8e-4, b=5e-3, k=-0.005, tau=1.0):
+def fhn_2d(prng_key, *, num, t1, t0=0.0, a=2.8e-4, b=5e-3, k=-0.005, tau=1.0):
     """Construct the FitzHugh-Nagumo PDE.
 
     Source: https://github.com/pnkraemer/tornadox/blob/main/tornadox/ivp.py
@@ -99,15 +99,13 @@ def fhn_2d(prng_key, *, dx, t1, t0=0.0, a=2.8e-4, b=5e-3, k=-0.005, tau=1.0):
     But simplified since Probdiffeq can handle matrix-valued ODEs.
     Here, we also set tau = 1.0 to make the example quick to execute.
     """
-    ny, nx = int(1 / dx), int(1 / dx)
-
-    y0 = jax.random.uniform(prng_key, shape=(2, ny, nx))
+    y0 = jax.random.uniform(prng_key, shape=(2, num, num))
 
     @jax.jit
     def fhn_2d(x):
         u, v = x
-        du = _laplace_2d(u, dx=dx)
-        dv = _laplace_2d(v, dx=dx)
+        du = _laplace_2d(u, dx=1.0 / num)
+        dv = _laplace_2d(v, dx=1.0 / num)
         u_new = a * du + u - u**3 - v + k
         v_new = (b * dv + u - v) / tau
         return jnp.stack((u_new, v_new))
