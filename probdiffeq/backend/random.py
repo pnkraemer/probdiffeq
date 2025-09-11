@@ -7,6 +7,10 @@ def prng_key(*, seed):
     return jax.random.PRNGKey(seed=seed)
 
 
+def split(key, num):
+    return jax.random.split(key, num=num)
+
+
 def normal(key, /, shape):
     return jax.random.normal(key, shape=shape)
 

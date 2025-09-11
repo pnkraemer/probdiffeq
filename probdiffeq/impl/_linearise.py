@@ -1,29 +1,37 @@
-from probdiffeq.backend import abc, functools, linalg, random, tree_util
+from probdiffeq.backend import abc, containers, functools, linalg, random, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _normal
 from probdiffeq.util import cholesky_util
 
 
+@containers.dataclass
+class _Linearization:
+    """Linearisation API."""
+
+    init: Callable
+    update: Callable
+
+
 class LinearisationBackend(abc.ABC):
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order: int, damp: float) -> _normal.Normal:
+    def ode_taylor_0th(self, ode_order: int, damp: float) -> _Linearization:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, ode_order: int, damp: float) -> _normal.Normal:
+    def ode_taylor_1st(self, ode_order: int, damp: float) -> _Linearization:
         raise NotImplementedError
 
     @abc.abstractmethod
     def ode_statistical_1st(
         self, cubature_fun: Callable, damp: float
-    ) -> _normal.Normal:
+    ) -> _Linearization:
         raise NotImplementedError
 
     @abc.abstractmethod
     def ode_statistical_0th(
         self, cubature_fun: Callable, damp: float
-    ) -> _normal.Normal:
+    ) -> _Linearization:
         raise NotImplementedError
 
 
@@ -32,8 +40,13 @@ class DenseLinearisation(LinearisationBackend):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order, damp: float):
-        def linearise_fun_wrapped(fun, rv):
+    def ode_taylor_0th(self, ode_order, damp: float) -> _Linearization:
+        def init():
+            return None
+
+        def step(fun, rv, state):
+            del state
+
             def a1(m):
                 """Select the 'n'-th derivative."""
                 return tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
@@ -44,14 +57,24 @@ class DenseLinearisation(LinearisationBackend):
             bias = _normal.Normal(-fx, cov_lower)
             to_latent = np.ones(linop.shape[1])
             to_observed = np.ones(linop.shape[0])
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, None
 
-        return linearise_fun_wrapped
+        return _Linearization(init, step)
 
-    def ode_taylor_1st(self, ode_order, damp):
-        def new(fun, rv, /):
+    def ode_taylor_1st(
+        self, ode_order, damp, jvp_samples: int, jvp_samples_seed: int
+    ) -> _Linearization:
+        del jvp_samples
+        del jvp_samples_seed
+
+        def init():
+            return None
+
+        def step(fun, rv, state):
+            del state
             mean = rv.mean
 
             # TODO: expose this function somehow. This way, we can
@@ -69,17 +92,23 @@ class DenseLinearisation(LinearisationBackend):
             bias = _normal.Normal(fx, cov_lower)
             to_latent = np.ones(linop.shape[1])
             to_observed = np.ones(linop.shape[0])
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, None
 
-        return new
+        return _Linearization(init, step)
 
-    def ode_statistical_1st(self, cubature_fun, damp: float):
+    def ode_statistical_1st(self, cubature_fun, damp: float) -> _Linearization:
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         linearise_fun = functools.partial(self.slr1, cubature_rule=cubature_rule)
 
-        def new(fun, rv, /):
+        def init():
+            return None
+
+        def new(fun, rv, state):
+            del state
+
             # TODO: we can make this a lot more general (yet a little less efficient)
             #       if we mirror the TS1 implementation more closely.
             def select_0(s):
@@ -116,17 +145,23 @@ class DenseLinearisation(LinearisationBackend):
             bias = _normal.Normal(-mean, cov_lower)
             to_latent = np.ones(linop.shape[1])
             to_observed = np.ones(linop.shape[0])
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, None
 
-        return new
+        return _Linearization(init, new)
 
-    def ode_statistical_0th(self, cubature_fun, damp: float):
+    def ode_statistical_0th(self, cubature_fun, damp: float) -> _Linearization:
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         linearise_fun = functools.partial(self.slr0, cubature_rule=cubature_rule)
 
-        def new(fun, rv, /):
+        def init():
+            return None
+
+        def new(fun, rv, state):
+            del state
+
             def select_0(s):
                 return tree_util.ravel_pytree(self.unravel(s)[0])
 
@@ -158,11 +193,12 @@ class DenseLinearisation(LinearisationBackend):
             bias = _normal.Normal(-mean, cov_lower)
             to_latent = np.ones(linop.shape[1])
             to_observed = np.ones(linop.shape[0])
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, None
 
-        return new
+        return _Linearization(init, new)
 
     @staticmethod
     def slr1(fn, x, *, cubature_rule):
@@ -216,11 +252,16 @@ class IsotropicLinearisation(LinearisationBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
-    def ode_taylor_1st(self, ode_order, damp: float):
+    def ode_taylor_1st(
+        self, ode_order, damp: float, jvp_samples: int, jvp_samples_seed: int
+    ):
         if ode_order > 1:
             raise ValueError
 
-        def linearise_fun_wrapped(fun, rv):
+        def init():
+            return random.prng_key(seed=jvp_samples_seed)
+
+        def step(fun, rv, key):
             mean = rv.mean
 
             def a1(m):
@@ -234,36 +275,40 @@ class IsotropicLinearisation(LinearisationBackend):
             def select_0(s):
                 return tree_util.ravel_pytree(self.unravel(s)[0])
 
+            # Evaluate the linearisation
             m0, unravel = select_0(rv.mean)
             fx, Jvp = functools.linearize(vf_flat, m0)
 
-            key = random.prng_key(seed=2)
-            v = random.rademacher(key, shape=(10, *m0.shape), dtype=m0.dtype)
-
-            J = functools.jacrev(Jvp)(m0)
+            # Estimate the trace using Hutchinson's estimator
+            # J_trace, jacobian_state = jacobian(Jvp, m0, jacobian_state)
+            key, subkey = random.split(key, num=2)
+            sample_shape = (jvp_samples, *m0.shape)
+            v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
             J_trace = functools.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
             J_trace = J_trace.mean(axis=0)
-            print(linalg.trace(J), J_trace)
 
+            # Turn fx and J_trace into an observation model
             E0 = functools.jacrev(lambda s: s[[0], ...])(mean[..., 0])
             linop = linop - J_trace * E0
-
             fx = mean[1, ...] - fx
             fx = fx - linop @ mean
-
             cov_lower = damp * np.eye(1)
             bias = _normal.Normal(fx, cov_lower)
-
             to_latent = np.ones((linop.shape[1],))
             to_observed = np.ones((linop.shape[0],))
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, key
 
-        return linearise_fun_wrapped
+        return _Linearization(init, step)
 
-    def ode_taylor_0th(self, ode_order, damp: float):
-        def linearise_fun_wrapped(fun, rv):
+    def ode_taylor_0th(self, ode_order, damp: float) -> _Linearization:
+        def init():
+            return None
+
+        def step(fun, rv, state):
+            del state
             mean = rv.mean
 
             def a1(m):
@@ -277,11 +322,12 @@ class IsotropicLinearisation(LinearisationBackend):
 
             to_latent = np.ones((linop.shape[1],))
             to_observed = np.ones((linop.shape[0],))
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, None
 
-        return linearise_fun_wrapped
+        return _Linearization(init, step)
 
     def ode_statistical_0th(self, cubature_fun, damp: float):
         raise NotImplementedError
@@ -294,8 +340,12 @@ class BlockDiagLinearisation(LinearisationBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order, damp: float):
-        def linearise_fun_wrapped(fun, rv):
+    def ode_taylor_0th(self, ode_order, damp: float) -> _Linearization:
+        def init():
+            return None
+
+        def step(fun, rv, state):
+            del state
             mean = rv.mean
             fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
 
@@ -310,13 +360,16 @@ class BlockDiagLinearisation(LinearisationBackend):
 
             to_latent = np.ones((linop.shape[2],))
             to_observed = np.ones((linop.shape[1],))
-            return _conditional.LatentCond(
+            cond = _conditional.LatentCond(
                 linop, bias, to_latent=to_latent, to_observed=to_observed
             )
+            return cond, None
 
-        return linearise_fun_wrapped
+        return _Linearization(init, step)
 
-    def ode_taylor_1st(self, ode_order, damp: float):
+    def ode_taylor_1st(
+        self, ode_order, damp: float, jvp_samples: int, jvp_samples_seed: int
+    ):
         raise NotImplementedError
 
     def ode_statistical_0th(self, cubature_fun, damp: float):
