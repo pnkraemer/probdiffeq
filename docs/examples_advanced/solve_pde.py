@@ -19,57 +19,63 @@
 # +
 """Solve a partial differential equation."""
 
+import time
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, ivpsolvers, taylor
+
+jax.config.update("jax_enable_x64", True)
 
 
 def main():
     """Simulate a PDE."""
     key = jax.random.PRNGKey(2)
-    v = 1.25
-    f, (u0,), (t0, t1) = fhn_2d(key, bbox=[[-v, -v], [v, v]], dx=0.05, t1=10.0)
+    v = 0.25
+    f, (u0,), (t0, t1) = fhn_2d(key, bbox=[[-v, -v], [v, v]], dx=0.025, t1=50.0)
 
     @jax.jit
     def vf(y, *, t):  # noqa: ARG001
         """Evaluate the dynamics of the logistic ODE."""
         return f(y)
 
-    print(u0.shape)
-    print(vf(u0, t=t0).shape)
+    print(u0.size)
 
     # Set up a state-space model
-    tcoeffs = [u0, vf(u0, t=t0)]
+    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 
     # Build a solver
-    ts = ivpsolvers.correction_ts1(vf, ssm=ssm, ode_order=1)
+    ts = ivpsolvers.correction_ts1(vf, ssm=ssm, ode_order=1, jvp_probes=10)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_dynamic(
         ssm=ssm, strategy=strategy, prior=ibm, correction=ts
     )
-    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm, atol=1e-3, rtol=1e-3)
+    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm, clip_dt=True)
 
     # Solve the ODE
     # To all users: Try different solution routines.
-    save_at = jnp.linspace(t0, t1, num=5)
+    save_at = jnp.linspace(t0, t1, num=4)
     simulate = simulator(save_at=save_at, adaptive_solver=adaptive_solver, ssm=ssm)
-    u, u_std = simulate(init)
-    # u.block_until_ready()
-    print("ok")
-    print(u_std)
+    t0 = time.perf_counter()
+    (u, u_std), solution = simulate(init)
+    u.block_until_ready()
+    u_std.block_until_ready()
+    t1 = time.perf_counter()
+    print("Simulated in", t1 - t0)
 
-    u, u_std = simulate(init)
-    # u.block_until_ready()
-    print("ok again")
+    print(solution.num_steps)
+
     fig, axes = plt.subplots(
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True, dpi=200
     )
     for u_i, std_i, ax_i in zip(u, u_std, axes.T):
         ax_i[0].imshow(u_i[0], vmin=-1, vmax=1, cmap="copper")
-        ax_i[1].imshow(jnp.abs(std_i[0]) ** 2, cmap="copper")
+        ax_i[1].imshow(
+            jnp.log10(jnp.abs(std_i[0]) + 1e-10), vmin=-7, vmax=-5, cmap="copper"
+        )
 
     plt.show()
 
@@ -82,7 +88,7 @@ def simulator(save_at, adaptive_solver, ssm):
         solution = ivpsolve.solve_adaptive_save_at(
             init, save_at=save_at, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
         )
-        return solution.u[0], solution.u_std[0]
+        return (solution.u[0], solution.u_std[0]), solution
 
     return solve
 
