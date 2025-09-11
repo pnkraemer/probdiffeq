@@ -12,11 +12,14 @@
 #     name: python3
 # ---
 
-# # Simulate a partial differential equation
+# # Solve a PDE
 #
+# This tutorial replicates Figure 1 from https://arxiv.org/abs/2110.11812,
+# but uses some advanced features in Probdiffeq, namely, solving matrix-valued problems
+# and adaptive simulation with fixedpoint smoothing.
 
 # +
-"""Solve a partial differential equation."""
+"""Solve a PDE."""
 
 import jax
 import jax.numpy as jnp
@@ -30,7 +33,7 @@ jax.config.update("jax_enable_x64", True)
 def main():
     """Simulate a PDE."""
     key = jax.random.PRNGKey(1)
-    f, (u0,), (t0, t1) = fhn_2d(key, num=50, t1=10.0)
+    f, (u0,), (t0, t1) = fhn_2d(key, num=40, t1=10.0)
 
     @jax.jit
     def vf(y, *, t):  # noqa: ARG001

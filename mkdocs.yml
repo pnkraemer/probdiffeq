@@ -89,6 +89,7 @@ nav:
       - examples_advanced/parameter_estimation_blackjax.ipynb
       - examples_advanced/neural_ode.ipynb
       - examples_advanced/equinox_while_loop.ipynb
+      - examples_advanced/solve_pde.ipynb
   - API DOCUMENTATION:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md
