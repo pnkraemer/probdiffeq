@@ -42,7 +42,7 @@ u0 = jnp.asarray([20.0, 20.0])
 # Set up a solver
 # To all users: Try replacing the fixedpoint-smoother with a filter!
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
 solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
@@ -60,13 +60,20 @@ std = ssm.stats.standard_deviation(marginals)
 u_std = ssm.stats.qoi_from_sample(std)
 
 # Plot the solution
-fig, axes = plt.subplots(nrows=2, ncols=len(tcoeffs), tight_layout=True, figsize=(8, 3))
+fig, axes = plt.subplots(
+    nrows=3,
+    ncols=len(tcoeffs),
+    sharex="col",
+    tight_layout=True,
+    figsize=(len(u_std) * 2, 5),
+)
 for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, u_std, axes.T)):
     # Set up titles and axis descriptions
     if i == 0:
         ax_i[0].set_title("State")
-        ax_i[0].set_ylabel("Predators")
-        ax_i[1].set_ylabel("Prey")
+        ax_i[0].set_ylabel("Prey")
+        ax_i[1].set_ylabel("Predators")
+        ax_i[2].set_ylabel("Std.-dev.")
     elif i == 1:
         ax_i[0].set_title(f"{i}st deriv.")
     elif i == 2:
@@ -76,7 +83,7 @@ for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, u_std, axes.T)):
     else:
         ax_i[0].set_title(f"{i}th deriv.")
 
-    ax_i[1].set_xlabel("Time")
+    ax_i[-1].set_xlabel("Time")
 
     for m, std, ax in zip(u_i.T, std_i.T, ax_i):
         # Plot the mean
@@ -86,6 +93,10 @@ for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, u_std, axes.T)):
         lower, upper = m - 1.96 * std, m + 1.96 * std
         ax.fill_between(sol.t, lower, upper, alpha=0.3)
         ax.set_xlim((jnp.amin(ts), jnp.amax(ts)))
+
+    ax_i[2].semilogy(sol.t, std_i[:, 0], label="Prey")
+    ax_i[2].semilogy(sol.t, std_i[:, 1], label="Predators")
+    ax_i[2].legend(fontsize="x-small")
 
 fig.align_ylabels()
 plt.show()

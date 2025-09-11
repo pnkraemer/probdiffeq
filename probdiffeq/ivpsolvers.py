@@ -28,6 +28,8 @@ def prior_wiener_integrated(
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
     # TODO: should the output_scale be an argument to solve()?
+    # TODO: should the output scale (and all 'damp'-like factors)
+    #       mirror the pytree structure of 'tcoeffs'?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
 
@@ -445,26 +447,26 @@ class _Correction:
     name: str
     ode_order: int
     ssm: Any
-    linearize: Callable
+    linearize: Any
     vector_field: Callable
 
     def init(self, x, /):
         """Initialise the state from the solution."""
-        y = self.ssm.prototypes.observed()
-        return x, y
+        jac = self.linearize.init()
+        return x, jac
 
-    def correct(self, rv, /, t):
+    def correct(self, rv, correction_state, /, t):
         """Perform the correction step."""
         f_wrapped = functools.partial(self.vector_field, t=t)
-        cond = self.linearize(f_wrapped, rv)
+        cond, correction_state = self.linearize.update(f_wrapped, rv, correction_state)
         observed, reverted = self.ssm.conditional.revert(rv, cond)
         corrected = reverted.noise
-        return corrected, observed
+        return corrected, observed, correction_state
 
-    def estimate_error(self, rv, /, t):
+    def estimate_error(self, rv, correction_state, /, t):
         """Estimate the error."""
         f_wrapped = functools.partial(self.vector_field, t=t)
-        cond = self.linearize(f_wrapped, rv)
+        cond, correction_state = self.linearize.update(f_wrapped, rv, correction_state)
         observed = self.ssm.conditional.marginalise(rv, cond)
 
         zero_data = np.zeros(())
@@ -472,7 +474,7 @@ class _Correction:
         stdev = self.ssm.stats.standard_deviation(observed)
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed
+        return error_estimate, observed, correction_state
 
 
 def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
@@ -487,9 +489,23 @@ def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Cor
     )
 
 
-def correction_ts1(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
+def correction_ts1(
+    vector_field,
+    *,
+    ssm,
+    ode_order=1,
+    damp: float = 0.0,
+    jvp_probes=10,
+    jvp_probes_seed=1,
+) -> _Correction:
     """First-order Taylor linearisation."""
-    linearize = ssm.linearise.ode_taylor_1st(ode_order=ode_order, damp=damp)
+    assert jvp_probes > 0
+    linearize = ssm.linearise.ode_taylor_1st(
+        ode_order=ode_order,
+        damp=damp,
+        jvp_probes=jvp_probes,
+        jvp_probes_seed=jvp_probes_seed,
+    )
     return _Correction(
         name="TS1",
         vector_field=vector_field,
@@ -542,6 +558,7 @@ class _State(containers.NamedTuple):
     t: Any
     rv: Any
     strategy_state: Any
+    correction_state: Any
     output_scale: Any
 
 
@@ -611,7 +628,13 @@ class _ProbabilisticSolver:
         # TODO: make the init() and extract() an interface.
         #       Then, lots of calibration logic simplifies considerably.
         calib_state = self.calibration.init()
-        return _State(t=t, rv=rv, strategy_state=extra, output_scale=calib_state)
+        return _State(
+            t=t,
+            rv=rv,
+            strategy_state=extra,
+            correction_state=corr,
+            output_scale=calib_state,
+        )
 
     def step(self, state: _State, *, dt):
         return self.step_implementation(state, dt=dt, calibration=self.calibration)
@@ -638,12 +661,30 @@ class _ProbabilisticSolver:
 
         # Turn outputs into valid states
 
-        def _state(t_, x, scale):
-            return _State(t=t_, rv=x[0], strategy_state=x[1], output_scale=scale)
+        def _state(t_, x, scale, cs):
+            return _State(
+                t=t_,
+                rv=x[0],
+                strategy_state=x[1],
+                correction_state=cs,
+                output_scale=scale,
+            )
 
-        step_from = _state(interp_to.t, interp.step_from, interp_to.output_scale)
-        interpolated = _state(t, interp.interpolated, interp_to.output_scale)
-        interp_from = _state(t, interp.interp_from, interp_from.output_scale)
+        step_from = _state(
+            interp_to.t,
+            interp.step_from,
+            interp_to.output_scale,
+            interp_to.correction_state,
+        )
+        interpolated = _state(
+            t, interp.interpolated, interp_to.output_scale, interp_to.correction_state
+        )
+        interp_from = _state(
+            t,
+            interp.interp_from,
+            interp_from.output_scale,
+            interp_from.correction_state,
+        )
         return _InterpRes(
             step_from=step_from, interpolated=interpolated, interp_from=interp_from
         )
@@ -667,13 +708,21 @@ class _ProbabilisticSolver:
             tmp.interp_from,
         )
 
-        def _state(t_, s, scale):
-            return _State(t=t_, rv=s[0], strategy_state=s[1], output_scale=scale)
+        def _state(t_, x, scale, cs):
+            return _State(
+                t=t_,
+                rv=x[0],
+                strategy_state=x[1],
+                correction_state=cs,
+                output_scale=scale,
+            )
 
         t = interp_to.t
-        prev = _state(t, interp_from_, interp_from.output_scale)
-        sol = _state(t, solution_, interp_to.output_scale)
-        acc = _state(t, step_from_, interp_to.output_scale)
+        prev = _state(
+            t, interp_from_, interp_from.output_scale, interp_from.correction_state
+        )
+        sol = _state(t, solution_, interp_to.output_scale, interp_to.correction_state)
+        acc = _state(t, step_from_, interp_to.output_scale, interp_to.correction_state)
         return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
 
 
@@ -693,7 +742,9 @@ def solver_mle(strategy, *, correction, prior, ssm):
         mean = ssm.stats.mean(state.rv)
         mean_extra = ssm.conditional.apply(mean, transition)
         t = state.t + dt
-        error, _ = correction.estimate_error(mean_extra, t=t)
+        error, _, correction_state = correction.estimate_error(
+            mean_extra, state.correction_state, t=t
+        )
 
         # Do the full prediction step (reuse previous discretisation)
         hidden, extra = strategy.extrapolate(
@@ -701,13 +752,20 @@ def solver_mle(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        hidden, observed = correction.correct(hidden, t=t)
+        hidden, observed, corr_state = correction.correct(hidden, correction_state, t=t)
 
         # Calibrate the output scale
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         # Normalise the error
-        state = _State(t=t, rv=hidden, strategy_state=extra, output_scale=output_scale)
+
+        state = _State(
+            t=t,
+            rv=hidden,
+            strategy_state=extra,
+            correction_state=corr_state,
+            output_scale=output_scale,
+        )
         u_proposed = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
         reference = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
         error = _ErrorEstimate(dt * error, reference=reference)
@@ -756,7 +814,9 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         hidden = ssm.conditional.apply(mean, transition)
 
         t = state.t + dt
-        error, observed = correction.estimate_error(hidden, t=t)
+        error, observed, correction_state = correction.estimate_error(
+            hidden, state.correction_state, t=t
+        )
         output_scale = calibration.update(state.output_scale, observed=observed)
 
         # Do the full extrapolation with the calibrated output scale
@@ -767,10 +827,16 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        hidden, corr = correction.correct(hidden, t=t)
+        hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
 
         # Return solution
-        state = _State(t=t, rv=hidden, strategy_state=extra, output_scale=output_scale)
+        state = _State(
+            t=t,
+            rv=hidden,
+            strategy_state=extra,
+            correction_state=correction_state,
+            output_scale=output_scale,
+        )
 
         # Normalise the error
         u_proposed = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
@@ -815,7 +881,9 @@ def solver(strategy, *, correction, prior, ssm):
         mean = ssm.stats.mean(state.rv)
         hidden = ssm.conditional.apply(mean, transition)
         t = state.t + dt
-        error, _ = correction.estimate_error(hidden, t=t)
+        error, _, correction_state = correction.estimate_error(
+            hidden, state.correction_state, t=t
+        )
 
         # Do the full extrapolation step (reuse the transition)
         hidden, extra = strategy.extrapolate(
@@ -823,9 +891,13 @@ def solver(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        hidden, corr = correction.correct(hidden, t=t)
+        hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
         state = _State(
-            t=t, rv=hidden, strategy_state=extra, output_scale=state.output_scale
+            t=t,
+            rv=hidden,
+            strategy_state=extra,
+            correction_state=correction_state,
+            output_scale=state.output_scale,
         )
 
         # Normalise the error
@@ -960,15 +1032,15 @@ class _AdaSolver:
             step_from: Any
 
         def init(s0: _AdaState) -> _RejectionState:
-            def _inf_like(tree):
-                return tree_util.tree_map(lambda x: np.inf() * np.ones_like(x), tree)
+            def _ones_like(tree):
+                return tree_util.tree_map(np.ones_like, tree)
 
             smaller_than_1 = 0.9  # the cond() must return True
             return _RejectionState(
                 error_norm_proposed=smaller_than_1,
                 dt=s0.dt,
                 control=s0.control,
-                proposed=_inf_like(s0.step_from),
+                proposed=_ones_like(s0.step_from),  # irrelevant
                 step_from=s0.step_from,
             )
 
