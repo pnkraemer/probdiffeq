@@ -135,11 +135,6 @@ from diffeqzoo import backend, ivps
 from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 
 # +
-# x64 precision
-jax.config.update("jax_enable_x64", True)
-
-# CPU
-jax.config.update("jax_platform_name", "cpu")
 
 # IVP examples in JAX
 if not backend.has_been_selected:

@@ -34,5 +34,5 @@ def test_sample_shape(approximation, shape):
         u_terminal_shape = tree_util.tree_map(lambda x: shape + x[-1].shape, u)
         u_inner_shape = tree_util.tree_map(lambda x: shape + x[:-1].shape, u)
 
-        assert testing.tree_all_allclose(i_shape, u_terminal_shape)
-        assert testing.tree_all_allclose(s_shape, u_inner_shape)
+        assert testing.allclose(i_shape, u_terminal_shape)
+        assert testing.allclose(s_shape, u_inner_shape)

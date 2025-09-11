@@ -5,18 +5,6 @@ from probdiffeq.backend import config, functools, ode
 from probdiffeq.backend import numpy as np
 
 
-def set_environment():
-    """Set the environment (e.g., 64-bit precision).
-
-    The setup used to precompute references should match that of the other tests.
-    """
-    # Test on CPU.
-    config.update("platform_name", "cpu")
-
-    # Double precision
-    config.update("enable_x64", True)
-
-
 def three_body_first(num_derivatives_max=6):
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
     vf = functools.partial(vf, t=t0)
@@ -30,8 +18,8 @@ def van_der_pol_second(num_derivatives_max=6):
 
 
 if __name__ == "__main__":
-    # 64-bit precision and the like
-    set_environment()
+    # Double precision
+    config.update("enable_x64", True)
 
     solution1 = three_body_first()
     np.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)

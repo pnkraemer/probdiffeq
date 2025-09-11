@@ -34,7 +34,6 @@ from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
-jax.config.update("jax_platform_name", "cpu")
 # -
 
 # We start by defining an ODE.

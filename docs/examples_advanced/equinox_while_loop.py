@@ -27,9 +27,6 @@ import jax.numpy as jnp
 from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import control_flow
 
-jax.config.update("jax_platform_name", "cpu")
-
-
 # -
 
 # Overwrite the while-loop (via a context manager):

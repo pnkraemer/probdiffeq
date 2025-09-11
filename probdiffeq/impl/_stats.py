@@ -63,16 +63,16 @@ class DenseStats(StatsBackend):
         return np.reshape(np.abs(mahalanobis) / np.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
-        # The cholesky factor is triangular, so we compute a cheap slogdet.
-        diagonal = linalg.diagonal_along_axis(rv.cholesky, axis1=-1, axis2=-2)
+        cholesky = linalg.qr_r(rv.cholesky.T).T
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
         slogdet = np.sum(np.log(np.abs(diagonal)))
 
         dx = u - rv.mean
-        residual_white = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
-        x1 = linalg.vector_dot(residual_white, residual_white)
-        x2 = 2.0 * slogdet
-        x3 = u.size * np.log(np.pi() * 2)
-        return -0.5 * (x1 + x2 + x3)
+        residual_white = linalg.solve_triangular(cholesky, dx, lower=True, trans=0)
+        sqrnorm = linalg.vector_dot(residual_white, residual_white)
+
+        const = np.log(np.pi() * 2)
+        return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
 
     def mean(self, rv):
         return rv.mean
@@ -128,12 +128,14 @@ class IsotropicStats(StatsBackend):
             u = u[None, :]
 
         def logpdf_scalar(x, r):
+            cholesky = linalg.qr_r(r.cholesky.T).T
+
             dx = x - r.mean
-            w = linalg.solve_triangular(r.cholesky.T, dx, trans="T")
+            w = linalg.solve_triangular(cholesky.T, dx, trans="T")
 
             maha_term = linalg.vector_dot(w, w)
 
-            diagonal = linalg.diagonal_along_axis(r.cholesky, axis1=-1, axis2=-2)
+            diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
             slogdet = np.sum(np.log(np.abs(diagonal)))
             logdet_term = 2.0 * slogdet
             return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
@@ -195,12 +197,14 @@ class BlockDiagStats(StatsBackend):
 
     def logpdf(self, u, /, rv):
         def logpdf_scalar(x, r):
+            cholesky = linalg.qr_r(r.cholesky.T).T
+
             dx = x - r.mean
-            w = linalg.solve_triangular(r.cholesky.T, dx, trans="T")
+            w = linalg.solve_triangular(cholesky.T, dx, trans="T")
 
             maha_term = linalg.vector_dot(w, w)
 
-            diagonal = linalg.diagonal_along_axis(r.cholesky, axis1=-1, axis2=-2)
+            diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
             slogdet = np.sum(np.log(np.abs(diagonal)))
             logdet_term = 2.0 * slogdet
             return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))

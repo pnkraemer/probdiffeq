@@ -26,7 +26,7 @@ def test_terminal_values_identical(fact):
     received = ivpsolve.solve_adaptive_terminal_values(
         init, t0=t0, t1=t1, adaptive_solver=asolver, dt0=0.1, ssm=ssm
     )
-    assert testing.tree_all_allclose(received, expected)
+    assert testing.allclose(received, expected)
 
     # Assert u and u_std have matching shapes (that was wrong before)
     u_shape = tree_util.tree_map(np.shape, received.u)

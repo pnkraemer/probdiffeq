@@ -37,8 +37,6 @@ from probdiffeq import ivpsolve, ivpsolvers, stats
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
-jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_platform_name", "cpu")
 # -
 
 

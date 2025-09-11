@@ -52,8 +52,8 @@ def flip(arr, /, axis=None):
     return jnp.flip(arr, axis=axis)
 
 
-def asarray(x, /):
-    return jnp.asarray(x)
+def asarray(x, /, dtype=None):
+    return jnp.asarray(x, dtype=dtype)
 
 
 def squeeze(arr, /):
@@ -138,10 +138,6 @@ def save(path, arr, /):
 
 def load(path, /):
     return jnp.load(path, allow_pickle=True)
-
-
-def allclose(a, b, *, atol=1e-8, rtol=1e-5):
-    return jnp.allclose(a, b, atol=atol, rtol=rtol)
 
 
 def stack(list_of_arrays, /):

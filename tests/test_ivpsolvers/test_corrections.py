@@ -57,7 +57,7 @@ def fixture_solution(correction_impl, fact):
 def test_terminal_value_simulation_matches_reference(solution):
     expected = reference_solution(solution.t)
     received = solution.u[0]
-    assert testing.tree_all_allclose(received, expected, rtol=1e-2)
+    assert testing.allclose(received, expected, rtol=1e-2)
 
 
 @functools.jit

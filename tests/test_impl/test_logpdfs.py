@@ -3,7 +3,7 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-from probdiffeq.backend import functools, stats, testing
+from probdiffeq.backend import functools, random, stats, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.impl import impl
 
@@ -11,6 +11,7 @@ from probdiffeq.impl import impl
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def test_logpdf(fact):
     rv, ssm = random_variable(fact=fact)
+
     u = np.ones_like(ssm.stats.mean(rv))
 
     (mean_dense, cov_dense) = ssm.stats.to_multivariate_normal(rv)
@@ -18,7 +19,7 @@ def test_logpdf(fact):
 
     pdf1 = ssm.stats.logpdf(u, rv)
     pdf2 = stats.multivariate_normal_logpdf(u_dense, mean_dense, cov_dense)
-    assert np.allclose(pdf1, pdf2)
+    assert testing.allclose(pdf1, pdf2)
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -37,4 +38,9 @@ def random_variable(fact):
     output_scale = np.ones_like(ssm.prototypes.output_scale())
     discretize = ssm.conditional.ibm_transitions(output_scale)
     rv = discretize(0.1, output_scale)
-    return rv.noise, ssm
+
+    key = random.prng_key(seed=1)
+    noise_flat, unravel = tree_util.ravel_pytree(rv.noise)
+    noise_flat = random.normal(key, shape=noise_flat.shape)
+    noise = unravel(noise_flat)
+    return noise, ssm
