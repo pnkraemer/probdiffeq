@@ -65,10 +65,10 @@ class DenseLinearisation(LinearisationBackend):
         return _Linearization(init, step)
 
     def ode_taylor_1st(
-        self, ode_order, damp, jvp_samples: int, jvp_samples_seed: int
+        self, ode_order, damp, jvp_probes: int, jvp_probes_seed: int
     ) -> _Linearization:
-        del jvp_samples
-        del jvp_samples_seed
+        del jvp_probes
+        del jvp_probes_seed
 
         def init():
             return None
@@ -253,13 +253,13 @@ class IsotropicLinearisation(LinearisationBackend):
         self.unravel = unravel
 
     def ode_taylor_1st(
-        self, ode_order, damp: float, jvp_samples: int, jvp_samples_seed: int
+        self, ode_order, damp: float, jvp_probes: int, jvp_probes_seed: int
     ):
         if ode_order > 1:
             raise ValueError
 
         def init():
-            return random.prng_key(seed=jvp_samples_seed)
+            return random.prng_key(seed=jvp_probes_seed)
 
         def step(fun, rv, key):
             mean = rv.mean
@@ -282,7 +282,7 @@ class IsotropicLinearisation(LinearisationBackend):
             # Estimate the trace using Hutchinson's estimator
             # J_trace, jacobian_state = jacobian(Jvp, m0, jacobian_state)
             key, subkey = random.split(key, num=2)
-            sample_shape = (jvp_samples, *m0.shape)
+            sample_shape = (jvp_probes, *m0.shape)
             v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
             J_trace = functools.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
             J_trace = J_trace.mean(axis=0)
@@ -368,9 +368,57 @@ class BlockDiagLinearisation(LinearisationBackend):
         return _Linearization(init, step)
 
     def ode_taylor_1st(
-        self, ode_order, damp: float, jvp_samples: int, jvp_samples_seed: int
+        self, ode_order, damp: float, jvp_probes: int, jvp_probes_seed: int
     ):
-        raise NotImplementedError
+        if ode_order > 1:
+            raise ValueError
+
+        def init():
+            return random.prng_key(seed=jvp_probes_seed)
+
+        def step(fun, rv, key):
+            mean = rv.mean
+
+            def a1(s):
+                return s[[ode_order], ...]
+
+            linop = functools.vmap(functools.jacrev(a1))(mean)
+
+            def vf_flat(u):
+                return tree_util.ravel_pytree(fun(unravel(u)))[0]
+
+            def select_0(s):
+                return tree_util.ravel_pytree(self.unravel(s)[0])
+
+            # Evaluate the linearisation
+            m0, unravel = select_0(rv.mean)
+            fx, Jvp = functools.linearize(vf_flat, m0)
+
+            key, subkey = random.split(key, num=2)
+            sample_shape = (jvp_probes, *m0.shape)
+            v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
+            J_diag = functools.vmap(lambda s: s * Jvp(s))(v)
+            J_diag = J_diag.mean(axis=0)
+            E1 = functools.jacrev(lambda s: s[0])(rv.mean[0])
+            linop = linop - J_diag[:, None, None] * E1[None, None, :]
+
+            fx = rv.mean[:, 1] - fx
+            fx = fx[..., None]
+            diff = functools.vmap(lambda a, b: a @ b)(linop, rv.mean)
+            fx = fx - diff
+
+            d, *_ = linop.shape
+            cov_lower = damp * np.ones((d, 1, 1))
+            bias = _normal.Normal(fx, cov_lower)
+
+            to_latent = np.ones((linop.shape[2],))
+            to_observed = np.ones((linop.shape[1],))
+            cond = _conditional.LatentCond(
+                linop, bias, to_latent=to_latent, to_observed=to_observed
+            )
+            return cond, key
+
+        return _Linearization(init, step)
 
     def ode_statistical_0th(self, cubature_fun, damp: float):
         raise NotImplementedError

@@ -458,7 +458,6 @@ class _Correction:
     def correct(self, rv, correction_state, /, t):
         """Perform the correction step."""
         f_wrapped = functools.partial(self.vector_field, t=t)
-
         cond, correction_state = self.linearize.update(f_wrapped, rv, correction_state)
         observed, reverted = self.ssm.conditional.revert(rv, cond)
         corrected = reverted.noise
@@ -496,16 +495,16 @@ def correction_ts1(
     ssm,
     ode_order=1,
     damp: float = 0.0,
-    jvp_samples=10,
-    jvp_samples_seed=1,
+    jvp_probes=10,
+    jvp_probes_seed=1,
 ) -> _Correction:
     """First-order Taylor linearisation."""
-    assert jvp_samples > 0
+    assert jvp_probes > 0
     linearize = ssm.linearise.ode_taylor_1st(
         ode_order=ode_order,
         damp=damp,
-        jvp_samples=jvp_samples,
-        jvp_samples_seed=jvp_samples_seed,
+        jvp_probes=jvp_probes,
+        jvp_probes_seed=jvp_probes_seed,
     )
     return _Correction(
         name="TS1",

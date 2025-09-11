@@ -42,7 +42,7 @@ u0 = jnp.asarray([20.0, 20.0])
 # Set up a solver
 # To all users: Try replacing the fixedpoint-smoother with a filter!
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
 strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
 solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
