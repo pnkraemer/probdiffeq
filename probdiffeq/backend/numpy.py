@@ -52,8 +52,8 @@ def flip(arr, /, axis=None):
     return jnp.flip(arr, axis=axis)
 
 
-def asarray(x, /):
-    return jnp.asarray(x)
+def asarray(x, /, dtype=None):
+    return jnp.asarray(x, dtype=dtype)
 
 
 def squeeze(arr, /):

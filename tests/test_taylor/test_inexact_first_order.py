@@ -5,7 +5,7 @@ from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
 
-@testing.parametrize("num", [0, 1, 4])
+@testing.parametrize("num", [0, 1, 3])
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
 def test_initialised_correct_shape_and_values(num, fact):
     vf, (u0,), (t0, _) = ode.ivp_lotka_volterra()

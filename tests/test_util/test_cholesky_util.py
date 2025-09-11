@@ -3,9 +3,7 @@
 These are so crucial and annoying to debug that they need their own test set.
 """
 
-from math import prod
-
-from probdiffeq.backend import functools, linalg, testing, tree_util
+from probdiffeq.backend import functools, linalg, random, testing, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.util import cholesky_util
 
@@ -34,14 +32,16 @@ def test_revert_conditional(HCshape, Cshape, Xshape):
     assert testing.allclose(cov(bw_noise), C1)
 
 
-@testing.parametrize("Cshape, HCshape", ([(3, 3), (2, 3)],))
-def test_revert_kernel_noisefree(Cshape, HCshape):
+@testing.parametrize("Cshape, Hshape", ([(3, 3), (2, 3)],))
+def test_revert_kernel_noisefree(Cshape, Hshape):
     C = _some_array(Cshape) + 1.0
-    HC = _some_array(HCshape) + 2.0
+    H = _some_array(Hshape) + 2.0
+    HC = H @ C
 
     S = HC @ HC.T
     K = C @ HC.T @ linalg.inv(S)
-    C1 = C @ C.T - K @ S @ K.T
+
+    C1 = (np.eye(Cshape[0]) - K @ H) @ C @ C.T @ (np.eye(Cshape[0]) - K @ H).T
 
     extra, (bw_noise, g) = cholesky_util.revert_conditional_noisefree(
         R_X_F=HC.T, R_X=C.T
@@ -56,7 +56,8 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
 
 
 def _some_array(shape):
-    return np.arange(1.0, 1.0 + prod(shape)).reshape(shape)
+    key = random.prng_key(seed=1)
+    return random.normal(key, shape=shape)
 
 
 def test_sqrt_sum_square_scalar():

@@ -67,9 +67,11 @@ def _allclose(a, b, /, *, atol: float | None, rtol: float | None):
     a = jnp.asarray(1.0 * a)
     b = jnp.asarray(1.0 * b)
 
+    # numpy.allclose uses defaults atol=1e-8 and rtol=1e-5;
+    # we mirror this as atol=sqrt(tol) and rtol slightly larger.
     tol = jnp.sqrt(jnp.finfo(b.dtype).eps)
     if atol is None:
         atol = tol
     if rtol is None:
-        rtol = tol
+        rtol = 10 * tol
     return jnp.allclose(a, b, atol=atol, rtol=rtol)

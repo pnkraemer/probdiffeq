@@ -104,5 +104,6 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     # Compare QOI and marginals
     marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = functools.vmap(marginals_allclose_func)
+
     assert testing.allclose(u_fixedpoint, u_interp)
     assert np.all(marginals_allclose_func(marginals_fixedpoint, marginals_interp))
