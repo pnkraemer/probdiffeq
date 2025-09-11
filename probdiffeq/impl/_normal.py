@@ -61,7 +61,8 @@ class IsotropicNormal(NormalBackend):
         c_sqrtm0_corrected = linalg.diagonal_matrix(damp**powers)
 
         leaves, _ = tree_util.tree_flatten(tcoeffs)
-        m0_corrected = np.stack(leaves)
+        leaves_flat = tree_util.tree_map(lambda s: tree_util.ravel_pytree(s)[0], leaves)
+        m0_corrected = np.stack(leaves_flat)
         return Normal(m0_corrected, c_sqrtm0_corrected)
 
     def preconditioner_apply(self, rv, p, /):
@@ -83,7 +84,8 @@ class BlockDiagNormal(NormalBackend):
         cholesky = np.ones((*self.ode_shape, 1, 1)) * cholesky[None, ...]
 
         leaves, _ = tree_util.tree_flatten(tcoeffs)
-        mean = np.stack(leaves).T
+        leaves_flat = tree_util.tree_map(lambda s: tree_util.ravel_pytree(s)[0], leaves)
+        mean = np.stack(leaves_flat).T
         return Normal(mean, cholesky)
 
     def preconditioner_apply(self, rv, p, /):
