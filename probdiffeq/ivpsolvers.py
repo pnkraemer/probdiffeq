@@ -827,7 +827,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        hidden, correction_state = correction.correct(hidden, correction_state, t=t)
+        hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
 
         # Return solution
         state = _State(
@@ -891,7 +891,7 @@ def solver(strategy, *, correction, prior, ssm):
         )
 
         # Do the full correction step
-        hidden, correction_state = correction.correct(hidden, t=t)
+        hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
         state = _State(
             t=t,
             rv=hidden,
