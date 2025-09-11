@@ -18,7 +18,7 @@ def test_logpdf(fact):
 
     pdf1 = ssm.stats.logpdf(u, rv)
     pdf2 = stats.multivariate_normal_logpdf(u_dense, mean_dense, cov_dense)
-    assert np.allclose(pdf1, pdf2)
+    assert testing.allclose(pdf1, pdf2)
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])

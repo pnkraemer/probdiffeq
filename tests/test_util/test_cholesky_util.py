@@ -29,9 +29,9 @@ def test_revert_conditional(HCshape, Cshape, Xshape):
     def cov(x):
         return x.T @ x
 
-    assert np.allclose(cov(extra), S)
-    assert np.allclose(g, K)
-    assert np.allclose(cov(bw_noise), C1)
+    assert testing.allclose(cov(extra), S)
+    assert testing.allclose(g, K)
+    assert testing.allclose(cov(bw_noise), C1)
 
 
 @testing.parametrize("Cshape, HCshape", ([(3, 3), (2, 3)],))
@@ -50,9 +50,9 @@ def test_revert_kernel_noisefree(Cshape, HCshape):
     def cov(x):
         return x.T @ x
 
-    assert np.allclose(cov(extra), S)
-    assert np.allclose(g, K)
-    assert np.allclose(cov(bw_noise), C1)
+    assert testing.allclose(cov(extra), S)
+    assert testing.allclose(g, K)
+    assert testing.allclose(cov(bw_noise), C1)
 
 
 def _some_array(shape):
@@ -65,7 +65,7 @@ def test_sqrt_sum_square_scalar():
     c = 5.0
     expected = np.sqrt(a**2 + b**2 + c**2)
     received = cholesky_util.sqrt_sum_square_scalar(a, b, c)
-    assert np.allclose(expected, received)
+    assert testing.allclose(expected, received)
 
 
 def test_sqrt_sum_square_error():
@@ -121,7 +121,7 @@ def test_sqrt_sum_square_scalar_derivative_value_test():
     a, b, c = 3.0, 4.0, 5.0
     expected = triu_via_naive_arithmetic_and_autograd(a, b, c)
     received = triu_via_qr_r(a, b, c)
-    assert np.allclose(expected, received)
+    assert testing.allclose(expected, received)
 
 
 def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
@@ -144,7 +144,7 @@ def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
     a, b, c = 0.0, 0.0, 0.0
     expected = triu_via_naive_arithmetic_and_autograd(a, b, c)
     received = triu_via_qr_r(a, b, c)
-    assert np.allclose(expected, received)
+    assert testing.allclose(expected, received)
 
 
 def _tree_is_free_of_nans(tree):

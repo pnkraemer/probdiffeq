@@ -1,7 +1,6 @@
 """Test the controllers."""
 
 from probdiffeq import ivpsolvers
-from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 
 
@@ -23,4 +22,4 @@ def test_equivalence_pi_vs_i(dt, error_power, num_applies):
     dt_i = dt
     for _ in range(num_applies):
         dt_i, x_i = ctrl_i.apply(dt_i, x_i, error_power=error_power)
-    assert np.allclose(dt_i, dt_pi)
+    assert testing.allclose(dt_i, dt_pi)

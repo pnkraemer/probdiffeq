@@ -1,7 +1,6 @@
 """Test equivalences between cubature rules."""
 
 from probdiffeq import ivpsolvers
-from probdiffeq.backend import numpy as np
 from probdiffeq.backend import testing
 
 
@@ -12,9 +11,9 @@ def test_third_order_spherical_vs_unscented_transform_scalar_input():
     tos_points, tos_weights = tos.points, tos.weights_sqrtm
     ut_points, ut_weights = ut.points, ut.weights_sqrtm
     for x, y in [(ut_weights, tos_weights), (ut_points, tos_points)]:
-        assert np.allclose(x[:1], y[:1])
-        assert np.allclose(x[1], 0.0)
-        assert np.allclose(x[2:], y[1:])
+        assert testing.allclose(x[:1], y[:1])
+        assert testing.allclose(x[1], 0.0)
+        assert testing.allclose(x[2:], y[1:])
 
 
 @testing.parametrize("n", [4])
@@ -25,9 +24,9 @@ def test_third_order_spherical_vs_unscented_transform(n):
     tos_points, tos_weights = tos.points, tos.weights_sqrtm
     ut_points, ut_weights = ut.points, ut.weights_sqrtm
     for x, y in [(ut_weights, tos_weights), (ut_points, tos_points)]:
-        assert np.allclose(x[:n], y[:n])
-        assert np.allclose(x[n], 0.0)
-        assert np.allclose(x[n + 1 :], y[n:])
+        assert testing.allclose(x[:n], y[:n])
+        assert testing.allclose(x[n], 0.0)
+        assert testing.allclose(x[n + 1 :], y[n:])
 
 
 # todo: test for gauss-hermite? Do we need one? (we wrap scipy's rules anyway...)

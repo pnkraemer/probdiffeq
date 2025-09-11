@@ -36,6 +36,10 @@ def tree_all_allclose(tree1, tree2, **kwargs):
     return jax.tree_util.tree_all(trees_is_allclose)
 
 
+def allclose(a, b, *, atol=1e-8, rtol=1e-5):
+    return jnp.allclose(a, b, atol=atol, rtol=rtol)
+
+
 def tree_allclose(tree1, tree2, **kwargs):
     def allclose_partial(*args):
         return jnp.allclose(*args, **kwargs)

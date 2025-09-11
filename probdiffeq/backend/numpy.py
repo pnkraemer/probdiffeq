@@ -140,10 +140,6 @@ def load(path, /):
     return jnp.load(path, allow_pickle=True)
 
 
-def allclose(a, b, *, atol=1e-8, rtol=1e-5):
-    return jnp.allclose(a, b, atol=atol, rtol=rtol)
-
-
 def stack(list_of_arrays, /):
     return jnp.stack(list_of_arrays)
 

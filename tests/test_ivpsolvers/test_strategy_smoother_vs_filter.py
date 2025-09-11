@@ -44,7 +44,7 @@ def fixture_smoother_solution(solver_setup):
 
 
 def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
-    assert np.allclose(filter_solution.t, smoother_solution.t)  # sanity check
+    assert testing.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = _reference_solution(filter_solution.t)
     u_fi = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(filter_solution.u[0])
@@ -58,7 +58,7 @@ def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
 
     # I would like to compare filter & smoother RMSE. but this test is too unreliable,
     # so we simply assert that both are "comparable".
-    assert np.allclose(filter_rmse, smoother_rmse, atol=0.0, rtol=1.0)
+    assert testing.allclose(filter_rmse, smoother_rmse, atol=0.0, rtol=1.0)
 
     # The error should be small, otherwise the test makes little sense
     assert filter_rmse < 0.01
