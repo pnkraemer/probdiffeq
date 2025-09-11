@@ -36,7 +36,7 @@ def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num)
 
     derivatives = taylor_fun(f, init, num=num)
     assert len(derivatives) == num + 1
-    assert testing.tree_all_allclose(derivatives, list(solution[: len(derivatives)]))
+    assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
 
 
 @testing.parametrize("num_doublings", [1, 2])
@@ -46,4 +46,4 @@ def test_approximation_identical_to_reference_doubling(pb_with_solution, num_dou
 
     derivatives = taylor.odejet_doubling_unroll(f, init, num_doublings=num_doublings)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
-    assert testing.tree_all_allclose(derivatives, list(solution[: len(derivatives)]))
+    assert testing.allclose(derivatives, list(solution[: len(derivatives)]))

@@ -12,7 +12,7 @@ def test_affine_recursion(num, num_derivatives_max):
     f, init, solution = _affine_problem(num_derivatives_max)
     derivatives = taylor.odejet_affine(f, init, num=num)
     assert len(derivatives) == num + 1
-    assert testing.tree_all_allclose(derivatives, solution[: len(derivatives)])
+    assert testing.allclose(derivatives, solution[: len(derivatives)])
 
 
 def _affine_problem(n):

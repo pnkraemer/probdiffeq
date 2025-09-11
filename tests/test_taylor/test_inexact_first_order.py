@@ -17,9 +17,7 @@ def test_initialised_correct_shape_and_values(num, fact):
     rk_starter = taylor.runge_kutta_starter(dt=0.01, prior=prior, ssm=ssm, num=num)
     derivatives = rk_starter(vf, (u0,), t=t0)
     assert len(derivatives) == 1 + num
-    assert testing.tree_all_allclose(derivatives[:1], solution[:1], rtol=1e-1)
+    assert testing.allclose(derivatives[:1], solution[:1], rtol=1e-1)
 
     if num > 1:
-        assert testing.tree_all_allclose(
-            derivatives[: num - 1], solution[: num - 1], rtol=1e-1
-        )
+        assert testing.allclose(derivatives[: num - 1], solution[: num - 1], rtol=1e-1)

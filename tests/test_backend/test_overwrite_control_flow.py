@@ -10,7 +10,7 @@ def test_overwrite_scan_func():
         return res, res
 
     xs = np.arange(1.0, 11.0, step=2.0)
-    sum_total = 25
+    sum_total = 25.0
     cumsum_total = np.asarray([1.0, 4.0, 9.0, 16.0, 25])
 
     final, outputs = control_flow.scan(cumsum_step, init=0.0, xs=xs)

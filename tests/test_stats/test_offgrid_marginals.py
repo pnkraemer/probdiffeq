@@ -25,11 +25,11 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     for u1, u2 in zip(u, sol.u):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
         u2_ = tree_util.tree_map(lambda s: s[-2], u2)
-        assert testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
+        assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
         u1_ = tree_util.tree_map(lambda s: s[-1], u1)
         u2_ = tree_util.tree_map(lambda s: s[-1], u2)
-        assert not testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
+        assert not testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
@@ -53,8 +53,8 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     for u1, u2 in zip(u, sol.u):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
         u2_ = tree_util.tree_map(lambda s: s[-2], u2)
-        assert testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
+        assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
         u1_ = tree_util.tree_map(lambda s: s[-1], u1)
         u2_ = tree_util.tree_map(lambda s: s[-1], u2)
-        assert testing.tree_all_allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
+        assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)

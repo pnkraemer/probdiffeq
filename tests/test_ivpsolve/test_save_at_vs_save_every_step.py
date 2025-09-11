@@ -40,7 +40,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     # Assert similarity
 
     for ui, us in zip(u_interp, u_save_at):
-        assert testing.tree_all_allclose(ui, us)
+        assert testing.allclose(ui, us)
 
     marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = functools.vmap(marginals_allclose_func)

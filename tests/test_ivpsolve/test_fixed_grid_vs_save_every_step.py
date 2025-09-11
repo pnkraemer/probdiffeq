@@ -32,7 +32,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     solution_fixed = ivpsolve.solve_fixed_grid(
         init, grid=grid_adaptive, solver=solver, ssm=ssm
     )
-    assert testing.tree_all_allclose(solution_adaptive, solution_fixed)
+    assert testing.allclose(solution_adaptive, solution_fixed)
 
     # Assert u and u_std have matching shapes (that was wrong before)
     u_shape = tree_util.tree_map(np.shape, solution_fixed.u)
