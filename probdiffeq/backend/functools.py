@@ -18,8 +18,10 @@ def jit(func, /, static_argnums=None, static_argnames=None):
     return jax.jit(func, static_argnums=static_argnums, static_argnames=static_argnames)
 
 
-def jet(func, /, primals, series):
-    return jax.experimental.jet.jet(func, primals=primals, series=series)
+def jet(func, /, primals, series, *, is_tcoeff=False):
+    return jax.experimental.jet.jet(
+        func, primals=primals, series=series, factorial_scaled=not is_tcoeff
+    )
 
 
 def linearize(func, *args):

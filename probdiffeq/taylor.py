@@ -275,9 +275,9 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
         (compared to unnormalised coefficients).
         """
         coeffs_emb = [*c] + [zeros] * degree
-        p, *s = _unnormalise(*coeffs_emb)
-        p_new, s_new = functools.jet(vf, (p,), (s,))
-        return _normalise(p_new, *s_new)
+        p, *s = coeffs_emb
+        p_new, s_new = functools.jet(vf, (p,), (s,), is_tcoeff=True)
+        return p_new, *s_new
 
     taylor_coefficients = [u0]
     degrees = list(itertools.accumulate(map(lambda s: 2**s, range(num_doublings))))
