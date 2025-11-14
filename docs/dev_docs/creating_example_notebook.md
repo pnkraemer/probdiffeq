@@ -1,25 +1,26 @@
-# Creating an example notebook
+# Creating an new example/benchmark
+
+Probdiffeq hosts numerous tutorials and benchmarks that demonstrate the library.
+The differences between examples and benchmarks are minimal. Generally, they are all jupyter notebooks (paired to Markdown files via jupytext for version control) and demonstrate one functionality. The difference between an example and a benchmark is that the examples show *what* probdiffeq offers,
+and the benchmarks demonstrate *how well* probdiffeq offers it, e.g. in comparison to other solver libraries. Each tutorial or benchmark runs in under a minute.
+New examples are welcome! To create a new example or benchmark, follow these steps:
 
 
-## Tutorial
+
+1. Create a new script in the corresponding subdirectory of the `docs/` directory. The resulting path should look like: `docs/examples_benchmarks/benchmark-name.ipynb` or `docs/examples_advanced/example-name.ipynb` or similar. Choose a meaningful name for your benchmark, e.g. `scipy-comparison-hires` or `demonstrate-calibration`. In case you are wondering which examples-subfolder is most appropriate: if your notebook introduces an external dependency (for example, an optimisation or sampling library), then it is an advanced tutorial. 
 
 
-To create a new example notebook and include it in the documentation, follow the steps:
 
-1. Create a jupyter notebook, preferably in `docs/examples_*/` and fill it with content.
-   In case you are wondering which subfolder is most appropriate: 
-   if your notebook introduces an external dependency 
-   (for example, an optimisation or sampling library), 
-   do not place it next to the solver-configuration notebooks.
-2. Pair the notebook with a `py:light` version of the notebook via jupytext. This is important for version control, which ignores all examples with `*.ipynb` or `*.md` ending.
-3. Include the notebook into the docs by mentioning it in the `nav` section of `mkdocs.yml`
-4. Enjoy.
+2. Create a Jupyter notebook that contains the example or benchmark. This notebook should execute the script and plot the results. The run itself not take too long (think, less much than a minute), otherwise the continuous integration (which verifies the examples and benchmarks run correctly) grows out of hand.
 
+3. Link the notebook to a markdown file via jupytext (for better version control):
 
-## Benchmark
+      ```
+      jupytext --set-formats ipynb,py:light  <new-benchmark-notebook.ipynb>
+      ```
 
-1. Create a new folder in the `docs/benchmarks/` directory
-2. Create the benchmark script. Usually, the execution is in a python script and the plotting in a jupyter notebook.
-3. Link the (plotting-)notebook to a markdown file (for better version control). 
-4. Include the (plotting-)notebook into the docs via `mkdocs.yml`. Mention the markdown and python script in the same folder under `mkdocs.yml -> exclude`
-5. Mention the new benchmark in the makefile (`benchmarks-run`, `benchmarks-dry-run`). A dry-run is for checking that the code functions properly. The benchmark run itself should not take less than a minute, otherwise the whole benchmark suite grows out of hand.
+      If not done already, run `pip install .[doc]` to install dependencies like jupytext.
+
+4. Include the notebook (the .ipynb file) into the docs by mentioning it in the `nav:` entry in  `mkdocs.yml`. Check whether the markdown script is covered by the rules in `mkdocs.yml` under `exclude:` -- if not, include it here.
+5. Mention the new benchmark in the makefile (`benchmarks-run`). T
+6. If the example requires access to an external dependency, mention it under the `doc` optional dependencies in the `pyproject.toml`.
