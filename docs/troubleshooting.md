@@ -8,8 +8,6 @@ If you're not already using [virtual environments](https://docs.python.org/3/tut
 With these points covered, try to execute some of the examples in Probdiffeq's documentation, for example [the easy example](https://pnkraemer.github.io/probdiffeq/examples_quickstart/easy_example/).
 If these examples work $-$ great! If not, reach out. 
 
-Unlike many other JAX-based scientific computing libraries, probdiffeq works best with double precision. 
-This is because, during solver initialization, it computes the Cholesky factor of a Hilbert matrix (with somewhere between 2-12 rows), which needs high precision.
 
 ## Long compilation times
 
