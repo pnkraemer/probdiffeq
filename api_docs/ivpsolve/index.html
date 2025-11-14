@@ -1,0 +1,3002 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The documentation for the probdiffeq library.">
+      
+      
+        <meta name="author" content="Nicholas Krämer">
+      
+      
+      
+        <link rel="prev" href="../../examples_benchmarks/convergence-rates-lotka-volterra/">
+      
+      
+        <link rel="next" href="../ivpsolvers/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>ivpsolve - probdiffeq documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Sans:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Fira Sans";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../_stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#probdiffeq.ivpsolve" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="probdiffeq documentation" class="md-header__button md-logo" aria-label="probdiffeq documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            probdiffeq documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ivpsolve
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5 5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m0-4.5c5 0 9.27 3.11 11 7.5-1.73 4.39-6 7.5-11 7.5S2.73 16.39 1 12c1.73-4.39 6-7.5 11-7.5M3.18 12a9.821 9.821 0 0 0 17.64 0 9.821 9.821 0 0 0-17.64 0"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pnkraemer/probdiffeq" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pnkraemer/probdiffeq
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="probdiffeq documentation" class="md-nav__button md-logo" aria-label="probdiffeq documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    probdiffeq documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pnkraemer/probdiffeq" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pnkraemer/probdiffeq
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    probdiffeq
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_quickstart/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migration_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../choosing_a_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a solver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EXAMPLES | BASIC
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    EXAMPLES | BASIC
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_basic/conditioning_on_zero_residual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How probabilistic solvers work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_basic/posterior_uncertainties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Posterior uncertainties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_basic/dynamic_output_scales/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_basic/second_order_problems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Second-order systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_basic/taylor_coefficients/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taylor coefficients
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EXAMPLES | ADVANCED
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    EXAMPLES | ADVANCED
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_advanced/parameter_estimation_optax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter estimation (Optax)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_advanced/parameter_estimation_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter estimation (BlackJAX)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_advanced/neural_ode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion tempering &amp; NODEs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_advanced/equinox_while_loop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Equinox's while-loops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_advanced/solve_pde/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solve a PDE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EXAMPLES | BENCHMARKS
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    EXAMPLES | BENCHMARKS
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/work-precision-lotka-volterra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WP diagram: Lotka-Volterra
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/work-precision-pleiades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WP diagram: Pleiades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/work-precision-vanderpol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WP diagram: Stiff van-der-Pol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/work-precision-hires/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WP diagram: HIRES
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/taylor-init-fitzhughnagumo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initialisation: FitzHugh-Nagumo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/taylor-init-node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initialisation: Neural ODE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/taylor-init-pleiades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initialisation: Pleiades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples_benchmarks/convergence-rates-lotka-volterra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CR: Lotka-Volterra
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DOCUMENTATION | API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    DOCUMENTATION | API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ivpsolve
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ivpsolve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ivpsolve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IVPSolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IVPSolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.marginals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.num_steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        num_steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.output_scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output_scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.ssm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ssm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        t
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.u" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        u
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.u_std" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        u_std
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.dt0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dt0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.dt0_adaptive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dt0_adaptive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_adaptive_save_at" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_adaptive_save_at
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_adaptive_save_every_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_adaptive_save_every_step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_adaptive_terminal_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_adaptive_terminal_values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_fixed_grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_fixed_grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ivpsolvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ivpsolvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../taylor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    taylor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../impl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    impl
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DOCUMENTATION | DEVELOPER
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    DOCUMENTATION | DEVELOPER
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev_docs/public_api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Private and public API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev_docs/creating_example_notebook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a new example/benchmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev_docs/continuous_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Continuous Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ivpsolve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IVPSolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IVPSolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.marginals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.num_steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        num_steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.output_scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output_scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.ssm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ssm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        t
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.u" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        u
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.IVPSolution.u_std" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        u_std
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.dt0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dt0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.dt0_adaptive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dt0_adaptive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_adaptive_save_at" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_adaptive_save_at
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_adaptive_save_every_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_adaptive_save_every_step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_adaptive_terminal_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_adaptive_terminal_values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq.ivpsolve.solve_fixed_grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_fixed_grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    probdiffeq
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    DOCUMENTATION | API
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>ivpsolve</h1>
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="probdiffeq.ivpsolve"></a>
+    <div class="doc doc-contents first">
+
+        <p>Routines for estimating solutions of initial value problems.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq.ivpsolve.IVPSolution" class="doc doc-heading">
+            <code>IVPSolution</code>
+
+
+<a href="#probdiffeq.ivpsolve.IVPSolution" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The probabilistic numerical solution of an initial value problem (IVP).</p>
+<p>This class stores the computed solution,
+its uncertainty estimates, and details of the probabilistic model
+used in probabilistic numerical integration.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@containers</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IVPSolution</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The probabilistic numerical solution of an initial value problem (IVP).</span>
+
+<span class="sd">    This class stores the computed solution,</span>
+<span class="sd">    its uncertainty estimates, and details of the probabilistic model</span>
+<span class="sd">    used in probabilistic numerical integration.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">t</span><span class="p">:</span> <span class="n">Array</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Time points at which the IVP solution has been computed.&quot;&quot;&quot;</span>
+
+    <span class="n">u</span><span class="p">:</span> <span class="n">Array</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The mean of the IVP solution at each computed time point.&quot;&quot;&quot;</span>
+
+    <span class="n">u_std</span><span class="p">:</span> <span class="n">Array</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The standard deviation of the IVP solution, indicating uncertainty.&quot;&quot;&quot;</span>
+
+    <span class="n">output_scale</span><span class="p">:</span> <span class="n">Array</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The calibrated output scale of the probabilistic model.&quot;&quot;&quot;</span>
+
+    <span class="n">marginals</span><span class="p">:</span> <span class="n">Any</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Marginal distributions for each time point in the posterior distribution.&quot;&quot;&quot;</span>
+
+    <span class="n">posterior</span><span class="p">:</span> <span class="n">Any</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A the full posterior distribution of the probabilistic numerical solution.</span>
+
+<span class="sd">    Typically, a backward factorisation of the posterior.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">num_steps</span><span class="p">:</span> <span class="n">Array</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The number of solver steps taken at each time point.&quot;&quot;&quot;</span>
+
+    <span class="n">ssm</span><span class="p">:</span> <span class="n">Any</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;State-space model implementation used by the solver.&quot;&quot;&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_register_pytree_node</span><span class="p">():</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_sol_flatten</span><span class="p">(</span><span class="n">sol</span><span class="p">):</span>
+            <span class="n">children</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">t</span><span class="p">,</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">u</span><span class="p">,</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">u_std</span><span class="p">,</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">marginals</span><span class="p">,</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">posterior</span><span class="p">,</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">output_scale</span><span class="p">,</span>
+                <span class="n">sol</span><span class="o">.</span><span class="n">num_steps</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">aux</span> <span class="o">=</span> <span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">ssm</span><span class="p">,)</span>
+            <span class="k">return</span> <span class="n">children</span><span class="p">,</span> <span class="n">aux</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_sol_unflatten</span><span class="p">(</span><span class="n">aux</span><span class="p">,</span> <span class="n">children</span><span class="p">):</span>
+            <span class="p">(</span><span class="n">ssm</span><span class="p">,)</span> <span class="o">=</span> <span class="n">aux</span>
+            <span class="n">t</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">u_std</span><span class="p">,</span> <span class="n">marginals</span><span class="p">,</span> <span class="n">posterior</span><span class="p">,</span> <span class="n">output_scale</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="n">children</span>
+            <span class="k">return</span> <span class="n">IVPSolution</span><span class="p">(</span>
+                <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">,</span>
+                <span class="n">u_std</span><span class="o">=</span><span class="n">u_std</span><span class="p">,</span>
+                <span class="n">marginals</span><span class="o">=</span><span class="n">marginals</span><span class="p">,</span>
+                <span class="n">posterior</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
+                <span class="n">output_scale</span><span class="o">=</span><span class="n">output_scale</span><span class="p">,</span>
+                <span class="n">num_steps</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
+                <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">tree_util</span><span class="o">.</span><span class="n">register_pytree_node</span><span class="p">(</span><span class="n">IVPSolution</span><span class="p">,</span> <span class="n">_sol_flatten</span><span class="p">,</span> <span class="n">_sol_unflatten</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.marginals" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">marginals</span><span class="p">:</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.marginals" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Marginal distributions for each time point in the posterior distribution.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.num_steps" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">num_steps</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.num_steps" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The number of solver steps taken at each time point.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.output_scale" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">output_scale</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.output_scale" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The calibrated output scale of the probabilistic model.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.posterior" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">posterior</span><span class="p">:</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.posterior" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>A the full posterior distribution of the probabilistic numerical solution.</p>
+<p>Typically, a backward factorisation of the posterior.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.ssm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ssm</span><span class="p">:</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.ssm" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>State-space model implementation used by the solver.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.t" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">t</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.t" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Time points at which the IVP solution has been computed.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.u" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">u</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.u" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The mean of the IVP solution at each computed time point.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq.ivpsolve.IVPSolution.u_std" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">u_std</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq.ivpsolve.IVPSolution.u_std" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The standard deviation of the IVP solution, indicating uncertainty.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq.ivpsolve.dt0" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">dt0</span><span class="p">(</span><span class="n">vf_autonomous</span><span class="p">,</span> <span class="n">initial_values</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">nugget</span><span class="o">=</span><span class="mf">1e-05</span><span class="p">)</span></code>
+
+<a href="#probdiffeq.ivpsolve.dt0" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Propose an initial time-step.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dt0</span><span class="p">(</span><span class="n">vf_autonomous</span><span class="p">,</span> <span class="n">initial_values</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">nugget</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Propose an initial time-step.&quot;&quot;&quot;</span>
+    <span class="n">u0</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">initial_values</span>
+    <span class="n">f0</span> <span class="o">=</span> <span class="n">vf_autonomous</span><span class="p">(</span><span class="o">*</span><span class="n">initial_values</span><span class="p">)</span>
+
+    <span class="n">u0</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">tree_util</span><span class="o">.</span><span class="n">ravel_pytree</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+    <span class="n">f0</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">tree_util</span><span class="o">.</span><span class="n">ravel_pytree</span><span class="p">(</span><span class="n">f0</span><span class="p">)</span>
+
+    <span class="n">norm_y0</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">vector_norm</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+    <span class="n">norm_dy0</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">vector_norm</span><span class="p">(</span><span class="n">f0</span><span class="p">)</span> <span class="o">+</span> <span class="n">nugget</span>
+
+    <span class="k">return</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">norm_y0</span> <span class="o">/</span> <span class="n">norm_dy0</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq.ivpsolve.dt0_adaptive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">dt0_adaptive</span><span class="p">(</span><span class="n">vf</span><span class="p">,</span> <span class="n">initial_values</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">error_contraction_rate</span><span class="p">,</span> <span class="n">rtol</span><span class="p">,</span> <span class="n">atol</span><span class="p">)</span></code>
+
+<a href="#probdiffeq.ivpsolve.dt0_adaptive" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Propose an initial time-step as a function of the tolerances.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dt0_adaptive</span><span class="p">(</span><span class="n">vf</span><span class="p">,</span> <span class="n">initial_values</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">error_contraction_rate</span><span class="p">,</span> <span class="n">rtol</span><span class="p">,</span> <span class="n">atol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Propose an initial time-step as a function of the tolerances.&quot;&quot;&quot;</span>
+    <span class="c1"># Algorithm from:</span>
+    <span class="c1"># E. Hairer, S. P. Norsett G. Wanner,</span>
+    <span class="c1"># Solving Ordinary Differential Equations I: Nonstiff Problems, Sec. II.4.</span>
+    <span class="c1"># Implementation mostly copied from</span>
+    <span class="c1">#</span>
+    <span class="c1"># https://github.com/google/jax/blob/main/jax/experimental/ode.py</span>
+    <span class="c1">#</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">initial_values</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span>
+    <span class="n">y0</span> <span class="o">=</span> <span class="n">initial_values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">f0</span> <span class="o">=</span> <span class="n">vf</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t0</span><span class="p">)</span>
+
+    <span class="n">y0</span><span class="p">,</span> <span class="n">unravel</span> <span class="o">=</span> <span class="n">tree_util</span><span class="o">.</span><span class="n">ravel_pytree</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span>
+    <span class="n">f0</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">tree_util</span><span class="o">.</span><span class="n">ravel_pytree</span><span class="p">(</span><span class="n">f0</span><span class="p">)</span>
+
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">atol</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span> <span class="o">*</span> <span class="n">rtol</span>
+    <span class="n">d0</span><span class="p">,</span> <span class="n">d1</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">vector_norm</span><span class="p">(</span><span class="n">y0</span><span class="p">),</span> <span class="n">linalg</span><span class="o">.</span><span class="n">vector_norm</span><span class="p">(</span><span class="n">f0</span><span class="p">)</span>
+
+    <span class="n">dt0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">d0</span> <span class="o">&lt;</span> <span class="mf">1e-5</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">d1</span> <span class="o">&lt;</span> <span class="mf">1e-5</span><span class="p">),</span> <span class="mf">1e-6</span><span class="p">,</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="n">d0</span> <span class="o">/</span> <span class="n">d1</span><span class="p">)</span>
+
+    <span class="n">y1</span> <span class="o">=</span> <span class="n">y0</span> <span class="o">+</span> <span class="n">dt0</span> <span class="o">*</span> <span class="n">f0</span>
+    <span class="n">f1</span> <span class="o">=</span> <span class="n">vf</span><span class="p">(</span><span class="n">unravel</span><span class="p">(</span><span class="n">y1</span><span class="p">),</span> <span class="n">t</span><span class="o">=</span><span class="n">t0</span> <span class="o">+</span> <span class="n">dt0</span><span class="p">)</span>
+    <span class="n">f1</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">tree_util</span><span class="o">.</span><span class="n">ravel_pytree</span><span class="p">(</span><span class="n">f1</span><span class="p">)</span>
+    <span class="n">d2</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">vector_norm</span><span class="p">((</span><span class="n">f1</span> <span class="o">-</span> <span class="n">f0</span><span class="p">)</span> <span class="o">/</span> <span class="n">scale</span><span class="p">)</span> <span class="o">/</span> <span class="n">dt0</span>
+
+    <span class="n">dt1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">d1</span> <span class="o">&lt;=</span> <span class="mf">1e-15</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">d2</span> <span class="o">&lt;=</span> <span class="mf">1e-15</span><span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">dt0</span> <span class="o">*</span> <span class="mf">1e-3</span><span class="p">),</span>
+        <span class="p">(</span><span class="mf">0.01</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="n">d2</span><span class="p">))</span> <span class="o">**</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="n">error_contraction_rate</span> <span class="o">+</span> <span class="mf">1.0</span><span class="p">)),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="mf">100.0</span> <span class="o">*</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">dt1</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq.ivpsolve.solve_adaptive_save_at" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">solve_adaptive_save_at</span><span class="p">(</span><span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">save_at</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">ssm</span><span class="p">,</span> <span class="n">warn</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span></code>
+
+<a href="#probdiffeq.ivpsolve.solve_adaptive_save_at" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Solve an initial value problem and return the solution at a pre-determined grid.</p>
+<p>This algorithm implements the method by Krämer (2024). Please consider citing it
+if you use it for your research. A PDF is available
+<a href="https://arxiv.org/abs/2410.10530">here</a> and Krämer's (2024) experiments are
+available <a href="https://github.com/pnkraemer/code-adaptive-prob-ode-solvers">here</a>.</p>
+<details class="note">
+<summary>BibTex for Krämer (2024)</summary>
+<div class="highlight"><pre><span></span><code><span class="nc">@InProceedings</span><span class="p">{</span><span class="nl">kramer2024adaptive</span><span class="p">,</span>
+<span class="w">    </span><span class="na">title</span><span class="w">     </span><span class="p">=</span><span class="w"> </span><span class="s">{Adaptive Probabilistic ODE Solvers Without Adaptive Memory</span>
+<span class="s">                Requirements}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">author</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Kr\&quot;{a}mer, Nicholas}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">booktitle</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Proceedings of the First International Conference on</span>
+<span class="s">                Probabilistic Numerics}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">pages</span><span class="w">     </span><span class="p">=</span><span class="w"> </span><span class="s">{12--24}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">year</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{2025}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">editor</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Kanagawa, Motonobu and Cockayne, Jon and Gessner, Alexandra</span>
+<span class="s">                and Hennig, Philipp}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">volume</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{271}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">series</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="s">{Proceedings of Machine Learning Research}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">publisher</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{PMLR}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">url</span><span class="w">       </span><span class="p">=</span><span class="w"> </span><span class="s">{https://proceedings.mlr.press/v271/kramer25a.html}</span>
+<span class="p">}</span>
+</code></pre></div>
+</details>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">solve_adaptive_save_at</span><span class="p">(</span>
+    <span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">save_at</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">ssm</span><span class="p">,</span> <span class="n">warn</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Solve an initial value problem and return the solution at a pre-determined grid.</span>
+
+<span class="sd">    This algorithm implements the method by Krämer (2024). Please consider citing it</span>
+<span class="sd">    if you use it for your research. A PDF is available</span>
+<span class="sd">    [here](https://arxiv.org/abs/2410.10530) and Krämer&#39;s (2024) experiments are</span>
+<span class="sd">    available [here](https://github.com/pnkraemer/code-adaptive-prob-ode-solvers).</span>
+
+<span class="sd">    ??? note &quot;BibTex for Krämer (2024)&quot;</span>
+<span class="sd">        ```bibtex</span>
+<span class="sd">        @InProceedings{kramer2024adaptive,</span>
+<span class="sd">            title     = {Adaptive Probabilistic ODE Solvers Without Adaptive Memory</span>
+<span class="sd">                        Requirements},</span>
+<span class="sd">            author    = {Kr\&quot;{a}mer, Nicholas},</span>
+<span class="sd">            booktitle = {Proceedings of the First International Conference on</span>
+<span class="sd">                        Probabilistic Numerics},</span>
+<span class="sd">            pages     = {12--24},</span>
+<span class="sd">            year      = {2025},</span>
+<span class="sd">            editor    = {Kanagawa, Motonobu and Cockayne, Jon and Gessner, Alexandra</span>
+<span class="sd">                        and Hennig, Philipp},</span>
+<span class="sd">            volume    = {271},</span>
+<span class="sd">            series    = {Proceedings of Machine Learning Research},</span>
+<span class="sd">            publisher = {PMLR},</span>
+<span class="sd">            url       = {https://proceedings.mlr.press/v271/kramer25a.html}</span>
+<span class="sd">        }</span>
+<span class="sd">        ```</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">adaptive_solver</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">is_suitable_for_save_at</span> <span class="ow">and</span> <span class="n">warn</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Strategy </span><span class="si">{</span><span class="n">adaptive_solver</span><span class="o">.</span><span class="n">solver</span><span class="si">}</span><span class="s2"> should not &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;be used in solve_adaptive_save_at. &quot;</span>
+        <span class="p">)</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="p">(</span><span class="n">_t</span><span class="p">,</span> <span class="n">solution_save_at</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">num_steps</span> <span class="o">=</span> <span class="n">_solve_adaptive_save_at</span><span class="p">(</span>
+        <span class="n">save_at</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">ssm_init</span><span class="p">,</span>
+        <span class="n">save_at</span><span class="o">=</span><span class="n">save_at</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span>
+        <span class="n">adaptive_solver</span><span class="o">=</span><span class="n">adaptive_solver</span><span class="p">,</span>
+        <span class="n">dt0</span><span class="o">=</span><span class="n">dt0</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># I think the user expects the initial condition to be part of the state</span>
+    <span class="c1"># (as well as marginals), so we compute those things here</span>
+    <span class="n">posterior_save_at</span><span class="p">,</span> <span class="n">output_scale</span> <span class="o">=</span> <span class="n">solution_save_at</span>
+    <span class="n">_tmp</span> <span class="o">=</span> <span class="n">_userfriendly_output</span><span class="p">(</span><span class="n">posterior</span><span class="o">=</span><span class="n">posterior_save_at</span><span class="p">,</span> <span class="n">ssm_init</span><span class="o">=</span><span class="n">ssm_init</span><span class="p">,</span> <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">)</span>
+    <span class="n">marginals</span><span class="p">,</span> <span class="n">posterior</span> <span class="o">=</span> <span class="n">_tmp</span>
+    <span class="n">u</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">qoi_from_sample</span><span class="p">(</span><span class="n">marginals</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">standard_deviation</span><span class="p">(</span><span class="n">marginals</span><span class="p">)</span>
+    <span class="n">u_std</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">qoi_from_sample</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">IVPSolution</span><span class="p">(</span>
+        <span class="n">t</span><span class="o">=</span><span class="n">save_at</span><span class="p">,</span>
+        <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">,</span>
+        <span class="n">u_std</span><span class="o">=</span><span class="n">u_std</span><span class="p">,</span>
+        <span class="n">marginals</span><span class="o">=</span><span class="n">marginals</span><span class="p">,</span>
+        <span class="n">posterior</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
+        <span class="n">output_scale</span><span class="o">=</span><span class="n">output_scale</span><span class="p">,</span>
+        <span class="n">num_steps</span><span class="o">=</span><span class="n">num_steps</span><span class="p">,</span>
+        <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq.ivpsolve.solve_adaptive_save_every_step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">solve_adaptive_save_every_step</span><span class="p">(</span><span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">ssm</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span></code>
+
+<a href="#probdiffeq.ivpsolve.solve_adaptive_save_every_step" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Solve an initial value problem and save every step.</p>
+<p>This function uses a native-Python while loop.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not JITable, not reverse-mode-differentiable.</p>
+</div>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">solve_adaptive_save_every_step</span><span class="p">(</span>
+    <span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">ssm</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve an initial value problem and save every step.</span>
+
+<span class="sd">    This function uses a native-Python while loop.</span>
+
+<span class="sd">    !!! warning</span>
+<span class="sd">        Not JITable, not reverse-mode-differentiable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">adaptive_solver</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">is_suitable_for_save_every_step</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Strategy </span><span class="si">{</span><span class="n">adaptive_solver</span><span class="o">.</span><span class="n">solver</span><span class="si">}</span><span class="s2"> should not &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;be used in solve_adaptive_save_every_step.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">generator</span> <span class="o">=</span> <span class="n">_solution_generator</span><span class="p">(</span>
+        <span class="n">t0</span><span class="p">,</span> <span class="n">ssm_init</span><span class="p">,</span> <span class="n">t1</span><span class="o">=</span><span class="n">t1</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="o">=</span><span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">dt0</span>
+    <span class="p">)</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">tree_array_util</span><span class="o">.</span><span class="n">tree_stack</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">generator</span><span class="p">))</span>
+    <span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">solution_every_step</span><span class="p">),</span> <span class="n">_dt</span><span class="p">,</span> <span class="n">num_steps</span> <span class="o">=</span> <span class="n">tmp</span>
+
+    <span class="c1"># I think the user expects the initial time-point to be part of the grid</span>
+    <span class="c1"># (Even though t0 is not computed by this function)</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">t0</span><span class="p">),</span> <span class="n">t</span><span class="p">))</span>
+
+    <span class="c1"># I think the user expects marginals, so we compute them here</span>
+    <span class="n">posterior</span><span class="p">,</span> <span class="n">output_scale</span> <span class="o">=</span> <span class="n">solution_every_step</span>
+    <span class="n">_tmp</span> <span class="o">=</span> <span class="n">_userfriendly_output</span><span class="p">(</span><span class="n">posterior</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span> <span class="n">ssm_init</span><span class="o">=</span><span class="n">ssm_init</span><span class="p">,</span> <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">)</span>
+    <span class="n">marginals</span><span class="p">,</span> <span class="n">posterior</span> <span class="o">=</span> <span class="n">_tmp</span>
+
+    <span class="n">u</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">qoi_from_sample</span><span class="p">(</span><span class="n">marginals</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">standard_deviation</span><span class="p">(</span><span class="n">marginals</span><span class="p">)</span>
+    <span class="n">u_std</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">qoi_from_sample</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">IVPSolution</span><span class="p">(</span>
+        <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+        <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">,</span>
+        <span class="n">u_std</span><span class="o">=</span><span class="n">u_std</span><span class="p">,</span>
+        <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">,</span>
+        <span class="n">marginals</span><span class="o">=</span><span class="n">marginals</span><span class="p">,</span>
+        <span class="n">posterior</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
+        <span class="n">output_scale</span><span class="o">=</span><span class="n">output_scale</span><span class="p">,</span>
+        <span class="n">num_steps</span><span class="o">=</span><span class="n">num_steps</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq.ivpsolve.solve_adaptive_terminal_values" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">solve_adaptive_terminal_values</span><span class="p">(</span><span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">ssm</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span></code>
+
+<a href="#probdiffeq.ivpsolve.solve_adaptive_terminal_values" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Simulate the terminal values of an initial value problem.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">solve_adaptive_terminal_values</span><span class="p">(</span>
+    <span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">adaptive_solver</span><span class="p">,</span> <span class="n">dt0</span><span class="p">,</span> <span class="n">ssm</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simulate the terminal values of an initial value problem.&quot;&quot;&quot;</span>
+    <span class="n">save_at</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">])</span>
+    <span class="n">solution</span> <span class="o">=</span> <span class="n">solve_adaptive_save_at</span><span class="p">(</span>
+        <span class="n">ssm_init</span><span class="p">,</span>
+        <span class="n">save_at</span><span class="o">=</span><span class="n">save_at</span><span class="p">,</span>
+        <span class="n">adaptive_solver</span><span class="o">=</span><span class="n">adaptive_solver</span><span class="p">,</span>
+        <span class="n">dt0</span><span class="o">=</span><span class="n">dt0</span><span class="p">,</span>
+        <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">,</span>
+        <span class="n">warn</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Turn off warnings because any solver goes for terminal values</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">tree_util</span><span class="o">.</span><span class="n">tree_map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">solution</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq.ivpsolve.solve_fixed_grid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">solve_fixed_grid</span><span class="p">(</span><span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ssm</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span></code>
+
+<a href="#probdiffeq.ivpsolve.solve_fixed_grid" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Solve an initial value problem on a fixed, pre-determined grid.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>probdiffeq/ivpsolve.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">solve_fixed_grid</span><span class="p">(</span><span class="n">ssm_init</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ssm</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IVPSolution</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve an initial value problem on a fixed, pre-determined grid.&quot;&quot;&quot;</span>
+    <span class="c1"># Compute the solution</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">body_fn</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+        <span class="n">_error</span><span class="p">,</span> <span class="n">s_new</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">state</span><span class="o">=</span><span class="n">s</span><span class="p">,</span> <span class="n">dt</span><span class="o">=</span><span class="n">dt</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">s_new</span><span class="p">,</span> <span class="n">s_new</span>
+
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">grid</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">state0</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">t0</span><span class="p">,</span> <span class="n">ssm_init</span><span class="p">)</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">result_state</span> <span class="o">=</span> <span class="n">control_flow</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">body_fn</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="n">state0</span><span class="p">,</span> <span class="n">xs</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">grid</span><span class="p">))</span>
+    <span class="n">_t</span><span class="p">,</span> <span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">output_scale</span><span class="p">)</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">result_state</span><span class="p">)</span>
+
+    <span class="c1"># I think the user expects marginals, so we compute them here</span>
+    <span class="n">_tmp</span> <span class="o">=</span> <span class="n">_userfriendly_output</span><span class="p">(</span><span class="n">posterior</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span> <span class="n">ssm_init</span><span class="o">=</span><span class="n">ssm_init</span><span class="p">,</span> <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">)</span>
+    <span class="n">marginals</span><span class="p">,</span> <span class="n">posterior</span> <span class="o">=</span> <span class="n">_tmp</span>
+
+    <span class="n">u</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">qoi_from_sample</span><span class="p">(</span><span class="n">marginals</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">standard_deviation</span><span class="p">(</span><span class="n">marginals</span><span class="p">)</span>
+    <span class="n">u_std</span> <span class="o">=</span> <span class="n">ssm</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">qoi_from_sample</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">IVPSolution</span><span class="p">(</span>
+        <span class="n">t</span><span class="o">=</span><span class="n">grid</span><span class="p">,</span>
+        <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">,</span>
+        <span class="n">u_std</span><span class="o">=</span><span class="n">u_std</span><span class="p">,</span>
+        <span class="n">ssm</span><span class="o">=</span><span class="n">ssm</span><span class="p">,</span>
+        <span class="n">marginals</span><span class="o">=</span><span class="n">marginals</span><span class="p">,</span>
+        <span class="n">posterior</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
+        <span class="n">output_scale</span><span class="o">=</span><span class="n">output_scale</span><span class="p">,</span>
+        <span class="n">num_steps</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">grid</span><span class="p">)),</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://twitter.com/@pnkraemer" target="_blank" rel="noopener" title="pnkraemer" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M459.4 151.7c.3 4.5.3 9.1.3 13.6 0 138.7-105.6 298.6-298.6 298.6-59.5 0-114.7-17.2-161.1-47.1 8.4 1 16.6 1.3 25.3 1.3 49.1 0 94.2-16.6 130.3-44.8-46.1-1-84.8-31.2-98.1-72.8 6.5 1 13 1.6 19.8 1.6 9.4 0 18.8-1.3 27.6-3.6-48.1-9.7-84.1-52-84.1-103v-1.3c14 7.8 30.2 12.7 47.4 13.3-28.3-18.8-46.8-51-46.8-87.4 0-19.5 5.2-37.4 14.3-53C87.4 130.8 165 172.4 252.1 176.9c-1.6-7.8-2.6-15.9-2.6-24C249.5 95.1 296.3 48 354.4 48c30.2 0 57.5 12.7 76.7 33.1 23.7-4.5 46.5-13.3 66.6-25.3-7.8 24.4-24.4 44.8-46.1 57.8 21.1-2.3 41.6-8.1 60.4-16.2-14.3 20.8-32.2 39.3-52.6 54.3"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.path", "navigation.indexes", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="../../_javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
