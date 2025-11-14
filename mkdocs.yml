@@ -90,22 +90,22 @@ nav:
       - examples_advanced/neural_ode.ipynb
       - examples_advanced/equinox_while_loop.ipynb
       - examples_advanced/solve_pde.ipynb
-  - API DOCUMENTATION:
+  - EXAMPLES | BENCHMARKS:
+      - examples_benchmarks/work-precision-lotka-volterra.ipynb
+      - examples_benchmarks/work-precision-pleiades.ipynb
+      - examples_benchmarks/work-precision-vanderpol.ipynb
+      - examples_benchmarks/work-precision-hires.ipynb
+      - examples_benchmarks/taylor-init-fitzhughnagumo.ipynb
+      - examples_benchmarks/taylor-init-node.ipynb
+      - examples_benchmarks/taylor-init-pleiades.ipynb
+      - examples_benchmarks/convergence-rates-lotka-volterra.ipynb
+  - DOCUMENTATION | API:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md
       - stats: api_docs/stats.md
       - taylor: api_docs/taylor.md
       - impl: api_docs/impl.md
-  - DEVELOPER DOCUMENTATION:
+  - DOCUMENTATION | DEVELOPER:
       - dev_docs/public_api.md
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md
-  - BENCHMARKS:
-      - benchmarks/lotkavolterra/plot.ipynb
-      - benchmarks/pleiades/plot.ipynb
-      - benchmarks/hires/plot.ipynb
-      - benchmarks/vanderpol/plot.ipynb
-      - Taylor coefficients:
-          - benchmarks/taylor_pleiades/plot.ipynb
-          - benchmarks/taylor_fitzhughnagumo/plot.ipynb
-          - benchmarks/taylor_node/plot.ipynb
