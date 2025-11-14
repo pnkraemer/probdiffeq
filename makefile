@@ -16,35 +16,6 @@ example-and-benchmark:
 	jupytext --execute docs/examples*/*.ipynb
 
 
-benchmarks-plot-results:
-	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
-	jupytext --execute docs/benchmarks/**/*.ipynb
-
-benchmarks-run:
-	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
-	time jupytext --execute docs/benchmarks/convergence-rates/convergence-rates-lotka-volterra.ipynb
-	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 7  --save
-	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 8 --repeats 3  --save  --no-diffrax  # Skip Diffrax for now
-	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 11 --repeats 3  --save
-	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 9 --repeats 7  --save  --no-diffrax  # Skip Diffrax for now
-	time python docs/benchmarks/taylor_node/run_taylor_node.py --max_time 8 --repeats 3 --save
-	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 8 --repeats 3 --save
-	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 8 --repeats 3 --save
-	make benchmarks-plot-results
-
-benchmarks-dry-run:
-	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
-	time jupytext --execute docs/benchmarks/convergence-rates/convergence-rates-lotka-volterra.ipynb
-	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 5 --repeats 2 --no-save
-	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 3 --repeats 2  --no-save  --no-diffrax  # Skip Diffrax for now
-	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --no-save
-	time python docs/benchmarks/hires/run_hires.py --start 1 --stop 3 --repeats 2  --no-save  --no-diffrax  # Skip Diffrax for now
-	time python docs/benchmarks/taylor_node/run_taylor_node.py --max_time 0.5 --repeats 2 --no-save
-	time python docs/benchmarks/taylor_fitzhughnagumo/run_taylor_fitzhughnagumo.py --max_time 0.5 --repeats 2 --no-save
-	time python docs/benchmarks/taylor_pleiades/run_taylor_pleiades.py --max_time 0.5 --repeats 2 --no-save
-	make benchmarks-plot-results
-
-
 clean:
 	pre-commit clean
 	git clean -xdf

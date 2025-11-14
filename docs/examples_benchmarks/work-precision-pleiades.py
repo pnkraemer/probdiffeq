@@ -356,4 +356,3 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
 
 
 main()
-# -

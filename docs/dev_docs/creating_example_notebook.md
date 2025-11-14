@@ -7,20 +7,27 @@ New examples are welcome! To create a new example or benchmark, follow these ste
 
 
 
-1. Create a new script in the corresponding subdirectory of the `docs/` directory. The resulting path should look like: `docs/examples_benchmarks/benchmark-name.ipynb` or `docs/examples_advanced/example-name.ipynb` or similar. Choose a meaningful name for your benchmark, e.g. `scipy-comparison-hires` or `demonstrate-calibration`. In case you are wondering which examples-subfolder is most appropriate: if your notebook introduces an external dependency (for example, an optimisation or sampling library), then it is an advanced tutorial. 
+1. Create a new Jupyter notebook that contains the example or benchmark in the corresponding subdirectory of the `docs/` directory. The resulting path should look like: `docs/examples_benchmarks/benchmark-name.ipynb` or `docs/examples_advanced/example-name.ipynb` or similar. Choose a meaningful name for your benchmark, e.g. `work-precision-hires` or `demonstrate-calibration`. The new notebook should execute the script and plot the results. The run itself not take too long (think, less much than a minute), otherwise the continuous integration (which verifies the examples and benchmarks run correctly) grows out of hand.
+
+      In case you are wondering which examples-subfolder is most appropriate: if your notebook introduces an external dependency (for example, an optimisation or sampling library), then it is an advanced tutorial. 
 
 
 
-2. Create a Jupyter notebook that contains the example or benchmark. This notebook should execute the script and plot the results. The run itself not take too long (think, less much than a minute), otherwise the continuous integration (which verifies the examples and benchmarks run correctly) grows out of hand.
-
-3. Link the notebook to a markdown file via jupytext (for better version control):
+2. If not done already, run `pip install .[doc,format-and-lint]` to install dependencies like jupytext and `pre-commit install` to install the pre-commit hook (which formats and lints the new notebook after the below steps have been completed). Link the notebook to a markdown file via jupytext (for better version control):
 
       ```
       jupytext --set-formats ipynb,py:light  <new-benchmark-notebook.ipynb>
       ```
+      
+      Alternative, run the following line which links all notebooks to a py:light format.
+      ```
+      jupytext --set-formats ipynb,py:light docs/examples_*/*.ipynb
+      ```
+      If the position and naming of the new notabook matches the instructions above, the new notebook is not synced to a python script.  
+      We link to py:light format (not to, e.g., markdown), because this way we can run the formatters and linters on the scripts.
+      i
 
-      If not done already, run `pip install .[doc]` to install dependencies like jupytext.
-
-4. Include the notebook (the .ipynb file) into the docs by mentioning it in the `nav:` entry in  `mkdocs.yml`. Check whether the markdown script is covered by the rules in `mkdocs.yml` under `exclude:` -- if not, include it here.
-5. Mention the new benchmark in the makefile (`benchmarks-run`). T
-6. If the example requires access to an external dependency, mention it under the `doc` optional dependencies in the `pyproject.toml`.
+3. Include the notebook (the .ipynb file) into the docs by mentioning it in the `nav:` entry in  `mkdocs.yml`. Check whether the markdown script is covered by the rules in `mkdocs.yml` under `exclude:` -- if not, include it here.
+4. Mention the new benchmark in the makefile (`benchmarks-run`). T
+5. If the example requires access to an external dependency, mention it under the `doc` optional dependencies in the `pyproject.toml`.
+6. Add and commit the new notebook (the pre-commit hook checks formatting and linting). Create a pull request and you're done.

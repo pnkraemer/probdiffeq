@@ -91,22 +91,21 @@ nav:
       - examples_advanced/equinox_while_loop.ipynb
       - examples_advanced/solve_pde.ipynb
   - EXAMPLES | BENCHMARKS:
-      - examples_benchmarks/convergence-rates-lotka-volterra.ipynb
       - examples_benchmarks/work-precision-lotka-volterra.ipynb
       - examples_benchmarks/work-precision-pleiades.ipynb
       - examples_benchmarks/work-precision-vanderpol.ipynb
       - examples_benchmarks/work-precision-hires.ipynb
-      - Taylor coefficients:
-          - examples_benchmarks/taylor_pleiades/plot.ipynb
-          - examples_benchmarks/taylor_fitzhughnagumo/plot.ipynb
-          - examples_benchmarks/taylor_node/plot.ipynb
-  - API DOCUMENTATION:
+      - examples_benchmarks/taylor-init-fitzhugh-nagumo.ipynb
+      - examples_benchmarks/taylor-init-node.ipynb
+      - examples_benchmarks/taylor-init-pleiades.ipynb
+      - examples_benchmarks/convergence-rates-lotka-volterra.ipynb
+  - DOCUMENTATION | API:
       - ivpsolve: api_docs/ivpsolve.md
       - ivpsolvers: api_docs/ivpsolvers.md
       - stats: api_docs/stats.md
       - taylor: api_docs/taylor.md
       - impl: api_docs/impl.md
-  - DEVELOPER DOCUMENTATION:
+  - DOCUMENTATION | DEVELOPER:
       - dev_docs/public_api.md
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md
