@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Work-precision diagram (Lotka-Volterra)
+# # WP diagram: Lotka-Volterra
 
 # +
 """Lotka-Volterra work-precision diagram."""

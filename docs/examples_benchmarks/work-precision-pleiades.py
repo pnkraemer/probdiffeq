@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Work-precision diagram (Pleiades)
+# # WP diagram: Pleiades
 
 # +
 """Pleiades work-precision diagram."""

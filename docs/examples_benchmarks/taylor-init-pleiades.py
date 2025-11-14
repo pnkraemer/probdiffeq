@@ -13,8 +13,7 @@
 #     name: python3
 # ---
 
-# +
-# Taylor initisalisation (Pleiades)
+# # Initialisation: Pleiades
 
 # +
 """Benchmark the initialisation methods on the Pleiades problem."""

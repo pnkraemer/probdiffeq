@@ -13,8 +13,7 @@
 #     name: python3
 # ---
 
-# +
-# Taylor initisalisation (Neural ODE)
+# # Initialisation: Neural ODE
 
 # +
 """Benchmark the initialisation methods on a neural ODE problem."""
@@ -212,4 +211,3 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 
 
 main()
-# -

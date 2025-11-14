@@ -13,8 +13,7 @@
 #     name: python3
 # ---
 
-# +
-# Taylor initisalisation (FitzHugh-Nagumo)
+# # Initialisation: FitzHugh-Nagumo
 
 # +
 """Benchmark the initialisation methods on the FitzHugh-Nagumo problem."""
@@ -200,4 +199,3 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
 
 
 main()
-# -

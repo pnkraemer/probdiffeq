@@ -95,7 +95,7 @@ nav:
       - examples_benchmarks/work-precision-pleiades.ipynb
       - examples_benchmarks/work-precision-vanderpol.ipynb
       - examples_benchmarks/work-precision-hires.ipynb
-      - examples_benchmarks/taylor-init-fitzhugh-nagumo.ipynb
+      - examples_benchmarks/taylor-init-fitzhughnagumo.ipynb
       - examples_benchmarks/taylor-init-node.ipynb
       - examples_benchmarks/taylor-init-pleiades.ipynb
       - examples_benchmarks/convergence-rates-lotka-volterra.ipynb

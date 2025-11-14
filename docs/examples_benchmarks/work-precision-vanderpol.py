@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Work-precision diagram (Van-der-Pol)
+# # WP diagram: Stiff van-der-Pol
 
 # +
 """Stiff-van-der-Pol work-precision diagram."""

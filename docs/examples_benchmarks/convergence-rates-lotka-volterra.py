@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Convergence rates and high-order solvers
+# # CR: Lotka-Volterra
 
 # +
 """Evaluate the convergence rates of the probabilistic solvers."""

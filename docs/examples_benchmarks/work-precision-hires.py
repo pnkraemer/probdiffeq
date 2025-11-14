@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Work-precision diagram (HIRES)
+# # WP diagram: HIRES
 
 # +
 """HIRES work-precision diagram."""
