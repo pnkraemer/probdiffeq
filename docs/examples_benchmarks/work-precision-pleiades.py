@@ -1,11 +1,24 @@
-"""Pleiades benchmark.
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:light
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.17.3
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
 
-See makefile for instructions.
-"""
+# # Work-precision diagram (Pleiades)
 
-import argparse
+# +
+"""Pleiades work-precision diagram."""
+
 import functools
-import os
 import statistics
 import timeit
 from collections.abc import Callable
@@ -13,50 +26,135 @@ from collections.abc import Callable
 import diffrax
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numba
 import numpy as np
 import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.util.doc_util import info
 
 
-def set_jax_config() -> None:
-    """Set JAX and other external libraries up."""
-    # x64 precision
+def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
+    """Run the script."""
+    # Set up all the configs
     jax.config.update("jax_enable_x64", True)
 
-    # CPU
-    jax.config.update("jax_platform_name", "cpu")
+    # Simulate once to plot the state
+    ts, ys = solve_ivp_once()
+
+    fig, ax = plt.subplots(figsize=(5, 3))
+    ax.plot(ys[:, :7], ys[:, 7:14], linestyle="solid", marker="None")
+    ax.plot(ys[0, :7], ys[0, 7:14], linestyle="None", marker=".", markersize=4)
+    ax.plot(ys[-1, :7], ys[-1, 7:14], linestyle="None", marker="*", markersize=8)
+
+    ax.set_title("Pleiades problem")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("State")
+    plt.tight_layout()
+    plt.show()
+
+    # Read configuration from command line
+    tolerances = setup_tolerances(start=start, stop=stop, step=step)
+    timeit_fun = setup_timeit(repeats=repeats)
+
+    # Assemble algorithms
+    algorithms = {
+        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
+            num_derivatives=5, correction_fun=ivpsolvers.correction_ts0
+        ),
+        r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
+            num_derivatives=8, correction_fun=ivpsolvers.correction_ts0
+        ),
+        "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
+        "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
+        "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
+        "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
+        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
+    }
+
+    if use_diffrax:
+        # TODO: this is a temporary fix because Diffrax doesn't work with JAX >= 0.7.0
+        # Revisit in the near future.
+        algorithms["Diffrax: Kvaerno3()"] = solver_diffrax(solver=diffrax.Kvaerno3())
+        algorithms["Diffrax: Kvaerno5()"] = solver_diffrax(solver=diffrax.Kvaerno5())
+    else:
+        print("\nSkipped Diffrax.\n")
+
+    # Compute a reference solution
+    reference = solver_scipy(method="LSODA", use_numba=False)(1e-14)
+    precision_fun = rmse_absolute(reference)
+
+    # Compute all work-precision diagrams
+    results = {}
+    for label, algo in tqdm.tqdm(algorithms.items()):
+        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
+        results[label] = param_to_wp(tolerances)
+
+    fig, ax = plt.subplots(figsize=(7, 3))
+    for label, wp in results.items():
+        ax.loglog(wp["precision"], wp["work_mean"], label=label)
+
+    ax.set_title("Work-precision diagram")
+    ax.set_xlabel("Precision (relative RMSE)")
+    ax.set_ylabel("Work (avg. wall time)")
+    ax.grid(linestyle="dotted", which="both")
+    ax.legend(fontsize="small", loc="center left", bbox_to_anchor=(1, 0.5))
+
+    plt.tight_layout()
+    plt.show()
 
 
-def print_library_info() -> None:
-    """Print the environment info for this benchmark."""
-    info.print_info()
-    print("\n------------------------------------------\n")
+def solve_ivp_once():
+    """Compute plotting-values for the IVP."""
+    # fmt: off
+    u0 = np.asarray(
+        [
+            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
+            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
+            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
+            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
+        ]
+    )
+    # fmt: on
+
+    def vf_scipy(_t, u):
+        """Pleiades problem."""
+        x = u[0:7]  # x
+        y = u[7:14]  # y
+        xi, xj = x[:, None], x[None, :]
+        yi, yj = y[:, None], y[None, :]
+        rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
+        mj = np.arange(1, 8)[None, :]
+
+        # Explicitly avoid dividing by zero for scipy's solver
+        # The JAX solvers divide by zero and turn the NaNs to zeros.
+        rij = np.where(rij == 0.0, 1.0, rij)
+        ddx = np.sum((mj * (xj - xi) / rij), axis=1)
+        ddy = np.sum((mj * (yj - yi) / rij), axis=1)
+        return np.concatenate((u[14:21], u[21:28], ddx, ddy))
+
+    time_span = np.asarray([0.0, 3.0])
+
+    tol = 1e-12
+    solution = scipy.integrate.solve_ivp(
+        vf_scipy, y0=u0, t_span=time_span, atol=1e-3 * tol, rtol=tol, method="LSODA"
+    )
+
+    return solution.t, solution.y.T
 
 
-def parse_arguments() -> argparse.Namespace:
-    """Parse the arguments from the command line."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--start", type=int, default=1)
-    parser.add_argument("--stop", type=int, default=3)
-    parser.add_argument("--repeats", type=int, default=10)
-    parser.add_argument("--save", action=argparse.BooleanOptionalAction)
-    return parser.parse_args()
-
-
-def tolerances_from_args(arguments: argparse.Namespace, /) -> jax.Array:
+def setup_tolerances(*, start: float, stop: float, step: float) -> jax.Array:
     """Choose vector of tolerances from the command-line arguments."""
-    return 0.1 ** jnp.arange(arguments.start, arguments.stop, step=1.0)
+    return 0.1 ** jnp.arange(start, stop, step=step)
 
 
-def timeit_fun_from_args(arguments: argparse.Namespace, /) -> Callable:
+def setup_timeit(*, repeats: int) -> Callable:
     """Construct a timeit-function from the command-line arguments."""
 
     def timer(fun, /):
-        return list(timeit.repeat(fun, number=1, repeat=arguments.repeats))
+        return list(timeit.repeat(fun, number=1, repeat=repeats))
 
     return timer
 
@@ -222,47 +320,8 @@ def solver_scipy(*, method: str, use_numba: bool) -> Callable:
     return param_to_solution
 
 
-def plot_ivp_solution():
-    """Compute plotting-values for the IVP."""
-    # fmt: off
-    u0 = np.asarray(
-        [
-            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
-            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
-            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
-            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
-        ]
-    )
-    # fmt: on
-
-    def vf_scipy(_t, u):
-        """Pleiades problem."""
-        x = u[0:7]  # x
-        y = u[7:14]  # y
-        xi, xj = x[:, None], x[None, :]
-        yi, yj = y[:, None], y[None, :]
-        rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
-        mj = np.arange(1, 8)[None, :]
-
-        # Explicitly avoid dividing by zero for scipy's solver
-        # The JAX solvers divide by zero and turn the NaNs to zeros.
-        rij = np.where(rij == 0.0, 1.0, rij)
-        ddx = np.sum((mj * (xj - xi) / rij), axis=1)
-        ddy = np.sum((mj * (yj - yi) / rij), axis=1)
-        return np.concatenate((u[14:21], u[21:28], ddx, ddy))
-
-    time_span = np.asarray([0.0, 3.0])
-
-    tol = 1e-12
-    solution = scipy.integrate.solve_ivp(
-        vf_scipy, y0=u0, t_span=time_span, atol=1e-3 * tol, rtol=tol, method="LSODA"
-    )
-
-    return solution.t, solution.y.T
-
-
 def rmse_absolute(expected: jax.Array) -> Callable:
-    """Compute the relative RMSE."""
+    """Compute the absolute RMSE."""
     expected = jnp.asarray(expected)
 
     def rmse(received):
@@ -274,14 +333,7 @@ def rmse_absolute(expected: jax.Array) -> Callable:
 
 
 def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function to a parameter-to-workprecision function.
-
-    Turn a function param->solution into a function
-
-    (param1, param2, ...)->(workprecision1, workprecision2, ...)
-
-    where workprecisionX is a dictionary with keys "work" and "precision".
-    """
+    """Turn a parameter-to-solution function into parameter-to-workprecision."""
 
     def parameter_list_to_workprecision(list_of_args, /):
         works_mean = []
@@ -303,50 +355,5 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
     return parameter_list_to_workprecision
 
 
-if __name__ == "__main__":
-    # Set up all the configs
-    set_jax_config()
-    print_library_info()
-
-    # Simulate once to get plotting code
-    ts, ys = plot_ivp_solution()
-
-    # Read configuration from command line
-    args = parse_arguments()
-    tolerances = tolerances_from_args(args)
-    timeit_fun = timeit_fun_from_args(args)
-
-    # Assemble algorithms
-    algorithms = {
-        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, correction_fun=ivpsolvers.correction_ts0
-        ),
-        r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, correction_fun=ivpsolvers.correction_ts0
-        ),
-        "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
-        "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
-        "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
-        "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
-        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
-    }
-
-    # Compute a reference solution
-    reference = solver_scipy(method="LSODA", use_numba=False)(1e-14)
-    precision_fun = rmse_absolute(reference)
-
-    # Compute all work-precision diagrams
-    results = {}
-    for label, algo in tqdm.tqdm(algorithms.items()):
-        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
-        results[label] = param_to_wp(tolerances)
-
-    # Save results
-    if args.save:
-        jnp.save(os.path.dirname(__file__) + "/results.npy", results)
-        jnp.save(os.path.dirname(__file__) + "/plot_ts.npy", ts)
-        jnp.save(os.path.dirname(__file__) + "/plot_ys.npy", ys)
-        print("\nSaving successful.\n")
-    else:
-        print("\nSkipped saving.\n")
+main()
+# -

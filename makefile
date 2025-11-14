@@ -11,7 +11,7 @@ quickstart:
 	# https://github.com/pnkraemer/probdiffeq/issues/810
 	python docs/examples_quickstart/*.py
 
-example:
+example-and-benchmark:
 	jupytext --quiet --to ipynb --update docs/examples*/*.py
 	jupytext --execute docs/examples*/*.ipynb
 
@@ -21,6 +21,8 @@ benchmarks-plot-results:
 	jupytext --execute docs/benchmarks/**/*.ipynb
 
 benchmarks-run:
+	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
+	time jupytext --execute docs/benchmarks/convergence-rates/convergence-rates-lotka-volterra.ipynb
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 12 --repeats 7  --save
 	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 8 --repeats 3  --save  --no-diffrax  # Skip Diffrax for now
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 11 --repeats 3  --save
@@ -31,6 +33,8 @@ benchmarks-run:
 	make benchmarks-plot-results
 
 benchmarks-dry-run:
+	jupytext --quiet --to ipynb --update docs/benchmarks/**/*.md
+	time jupytext --execute docs/benchmarks/convergence-rates/convergence-rates-lotka-volterra.ipynb
 	time python docs/benchmarks/lotkavolterra/run_lotkavolterra.py --start 3 --stop 5 --repeats 2 --no-save
 	time python docs/benchmarks/vanderpol/run_vanderpol.py --start 1 --stop 3 --repeats 2  --no-save  --no-diffrax  # Skip Diffrax for now
 	time python docs/benchmarks/pleiades/run_pleiades.py --start 3 --stop 5 --repeats 2  --no-save
