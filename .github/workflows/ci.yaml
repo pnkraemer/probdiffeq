@@ -72,29 +72,9 @@ jobs:
           pip install .[cpu,test]
       - name: Run tests
         run: make test
-  dry-run-benchmarks:
-    name: Dry-run benchmarks with ${{ matrix.python-version }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.12']
-        os: [ubuntu-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip 
-          pip install .[cpu,doc]
-      - name: Sync and execute notebooks
-        run: make benchmarks-dry-run
   doc:
-    name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }}
+    name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }} (runs examples
+      and benchmarks)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
