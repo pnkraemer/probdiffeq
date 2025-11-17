@@ -72,7 +72,7 @@ If you use **Probdiffeq** in your research, please cite:
 ```bibtex
 @phdthesis{kramer2024implementing,
   title={Implementing probabilistic numerical solvers for differential equations},
-  author={Kr{"a}mer, Peter Nicholas},
+  author={Kr{\"a}mer, Peter Nicholas},
   year={2024},
   school={Universit{"a}t T{"u}bingen}
 }
@@ -84,7 +84,7 @@ For the *solve-and-save-at* functionality, cite:
 ```bibtex
 @InProceedings{kramer2024adaptive,
   title     = {Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements},
-  author    = {Kr"{a}mer, Nicholas},
+  author    = {Kr{\"a}mer, Nicholas},
   booktitle = {Proceedings of the First International Conference on Probabilistic Numerics},
   pages     = {12--24},
   year      = {2025},

@@ -115,7 +115,7 @@ def solve_adaptive_save_at(
         @InProceedings{kramer2024adaptive,
             title     = {Adaptive Probabilistic ODE Solvers Without Adaptive Memory
                         Requirements},
-            author    = {Kr\"{a}mer, Nicholas},
+            author    = {Kr{\"a}mer, Nicholas},
             booktitle = {Proceedings of the First International Conference on
                         Probabilistic Numerics},
             pages     = {12--24},
