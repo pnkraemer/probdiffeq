@@ -16,15 +16,28 @@ from probdiffeq.backend.typing import (
     Callable,
     Generic,
     NamedArg,
+    Sequence,
     TypeVar,
 )
 from probdiffeq.impl import impl
 
+C = TypeVar("C", bound=Sequence)
+
 
 def prior_wiener_integrated(
-    tcoeffs, *, ssm_fact: str, output_scale: ArrayLike | None = None, damp: float = 0.0
+    tcoeffs: C,
+    *,
+    tcoeffs_std: C | None = None,
+    ssm_fact: str,
+    output_scale: ArrayLike | None = None,
+    damp: float = 0.0,
 ):
-    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process."""
+    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process.
+
+    Increase damping to get visually more pleasing uncertainties
+     and more numerical robustness for
+     high-order solvers in low precision arithmetic
+    """
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
     # TODO: should the output_scale be an argument to solve()?
@@ -35,10 +48,10 @@ def prior_wiener_integrated(
 
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
-    # Increase damping to get visually more pleasing uncertainties
-    #  and more numerical robustness for
-    #  high-order solvers in low precision arithmetic
-    init = ssm.normal.from_tcoeffs(tcoeffs, damp=damp)
+    if tcoeffs_std is None:
+        error_like = np.ones_like(ssm.prototypes.error_estimate())
+        tcoeffs_std = tree_util.tree_map(lambda _: error_like, tcoeffs)
+    init = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std, damp=damp)
     return init, discretize, ssm
 
 
