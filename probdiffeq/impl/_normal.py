@@ -15,7 +15,7 @@ C = TypeVar("C", bound=Sequence)
 
 class NormalBackend(abc.ABC):
     @abc.abstractmethod
-    def from_tcoeffs(self, loc: C, scale: C, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -31,7 +31,10 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+        if scale is None:
+            scale = tree_util.tree_map(np.ones_like, loc)
+
         loc_flat, _ = tree_util.ravel_pytree(loc)
         scale_flat, _ = tree_util.ravel_pytree(scale)
         assert loc_flat.shape == scale_flat.shape
@@ -62,7 +65,10 @@ class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+        if scale is None:
+            scale = tree_util.tree_map(lambda _: np.ones(()), loc)
+
         def ravel(s):
             return tree_util.ravel_pytree(s)[0]
 
@@ -97,7 +103,10 @@ class BlockDiagNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+        if scale is None:
+            scale = tree_util.tree_map(np.ones_like, loc)
+
         def ravel(s):
             return tree_util.ravel_pytree(s)[0]
 
