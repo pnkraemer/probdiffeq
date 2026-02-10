@@ -295,12 +295,7 @@ def odejet_coefficient_double(vf):
         jet_embedded_deg = tree_util.Partial(jet_embedded, degree=deg)
         fx, jvp = functools.linearize(jet_embedded_deg, *taylor_coefficients)
 
-        # Compute the next set of coefficients.
-        # TODO: can we fori_loop() this loop?
-        #  the running variable (cs_padded) should have constant size
-        cs = [(fx[deg - 1] / deg)]
-        cs_padded = cs + [zeros] * (deg - 1)
-        for i, fx_i in enumerate(fx[deg : 2 * deg]):
+        def body_fun(cs_padded, i_and_fx_i):
             # The Jacobian of the embedded jet is block-banded,
             # i.e., of the form (for j=3)
             # (A0, 0, 0; A1, A0, 0; A2, A1, A0; *, *, *; *, *, *; *, *, *)
@@ -312,12 +307,21 @@ def odejet_coefficient_double(vf):
             # "Taylor-mode autodiff for higher-order derivatives in JAX")
             # explain details.
             # i = k - deg
-            linear_combination = jvp(*cs_padded)[i]
-            cs_ = cs_padded[: (i + 1)]
-            cs_ += [(fx_i + linear_combination) / (i + deg + 1)]
-            cs_padded = cs_ + [zeros] * (deg - i - 2)
+            i, fx_i = i_and_fx_i
+            linear_combination = jvp(*(cs_padded[:-1]))[i]
+            new = (fx_i + linear_combination) / (i + deg + 1)
+            cs_padded = cs_padded.at[i + 1].set(new)
+            return cs_padded, None
 
-        # Store all new coefficients
+        cs = [(fx[deg - 1] / deg)]
+        cs_padded = cs + [zeros] * (deg)
+        cs_padded = np.stack(cs_padded)
+
+        loop_over = np.arange(0, len(fx[deg : 2 * deg])), fx[deg : 2 * deg]
+        init = cs_padded
+
+        cs_padded, _ = control_flow.scan(body_fun, xs=loop_over, init=init)
+
         taylor_coefficients.extend(cs_padded)
         return taylor_coefficients
 
@@ -337,7 +341,7 @@ def odejet_coefficient_double(vf):
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
         p_new, s_new = functools.jet(vf, (p,), (s,), is_tcoeff=True)
-        return p_new, *s_new
+        return np.stack([p_new, *s_new])
 
     return double
 
