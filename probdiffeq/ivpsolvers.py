@@ -240,7 +240,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
-        def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
+        def interpolate(self, *, state_t0, state_t1, transition_t0_t, transition_t_t1):
             """Interpolate.
 
             A smoother interpolates by_
@@ -252,18 +252,22 @@ def strategy_smoother(*, ssm) -> _Strategy:
             This intermediate result is informed about its "right-hand side" datum.
 
             Subsequent interpolations continue from the value at 't'.
-            Subsequent IVP solver steps continue from the value at 't1'.
+            ( TODO: they could also continue from t0)
+            Subsequent IVP solver steps continue from the value at 't1' as before.
             """
             # TODO: if we pass prior1 and prior2, then
             #       we don't have to pass dt0, dt1, output_scale, and prior...
+            #       and since we always have to discretise anyway,
+            #       the whole thing could be simplified
 
             # Extrapolate from t0 to t, and from t to t1.
-            prior0 = prior(dt0, output_scale)
-            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
-            prior1 = prior(dt1, output_scale)
-            extrapolated_t1 = self.extrapolate(*extrapolated_t, transition=prior1)
 
-            # Marginalise from t1 to t to obtain the interpolated solution.
+            extrapolated_t = self.extrapolate(*state_t0, transition=transition_t0_t)
+            extrapolated_t1 = self.extrapolate(
+                *extrapolated_t, transition=transition_t_t1
+            )
+
+            # Marginalise backwards from t1 to t to obtain the interpolated solution.
             marginal_t1, _ = state_t1
             conditional_t1_to_t = extrapolated_t1[1]
             rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
@@ -377,56 +381,70 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             )
             return (rv, extra), interp_res
 
-        def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
-            """Interpolate.
+        def interpolate(self, *, state_t0, state_t1, transition_t0_t, transition_t_t1):
+            """
+            Interpolate using a fixed-point smoother.
 
-            A fixed-point smoother interpolates by
+            Assuming `state_t0` has seen 'n' collocation points, and `state_t1` has seen 'n+1'
+            collocation points, then interpolation at time `t` is computed as follows:
 
-            * Extrapolating from t0 to t, which gives the "filtering" marginal
-            and the backward transition from t to t0.
-            * Extrapolating from t to t1, which gives another "filtering" marginal
-            and the backward transition from t1 to t.
-            * Applying the t1-to-t backward transition
-            to compute the interpolation result.
-            This intermediate result is informed about its "right-hand side" datum.
+            1. Extrapolate from `t0` to `t`. This yields:
+                - the marginal at `t` given `n` observations.
+                - the backward transition from `t` to `t0` given `n` observations.
 
-            The difference to smoother-interpolation is quite subtle:
+            2. Extrapolate from `t` to `t1`. This yields:
+                - the marginal at `t1` given `n` observations (in contrast, `state_t1` has seen `n+1` observations)
+                - the backward transition from `t1` to `t` given `n` observations.
 
-            * The backward transition of the solution at 't'
-            is merged with that at 't0'.
-            The reason is that the backward transition at 't0' knows
-            "how to get to the quantity of interest",
-            and this is precisely what we want to interpolate.
-            * Subsequent interpolations do not continue from the value at 't', but
-            from a very similar value where the backward transition
-            is replaced with an identity. The reason is that the interpolated solution
-            becomes the new quantity of interest, and subsequent interpolations
-            need to learn how to get here.
-            * Subsequent solver steps do not continue from the value at 't1',
-            but the value at 't1' where the backward model is replaced by
-            the 't1-to-t' backward model. The reason is similar to the above:
-            future steps need to know "how to get back to the quantity of interest",
-            which is the interpolated solution.
+            3. Apply the backward transition from `t1` to `t` to the marginal inside `state_t1`
+            to obtain the marginal at `t` given `n+1` observations. Similarly,
+            the interpolated solution inherits all auxiliary info from the `t_1` state.
 
-            These distinctions are precisely why we need three fields
-            in every interpolation result:
-                the solution,
-                the continue-interpolation-from-here,
-                and the continue-stepping-from-here.
-            All three are different for fixed point smoothers.
-            (Really, I try removing one of them monthly and
-            then don't understand why tests fail.)
+            ---------------------------------------------------------------------
+
+            Difference to standard smoother interpolation:
+
+            In the fixed-point smoother, backward transitions are modified
+            to ensure that future operations remain correct.
+            Denote the location of the fixed-point with `t_f`. Then,
+            the backward transition at `t` is merged with that at `t0`.
+            This preserves knowledge of how to move from `t` to `t_f`.
+
+            Then, `t` becomes the new fixed-point location. To ensure
+            that future operations ``find their way back to t`:
+
+            - Subsequent interpolations do not continue from the raw
+            interpolated value. Instead, they continue from a nearly
+            identical state where the backward transition is replaced
+            by the identity.
+
+            - Subsequent solver steps do not continue from the initial `t1`
+            state. Instead, they continue from a version whose backward
+            model is replaced with the `t-to-t1` transition.
+
+
+            ---------------------------------------------------------------------
+
+            As a result, each interpolation must return three distinct states:
+
+                1. the interpolated solution,
+                2. the state to continue interpolating from,
+                3. the state to continue solver stepping from.
+
+            These are intentionally different in the fixed-point smoother.
+            Don't attempt to remove any of them. They're all important.
             """
             marginal_t1, _ = state_t1
+
             # Extrapolate from t0 to t, and from t to t1.
             # This yields all building blocks.
-            prior0 = prior(dt0, output_scale)
-            extrapolated_t = self.extrapolate(*state_t0, transition=prior0)
+            extrapolated_t = self.extrapolate(*state_t0, transition=transition_t0_t)
             conditional_id = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             previous_new = (extrapolated_t[0], conditional_id)
 
-            prior1 = prior(dt1, output_scale)
-            extrapolated_t1 = self.extrapolate(*previous_new, transition=prior1)
+            extrapolated_t1 = self.extrapolate(
+                *previous_new, transition=transition_t_t1
+            )
 
             # Marginalise from t1 to t to obtain the interpolated solution.
             conditional_t1_to_t = extrapolated_t1[1]
@@ -574,10 +592,26 @@ class _State(containers.NamedTuple):
     """Solver state."""
 
     t: Any
+    """The current time-step."""
+
     rv: Any
+    """The current hidden variable in the SSM."""
+
     strategy_state: Any
+    """Auxiliary states for the strategy.
+    
+    For instance, backward transitions in a smoother.
+    """
+
     correction_state: Any
+    """Auxiliary states for the correction.
+
+    For instance, random keys for Hutchinson-based
+    diagonal linearisation.
+    """
+
     output_scale: Any
+    """The current output scale."""
 
 
 @tree_util.register_dataclass
@@ -598,28 +632,6 @@ class _ProbabilisticSolver:
     strategy: _Strategy
     calibration: _Calibration
     correction: _Correction
-
-    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
-        """Compute offgrid_marginals."""
-        if not self.is_suitable_for_offgrid_marginals:
-            raise NotImplementedError
-
-        dt0 = t - t0
-        dt1 = t1 - t
-        rv, extra = self.strategy.init(posterior_t0)
-        rv, corr = self.correction.init(rv)
-
-        # TODO: Replace dt0, dt1, prior, and output_scale with prior_dt0, and prior_dt1
-        (marginals, _aux), _interp = self.strategy.interpolate(
-            state_t0=(rv, extra),
-            state_t1=(marginals_t1, None),
-            dt0=dt0,
-            dt1=dt1,
-            output_scale=output_scale,
-            prior=self.prior,
-        )
-        u = self.ssm.stats.qoi(marginals)
-        return u, marginals
 
     @property
     def error_contraction_rate(self):
@@ -662,45 +674,75 @@ class _ProbabilisticSolver:
         _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
         return t, (posterior, output_scale)
 
+    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
+        """Compute offgrid_marginals."""
+        if not self.is_suitable_for_offgrid_marginals:
+            raise NotImplementedError
+
+        rv, extra = self.strategy.init(posterior_t0)
+        rv, corr = self.correction.init(rv)
+
+        transition_t0_t = self.prior(t - t0, output_scale)
+        transition_t_t1 = self.prior(t1 - t, output_scale)
+        state_t0 = (rv, extra)
+        state_t1 = (marginals_t1, None)
+        interpolated, _step_and_interpolate_from = self.strategy.interpolate(
+            state_t0=state_t0,
+            state_t1=state_t1,
+            transition_t0_t=transition_t0_t,
+            transition_t_t1=transition_t_t1,
+        )
+        (marginals, _aux) = interpolated
+        u = self.ssm.stats.qoi(marginals)
+        return u, marginals
+
     def interpolate(self, *, t, interp_from: _State, interp_to: _State) -> _InterpRes:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
 
         # Interpolate
-        interpolated, interp = self.strategy.interpolate(
-            state_t0=(interp_from.rv, interp_from.strategy_state),
-            state_t1=(interp_to.rv, interp_to.strategy_state),
-            dt0=t - interp_from.t,
-            dt1=interp_to.t - t,
-            output_scale=output_scale,
-            prior=self.prior,
+        transition_t0_t = self.prior(t - interp_from.t, output_scale)
+        transition_t_t1 = self.prior(interp_to.t - t, output_scale)
+        state_t0 = (interp_from.rv, interp_from.strategy_state)
+        state_t1 = (interp_to.rv, interp_to.strategy_state)
+        interpolated, step_and_interpolate_from = self.strategy.interpolate(
+            state_t0=state_t0,
+            state_t1=state_t1,
+            transition_t0_t=transition_t0_t,
+            transition_t_t1=transition_t_t1,
         )
 
         # Turn outputs into valid states
 
-        def _state(t_, x, scale, cs):
-            return _State(
-                t=t_,
-                rv=x[0],
-                strategy_state=x[1],
-                correction_state=cs,
-                output_scale=scale,
-            )
+        # step_from is essentially the interp_to value, however, if we
+        # fixedpoint-smooth, then the backward transition is adjusted.
+        step_from = _State(
+            t=interp_to.t,
+            rv=step_and_interpolate_from.step_from[0],
+            strategy_state=step_and_interpolate_from.step_from[1],
+            correction_state=interp_to.correction_state,
+            output_scale=interp_to.output_scale,
+        )
 
-        step_from = _state(
-            interp_to.t,
-            interp.step_from,
-            interp_to.output_scale,
-            interp_to.correction_state,
+        # 'interpolated' inherits output scale and correction
+        # state from the 'interp_to' value, because we assume
+        # that the solver's subintervals are (t0, t1], not [t0, t1)
+        # (we predict-correct, we don't correct-predict).
+        interpolated = _State(
+            t=t,
+            rv=interpolated[0],
+            strategy_state=interpolated[1],
+            correction_state=interp_to.correction_state,
+            output_scale=interp_to.output_scale,
         )
-        interpolated = _state(
-            t, interpolated, interp_to.output_scale, interp_to.correction_state
+
+        interp_from = _State(
+            t=t,
+            rv=step_and_interpolate_from.interp_from[0],
+            strategy_state=step_and_interpolate_from.interp_from[1],
+            correction_state=interp_from.correction_state,
+            output_scale=interp_from.output_scale,
         )
-        interp_from = _state(
-            t,
-            interp.interp_from,
-            interp_from.output_scale,
-            interp_from.correction_state,
-        )
+
         interp_res = _InterpRes(step_from=step_from, interp_from=interp_from)
         return interpolated, interp_res
 
@@ -885,10 +927,13 @@ def solver(strategy, *, correction, prior, ssm):
     def step(state: _State, *, dt, calibration):
         del calibration  # unused
 
+        # Save a reference value for error estimation
         u_step_from = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
 
-        # Estimate the error
+        # Discretise
         transition = prior(dt, state.output_scale)
+
+        # Estimate the error
         mean = ssm.stats.mean(state.rv)
         hidden = ssm.conditional.apply(mean, transition)
         t = state.t + dt
@@ -897,7 +942,7 @@ def solver(strategy, *, correction, prior, ssm):
         )
 
         # Do the full extrapolation step (reuse the transition)
-        hidden, extra = strategy.extrapolate(
+        hidden, posterior = strategy.extrapolate(
             state.rv, state.strategy_state, transition=transition
         )
 
