@@ -68,7 +68,7 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
     return starter
 
 
-def odejet_padded_scan(vf: Callable, inits: Sequence[Array], /, num: int):
+def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `odejet_unroll()`, this function implements the loop via a scan,
@@ -79,7 +79,8 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[Array], /, num: int):
     The differences should be small.
     Consult the benchmarks if performance is critical.
     """
-    if not isinstance(inits[0], ArrayLike):
+    inits = tree_util.tree_map(np.asarray, inits)
+    if inits[0].ndim != 1:
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -143,7 +144,8 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
-    if not isinstance(inits[0], ArrayLike):
+    inits = tree_util.tree_map(np.asarray, inits)
+    if inits[0].ndim != 1:
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -205,7 +207,8 @@ def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
-    if not isinstance(inits[0], ArrayLike):
+    inits = tree_util.tree_map(np.asarray, inits)
+    if inits[0].ndim != 1:
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -251,7 +254,8 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
         JIT-compiling this function unrolls a loop.
 
     """
-    if not isinstance(inits[0], ArrayLike):
+    inits = tree_util.tree_map(np.asarray, inits)
+    if inits[0].ndim != 1:
         # If the Pytree elements are matrices or scalars,
         # promote and unpromote accordingly
         _, unravel = tree_util.ravel_pytree(inits[0])
@@ -363,10 +367,12 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop of length `num`.
 
     """
+    inits = tree_util.tree_map(np.asarray, inits)
+
     if num == 0:
         return inits
 
-    if not isinstance(inits[0], ArrayLike):
+    if inits[0].ndim != 1:
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
