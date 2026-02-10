@@ -136,32 +136,42 @@ def solve_adaptive_save_at(
         )
         warnings.warn(msg, stacklevel=1)
 
-    (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
+    result = _solve_adaptive_save_at(
         save_at[0],
         ssm_init,
         save_at=save_at[1:],
         adaptive_solver=adaptive_solver,
         dt0=dt0,
     )
-
-    # I think the user expects the initial condition to be part of the state
-    # (as well as marginals), so we compute those things here
-    posterior_save_at, output_scale = solution_save_at
-    _tmp = _userfriendly_output(posterior=posterior_save_at, ssm_init=ssm_init, ssm=ssm)
-    marginals, posterior = _tmp
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
     return IVPSolution(
-        t=save_at,
-        u=u,
-        u_std=u_std,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=num_steps,
+        t=result.t,
+        u=result.u,
+        u_std=result.u_std,
+        marginals=result.marginals,
+        posterior=result.posterior,
+        output_scale=result.output_scale,
+        num_steps=result.num_steps,
         ssm=ssm,
     )
+
+    # # I think the user expects the initial condition to be part of the state
+    # # (as well as marginals), so we compute those things here
+    # posterior_save_at, output_scale = solution_save_at
+    # _tmp = _userfriendly_output(posterior=posterior_save_at, ssm_init=ssm_init, ssm=ssm)
+    # marginals, posterior = _tmp
+    # u = ssm.stats.qoi_from_sample(marginals.mean)
+    # std = ssm.stats.standard_deviation(marginals)
+    # u_std = ssm.stats.qoi_from_sample(std)
+    # return IVPSolution(
+    #     t=save_at,
+    #     u=u,
+    #     u_std=u_std,
+    #     marginals=marginals,
+    #     posterior=posterior,
+    #     output_scale=output_scale,
+    #     num_steps=num_steps,
+    #     ssm=ssm,
+    # )
 
 
 def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
@@ -191,9 +201,16 @@ def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
         )
         return state, solution
 
-    state = adaptive_solver.init(t, ssm_init, dt=dt0, num_steps=0.0)
+    state = adaptive_solver.init(t, ssm_init, dt=dt0)
     _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
-    return solution
+
+    def prepend(a, A):
+        a = np.asarray(a)
+        A = np.asarray(A)
+        return np.concatenate([a[None, ...], A])
+
+    result = tree_util.tree_map(prepend, state.step_from, solution)
+    return adaptive_solver.solver.userfriendly_output(result)
 
 
 def solve_adaptive_save_every_step(
@@ -273,25 +290,36 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
 
     t0 = grid[0]
     state0 = solver.init(t0, ssm_init)
-    _, result_state = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
-    _t, (posterior, output_scale) = solver.extract(result_state)
+    _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
+
+    def prepend(a, A):
+        a = np.asarray(a)
+        A = np.asarray(A)
+        return np.concatenate([a[None, ...], A])
+
+    result = tree_util.tree_map(prepend, state0, result)
+    result = solver.userfriendly_output(result)
+
+    # # _t, (posterior, output_scale) = solver.extract(result_state)
+    # posterior = result_state.posterior
+    # output_scale = result_state.output_scale
 
     # I think the user expects marginals, so we compute them here
-    _tmp = _userfriendly_output(posterior=posterior, ssm_init=ssm_init, ssm=ssm)
-    marginals, posterior = _tmp
+    # _tmp = _userfriendly_output(posterior=posterior, ssm_init=ssm_init, ssm=ssm)
+    # marginals, posterior = _tmp
 
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
+    # u = ssm.stats.qoi_from_sample(marginals.mean)
+    # std = ssm.stats.standard_deviation(marginals)
+    # u_std = ssm.stats.qoi_from_sample(std)
     return IVPSolution(
-        t=grid,
-        u=u,
-        u_std=u_std,
+        t=result.t,
+        u=result.u,
+        u_std=result.u_std,
+        marginals=result.marginals,
+        posterior=result.posterior,
+        output_scale=result.output_scale,
+        num_steps=result.num_steps,
         ssm=ssm,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=np.arange(1.0, len(grid)),
     )
 
 

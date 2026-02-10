@@ -5,7 +5,7 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 
@@ -118,10 +118,11 @@ def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     posterior_mle = mle_solution.posterior
     output_scale_mle = mle_solution.output_scale
 
-    # Without a call to calibrate(), the posteriors are the same.
-    assert testing.allclose(posterior_uncalibrated, posterior_mle)
-    assert not testing.allclose(output_scale_uncalibrated, output_scale_mle)
-
-    # With a call to calibrate(), the posteriors are different.
-    posterior_calibrated = stats.calibrate(posterior_mle, output_scale_mle, ssm=ssm)
-    assert not testing.allclose(posterior_uncalibrated, posterior_calibrated)
+    # Assert the means are identical, but the stds & scales are not
+    assert testing.allclose(uncalibrated_solution.u, mle_solution.u)
+    assert not testing.allclose(
+        uncalibrated_solution.output_scale, mle_solution.output_scale
+    )
+    print(uncalibrated_solution.u_std)
+    print(mle_solution.u_std)
+    assert not testing.allclose(uncalibrated_solution.u_std, mle_solution.u_std)

@@ -197,16 +197,15 @@ class _Strategy:
     is_suitable_for_save_every_step: int
     is_suitable_for_offgrid_marginals: int
 
-    def init(self, sol, /):
-        """Initialise a state from a solution."""
-        raise NotImplementedError
+    # def init_posterior(self, sol, /):
+    #     """Initialise a state from a solution."""
+    #     raise NotImplementedError
 
-    def extrapolate(self, rv, strategy_state, /, *, transition):
+    def predict(self, posterior, /, *, transition):
         """Extrapolate (also known as prediction)."""
         raise NotImplementedError
 
-    def extract(self, rv, strategy_state, /):
-        """Extract a solution from a state."""
+    def apply_updates(self, prediction, *, updates):
         raise NotImplementedError
 
     def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
@@ -279,14 +278,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
             interp_res = _InterpRes(step_from=solution_at_t1, interp_from=solution_at_t)
             return solution_at_t, interp_res
 
-        def interpolate_at_t1(
-            self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
-        ):
-            del prior
-            del state_t0
-            del dt0
-            del dt1
-            del output_scale
+        def interpolate_at_t1(self, state_t1):
             return state_t1, _InterpRes(step_from=state_t1, interp_from=state_t1)
 
     return Smoother(
@@ -302,44 +294,46 @@ def strategy_filter(*, ssm) -> _Strategy:
 
     @containers.dataclass
     class Filter(_Strategy):
-        def init(self, sol, /):
-            return sol, None
+        def init_posterior(self, sol, /):
+            return sol
 
-        def extrapolate(self, rv, aux, /, *, transition):
-            del aux
-            rv = self.ssm.conditional.marginalise(rv, transition)
+        def predict(self, posterior, *, transition):
+            rv = self.ssm.conditional.marginalise(posterior, transition)
+            return rv, rv
 
-            return rv, None
+        def apply_updates(self, prediction, *, updates):
+            del prediction
+            rv = updates
+            u = self.ssm.stats.qoi(rv)
+            u_std = self.ssm.stats.standard_deviation(rv)
+            marginals = rv
+            return (u, u_std, marginals), rv
 
-        def extract(self, hidden_state, _extra, /):
-            return hidden_state
+        def finalize(self, posterior, scale):
+            posterior = ssm.stats.rescale_cholesky(posterior, scale)
+            u = ssm.stats.qoi(posterior)
+            u_std = ssm.stats.standard_deviation(posterior)
+            marginals = posterior
+            return (u, u_std, marginals), posterior
 
-        def interpolate(self, state_t0, state_t1, dt0, dt1, output_scale, *, prior):
-            # todo: by ditching marginal_t1 and dt1, this function _extrapolates
-            #  (no *inter*polation happening)
-            del dt1
-            marginal_t1, _ = state_t1
+        def interpolate(self, state_t0, state_t1, transition_t0_t, transition_t_t1):
+            del transition_t_t1
+            _, interpolated = self.predict(state_t0, transition=transition_t0_t)
 
-            hidden, extra = state_t0
-            prior0 = prior(dt0, output_scale)
-            hidden, extra = self.extrapolate(hidden, extra, transition=prior0)
+            u = ssm.stats.qoi(interpolated)
+            u_std = ssm.stats.standard_deviation(interpolated)
+            marginals = interpolated
 
-            # Consistent state-types in interpolation result.
-            interp = (hidden, extra)
-            step_from = (marginal_t1, None)
-            auxiliary = _InterpRes(step_from=step_from, interp_from=interp)
-            return interp, auxiliary
+            interp_res = _InterpRes(step_from=state_t1, interp_from=interpolated)
+            return ((u, u_std, marginals), interpolated), interp_res
 
-        def interpolate_at_t1(
-            self, state_t0, state_t1, dt0, dt1, output_scale, *, prior
-        ):
-            del prior
-            del state_t0
-            del dt0
-            del dt1
-            del output_scale
-            rv, extra = state_t1
-            return (rv, extra), _InterpRes((rv, extra), (rv, extra))
+        def interpolate_at_t1(self, state_t1):
+            u = ssm.stats.qoi(state_t1)
+            u_std = ssm.stats.standard_deviation(state_t1)
+            marginals = state_t1
+
+            interp_res = _InterpRes(step_from=state_t1, interp_from=state_t1)
+            return ((u, u_std, marginals), state_t1), interp_res
 
     return Filter(
         ssm=ssm,
@@ -354,26 +348,56 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
 
     @containers.dataclass
     class FixedPoint(_Strategy):
-        def init(self, sol, /):
+        def init_posterior(self, sol, /):
             cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
-            return sol, cond
+            return stats.MarkovSeq(sol, cond)
 
-        def extrapolate(self, rv, bw0, /, *, transition):
+        def predict(self, posterior, *, transition):
+            rv = posterior.init
+            bw0 = posterior.conditional
             extrapolated, cond = self.ssm.conditional.revert(rv, transition)
             cond = self.ssm.conditional.merge(bw0, cond)
-            return extrapolated, cond
+            pred = stats.MarkovSeq(extrapolated, cond)
+            return extrapolated, pred
+
+        def apply_updates(self, prediction, *, updates):
+            posterior = stats.MarkovSeq(updates, prediction.conditional)
+            rv = updates
+            u = self.ssm.stats.qoi(rv)
+            u_std = self.ssm.stats.standard_deviation(rv)
+            marginals = rv
+            return (u, u_std, marginals), posterior
+
+        def finalize(self, posterior, scale):
+            # TODO: I am in the middle of updating the data structures in here.
+            #       Effects:
+            #       - Calibration class gone
+            #       - Strategies are the only ones operating on the posterior
+            #       - Corrections don't have to care about posterior vs RV
+            #       - Interpolation cleaner
+            #       - and others.
+            init = ssm.stats.rescale_cholesky(posterior.init, scale)
+            init = tree_util.tree_map(lambda x: x[-1, ...], init)
+            conditional = ssm.conditional.rescale_noise(posterior.conditional, scale)
+            posterior = stats.MarkovSeq(init, conditional)
+
+            def smooth_step(x, cond):
+                extrapolated = ssm.conditional.marginalise(x, cond)
+                return extrapolated, extrapolated
+
+            init, xs = posterior.init, posterior.conditional
+            _, marginals = control_flow.scan(
+                smooth_step, init=init, xs=xs, reverse=True
+            )
+
+            u = ssm.stats.qoi(marginals)
+            u_std = ssm.stats.standard_deviation(marginals)
+            return (u, u_std, marginals), posterior
 
         def extract(self, hidden_state, extra, /):
             return stats.MarkovSeq(init=hidden_state, conditional=extra)
 
-        def interpolate_at_t1(
-            self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
-        ):
-            del prior
-            del state_t0
-            del dt0
-            del dt1
-            del output_scale
+        def interpolate_at_t1(self, state_t1):
             rv, extra = state_t1
             cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
             interp_res = _InterpRes(
@@ -476,10 +500,9 @@ class _Correction:
     vector_field: Callable
     re_linearize: bool
 
-    def init(self, x, /):
+    def init(self, /):
         """Initialise the state from the solution."""
-        jac = self.linearize.init()
-        return x, jac
+        return self.linearize.init()
 
     def estimate_error(self, rv, correction_state, /, t):
         """Estimate the error."""
@@ -494,7 +517,7 @@ class _Correction:
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, observed, (correction_state, cond)
 
-    def correct(self, rv, correction_state, /, t):
+    def updates(self, rv, correction_state, /, t):
         """Perform the correction step."""
         linearization_state, cond = correction_state
 
@@ -588,30 +611,37 @@ class _Calibration:
     extract: Callable
 
 
-class _State(containers.NamedTuple):
+class ProbSolverState(containers.NamedTuple):
     """Solver state."""
 
     t: Any
     """The current time-step."""
 
-    rv: Any
+    u: Any
+    """The current ODE solution."""
+
+    u_std: Any
+    """The standard deviation of the current ODE solution."""
+
+    marginals: Any
+    """The marginal distribution of the current ODE solution."""
+
+    posterior: Any
     """The current hidden variable in the SSM."""
-
-    strategy_state: Any
-    """Auxiliary states for the strategy.
-    
-    For instance, backward transitions in a smoother.
-    """
-
-    correction_state: Any
-    """Auxiliary states for the correction.
-
-    For instance, random keys for Hutchinson-based
-    diagonal linearisation.
-    """
 
     output_scale: Any
     """The current output scale."""
+
+    num_steps: int
+    """The number of steps taken until the current point."""
+
+    auxiliary: Any
+    """Auxiliary states.
+
+    For instance, random keys for Hutchinson-based
+    diagonal linearisation in the correction,
+    or running means of the MLE calibration.
+    """
 
 
 @tree_util.register_dataclass
@@ -623,14 +653,9 @@ class _ErrorEstimate:
 
 @containers.dataclass
 class _ProbabilisticSolver:
-    name: str
-
-    step_implementation: Callable
-
+    strategy: _Strategy
     prior: Callable
     ssm: Any
-    strategy: _Strategy
-    calibration: _Calibration
     correction: _Correction
 
     @property
@@ -649,30 +674,23 @@ class _ProbabilisticSolver:
     def is_suitable_for_save_every_step(self):
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init) -> _State:
-        rv, extra = self.strategy.init(init)
-        rv, corr = self.correction.init(rv)
+    def init(self, t, init) -> ProbSolverState:
+        raise NotImplementedError
 
-        # TODO: make the init() and extract() an interface.
-        #       Then, lots of calibration logic simplifies considerably.
-        calib_state = self.calibration.init()
-        return _State(
-            t=t,
-            rv=rv,
-            strategy_state=extra,
-            correction_state=corr,
-            output_scale=calib_state,
-        )
+    def step(self, state: ProbSolverState, *, dt):
+        raise NotImplementedError
 
-    def step(self, state: _State, *, dt):
-        return self.step_implementation(state, dt=dt, calibration=self.calibration)
+    def userfriendly_output(
+        self, solution: ProbSolverState, solution0: ProbSolverState
+    ):
+        raise NotImplementedError
 
-    def extract(self, state: _State, /):
-        posterior = self.strategy.extract(state.rv, state.strategy_state)
-        t = state.t
+    # def extract(self, state: ProbSolverState, /):
+    #     posterior = self.strategy.extract(state.rv, state.strategy_state)
+    #     t = state.t
 
-        _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
-        return t, (posterior, output_scale)
+    #     _output_scale_prior, output_scale = self.calibration.extract(state.output_scale)
+    #     return t, (posterior, output_scale)
 
     def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
         """Compute offgrid_marginals."""
@@ -696,73 +714,78 @@ class _ProbabilisticSolver:
         u = self.ssm.stats.qoi(marginals)
         return u, marginals
 
-    def interpolate(self, *, t, interp_from: _State, interp_to: _State) -> _InterpRes:
-        output_scale, _ = self.calibration.extract(interp_to.output_scale)
+    def interpolate(
+        self, *, t, interp_from: ProbSolverState, interp_to: ProbSolverState
+    ) -> _InterpRes:
+        # Domain is (t0, t1]; thus, take the output scale from interp_to
+        output_scale = interp_to.output_scale
+        auxiliary = interp_to.auxiliary
 
         # Interpolate
         transition_t0_t = self.prior(t - interp_from.t, output_scale)
         transition_t_t1 = self.prior(interp_to.t - t, output_scale)
-        state_t0 = (interp_from.rv, interp_from.strategy_state)
-        state_t1 = (interp_to.rv, interp_to.strategy_state)
-        interpolated, step_and_interpolate_from = self.strategy.interpolate(
-            state_t0=state_t0,
-            state_t1=state_t1,
+        tmp = self.strategy.interpolate(
+            state_t0=interp_from.posterior,
+            state_t1=interp_to.posterior,
             transition_t0_t=transition_t0_t,
             transition_t_t1=transition_t_t1,
         )
+        ((u, u_std, marginals), interpolated), step_and_interpolate_from = tmp
 
-        # Turn outputs into valid states
-
-        # step_from is essentially the interp_to value, however, if we
-        # fixedpoint-smooth, then the backward transition is adjusted.
-        step_from = _State(
+        step_from = ProbSolverState(
             t=interp_to.t,
-            rv=step_and_interpolate_from.step_from[0],
-            strategy_state=step_and_interpolate_from.step_from[1],
-            correction_state=interp_to.correction_state,
+            # New:
+            posterior=step_and_interpolate_from.step_from,
+            # Old:
+            u=interp_to.u,
+            u_std=interp_to.u_std,
+            marginals=interp_to.marginals,
             output_scale=interp_to.output_scale,
+            auxiliary=interp_to.auxiliary,
+            num_steps=interp_to.num_steps,
         )
 
-        # 'interpolated' inherits output scale and correction
-        # state from the 'interp_to' value, because we assume
-        # that the solver's subintervals are (t0, t1], not [t0, t1)
-        # (we predict-correct, we don't correct-predict).
-        interpolated = _State(
+        interpolated = ProbSolverState(
             t=t,
-            rv=interpolated[0],
-            strategy_state=interpolated[1],
-            correction_state=interp_to.correction_state,
+            # New:
+            posterior=interpolated,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            # Taken from the rhs point
             output_scale=interp_to.output_scale,
+            auxiliary=interp_to.auxiliary,
+            num_steps=interp_to.num_steps,
         )
 
-        interp_from = _State(
+        interp_from = ProbSolverState(
             t=t,
-            rv=step_and_interpolate_from.interp_from[0],
-            strategy_state=step_and_interpolate_from.interp_from[1],
-            correction_state=interp_from.correction_state,
+            # New:
+            posterior=step_and_interpolate_from.interp_from,
+            # Old:
+            u=interp_from.u,
+            u_std=interp_from.u_std,
+            marginals=interp_from.marginals,
             output_scale=interp_from.output_scale,
+            auxiliary=interp_from.auxiliary,
+            num_steps=interp_from.num_steps,
         )
 
         interp_res = _InterpRes(step_from=step_from, interp_from=interp_from)
         return interpolated, interp_res
 
     def interpolate_at_t1(
-        self, *, t, interp_from: _State, interp_to: _State
+        self, *, t, interp_from: ProbSolverState, interp_to: ProbSolverState
     ) -> _InterpRes:
         """Process the solution in case t=t_n."""
         del t
-        solution_, tmp = self.strategy.interpolate_at_t1(
-            state_t0=None,
-            dt0=None,
-            dt1=None,
-            output_scale=None,
-            state_t1=(interp_to.rv, interp_to.strategy_state),
-            prior=self.prior,
-        )
-        step_from_, interp_from_ = (tmp.step_from, tmp.interp_from)
+        tmp = self.strategy.interpolate_at_t1(state_t1=interp_to.posterior)
+        ((u, u_std, marginals), interpolated), step_and_interpolate_from = tmp
+
+        # step_from_, interp_from_ = (tmp.step_from, tmp.interp_from)
 
         def _state(t_, x, scale, cs):
-            return _State(
+            return ProbSolverState(
                 t=t_,
                 rv=x[0],
                 strategy_state=x[1],
@@ -771,87 +794,184 @@ class _ProbabilisticSolver:
             )
 
         t = interp_to.t
-        prev = _state(
-            t, interp_from_, interp_from.output_scale, interp_from.correction_state
+        prev = ProbSolverState(
+            t=interp_to.t,
+            # New
+            posterior=step_and_interpolate_from.interp_from,
+            # Old
+            u=interp_from.u,  # incorrect?
+            u_std=interp_from.u_std,  # incorrect?
+            marginals=interp_from.marginals,  # incorrect?
+            output_scale=interp_from.output_scale,  # incorrect?
+            auxiliary=interp_from.auxiliary,  # incorrect?
+            num_steps=interp_from.num_steps,  # incorrect?
         )
-        sol = _state(t, solution_, interp_to.output_scale, interp_to.correction_state)
-        acc = _state(t, step_from_, interp_to.output_scale, interp_to.correction_state)
+        sol = ProbSolverState(
+            t=interp_to.t,
+            # New:
+            posterior=interpolated,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            # Old:
+            output_scale=interp_to.output_scale,
+            auxiliary=interp_to.auxiliary,
+            num_steps=interp_to.num_steps,
+        )
+        acc = ProbSolverState(
+            t=interp_to.t,
+            # New:
+            posterior=step_and_interpolate_from.step_from,
+            # Old
+            u=interp_to.u,
+            u_std=interp_to.u_std,
+            marginals=interp_to.marginals,
+            output_scale=interp_to.output_scale,
+            auxiliary=interp_to.auxiliary,
+            num_steps=interp_to.num_steps,
+        )
         return sol, _InterpRes(step_from=acc, interp_from=prev)
 
 
-def solver_mle(strategy, *, correction, prior, ssm):
+class solver_mle(_ProbabilisticSolver):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
     Warning: needs to be combined with a call to stats.calibrate()
     after solving if the MLE-calibration shall be *used*.
     """
 
-    def step_mle(state, /, *, dt, calibration):
-        u_step_from = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
+    def init(self, t, init) -> ProbSolverState:
+        posterior = self.strategy.init_posterior(init)
+        correction_state = self.correction.init()
+
+        u = self.ssm.stats.qoi(init)
+        marginals = init
+        u_std = self.ssm.stats.standard_deviation(init)
+
+        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale_running = 0 * output_scale_prior
+        auxiliary = (correction_state, output_scale_running, 0)
+        return ProbSolverState(
+            t=t,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            posterior=posterior,
+            auxiliary=auxiliary,
+            output_scale=output_scale_prior,
+            num_steps=0,
+        )
+
+    def step(self, state, *, dt):
+        u_step_from = state.u
+        (correction_state, output_scale_running, num_data) = state.auxiliary
+
+        # Discretize
+        transition = self.prior(dt, state.output_scale)
 
         # Estimate the error
-        output_scale_prior, _calibrated = calibration.extract(state.output_scale)
-        transition = prior(dt, output_scale_prior)
-        mean = ssm.stats.mean(state.rv)
-        mean_extra = ssm.conditional.apply(mean, transition)
+        mean = self.ssm.stats.mean(state.marginals)
+        mean_extra = self.ssm.conditional.apply(mean, transition)
+
         t = state.t + dt
-        error, _, correction_state = correction.estimate_error(
-            mean_extra, state.correction_state, t=t
+        error, _, correction_state = self.correction.estimate_error(
+            mean_extra, correction_state, t=t
         )
 
         # Do the full prediction step (reuse previous discretisation)
-        hidden, extra = strategy.extrapolate(
-            state.rv, state.strategy_state, transition=transition
+        hidden, prediction = self.strategy.predict(
+            state.posterior, transition=transition
         )
 
         # Do the full correction step
-        hidden, observed, corr_state = correction.correct(hidden, correction_state, t=t)
+        updates, observed, correction_state = self.correction.updates(
+            hidden, correction_state, t=t
+        )
+        (u, u_std, marginals), posterior = self.strategy.apply_updates(
+            prediction, updates=updates
+        )
 
         # Calibrate the output scale
-        output_scale = calibration.update(state.output_scale, observed=observed)
+        new_term = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
+        output_scale_running = self.ssm.stats.update_mean(
+            output_scale_running, new_term, num=num_data
+        )
 
         # Normalise the error
+        auxiliary = (correction_state, output_scale_running, num_data + 1)
 
-        state = _State(
+        state = ProbSolverState(
             t=t,
-            rv=hidden,
-            strategy_state=extra,
-            correction_state=corr_state,
-            output_scale=output_scale,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            posterior=posterior,
+            output_scale=state.output_scale,
+            auxiliary=auxiliary,
+            num_steps=state.num_steps + 1,
         )
-        u_proposed = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
-        reference = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
+        u0 = tree_util.tree_leaves(u_step_from)[0]
+        u1 = tree_util.tree_leaves(u)[0]
+        reference = np.maximum(np.abs(u0), np.abs(u1))
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
-    return _ProbabilisticSolver(
-        ssm=ssm,
-        name="Probabilistic solver with MLE calibration",
-        prior=prior,
-        calibration=_calibration_running_mean(ssm=ssm),
-        step_implementation=step_mle,
-        strategy=strategy,
-        correction=correction,
-    )
+    def userfriendly_output(self, solution: ProbSolverState) -> ProbSolverState:
+        posterior = solution.posterior
+        _, output_scale, _ = solution.auxiliary  # calibrated scale!
+        (u, u_std, marginals), posterior = self.strategy.finalize(
+            posterior, scale=output_scale
+        )
+        return ProbSolverState(
+            t=solution.t,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            posterior=posterior,
+            output_scale=output_scale,
+            auxiliary=solution.auxiliary,
+            num_steps=solution.num_steps,
+        )
+
+        # if isinstance(posterior, stats.MarkovSeq):
+        #     # Compute marginals
+        #     posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
+        #     marginals = stats.markov_marginals(
+        #         posterior_no_filter_marginals, reverse=True, ssm=ssm
+        #     )
+
+        #     # Prepend the marginal at t1 to the computed marginals
+        #     marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+        #     marginals = tree_array_util.tree_append(marginals, marginal_t1)
+
+        #     # Prepend the marginal at t1 to the inits
+        #     init = tree_array_util.tree_prepend(ssm_init, posterior.init)
+        #     posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
+        # else:
+        #     posterior = tree_array_util.tree_prepend(ssm_init, posterior)
+        #     marginals = posterior
+        # return marginals, posterior
+
+        # assert False
 
 
-def _calibration_running_mean(*, ssm) -> _Calibration:
-    def init():
-        prior = np.ones_like(ssm.prototypes.output_scale())
-        return prior, prior, 0.0
+# def _calibration_running(ssm):
+#     def init():
+#         prior = np.ones_like(ssm.prototypes.output_scale())
+#         return prior, prior, 0.0
 
-    def update(state, /, observed):
-        prior, calibrated, num_data = state
+#     def update(state, /, observed):
+#         prior, calibrated, num_data = state
 
-        new_term = ssm.stats.mahalanobis_norm_relative(0.0, observed)
-        calibrated = ssm.stats.update_mean(calibrated, new_term, num=num_data)
-        return prior, calibrated, num_data + 1.0
+#         new_term = ssm.stats.mahalanobis_norm_relative(0.0, observed)
+#         calibrated = ssm.stats.update_mean(calibrated, new_term, num=num_data)
+#         return prior, calibrated, num_data + 1.0
 
-    def extract(state, /):
-        prior, calibrated, _num_data = state
-        return prior, calibrated
-
-    return _Calibration(init=init, update=update, extract=extract)
+#     def extract(state, /):
+#         prior, calibrated, _num_data = state
+#         return prior, calibrated
+#
+# return _Calibration(init=init, update=update, extract=extract)
 
 
 def solver_dynamic(strategy, *, correction, prior, ssm):
@@ -883,7 +1003,7 @@ def solver_dynamic(strategy, *, correction, prior, ssm):
         hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
 
         # Return solution
-        state = _State(
+        state = ProbSolverState(
             t=t,
             rv=hidden,
             strategy_state=extra,
@@ -921,56 +1041,95 @@ def _calibration_most_recent(*, ssm) -> _Calibration:
     return _Calibration(init=init, update=update, extract=extract)
 
 
-def solver(strategy, *, correction, prior, ssm):
+class solver(_ProbabilisticSolver):
     """Create a solver that does not calibrate the output scale automatically."""
 
-    def step(state: _State, *, dt, calibration):
-        del calibration  # unused
+    def init(self, t, init) -> ProbSolverState:
+        posterior = self.strategy.init_posterior(init)
+        correction_state = self.correction.init()
 
+        u = self.ssm.stats.qoi(init)
+        marginals = init
+        u_std = self.ssm.stats.standard_deviation(init)
+
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        return ProbSolverState(
+            t=t,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            posterior=posterior,
+            num_steps=0,
+            auxiliary=(correction_state,),
+            output_scale=output_scale,
+        )
+
+    def step(self, state: ProbSolverState, *, dt):
         # Save a reference value for error estimation
-        u_step_from = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
+
+        u_step_from = state.u
 
         # Discretise
-        transition = prior(dt, state.output_scale)
+        transition = self.prior(dt, state.output_scale)
 
-        # Estimate the error
-        mean = ssm.stats.mean(state.rv)
-        hidden = ssm.conditional.apply(mean, transition)
+        # Estimate the error.
+        # I hate this code and want to get rid of it.
+        # With cleaner error estimation, the solvers would be
+        # so much simpler to implement!
+        mean = self.ssm.stats.mean(state.marginals)
+        hidden = self.ssm.conditional.apply(mean, transition)
+
         t = state.t + dt
-        error, _, correction_state = correction.estimate_error(
-            hidden, state.correction_state, t=t
+        (correction_state,) = state.auxiliary
+        error, _, correction_state = self.correction.estimate_error(
+            hidden, correction_state, t=t
         )
 
         # Do the full extrapolation step (reuse the transition)
-        hidden, posterior = strategy.extrapolate(
-            state.rv, state.strategy_state, transition=transition
+        hidden, prediction = self.strategy.predict(
+            state.posterior, transition=transition
         )
-
-        # Do the full correction step
-        hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
-        state = _State(
+        updates, _, correction_state = self.correction.updates(
+            hidden, correction_state, t=t
+        )
+        (u, u_std, marginals), posterior = self.strategy.apply_updates(
+            prediction, updates=updates
+        )
+        state = ProbSolverState(
             t=t,
-            rv=hidden,
-            strategy_state=extra,
-            correction_state=correction_state,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            posterior=posterior,
             output_scale=state.output_scale,
+            auxiliary=(correction_state,),
+            num_steps=state.num_steps + 1,
         )
 
         # Normalise the error
-        u_proposed = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
-        reference = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
+        u0 = tree_util.tree_leaves(u_step_from)[0]
+        u1 = tree_util.tree_leaves(u)[0]
+        reference = np.maximum(np.abs(u0), np.abs(u1))
+
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
-    return _ProbabilisticSolver(
-        ssm=ssm,
-        prior=prior,
-        strategy=strategy,
-        correction=correction,
-        calibration=_calibration_none(ssm=ssm),
-        step_implementation=step,
-        name="Probabilistic solver",
-    )
+    def userfriendly_output(self, solution: ProbSolverState) -> ProbSolverState:
+        posterior = solution.posterior
+        output_scale = solution.output_scale
+        (u, u_std, marginals), posterior = self.strategy.finalize(
+            posterior, scale=output_scale
+        )
+        return ProbSolverState(
+            t=solution.t,
+            u=u,
+            u_std=u_std,
+            marginals=marginals,
+            posterior=posterior,
+            output_scale=output_scale,
+            num_steps=solution.num_steps,
+            auxiliary=solution.auxiliary,
+        )
 
 
 def _calibration_none(*, ssm) -> _Calibration:
@@ -1029,7 +1188,6 @@ class _AdaState(Generic[A]):
     step_from: A
     interp_from: A
     control: Any
-    stats: Any
 
 
 class _AdaSolver:
@@ -1069,7 +1227,7 @@ class _AdaSolver:
         )
 
     @functools.jit
-    def init(self, t, initial_condition, dt, num_steps) -> _AdaState:
+    def init(self, t, initial_condition, dt) -> _AdaState:
         """Initialise the IVP solver state."""
         state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt)
@@ -1078,7 +1236,6 @@ class _AdaSolver:
             step_from=state_solver,
             interp_from=state_solver,
             control=state_control,
-            stats=num_steps,
         )
 
     @functools.jit
@@ -1145,13 +1302,11 @@ class _AdaSolver:
             )
 
         def extract(s: _RejectionState) -> _AdaState:
-            num_steps = state0.stats + 1.0  # TODO: track step attempts as well
             return _AdaState(
                 dt=s.dt,
                 step_from=s.proposed,
                 interp_from=s.step_from,
                 control=s.control,
-                stats=num_steps,
             )
 
         init_val = init(state0)
@@ -1175,30 +1330,43 @@ class _AdaSolver:
         return state, extracted
 
     def extract_at_t1(self, state: _AdaState, t):
-        # todo: make the "at t1" decision inside solver.interpolate(),
+        # TODO: make the "at t1" decision inside solver.interpolate(),
         #  which collapses the next two functions together
-        interp, interp_res = self.solver.interpolate_at_t1(
+        interpolated, interp_res = self.solver.interpolate_at_t1(
             t=t, interp_from=state.interp_from, interp_to=state.step_from
         )
-        return self._extract_interpolate(interp, interp_res, state)
-
-    def extract_after_t1(self, state: _AdaState, t):
-        interpolated, interp_res = self.solver.interpolate(
-            t=t, interp_from=state.interp_from, interp_to=state.step_from
-        )
-        return self._extract_interpolate(interpolated, interp_res, state)
-
-    def _extract_interpolate(self, interpolated, interp_res: _InterpRes, state):
         state = _AdaState(
             dt=state.dt,
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,
             control=state.control,
-            stats=state.stats,
         )
+        return state, interpolated
 
-        solution_solver = self.solver.extract(interpolated)
-        return state, (solution_solver, (state.dt, state.control), state.stats)
+    def extract_after_t1(self, state: _AdaState, t):
+        """We have overstepped, so we interpolate before returning."""
+        interpolated, interp_res = self.solver.interpolate(
+            t=t, interp_from=state.interp_from, interp_to=state.step_from
+        )
+        state = _AdaState(
+            dt=state.dt,
+            step_from=interp_res.step_from,
+            interp_from=interp_res.interp_from,
+            control=state.control,
+        )
+        return state, interpolated
+
+    # def _extract_interpolate(self, interpolated, interp_res: _InterpRes, state):
+    #     state = _AdaState(
+    #         dt=state.dt,
+    #         step_from=interp_res.step_from,
+    #         interp_from=interp_res.interp_from,
+    #         control=state.control,
+    #         stats=state.stats,
+    #     )
+
+    #     solution_solver = self.solver.extract(interpolated)
+    #     return state, (solution_solver, (state.dt, state.control), state.stats)
 
     @staticmethod
     def register_pytree_node():

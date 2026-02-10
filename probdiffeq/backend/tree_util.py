@@ -32,5 +32,9 @@ def tree_flatten(tree, /):
     return jax.tree_util.tree_flatten(tree)
 
 
+def tree_leaves(tree, /):
+    return jax.tree_util.tree_leaves(tree)
+
+
 def register_dataclass(datacls):
     return jax.tree_util.register_dataclass(datacls)

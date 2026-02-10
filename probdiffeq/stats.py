@@ -259,6 +259,8 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
 
 def calibrate(x, /, output_scale, *, ssm):
     """Calibrated a posterior distribution of an IVP solution."""
+    print(x)
+
     if np.ndim(output_scale) > np.ndim(ssm.prototypes.output_scale()):
         output_scale = output_scale[-1]
     if isinstance(x, MarkovSeq):
