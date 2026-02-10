@@ -188,6 +188,10 @@ def sum(arr, /):  # noqa: A001
     return jnp.sum(arr)
 
 
+def cumsum(arr, /):
+    return jnp.cumsum(arr)
+
+
 def logical_not(a, /):
     return jnp.logical_not(a)
 

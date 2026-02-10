@@ -317,10 +317,8 @@ def odejet_coefficient_double(vf):
         cs_padded = cs + [zeros] * (deg)
         cs_padded = np.stack(cs_padded)
 
-        loop_over = np.arange(0, len(fx[deg : 2 * deg])), fx[deg : 2 * deg]
-        init = cs_padded
-
-        cs_padded, _ = control_flow.scan(body_fun, xs=loop_over, init=init)
+        xs = [np.arange(0, len(fx[deg : 2 * deg])), fx[deg : 2 * deg]]
+        cs_padded, _ = control_flow.scan(body_fun, xs=xs, init=cs_padded)
 
         taylor_coefficients.extend(cs_padded)
         return taylor_coefficients
