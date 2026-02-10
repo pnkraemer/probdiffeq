@@ -13,7 +13,7 @@ class PrototypeBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def error_estimate(self):
+    def error_estimate(self):  # also used for standard deviations
         raise NotImplementedError
 
     @abc.abstractmethod
