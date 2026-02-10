@@ -80,7 +80,7 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
     Consult the benchmarks if performance is critical.
     """
     inits = tree_util.tree_map(np.asarray, inits)
-    if inits[0].ndim != 1:
+    if not isinstance(inits[0], Array):
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -145,7 +145,7 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
 
     """
     inits = tree_util.tree_map(np.asarray, inits)
-    if inits[0].ndim != 1:
+    if not isinstance(inits[0], Array):
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -208,7 +208,7 @@ def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
 
     """
     inits = tree_util.tree_map(np.asarray, inits)
-    if inits[0].ndim != 1:
+    if not isinstance(inits[0], Array):
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -255,7 +255,7 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
 
     """
     inits = tree_util.tree_map(np.asarray, inits)
-    if inits[0].ndim != 1:
+    if not isinstance(inits[0], Array):
         # If the Pytree elements are matrices or scalars,
         # promote and unpromote accordingly
         _, unravel = tree_util.ravel_pytree(inits[0])
@@ -372,7 +372,7 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     if num == 0:
         return inits
 
-    if inits[0].ndim != 1:
+    if not isinstance(inits[0], Array):
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
