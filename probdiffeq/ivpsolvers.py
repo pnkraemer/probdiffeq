@@ -21,13 +21,13 @@ from probdiffeq.backend.typing import (
 )
 from probdiffeq.impl import impl
 
-Coeffs = TypeVar("Coeffs", bound=Sequence)
+C = TypeVar("C", bound=Sequence)
 
 
 def prior_wiener_integrated(
-    tcoeffs: Coeffs,
+    tcoeffs: C,
     *,
-    tcoeffs_std: Coeffs | None = None,
+    tcoeffs_std: C | None = None,
     ssm_fact: str,
     output_scale: ArrayLike | None = None,
     damp: float = 0.0,

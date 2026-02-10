@@ -1,6 +1,6 @@
 from probdiffeq.backend import abc, containers, linalg, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Array, Sequence
+from probdiffeq.backend.typing import Array, Sequence, TypeVar
 
 
 @tree_util.register_dataclass
@@ -10,9 +10,12 @@ class Normal:
     cholesky: Array
 
 
+C = TypeVar("C", bound=Sequence)
+
+
 class NormalBackend(abc.ABC):
     @abc.abstractmethod
-    def from_tcoeffs(self, loc: Sequence, scale: Sequence, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C, damp: float):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -28,7 +31,7 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: Sequence, scale: Sequence, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C, damp: float):
         loc_flat, _ = tree_util.ravel_pytree(loc)
         scale_flat, _ = tree_util.ravel_pytree(scale)
         assert loc_flat.shape == scale_flat.shape
@@ -59,7 +62,7 @@ class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: Sequence, scale: Sequence, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C, damp: float):
         def ravel(s):
             return tree_util.ravel_pytree(s)[0]
 
@@ -94,7 +97,7 @@ class BlockDiagNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: Sequence, scale: Sequence, damp: float):
+    def from_tcoeffs(self, loc: C, scale: C, damp: float):
         def ravel(s):
             return tree_util.ravel_pytree(s)[0]
 
