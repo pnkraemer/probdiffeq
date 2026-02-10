@@ -16,6 +16,7 @@ from probdiffeq.backend.typing import (
     Callable,
     Generic,
     NamedArg,
+    Protocol,
     Sequence,
     TypeVar,
 )
@@ -75,12 +76,6 @@ class _InterpRes(Generic[R]):
     At time `max(t, s1.t)`.
     Use this as the right-most reference state
     in future interpolations, or continue time-stepping from here.
-    """
-
-    interpolated: R
-    """The new 'solution' field.
-
-    At time `t`. This is the interpolation result.
     """
 
     interp_from: R
@@ -277,11 +272,8 @@ def strategy_smoother(*, ssm) -> _Strategy:
             # The state at t1 gets a new backward model;
             # (it must remember how to get back to t, not to t0).
             solution_at_t1 = (marginal_t1, conditional_t1_to_t)
-            return _InterpRes(
-                step_from=solution_at_t1,
-                interpolated=solution_at_t,
-                interp_from=solution_at_t,
-            )
+            interp_res = _InterpRes(step_from=solution_at_t1, interp_from=solution_at_t)
+            return solution_at_t, interp_res
 
         def interpolate_at_t1(
             self, state_t0, state_t1, *, dt0, dt1, output_scale, prior
@@ -291,7 +283,7 @@ def strategy_smoother(*, ssm) -> _Strategy:
             del dt0
             del dt1
             del output_scale
-            return _InterpRes(state_t1, state_t1, state_t1)
+            return state_t1, _InterpRes(step_from=state_t1, interp_from=state_t1)
 
     return Smoother(
         ssm=ssm,
@@ -331,9 +323,8 @@ def strategy_filter(*, ssm) -> _Strategy:
             # Consistent state-types in interpolation result.
             interp = (hidden, extra)
             step_from = (marginal_t1, None)
-            return _InterpRes(
-                step_from=step_from, interpolated=interp, interp_from=interp
-            )
+            auxiliary = _InterpRes(step_from=step_from, interp_from=interp)
+            return interp, auxiliary
 
         def interpolate_at_t1(
             self, state_t0, state_t1, dt0, dt1, output_scale, *, prior
@@ -344,7 +335,7 @@ def strategy_filter(*, ssm) -> _Strategy:
             del dt1
             del output_scale
             rv, extra = state_t1
-            return _InterpRes((rv, extra), (rv, extra), (rv, extra))
+            return (rv, extra), _InterpRes((rv, extra), (rv, extra))
 
     return Filter(
         ssm=ssm,
@@ -381,7 +372,10 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             del output_scale
             rv, extra = state_t1
             cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
-            return _InterpRes((rv, cond_identity), (rv, extra), (rv, cond_identity))
+            interp_res = _InterpRes(
+                step_from=(rv, cond_identity), interp_from=(rv, cond_identity)
+            )
+            return (rv, extra), interp_res
 
         def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
             """Interpolate.
@@ -439,11 +433,11 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
             # Return the right combination of marginals and conditionals.
-            return _InterpRes(
-                step_from=(marginal_t1, conditional_t1_to_t),
-                interpolated=(rv_at_t, extrapolated_t[1]),
-                interp_from=previous_new,
+            interpolated = (rv_at_t, extrapolated_t[1])
+            interp_res = _InterpRes(
+                step_from=(marginal_t1, conditional_t1_to_t), interp_from=previous_new
             )
+            return interpolated, interp_res
 
     return FixedPoint(
         ssm=ssm,
@@ -616,7 +610,7 @@ class _ProbabilisticSolver:
         rv, corr = self.correction.init(rv)
 
         # TODO: Replace dt0, dt1, prior, and output_scale with prior_dt0, and prior_dt1
-        interp = self.strategy.interpolate(
+        (marginals, _aux), _interp = self.strategy.interpolate(
             state_t0=(rv, extra),
             state_t1=(marginals_t1, None),
             dt0=dt0,
@@ -624,8 +618,6 @@ class _ProbabilisticSolver:
             output_scale=output_scale,
             prior=self.prior,
         )
-
-        (marginals, _aux) = interp.interpolated
         u = self.ssm.stats.qoi(marginals)
         return u, marginals
 
@@ -674,7 +666,7 @@ class _ProbabilisticSolver:
         output_scale, _ = self.calibration.extract(interp_to.output_scale)
 
         # Interpolate
-        interp = self.strategy.interpolate(
+        interpolated, interp = self.strategy.interpolate(
             state_t0=(interp_from.rv, interp_from.strategy_state),
             state_t1=(interp_to.rv, interp_to.strategy_state),
             dt0=t - interp_from.t,
@@ -701,7 +693,7 @@ class _ProbabilisticSolver:
             interp_to.correction_state,
         )
         interpolated = _state(
-            t, interp.interpolated, interp_to.output_scale, interp_to.correction_state
+            t, interpolated, interp_to.output_scale, interp_to.correction_state
         )
         interp_from = _state(
             t,
@@ -709,16 +701,15 @@ class _ProbabilisticSolver:
             interp_from.output_scale,
             interp_from.correction_state,
         )
-        return _InterpRes(
-            step_from=step_from, interpolated=interpolated, interp_from=interp_from
-        )
+        interp_res = _InterpRes(step_from=step_from, interp_from=interp_from)
+        return interpolated, interp_res
 
     def interpolate_at_t1(
         self, *, t, interp_from: _State, interp_to: _State
     ) -> _InterpRes:
         """Process the solution in case t=t_n."""
         del t
-        tmp = self.strategy.interpolate_at_t1(
+        solution_, tmp = self.strategy.interpolate_at_t1(
             state_t0=None,
             dt0=None,
             dt1=None,
@@ -726,11 +717,7 @@ class _ProbabilisticSolver:
             state_t1=(interp_to.rv, interp_to.strategy_state),
             prior=self.prior,
         )
-        step_from_, solution_, interp_from_ = (
-            tmp.step_from,
-            tmp.interpolated,
-            tmp.interp_from,
-        )
+        step_from_, interp_from_ = (tmp.step_from, tmp.interp_from)
 
         def _state(t_, x, scale, cs):
             return _State(
@@ -747,7 +734,7 @@ class _ProbabilisticSolver:
         )
         sol = _state(t, solution_, interp_to.output_scale, interp_to.correction_state)
         acc = _state(t, step_from_, interp_to.output_scale, interp_to.correction_state)
-        return _InterpRes(step_from=acc, interpolated=sol, interp_from=prev)
+        return sol, _InterpRes(step_from=acc, interp_from=prev)
 
 
 def solver_mle(strategy, *, correction, prior, ssm):
@@ -983,10 +970,19 @@ def adaptive(
     )
 
 
-class _AdaState(containers.NamedTuple):
+class _AnythingWithTimeAttribute(Protocol):
+    t: float
+
+
+A = TypeVar("A", bound=_AnythingWithTimeAttribute)
+
+
+@tree_util.register_dataclass
+@containers.dataclass
+class _AdaState(Generic[A]):
     dt: float
-    step_from: Any
-    interp_from: Any
+    step_from: A
+    interp_from: A
     control: Any
     stats: Any
 
@@ -1136,27 +1132,27 @@ class _AdaSolver:
     def extract_at_t1(self, state: _AdaState, t):
         # todo: make the "at t1" decision inside solver.interpolate(),
         #  which collapses the next two functions together
-        interp = self.solver.interpolate_at_t1(
+        interp, interp_res = self.solver.interpolate_at_t1(
             t=t, interp_from=state.interp_from, interp_to=state.step_from
         )
-        return self._extract_interpolate(interp, state)
+        return self._extract_interpolate(interp, interp_res, state)
 
     def extract_after_t1(self, state: _AdaState, t):
-        interp = self.solver.interpolate(
+        interpolated, interp_res = self.solver.interpolate(
             t=t, interp_from=state.interp_from, interp_to=state.step_from
         )
-        return self._extract_interpolate(interp, state)
+        return self._extract_interpolate(interpolated, interp_res, state)
 
-    def _extract_interpolate(self, interp, state):
+    def _extract_interpolate(self, interpolated, interp_res: _InterpRes, state):
         state = _AdaState(
             dt=state.dt,
-            step_from=interp.step_from,
-            interp_from=interp.interp_from,
+            step_from=interp_res.step_from,
+            interp_from=interp_res.interp_from,
             control=state.control,
             stats=state.stats,
         )
 
-        solution_solver = self.solver.extract(interp.interpolated)
+        solution_solver = self.solver.extract(interpolated)
         return state, (solution_solver, (state.dt, state.control), state.stats)
 
     @staticmethod
