@@ -1,6 +1,6 @@
 r"""Taylor-expand the solution of an initial value problem (IVP)."""
 
-from probdiffeq.backend import control_flow, functools, itertools, ode, tree_util
+from probdiffeq.backend import control_flow, functools, ode, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 from probdiffeq.util import filter_util
@@ -97,19 +97,15 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[Array], /, num: int):
     primals = vf(*inits)
     taylor_coeffs = [*inits, primals]
 
+    increment = odejet_coefficient_increment(vf, num_arguments=num_arguments)
+
     def body(tcoeffs, _):
-        # Pad the Taylor coefficients in zeros, call jet, and return the solution.
-        # This works, because the $i$th output coefficient of jet()
-        # is independent of the $i+j$th input coefficient
-        # (see also the explanation in odejet_doubling_unroll)
-        series = _subsets(tcoeffs[1:], num_arguments)  # for high-order ODEs
-        p, s_new = functools.jet(vf, primals=inits, series=series)
+        tcoeffs = increment(tcoeffs)
 
         # The final values in s_new are nonsensical
         # (well, they are not; but we don't care about them)
         # so we remove them
-        tcoeffs = [*inits, p, *s_new[:-1]]
-        return tcoeffs, None
+        return tcoeffs[:-1], None
 
     # Pad the initial Taylor series with zeros
     num_outputs = num_arguments + num
@@ -126,6 +122,10 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[Array], /, num: int):
         body, init=taylor_coeffs, xs=None, length=num - 1
     )
     return taylor_coeffs
+
+
+def _pad_to_length(x, /, *, length, value):
+    return x + [value] * (length - len(x))
 
 
 def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
@@ -161,37 +161,41 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
     primals = vf(*inits)
     taylor_coeffs = [*inits, primals]
 
+    increment = odejet_coefficient_increment(vf, num_arguments=num_arguments)
     for _ in range(num - 1):
-        series = _subsets(taylor_coeffs[1:], num_arguments)  # for high-order ODEs
-        p, s_new = functools.jet(vf, primals=inits, series=series)
-        taylor_coeffs = [*inits, p, *s_new]
+        taylor_coeffs = increment(taylor_coeffs)
     return taylor_coeffs
 
 
-def _pad_to_length(x, /, *, length, value):
-    return x + [value] * (length - len(x))
+def jet_unpack_series(taylor_series, num, /):
+    """Compute Jet-compatible arguments from a Taylor series.
 
-
-def _subsets(x, /, n):
-    """Compute staggered subsets.
-
-    See example below.
+    Arguments
+    ---------
+    taylor_series
+        A sequence of arrays to evaluate the Taylor series at.
+    num
+        The number of inputs to the root
+        (2 for a first-order ODE, 3 for second-order, etc.)
 
     Examples
     --------
     >>> a = (1, 2, 3, 4, 5)
-    >>> print(_subsets(a, n=1))
-    [(1, 2, 3, 4, 5)]
-    >>> print(_subsets(a, n=2))
-    [(1, 2, 3, 4), (2, 3, 4, 5)]
-    >>> print(_subsets(a, n=3))
-    [(1, 2, 3), (2, 3, 4), (3, 4, 5)]
+    >>> print(jet_unpack_series(a, n=1))
+    [1], [(1, 2, 3, 4, 5)]
+    >>> print(jet_unpack_series(a, n=2))
+    [1, 2], [(1, 2, 3, 4), (2, 3, 4, 5)]
+    >>> print(jet_unpack_series(a, n=3))
+    [1, 2, 3], [(1, 2, 3), (2, 3, 4), (3, 4, 5)]
+
     """
+    primals, series = taylor_series[:num], taylor_series[1:]
 
     def mask(i):
         return None if i == 0 else i
 
-    return [x[mask(k) : mask(k + 1 - n)] for k in range(n)]
+    series_ = [series[mask(k) : mask(k + 1 - num)] for k in range(num)]
+    return primals, series_
 
 
 def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
@@ -248,6 +252,8 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
 
     """
     if not isinstance(inits[0], ArrayLike):
+        # If the Pytree elements are matrices or scalars,
+        # promote and unpromote accordingly
         _, unravel = tree_util.ravel_pytree(inits[0])
         inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
 
@@ -260,28 +266,32 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
         )
         return tree_util.tree_map(unravel, tcoeffs)
 
-    (u0,) = inits
-    zeros = np.zeros_like(u0)
-
-    def jet_embedded(*c, degree):
-        """Call a modified jet().
-
-        The modifications include:
-        * We merge "primals" and "series" into a single set of coefficients
-        * We expect and return _normalised_ Taylor coefficients.
-
-        The reason for the latter is that the doubling-recursion
-        simplifies drastically for normalised coefficients
-        (compared to unnormalised coefficients).
-        """
-        coeffs_emb = [*c] + [zeros] * degree
-        p, *s = coeffs_emb
-        p_new, s_new = functools.jet(vf, (p,), (s,), is_tcoeff=True)
-        return p_new, *s_new
-
+    double = odejet_coefficient_double(vf)
+    (u0,) = inits  # This asserts ODEs are first-order only. High order is a todo
     taylor_coefficients = [u0]
-    degrees = list(itertools.accumulate(map(lambda s: 2**s, range(num_doublings))))
-    for deg in degrees:
+    for _ in range(num_doublings):
+        taylor_coefficients = double(taylor_coefficients)
+    return _unnormalise(*taylor_coefficients)
+
+
+def odejet_coefficient_increment(vf, *, num_arguments):
+    """Construct a method that increments Taylor series' of an ODE."""
+
+    def increment(taylor_coeffs):
+        primals, series = jet_unpack_series(taylor_coeffs, num_arguments)
+        p, s_new = functools.jet(vf, primals=primals, series=series)
+        return [*primals, p, *s_new]
+
+    return increment
+
+
+def odejet_coefficient_double(vf):
+    """Construct a method that doubles Taylor series' lengths of an ODE."""
+
+    def double(taylor_coefficients):
+        zeros = np.zeros_like(taylor_coefficients[0])
+        deg = len(taylor_coefficients)
+
         jet_embedded_deg = tree_util.Partial(jet_embedded, degree=deg)
         fx, jvp = functools.linearize(jet_embedded_deg, *taylor_coefficients)
 
@@ -309,8 +319,27 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
 
         # Store all new coefficients
         taylor_coefficients.extend(cs_padded)
+        return taylor_coefficients
 
-    return _unnormalise(*taylor_coefficients)
+    def jet_embedded(*c, degree):
+        """Call a modified jet().
+
+        The modifications include:
+        * We merge "primals" and "series" into a single set of coefficients
+        * We expect and return _normalised_ Taylor coefficients.
+
+        The reason for the latter is that the doubling-recursion
+        simplifies drastically for normalised coefficients
+        (compared to unnormalised coefficients).
+        """
+        zeros = np.zeros_like(c[0])
+
+        coeffs_emb = [*c] + [zeros] * degree
+        p, *s = coeffs_emb
+        p_new, s_new = functools.jet(vf, (p,), (s,), is_tcoeff=True)
+        return p_new, *s_new
+
+    return double
 
 
 def _normalise(primals, *series):
