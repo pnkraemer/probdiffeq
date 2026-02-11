@@ -91,7 +91,9 @@ class _InterpRes(Generic[R]):
     """
 
 
-class _PositiveCubatureRule(containers.NamedTuple):
+@tree_util.register_dataclass
+@containers.dataclass
+class _PositiveCubatureRule:
     """Cubature rule with positive weights."""
 
     points: ArrayLike
@@ -1299,7 +1301,9 @@ class _AdaSolver:
 
     @functools.jit
     def rejection_loop(self, state0: _AdaState, *, t1) -> _AdaState:
-        class _RejectionState(containers.NamedTuple):
+        @tree_util.register_dataclass
+        @containers.dataclass
+        class _RejectionState:
             """State for rejection loops.
 
             (Keep decreasing step-size until error norm is small.

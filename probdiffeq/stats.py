@@ -4,14 +4,7 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
-from probdiffeq.backend import (
-    containers,
-    control_flow,
-    functools,
-    random,
-    tree_util,
-    warnings,
-)
+from probdiffeq.backend import containers, control_flow, functools, random, tree_util
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any
 from probdiffeq.util import filter_util
@@ -19,7 +12,9 @@ from probdiffeq.util import filter_util
 # TODO: the functions in here should only depend on posteriors / strategies!
 
 
-class MarkovSeq(containers.NamedTuple):
+@tree_util.register_dataclass
+@containers.dataclass
+class MarkovSeq:
     """Markov sequence."""
 
     init: Any
@@ -266,20 +261,3 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
 
     # Return only the logpdf
     return logpdf
-
-
-def calibrate(x, /, output_scale, *, ssm):
-    """Calibrated a posterior distribution of an IVP solution."""
-    msg = "This function has been deprecated."
-    msg += " All solutions are automatically calibrated."
-    warnings.warn(msg, stacklevel=1)
-    del output_scale
-    del ssm
-    return x
-
-
-def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor, *, ssm) -> MarkovSeq:
-    """Rescale the Cholesky factor of the covariance of a Markov sequence."""
-    init = ssm.stats.rescale_cholesky(markov_seq.init, factor)
-    cond = ssm.conditional.rescale_noise(markov_seq.conditional, factor)
-    return MarkovSeq(init=init, conditional=cond)

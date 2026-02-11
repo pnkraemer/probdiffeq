@@ -348,12 +348,6 @@ def odejet_coefficient_double(vf):
     return double
 
 
-def _normalise(primals, *series):
-    """Un-normalised Taylor series to normalised Taylor series."""
-    series_new = [s / np.factorial(i + 1) for i, s in enumerate(series)]
-    return [primals, *series_new]
-
-
 def _unnormalise(primals, *series):
     """Normalised Taylor series to un-normalised Taylor series."""
     series_new = [s * np.factorial(i + 1) for i, s in enumerate(series)]
