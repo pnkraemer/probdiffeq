@@ -1235,7 +1235,7 @@ def adaptive(
         control = control_proportional_integral()
     if eps is None:
         eps = 10 * np.finfo_eps(float)
-    return _AdaSolver(
+    return _AdaptiveTimeStep(
         ssm=ssm,
         atol=atol,
         rtol=rtol,
@@ -1248,185 +1248,46 @@ def adaptive(
 
 @tree_util.register_dataclass
 @containers.dataclass
-class _AdaState:
+class _TimeStepState:
     dt: float
     step_from: ProbSolverState
     interp_from: ProbSolverState
     control: Any
 
 
-class _AdaSolver:
+@tree_util.register_dataclass
+@containers.dataclass
+class _AdaptiveTimeStep:
     """Adaptive IVP solvers."""
 
-    def __init__(
-        self, *, atol, rtol, control, norm_ord, ssm, clip_dt: bool, eps: float
-    ):
-        self.atol = atol
-        self.rtol = rtol
-        self.control = control
-        self.norm_ord = norm_ord
-        self.ssm = ssm
-        self.clip_dt = clip_dt
-        self.eps = eps
+    eps: float
+    """A small value to determine whether $t \\approx t_1$ or not."""
 
-    def __repr__(self):
-        return (
-            f"\n{self.__class__.__name__}("
-            f"\n\tatol={self.atol},"
-            f"\n\trtol={self.rtol},"
-            f"\n\tcontrol={self.control},"
-            f"\n\tnorm_order={self.norm_ord},"
-            "\n)"
-        )
+    clip_dt: bool = containers.dataclass_field(metadata={"static": True})
+    """Whether or not to clip the timestep before stepping."""
+
+    # todo: move this to the error estimator
+    atol: float
+    rtol: float
+    norm_ord: Any = containers.dataclass_field(metadata={"static": True})
+
+    control: _Controller = containers.dataclass_field(metadata={"static": True})
+
+    # Todo: delete
+    ssm: Any = containers.dataclass_field(metadata={"static": True})
 
     @functools.jit
-    def init(self, state_solver, dt) -> _AdaState:
-        """Initialise the IVP solver state."""
+    def init(self, state_solver, dt) -> _TimeStepState:
+        """Initialise the adaptive solver state."""
         state_control = self.control.init(dt)
-        return _AdaState(
+        return _TimeStepState(
             dt=dt,
             step_from=state_solver,
             interp_from=state_solver,
             control=state_control,
         )
 
-    @functools.partial(functools.jit, static_argnames=["solver"])
-    def rejection_loop(self, state0: _AdaState, *, t1, solver):
-        @tree_util.register_dataclass
-        @containers.dataclass
-        class _RejectionState:
-            """State for rejection loops.
-
-            (Keep decreasing step-size until error norm is small.
-            This is one part of an IVP solver step.)
-            """
-
-            dt: float
-            error_norm_proposed: float
-            control: Any
-            proposed: Any
-            step_from: Any
-
-        def init(s0: _AdaState) -> _RejectionState:
-            def _ones_like(tree):
-                return tree_util.tree_map(np.ones_like, tree)
-
-            smaller_than_1 = 0.9  # the cond() must return True
-            return _RejectionState(
-                error_norm_proposed=smaller_than_1,
-                dt=s0.dt,
-                control=s0.control,
-                proposed=_ones_like(s0.step_from),  # irrelevant
-                step_from=s0.step_from,
-            )
-
-        def cond_fn(state: _RejectionState) -> bool:
-            # error_norm_proposed is EEst ** (-1/rate), thus "<"
-            return state.error_norm_proposed < 1.0
-
-        def body_fn(state: _RejectionState) -> _RejectionState:
-            """Attempt a step.
-
-            Perform a step with an IVP solver and
-            propose a future time-step based on tolerances and error estimates.
-            """
-            dt = state.dt
-
-            # Some controllers like to clip the terminal value instead of interpolating.
-            # This must happen _before_ the step.
-            if self.clip_dt:
-                dt = np.minimum(dt, t1 - state.step_from.t)
-
-            # Perform the actual step.
-            error_estimate, state_proposed = solver.step(state=state.step_from, dt=dt)
-
-            # Propose a new step
-            error_power = self._error_scale_and_normalize(
-                error_estimate, error_contraction_rate=solver.error_contraction_rate
-            )
-            dt, state_control = self.control.apply(
-                dt, state.control, error_power=error_power
-            )
-            return _RejectionState(
-                dt=dt,  # new
-                error_norm_proposed=error_power,  # new
-                proposed=state_proposed,  # new
-                control=state_control,  # new
-                step_from=state.step_from,
-            )
-
-        def extract(s: _RejectionState) -> _AdaState:
-            return _AdaState(
-                dt=s.dt,
-                step_from=s.proposed,
-                interp_from=s.step_from,
-                control=s.control,
-            )
-
-        def do_step(s):
-            init_val = init(s)
-            state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
-            return extract(state_new)
-
-        def dont_step(s):
-            return s
-
-        is_before_t1 = state0.step_from.t + self.eps < t1
-        state = control_flow.cond(is_before_t1, do_step, dont_step, state0)
-
-        is_before_t1 = state.step_from.t + self.eps < t1
-        is_after_t1 = state.step_from.t > t1 + self.eps
-
-        def before_t1_branch(args):
-            """If step_from.t < t1, don't interpolate."""
-            state, t1 = args
-            solution = state.step_from
-            return solution, state
-
-        def at_or_after_t1_branch(args):
-            """If step_from.t >= t1, interpolate.
-
-            Depending on whether t=t1 holds, the kind of interpolation
-            changes a bit.
-            """
-            state, t1 = args
-
-            def after_t1_branch(args):
-                """If we stepped cleanly over t1, interpolate."""
-                state, t1 = args
-                solution, interp_res = solver.interpolate(
-                    t=t1, interp_from=state.interp_from, interp_to=state.step_from
-                )
-                return solution, interp_res
-
-            def at_t1_branch(args):
-                """If we stepped exactly to t1, still interpolate."""
-                state, t1 = args
-                solution, interp_res = solver.interpolate_at_t1(
-                    t=t1, interp_from=state.interp_from, interp_to=state.step_from
-                )
-                return solution, interp_res
-
-            solution, interp_res = control_flow.cond(
-                is_after_t1, after_t1_branch, at_t1_branch, (state, t1)
-            )
-
-            new_state = _AdaState(
-                dt=state.dt,
-                step_from=interp_res.step_from,
-                interp_from=interp_res.interp_from,
-                control=state.control,
-            )
-
-            return solution, new_state
-
-        solution, state = control_flow.cond(
-            is_before_t1, before_t1_branch, at_or_after_t1_branch, (state, t1)
-        )
-
-        return solution, state
-
-    def _error_scale_and_normalize(self, error: _ErrorEstimate, error_contraction_rate):
+    def error_scale_and_normalize(self, error: _ErrorEstimate, error_contraction_rate):
         assert isinstance(error, _ErrorEstimate)
         normalize = self.atol + self.rtol * np.abs(error.reference)
         error_relative = error.estimate / normalize
@@ -1436,32 +1297,151 @@ class _AdaSolver:
         error_norm_rel = error_norm / np.sqrt(dim)
         return error_norm_rel ** (-1.0 / error_contraction_rate)
 
-    @staticmethod
-    def register_pytree_node():
-        def _asolver_flatten(asolver):
-            children = (asolver.atol, asolver.rtol, asolver.eps)
-            aux = (asolver.control, asolver.norm_ord, asolver.ssm, asolver.clip_dt)
-            return children, aux
 
-        def _asolver_unflatten(aux, children):
-            atol, rtol, eps = children
-            (control, norm_ord, ssm, clip_dt) = aux
-            return _AdaSolver(
-                atol=atol,
-                rtol=rtol,
-                control=control,
-                norm_ord=norm_ord,
-                ssm=ssm,
-                clip_dt=clip_dt,
-                eps=eps,
-            )
+@tree_util.register_dataclass
+@containers.dataclass
+class _RejectionLoopState:
+    """State for rejection loops.
 
-        tree_util.register_pytree_node(
-            _AdaSolver, flatten_func=_asolver_flatten, unflatten_func=_asolver_unflatten
+    Keep decreasing step-size until error norm is small.
+    This is a critical part of an IVP solver step.
+    """
+
+    dt: float
+    error_norm_proposed: float
+    control: Any
+    proposed: Any
+    step_from: Any
+
+
+@containers.dataclass
+class RejectionLoop:
+    """Implement a rejection loop."""
+
+    solver: _AdaptiveTimeStep
+    adaptive: _ProbabilisticSolver
+
+    def __call__(self, state0: _TimeStepState, *, t1) -> tuple[Any, _TimeStepState]:
+        """Repeatedly attempt a step until the controller is happy.
+
+        Notably:
+        - This function may never attempt a step if the current timestep
+            is beyond t1.
+        - If we step beyond t1, this function interpolates to t1.
+        """
+        # If t1 is in the future, enter the rejection loop (otherwise do nothing)
+        is_before_t1 = state0.step_from.t + self.adaptive.eps < t1
+        state = control_flow.cond(is_before_t1, self.step, lambda s: s, state0)
+
+        # Interpolate
+        is_before_t1 = state.step_from.t + self.adaptive.eps < t1
+        is_after_t1 = state.step_from.t > t1 + self.adaptive.eps
+        branch_idx = np.where(is_before_t1, 0, np.where(is_after_t1, 1, 2))
+        options = (self.interp_skip, self.interp_beyond_t1, self.interp_at_t1)
+        return control_flow.switch(branch_idx, options, (state, t1))
+
+    def step(self, s):
+        """Do a rejection-loop step.
+
+        Keep attempting steps until one is accepted.
+        """
+
+        def cond(state: _RejectionLoopState) -> bool:
+            # error_norm_proposed is EEst ** (-1/rate), thus "<"
+            return state.error_norm_proposed < 1.0
+
+        init = self.step_init_loopstate(s)
+        state_new = control_flow.while_loop(cond, self.step_attempt, init)
+        return self.step_extract_timestepstate(state_new)
+
+    def step_init_loopstate(self, s0: _TimeStepState) -> _RejectionLoopState:
+        """Initialise the rejection state."""
+
+        def _ones_like(tree):
+            return tree_util.tree_map(np.ones_like, tree)
+
+        smaller_than_1 = 0.9  # the cond() must return True
+        return _RejectionLoopState(
+            error_norm_proposed=smaller_than_1,
+            dt=s0.dt,
+            control=s0.control,
+            proposed=_ones_like(s0.step_from),  # irrelevant
+            step_from=s0.step_from,
         )
 
+    def step_attempt(self, state: _RejectionLoopState) -> _RejectionLoopState:
+        """Attempt a step.
 
-_AdaSolver.register_pytree_node()
+        Perform a step with an IVP solver and
+        propose a future time-step based on tolerances and error estimates.
+        """
+        dt = state.dt
+
+        # Some controllers like to clip the terminal value instead of interpolating.
+        # This must happen _before_ the step.
+        if self.adaptive.clip_dt:
+            dt = np.minimum(dt, t1 - state.step_from.t)
+
+        # Perform the actual step.
+        error_estimate, state_proposed = self.solver.step(state=state.step_from, dt=dt)
+
+        # Propose a new step
+        error_power = self.adaptive.error_scale_and_normalize(
+            error_estimate, error_contraction_rate=self.solver.error_contraction_rate
+        )
+        dt, state_control = self.adaptive.control.apply(
+            dt, state.control, error_power=error_power
+        )
+        return _RejectionLoopState(
+            dt=dt,  # new
+            error_norm_proposed=error_power,  # new
+            proposed=state_proposed,  # new
+            control=state_control,  # new
+            step_from=state.step_from,
+        )
+
+    def step_extract_timestepstate(self, state: _RejectionLoopState) -> _TimeStepState:
+        return _TimeStepState(
+            dt=state.dt,
+            step_from=state.proposed,
+            interp_from=state.step_from,
+            control=state.control,
+        )
+
+    def interp_skip(self, args):
+        """If step_from.t < t1, don't interpolate."""
+        state, t1 = args
+        solution = state.step_from
+        return solution, state
+
+    def interp_beyond_t1(self, args):
+        """If we stepped cleanly over t1, interpolate."""
+        state, t1 = args
+        solution, interp_res = self.solver.interpolate(
+            t=t1, interp_from=state.interp_from, interp_to=state.step_from
+        )
+
+        new_state = _TimeStepState(
+            dt=state.dt,
+            step_from=interp_res.step_from,
+            interp_from=interp_res.interp_from,
+            control=state.control,
+        )
+        return solution, new_state
+
+    def interp_at_t1(self, args):
+        """If we stepped exactly to t1, still interpolate."""
+        state, t1 = args
+        solution, interp_res = self.solver.interpolate_at_t1(
+            t=t1, interp_from=state.interp_from, interp_to=state.step_from
+        )
+        new_state = _TimeStepState(
+            dt=state.dt,
+            step_from=interp_res.step_from,
+            interp_from=interp_res.interp_from,
+            control=state.control,
+        )
+        return solution, new_state
 
 
 @containers.dataclass

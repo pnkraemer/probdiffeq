@@ -1,8 +1,10 @@
 """Routines for estimating solutions of initial value problems."""
 
+from probdiffeq import ivpsolvers
 from probdiffeq.backend import (
     containers,
     control_flow,
+    functools,
     linalg,
     tree_array_util,
     tree_util,
@@ -134,6 +136,8 @@ def solve_adaptive_save_at(
         msg = f"Strategy {solver} should not be used in solve_adaptive_save_at. "
         warnings.warn(msg, stacklevel=1)
 
+    rejection_loop = RejectionLoop(adaptive=adaptive, solver=solver)
+
     def advance(sol_and_state: T, t_next) -> tuple[T, Any]:
         """Advance the adaptive solver to the next checkpoint."""
 
@@ -150,9 +154,7 @@ def solve_adaptive_save_at(
             return c.do_continue
 
         def body_fun(state: AdvanceState) -> AdvanceState:
-            solution, state_new = adaptive.rejection_loop(
-                state.adaptive, t1=t_next, solver=solver
-            )
+            solution, state_new = rejection_loop(state.adaptive, t1=t_next)
             do_continue = state_new.step_from.t + adaptive.eps < t_next
             return AdvanceState(do_continue, solution, state_new)
 
@@ -201,24 +203,17 @@ def solve_adaptive_save_every_step(
         msg = f"Strategy {solver} should not be used in solve_adaptive_save_every_step."
         warnings.warn(msg, stacklevel=1)
 
+    rejection_loop = ivpsolvers.RejectionLoop(solver=solver, adaptive=adaptive)
+    rejection_loop = functools.jit(rejection_loop)
+
     t0, t1 = np.asarray(t0), np.asarray(t1)
     solution0 = solver.init(t0, ssm_init)
     state = adaptive.init(solution0, dt=dt0)
+
     solutions = []
     while state.step_from.t < t1:
-        solution, state = adaptive.rejection_loop(state, t1=t1, solver=solver)
-
+        solution, state = rejection_loop(state, t1=t1)
         solutions.append(solution)
-
-    #     if state.step_from.t + adaptive.eps < t1:
-    #         _, solution = adaptive.extract_before_t1(state, t=t1)
-    # # Either interpolate (t > t_next) or "finalise" (t == t_next)
-    # is_after_t1 = state.step_from.t > t1 + adaptive.eps
-    # if is_after_t1:
-    #     _, solution = adaptive.extract_after_t1(state, t=t1)
-    # else:
-    #     _, solution = adaptive.extract_at_t1(state, t=t1)
-    # solutions.append(solution)
 
     solutions = tree_array_util.tree_stack(solutions)
     solutions = solver.userfriendly_output(solution0=solution0, solution=solutions)

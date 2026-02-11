@@ -60,3 +60,7 @@ def while_loop(cond_func, body_func, /, init):
 
 def cond(use_true_func, true_func, false_func, *operands):
     return jax.lax.cond(use_true_func, true_func, false_func, *operands)
+
+
+def switch(index, options, args):
+    return jax.lax.switch(index, options, args)
