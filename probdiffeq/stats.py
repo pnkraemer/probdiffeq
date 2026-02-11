@@ -4,7 +4,14 @@ For example, this module contains functionality to compute off-grid marginals,
 or to evaluate marginal likelihoods of observations of the solutions.
 """
 
-from probdiffeq.backend import containers, control_flow, functools, random, tree_util
+from probdiffeq.backend import (
+    containers,
+    control_flow,
+    functools,
+    random,
+    tree_util,
+    warnings,
+)
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Any
 from probdiffeq.util import filter_util
@@ -119,20 +126,27 @@ def _offgrid_marginals(t, solution, solver):
     # because we _assume_ that the point sets are disjoint.
     index = np.searchsorted(solution.t, t)
 
+    # Extract the LHS
+
     def _extract_previous(tree):
         return tree_util.tree_map(lambda s: s[index - 1, ...], tree)
-
-    def _extract(tree):
-        return tree_util.tree_map(lambda s: s[index, ...], tree)
 
     posterior_t0 = _extract_previous(solution.posterior)
     t0 = _extract_previous(solution.t)
 
-    posterior_t1 = _extract(solution.posterior)
+    # Extract the RHS
+
+    def _extract(tree):
+        return tree_util.tree_map(lambda s: s[index, ...], tree)
+
     t1 = _extract(solution.t)
     output_scale = _extract(solution.output_scale)
 
-    estimate = solver.offgrid_marginals(
+    # Take the marginals because we need the t1-value to be informed
+    # about *all* datapoints
+    marginals_t1 = _extract(solution.marginals)
+    _, posterior_t1 = solver.strategy.init_posterior(marginals=marginals_t1)
+    return solver.offgrid_marginals(
         posterior_t1=posterior_t1,
         posterior_t0=posterior_t0,
         t=t,
@@ -140,7 +154,6 @@ def _offgrid_marginals(t, solution, solver):
         t1=t1,
         output_scale=output_scale,
     )
-    return estimate.u, estimate.marginals
 
 
 def log_marginal_likelihood_terminal_values(
@@ -256,13 +269,12 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
 
 def calibrate(x, /, output_scale, *, ssm):
     """Calibrated a posterior distribution of an IVP solution."""
-    print(x)
-
-    if np.ndim(output_scale) > np.ndim(ssm.prototypes.output_scale()):
-        output_scale = output_scale[-1]
-    if isinstance(x, MarkovSeq):
-        return _markov_rescale_cholesky(x, output_scale, ssm=ssm)
-    return ssm.stats.rescale_cholesky(x, output_scale)
+    msg = "This function has been deprecated."
+    msg += " All solutions are automatically calibrated."
+    warnings.warn(msg, stacklevel=1)
+    del output_scale
+    del ssm
+    return x
 
 
 def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor, *, ssm) -> MarkovSeq:

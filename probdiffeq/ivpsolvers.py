@@ -197,37 +197,42 @@ class Estimate:
 
 
 @containers.dataclass
-class _Strategy:
-    """Estimation-strategy interface."""
-
+class _Strategy(Generic[T]):
     ssm: Any
 
     is_suitable_for_save_at: int
     is_suitable_for_save_every_step: int
     is_suitable_for_offgrid_marginals: int
 
-    def init_posterior(self, sol: Any, /) -> T:
+    def init_posterior(self, *, marginals) -> T:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def predict(self, posterior: T, /, *, transition) -> tuple[Estimate, T]:
+    def predict(self, *, posterior: T, transition) -> tuple[Estimate, T]:
         """Extrapolate (also known as prediction)."""
         raise NotImplementedError
 
-    def apply_updates(self, prediction: T, *, updates) -> tuple[Estimate, T]:
+    def apply_updates(self, *, prediction: T, updates) -> tuple[Estimate, T]:
+        """Apply a correction to the prediction."""
         raise NotImplementedError
 
-    def interpolate(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
+    def interpolate(
+        self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
+    ):
         """Interpolate."""
         raise NotImplementedError
 
-    def interpolate_at_t1(self, state_t0, state_t1, *, dt0, dt1, output_scale, prior):
+    def interpolate_at_t1(self, *, posterior_t1: T):
         """Process the state at a checkpoint."""
+        raise NotImplementedError
+
+    def finalize(self, *, posterior0: T, posterior: T, output_scale):
+        """Postprocess the posterior before returning."""
         raise NotImplementedError
 
 
 @containers.dataclass
-class strategy_smoother(_Strategy):
+class strategy_smoother(_Strategy[stats.MarkovSeq]):
     """Construct a smoother."""
 
     def __init__(self, ssm):
@@ -239,14 +244,8 @@ class strategy_smoother(_Strategy):
         )
 
     def init_posterior(self, marginals):
-        # Special case for implementing offgrid-marginals...
-        # TODO: fix this!
-        if isinstance(marginals, stats.MarkovSeq):
-            posterior = marginals
-            marginals = posterior.init
-        else:
-            cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-            posterior = stats.MarkovSeq(init=marginals, conditional=cond)
+        cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        posterior = stats.MarkovSeq(init=marginals, conditional=cond)
 
         u = self.ssm.stats.qoi(marginals)
         std = self.ssm.stats.standard_deviation(marginals)
@@ -254,7 +253,9 @@ class strategy_smoother(_Strategy):
         estimate = Estimate(u, u_std, marginals)
         return estimate, posterior
 
-    def predict(self, posterior, *, transition):
+    def predict(
+        self, *, posterior: stats.MarkovSeq, transition
+    ) -> tuple[Estimate, stats.MarkovSeq]:
         marginals, cond = self.ssm.conditional.revert(posterior.init, transition)
         posterior = stats.MarkovSeq(init=marginals, conditional=cond)
 
@@ -273,12 +274,17 @@ class strategy_smoother(_Strategy):
         return Estimate(u, u_std, marginals), posterior
 
     def finalize(
-        self, *, posterior0: stats.MarkovSeq, posterior: stats.MarkovSeq, scale
+        self, *, posterior0: stats.MarkovSeq, posterior: stats.MarkovSeq, output_scale
     ):
         # Calibrate
-        init = self.ssm.stats.rescale_cholesky(posterior0.init, scale[-1, ...])
-        conditional = self.ssm.conditional.rescale_noise(posterior0.conditional, scale)
-        posterior0 = stats.MarkovSeq(init, conditional)
+        scale0 = output_scale[-1, ...]
+        init0 = self.ssm.stats.rescale_cholesky(posterior0.init, scale0)
+        conditional0 = self.ssm.conditional.rescale_noise(
+            posterior0.conditional, scale0
+        )
+        posterior0 = stats.MarkovSeq(init0, conditional0)
+
+        scale = output_scale
         init = self.ssm.stats.rescale_cholesky(posterior.init, scale)
         conditional = self.ssm.conditional.rescale_noise(posterior.conditional, scale)
         posterior = stats.MarkovSeq(init, conditional)
@@ -307,8 +313,8 @@ class strategy_smoother(_Strategy):
     def interpolate(
         self,
         *,
-        state_t0: stats.MarkovSeq,
-        state_t1: stats.MarkovSeq,
+        posterior_t0: stats.MarkovSeq,
+        posterior_t1: stats.MarkovSeq,
         transition_t0_t,
         transition_t_t1,
     ):
@@ -328,11 +334,15 @@ class strategy_smoother(_Strategy):
         """
         # Extrapolate from t0 to t, and from t to t1.
 
-        _, extrapolated_t = self.predict(state_t0, transition=transition_t0_t)
-        _, extrapolated_t1 = self.predict(extrapolated_t, transition=transition_t_t1)
+        _, extrapolated_t = self.predict(
+            posterior=posterior_t0, transition=transition_t0_t
+        )
+        _, extrapolated_t1 = self.predict(
+            posterior=extrapolated_t, transition=transition_t_t1
+        )
 
         # Marginalise backwards from t1 to t to obtain the interpolated solution.
-        marginal_t1 = state_t1.init
+        marginal_t1 = posterior_t1.init
         conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
         solution_at_t = stats.MarkovSeq(rv_at_t, extrapolated_t.conditional)
@@ -350,15 +360,15 @@ class strategy_smoother(_Strategy):
         estimate = Estimate(u, u_std, marginals)
         return (estimate, solution_at_t), interp_res
 
-    def interpolate_at_t1(self, state_t1):
-        marginals = state_t1.init
+    def interpolate_at_t1(self, posterior_t1):
+        marginals = posterior_t1.init
         u = self.ssm.stats.qoi(marginals)
         std = self.ssm.stats.standard_deviation(marginals)
         u_std = self.ssm.stats.qoi_from_sample(std)
         estimate = Estimate(u, u_std, marginals)
 
-        interp_res = _InterpRes(step_from=state_t1, interp_from=state_t1)
-        return (estimate, state_t1), interp_res
+        interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
+        return (estimate, posterior_t1), interp_res
 
 
 @containers.dataclass
@@ -373,14 +383,14 @@ class strategy_filter(_Strategy):
             is_suitable_for_offgrid_marginals=True,
         )
 
-    def init_posterior(self, marginals, /):
+    def init_posterior(self, *, marginals):
         u = self.ssm.stats.qoi(marginals)
         std = self.ssm.stats.standard_deviation(marginals)
         u_std = self.ssm.stats.qoi_from_sample(std)
         estimate = Estimate(u, u_std, marginals)
         return estimate, marginals
 
-    def predict(self, posterior, *, transition):
+    def predict(self, *, posterior: T, transition) -> tuple[Estimate, T]:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
         u = self.ssm.stats.qoi(marginals)
         std = self.ssm.stats.standard_deviation(marginals)
@@ -397,10 +407,10 @@ class strategy_filter(_Strategy):
         estimate = Estimate(u, u_std, marginals)
         return estimate, marginals
 
-    def finalize(self, *, posterior0, posterior, scale):
+    def finalize(self, *, posterior0, posterior, output_scale):
         # Calibrate
-        posterior0 = self.ssm.stats.rescale_cholesky(posterior0, scale[-1, ...])
-        posterior = self.ssm.stats.rescale_cholesky(posterior, scale)
+        posterior0 = self.ssm.stats.rescale_cholesky(posterior0, output_scale[-1, ...])
+        posterior = self.ssm.stats.rescale_cholesky(posterior, output_scale)
 
         # Stack
         posterior = tree_array_util.tree_prepend(posterior0, posterior)
@@ -412,9 +422,13 @@ class strategy_filter(_Strategy):
         estimate = Estimate(u, u_std, marginals)
         return estimate, posterior
 
-    def interpolate(self, state_t0, state_t1, transition_t0_t, transition_t_t1):
+    def interpolate(
+        self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
+    ):
         del transition_t_t1
-        _, interpolated = self.predict(state_t0, transition=transition_t0_t)
+        _, interpolated = self.predict(
+            posterior=posterior_t0, transition=transition_t0_t
+        )
 
         u = self.ssm.stats.qoi(interpolated)
         std = self.ssm.stats.standard_deviation(interpolated)
@@ -422,22 +436,22 @@ class strategy_filter(_Strategy):
         marginals = interpolated
         estimate = Estimate(u, u_std, marginals)
 
-        interp_res = _InterpRes(step_from=state_t1, interp_from=interpolated)
+        interp_res = _InterpRes(step_from=posterior_t1, interp_from=interpolated)
         return (estimate, interpolated), interp_res
 
-    def interpolate_at_t1(self, state_t1):
-        u = self.ssm.stats.qoi(state_t1)
-        std = self.ssm.stats.standard_deviation(state_t1)
+    def interpolate_at_t1(self, *, posterior_t1):
+        u = self.ssm.stats.qoi(posterior_t1)
+        std = self.ssm.stats.standard_deviation(posterior_t1)
         u_std = self.ssm.stats.qoi_from_sample(std)
-        marginals = state_t1
+        marginals = posterior_t1
         estimate = Estimate(u, u_std, marginals)
 
-        interp_res = _InterpRes(step_from=state_t1, interp_from=state_t1)
-        return (estimate, state_t1), interp_res
+        interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
+        return (estimate, posterior_t1), interp_res
 
 
 @containers.dataclass
-class strategy_fixedpoint(_Strategy):
+class strategy_fixedpoint(_Strategy[stats.MarkovSeq]):
     """Construct a fixedpoint-smoother."""
 
     def __init__(self, ssm):
@@ -448,7 +462,7 @@ class strategy_fixedpoint(_Strategy):
             is_suitable_for_offgrid_marginals=False,
         )
 
-    def init_posterior(self, marginals, /):
+    def init_posterior(self, *, marginals):
         cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
         posterior = stats.MarkovSeq(marginals, cond)
 
@@ -458,7 +472,9 @@ class strategy_fixedpoint(_Strategy):
         estimate = Estimate(u, u_std, marginals)
         return estimate, posterior
 
-    def predict(self, posterior: stats.MarkovSeq, *, transition):
+    def predict(
+        self, *, posterior: stats.MarkovSeq, transition
+    ) -> tuple[Estimate, stats.MarkovSeq]:
         rv = posterior.init
         bw0 = posterior.conditional
         marginals, cond = self.ssm.conditional.revert(rv, transition)
@@ -482,14 +498,18 @@ class strategy_fixedpoint(_Strategy):
         return estimate, posterior
 
     def finalize(
-        self, *, posterior0: stats.MarkovSeq, posterior: stats.MarkovSeq, scale
+        self, *, posterior0: stats.MarkovSeq, posterior: stats.MarkovSeq, output_scale
     ):
         # Calibrate
-        init = self.ssm.stats.rescale_cholesky(posterior0.init, scale[-1, ...])
-        conditional = self.ssm.conditional.rescale_noise(posterior0.conditional, scale)
+        init = self.ssm.stats.rescale_cholesky(posterior0.init, output_scale[-1, ...])
+        conditional = self.ssm.conditional.rescale_noise(
+            posterior0.conditional, output_scale
+        )
         posterior0 = stats.MarkovSeq(init, conditional)
-        init = self.ssm.stats.rescale_cholesky(posterior.init, scale)
-        conditional = self.ssm.conditional.rescale_noise(posterior.conditional, scale)
+        init = self.ssm.stats.rescale_cholesky(posterior.init, output_scale)
+        conditional = self.ssm.conditional.rescale_noise(
+            posterior.conditional, output_scale
+        )
         posterior = stats.MarkovSeq(init, conditional)
 
         # Marginalise
@@ -513,12 +533,12 @@ class strategy_fixedpoint(_Strategy):
         estimate = Estimate(u, u_std, marginals)
         return estimate, posterior
 
-    def interpolate_at_t1(self, state_t1: stats.MarkovSeq):
+    def interpolate_at_t1(self, *, posterior_t1: stats.MarkovSeq):
         cond_identity = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        resume_from = stats.MarkovSeq(state_t1.init, conditional=cond_identity)
+        resume_from = stats.MarkovSeq(posterior_t1.init, conditional=cond_identity)
         interp_res = _InterpRes(step_from=resume_from, interp_from=resume_from)
 
-        interpolated = state_t1
+        interpolated = posterior_t1
         marginals = interpolated.init
         u = self.ssm.stats.qoi(marginals)
         std = self.ssm.stats.standard_deviation(marginals)
@@ -529,26 +549,29 @@ class strategy_fixedpoint(_Strategy):
     def interpolate(
         self,
         *,
-        state_t0: stats.MarkovSeq,
-        state_t1: stats.MarkovSeq,
+        posterior_t0: stats.MarkovSeq,
+        posterior_t1: stats.MarkovSeq,
         transition_t0_t,
         transition_t_t1,
     ):
         """
         Interpolate using a fixed-point smoother.
 
-        Assuming `state_t0` has seen 'n' collocation points, and `state_t1` has seen 'n+1'
-        collocation points, then interpolation at time `t` is computed as follows:
+        Assuming `state_t0` has seen 'n' collocation points,
+        and `state_t1` has seen 'n+1' collocation points,
+        then interpolation at time `t` is computed as follows:
 
         1. Extrapolate from `t0` to `t`. This yields:
             - the marginal at `t` given `n` observations.
             - the backward transition from `t` to `t0` given `n` observations.
 
         2. Extrapolate from `t` to `t1`. This yields:
-            - the marginal at `t1` given `n` observations (in contrast, `state_t1` has seen `n+1` observations)
+            - the marginal at `t1` given `n` observations
+              (in contrast, `state_t1` has seen `n+1` observations)
             - the backward transition from `t1` to `t` given `n` observations.
 
-        3. Apply the backward transition from `t1` to `t` to the marginal inside `state_t1`
+        3. Apply the backward transition from `t1` to `t`
+        to the marginal inside `state_t1`
         to obtain the marginal at `t` given `n+1` observations. Similarly,
         the interpolated solution inherits all auxiliary info from the `t_1` state.
 
@@ -588,19 +611,23 @@ class strategy_fixedpoint(_Strategy):
         """
         # Extrapolate from t0 to t, and from t to t1.
         # This yields all building blocks.
-        _, extrapolated_t = self.predict(state_t0, transition=transition_t0_t)
+        _, extrapolated_t = self.predict(
+            posterior=posterior_t0, transition=transition_t0_t
+        )
         conditional_id = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
         previous_new = stats.MarkovSeq(extrapolated_t.init, conditional_id)
-        _, extrapolated_t1 = self.predict(previous_new, transition=transition_t_t1)
+        _, extrapolated_t1 = self.predict(
+            posterior=previous_new, transition=transition_t_t1
+        )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
-        marginal_t1 = state_t1.init
+        marginal_t1 = posterior_t1.init
         conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
         # Return the right combination of marginals and conditionals.
         interpolated = stats.MarkovSeq(rv_at_t, extrapolated_t.conditional)
-        step_from = stats.MarkovSeq(state_t1.init, conditional=conditional_t1_to_t)
+        step_from = stats.MarkovSeq(posterior_t1.init, conditional=conditional_t1_to_t)
         interp_res = _InterpRes(step_from=step_from, interp_from=previous_new)
 
         marginals = interpolated.init
@@ -790,8 +817,12 @@ class _ProbabilisticSolver:
         raise NotImplementedError
 
     def userfriendly_output(
-        self, *, solution: ProbSolverState, solution0: ProbSolverState
-    ):
+        self, *, solution0: ProbSolverState, solution: ProbSolverState
+    ) -> ProbSolverState:
+        """Make the solutions user-friendly.
+
+        This means calibrating, precomputing marginals, etc..
+        """
         raise NotImplementedError
 
     def offgrid_marginals(self, *, t, posterior_t1, posterior_t0, t0, t1, output_scale):
@@ -804,8 +835,8 @@ class _ProbabilisticSolver:
         transition_t0_t = self.prior(t - t0, output_scale)
         transition_t_t1 = self.prior(t1 - t, output_scale)
         (estimate, _posterior), _interp_res = self.strategy.interpolate(
-            state_t0=posterior_t0,
-            state_t1=posterior_t1,
+            posterior_t0=posterior_t0,
+            posterior_t1=posterior_t1,
             transition_t0_t=transition_t0_t,
             transition_t_t1=transition_t_t1,
         )
@@ -813,17 +844,16 @@ class _ProbabilisticSolver:
 
     def interpolate(
         self, *, t, interp_from: ProbSolverState, interp_to: ProbSolverState
-    ) -> _InterpRes:
+    ):
         # Domain is (t0, t1]; thus, take the output scale from interp_to
         output_scale = interp_to.output_scale
-        auxiliary = interp_to.auxiliary
-
-        # Interpolate
         transition_t0_t = self.prior(t - interp_from.t, output_scale)
         transition_t_t1 = self.prior(interp_to.t - t, output_scale)
+
+        # Interpolate
         tmp = self.strategy.interpolate(
-            state_t0=interp_from.posterior,
-            state_t1=interp_to.posterior,
+            posterior_t0=interp_from.posterior,
+            posterior_t1=interp_to.posterior,
             transition_t0_t=transition_t0_t,
             transition_t_t1=transition_t_t1,
         )
@@ -867,10 +897,10 @@ class _ProbabilisticSolver:
 
     def interpolate_at_t1(
         self, *, t, interp_from: ProbSolverState, interp_to: ProbSolverState
-    ) -> _InterpRes:
+    ):
         """Process the solution in case t=t_n."""
         del t
-        tmp = self.strategy.interpolate_at_t1(state_t1=interp_to.posterior)
+        tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.posterior)
         (estimate, interpolated), step_and_interpolate_from = tmp
 
         prev = ProbSolverState(
@@ -914,7 +944,7 @@ class solver_mle(_ProbabilisticSolver):
     """
 
     def init(self, t, init) -> ProbSolverState:
-        estimate, posterior = self.strategy.init_posterior(init)
+        estimate, posterior = self.strategy.init_posterior(marginals=init)
         correction_state = self.correction.init()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
@@ -946,14 +976,16 @@ class solver_mle(_ProbabilisticSolver):
 
         # Do the full prediction step (reuse previous discretisation)
         hidden, prediction = self.strategy.predict(
-            state.posterior, transition=transition
+            posterior=state.posterior, transition=transition
         )
 
         # Do the full correction step
         updates, observed, correction_state = self.correction.updates(
             hidden.marginals, correction_state, t=t
         )
-        estimate, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        estimate, posterior = self.strategy.apply_updates(
+            prediction=prediction, updates=updates
+        )
 
         # Calibrate the output scale
         new_term = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
@@ -987,7 +1019,7 @@ class solver_mle(_ProbabilisticSolver):
         init = solution0.posterior
         posterior = solution.posterior
         estimate, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, scale=output_scale
+            posterior0=init, posterior=posterior, output_scale=output_scale
         )
 
         ts = np.concatenate([solution0.t[None], solution.t])
@@ -1005,7 +1037,7 @@ class solver_dynamic(_ProbabilisticSolver):
     """Create a solver that calibrates the output scale dynamically."""
 
     def init(self, t, init) -> ProbSolverState:
-        estimate, posterior = self.strategy.init_posterior(init)
+        estimate, posterior = self.strategy.init_posterior(marginals=init)
         correction_state = self.correction.init()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1040,14 +1072,16 @@ class solver_dynamic(_ProbabilisticSolver):
         # Do the full extrapolation with the calibrated output scale
         transition = self.prior(dt, output_scale)
         estimate, prediction = self.strategy.predict(
-            state.posterior, transition=transition
+            posterior=state.posterior, transition=transition
         )
 
         # Do the full correction step
         updates, _, correction_state = self.correction.updates(
             estimate.marginals, correction_state, t=t
         )
-        estimate, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        estimate, posterior = self.strategy.apply_updates(
+            prediction=prediction, updates=updates
+        )
 
         # Return solution
         state = ProbSolverState(
@@ -1060,7 +1094,6 @@ class solver_dynamic(_ProbabilisticSolver):
         )
 
         # Normalise the error
-        u_proposed = estimate.u
         u0 = tree_util.tree_leaves(u_step_from)[0]
         u1 = tree_util.tree_leaves(estimate.u)[0]
         reference = np.maximum(np.abs(u1), np.abs(u0))
@@ -1077,7 +1110,7 @@ class solver_dynamic(_ProbabilisticSolver):
         init = solution0.posterior
         posterior = solution.posterior
         estimate, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, scale=output_scale
+            posterior0=init, posterior=posterior, output_scale=output_scale
         )
 
         # TODO: stack the calibrated output scales?
@@ -1096,7 +1129,7 @@ class solver(_ProbabilisticSolver):
     """Create a solver that does not calibrate the output scale automatically."""
 
     def init(self, t, init) -> ProbSolverState:
-        estimate, posterior = self.strategy.init_posterior(init)
+        estimate, posterior = self.strategy.init_posterior(marginals=init)
         correction_state = self.correction.init()
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         return ProbSolverState(
@@ -1131,12 +1164,14 @@ class solver(_ProbabilisticSolver):
 
         # Do the full extrapolation step (reuse the transition)
         hidden, prediction = self.strategy.predict(
-            state.posterior, transition=transition
+            posterior=state.posterior, transition=transition
         )
         updates, _, correction_state = self.correction.updates(
             hidden.marginals, correction_state, t=t
         )
-        estimate, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        estimate, posterior = self.strategy.apply_updates(
+            prediction=prediction, updates=updates
+        )
         state = ProbSolverState(
             t=t,
             estimate=estimate,
@@ -1162,7 +1197,7 @@ class solver(_ProbabilisticSolver):
         init = solution0.posterior
         posterior = solution.posterior
         estimate, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, scale=output_scale
+            posterior0=init, posterior=posterior, output_scale=output_scale
         )
 
         ts = np.concatenate([solution0.t[None], solution.t])

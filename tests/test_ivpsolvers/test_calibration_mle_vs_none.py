@@ -112,17 +112,9 @@ def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
 def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     (uncalibrated_solution, mle_solution), ssm = uncalibrated_and_mle_solution
 
-    posterior_uncalibrated = uncalibrated_solution.posterior
-    output_scale_uncalibrated = uncalibrated_solution.output_scale
-
-    posterior_mle = mle_solution.posterior
-    output_scale_mle = mle_solution.output_scale
-
     # Assert the means are identical, but the stds & scales are not
     assert testing.allclose(uncalibrated_solution.u, mle_solution.u)
     assert not testing.allclose(
         uncalibrated_solution.output_scale, mle_solution.output_scale
     )
-    print(uncalibrated_solution.u_std)
-    print(mle_solution.u_std)
     assert not testing.allclose(uncalibrated_solution.u_std, mle_solution.u_std)
