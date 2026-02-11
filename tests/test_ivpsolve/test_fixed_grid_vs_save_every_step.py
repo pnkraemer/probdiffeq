@@ -37,5 +37,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     # Assert u and u_std have matching shapes (that was wrong before)
     u_shape = tree_util.tree_map(np.shape, solution_fixed.u)
     u_std_shape = tree_util.tree_map(np.shape, solution_fixed.u_std)
+    print(u_shape)
+    print(u_std_shape)
     match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
     assert tree_util.tree_all(match)

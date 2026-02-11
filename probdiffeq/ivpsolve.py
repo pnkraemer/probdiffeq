@@ -145,9 +145,9 @@ def solve_adaptive_save_at(
     )
     return IVPSolution(
         t=result.t,
-        u=result.u,
-        u_std=result.u_std,
-        marginals=result.marginals,
+        u=result.estimate.u,
+        u_std=result.estimate.u_std,
+        marginals=result.estimate.marginals,
         posterior=result.posterior,
         output_scale=result.output_scale,
         num_steps=result.num_steps,
@@ -209,6 +209,7 @@ def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
         A = np.asarray(A)
         return np.concatenate([a[None, ...], A])
 
+    print(tree_util.tree_map(np.shape, solution))
     result = tree_util.tree_map(prepend, state.step_from, solution)
     return adaptive_solver.solver.userfriendly_output(result)
 
@@ -230,45 +231,14 @@ def solve_adaptive_save_every_step(
         )
         warnings.warn(msg, stacklevel=1)
 
-    generator = _solution_generator(
-        t0, ssm_init, t1=t1, adaptive_solver=adaptive_solver, dt0=dt0
-    )
-    tmp = tree_array_util.tree_stack(list(generator))
-    (t, solution_every_step), _dt, num_steps = tmp
-
-    # I think the user expects the initial time-point to be part of the grid
-    # (Even though t0 is not computed by this function)
-    t = np.concatenate((np.atleast_1d(t0), t))
-
-    # I think the user expects marginals, so we compute them here
-    posterior, output_scale = solution_every_step
-    _tmp = _userfriendly_output(posterior=posterior, ssm_init=ssm_init, ssm=ssm)
-    marginals, posterior = _tmp
-
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
-    return IVPSolution(
-        t=t,
-        u=u,
-        u_std=u_std,
-        ssm=ssm,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=num_steps,
-    )
-
-
-def _solution_generator(t, ssm_init, *, dt0, t1, adaptive_solver):
-    state = adaptive_solver.init(t, ssm_init, dt=dt0, num_steps=0)
-
+    state = adaptive_solver.init(t0, ssm_init, dt=dt0)
+    solutions = [state.step_from]
     while state.step_from.t < t1:
         state = adaptive_solver.rejection_loop(state, t1=t1)
 
         if state.step_from.t + adaptive_solver.eps < t1:
             _, solution = adaptive_solver.extract_before_t1(state, t=t1)
-            yield solution
+            solutions.append(solution)
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     is_after_t1 = state.step_from.t > t1 + adaptive_solver.eps
@@ -277,7 +247,19 @@ def _solution_generator(t, ssm_init, *, dt0, t1, adaptive_solver):
     else:
         _, solution = adaptive_solver.extract_at_t1(state, t=t1)
 
-    yield solution
+    solutions.append(solution)
+    solutions = tree_array_util.tree_stack(solutions)
+    solutions = adaptive_solver.solver.userfriendly_output(solutions)
+    return IVPSolution(
+        t=solutions.t,
+        u=solutions.estimate.u,
+        u_std=solutions.estimate.u_std,
+        marginals=solutions.estimate.marginals,
+        posterior=solutions.posterior,
+        output_scale=solutions.output_scale,
+        num_steps=solutions.num_steps,
+        ssm=ssm,
+    )
 
 
 def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
@@ -300,22 +282,11 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
     result = tree_util.tree_map(prepend, state0, result)
     result = solver.userfriendly_output(result)
 
-    # # _t, (posterior, output_scale) = solver.extract(result_state)
-    # posterior = result_state.posterior
-    # output_scale = result_state.output_scale
-
-    # I think the user expects marginals, so we compute them here
-    # _tmp = _userfriendly_output(posterior=posterior, ssm_init=ssm_init, ssm=ssm)
-    # marginals, posterior = _tmp
-
-    # u = ssm.stats.qoi_from_sample(marginals.mean)
-    # std = ssm.stats.standard_deviation(marginals)
-    # u_std = ssm.stats.qoi_from_sample(std)
     return IVPSolution(
         t=result.t,
-        u=result.u,
-        u_std=result.u_std,
-        marginals=result.marginals,
+        u=result.estimate.u,
+        u_std=result.estimate.u_std,
+        marginals=result.estimate.marginals,
         posterior=result.posterior,
         output_scale=result.output_scale,
         num_steps=result.num_steps,

@@ -1,5 +1,6 @@
 """Pytree-array utility functions (e.g. tree_concatenate)."""
 
+import jax
 import jax.numpy as jnp
 import jax.tree_util
 
@@ -28,9 +29,11 @@ def tree_concatenate(list_of_trees):
 def tree_stack(list_of_trees):
     """Apply  tree_transpose and jnp.stack() to a list of PyTrees."""
     tree_of_lists = _tree_transpose(list_of_trees)
-    return jax.tree_util.tree_map(
-        jnp.stack, tree_of_lists, is_leaf=lambda x: isinstance(x, list)
-    )
+
+    def is_leaf(x):
+        return isinstance(x, list) and isinstance(x[0], jax.Array)
+
+    return jax.tree_util.tree_map(jnp.stack, tree_of_lists, is_leaf=is_leaf)
 
 
 # From https://jax.readthedocs.io/en/latest/jax-101/05.1-pytrees.html
