@@ -1009,6 +1009,8 @@ class solver_mle(_ProbabilisticSolver):
         u0 = tree_util.tree_leaves(u_step_from)[0]
         u1 = tree_util.tree_leaves(estimate.u)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
+        error = tree_util.ravel_pytree(error)[0]
+        reference = tree_util.ravel_pytree(reference)[0]
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
@@ -1099,6 +1101,8 @@ class solver_dynamic(_ProbabilisticSolver):
         u0 = tree_util.tree_leaves(u_step_from)[0]
         u1 = tree_util.tree_leaves(estimate.u)[0]
         reference = np.maximum(np.abs(u1), np.abs(u0))
+        error = tree_util.ravel_pytree(error)[0]
+        reference = tree_util.ravel_pytree(reference)[0]
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
@@ -1187,6 +1191,8 @@ class solver(_ProbabilisticSolver):
         u0 = tree_util.tree_leaves(u_step_from)[0]
         u1 = tree_util.tree_leaves(estimate.u)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
+        error = tree_util.ravel_pytree(error)[0]
+        reference = tree_util.ravel_pytree(reference)[0]
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
