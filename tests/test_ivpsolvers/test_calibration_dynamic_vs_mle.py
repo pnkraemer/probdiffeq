@@ -26,8 +26,9 @@ def test_exponential_approximated_well(fact):
     solution = ode.odeint_and_save_at(
         vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5
     )
-    u = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(approximation.u[0])
-    sol = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(solution)
+    vmap_ravel = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])
+    u = vmap_ravel(approximation.u.mean[0])
+    sol = vmap_ravel(solution)
     rmse = _rmse(u[-1], sol[-1])
     assert rmse < 0.1
 

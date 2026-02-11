@@ -47,11 +47,10 @@ def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
     assert testing.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = _reference_solution(filter_solution.t)
-    u_fi = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(filter_solution.u[0])
-    u_sm = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(
-        smoother_solution.u[0]
-    )
-    u_re = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])(reference)
+    vmap_tree_ravel = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])
+    u_fi = vmap_tree_ravel(filter_solution.u.mean[0])
+    u_sm = vmap_tree_ravel(smoother_solution.u.mean[0])
+    u_re = vmap_tree_ravel(reference)
 
     filter_rmse = _rmse(u_fi, u_re)
     smoother_rmse = _rmse(u_sm, u_re)

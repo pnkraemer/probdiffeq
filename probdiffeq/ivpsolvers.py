@@ -1211,8 +1211,8 @@ class solver_mle(_ProbabilisticSolver):
 class solver_dynamic(_ProbabilisticSolver):
     """Create a solver that calibrates the output scale dynamically."""
 
-    def init(self, t, init) -> ProbDiffEqSol:
-        estimate, posterior = self.strategy.init_posterior(marginals=init)
+    def init(self, t, u) -> ProbDiffEqSol:
+        estimate, posterior = self.strategy.init_posterior(u=u)
         correction_state = self.correction.init()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1230,19 +1230,15 @@ class solver_dynamic(_ProbabilisticSolver):
         u_step_from = state.u.mean
         (correction_state,) = state.auxiliary
 
-        # ProbTaylorCoeffs error and calibrate the output scale
+        # Calibrate the output scale
         ones = np.ones_like(self.ssm.prototypes.output_scale())
         transition = self.prior(dt, ones)
         mean = self.ssm.stats.mean(state.u.marginals)
         hidden = self.ssm.conditional.apply(mean, transition)
 
         t = state.t + dt
-        error, observed, correction_state = self.correction.estimate_error(
-            hidden, correction_state, t=t
-        )
-
-        # Calibrate
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
+        _, observed, _ = self.correction.updates(hidden, correction_state, t=t)
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
 
         # Do the full extrapolation with the calibrated output scale
         transition = self.prior(dt, output_scale)
@@ -1259,7 +1255,7 @@ class solver_dynamic(_ProbabilisticSolver):
         )
 
         # Return solution
-        state = ProbDiffEqSol(
+        return ProbDiffEqSol(
             t=t,
             u=estimate,
             posterior=posterior,
@@ -1267,15 +1263,6 @@ class solver_dynamic(_ProbabilisticSolver):
             auxiliary=(correction_state,),
             output_scale=output_scale,
         )
-
-        # Normalise the error
-        u0 = tree_util.tree_leaves(u_step_from)[0]
-        u1 = tree_util.tree_leaves(u.mean)[0]
-        reference = np.maximum(np.abs(u1), np.abs(u0))
-        error = tree_util.ravel_pytree(error)[0]
-        reference = tree_util.ravel_pytree(reference)[0]
-        error = _ErrorProbTaylorCoeffs(dt * error, reference=reference)
-        return error, state
 
     def userfriendly_output(self, *, solution: ProbDiffEqSol, solution0: ProbDiffEqSol):
         # This is the dynamic solver,
