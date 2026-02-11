@@ -1,6 +1,5 @@
 """Routines for estimating solutions of initial value problems."""
 
-from probdiffeq import stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -136,45 +135,9 @@ def solve_adaptive_save_at(
         )
         warnings.warn(msg, stacklevel=1)
 
-    result = _solve_adaptive_save_at(
-        save_at[0],
-        ssm_init,
-        save_at=save_at[1:],
-        adaptive_solver=adaptive_solver,
-        dt0=dt0,
-    )
-    return IVPSolution(
-        t=result.t,
-        u=result.estimate.u,
-        u_std=result.estimate.u_std,
-        marginals=result.estimate.marginals,
-        posterior=result.posterior,
-        output_scale=result.output_scale,
-        num_steps=result.num_steps,
-        ssm=ssm,
-    )
+    t = save_at[0]
+    save_at = save_at[1:]
 
-    # # I think the user expects the initial condition to be part of the state
-    # # (as well as marginals), so we compute those things here
-    # posterior_save_at, output_scale = solution_save_at
-    # _tmp = _userfriendly_output(posterior=posterior_save_at, ssm_init=ssm_init, ssm=ssm)
-    # marginals, posterior = _tmp
-    # u = ssm.stats.qoi_from_sample(marginals.mean)
-    # std = ssm.stats.standard_deviation(marginals)
-    # u_std = ssm.stats.qoi_from_sample(std)
-    # return IVPSolution(
-    #     t=save_at,
-    #     u=u,
-    #     u_std=u_std,
-    #     marginals=marginals,
-    #     posterior=posterior,
-    #     output_scale=output_scale,
-    #     num_steps=num_steps,
-    #     ssm=ssm,
-    # )
-
-
-def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
     def advance(state, t_next):
         # Advance until accepted.t >= t_next.
         # Note: This could already be the case and we may not loop (just interpolate)
@@ -203,8 +166,19 @@ def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
 
     state = adaptive_solver.init(t, ssm_init, dt=dt0)
     _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
-    return adaptive_solver.solver.userfriendly_output(
+    result = adaptive_solver.solver.userfriendly_output(
         solution0=state.step_from, solution=solution
+    )
+
+    return IVPSolution(
+        t=result.t,
+        u=result.estimate.u,
+        u_std=result.estimate.u_std,
+        marginals=result.estimate.marginals,
+        posterior=result.posterior,
+        output_scale=result.output_scale,
+        num_steps=result.num_steps,
+        ssm=ssm,
     )
 
 
@@ -271,12 +245,6 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
     state0 = solver.init(t0, ssm_init)
     _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
-    # def prepend(a, A):
-    #     a = np.asarray(a)
-    #     A = np.asarray(A)
-    #     return np.concatenate([a[None, ...], A])
-
-    # result = tree_util.tree_map(prepend, state0, result)
     result = solver.userfriendly_output(solution0=state0, solution=result)
 
     return IVPSolution(
@@ -289,27 +257,6 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
         num_steps=result.num_steps,
         ssm=ssm,
     )
-
-
-def _userfriendly_output(*, posterior, ssm_init, ssm):
-    if isinstance(posterior, stats.MarkovSeq):
-        # Compute marginals
-        posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
-        marginals = stats.markov_marginals(
-            posterior_no_filter_marginals, reverse=True, ssm=ssm
-        )
-
-        # Prepend the marginal at t1 to the computed marginals
-        marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
-        # Prepend the marginal at t1 to the inits
-        init = tree_array_util.tree_prepend(ssm_init, posterior.init)
-        posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
-    else:
-        posterior = tree_array_util.tree_prepend(ssm_init, posterior)
-        marginals = posterior
-    return marginals, posterior
 
 
 def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
