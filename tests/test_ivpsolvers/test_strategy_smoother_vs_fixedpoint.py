@@ -24,13 +24,14 @@ def fixture_solution_smoother(solver_setup):
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
+    adaptive = ivpsolvers.adaptive(atol=1e-3, rtol=1e-3, ssm=ssm)
     return ivpsolve.solve_adaptive_save_every_step(
         init,
         t0=solver_setup["t0"],
         t1=solver_setup["t1"],
         dt0=0.1,
-        adaptive_solver=adaptive_solver,
+        adaptive=adaptive,
+        solver=solver,
         ssm=ssm,
     )
 
@@ -42,11 +43,11 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
+    adaptive = ivpsolvers.adaptive(atol=1e-3, rtol=1e-3, ssm=ssm)
 
     save_at = solution_smoother.t
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
-        init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+        init, save_at=save_at, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
     )
 
     sol_fp, sol_sm = solution_fixedpoint, solution_smoother  # alias for brevity
@@ -89,9 +90,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy_fp = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy_fp, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
+    adaptive = ivpsolvers.adaptive(atol=1e-3, rtol=1e-3, ssm=ssm)
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+        init, save_at=ts, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
     )
 
     # Extract the interior points of the save_at solution

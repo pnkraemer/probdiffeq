@@ -16,12 +16,12 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    adaptive = ivpsolvers.adaptive(atol=1e-2, rtol=1e-2, ssm=ssm)
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
     solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+        init, t0=t0, t1=t1, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
     )
     u_interp, _, marginals_interp = stats.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_adaptive, solver=solver
@@ -29,7 +29,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
 
     # Compute a save-at solution and remove the edge-points
     solution_save_at = ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+        init, save_at=ts, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
     )
 
     u_save_at = tree_util.tree_map(lambda s: s[1:-1], solution_save_at.u)

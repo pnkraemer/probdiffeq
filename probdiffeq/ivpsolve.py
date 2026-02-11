@@ -100,7 +100,7 @@ def solve_adaptive_terminal_values(
 
 
 def solve_adaptive_save_at(
-    ssm_init, /, *, save_at, adaptive_solver, dt0, ssm, warn=True
+    ssm_init, /, *, save_at, adaptive, solver, dt0, ssm, warn=True
 ) -> IVPSolution:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -128,47 +128,48 @@ def solve_adaptive_save_at(
         }
         ```
     """
-    if not adaptive_solver.solver.is_suitable_for_save_at and warn:
-        msg = (
-            f"Strategy {adaptive_solver.solver} should not "
-            f"be used in solve_adaptive_save_at. "
-        )
+    if not solver.is_suitable_for_save_at and warn:
+        msg = f"Strategy {solver} should not be used in solve_adaptive_save_at. "
         warnings.warn(msg, stacklevel=1)
 
     t = save_at[0]
     save_at = save_at[1:]
 
-    def advance(state, t_next):
+    def advance(sol_and_state, t_next):
         # Advance until accepted.t >= t_next.
         # Note: This could already be the case and we may not loop (just interpolate)
-        def cond_fun(s):
-            # Terminate the loop if
-            # the difference from s.t to t_next is smaller than a constant factor
-            # (which is a "small" multiple of the current machine precision)
-            # or if s.t > t_next holds.
-            return s.step_from.t + adaptive_solver.eps < t_next
+        def cond_fun(c):
+            return c[0]
 
-        def body_fun(s):
-            return adaptive_solver.rejection_loop(s, t1=t_next)
+        def body_fun(sol_and_state_):
+            _, _, s = sol_and_state_
+            solution, s = adaptive.rejection_loop(s, t1=t_next, solver=solver)
+            do_continue = s.step_from.t + adaptive.eps < t_next
+            return (do_continue, solution, s)
 
-        state = control_flow.while_loop(cond_fun, body_fun, init=state)
-
-        # Either interpolate (t > t_next) or "finalise" (t == t_next)
-        is_after_t1 = state.step_from.t > t_next + adaptive_solver.eps
-        state, solution = control_flow.cond(
-            is_after_t1,
-            adaptive_solver.extract_after_t1,
-            adaptive_solver.extract_at_t1,
-            state,
-            t_next,
+        _, solution, state = control_flow.while_loop(
+            cond_fun, body_fun, init=(True, *sol_and_state)
         )
-        return state, solution
+        import jax
 
-    state = adaptive_solver.init(t, ssm_init, dt=dt0)
-    _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
-    result = adaptive_solver.solver.userfriendly_output(
-        solution0=state.step_from, solution=solution
-    )
+        jax.debug.print("Saving...\n")
+
+        # # Either interpolate (t > t_next) or "finalise" (t == t_next)
+        # is_after_t1 = state.step_from.t > t_next + adaptive.eps
+        # state, solution = control_flow.cond(
+        #     is_after_t1,
+        #     adaptive_solver.extract_after_t1,
+        #     adaptive_solver.extract_at_t1,
+        #     state,
+        #     t_next,
+        # )
+        return (solution, state), solution
+
+    solution0 = solver.init(t, ssm_init)
+    state = adaptive.init(solution0, dt=dt0)
+    init = (solution0, state)
+    _, solution = control_flow.scan(advance, init=init, xs=save_at, reverse=False)
+    result = solver.userfriendly_output(solution0=solution0, solution=solution)
 
     return IVPSolution(
         t=result.t,
@@ -183,7 +184,7 @@ def solve_adaptive_save_at(
 
 
 def solve_adaptive_save_every_step(
-    ssm_init, /, *, t0, t1, adaptive_solver, dt0, ssm
+    ssm_init, /, *, t0, t1, adaptive, solver, dt0, ssm
 ) -> IVPSolution:
     """Solve an initial value problem and save every step.
 
@@ -192,35 +193,31 @@ def solve_adaptive_save_every_step(
     !!! warning
         Not JITable, not reverse-mode-differentiable.
     """
-    if not adaptive_solver.solver.is_suitable_for_save_every_step:
-        msg = (
-            f"Strategy {adaptive_solver.solver} should not "
-            f"be used in solve_adaptive_save_every_step."
-        )
+    if not solver.is_suitable_for_save_every_step:
+        msg = f"Strategy {solver} should not be used in solve_adaptive_save_every_step."
         warnings.warn(msg, stacklevel=1)
 
-    state = adaptive_solver.init(t0, ssm_init, dt=dt0)
-    solution0 = state.step_from
+    t0, t1 = np.asarray(t0), np.asarray(t1)
+    solution0 = solver.init(t0, ssm_init)
+    state = adaptive.init(solution0, dt=dt0)
     solutions = []
     while state.step_from.t < t1:
-        state = adaptive_solver.rejection_loop(state, t1=t1)
+        solution, state = adaptive.rejection_loop(state, t1=t1, solver=solver)
 
-        if state.step_from.t + adaptive_solver.eps < t1:
-            _, solution = adaptive_solver.extract_before_t1(state, t=t1)
-            solutions.append(solution)
+        solutions.append(solution)
 
-    # Either interpolate (t > t_next) or "finalise" (t == t_next)
-    is_after_t1 = state.step_from.t > t1 + adaptive_solver.eps
-    if is_after_t1:
-        _, solution = adaptive_solver.extract_after_t1(state, t=t1)
-    else:
-        _, solution = adaptive_solver.extract_at_t1(state, t=t1)
+    #     if state.step_from.t + adaptive.eps < t1:
+    #         _, solution = adaptive.extract_before_t1(state, t=t1)
+    # # Either interpolate (t > t_next) or "finalise" (t == t_next)
+    # is_after_t1 = state.step_from.t > t1 + adaptive.eps
+    # if is_after_t1:
+    #     _, solution = adaptive.extract_after_t1(state, t=t1)
+    # else:
+    #     _, solution = adaptive.extract_at_t1(state, t=t1)
+    # solutions.append(solution)
 
-    solutions.append(solution)
     solutions = tree_array_util.tree_stack(solutions)
-    solutions = adaptive_solver.solver.userfriendly_output(
-        solution0=solution0, solution=solutions
-    )
+    solutions = solver.userfriendly_output(solution0=solution0, solution=solutions)
     return IVPSolution(
         t=solutions.t,
         u=solutions.estimate.u,

@@ -67,6 +67,7 @@ def prior_wiener_integrated_discrete(ts, *args, **kwargs):
 
 
 # TODO: AdaState carries the same two fields. Combine?
+@tree_util.register_dataclass
 @containers.dataclass
 class _InterpRes(Generic[R]):
     step_from: R
@@ -1220,8 +1221,6 @@ class solver(_ProbabilisticSolver):
 
 
 def adaptive(
-    slvr,
-    /,
     *,
     ssm,
     atol=1e-4,
@@ -1237,7 +1236,6 @@ def adaptive(
     if eps is None:
         eps = 10 * np.finfo_eps(float)
     return _AdaSolver(
-        slvr,
         ssm=ssm,
         atol=atol,
         rtol=rtol,
@@ -1261,19 +1259,8 @@ class _AdaSolver:
     """Adaptive IVP solvers."""
 
     def __init__(
-        self,
-        probsolver: _ProbabilisticSolver,
-        /,
-        *,
-        atol,
-        rtol,
-        control,
-        norm_ord,
-        ssm,
-        clip_dt: bool,
-        eps: float,
+        self, *, atol, rtol, control, norm_ord, ssm, clip_dt: bool, eps: float
     ):
-        self.solver = probsolver
         self.atol = atol
         self.rtol = rtol
         self.control = control
@@ -1285,7 +1272,6 @@ class _AdaSolver:
     def __repr__(self):
         return (
             f"\n{self.__class__.__name__}("
-            f"\n\tsolver={self.solver},"
             f"\n\tatol={self.atol},"
             f"\n\trtol={self.rtol},"
             f"\n\tcontrol={self.control},"
@@ -1294,9 +1280,8 @@ class _AdaSolver:
         )
 
     @functools.jit
-    def init(self, t, initial_condition, dt) -> _AdaState:
+    def init(self, state_solver, dt) -> _AdaState:
         """Initialise the IVP solver state."""
-        state_solver = self.solver.init(t, initial_condition)
         state_control = self.control.init(dt)
         return _AdaState(
             dt=dt,
@@ -1305,8 +1290,8 @@ class _AdaSolver:
             control=state_control,
         )
 
-    @functools.jit
-    def rejection_loop(self, state0: _AdaState, *, t1) -> _AdaState:
+    @functools.partial(functools.jit, static_argnames=["solver"])
+    def rejection_loop(self, state0: _AdaState, *, t1, solver):
         @tree_util.register_dataclass
         @containers.dataclass
         class _RejectionState:
@@ -1353,12 +1338,12 @@ class _AdaSolver:
                 dt = np.minimum(dt, t1 - state.step_from.t)
 
             # Perform the actual step.
-            error_estimate, state_proposed = self.solver.step(
-                state=state.step_from, dt=dt
-            )
+            error_estimate, state_proposed = solver.step(state=state.step_from, dt=dt)
 
             # Propose a new step
-            error_power = self._error_scale_and_normalize(error_estimate)
+            error_power = self._error_scale_and_normalize(
+                error_estimate, error_contraction_rate=solver.error_contraction_rate
+            )
             dt, state_control = self.control.apply(
                 dt, state.control, error_power=error_power
             )
@@ -1378,11 +1363,70 @@ class _AdaSolver:
                 control=s.control,
             )
 
-        init_val = init(state0)
-        state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
-        return extract(state_new)
+        def do_step(s):
+            init_val = init(s)
+            state_new = control_flow.while_loop(cond_fn, body_fn, init_val)
+            return extract(state_new)
 
-    def _error_scale_and_normalize(self, error: _ErrorEstimate):
+        def dont_step(s):
+            return s
+
+        is_before_t1 = state0.step_from.t + self.eps < t1
+        state = control_flow.cond(is_before_t1, do_step, dont_step, state0)
+
+        is_before_t1 = state.step_from.t + self.eps < t1
+        is_after_t1 = state.step_from.t > t1 + self.eps
+
+        def before_t1_branch(args):
+            """If step_from.t < t1, don't interpolate."""
+            state, t1 = args
+            solution = state.step_from
+            return solution, state
+
+        def at_or_after_t1_branch(args):
+            """If step_from.t >= t1, interpolate.
+
+            Depending on whether t=t1 holds, the kind of interpolation
+            changes a bit.
+            """
+            state, t1 = args
+
+            def after_t1_branch(args):
+                """If we stepped cleanly over t1, interpolate."""
+                state, t1 = args
+                solution, interp_res = solver.interpolate(
+                    t=t1, interp_from=state.interp_from, interp_to=state.step_from
+                )
+                return solution, interp_res
+
+            def at_t1_branch(args):
+                """If we stepped exactly to t1, still interpolate."""
+                state, t1 = args
+                solution, interp_res = solver.interpolate_at_t1(
+                    t=t1, interp_from=state.interp_from, interp_to=state.step_from
+                )
+                return solution, interp_res
+
+            solution, interp_res = control_flow.cond(
+                is_after_t1, after_t1_branch, at_t1_branch, (state, t1)
+            )
+
+            new_state = _AdaState(
+                dt=state.dt,
+                step_from=interp_res.step_from,
+                interp_from=interp_res.interp_from,
+                control=state.control,
+            )
+
+            return solution, new_state
+
+        solution, state = control_flow.cond(
+            is_before_t1, before_t1_branch, at_or_after_t1_branch, (state, t1)
+        )
+
+        return solution, state
+
+    def _error_scale_and_normalize(self, error: _ErrorEstimate, error_contraction_rate):
         assert isinstance(error, _ErrorEstimate)
         normalize = self.atol + self.rtol * np.abs(error.reference)
         error_relative = error.estimate / normalize
@@ -1390,59 +1434,52 @@ class _AdaSolver:
         dim = np.atleast_1d(error.reference).size
         error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
         error_norm_rel = error_norm / np.sqrt(dim)
-        return error_norm_rel ** (-1.0 / self.solver.error_contraction_rate)
+        return error_norm_rel ** (-1.0 / error_contraction_rate)
 
-    def extract_before_t1(self, state: _AdaState, t):
-        del t
-        # solution_solver = self.solver.extract(state.step_from)
-        # extracted = solution_solver
-        return state, state.step_from
+    # def extract_before_t1(self, state: _AdaState, t, solver):
+    #     del t
+    #     # solution_solver = self.solver.extract(state.step_from)
+    #     # extracted = solution_solver
+    #     return state, state.step_from
 
-    def extract_at_t1(self, state: _AdaState, t):
-        # TODO: make the "at t1" decision inside solver.interpolate(),
-        #  which collapses the next two functions together
-        interpolated, interp_res = self.solver.interpolate_at_t1(
-            t=t, interp_from=state.interp_from, interp_to=state.step_from
-        )
-        state = _AdaState(
-            dt=state.dt,
-            step_from=interp_res.step_from,
-            interp_from=interp_res.interp_from,
-            control=state.control,
-        )
-        return state, interpolated
+    # def extract_at_t1(self, state: _AdaState, t, solver):
+    #     # TODO: make the "at t1" decision inside solver.interpolate(),
+    #     #  which collapses the next two functions together
+    #     interpolated, interp_res = self.solver.interpolate_at_t1(
+    #         t=t, interp_from=state.interp_from, interp_to=state.step_from
+    #     )
+    #     state = _AdaState(
+    #         dt=state.dt,
+    #         step_from=interp_res.step_from,
+    #         interp_from=interp_res.interp_from,
+    #         control=state.control,
+    #     )
+    #     return state, interpolated
 
-    def extract_after_t1(self, state: _AdaState, t):
-        """We have overstepped, so we interpolate before returning."""
-        interpolated, interp_res = self.solver.interpolate(
-            t=t, interp_from=state.interp_from, interp_to=state.step_from
-        )
-        state = _AdaState(
-            dt=state.dt,
-            step_from=interp_res.step_from,
-            interp_from=interp_res.interp_from,
-            control=state.control,
-        )
-        return state, interpolated
+    # def extract_after_t1(self, state: _AdaState, t, solver):
+    #     """We have overstepped, so we interpolate before returning."""
+    #     interpolated, interp_res = solver.interpolate(
+    #         t=t, interp_from=state.interp_from, interp_to=state.step_from
+    #     )
+    #     state = _AdaState(
+    #         dt=state.dt,
+    #         step_from=interp_res.step_from,
+    #         interp_from=interp_res.interp_from,
+    #         control=state.control,
+    #     )
+    #     return state, interpolated
 
     @staticmethod
     def register_pytree_node():
         def _asolver_flatten(asolver):
             children = (asolver.atol, asolver.rtol, asolver.eps)
-            aux = (
-                asolver.solver,
-                asolver.control,
-                asolver.norm_ord,
-                asolver.ssm,
-                asolver.clip_dt,
-            )
+            aux = (asolver.control, asolver.norm_ord, asolver.ssm, asolver.clip_dt)
             return children, aux
 
         def _asolver_unflatten(aux, children):
             atol, rtol, eps = children
-            (slvr, control, norm_ord, ssm, clip_dt) = aux
+            (control, norm_ord, ssm, clip_dt) = aux
             return _AdaSolver(
-                slvr,
                 atol=atol,
                 rtol=rtol,
                 control=control,
