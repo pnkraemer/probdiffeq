@@ -28,6 +28,10 @@ def test_output_is_a_scalar_and_not_nan_and_not_inf(solution):
     sol, ssm = solution
     data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
     std = tree_util.tree_map(lambda _s: np.ones_like(sol.t), sol.u[0])
+    print(tree_util.tree_map(np.shape, data))
+    print(tree_util.tree_map(np.shape, std))
+    print(tree_util.tree_map(np.shape, sol))
+
     lml = stats.log_marginal_likelihood(
         data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
     )

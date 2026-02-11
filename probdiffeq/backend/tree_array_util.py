@@ -20,9 +20,11 @@ def tree_append(X, y, /):
 def tree_concatenate(list_of_trees):
     """Apply  tree_transpose and jnp.stack() to a list of PyTrees."""
     tree_of_lists = _tree_transpose(list_of_trees)
-    return jax.tree_util.tree_map(
-        jnp.concatenate, tree_of_lists, is_leaf=lambda x: isinstance(x, list)
-    )
+
+    def is_leaf(x):
+        return isinstance(x, list) and isinstance(x[0], jax.Array)
+
+    return jax.tree_util.tree_map(jnp.concatenate, tree_of_lists, is_leaf=is_leaf)
 
 
 # TODO: should this be public or not?

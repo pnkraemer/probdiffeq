@@ -7,6 +7,7 @@ from probdiffeq.backend import (
     functools,
     linalg,
     special,
+    tree_array_util,
     tree_util,
 )
 from probdiffeq.backend import numpy as np
@@ -267,27 +268,46 @@ def strategy_smoother(*, ssm) -> _Strategy:
             u_std = self.ssm.stats.qoi_from_sample(std)
             return Estimate(u, u_std, marginals), posterior
 
-        def finalize(self, posterior, scale):
+        def finalize(
+            self, *, posterior0: stats.MarkovSeq, posterior: stats.MarkovSeq, scale
+        ):
+            # Calibrate
+            init = ssm.stats.rescale_cholesky(posterior0.init, scale[-1, ...])
+            conditional = ssm.conditional.rescale_noise(posterior0.conditional, scale)
+            posterior0 = stats.MarkovSeq(init, conditional)
             init = ssm.stats.rescale_cholesky(posterior.init, scale)
-            init = tree_util.tree_map(lambda x: x[-1, ...], init)
             conditional = ssm.conditional.rescale_noise(posterior.conditional, scale)
             posterior = stats.MarkovSeq(init, conditional)
 
-            def smooth_step(x, cond):
-                extrapolated = ssm.conditional.marginalise(x, cond)
-                return extrapolated, extrapolated
-
-            init, xs = posterior.init, posterior.conditional
-            _, marginals = control_flow.scan(
-                smooth_step, init=init, xs=xs, reverse=True
+            # Marginalise
+            posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
+            marginals = stats.markov_marginals(
+                posterior_no_filter_marginals, reverse=True, ssm=self.ssm
             )
 
+            # Append the terminal marginal to the computed ones
+            marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+            marginals = tree_array_util.tree_append(marginals, marginal_t1)
+
+            # Prepend the initial condition to the filtering distributions
+            init = tree_array_util.tree_prepend(posterior0.init, posterior.init)
+            posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
+
+            # Extract targets
             u = ssm.stats.qoi(marginals)
-            u_std = ssm.stats.standard_deviation(marginals)
+            std = ssm.stats.standard_deviation(marginals)
+            u_std = ssm.stats.qoi_from_sample(std)
             estimate = Estimate(u, u_std, marginals)
             return estimate, posterior
 
-        def interpolate(self, *, state_t0, state_t1, transition_t0_t, transition_t_t1):
+        def interpolate(
+            self,
+            *,
+            state_t0: stats.MarkovSeq,
+            state_t1: stats.MarkovSeq,
+            transition_t0_t,
+            transition_t_t1,
+        ):
             """Interpolate.
 
             A smoother interpolates by_
@@ -302,32 +322,41 @@ def strategy_smoother(*, ssm) -> _Strategy:
             ( TODO: they could also continue from t0)
             Subsequent IVP solver steps continue from the value at 't1' as before.
             """
-            # TODO: if we pass prior1 and prior2, then
-            #       we don't have to pass dt0, dt1, output_scale, and prior...
-            #       and since we always have to discretise anyway,
-            #       the whole thing could be simplified
-
             # Extrapolate from t0 to t, and from t to t1.
 
-            extrapolated_t = self.extrapolate(*state_t0, transition=transition_t0_t)
-            extrapolated_t1 = self.extrapolate(
-                *extrapolated_t, transition=transition_t_t1
+            _, extrapolated_t = self.predict(state_t0, transition=transition_t0_t)
+            _, extrapolated_t1 = self.predict(
+                extrapolated_t, transition=transition_t_t1
             )
 
             # Marginalise backwards from t1 to t to obtain the interpolated solution.
-            marginal_t1, _ = state_t1
-            conditional_t1_to_t = extrapolated_t1[1]
+            marginal_t1 = state_t1.init
+            conditional_t1_to_t = extrapolated_t1.conditional
             rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
-            solution_at_t = (rv_at_t, extrapolated_t[1])
+            solution_at_t = stats.MarkovSeq(rv_at_t, extrapolated_t.conditional)
 
             # The state at t1 gets a new backward model;
             # (it must remember how to get back to t, not to t0).
-            solution_at_t1 = (marginal_t1, conditional_t1_to_t)
+            solution_at_t1 = stats.MarkovSeq(marginal_t1, conditional_t1_to_t)
             interp_res = _InterpRes(step_from=solution_at_t1, interp_from=solution_at_t)
-            return solution_at_t, interp_res
+
+            # Extract targets
+            marginals = solution_at_t.init
+            u = ssm.stats.qoi(marginals)
+            std = ssm.stats.standard_deviation(marginals)
+            u_std = ssm.stats.qoi_from_sample(std)
+            estimate = Estimate(u, u_std, marginals)
+            return (estimate, solution_at_t), interp_res
 
         def interpolate_at_t1(self, state_t1):
-            return state_t1, _InterpRes(step_from=state_t1, interp_from=state_t1)
+            marginals = state_t1.init
+            u = ssm.stats.qoi(marginals)
+            std = ssm.stats.standard_deviation(marginals)
+            u_std = ssm.stats.qoi_from_sample(std)
+            estimate = Estimate(u, u_std, marginals)
+
+            interp_res = _InterpRes(step_from=state_t1, interp_from=state_t1)
+            return (estimate, state_t1), interp_res
 
     return Smoother(
         ssm=ssm,
@@ -366,8 +395,14 @@ def strategy_filter(*, ssm) -> _Strategy:
             estimate = Estimate(u, u_std, marginals)
             return estimate, marginals
 
-        def finalize(self, posterior, scale):
+        def finalize(self, *, posterior0, posterior, scale):
+            # Calibrate
+            posterior0 = ssm.stats.rescale_cholesky(posterior0, scale[-1, ...])
             posterior = ssm.stats.rescale_cholesky(posterior, scale)
+
+            # Stack
+            posterior = tree_array_util.tree_prepend(posterior0, posterior)
+
             marginals = posterior
             u = ssm.stats.qoi(marginals)
             std = ssm.stats.standard_deviation(marginals)
@@ -444,27 +479,83 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
             estimate = Estimate(u, u_std, marginals)
             return estimate, posterior
 
-        def finalize(self, posterior: stats.MarkovSeq, scale):
-            # TODO: should we always select the last item or not?
+        def finalize(
+            self, *, posterior0: stats.MarkovSeq, posterior: stats.MarkovSeq, scale
+        ):
+            # Calibrate
+            init = ssm.stats.rescale_cholesky(posterior0.init, scale[-1, ...])
+            conditional = ssm.conditional.rescale_noise(posterior0.conditional, scale)
+            posterior0 = stats.MarkovSeq(init, conditional)
             init = ssm.stats.rescale_cholesky(posterior.init, scale)
-            init = tree_util.tree_map(lambda x: x[-1, ...], init)
             conditional = ssm.conditional.rescale_noise(posterior.conditional, scale)
             posterior = stats.MarkovSeq(init, conditional)
 
-            def smooth_step(x, cond):
-                extrapolated = ssm.conditional.marginalise(x, cond)
-                return extrapolated, extrapolated
-
-            init, xs = posterior.init, posterior.conditional
-            _, marginals = control_flow.scan(
-                smooth_step, init=init, xs=xs, reverse=True
+            # Marginalise
+            posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
+            marginals = stats.markov_marginals(
+                posterior_no_filter_marginals, reverse=True, ssm=self.ssm
             )
 
+            # Append the terminal marginal to the computed ones
+            marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+            marginals = tree_array_util.tree_append(marginals, marginal_t1)
+
+            # Prepend the initial condition to the filtering distributions
+            init = tree_array_util.tree_prepend(posterior0.init, posterior.init)
+            posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
+
+            # Extract targets
             u = ssm.stats.qoi(marginals)
             std = ssm.stats.standard_deviation(marginals)
             u_std = ssm.stats.qoi_from_sample(std)
             estimate = Estimate(u, u_std, marginals)
             return estimate, posterior
+            # # def prepend(a, A):
+            # #     a = np.asarray(a)
+            # #     A = np.asarray(A)
+            # #     return np.concatenate([a[None, ...], A])
+
+            # # result = tree_util.tree_map(prepend, state.step_from, solution)
+            # # if isinstance(posterior, stats.MarkovSeq):
+            #         # #     # Compute marginals
+            # # #     posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
+            # # #     marginals = stats.markov_marginals(
+            # # #         posterior_no_filter_marginals, reverse=True, ssm=ssm
+            # # #     )
+
+            # # #     # Prepend the marginal at t1 to the computed marginals
+            # # #     marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
+            # # #     marginals = tree_array_util.tree_append(marginals, marginal_t1)
+
+            # # #     # Prepend the marginal at t1 to the inits
+            # # #     init = tree_array_util.tree_prepend(ssm_init, posterior.init)
+            # # #     posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
+            # # # else:
+            # # #     posterior = tree_array_util.tree_prepend(ssm_init, posterior)
+            # # #     marginals = posterior
+
+            # # TODO: should we always select the last item or not?
+            # # Calibrate
+            # init = ssm.stats.rescale_cholesky(posterior.init, scale)
+            # conditional = ssm.conditional.rescale_noise(posterior.conditional, scale)
+
+            # init = tree_util.tree_map(lambda x: x[-1, ...], init)
+            # posterior = stats.MarkovSeq(init, conditional)
+
+            # def smooth_step(x, cond):
+            #     extrapolated = ssm.conditional.marginalise(x, cond)
+            #     return extrapolated, extrapolated
+
+            # init, xs = posterior.init, posterior.conditional
+            # _, marginals = control_flow.scan(
+            #     smooth_step, init=init, xs=xs, reverse=True
+            # )
+
+            # u = ssm.stats.qoi(marginals)
+            # std = ssm.stats.standard_deviation(marginals)
+            # u_std = ssm.stats.qoi_from_sample(std)
+            # estimate = Estimate(u, u_std, marginals)
+            # return estimate, posterior
 
         def interpolate_at_t1(self, state_t1: stats.MarkovSeq):
             cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
@@ -758,7 +849,7 @@ class _ProbabilisticSolver:
         raise NotImplementedError
 
     def userfriendly_output(
-        self, solution: ProbSolverState, solution0: ProbSolverState
+        self, *, solution: ProbSolverState, solution0: ProbSolverState
     ):
         raise NotImplementedError
 
@@ -956,18 +1047,39 @@ class solver_mle(_ProbabilisticSolver):
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
-    def userfriendly_output(self, solution: ProbSolverState) -> ProbSolverState:
+    def userfriendly_output(
+        self, *, solution0: ProbSolverState, solution: ProbSolverState
+    ) -> ProbSolverState:
+        # This is the MLE solver, so we take the calibrated scale
+        _, output_scale, _ = solution.auxiliary
+
+        init = solution0.posterior
         posterior = solution.posterior
-        _, output_scale, _ = solution.auxiliary  # calibrated scale!
-        estimate, posterior = self.strategy.finalize(posterior, scale=output_scale)
+        estimate, posterior = self.strategy.finalize(
+            posterior0=init, posterior=posterior, scale=output_scale
+        )
+
+        ts = np.concatenate([solution0.t[None], solution.t])
         return ProbSolverState(
-            t=solution.t,
+            t=ts,
             estimate=estimate,
             posterior=posterior,
             output_scale=output_scale,
-            auxiliary=solution.auxiliary,
             num_steps=solution.num_steps,
+            auxiliary=solution.auxiliary,
         )
+
+        # posterior = solution.posterior
+        # _, output_scale, _ = solution.auxiliary  # calibrated scale!
+        # estimate, posterior = self.strategy.finalize(posterior, scale=output_scale)
+        # return ProbSolverState(
+        #     t=solution.t,
+        #     estimate=estimate,
+        #     posterior=posterior,
+        #     output_scale=output_scale,
+        #     auxiliary=solution.auxiliary,
+        #     num_steps=solution.num_steps,
+        # )
 
         # if isinstance(posterior, stats.MarkovSeq):
         #     # Compute marginals
@@ -1138,12 +1250,21 @@ class solver(_ProbabilisticSolver):
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
-    def userfriendly_output(self, solution: ProbSolverState) -> ProbSolverState:
+    def userfriendly_output(
+        self, *, solution0: ProbSolverState, solution: ProbSolverState
+    ) -> ProbSolverState:
+        # This is the uncalibrated solver, so scale=1
+        output_scale = np.ones_like(solution.output_scale)
+
+        init = solution0.posterior
         posterior = solution.posterior
-        output_scale = solution.output_scale
-        estimate, posterior = self.strategy.finalize(posterior, scale=output_scale)
+        estimate, posterior = self.strategy.finalize(
+            posterior0=init, posterior=posterior, scale=output_scale
+        )
+
+        ts = np.concatenate([solution0.t[None], solution.t])
         return ProbSolverState(
-            t=solution.t,
+            t=ts,
             estimate=estimate,
             posterior=posterior,
             output_scale=output_scale,

@@ -199,19 +199,16 @@ def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
             state,
             t_next,
         )
+        print("intermediate solution", tree_util.tree_map(np.shape, solution))
         return state, solution
 
     state = adaptive_solver.init(t, ssm_init, dt=dt0)
+    print("step_from", tree_util.tree_map(np.shape, state.step_from))
     _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
-
-    def prepend(a, A):
-        a = np.asarray(a)
-        A = np.asarray(A)
-        return np.concatenate([a[None, ...], A])
-
-    print(tree_util.tree_map(np.shape, solution))
-    result = tree_util.tree_map(prepend, state.step_from, solution)
-    return adaptive_solver.solver.userfriendly_output(result)
+    print("solution", tree_util.tree_map(np.shape, solution))
+    return adaptive_solver.solver.userfriendly_output(
+        solution0=state.step_from, solution=solution
+    )
 
 
 def solve_adaptive_save_every_step(
@@ -232,7 +229,8 @@ def solve_adaptive_save_every_step(
         warnings.warn(msg, stacklevel=1)
 
     state = adaptive_solver.init(t0, ssm_init, dt=dt0)
-    solutions = [state.step_from]
+    solution0 = state.step_from
+    solutions = []
     while state.step_from.t < t1:
         state = adaptive_solver.rejection_loop(state, t1=t1)
 
@@ -249,7 +247,9 @@ def solve_adaptive_save_every_step(
 
     solutions.append(solution)
     solutions = tree_array_util.tree_stack(solutions)
-    solutions = adaptive_solver.solver.userfriendly_output(solutions)
+    solutions = adaptive_solver.solver.userfriendly_output(
+        solution0=solution0, solution=solutions
+    )
     return IVPSolution(
         t=solutions.t,
         u=solutions.estimate.u,
@@ -274,13 +274,13 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
     state0 = solver.init(t0, ssm_init)
     _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
-    def prepend(a, A):
-        a = np.asarray(a)
-        A = np.asarray(A)
-        return np.concatenate([a[None, ...], A])
+    # def prepend(a, A):
+    #     a = np.asarray(a)
+    #     A = np.asarray(A)
+    #     return np.concatenate([a[None, ...], A])
 
-    result = tree_util.tree_map(prepend, state0, result)
-    result = solver.userfriendly_output(result)
+    # result = tree_util.tree_map(prepend, state0, result)
+    result = solver.userfriendly_output(solution0=state0, solution=result)
 
     return IVPSolution(
         t=result.t,
