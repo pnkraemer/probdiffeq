@@ -1068,111 +1068,95 @@ class solver_mle(_ProbabilisticSolver):
             auxiliary=solution.auxiliary,
         )
 
-        # posterior = solution.posterior
-        # _, output_scale, _ = solution.auxiliary  # calibrated scale!
-        # estimate, posterior = self.strategy.finalize(posterior, scale=output_scale)
-        # return ProbSolverState(
-        #     t=solution.t,
-        #     estimate=estimate,
-        #     posterior=posterior,
-        #     output_scale=output_scale,
-        #     auxiliary=solution.auxiliary,
-        #     num_steps=solution.num_steps,
-        # )
 
-        # if isinstance(posterior, stats.MarkovSeq):
-        #     # Compute marginals
-        #     posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
-        #     marginals = stats.markov_marginals(
-        #         posterior_no_filter_marginals, reverse=True, ssm=ssm
-        #     )
-
-        #     # Prepend the marginal at t1 to the computed marginals
-        #     marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        #     marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
-        #     # Prepend the marginal at t1 to the inits
-        #     init = tree_array_util.tree_prepend(ssm_init, posterior.init)
-        #     posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
-        # else:
-        #     posterior = tree_array_util.tree_prepend(ssm_init, posterior)
-        #     marginals = posterior
-        # return marginals, posterior
-
-        # assert False
-
-
-# def _calibration_running(ssm):
-#     def init():
-#         prior = np.ones_like(ssm.prototypes.output_scale())
-#         return prior, prior, 0.0
-
-#     def update(state, /, observed):
-#         prior, calibrated, num_data = state
-
-#         new_term = ssm.stats.mahalanobis_norm_relative(0.0, observed)
-#         calibrated = ssm.stats.update_mean(calibrated, new_term, num=num_data)
-#         return prior, calibrated, num_data + 1.0
-
-#     def extract(state, /):
-#         prior, calibrated, _num_data = state
-#         return prior, calibrated
-#
-# return _Calibration(init=init, update=update, extract=extract)
-
-
-def solver_dynamic(strategy, *, correction, prior, ssm):
+class solver_dynamic(_ProbabilisticSolver):
     """Create a solver that calibrates the output scale dynamically."""
 
-    def step_dynamic(state, /, *, dt, calibration):
-        u_step_from = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
+    def init(self, t, init) -> ProbSolverState:
+        estimate, posterior = self.strategy.init_posterior(init)
+        correction_state = self.correction.init()
+
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        auxiliary = (correction_state,)
+        return ProbSolverState(
+            t=t,
+            estimate=estimate,
+            posterior=posterior,
+            auxiliary=auxiliary,
+            output_scale=output_scale,
+            num_steps=0,
+        )
+
+    def step(self, state: ProbSolverState, *, dt):
+        u_step_from = state.estimate.u
+        (correction_state,) = state.auxiliary
 
         # Estimate error and calibrate the output scale
-        ones = np.ones_like(ssm.prototypes.output_scale())
-        transition = prior(dt, ones)
-        mean = ssm.stats.mean(state.rv)
-        hidden = ssm.conditional.apply(mean, transition)
+        ones = np.ones_like(self.ssm.prototypes.output_scale())
+        transition = self.prior(dt, ones)
+        mean = self.ssm.stats.mean(state.estimate.marginals)
+        hidden = self.ssm.conditional.apply(mean, transition)
 
         t = state.t + dt
-        error, observed, correction_state = correction.estimate_error(
-            hidden, state.correction_state, t=t
+        error, observed, correction_state = self.correction.estimate_error(
+            hidden, correction_state, t=t
         )
-        output_scale = calibration.update(state.output_scale, observed=observed)
+
+        # Calibrate
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
 
         # Do the full extrapolation with the calibrated output scale
-        scale, _ = calibration.extract(output_scale)
-        transition = prior(dt, scale)
-        hidden, extra = strategy.extrapolate(
-            state.rv, state.strategy_state, transition=transition
+        transition = self.prior(dt, output_scale)
+        estimate, prediction = self.strategy.predict(
+            state.posterior, transition=transition
         )
 
         # Do the full correction step
-        hidden, _, correction_state = correction.correct(hidden, correction_state, t=t)
+        updates, _, correction_state = self.correction.updates(
+            estimate.marginals, correction_state, t=t
+        )
+        estimate, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
         state = ProbSolverState(
             t=t,
-            rv=hidden,
-            strategy_state=extra,
-            correction_state=correction_state,
+            estimate=estimate,
+            posterior=posterior,
+            num_steps=state.num_steps + 1,
+            auxiliary=(correction_state,),
             output_scale=output_scale,
         )
 
         # Normalise the error
-        u_proposed = tree_util.ravel_pytree(ssm.unravel(state.rv.mean)[0])[0]
-        reference = np.maximum(np.abs(u_proposed), np.abs(u_step_from))
+        u_proposed = estimate.u
+        u0 = tree_util.tree_leaves(u_step_from)[0]
+        u1 = tree_util.tree_leaves(estimate.u)[0]
+        reference = np.maximum(np.abs(u1), np.abs(u0))
         error = _ErrorEstimate(dt * error, reference=reference)
         return error, state
 
-    return _ProbabilisticSolver(
-        prior=prior,
-        ssm=ssm,
-        strategy=strategy,
-        correction=correction,
-        calibration=_calibration_most_recent(ssm=ssm),
-        name="Dynamic probabilistic solver",
-        step_implementation=step_dynamic,
-    )
+    def userfriendly_output(
+        self, *, solution: ProbSolverState, solution0: ProbSolverState
+    ):
+        # This is the dynamic solver, and all covariances have been calibrated
+        output_scale = np.ones_like(solution.output_scale)
+
+        init = solution0.posterior
+        posterior = solution.posterior
+        estimate, posterior = self.strategy.finalize(
+            posterior0=init, posterior=posterior, scale=output_scale
+        )
+
+        # TODO: stack the calibrated output scales?
+        ts = np.concatenate([solution0.t[None], solution.t])
+        return ProbSolverState(
+            t=ts,
+            estimate=estimate,
+            posterior=posterior,
+            output_scale=solution.output_scale,
+            num_steps=solution.num_steps,
+            auxiliary=solution.auxiliary,
+        )
 
 
 def _calibration_most_recent(*, ssm) -> _Calibration:
