@@ -14,7 +14,6 @@ def test_python_loop_output_matches_reference(fact, strategy):
 
     received = python_loop_solution(ivp, fact=fact, strategy_fun=strategy)
     expected = reference_solution(ivp, received.t)
-    print(received.t)
     assert testing.allclose(received.u[0], expected, rtol=1e-2)
 
     # Assert u and u_std have matching shapes (that was wrong before)
@@ -35,7 +34,10 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     solver = ivpsolvers.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
 
     # clip=False because we need to test adaptive-step-interpolation for smoothers
-    adaptive = ivpsolvers.adaptive(atol=1e-2, rtol=1e-2, ssm=ssm, clip_dt=False)
+    errorest = ivpsolvers.ErrorEstSchober(
+        prior=transition, ssm=ssm, correction=ts0, atol=1e-2, rtol=1e-2
+    )
+    adaptive = ivpsolvers.adaptive(errorest=errorest, ssm=ssm, clip_dt=False)
 
     dt0 = ivpsolve.dt0_adaptive(
         vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5

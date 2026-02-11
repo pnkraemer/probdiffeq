@@ -650,34 +650,20 @@ class _Correction:
     ssm: Any
     linearize: Any
     vector_field: Callable
-    re_linearize: bool
+    re_linearize: bool  # TODO: remove (it's unused)
 
     def init(self, /):
         """Initialise the state from the solution."""
         return self.linearize.init()
 
-    def estimate_error(self, rv, correction_state, /, t):
-        """Estimate the error."""
-        f_wrapped = functools.partial(self.vector_field, t=t)
-        cond, correction_state = self.linearize.update(f_wrapped, rv, correction_state)
-        observed = self.ssm.conditional.marginalise(rv, cond)
-
-        zero_data = np.zeros(())
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
-        stdev = self.ssm.stats.standard_deviation(observed)
-        error_estimate_unscaled = np.squeeze(stdev)
-        error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, observed, (correction_state, cond)
-
-    def updates(self, rv, correction_state, /, t):
+    def updates(self, rv, linearization_state, /, t):
         """Perform the correction step."""
-        linearization_state, cond = correction_state
+        # linearization_state,  = correction_state
 
-        if self.re_linearize:
-            f_wrapped = functools.partial(self.vector_field, t=t)
-            cond, linearization_state = self.linearize.update(
-                f_wrapped, rv, linearization_state
-            )
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        cond, linearization_state = self.linearize.update(
+            f_wrapped, rv, linearization_state
+        )
 
         observed, reverted = self.ssm.conditional.revert(rv, cond)
         corrected = reverted.noise
@@ -781,13 +767,6 @@ class ProbSolverState:
     diagonal linearisation in the correction,
     or running means of the MLE calibration.
     """
-
-
-@tree_util.register_dataclass
-@containers.dataclass
-class _ErrorEstimate:
-    estimate: ArrayLike
-    reference: ArrayLike
 
 
 @containers.dataclass
@@ -970,12 +949,11 @@ class solver_mle(_ProbabilisticSolver):
         transition = self.prior(dt, state.output_scale)
 
         # Estimate the error
-        mean = self.ssm.stats.mean(state.estimate.marginals)
-        mean_extra = self.ssm.conditional.apply(mean, transition)
-        t = state.t + dt
-        error, _, correction_state = self.correction.estimate_error(
-            mean_extra, correction_state, t=t
-        )
+        # mean = self.ssm.stats.mean(state.estimate.marginals)
+        # mean_extra = self.ssm.conditional.apply(mean, transition)
+        # error, _, correction_state = self.correction.estimate_error(
+        #     mean_extra, correction_state, t=t
+        # )
 
         # Do the full prediction step (reuse previous discretisation)
         hidden, prediction = self.strategy.predict(
@@ -983,6 +961,7 @@ class solver_mle(_ProbabilisticSolver):
         )
 
         # Do the full correction step
+        t = state.t + dt
         updates, observed, correction_state = self.correction.updates(
             hidden.marginals, correction_state, t=t
         )
@@ -996,9 +975,7 @@ class solver_mle(_ProbabilisticSolver):
             output_scale_running, new_term, num=num_data
         )
 
-        # Normalise the error
         auxiliary = (correction_state, output_scale_running, num_data + 1)
-
         state = ProbSolverState(
             t=t,
             estimate=estimate,
@@ -1007,13 +984,9 @@ class solver_mle(_ProbabilisticSolver):
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
         )
-        u0 = tree_util.tree_leaves(u_step_from)[0]
-        u1 = tree_util.tree_leaves(estimate.u)[0]
-        reference = np.maximum(np.abs(u0), np.abs(u1))
-        error = tree_util.ravel_pytree(error)[0]
-        reference = tree_util.ravel_pytree(reference)[0]
-        error = _ErrorEstimate(dt * error, reference=reference)
-        return error, state
+
+        # return error, state
+        return state
 
     def userfriendly_output(
         self, *, solution0: ProbSolverState, solution: ProbSolverState
@@ -1223,8 +1196,7 @@ class solver(_ProbabilisticSolver):
 def adaptive(
     *,
     ssm,
-    atol=1e-4,
-    rtol=1e-2,
+    errorest,
     control=None,
     norm_ord=None,
     clip_dt: bool = False,
@@ -1236,14 +1208,63 @@ def adaptive(
     if eps is None:
         eps = 10 * np.finfo_eps(float)
     return _AdaptiveTimeStep(
-        ssm=ssm,
-        atol=atol,
-        rtol=rtol,
-        control=control,
-        norm_ord=norm_ord,
-        clip_dt=clip_dt,
-        eps=eps,
+        ssm=ssm, errorest=errorest, control=control, clip_dt=clip_dt, eps=eps
     )
+
+
+@containers.dataclass
+class ErrorEstSchober:
+    prior: Any
+    ssm: Any
+    correction: Any
+    atol: float = 1e-4
+    rtol: float = 1e-2
+    norm_ord: Any = None
+
+    def init(self):
+        return self.correction.init()
+
+    def estimate(self, state, previous, proposed, dt):
+        # Discretize
+        transition = self.prior(dt, previous.output_scale)
+
+        # Estimate the error
+        mean = self.ssm.stats.mean(previous.estimate.marginals)
+        mean_extra = self.ssm.conditional.apply(mean, transition)
+        error, state = self.linearize_and_estimate(mean_extra, state, t=proposed.t)
+
+        # Normalise the error
+        u0 = tree_util.tree_leaves(previous.estimate.u)[0]
+        u1 = tree_util.tree_leaves(proposed.estimate.u)[0]
+        reference = np.maximum(np.abs(u0), np.abs(u1))
+        error = tree_util.ravel_pytree(error)[0]
+        reference = tree_util.ravel_pytree(reference)[0]
+        error_abs = dt * error
+        error_norm = self.error_scale_and_normalize(error_abs, reference)
+        return error_norm, state
+
+    def linearize_and_estimate(self, rv, state, /, t):
+        f_wrapped = functools.partial(self.correction.vector_field, t=t)
+        cond, state = self.correction.linearize.update(f_wrapped, rv, state)
+        observed = self.ssm.conditional.marginalise(rv, cond)
+
+        zero_data = np.zeros(())
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
+        stdev = self.ssm.stats.standard_deviation(observed)
+        error_estimate_unscaled = np.squeeze(stdev)
+        error_estimate = output_scale * error_estimate_unscaled
+        return error_estimate, state
+
+    def error_scale_and_normalize(self, error_abs, reference):
+        normalize = self.atol + self.rtol * np.abs(reference)
+        error_relative = error_abs / normalize
+
+        dim = np.atleast_1d(error.reference).size
+        error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
+        error_norm_rel = error_norm / np.sqrt(dim)
+
+        error_contraction_rate = self.ssm.num_derivatives + 1
+        return error_norm_rel ** (-1.0 / error_contraction_rate)
 
 
 @tree_util.register_dataclass
@@ -1253,6 +1274,8 @@ class _TimeStepState:
     step_from: ProbSolverState
     interp_from: ProbSolverState
     control: Any
+    errorest_step_from: Any
+    errorest_interp_from: Any
 
 
 @tree_util.register_dataclass
@@ -1267,11 +1290,10 @@ class _AdaptiveTimeStep:
     """Whether or not to clip the timestep before stepping."""
 
     # todo: move this to the error estimator
-    atol: float
-    rtol: float
-    norm_ord: Any = containers.dataclass_field(metadata={"static": True})
+    errorest: Any = containers.dataclass_field(metadata={"static": True})
+    """Error estimator."""
 
-    control: _Controller = containers.dataclass_field(metadata={"static": True})
+    control: Any = containers.dataclass_field(metadata={"static": True})
 
     # Todo: delete
     ssm: Any = containers.dataclass_field(metadata={"static": True})
@@ -1280,22 +1302,15 @@ class _AdaptiveTimeStep:
     def init(self, state_solver, dt) -> _TimeStepState:
         """Initialise the adaptive solver state."""
         state_control = self.control.init(dt)
+        state_errorest = self.errorest.init()
         return _TimeStepState(
             dt=dt,
             step_from=state_solver,
             interp_from=state_solver,
             control=state_control,
+            errorest_step_from=state_errorest,
+            errorest_interp_from=state_errorest,
         )
-
-    def error_scale_and_normalize(self, error: _ErrorEstimate, error_contraction_rate):
-        assert isinstance(error, _ErrorEstimate)
-        normalize = self.atol + self.rtol * np.abs(error.reference)
-        error_relative = error.estimate / normalize
-
-        dim = np.atleast_1d(error.reference).size
-        error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
-        error_norm_rel = error_norm / np.sqrt(dim)
-        return error_norm_rel ** (-1.0 / error_contraction_rate)
 
 
 @tree_util.register_dataclass
@@ -1312,6 +1327,8 @@ class _RejectionLoopState:
     control: Any
     proposed: Any
     step_from: Any
+    errorest_step_from: Any
+    errorest_proposed: Any
 
 
 @containers.dataclass
@@ -1365,8 +1382,10 @@ class RejectionLoop:
             error_norm_proposed=smaller_than_1,
             dt=s0.dt,
             control=s0.control,
-            proposed=_ones_like(s0.step_from),  # irrelevant
             step_from=s0.step_from,
+            errorest_step_from=s0.errorest_step_from,
+            proposed=_ones_like(s0.step_from),  # irrelevant
+            errorest_proposed=_ones_like(s0.errorest_step_from),  # irrelevant
         )
 
     def step_attempt(self, state: _RejectionLoopState) -> _RejectionLoopState:
@@ -1383,12 +1402,13 @@ class RejectionLoop:
             dt = np.minimum(dt, t1 - state.step_from.t)
 
         # Perform the actual step.
-        error_estimate, state_proposed = self.solver.step(state=state.step_from, dt=dt)
+        state_proposed = self.solver.step(state=state.step_from, dt=dt)
+
+        error_power, errorstate = self.adaptive.errorest.estimate(
+            state.errorest_step_from, state.step_from, proposed=state_proposed, dt=dt
+        )
 
         # Propose a new step
-        error_power = self.adaptive.error_scale_and_normalize(
-            error_estimate, error_contraction_rate=self.solver.error_contraction_rate
-        )
         dt, state_control = self.adaptive.control.apply(
             dt, state.control, error_power=error_power
         )
@@ -1397,6 +1417,8 @@ class RejectionLoop:
             error_norm_proposed=error_power,  # new
             proposed=state_proposed,  # new
             control=state_control,  # new
+            errorest_proposed=errorstate,  # new
+            errorest_step_from=state.errorest_step_from,
             step_from=state.step_from,
         )
 
@@ -1406,6 +1428,8 @@ class RejectionLoop:
             step_from=state.proposed,
             interp_from=state.step_from,
             control=state.control,
+            errorest_step_from=state.errorest_proposed,
+            errorest_interp_from=state.errorest_step_from,
         )
 
     def interp_skip(self, args):
@@ -1426,6 +1450,8 @@ class RejectionLoop:
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,
             control=state.control,
+            errorest_step_from=state.errorest_step_from,
+            errorest_interp_from=state.errorest_step_from,
         )
         return solution, new_state
 
@@ -1440,6 +1466,8 @@ class RejectionLoop:
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,
             control=state.control,
+            errorest_step_from=state.errorest_step_from,
+            errorest_interp_from=state.errorest_step_from,
         )
         return solution, new_state
 
