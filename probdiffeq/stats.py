@@ -12,7 +12,9 @@ from probdiffeq.util import filter_util
 # TODO: the functions in here should only depend on posteriors / strategies!
 
 
-class MarkovSeq(containers.NamedTuple):
+@tree_util.register_dataclass
+@containers.dataclass
+class MarkovSeq:
     """Markov sequence."""
 
     init: Any
@@ -119,31 +121,35 @@ def _offgrid_marginals(t, solution, solver):
     # because we _assume_ that the point sets are disjoint.
     index = np.searchsorted(solution.t, t)
 
+    # Extract the LHS
+
     def _extract_previous(tree):
         return tree_util.tree_map(lambda s: s[index - 1, ...], tree)
+
+    posterior_t0 = _extract_previous(solution.posterior)
+    t0 = _extract_previous(solution.t)
+
+    # Extract the RHS
 
     def _extract(tree):
         return tree_util.tree_map(lambda s: s[index, ...], tree)
 
-    marginals = _extract(solution.marginals)
-
-    # In the smoothing context:
-    # Extract the correct posterior.init (aka the filtering solutions)
-    # The conditionals are incorrect, but we don't really care about this.
-    posterior_previous = _extract_previous(solution.posterior)
-
-    t0 = _extract_previous(solution.t)
     t1 = _extract(solution.t)
     output_scale = _extract(solution.output_scale)
 
-    return solver.offgrid_marginals(
-        marginals_t1=marginals,
-        posterior_t0=posterior_previous,
+    # Take the marginals because we need the t1-value to be informed
+    # about *all* datapoints
+    marginals_t1 = _extract(solution.marginals)
+    _, posterior_t1 = solver.strategy.init_posterior(marginals=marginals_t1)
+    estim = solver.offgrid_marginals(
+        posterior_t1=posterior_t1,
+        posterior_t0=posterior_t0,
         t=t,
         t0=t0,
         t1=t1,
         output_scale=output_scale,
     )
+    return estim.u, estim.u_std, estim.marginals
 
 
 def log_marginal_likelihood_terminal_values(
@@ -245,7 +251,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
 
     # Run the reverse Kalman filter
     estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=ssm)
-    (_corrected, _num_data, logpdf), _ = filter_util.estimate_rev(
+    result, _ = filter_util.estimate_rev(
         np.zeros_like(u_leaves),
         init=rv,
         prior_transitions=posterior.conditional,
@@ -254,20 +260,4 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
     )
 
     # Return only the logpdf
-    return logpdf
-
-
-def calibrate(x, /, output_scale, *, ssm):
-    """Calibrated a posterior distribution of an IVP solution."""
-    if np.ndim(output_scale) > np.ndim(ssm.prototypes.output_scale()):
-        output_scale = output_scale[-1]
-    if isinstance(x, MarkovSeq):
-        return _markov_rescale_cholesky(x, output_scale, ssm=ssm)
-    return ssm.stats.rescale_cholesky(x, output_scale)
-
-
-def _markov_rescale_cholesky(markov_seq: MarkovSeq, factor, *, ssm) -> MarkovSeq:
-    """Rescale the Cholesky factor of the covariance of a Markov sequence."""
-    init = ssm.stats.rescale_cholesky(markov_seq.init, factor)
-    cond = ssm.conditional.rescale_noise(markov_seq.conditional, factor)
-    return MarkovSeq(init=init, conditional=cond)
+    return result.logpdf

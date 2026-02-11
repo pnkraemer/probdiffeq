@@ -23,7 +23,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
         init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )
-    u_interp, marginals_interp = stats.offgrid_marginals_searchsorted(
+    u_interp, _, marginals_interp = stats.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_adaptive, solver=solver
     )
 

@@ -39,7 +39,9 @@ def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimat
 def fixedpointsmoother_precon(*, ssm):
     """Construct a discrete, preconditioned fixedpoint-smoother."""
 
-    class _FPState(containers.NamedTuple):
+    @tree_util.register_dataclass
+    @containers.dataclass
+    class _FPState:
         rv: Any
         conditional: Any
 
@@ -51,7 +53,7 @@ def fixedpointsmoother_precon(*, ssm):
 
     def _step(state: _FPState, cond_and_data_and_obs) -> tuple[_FPState, _FPState]:
         conditional, data, observation = cond_and_data_and_obs
-        rv, conditional_rev = state
+        rv, conditional_rev = state.rv, state.conditional
 
         # Extrapolate
         rv, conditional_new = ssm.conditional.revert(rv, conditional)
@@ -75,7 +77,9 @@ def _select(tree, idx_or_slice):
 def kalmanfilter_with_marginal_likelihood(*, ssm):
     """Construct a Kalman-filter-implementation of computing the marginal likelihood."""
 
-    class _KFState(containers.NamedTuple):
+    @tree_util.register_dataclass
+    @containers.dataclass
+    class _KFState:
         rv: Any
         num_data_points: float
         logpdf: float
@@ -88,7 +92,7 @@ def kalmanfilter_with_marginal_likelihood(*, ssm):
 
     def _step(state: _KFState, cond_and_data_and_obs) -> tuple[_KFState, _KFState]:
         conditional, data, observation = cond_and_data_and_obs
-        rv, num_data, logpdf = state
+        rv, num_data, logpdf = state.rv, state.num_data_points, state.logpdf
 
         # Extrapolate-correct
         rv = ssm.conditional.marginalise(rv, conditional)

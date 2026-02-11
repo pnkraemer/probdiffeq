@@ -74,12 +74,12 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     _init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
-    solver_smoother = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    strategy_sm = ivpsolvers.strategy_smoother(ssm=ssm)
+    solver_smoother = ivpsolvers.solver(strategy_sm, prior=ibm, correction=ts0, ssm=ssm)
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
-    u_interp, marginals_interp = stats.offgrid_marginals_searchsorted(
+    interpolated = stats.offgrid_marginals_searchsorted(
         ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
     )
 
@@ -87,8 +87,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    strategy_fp = ivpsolvers.strategy_fixedpoint(ssm=ssm)
+    solver = ivpsolvers.solver(strategy_fp, prior=ibm, correction=ts0, ssm=ssm)
     adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-3, rtol=1e-3, ssm=ssm)
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
         init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
@@ -97,13 +97,15 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     # Extract the interior points of the save_at solution
     # (because only there is the interpolated solution defined)
     u_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u)
+    u_std_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u_std)
     marginals_fixedpoint = tree_util.tree_map(
         lambda s: s[1:-1], solution_fixedpoint.marginals
     )
 
+    assert testing.allclose(u_fixedpoint, interpolated[0])
+    assert testing.allclose(u_std_fixedpoint, interpolated[1])
+
     # Compare QOI and marginals
     marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = functools.vmap(marginals_allclose_func)
-
-    assert testing.allclose(u_fixedpoint, u_interp)
-    assert np.all(marginals_allclose_func(marginals_fixedpoint, marginals_interp))
+    assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated[2]))

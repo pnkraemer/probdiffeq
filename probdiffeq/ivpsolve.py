@@ -1,6 +1,5 @@
 """Routines for estimating solutions of initial value problems."""
 
-from probdiffeq import stats
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -136,35 +135,9 @@ def solve_adaptive_save_at(
         )
         warnings.warn(msg, stacklevel=1)
 
-    (_t, solution_save_at), _, num_steps = _solve_adaptive_save_at(
-        save_at[0],
-        ssm_init,
-        save_at=save_at[1:],
-        adaptive_solver=adaptive_solver,
-        dt0=dt0,
-    )
+    t = save_at[0]
+    save_at = save_at[1:]
 
-    # I think the user expects the initial condition to be part of the state
-    # (as well as marginals), so we compute those things here
-    posterior_save_at, output_scale = solution_save_at
-    _tmp = _userfriendly_output(posterior=posterior_save_at, ssm_init=ssm_init, ssm=ssm)
-    marginals, posterior = _tmp
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
-    return IVPSolution(
-        t=save_at,
-        u=u,
-        u_std=u_std,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=num_steps,
-        ssm=ssm,
-    )
-
-
-def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
     def advance(state, t_next):
         # Advance until accepted.t >= t_next.
         # Note: This could already be the case and we may not loop (just interpolate)
@@ -191,9 +164,22 @@ def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
         )
         return state, solution
 
-    state = adaptive_solver.init(t, ssm_init, dt=dt0, num_steps=0.0)
+    state = adaptive_solver.init(t, ssm_init, dt=dt0)
     _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
-    return solution
+    result = adaptive_solver.solver.userfriendly_output(
+        solution0=state.step_from, solution=solution
+    )
+
+    return IVPSolution(
+        t=result.t,
+        u=result.estimate.u,
+        u_std=result.estimate.u_std,
+        marginals=result.estimate.marginals,
+        posterior=result.posterior,
+        output_scale=result.output_scale,
+        num_steps=result.num_steps,
+        ssm=ssm,
+    )
 
 
 def solve_adaptive_save_every_step(
@@ -213,45 +199,15 @@ def solve_adaptive_save_every_step(
         )
         warnings.warn(msg, stacklevel=1)
 
-    generator = _solution_generator(
-        t0, ssm_init, t1=t1, adaptive_solver=adaptive_solver, dt0=dt0
-    )
-    tmp = tree_array_util.tree_stack(list(generator))
-    (t, solution_every_step), _dt, num_steps = tmp
-
-    # I think the user expects the initial time-point to be part of the grid
-    # (Even though t0 is not computed by this function)
-    t = np.concatenate((np.atleast_1d(t0), t))
-
-    # I think the user expects marginals, so we compute them here
-    posterior, output_scale = solution_every_step
-    _tmp = _userfriendly_output(posterior=posterior, ssm_init=ssm_init, ssm=ssm)
-    marginals, posterior = _tmp
-
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
-    return IVPSolution(
-        t=t,
-        u=u,
-        u_std=u_std,
-        ssm=ssm,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=num_steps,
-    )
-
-
-def _solution_generator(t, ssm_init, *, dt0, t1, adaptive_solver):
-    state = adaptive_solver.init(t, ssm_init, dt=dt0, num_steps=0)
-
+    state = adaptive_solver.init(t0, ssm_init, dt=dt0)
+    solution0 = state.step_from
+    solutions = []
     while state.step_from.t < t1:
         state = adaptive_solver.rejection_loop(state, t1=t1)
 
         if state.step_from.t + adaptive_solver.eps < t1:
             _, solution = adaptive_solver.extract_before_t1(state, t=t1)
-            yield solution
+            solutions.append(solution)
 
     # Either interpolate (t > t_next) or "finalise" (t == t_next)
     is_after_t1 = state.step_from.t > t1 + adaptive_solver.eps
@@ -260,7 +216,21 @@ def _solution_generator(t, ssm_init, *, dt0, t1, adaptive_solver):
     else:
         _, solution = adaptive_solver.extract_at_t1(state, t=t1)
 
-    yield solution
+    solutions.append(solution)
+    solutions = tree_array_util.tree_stack(solutions)
+    solutions = adaptive_solver.solver.userfriendly_output(
+        solution0=solution0, solution=solutions
+    )
+    return IVPSolution(
+        t=solutions.t,
+        u=solutions.estimate.u,
+        u_std=solutions.estimate.u_std,
+        marginals=solutions.estimate.marginals,
+        posterior=solutions.posterior,
+        output_scale=solutions.output_scale,
+        num_steps=solutions.num_steps,
+        ssm=ssm,
+    )
 
 
 def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
@@ -273,47 +243,20 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
 
     t0 = grid[0]
     state0 = solver.init(t0, ssm_init)
-    _, result_state = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
-    _t, (posterior, output_scale) = solver.extract(result_state)
+    _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
-    # I think the user expects marginals, so we compute them here
-    _tmp = _userfriendly_output(posterior=posterior, ssm_init=ssm_init, ssm=ssm)
-    marginals, posterior = _tmp
+    result = solver.userfriendly_output(solution0=state0, solution=result)
 
-    u = ssm.stats.qoi_from_sample(marginals.mean)
-    std = ssm.stats.standard_deviation(marginals)
-    u_std = ssm.stats.qoi_from_sample(std)
     return IVPSolution(
-        t=grid,
-        u=u,
-        u_std=u_std,
+        t=result.t,
+        u=result.estimate.u,
+        u_std=result.estimate.u_std,
+        marginals=result.estimate.marginals,
+        posterior=result.posterior,
+        output_scale=result.output_scale,
+        num_steps=result.num_steps,
         ssm=ssm,
-        marginals=marginals,
-        posterior=posterior,
-        output_scale=output_scale,
-        num_steps=np.arange(1.0, len(grid)),
     )
-
-
-def _userfriendly_output(*, posterior, ssm_init, ssm):
-    if isinstance(posterior, stats.MarkovSeq):
-        # Compute marginals
-        posterior_no_filter_marginals = stats.markov_select_terminal(posterior)
-        marginals = stats.markov_marginals(
-            posterior_no_filter_marginals, reverse=True, ssm=ssm
-        )
-
-        # Prepend the marginal at t1 to the computed marginals
-        marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
-        # Prepend the marginal at t1 to the inits
-        init = tree_array_util.tree_prepend(ssm_init, posterior.init)
-        posterior = stats.MarkovSeq(init=init, conditional=posterior.conditional)
-    else:
-        posterior = tree_array_util.tree_prepend(ssm_init, posterior)
-        marginals = posterior
-    return marginals, posterior
 
 
 def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):

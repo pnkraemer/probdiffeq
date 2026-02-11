@@ -20,7 +20,7 @@
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 
 # Set up the ODE
 
@@ -54,20 +54,15 @@ sol = ivpsolve.solve_adaptive_save_at(
     init, save_at=ts, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
 )
 
-# Calibrate
-marginals = stats.calibrate(sol.marginals, output_scale=sol.output_scale, ssm=ssm)
-std = ssm.stats.standard_deviation(marginals)
-u_std = ssm.stats.qoi_from_sample(std)
-
 # Plot the solution
 fig, axes = plt.subplots(
     nrows=3,
     ncols=len(tcoeffs),
     sharex="col",
     tight_layout=True,
-    figsize=(len(u_std) * 2, 5),
+    figsize=(len(sol.u) * 2, 5),
 )
-for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, u_std, axes.T)):
+for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, sol.u_std, axes.T)):
     # Set up titles and axis descriptions
     if i == 0:
         ax_i[0].set_title("State")

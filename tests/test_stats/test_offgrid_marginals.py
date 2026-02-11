@@ -21,7 +21,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    u, _ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    u, *_ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
     for u1, u2 in zip(u, sol.u):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
         u2_ = tree_util.tree_map(lambda s: s[-2], u2)
@@ -48,7 +48,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    u, _ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    u, *_ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
 
     for u1, u2 in zip(u, sol.u):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
