@@ -1,8 +1,8 @@
 """Tests for IVP solvers."""
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
@@ -21,8 +21,9 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    u, *_ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
-    for u1, u2 in zip(u, sol.u):
+    offgrid_marginals = functools.partial(solver.offgrid_marginals, solution=sol)
+    u = functools.vmap(offgrid_marginals)(ts)
+    for u1, u2 in zip(u.mean, sol.u.mean):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
         u2_ = tree_util.tree_map(lambda s: s[-2], u2)
         assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
@@ -48,9 +49,10 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    u, *_ = stats.offgrid_marginals_searchsorted(ts=ts, solution=sol, solver=solver)
+    offgrid_marginals = functools.partial(solver.offgrid_marginals, solution=sol)
+    u = functools.vmap(offgrid_marginals)(ts)
 
-    for u1, u2 in zip(u, sol.u):
+    for u1, u2 in zip(u.mean, sol.u.mean):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
         u2_ = tree_util.tree_map(lambda s: s[-2], u2)
         assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)

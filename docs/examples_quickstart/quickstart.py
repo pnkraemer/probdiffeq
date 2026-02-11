@@ -33,26 +33,26 @@ def vf(y, *, t):  # noqa: ARG001
     return 2 * y * (1 - y)
 
 
-u0 = jnp.asarray([0.1])
+u0 = jnp.asarray(0.1)
 t0, t1 = 0.0, 5.0
 
 
 # Set up a state-space model
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+init, iwp, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver
 ts = ivpsolvers.correction_ts1(vf, ssm=ssm, ode_order=1)
 strategy = ivpsolvers.strategy_filter(ssm=ssm)
-solver = ivpsolvers.solver_mle(ssm=ssm, strategy=strategy, prior=ibm, correction=ts)
-adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
+solver = ivpsolvers.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, correction=ts)
+errorest = ivpsolvers.errorest_schober(prior=iwp, correction=ts, ssm=ssm)
 
 
 # Solve the ODE
 # To all users: Try different solution routines.
 solution = ivpsolve.solve_adaptive_save_every_step(
-    init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
+    init, t0=t0, t1=t1, solver=solver, errorest=errorest
 )
 
 # Look at the solution

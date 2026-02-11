@@ -1,6 +1,6 @@
 """Assert that solve_adaptive_save_at is consistent with solve_with_python_loop()."""
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -15,39 +15,43 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive = ivpsolvers.adaptive(atol=1e-2, rtol=1e-2, ssm=ssm)
+    solver = ivpsolvers.solver(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = ivpsolvers.errorest_schober(
+        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
+    )
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
-    solution_adaptive = ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
+    save_every = ivpsolve.solve_adaptive_save_every_step(
+        init, t0=t0, t1=t1, errorest=errorest, solver=solver, dt0=0.1
     )
-    u_interp, _, marginals_interp = stats.offgrid_marginals_searchsorted(
-        ts=ts[1:-1], solution=solution_adaptive, solver=solver
+    u_interpolated = solver.offgrid_marginals_searchsorted(
+        ts[1:-1], solution=save_every
     )
 
     # Compute a save-at solution and remove the edge-points
-    solution_save_at = ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
+    save_at = ivpsolve.solve_adaptive_save_at(
+        init, save_at=ts, errorest=errorest, solver=solver, dt0=0.1
     )
 
-    u_save_at = tree_util.tree_map(lambda s: s[1:-1], solution_save_at.u)
-    marginals_save_at = tree_util.tree_map(
-        lambda s: s[1:-1], solution_save_at.marginals
-    )
+    u_save_at = tree_util.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
 
-    for ui, us in zip(u_interp, u_save_at):
+    for ui, us in zip(u_interpolated.mean, u_save_at.mean):
+        assert testing.allclose(ui, us)
+
+    for ui, us in zip(u_interpolated.std, u_save_at.std):
         assert testing.allclose(ui, us)
 
     marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = functools.vmap(marginals_allclose_func)
-    assert np.all(marginals_allclose_func(marginals_interp, marginals_save_at))
+    assert np.all(
+        marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
+    )
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree_util.tree_map(np.shape, solution_save_at.u)
-    u_std_shape = tree_util.tree_map(np.shape, solution_save_at.u_std)
+    u_shape = tree_util.tree_map(np.shape, u_save_at.mean)
+    u_std_shape = tree_util.tree_map(np.shape, u_save_at.std)
     match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
     assert tree_util.tree_all(match)

@@ -1,6 +1,6 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing, tree_util
 
@@ -31,11 +31,13 @@ def fixture_solution(strategy_func, fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-    sol = ivpsolve.solve_adaptive_terminal_values(
-        init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+    errorest = ivpsolvers.errorest_schober(
+        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
-    return sol, ssm
+    sol = ivpsolve.solve_adaptive_terminal_values(
+        init, t0=t0, t1=t1, solver=solver, errorest=errorest
+    )
+    return sol, strategy
 
 
 def test_output_is_scalar_and_not_inf_and_not_nan(solution):
@@ -43,13 +45,13 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
 
     See also: issue #477 (closed).
     """
-    sol, ssm = solution
+    sol, strategy = solution
 
-    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
-    std = tree_util.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u[0])
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u.mean[0])
+    std = tree_util.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u.std[0])
 
-    mll = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
+    mll = strategy.log_marginal_likelihood_terminal_values(
+        data, standard_deviation=std, posterior=sol.posterior
     )
 
     assert mll.shape == ()
@@ -58,11 +60,11 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
 
 
 def test_raise_error_if_structures_dont_match(solution):
-    sol, ssm = solution
-    data = tree_util.tree_map(lambda s: s + 0.005, sol.u[0])
+    sol, strategy = solution
+    data = tree_util.tree_map(lambda s: s + 0.005, sol.u.mean[0])
     std = 1.0  # not the correct pytree
 
     with testing.raises(ValueError, match="structure"):
-        _ = stats.log_marginal_likelihood_terminal_values(
-            data, standard_deviation=std, posterior=sol.posterior, ssm=ssm
+        _ = strategy.log_marginal_likelihood_terminal_values(
+            data, standard_deviation=std, posterior=sol.posterior
         )

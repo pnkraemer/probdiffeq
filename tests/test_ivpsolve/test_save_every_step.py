@@ -14,11 +14,11 @@ def test_python_loop_output_matches_reference(fact, strategy):
 
     received = python_loop_solution(ivp, fact=fact, strategy_fun=strategy)
     expected = reference_solution(ivp, received.t)
-    assert testing.allclose(received.u[0], expected, rtol=1e-2)
+    assert testing.allclose(received.u.mean[0], expected, rtol=1e-2)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree_util.tree_map(np.shape, received.u)
-    u_std_shape = tree_util.tree_map(np.shape, received.u_std)
+    u_shape = tree_util.tree_map(np.shape, received.u.mean)
+    u_std_shape = tree_util.tree_map(np.shape, received.u.std)
     match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
     assert tree_util.tree_all(match)
 
@@ -33,17 +33,12 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     strategy = strategy_fun(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
 
-    # clip=False because we need to test adaptive-step-interpolation for smoothers
-    errorest = ivpsolvers.ErrorEstSchober(
+    # Adaptive solvers need an error estimate
+    errorest = ivpsolvers.errorest_schober(
         prior=transition, ssm=ssm, correction=ts0, atol=1e-2, rtol=1e-2
     )
-    adaptive = ivpsolvers.adaptive(errorest=errorest, ssm=ssm, clip_dt=False)
-
-    dt0 = ivpsolve.dt0_adaptive(
-        vf, u0, t0=t0, atol=1e-2, rtol=1e-2, error_contraction_rate=5
-    )
     return ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, adaptive=adaptive, solver=solver, dt0=dt0, ssm=ssm
+        init, t0=t0, t1=t1, solver=solver, dt0=0.1, errorest=errorest
     )
 
 

@@ -1,6 +1,5 @@
 """Routines for estimating solutions of initial value problems."""
 
-from probdiffeq import ivpsolvers
 from probdiffeq.backend import (
     containers,
     control_flow,
@@ -11,109 +10,51 @@ from probdiffeq.backend import (
     warnings,
 )
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Array, TypeVar
+from probdiffeq.backend.typing import Any, Callable, Generic, NamedArg, TypeVar
 
 T = TypeVar("T")
 
 
-@containers.dataclass
-class IVPSolution:
-    """The probabilistic numerical solution of an initial value problem (IVP).
-
-    This class stores the computed solution,
-    its uncertainty estimates, and details of the probabilistic model
-    used in probabilistic numerical integration.
-    """
-
-    t: Array
-    """Time points at which the IVP solution has been computed."""
-
-    u: Array
-    """The mean of the IVP solution at each computed time point."""
-
-    u_std: Array
-    """The standard deviation of the IVP solution, indicating uncertainty."""
-
-    output_scale: Array
-    """The calibrated output scale of the probabilistic model."""
-
-    marginals: Any
-    """Marginal distributions for each time point in the posterior distribution."""
-
-    posterior: Any
-    """A the full posterior distribution of the probabilistic numerical solution.
-
-    Typically, a backward factorisation of the posterior.
-    """
-
-    num_steps: Array
-    """The number of solver steps taken at each time point."""
-
-    ssm: Any
-    """State-space model implementation used by the solver."""
-
-    @staticmethod
-    def _register_pytree_node():
-        def _sol_flatten(sol):
-            children = (
-                sol.t,
-                sol.u,
-                sol.u_std,
-                sol.marginals,
-                sol.posterior,
-                sol.output_scale,
-                sol.num_steps,
-            )
-            aux = (sol.ssm,)
-            return children, aux
-
-        def _sol_unflatten(aux, children):
-            (ssm,) = aux
-            t, u, u_std, marginals, posterior, output_scale, n = children
-            return IVPSolution(
-                t=t,
-                u=u,
-                u_std=u_std,
-                marginals=marginals,
-                posterior=posterior,
-                output_scale=output_scale,
-                num_steps=n,
-                ssm=ssm,
-            )
-
-        tree_util.register_pytree_node(IVPSolution, _sol_flatten, _sol_unflatten)
-
-
-IVPSolution._register_pytree_node()
-
-
 def solve_adaptive_terminal_values(
-    ssm_init, /, *, t0, t1, adaptive_solver, dt0, ssm
-) -> IVPSolution:
+    u, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
+):
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t0, t1])
     solution = solve_adaptive_save_at(
-        ssm_init,
+        u,
         save_at=save_at,
-        adaptive_solver=adaptive_solver,
+        solver=solver,
+        errorest=errorest,
         dt0=dt0,
-        ssm=ssm,
+        control=control,
+        clip_dt=clip_dt,
+        eps=eps,
         warn=False,  # Turn off warnings because any solver goes for terminal values
     )
     return tree_util.tree_map(lambda s: s[-1], solution)
 
 
 def solve_adaptive_save_at(
-    ssm_init, /, *, save_at, adaptive, solver, dt0, ssm, warn=True
-) -> IVPSolution:
+    ssm_init,
+    /,
+    *,
+    save_at,
+    solver,
+    errorest,
+    dt0=0.1,
+    control=None,
+    clip_dt=False,
+    eps=1e-8,
+    warn=True,
+):
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
-    This algorithm implements the method by Krämer (2024). Please consider citing it
+    This algorithm implements the method by Krämer (2025). Please consider citing it
     if you use it for your research. A PDF is available
-    [here](https://arxiv.org/abs/2410.10530) and Krämer's (2024) experiments are
+    [here](https://arxiv.org/abs/2410.10530) and Krämer's (2025) experiments are
     available [here](https://github.com/pnkraemer/code-adaptive-prob-ode-solvers).
 
-    ??? note "BibTex for Krämer (2024)"
+    ??? note "BibTex for Krämer (2025)"
         ```bibtex
         @InProceedings{kramer2024adaptive,
             title     = {Adaptive Probabilistic ODE Solvers Without Adaptive Memory
@@ -136,13 +77,20 @@ def solve_adaptive_save_at(
         msg = f"Strategy {solver} should not be used in solve_adaptive_save_at. "
         warnings.warn(msg, stacklevel=1)
 
-    rejection_loop = RejectionLoop(adaptive=adaptive, solver=solver)
+    if control is None:
+        control = control_proportional_integral()
+
+    loop = RejectionLoop(
+        solver=solver, eps=eps, clip_dt=clip_dt, control=control, errorest=errorest
+    )
 
     def advance(sol_and_state: T, t_next) -> tuple[T, Any]:
-        """Advance the adaptive solver to the next checkpoint."""
+        """Advance the adaptive solver to the next checkpoint.
 
-        # Advance until accepted.t >= t_next.
-        # Note: This could already be the case and we may not loop (just interpolate)
+        Note: we may already be beyond the checkpoint in which case
+        the rejection loop automatically interpolates.
+        """
+
         @tree_util.register_dataclass
         @containers.dataclass
         class AdvanceState:
@@ -154,19 +102,18 @@ def solve_adaptive_save_at(
             return c.do_continue
 
         def body_fun(state: AdvanceState) -> AdvanceState:
-            solution, state_new = rejection_loop(state.adaptive, t1=t_next)
-            do_continue = state_new.step_from.t + adaptive.eps < t_next
+            solution, state_new = loop.loop(state.adaptive, t1=t_next)
+            do_continue = state_new.step_from.t + loop.eps < t_next
             return AdvanceState(do_continue, solution, state_new)
 
-        init = AdvanceState(
-            True, *sol_and_state
-        )  # always step >=1x into the rejection loop
+        # Always step >=1x into the rejection loop
+        init = AdvanceState(True, *sol_and_state)
         advanced = control_flow.while_loop(cond_fun, body_fun, init=init)
         return (advanced.solution, advanced.adaptive), advanced.solution
 
     # Initialise the adaptive solver
     solution0 = solver.init(save_at[0], ssm_init)
-    state = adaptive.init(solution0, dt=dt0)
+    state = loop.init(solution0, dt=dt0)
 
     # Advance to one checkpoint after the other
     init = (solution0, state)
@@ -176,22 +123,22 @@ def solve_adaptive_save_at(
     )
 
     # Stack the initial value into the solution and return
-    result = solver.userfriendly_output(solution0=solution0, solution=solution)
-    return IVPSolution(
-        t=result.t,
-        u=result.estimate.u,
-        u_std=result.estimate.u_std,
-        marginals=result.estimate.marginals,
-        posterior=result.posterior,
-        output_scale=result.output_scale,
-        num_steps=result.num_steps,
-        ssm=ssm,
-    )
+    return solver.userfriendly_output(solution0=solution0, solution=solution)
 
 
 def solve_adaptive_save_every_step(
-    ssm_init, /, *, t0, t1, adaptive, solver, dt0, ssm
-) -> IVPSolution:
+    ssm_init,
+    /,
+    *,
+    t0,
+    t1,
+    solver,
+    errorest,
+    dt0=0.1,
+    control=None,
+    clip_dt=False,
+    eps=1e-8,
+):
     """Solve an initial value problem and save every step.
 
     This function uses a native-Python while loop.
@@ -203,56 +150,41 @@ def solve_adaptive_save_every_step(
         msg = f"Strategy {solver} should not be used in solve_adaptive_save_every_step."
         warnings.warn(msg, stacklevel=1)
 
-    rejection_loop = ivpsolvers.RejectionLoop(solver=solver, adaptive=adaptive)
-    rejection_loop = functools.jit(rejection_loop)
+    if control is None:
+        control = control_proportional_integral()
+
+    loop = RejectionLoop(
+        solver=solver, eps=eps, clip_dt=clip_dt, control=control, errorest=errorest
+    )
 
     t0, t1 = np.asarray(t0), np.asarray(t1)
     solution0 = solver.init(t0, ssm_init)
-    state = adaptive.init(solution0, dt=dt0)
+    state = loop.init(solution0, dt=dt0)
+
+    rejection_loop_apply = functools.jit(loop.loop)
 
     solutions = []
     while state.step_from.t < t1:
-        solution, state = rejection_loop(state, t1=t1)
+        solution, state = rejection_loop_apply(state, t1=t1)
         solutions.append(solution)
 
     solutions = tree_array_util.tree_stack(solutions)
-    solutions = solver.userfriendly_output(solution0=solution0, solution=solutions)
-    return IVPSolution(
-        t=solutions.t,
-        u=solutions.estimate.u,
-        u_std=solutions.estimate.u_std,
-        marginals=solutions.estimate.marginals,
-        posterior=solutions.posterior,
-        output_scale=solutions.output_scale,
-        num_steps=solutions.num_steps,
-        ssm=ssm,
-    )
+    return solver.userfriendly_output(solution0=solution0, solution=solutions)
 
 
-def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm) -> IVPSolution:
+def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm):
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
     def body_fn(s, dt):
-        _error, s_new = solver.step(state=s, dt=dt)
+        s_new = solver.step(state=s, dt=dt)
         return s_new, s_new
 
     t0 = grid[0]
     state0 = solver.init(t0, ssm_init)
     _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
-    result = solver.userfriendly_output(solution0=state0, solution=result)
-
-    return IVPSolution(
-        t=result.t,
-        u=result.estimate.u,
-        u_std=result.estimate.u_std,
-        marginals=result.estimate.marginals,
-        posterior=result.posterior,
-        output_scale=result.output_scale,
-        num_steps=result.num_steps,
-        ssm=ssm,
-    )
+    return solver.userfriendly_output(solution0=state0, solution=result)
 
 
 def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
@@ -304,3 +236,258 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
         (0.01 / np.maximum(d1, d2)) ** (1.0 / (error_contraction_rate + 1.0)),
     )
     return np.minimum(100.0 * dt0, dt1)
+
+
+@tree_util.register_dataclass
+@containers.dataclass
+class _TimeStepState:
+    """State for adaptive time-stepping."""
+
+    dt: float
+    step_from: Any
+    interp_from: Any
+    control: Any
+    errorest_step_from: Any
+    errorest_interp_from: Any
+
+
+@tree_util.register_dataclass
+@containers.dataclass
+class _RejectionLoopState:
+    """State for a single rejection loop.
+
+    Keep decreasing step-size until error norm is small.
+    This is a critical part of an IVP solver step.
+    """
+
+    dt: float
+    error_norm_proposed: float
+    control: Any
+    proposed: Any
+    step_from: Any
+    errorest_step_from: Any
+    errorest_proposed: Any
+
+
+@containers.dataclass
+class RejectionLoop:
+    """Implement a rejection loop."""
+
+    solver: Any
+
+    eps: float
+    """A small value to determine whether $t \\approx t_1$ or not."""
+
+    clip_dt: bool = containers.dataclass_field(metadata={"static": True})
+    """Whether or not to clip the timestep before stepping."""
+
+    errorest: Any = containers.dataclass_field(metadata={"static": True})
+    """Error estimator."""
+
+    control: Any = containers.dataclass_field(metadata={"static": True})
+
+    def init(self, state_solver, dt) -> _TimeStepState:
+        """Initialise the adaptive solver state."""
+        state_control = self.control.init(dt)
+        state_errorest = self.errorest.init()
+        return _TimeStepState(
+            dt=dt,
+            step_from=state_solver,
+            interp_from=state_solver,
+            control=state_control,
+            errorest_step_from=state_errorest,
+            errorest_interp_from=state_errorest,
+        )
+
+    def loop(self, state0: _TimeStepState, *, t1) -> tuple[Any, _TimeStepState]:
+        """Repeatedly attempt a step until the controller is happy.
+
+        Notably:
+        - This function may never attempt a step if the current timestep
+            is beyond t1.
+        - If we step beyond t1, this function interpolates to t1.
+        """
+        # If t1 is in the future, enter the rejection loop (otherwise do nothing)
+        is_before_t1 = state0.step_from.t + self.eps < t1
+        state = control_flow.cond(is_before_t1, self.step, lambda s: s, state0)
+
+        # Interpolate
+        is_before_t1 = state.step_from.t + self.eps < t1
+        is_after_t1 = state.step_from.t > t1 + self.eps
+        branch_idx = np.where(is_before_t1, 0, np.where(is_after_t1, 1, 2))
+        options = (self.interp_skip, self.interp_beyond_t1, self.interp_at_t1)
+        return control_flow.switch(branch_idx, options, (state, t1))
+
+    def step(self, s):
+        """Do a rejection-loop step.
+
+        Keep attempting steps until one is accepted.
+        """
+
+        def cond(state: _RejectionLoopState) -> bool:
+            # error_norm_proposed is EEst ** (-1/rate), thus "<"
+            return state.error_norm_proposed < 1.0
+
+        init = self.step_init_loopstate(s)
+        state_new = control_flow.while_loop(cond, self.step_attempt, init)
+        return self.step_extract_timestepstate(state_new)
+
+    def step_init_loopstate(self, s0: _TimeStepState) -> _RejectionLoopState:
+        """Initialise the rejection state."""
+
+        def _ones_like(tree):
+            return tree_util.tree_map(np.ones_like, tree)
+
+        smaller_than_1 = 0.9  # the cond() must return True
+        return _RejectionLoopState(
+            error_norm_proposed=smaller_than_1,
+            dt=s0.dt,
+            control=s0.control,
+            step_from=s0.step_from,
+            errorest_step_from=s0.errorest_step_from,
+            proposed=_ones_like(s0.step_from),  # irrelevant
+            errorest_proposed=_ones_like(s0.errorest_step_from),  # irrelevant
+        )
+
+    def step_attempt(self, state: _RejectionLoopState) -> _RejectionLoopState:
+        """Attempt a step.
+
+        Perform a step with an IVP solver and
+        propose a future time-step based on tolerances and error estimates.
+        """
+        dt = state.dt
+
+        # Some controllers like to clip the terminal value instead of interpolating.
+        # This must happen _before_ the step.
+        if self.clip_dt:
+            dt = np.minimum(dt, t1 - state.step_from.t)
+
+        # Perform the actual step.
+        state_proposed = self.solver.step(state=state.step_from, dt=dt)
+
+        error_power, errorstate = self.errorest.estimate(
+            state.errorest_step_from, state.step_from, proposed=state_proposed, dt=dt
+        )
+
+        # Propose a new step
+        dt, state_control = self.control.apply(
+            dt, state.control, error_power=error_power
+        )
+        return _RejectionLoopState(
+            dt=dt,  # new
+            error_norm_proposed=error_power,  # new
+            proposed=state_proposed,  # new
+            control=state_control,  # new
+            errorest_proposed=errorstate,  # new
+            errorest_step_from=state.errorest_step_from,
+            step_from=state.step_from,
+        )
+
+    def step_extract_timestepstate(self, state: _RejectionLoopState) -> _TimeStepState:
+        return _TimeStepState(
+            dt=state.dt,
+            step_from=state.proposed,
+            interp_from=state.step_from,
+            control=state.control,
+            errorest_step_from=state.errorest_proposed,
+            errorest_interp_from=state.errorest_step_from,
+        )
+
+    def interp_skip(self, args):
+        """If step_from.t < t1, don't interpolate."""
+        state, t1 = args
+        solution = state.step_from
+        return solution, state
+
+    def interp_beyond_t1(self, args):
+        """If we stepped cleanly over t1, interpolate."""
+        state, t1 = args
+        solution, interp_res = self.solver.interpolate(
+            t=t1, interp_from=state.interp_from, interp_to=state.step_from
+        )
+
+        new_state = _TimeStepState(
+            dt=state.dt,
+            step_from=interp_res.step_from,
+            interp_from=interp_res.interp_from,
+            control=state.control,
+            errorest_step_from=state.errorest_step_from,
+            errorest_interp_from=state.errorest_step_from,
+        )
+        return solution, new_state
+
+    def interp_at_t1(self, args):
+        """If we stepped exactly to t1, still interpolate."""
+        state, t1 = args
+        solution, interp_res = self.solver.interpolate_at_t1(
+            t=t1, interp_from=state.interp_from, interp_to=state.step_from
+        )
+        new_state = _TimeStepState(
+            dt=state.dt,
+            step_from=interp_res.step_from,
+            interp_from=interp_res.interp_from,
+            control=state.control,
+            errorest_step_from=state.errorest_step_from,
+            errorest_interp_from=state.errorest_step_from,
+        )
+        return solution, new_state
+
+
+@containers.dataclass
+class _Controller(Generic[T]):
+    """Control algorithm."""
+
+    init: Callable[[float], T]
+    """Initialise the controller state."""
+
+    apply: Callable[[float, T, NamedArg(float, "error_power")], tuple[float, T]]
+    r"""Propose a time-step $\Delta t$."""
+
+
+def control_proportional_integral(
+    *,
+    safety=0.95,
+    factor_min=0.2,
+    factor_max=10.0,
+    power_integral_unscaled=0.3,
+    power_proportional_unscaled=0.4,
+) -> _Controller[float]:
+    """Construct a proportional-integral-controller with time-clipping."""
+
+    def init(_dt: float, /) -> float:
+        return 1.0
+
+    def apply(dt: float, error_power_prev: float, /, *, error_power):
+        # Equivalent: error_power = error_norm ** (-1.0 / error_contraction_rate)
+        a1 = error_power**power_integral_unscaled
+        a2 = (error_power / error_power_prev) ** power_proportional_unscaled
+        scale_factor_unclipped = safety * a1 * a2
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
+        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
+
+        # >= 1.0 because error_power is 1/scaled_error_norm
+        error_power_prev = np.where(error_power >= 1.0, error_power, error_power_prev)
+
+        dt_proposed = scale_factor * dt
+        return dt_proposed, error_power_prev
+
+    return _Controller(init=init, apply=apply)
+
+
+def control_integral(
+    *, safety=0.95, factor_min=0.2, factor_max=10.0
+) -> _Controller[None]:
+    """Construct an integral-controller."""
+
+    def init(_dt, /) -> None:
+        return None
+
+    def apply(dt, _state, /, *, error_power):
+        scale_factor_unclipped = safety * error_power
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
+        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
+        return scale_factor * dt, None
+
+    return _Controller(init=init, apply=apply)

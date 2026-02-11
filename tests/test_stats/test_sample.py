@@ -1,12 +1,12 @@
 """Tests for sampling behaviour."""
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import ode, random, testing, tree_util
 
 
-@testing.fixture(name="approximation")
+@testing.fixture(name="approximation_and_strategy")
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def fixture_approximation(fact):
+def fixture_approximation_and_strategy(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
@@ -14,25 +14,25 @@ def fixture_approximation(fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-    return ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+
+    errorest = ivpsolvers.errorest_schober(
+        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
+    sol = ivpsolve.solve_adaptive_save_every_step(
+        init, t0=t0, t1=t1, solver=solver, errorest=errorest
+    )
+    return sol, strategy
 
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_sample_shape(approximation, shape):
+def test_sample_shape(approximation_and_strategy, shape):
+    approximation, strategy = approximation_and_strategy
+
     key = random.prng_key(seed=15)
-    posterior = stats.markov_select_terminal(approximation.posterior)
-    samples, samples_init = stats.markov_sample(
-        key, posterior, shape=shape, reverse=True, ssm=approximation.ssm
+    samples = strategy.markov_sample(
+        key, approximation.posterior, shape=shape, reverse=True
     )
-
-    for i, s, u in zip(samples_init, samples, approximation.u):
-        i_shape = tree_util.tree_map(lambda x: x.shape, i)
+    for s, u in zip(samples, approximation.u.mean):
         s_shape = tree_util.tree_map(lambda x: x.shape, s)
-        u_terminal_shape = tree_util.tree_map(lambda x: shape + x[-1].shape, u)
-        u_inner_shape = tree_util.tree_map(lambda x: shape + x[:-1].shape, u)
-
-        assert testing.allclose(i_shape, u_terminal_shape)
+        u_inner_shape = tree_util.tree_map(lambda x: shape + x.shape, u)
         assert testing.allclose(s_shape, u_inner_shape)
