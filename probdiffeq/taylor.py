@@ -54,13 +54,14 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
         zeros = np.zeros_like(models.noise.mean)
 
         # Run the preconditioned fixedpoint smoother
-        (corrected, conditional), _ = filter_util.estimate_fwd(
+        result, _ = filter_util.estimate_fwd(
             zeros,
             init=init,
             prior_transitions=ibm_transitions,
             observation_model=models,
             estimator=estimator,
         )
+        corrected, conditional = result.rv, result.conditional
         initial = ssm.conditional.marginalise(corrected, conditional)
         mean = ssm.stats.mean(initial)
         return ssm.unravel(mean)

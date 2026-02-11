@@ -251,7 +251,7 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
 
     # Run the reverse Kalman filter
     estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=ssm)
-    (_corrected, _num_data, logpdf), _ = filter_util.estimate_rev(
+    result, _ = filter_util.estimate_rev(
         np.zeros_like(u_leaves),
         init=rv,
         prior_transitions=posterior.conditional,
@@ -260,4 +260,4 @@ def log_marginal_likelihood(u, /, *, standard_deviation, posterior, ssm):
     )
 
     # Return only the logpdf
-    return logpdf
+    return result.logpdf
