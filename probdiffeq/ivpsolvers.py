@@ -794,25 +794,22 @@ class _ProbabilisticSolver:
     ):
         raise NotImplementedError
 
-    def offgrid_marginals(self, *, t, marginals_t1, posterior_t0, t0, t1, output_scale):
+    def offgrid_marginals(self, *, t, posterior_t1, posterior_t0, t0, t1, output_scale):
         """Compute offgrid_marginals."""
         if not self.is_suitable_for_offgrid_marginals:
             raise NotImplementedError
 
         # TODO: how is this function different to interpolate() now?
 
-        _estimate, state_t0 = self.strategy.init_posterior(posterior_t0)
-        _estimate, state_t1 = self.strategy.init_posterior(marginals_t1)
-
         transition_t0_t = self.prior(t - t0, output_scale)
         transition_t_t1 = self.prior(t1 - t, output_scale)
         (estimate, _posterior), _interp_res = self.strategy.interpolate(
-            state_t0=state_t0,
-            state_t1=state_t1,
+            state_t0=posterior_t0,
+            state_t1=posterior_t1,
             transition_t0_t=transition_t0_t,
             transition_t_t1=transition_t_t1,
         )
-        return estimate.u, estimate.marginals  # todo: return "estimate"?
+        return estimate
 
     def interpolate(
         self, *, t, interp_from: ProbSolverState, interp_to: ProbSolverState
@@ -1210,7 +1207,7 @@ def adaptive(
 
 @tree_util.register_dataclass
 @containers.dataclass
-class _AdaState(Generic[A]):
+class _AdaState:
     dt: float
     step_from: ProbSolverState
     interp_from: ProbSolverState

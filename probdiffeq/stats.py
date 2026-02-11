@@ -125,25 +125,22 @@ def _offgrid_marginals(t, solution, solver):
     def _extract(tree):
         return tree_util.tree_map(lambda s: s[index, ...], tree)
 
-    marginals = _extract(solution.marginals)
-
-    # In the smoothing context:
-    # Extract the correct posterior.init (aka the filtering solutions)
-    # The conditionals are incorrect, but we don't really care about this.
-    posterior_previous = _extract_previous(solution.posterior)
-
+    posterior_t0 = _extract_previous(solution.posterior)
     t0 = _extract_previous(solution.t)
+
+    posterior_t1 = _extract(solution.posterior)
     t1 = _extract(solution.t)
     output_scale = _extract(solution.output_scale)
 
-    return solver.offgrid_marginals(
-        marginals_t1=marginals,
-        posterior_t0=posterior_previous,
+    estimate = solver.offgrid_marginals(
+        posterior_t1=posterior_t1,
+        posterior_t0=posterior_t0,
         t=t,
         t0=t0,
         t1=t1,
         output_scale=output_scale,
     )
+    return estimate.u, estimate.marginals
 
 
 def log_marginal_likelihood_terminal_values(
