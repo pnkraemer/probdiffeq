@@ -146,7 +146,7 @@ def _offgrid_marginals(t, solution, solver):
     # about *all* datapoints
     marginals_t1 = _extract(solution.marginals)
     _, posterior_t1 = solver.strategy.init_posterior(marginals=marginals_t1)
-    return solver.offgrid_marginals(
+    estim = solver.offgrid_marginals(
         posterior_t1=posterior_t1,
         posterior_t0=posterior_t0,
         t=t,
@@ -154,6 +154,7 @@ def _offgrid_marginals(t, solution, solver):
         t1=t1,
         output_scale=output_scale,
     )
+    return estim.u, estim.u_std, estim.marginals
 
 
 def log_marginal_likelihood_terminal_values(

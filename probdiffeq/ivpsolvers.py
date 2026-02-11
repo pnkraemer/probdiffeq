@@ -1353,7 +1353,7 @@ class _AdaSolver:
                 dt, state.control, error_power=error_power
             )
             return _RejectionState(
-                dt=dt,
+                dt=dt,  # new
                 error_norm_proposed=error_power,  # new
                 proposed=state_proposed,  # new
                 control=state_control,  # new
