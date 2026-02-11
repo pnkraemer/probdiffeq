@@ -1436,39 +1436,6 @@ class _AdaSolver:
         error_norm_rel = error_norm / np.sqrt(dim)
         return error_norm_rel ** (-1.0 / error_contraction_rate)
 
-    # def extract_before_t1(self, state: _AdaState, t, solver):
-    #     del t
-    #     # solution_solver = self.solver.extract(state.step_from)
-    #     # extracted = solution_solver
-    #     return state, state.step_from
-
-    # def extract_at_t1(self, state: _AdaState, t, solver):
-    #     # TODO: make the "at t1" decision inside solver.interpolate(),
-    #     #  which collapses the next two functions together
-    #     interpolated, interp_res = self.solver.interpolate_at_t1(
-    #         t=t, interp_from=state.interp_from, interp_to=state.step_from
-    #     )
-    #     state = _AdaState(
-    #         dt=state.dt,
-    #         step_from=interp_res.step_from,
-    #         interp_from=interp_res.interp_from,
-    #         control=state.control,
-    #     )
-    #     return state, interpolated
-
-    # def extract_after_t1(self, state: _AdaState, t, solver):
-    #     """We have overstepped, so we interpolate before returning."""
-    #     interpolated, interp_res = solver.interpolate(
-    #         t=t, interp_from=state.interp_from, interp_to=state.step_from
-    #     )
-    #     state = _AdaState(
-    #         dt=state.dt,
-    #         step_from=interp_res.step_from,
-    #         interp_from=interp_res.interp_from,
-    #         control=state.control,
-    #     )
-    #     return state, interpolated
-
     @staticmethod
     def register_pytree_node():
         def _asolver_flatten(asolver):

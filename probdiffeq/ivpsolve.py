@@ -9,7 +9,9 @@ from probdiffeq.backend import (
     warnings,
 )
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Array
+from probdiffeq.backend.typing import Any, Array, TypeVar
+
+T = TypeVar("T")
 
 
 @containers.dataclass
@@ -132,45 +134,47 @@ def solve_adaptive_save_at(
         msg = f"Strategy {solver} should not be used in solve_adaptive_save_at. "
         warnings.warn(msg, stacklevel=1)
 
-    t = save_at[0]
-    save_at = save_at[1:]
+    def advance(sol_and_state: T, t_next) -> tuple[T, Any]:
+        """Advance the adaptive solver to the next checkpoint."""
 
-    def advance(sol_and_state, t_next):
         # Advance until accepted.t >= t_next.
         # Note: This could already be the case and we may not loop (just interpolate)
-        def cond_fun(c):
-            return c[0]
+        @tree_util.register_dataclass
+        @containers.dataclass
+        class AdvanceState:
+            do_continue: bool
+            solution: Any
+            adaptive: Any
 
-        def body_fun(sol_and_state_):
-            _, _, s = sol_and_state_
-            solution, s = adaptive.rejection_loop(s, t1=t_next, solver=solver)
-            do_continue = s.step_from.t + adaptive.eps < t_next
-            return (do_continue, solution, s)
+        def cond_fun(c: AdvanceState) -> bool:
+            return c.do_continue
 
-        _, solution, state = control_flow.while_loop(
-            cond_fun, body_fun, init=(True, *sol_and_state)
-        )
-        import jax
+        def body_fun(state: AdvanceState) -> AdvanceState:
+            solution, state_new = adaptive.rejection_loop(
+                state.adaptive, t1=t_next, solver=solver
+            )
+            do_continue = state_new.step_from.t + adaptive.eps < t_next
+            return AdvanceState(do_continue, solution, state_new)
 
-        jax.debug.print("Saving...\n")
+        init = AdvanceState(
+            True, *sol_and_state
+        )  # always step >=1x into the rejection loop
+        advanced = control_flow.while_loop(cond_fun, body_fun, init=init)
+        return (advanced.solution, advanced.adaptive), advanced.solution
 
-        # # Either interpolate (t > t_next) or "finalise" (t == t_next)
-        # is_after_t1 = state.step_from.t > t_next + adaptive.eps
-        # state, solution = control_flow.cond(
-        #     is_after_t1,
-        #     adaptive_solver.extract_after_t1,
-        #     adaptive_solver.extract_at_t1,
-        #     state,
-        #     t_next,
-        # )
-        return (solution, state), solution
-
-    solution0 = solver.init(t, ssm_init)
+    # Initialise the adaptive solver
+    solution0 = solver.init(save_at[0], ssm_init)
     state = adaptive.init(solution0, dt=dt0)
-    init = (solution0, state)
-    _, solution = control_flow.scan(advance, init=init, xs=save_at, reverse=False)
-    result = solver.userfriendly_output(solution0=solution0, solution=solution)
 
+    # Advance to one checkpoint after the other
+    init = (solution0, state)
+    xs = save_at[1:]
+    (_solution, _state), solution = control_flow.scan(
+        advance, init=init, xs=xs, reverse=False
+    )
+
+    # Stack the initial value into the solution and return
+    result = solver.userfriendly_output(solution0=solution0, solution=solution)
     return IVPSolution(
         t=result.t,
         u=result.estimate.u,
