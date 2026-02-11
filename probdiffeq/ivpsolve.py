@@ -199,13 +199,10 @@ def _solve_adaptive_save_at(t, ssm_init, *, save_at, adaptive_solver, dt0):
             state,
             t_next,
         )
-        print("intermediate solution", tree_util.tree_map(np.shape, solution))
         return state, solution
 
     state = adaptive_solver.init(t, ssm_init, dt=dt0)
-    print("step_from", tree_util.tree_map(np.shape, state.step_from))
     _, solution = control_flow.scan(advance, init=state, xs=save_at, reverse=False)
-    print("solution", tree_util.tree_map(np.shape, solution))
     return adaptive_solver.solver.userfriendly_output(
         solution0=state.step_from, solution=solution
     )

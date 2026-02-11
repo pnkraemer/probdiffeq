@@ -233,22 +233,20 @@ def strategy_smoother(*, ssm) -> _Strategy:
     @containers.dataclass
     class Smoother(_Strategy):
         def init_posterior(self, marginals):
-            cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
-            posterior = stats.MarkovSeq(init=marginals, conditional=cond)
+            # Special case for implementing offgrid-marginals...
+            # TODO: fix this!
+            if isinstance(marginals, stats.MarkovSeq):
+                posterior = marginals
+                marginals = posterior.init
+            else:
+                cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
+                posterior = stats.MarkovSeq(init=marginals, conditional=cond)
 
             u = self.ssm.stats.qoi(marginals)
             std = self.ssm.stats.standard_deviation(marginals)
             u_std = self.ssm.stats.qoi_from_sample(std)
             estimate = Estimate(u, u_std, marginals)
             return estimate, posterior
-            # # # Special case for implementing offgrid-marginals...
-            # # if isinstance(sol, stats.MarkovSeq):
-            # #     rv = sol.init
-            # #     cond = sol.conditional
-            # # else:
-            # # rv = sol
-            # # cond = self.ssm.conditional.identity(ssm.num_derivatives + 1)
-            # return rv, cond
 
         def predict(self, posterior, *, transition):
             marginals, cond = self.ssm.conditional.revert(posterior.init, transition)
@@ -559,9 +557,10 @@ def strategy_fixedpoint(*, ssm) -> _Strategy:
 
         def interpolate_at_t1(self, state_t1: stats.MarkovSeq):
             cond_identity = self.ssm.conditional.identity(ssm.num_derivatives + 1)
-            interpolated = stats.MarkovSeq(state_t1.init, conditional=cond_identity)
-            interp_res = _InterpRes(step_from=interpolated, interp_from=interpolated)
+            resume_from = stats.MarkovSeq(state_t1.init, conditional=cond_identity)
+            interp_res = _InterpRes(step_from=resume_from, interp_from=resume_from)
 
+            interpolated = state_t1
             marginals = interpolated.init
             u = ssm.stats.qoi(marginals)
             std = ssm.stats.standard_deviation(marginals)
