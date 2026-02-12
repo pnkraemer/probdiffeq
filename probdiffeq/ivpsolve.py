@@ -38,12 +38,17 @@ class Solver(Protocol[T]):
 
 
 def solve_adaptive_terminal_values(
-    solver, errorest, control=None, clip_dt=False
+    solver, errorest, control=None, clip_dt=False, while_loop=control_flow.while_loop
 ) -> Callable:
     """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
     solver = solve_adaptive_save_at(
-        solver=solver, errorest=errorest, control=control, clip_dt=clip_dt, warn=False
+        solver=solver,
+        errorest=errorest,
+        control=control,
+        clip_dt=clip_dt,
+        warn=False,
+        while_loop=while_loop,
     )
 
     def solve(u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8) -> Solution[T]:
@@ -55,7 +60,13 @@ def solve_adaptive_terminal_values(
 
 
 def solve_adaptive_save_at(
-    *, solver, errorest, control=None, clip_dt=False, warn=True
+    *,
+    solver,
+    errorest,
+    control=None,
+    clip_dt=False,
+    warn=True,
+    while_loop=control_flow.while_loop,
 ) -> Callable[[T, Array, float, float, float], Solution[T]]:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -91,7 +102,11 @@ def solve_adaptive_save_at(
         control = control_proportional_integral()
 
     loop = RejectionLoop(
-        solver=solver, clip_dt=clip_dt, control=control, errorest=errorest
+        solver=solver,
+        clip_dt=clip_dt,
+        control=control,
+        errorest=errorest,
+        while_loop=while_loop,
     )
 
     def solve(u: T, save_at: Array, atol: float, rtol: float, dt0=0.1, eps=1e-8):
@@ -121,7 +136,7 @@ def solve_adaptive_save_at(
 
             # Always step >=1x into the rejection loop
             init = AdvanceState(True, *sol_and_state)
-            advanced = control_flow.while_loop(cond_fun, body_fun, init=init)
+            advanced = while_loop(cond_fun, body_fun, init)
             return (advanced.solution, advanced.loopstate), advanced.solution
 
         # Initialise the adaptive solver
@@ -253,6 +268,7 @@ class RejectionLoop:
     """Error estimator."""
 
     control: Any = containers.dataclass_field(metadata={"static": True})
+    while_loop: Callable = containers.dataclass_field(metadata={"static": True})
 
     def init(self, state_solver, dt) -> _TimeStepState:
         """Initialise the adaptive solver state."""
@@ -301,7 +317,7 @@ class RejectionLoop:
             return state.error_norm_proposed < 1.0
 
         init = self.step_init_loopstate(s)
-        state_new = control_flow.while_loop(
+        state_new = self.while_loop(
             cond, lambda x: self.step_attempt(x, t1=t1, atol=atol, rtol=rtol), init
         )
         return self.step_extract_timestepstate(state_new)

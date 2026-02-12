@@ -24,30 +24,12 @@ import equinox
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
-from probdiffeq.backend import control_flow
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 # -
 
-# Overwrite the while-loop (via a context manager):
 
-
-# +
-def while_loop_func(*a, **kw):
-    """Evaluate a bounded while loop."""
-    return equinox.internal.while_loop(*a, **kw, kind="bounded", max_steps=100)
-
-
-context_compute_gradient = control_flow.context_overwrite_while_loop(while_loop_func)
-# -
-
-# The rest is the similar to the "easy example" in the quickstart,
-# except for simulating adaptively and
-# computing the value and the gradient
-# (which is impossible without the specialised while-loop implementation).
-
-
-def solution_routine():
+def solution_routine(while_loop):
     """Construct a parameter-to-solution function and an initial value."""
 
     def vf(y, *, t):  # noqa: ARG001
@@ -58,37 +40,47 @@ def solution_routine():
     u0 = jnp.asarray([0.1])
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    ts0 = ivpsolvers.correction_ts0(vf, ode_order=1, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+    ts0 = probdiffeq.correction_ts0(vf, ode_order=1, ssm=ssm)
 
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
+    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solve_adaptive = ivpsolve.solve_adaptive_terminal_values(
+        solver=solver, errorest=errorest, while_loop=while_loop
+    )
 
     def simulate(init_val):
         """Evaluate the parameter-to-solution function."""
-        sol = ivpsolve.solve_adaptive_terminal_values(
-            init_val, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        sol = solve_adaptive(init_val, t0=t0, t1=t1, atol=1e-3, rtol=1e-3)
 
         # Any scalar function of the IVP solution would do
-        return jnp.dot(sol.u[0], sol.u[0])
+        # Try the log-marginal-likelihood losses (see the other tutorials).
+        return jnp.dot(sol.u.mean[0], sol.u.mean[0])
 
     return simulate, init
 
 
+# This is the default behaviour
+solve, x = solution_routine(jax.lax.while_loop)
+
 try:
-    solve, x = solution_routine()
-    solution, gradient = jax.value_and_grad(solve)(x)
+    solution, gradient = jax.jit(jax.value_and_grad(solve))(x)
 except ValueError as err:
     print(f"Caught error:\n\t {err}")
 
-with context_compute_gradient:
-    # Construct the solution routine inside the context
-    solve, x = solution_routine()
+# This while-loop makes the solver differentiable
 
-    # Compute gradients
-    solution, gradient = jax.value_and_grad(solve)(x)
 
-    print(solution)
-    print(gradient)
+def while_loop_func(*a, **kw):
+    """Evaluate a bounded while loop."""
+    return equinox.internal.while_loop(*a, **kw, kind="bounded", max_steps=100)
+
+
+solve, x = solution_routine(while_loop=while_loop_func)
+
+# Compute gradients
+solution, gradient = jax.jit(jax.value_and_grad(solve))(x)
+
+print(solution)
+print(gradient)
