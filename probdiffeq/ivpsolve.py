@@ -1,13 +1,6 @@
 """Routines for estimating solutions of initial value problems."""
 
-from probdiffeq.backend import (
-    containers,
-    control_flow,
-    functools,
-    linalg,
-    tree_util,
-    warnings,
-)
+from probdiffeq.backend import containers, control_flow, linalg, tree_util, warnings
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import (
     Any,
@@ -44,14 +37,16 @@ class Solver(Protocol[T]):
     step: Callable[[Solution[T]], Solution[T]]
 
 
-def solve_adaptive_terminal_values(solver, errorest, control=None, clip_dt=False):
+def solve_adaptive_terminal_values(
+    solver, errorest, control=None, clip_dt=False
+) -> Callable:
+    """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
     solver = solve_adaptive_save_at(
         solver=solver, errorest=errorest, control=control, clip_dt=clip_dt, warn=False
     )
 
     def solve(u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8) -> Solution[T]:
-        """Simulate the terminal values of an initial value problem."""
         save_at = np.asarray([t0, t1])
         solution = solver(u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps)
         return tree_util.tree_map(lambda s: s[-1], solution)
@@ -146,20 +141,21 @@ def solve_adaptive_save_at(
     return solve
 
 
-@functools.partial(functools.jit, static_argnames=["solver"])
-def solve_fixed_grid(u: T, /, *, grid, solver) -> Solution[T]:
+def solve_fixed_grid(*, solver) -> Callable:
     """Solve an initial value problem on a fixed, pre-determined grid."""
-    # Compute the solution
 
-    def body_fn(s, dt):
-        s_new = solver.step(state=s, dt=dt)
-        return s_new, s_new
+    def solve(u: T, /, *, grid) -> Solution[T]:
+        def body_fn(s, dt):
+            s_new = solver.step(state=s, dt=dt)
+            return s_new, s_new
 
-    t0 = grid[0]
-    state0 = solver.init(t=t0, u=u)
-    _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
+        t0 = grid[0]
+        state0 = solver.init(t=t0, u=u)
+        _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
-    return solver.userfriendly_output(solution0=state0, solution=result)
+        return solver.userfriendly_output(solution0=state0, solution=result)
+
+    return solve
 
 
 def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
