@@ -132,7 +132,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, stats, taylor
 
 # +
 
@@ -178,12 +178,12 @@ def solve_fixed(theta, *, ts):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     return ivpsolve.solve_fixed_grid(init, grid=ts, solver=solver, ssm=ssm)
 
 
@@ -193,13 +193,13 @@ def solve_adaptive(theta, *, save_at):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     output_scale = 10.0
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    adaptive_solver = probdiffeq.adaptive(solver, ssm=ssm)
     return ivpsolve.solve_adaptive_save_at(
         init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )

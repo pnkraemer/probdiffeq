@@ -31,7 +31,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
@@ -55,7 +55,7 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
     timeit_fun = setup_timeit(repeats=repeats)
 
     # Assemble algorithms
-    ts0, ts1 = ivpsolvers.correction_ts0, ivpsolvers.correction_ts1
+    ts0, ts1 = probdiffeq.correction_ts0, probdiffeq.correction_ts1
     ts0_iso = solver_probdiffeq(5, correction=ts0, implementation="isotropic")
     ts0_bd = solver_probdiffeq(5, correction=ts0, implementation="blockdiag")
     ts1_dense = solver_probdiffeq(8, correction=ts1, implementation="dense")
@@ -152,14 +152,14 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, ssm_fact=implementation
         )
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
         corr = correction(vf_probdiffeq, ssm=ssm)
-        solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
+        solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
+        control = probdiffeq.control_proportional_integral()
+        adaptive_solver = probdiffeq.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
         )
 

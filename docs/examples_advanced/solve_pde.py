@@ -25,7 +25,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 jax.config.update("jax_enable_x64", True)
 
@@ -44,15 +44,15 @@ def main():
 
     # Set up a state-space model
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 
     # Build a solver
-    ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver_dynamic(
+    ts = probdiffeq.correction_ts1(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver_dynamic(
         ssm=ssm, strategy=strategy, prior=ibm, correction=ts
     )
-    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
+    adaptive_solver = probdiffeq.adaptive(solver, ssm=ssm)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)

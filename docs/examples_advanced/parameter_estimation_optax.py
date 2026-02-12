@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 import optax
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers, stats
+from probdiffeq import ivpsolve, probdiffeq, stats
 
 # +
 if not backend.has_been_selected:
@@ -57,12 +57,12 @@ def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
     output_scale = 10.0
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
     )
-    ts0 = ivpsolvers.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    ts0 = probdiffeq.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
+    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     return ivpsolve.solve_fixed_grid(init, grid=ts, solver=solver, ssm=ssm)
 
 

@@ -1342,7 +1342,7 @@ class solver(_ProbabilisticSolver):
         (correction_state,) = state.auxiliary
 
         # Discretise
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(state.output_scale)
         transition = self.prior(dt, output_scale)
 
         # Do the full extrapolation step (reuse the transition)

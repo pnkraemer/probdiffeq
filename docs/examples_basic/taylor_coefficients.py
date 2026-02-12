@@ -29,7 +29,7 @@ import jax
 import jax.numpy as jnp
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, stats, taylor
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
@@ -56,12 +56,12 @@ def vf(*y, t):  # noqa: ARG001
 # +
 def solve(tc):
     """Solve the ODE."""
-    init, prior, ssm = ivpsolvers.prior_wiener_integrated(tc, ssm_fact="dense")
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
+    init, prior, ssm = probdiffeq.prior_wiener_integrated(tc, ssm_fact="dense")
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    adaptive_solver = probdiffeq.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
     return ivpsolve.solve_adaptive_save_at(
         init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
     )

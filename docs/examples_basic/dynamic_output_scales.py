@@ -39,7 +39,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, probdiffeq
 
 # +
 if not backend.has_been_selected:
@@ -63,13 +63,13 @@ def vf(*ys, t):  # noqa: ARG001
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = ivpsolvers.correction_ts1(vf, ssm=ssm)
-strategy = ivpsolvers.strategy_filter(ssm=ssm)
-dynamic = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
-mle = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts1, ssm=ssm)
+ts1 = probdiffeq.correction_ts1(vf, ssm=ssm)
+strategy = probdiffeq.strategy_filter(ssm=ssm)
+dynamic = probdiffeq.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
+mle = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts1, ssm=ssm)
 
 # +
 t0, t1 = 0.0, 3.0

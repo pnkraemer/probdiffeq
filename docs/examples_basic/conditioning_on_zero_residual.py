@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, stats, taylor
 
 # +
 if not backend.has_been_selected:
@@ -52,7 +52,7 @@ u0 = jnp.asarray([0.1])
 NUM_DERIVATIVES = 2
 tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-init_raw, transitions, ssm = ivpsolvers.prior_wiener_integrated_discrete(
+init_raw, transitions, ssm = probdiffeq.prior_wiener_integrated_discrete(
     ts, tcoeffs_like, output_scale=100.0, ssm_fact="dense"
 )
 
@@ -68,13 +68,13 @@ markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
 # +
 # Compute the posterior
 
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = ivpsolvers.correction_ts1(vector_field, ssm=ssm)
-strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
-adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-2, ssm=ssm)
+ts1 = probdiffeq.correction_ts1(vector_field, ssm=ssm)
+strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+solver = probdiffeq.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
+adaptive_solver = probdiffeq.adaptive(solver, atol=1e-1, rtol=1e-2, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 sol = ivpsolve.solve_adaptive_save_at(

@@ -20,7 +20,7 @@
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 # Set up the ODE
 
@@ -42,11 +42,11 @@ u0 = jnp.asarray([20.0, 20.0])
 # Set up a solver
 # To all users: Try replacing the fixedpoint-smoother with a filter!
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
-ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
-strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
-adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+ts = probdiffeq.correction_ts1(vf, ssm=ssm)
+strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
+adaptive_solver = probdiffeq.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
 
 # Solve the ODE
 ts = jnp.linspace(t0, t1, endpoint=True, num=50)

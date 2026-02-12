@@ -31,7 +31,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main():
@@ -175,12 +175,12 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
-        corr = ivpsolvers.correction_ts1(vf_probdiffeq, ssm=ssm)
-        solver = ivpsolvers.solver(strategy, prior=ibm, correction=corr, ssm=ssm)
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        corr = probdiffeq.correction_ts1(vf_probdiffeq, ssm=ssm)
+        solver = probdiffeq.solver(strategy, prior=ibm, correction=corr, ssm=ssm)
+        control = probdiffeq.control_proportional_integral()
+        adaptive_solver = probdiffeq.adaptive(
             solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
         )
 

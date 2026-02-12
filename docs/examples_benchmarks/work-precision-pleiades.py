@@ -32,7 +32,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
@@ -61,10 +61,10 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
     # Assemble algorithms
     algorithms = {
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, correction_fun=ivpsolvers.correction_ts0
+            num_derivatives=5, correction_fun=probdiffeq.correction_ts0
         ),
         r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, correction_fun=ivpsolvers.correction_ts0
+            num_derivatives=8, correction_fun=probdiffeq.correction_ts0
         ),
         "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
         "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
@@ -197,16 +197,16 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, ssm_fact="isotropic"
         )
         ts0_or_ts1 = correction_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
-        solver = ivpsolvers.solver_dynamic(
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        solver = probdiffeq.solver_dynamic(
             strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
         )
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
+        control = probdiffeq.control_proportional_integral()
+        adaptive_solver = probdiffeq.adaptive(
             solver, atol=1e-3 * tol, rtol=tol, control=control, ssm=ssm
         )
 

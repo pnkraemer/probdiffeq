@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
 
-from probdiffeq import ivpsolve, ivpsolvers, stats
+from probdiffeq import ivpsolve, probdiffeq
 
 
 def main(num_data=100, epochs=1_000, print_every=100, hidden=(20,), lr=0.2):
@@ -44,7 +44,7 @@ def main(num_data=100, epochs=1_000, print_every=100, hidden=(20,), lr=0.2):
     # Plot the data and the initial guess
     plt.title(f"Initial estimate | Loss: {loss0:.2f}")
     plt.plot(grid, data, "x", label="Data", color="C0")
-    plt.plot(grid, info0["sol"].u[0], "-", label="Estimate", color="C1")
+    plt.plot(grid, info0["sol"].u.mean[0], "-", label="Estimate", color="C1")
     plt.legend()
     plt.show()
 
@@ -79,8 +79,8 @@ def main(num_data=100, epochs=1_000, print_every=100, hidden=(20,), lr=0.2):
     # Plot the results
     plt.title(f"Final estimate | Loss: {info['loss']:.2f}")
     plt.plot(grid, data, "x", label="Data", color="C0")
-    plt.plot(grid, info0["sol"].u[0], "-", label="Initial estimate", color="C1")
-    plt.plot(grid, info["sol"].u[0], "-", label="Final estimate", color="C2")
+    plt.plot(grid, info0["sol"].u.mean[0], "-", label="Initial estimate", color="C1")
+    plt.plot(grid, info["sol"].u.mean[0], "-", label="Final estimate", color="C2")
     plt.legend()
     plt.show()
 
@@ -149,22 +149,22 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
         )
-        ts0 = ivpsolvers.correction_ts0(lambda *a, **kw: vf(*a, **kw, p=p), ssm=ssm)
-        strategy = ivpsolvers.strategy_smoother(ssm=ssm)
-        solver_ts0 = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+        ts0 = probdiffeq.correction_ts0(lambda *a, **kw: vf(*a, **kw, p=p), ssm=ssm)
+        strategy = probdiffeq.strategy_smoother(ssm=ssm)
+        solver_ts0 = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
         # Solve
-        sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver_ts0, ssm=ssm)
+        solve = ivpsolve.solve_fixed_grid(solver=solver_ts0)
+        sol = solve(init, grid=grid)
 
         # Evaluate loss
-        marginal_likelihood = stats.log_marginal_likelihood(
+        marginal_likelihood = strategy.log_marginal_likelihood(
             data[:, None],
             standard_deviation=jnp.ones_like(grid) * stdev,
             posterior=sol.posterior,
-            ssm=sol.ssm,
         )
         return -1 * marginal_likelihood, {"sol": sol}
 
