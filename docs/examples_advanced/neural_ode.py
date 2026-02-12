@@ -26,13 +26,13 @@ import optax
 from probdiffeq import ivpsolve, probdiffeq
 
 
-def main(num_data=100, epochs=1_000, print_every=100, hidden=(20,), lr=0.2):
+def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
     """Train a neural ODE using diffusion tempering."""
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)
     data = jnp.sin(2.5 * jnp.pi * grid) * jnp.pi * grid
     stdev = 1e-1
-    output_scale = 1e2
+    output_scale = 1e4
     vf, u0, (t0, t1), f_args = vf_neural_ode(hidden=hidden, t0=0.0, t1=1)
 
     # Create a loss (this is where probabilistic numerics enters!)

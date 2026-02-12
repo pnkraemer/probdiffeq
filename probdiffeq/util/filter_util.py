@@ -88,7 +88,7 @@ def kalmanfilter_with_marginal_likelihood(*, ssm):
         observed, conditional = ssm.conditional.revert(rv, model)
         corrected = ssm.conditional.apply(data, conditional)
         logpdf = ssm.stats.logpdf(data, observed)
-        return _KFState(corrected, num_data_points=0.0, logpdf=logpdf)
+        return _KFState(corrected, num_data_points=1.0, logpdf=logpdf)
 
     def _step(state: _KFState, cond_and_data_and_obs) -> tuple[_KFState, _KFState]:
         conditional, data, observation = cond_and_data_and_obs
