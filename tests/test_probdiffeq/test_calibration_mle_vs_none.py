@@ -23,7 +23,8 @@ def case_solve_fixed_grid(fact):
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        return ivpsolve.solve_fixed_grid(init, solver=solver, grid=grid)
+        solve = ivpsolve.solve_fixed_grid(solver=solver)
+        return solve(init, grid=grid)
 
     return solver_to_solution, ssm
 
@@ -43,36 +44,9 @@ def case_solve_adaptive_save_at(fact):
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = probdiffeq.errorest_schober_bosch(
-            prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
-        )
-        return ivpsolve.solve_adaptive_save_at(
-            init, errorest=errorest, solver=solver, save_at=save_at, dt0=dt0
-        )
-
-    return solver_to_solution, ssm
-
-
-@testing.case()
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def case_solve_adaptive_save_every_step(fact):
-    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
-
-    dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
-
-    def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = probdiffeq.errorest_schober_bosch(
-            prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
-        )
-        return ivpsolve.solve_adaptive_save_every_step(
-            init, t0=t0, t1=t1, dt0=dt0, solver=solver, errorest=errorest
-        )
+        errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+        solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+        return solve(init, save_at=save_at, dt0=dt0, atol=1e-2, rtol=1e-2)
 
     return solver_to_solution, ssm
 
@@ -90,12 +64,11 @@ def case_simulate_terminal_values(fact):
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = probdiffeq.errorest_schober_bosch(
-            prior=ibm, correction=ts0, ssm=ssm, atol=1e-2, rtol=1e-2
+        errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            errorest=errorest, solver=solver
         )
-        return ivpsolve.solve_adaptive_terminal_values(
-            init, solver=solver, errorest=errorest, t0=t0, t1=t1, dt0=dt0
-        )
+        return solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2, rtol=1e-2)
 
     return solver_to_solution, ssm
 

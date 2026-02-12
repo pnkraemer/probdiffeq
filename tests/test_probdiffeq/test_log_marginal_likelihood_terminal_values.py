@@ -31,12 +31,9 @@ def fixture_solution(strategy_func, fact):
     ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
-    )
-    sol = ivpsolve.solve_adaptive_terminal_values(
-        init, t0=t0, t1=t1, solver=solver, errorest=errorest
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
+    sol = solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
     return sol, strategy
 
 

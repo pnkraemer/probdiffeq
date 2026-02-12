@@ -48,12 +48,9 @@ def fixture_solution(correction_impl, fact):
 
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=corr, atol=1e-2, rtol=1e-2, ssm=ssm
-    )
-    return ivpsolve.solve_adaptive_terminal_values(
-        init, t0=t0, t1=t1, solver=solver, errorest=errorest
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=corr, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
+    return solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
 
 
 def test_terminal_value_simulation_matches_reference(solution):
