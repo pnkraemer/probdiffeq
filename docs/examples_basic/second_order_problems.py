@@ -49,16 +49,13 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(
 ts0 = probdiffeq.correction_ts0(vf_1, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-errorest_1st = probdiffeq.errorest_schober_bosch(
-    prior=ibm, correction=ts0, atol=1e-5, rtol=1e-5, ssm=ssm
-)
+errorest_1st = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
 
 
 # -
-solve = ivpsolve.solve_adaptive(
-    solver=solver_1st, errorest=errorest_1st, num_save_at=150
-)
-solution = jax.jit(solve)(init, t0=t0, t1=t1)
+save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest_1st)
+solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 norm = jnp.linalg.norm((solution.u.mean[0][-1] - u0) / jnp.abs(1.0 + u0))
 plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
@@ -85,16 +82,12 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(
 ts0 = probdiffeq.correction_ts0(vf_2, ode_order=2, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-errorest_2nd = probdiffeq.errorest_schober_bosch(
-    prior=ibm, correction=ts0, atol=1e-5, rtol=1e-5, ssm=ssm
-)
+errorest_2nd = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
 
 # -
 
-solve = ivpsolve.solve_adaptive(
-    solver=solver_2nd, errorest=errorest_2nd, num_save_at=150
-)
-solution = jax.jit(solve)(init, t0=t0, t1=t1)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
+solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 
 norm = jnp.linalg.norm((solution.u.mean[0][-1, ...] - u0) / jnp.abs(1.0 + u0))
 plt.title(f"error={norm:.3f}")

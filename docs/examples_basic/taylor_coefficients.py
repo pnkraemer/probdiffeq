@@ -29,7 +29,7 @@ import jax
 import jax.numpy as jnp
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, probdiffeq, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
@@ -61,10 +61,9 @@ def solve(tc):
     strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    adaptive_solver = probdiffeq.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-    return ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=prior, correction=ts0, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
 
 
 # -
@@ -110,14 +109,15 @@ print(jax.tree.map(jnp.shape, solution.u))
 # +
 
 key = jax.random.PRNGKey(seed=15)
-posterior = stats.markov_select_terminal(solution.posterior)
-samples, samples_init = stats.markov_sample(
-    key, posterior, reverse=True, ssm=solution.ssm
-)
+_, _, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+strategy = probdiffeq.strategy_filter(ssm)
+posterior = solution.posterior
+sample_one = strategy.markov_sample(key, posterior, reverse=True)
+sample_many = strategy.markov_sample(key, posterior, shape=(1, 2, 3), reverse=True)
 
-print(jax.tree.map(jnp.shape, solution.u))
-print(jax.tree.map(jnp.shape, solution.u_std))
-print(jax.tree.map(jnp.shape, samples))
-print(jax.tree.map(jnp.shape, samples_init))
+print(jax.tree.map(jnp.shape, solution.u.mean))
+print(jax.tree.map(jnp.shape, solution.u.std))
+print(jax.tree.map(jnp.shape, sample_one))
+print(jax.tree.map(jnp.shape, sample_many))
 
 # -

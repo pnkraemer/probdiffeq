@@ -17,6 +17,7 @@
 # +
 """Display the marginal uncertainties of filters and smoothers."""
 
+import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
@@ -46,13 +47,13 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag
 ts = probdiffeq.correction_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
 solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
-adaptive_solver = probdiffeq.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
+errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts, ssm=ssm)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+
 
 # Solve the ODE
 ts = jnp.linspace(t0, t1, endpoint=True, num=50)
-sol = ivpsolve.solve_adaptive_save_at(
-    init, save_at=ts, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
-)
+sol = jax.jit(solve)(init, save_at=ts, dt0=0.1, atol=1e-1, rtol=1e-1)
 
 # Plot the solution
 fig, axes = plt.subplots(
@@ -60,9 +61,9 @@ fig, axes = plt.subplots(
     ncols=len(tcoeffs),
     sharex="col",
     tight_layout=True,
-    figsize=(len(sol.u) * 2, 5),
+    figsize=(len(sol.u.mean) * 2, 5),
 )
-for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, sol.u_std, axes.T)):
+for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u.mean, sol.u.std, axes.T)):
     # Set up titles and axis descriptions
     if i == 0:
         ax_i[0].set_title("State")
