@@ -67,7 +67,7 @@ def solve_adaptive_save_at(
     clip_dt=False,
     warn=True,
     while_loop=control_flow.while_loop,
-) -> Callable[[T, Array, float, float, float], Solution[T]]:
+) -> Callable:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
     This algorithm implements the method by Krämer (2025). Please consider citing it

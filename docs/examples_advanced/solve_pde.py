@@ -52,11 +52,11 @@ def main():
     solver = probdiffeq.solver_dynamic(
         ssm=ssm, strategy=strategy, prior=ibm, correction=ts
     )
-    adaptive_solver = probdiffeq.adaptive(solver, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts, ssm=ssm)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)
-    simulate = simulator(save_at=save_at, adaptive_solver=adaptive_solver, ssm=ssm)
+    simulate = simulator(save_at=save_at, errorest=errorest, solver=solver)
     (u, u_std) = simulate(init)
 
     fig, axes = plt.subplots(
@@ -81,15 +81,14 @@ def main():
     plt.show()
 
 
-def simulator(save_at, adaptive_solver, ssm):
+def simulator(save_at, errorest, solver):
     """Simulate a PDE."""
 
     @jax.jit
     def solve(init):
-        solution = ivpsolve.solve_adaptive_save_at(
-            init, save_at=save_at, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
-        )
-        return (solution.u[0], solution.u_std[0])
+        solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+        solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-2)
+        return (solution.u.mean[0], solution.u.std[0])
 
     return solve
 

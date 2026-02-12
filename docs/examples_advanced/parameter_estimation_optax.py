@@ -57,8 +57,6 @@ tcoeffs = (u0, vf(u0, t0, p=f_args))
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=10.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
-strategy = probdiffeq.strategy_smoother(ssm=ssm)
 
 
 def solve(p):
@@ -105,6 +103,7 @@ plt.show()
 def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
     """Evaluate the data fit as a function of the parameters."""
     sol_ = solve(parameters_)
+    strategy = probdiffeq.strategy_smoother(ssm=ssm)
     return -1.0 * strategy.log_marginal_likelihood(
         data,
         standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
