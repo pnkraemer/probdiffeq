@@ -286,19 +286,26 @@ class _Strategy(Generic[T]):
 
     def markov_marginals(self, markov_seq, *, reverse):
         """Extract the (time-)marginals from a Markov sequence."""
-        markov_seq = self._markov_select_terminal(markov_seq)
+        if markov_seq.init.mean.ndim == markov_seq.conditional.noise.mean.ndim:
+            markov_seq = self._markov_select_terminal(markov_seq)
 
         def step(x, cond):
             extrapolated = self.ssm.conditional.marginalise(x, cond)
             return extrapolated, extrapolated
 
         init, xs = markov_seq.init, markov_seq.conditional
-        _, marg = control_flow.scan(step, init=init, xs=xs, reverse=reverse)
-        return marg
+        _, marginals = control_flow.scan(step, init=init, xs=xs, reverse=reverse)
+
+        if reverse:
+            # Append the terminal marginal to the computed ones
+            return tree_array_util.tree_append(marginals, init)
+
+        return tree_array_util.tree_prepend(init, marginals)
 
     def markov_sample(self, key, markov_seq, *, reverse, shape=()):
         """Sample from a Markov sequence."""
-        markov_seq = self._markov_select_terminal(markov_seq)
+        if markov_seq.init.mean.ndim == markov_seq.conditional.noise.mean.ndim:
+            markov_seq = self._markov_select_terminal(markov_seq)
         # A smoother samples on the grid by sampling i.i.d values
         # from the terminal RV x_N and the backward noises z_(1:N)
         # and then combining them backwards as
@@ -519,10 +526,6 @@ class strategy_smoother(_Strategy[MarkovSeq]):
         # Marginalise
         marginals = self.markov_marginals(posterior, reverse=True)
 
-        # Append the terminal marginal to the computed ones
-        marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
-
         # Prepend the initial condition to the filtering distributions
         init = tree_array_util.tree_prepend(posterior0.init, posterior.init)
         posterior = MarkovSeq(init=init, conditional=posterior.conditional)
@@ -733,10 +736,6 @@ class strategy_fixedpoint(_Strategy[MarkovSeq]):
 
         # Marginalise
         marginals = self.markov_marginals(posterior, reverse=True)
-
-        # Append the terminal marginal to the computed ones
-        marginal_t1 = tree_util.tree_map(lambda s: s[-1, ...], posterior.init)
-        marginals = tree_array_util.tree_append(marginals, marginal_t1)
 
         # Prepend the initial condition to the filtering distributions
         init = tree_array_util.tree_prepend(posterior0.init, posterior.init)
