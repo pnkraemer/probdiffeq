@@ -120,7 +120,7 @@ def solve_adaptive_save_at(
         solver=solver, eps=eps, clip_dt=clip_dt, control=control, errorest=errorest
     )
 
-    def advance(sol_and_state: T, t_next) -> tuple[T, Any]:
+    def advance(sol_and_state: tuple, t_next) -> tuple[tuple, Any]:
         """Advance the adaptive solver to the next checkpoint.
 
         Note: we may already be beyond the checkpoint in which case

@@ -258,7 +258,7 @@ class _Strategy(Generic[T]):
     is_suitable_for_save_every_step: int
     is_suitable_for_offgrid_marginals: int
 
-    def init_posterior(self, *, marginals) -> T:
+    def init_posterior(self, *, u) -> T:
         """Initialise a state from a solution."""
         raise NotImplementedError
 
@@ -1396,7 +1396,7 @@ class solver(_ProbabilisticSolver):
 
 
 @containers.dataclass
-class errorest_schober_bosch:
+class errorest_schober_bosch(Generic[T]):
     atol: float
     rtol: float
     prior: Any
