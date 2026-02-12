@@ -146,31 +146,30 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
     u0 = jnp.asarray((20.0, 20.0))
     t0, t1 = (0.0, 50.0)
 
+    vf_auto = functools.partial(vf_probdiffeq, t=t0)
+    tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+        tcoeffs, ssm_fact=implementation
+    )
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    corr = correction(vf_probdiffeq, ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=corr, ssm=ssm)
+
+    control = ivpsolve.control_proportional_integral()
+    solve = ivpsolve.solve_adaptive_terminal_values(
+        errorest=errorest, solver=solver, control=control
+    )
+    dt0 = ivpsolve.dt0(vf_auto, (u0,))
+
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm_fact=implementation
-        )
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-        corr = correction(vf_probdiffeq, ssm=ssm)
-        solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-        control = probdiffeq.control_proportional_integral()
-        adaptive_solver = probdiffeq.adaptive(
-            solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
-        )
-
-        # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0,))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u[0])
+        return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 

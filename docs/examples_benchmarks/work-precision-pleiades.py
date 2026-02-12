@@ -191,33 +191,34 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
 
     t0, t1 = 0.0, 3.0
 
+    # Build a solver
+    vf_auto = functools.partial(vf_probdiffeq, t=t0)
+    tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
+
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+    ts0_or_ts1 = correction_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver_dynamic(
+        strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
+    )
+    errorest = probdiffeq.errorest_schober_bosch(
+        correction=ts0_or_ts1, prior=ibm, ssm=ssm
+    )
+
+    control = ivpsolve.control_proportional_integral()
+    solve = ivpsolve.solve_adaptive_terminal_values(
+        solver=solver, errorest=errorest, control=control
+    )
+
+    # Solve
+    dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
+
     @jax.jit
     def param_to_solution(tol):
-        # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
-
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm_fact="isotropic"
-        )
-        ts0_or_ts1 = correction_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-        solver = probdiffeq.solver_dynamic(
-            strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
-        )
-        control = probdiffeq.control_proportional_integral()
-        adaptive_solver = probdiffeq.adaptive(
-            solver, atol=1e-3 * tol, rtol=tol, control=control, ssm=ssm
-        )
-
-        # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u[0])
+        return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 

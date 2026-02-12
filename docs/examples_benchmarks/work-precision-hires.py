@@ -68,7 +68,7 @@ def main(start=1.0, stop=9.0, step=1.0, repeats=2, use_diffrax: bool = False):
         algorithms["Diffrax: Kvaerno3()"] = solver_diffrax(solver=diffrax.Kvaerno3())
         algorithms["Diffrax: Kvaerno5()"] = solver_diffrax(solver=diffrax.Kvaerno5())
     else:
-        print("\nSkipped Diffrax.\n")
+        print("\nSkipped Diffrax's Kvaerno.\n")
 
     # Compute a reference solution
     reference = solver_scipy(method="BDF")(1e-13)
@@ -156,28 +156,29 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
     t0, t1 = jnp.asarray([0.0, 321.8122])
 
+    # Build a solver
+    vf_auto = functools.partial(vf_probdiffeq, t=t0)
+    tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+    ts1 = probdiffeq.correction_ts1(vf_probdiffeq, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts1, ssm=ssm)
+
+    control = ivpsolve.control_proportional_integral()
+    solve = ivpsolve.solve_adaptive_terminal_values(
+        solver=solver, clip_dt=True, control=control, errorest=errorest
+    )
+
+    # Solve
+    dt0 = ivpsolve.dt0(vf_auto, (u0,))
+
     @jax.jit
     def param_to_solution(tol):
-        # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts1 = probdiffeq.correction_ts1(vf_probdiffeq, ssm=ssm)
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-        solver = probdiffeq.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
-        control = probdiffeq.control_proportional_integral()
-        adaptive_solver = probdiffeq.adaptive(
-            solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm, clip_dt=True
-        )
-
-        # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0,))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u[0])
+        return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 
