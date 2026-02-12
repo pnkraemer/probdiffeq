@@ -1152,7 +1152,6 @@ class solver_mle(_ProbabilisticSolver):
         )
 
     def step(self, state, *, dt):
-        u_step_from = state.u.mean
         (correction_state, output_scale_running, num_data) = state.auxiliary
 
         # Discretize
@@ -1231,7 +1230,6 @@ class solver_dynamic(_ProbabilisticSolver):
         )
 
     def step(self, state: ProbDiffEqSol, *, dt):
-        u_step_from = state.u.mean
         (correction_state,) = state.auxiliary
 
         # Calibrate the output scale

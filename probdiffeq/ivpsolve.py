@@ -22,16 +22,6 @@ from probdiffeq.backend.typing import (
 )
 
 T = TypeVar("T")
-S = TypeVar("S")
-
-# T_co = TypeVar('T_co', covariant=True)
-
-
-class Solver(Protocol[T]):
-    # TODO: is the target not a separate output?
-    #   Why is it a part of the ProbDiffEqSol output?
-    init: Callable[[ArrayLike, T], S]
-    step: Callable[[S], S]
 
 
 class Solution(Protocol[T]):
@@ -43,6 +33,16 @@ class Solution(Protocol[T]):
 
     t: Array
     u: T
+
+
+# Revisit this dependent typing one Python >=3.12 is enforced
+# Concretely, Something like Solver[T, S: Solution[T]](Protocol):...
+# can now be written.
+
+
+class Solver(Protocol[T]):
+    init: Callable[[ArrayLike, T], Solution[T]]
+    step: Callable[[Solution[T]], Solution[T]]
 
 
 def solve_adaptive_terminal_values(
@@ -329,7 +329,7 @@ class RejectionLoop:
         """
         # If t1 is in the future, enter the rejection loop (otherwise do nothing)
         is_before_t1 = state0.step_from.t + self.eps < t1
-        state = control_flow.cond(is_before_t1, self.step, lambda s: s, state0)
+        state = control_flow.cond(is_before_t1, self.step, lambda s: s[0], (state0, t1))
 
         # Interpolate
         is_before_t1 = state.step_from.t + self.eps < t1
@@ -338,18 +338,21 @@ class RejectionLoop:
         options = (self.interp_skip, self.interp_beyond_t1, self.interp_at_t1)
         return control_flow.switch(branch_idx, options, (state, t1))
 
-    def step(self, s):
+    def step(self, s_and_t1):
         """Do a rejection-loop step.
 
         Keep attempting steps until one is accepted.
         """
+        s, t1 = s_and_t1
 
         def cond(state: _RejectionLoopState) -> bool:
             # error_norm_proposed is EEst ** (-1/rate), thus "<"
             return state.error_norm_proposed < 1.0
 
         init = self.step_init_loopstate(s)
-        state_new = control_flow.while_loop(cond, self.step_attempt, init)
+        state_new = control_flow.while_loop(
+            cond, lambda x: self.step_attempt(x, t1), init
+        )
         return self.step_extract_timestepstate(state_new)
 
     def step_init_loopstate(self, s0: _TimeStepState) -> _RejectionLoopState:
@@ -369,7 +372,7 @@ class RejectionLoop:
             errorest_proposed=_ones_like(s0.errorest_step_from),  # irrelevant
         )
 
-    def step_attempt(self, state: _RejectionLoopState) -> _RejectionLoopState:
+    def step_attempt(self, state: _RejectionLoopState, t1) -> _RejectionLoopState:
         """Attempt a step.
 
         Perform a step with an IVP solver and

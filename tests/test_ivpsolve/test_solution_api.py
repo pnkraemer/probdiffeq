@@ -25,15 +25,17 @@ def fixture_pn_solution(fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    asolver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    errorest = ivpsolvers.errorest_schober(
+        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
+    )
     return ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=asolver, ssm=ssm
+        init, t0=t0, t1=t1, solver=solver, errorest=errorest
     )
 
 
 def test_u_inherits_data_structure(pn_solution):
-    assert isinstance(pn_solution.u, Taylor)
+    assert isinstance(pn_solution.u.mean, Taylor)
 
 
 def test_u_std_inherits_data_structure(pn_solution):
-    assert isinstance(pn_solution.u_std, Taylor)
+    assert isinstance(pn_solution.u.std, Taylor)

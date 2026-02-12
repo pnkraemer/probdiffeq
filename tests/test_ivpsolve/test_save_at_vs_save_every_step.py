@@ -25,15 +25,13 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     save_every = ivpsolve.solve_adaptive_save_every_step(
         init, t0=t0, t1=t1, errorest=errorest, solver=solver, dt0=0.1
     )
-    u_interpolated = solver.offgrid_marginals_searchsorted(
-        ts[1:-1], solution=save_every
-    )
+    offgrid = functools.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
+    u_interpolated = offgrid(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
     save_at = ivpsolve.solve_adaptive_save_at(
         init, save_at=ts, errorest=errorest, solver=solver, dt0=0.1
     )
-
     u_save_at = tree_util.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
