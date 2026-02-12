@@ -1,6 +1,6 @@
 """Tests for interaction with the solution API."""
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import containers, ode, testing
 from probdiffeq.backend.typing import Array
 
@@ -20,12 +20,12 @@ def fixture_pn_solution(fact):
 
     # Generate a solver
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober_bosch(
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     return ivpsolve.solve_adaptive_save_every_step(

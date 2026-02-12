@@ -5,7 +5,7 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing
 
@@ -16,8 +16,8 @@ def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
@@ -36,14 +36,14 @@ def case_solve_adaptive_save_at(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     save_at = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = ivpsolvers.errorest_schober_bosch(
+        errorest = probdiffeq.errorest_schober_bosch(
             prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
         )
         return ivpsolve.solve_adaptive_save_at(
@@ -61,13 +61,13 @@ def case_solve_adaptive_save_every_step(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = ivpsolvers.errorest_schober_bosch(
+        errorest = probdiffeq.errorest_schober_bosch(
             prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
         )
         return ivpsolve.solve_adaptive_save_every_step(
@@ -84,13 +84,13 @@ def case_simulate_terminal_values(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = ivpsolvers.errorest_schober_bosch(
+        errorest = probdiffeq.errorest_schober_bosch(
             prior=ibm, correction=ts0, ssm=ssm, atol=1e-2, rtol=1e-2
         )
         return ivpsolve.solve_adaptive_terminal_values(
@@ -105,15 +105,15 @@ def case_simulate_terminal_values(fact):
 @testing.parametrize(
     "strategy_fun",
     [
-        ivpsolvers.strategy_filter,
-        ivpsolvers.strategy_smoother,
-        ivpsolvers.strategy_fixedpoint,
+        probdiffeq.strategy_filter,
+        probdiffeq.strategy_smoother,
+        probdiffeq.strategy_fixedpoint,
     ],
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
     solve, ssm = solver_to_solution
-    uncalib = solve(ivpsolvers.solver, strategy_fun)
-    mle = solve(ivpsolvers.solver_mle, strategy_fun)
+    uncalib = solve(probdiffeq.solver, strategy_fun)
+    mle = solve(probdiffeq.solver_mle, strategy_fun)
     return (uncalib, mle)
 
 

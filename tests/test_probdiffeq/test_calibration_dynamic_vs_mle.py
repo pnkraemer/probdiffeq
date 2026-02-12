@@ -5,7 +5,7 @@ This is difficult for the MLE- and calibration-free solver,
 but not for the dynamic solver.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import functools, linalg, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -15,10 +15,10 @@ def test_exponential_approximated_well(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (*u0, vf(*u0, t=t0))
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver_dynamic(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=20)
     approximation = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)

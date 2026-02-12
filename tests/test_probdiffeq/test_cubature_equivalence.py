@@ -1,13 +1,13 @@
 """Test equivalences between cubature rules."""
 
-from probdiffeq import ivpsolvers
+from probdiffeq import probdiffeq
 from probdiffeq.backend import testing
 
 
 def test_third_order_spherical_vs_unscented_transform_scalar_input():
     """Assert that UT with r=0 equals the third-order spherical rule."""
-    tos = ivpsolvers.cubature_third_order_spherical(input_shape=())
-    ut = ivpsolvers.cubature_unscented_transform(input_shape=(), r=0.0)
+    tos = probdiffeq.cubature_third_order_spherical(input_shape=())
+    ut = probdiffeq.cubature_unscented_transform(input_shape=(), r=0.0)
     tos_points, tos_weights = tos.points, tos.weights_sqrtm
     ut_points, ut_weights = ut.points, ut.weights_sqrtm
     for x, y in [(ut_weights, tos_weights), (ut_points, tos_points)]:
@@ -19,8 +19,8 @@ def test_third_order_spherical_vs_unscented_transform_scalar_input():
 @testing.parametrize("n", [4])
 def test_third_order_spherical_vs_unscented_transform(n):
     """Assert that UT with r=0 equals the third-order spherical rule."""
-    tos = ivpsolvers.cubature_third_order_spherical(input_shape=(n,))
-    ut = ivpsolvers.cubature_unscented_transform(input_shape=(n,), r=0.0)
+    tos = probdiffeq.cubature_third_order_spherical(input_shape=(n,))
+    ut = probdiffeq.cubature_unscented_transform(input_shape=(n,), r=0.0)
     tos_points, tos_weights = tos.points, tos.weights_sqrtm
     ut_points, ut_weights = ut.points, ut.weights_sqrtm
     for x, y in [(ut_weights, tos_weights), (ut_points, tos_points)]:

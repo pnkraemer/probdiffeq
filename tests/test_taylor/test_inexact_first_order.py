@@ -1,6 +1,6 @@
 """Tests for inexact approximations for first-order problems."""
 
-from probdiffeq import ivpsolvers, taylor
+from probdiffeq import probdiffeq, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -13,7 +13,7 @@ def test_initialised_correct_shape_and_values(num, fact):
     solution = taylor.odejet_padded_scan(vf_autonomous, (u0,), num=num)
 
     tcoeffs_like = [tree_util.tree_map(np.zeros_like, u0)] * (num + 1)
-    _init, prior, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs_like, ssm_fact=fact)
+    _init, prior, ssm = probdiffeq.prior_wiener_integrated(tcoeffs_like, ssm_fact=fact)
     rk_starter = taylor.runge_kutta_starter(dt=0.01, prior=prior, ssm=ssm, num=num)
     derivatives = rk_starter(vf, (u0,), t=t0)
     assert len(derivatives) == 1 + num

@@ -1,23 +1,23 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing, tree_util
 
 
 @testing.case()
 def case_strategy_filter():
-    return ivpsolvers.strategy_filter
+    return probdiffeq.strategy_filter
 
 
 @testing.case()
 def case_strategy_smoother():
-    return ivpsolvers.strategy_smoother
+    return probdiffeq.strategy_smoother
 
 
 @testing.case()
 def case_strategy_fixedpoint():
-    return ivpsolvers.strategy_fixedpoint
+    return probdiffeq.strategy_fixedpoint
 
 
 @testing.fixture(name="solution")
@@ -27,11 +27,11 @@ def fixture_solution(strategy_func, fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober_bosch(
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     sol = ivpsolve.solve_adaptive_terminal_values(

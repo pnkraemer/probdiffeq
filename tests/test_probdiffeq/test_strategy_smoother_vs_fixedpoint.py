@@ -3,7 +3,7 @@
 That is, when called with correct adaptive- and checkpoint-setups.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -20,11 +20,11 @@ def fixture_solver_setup(fact):
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober_bosch(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
+    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
     )
     return ivpsolve.solve_adaptive_save_every_step(
@@ -40,11 +40,11 @@ def fixture_solution_smoother(solver_setup):
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober_bosch(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
+    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
     )
 
@@ -76,10 +76,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Re-generate the smoothing solver
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    _init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy_sm = ivpsolvers.strategy_smoother(ssm=ssm)
-    solver_smoother = ivpsolvers.solver(strategy_sm, prior=ibm, correction=ts0, ssm=ssm)
+    _init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
+    strategy_sm = probdiffeq.strategy_smoother(ssm=ssm)
+    solver_smoother = probdiffeq.solver(strategy_sm, prior=ibm, correction=ts0, ssm=ssm)
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
@@ -90,11 +90,11 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy_fp = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver(strategy_fp, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober_bosch(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
+    strategy_fp = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver(strategy_fp, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
     )
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(

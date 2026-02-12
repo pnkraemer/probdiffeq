@@ -1,6 +1,6 @@
 """Tests for IVP solvers."""
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -11,10 +11,10 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (u0, vf(u0, t=t0))
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
 
@@ -39,10 +39,10 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)

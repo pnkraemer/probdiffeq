@@ -1,6 +1,6 @@
 """Compare simulate_terminal_values to solve_adaptive_save_every_step."""
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing, tree_util
 
@@ -12,12 +12,12 @@ def test_terminal_values_identical(fact):
 
     # Generate a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober_bosch(
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     solution_loop = ivpsolve.solve_adaptive_save_every_step(

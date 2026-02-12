@@ -1,6 +1,6 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import functools, linalg, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -18,24 +18,24 @@ def fixture_solver_setup(fact):
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, ssm_fact=solver_setup["fact"]
     )
-    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     return ivpsolve.solve_fixed_grid(init, grid=solver_setup["grid"], solver=solver)
 
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, ssm_fact=solver_setup["fact"]
     )
-    ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = ivpsolvers.strategy_smoother(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
+    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     return ivpsolve.solve_fixed_grid(init, grid=solver_setup["grid"], solver=solver)
 
 

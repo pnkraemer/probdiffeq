@@ -1,13 +1,13 @@
 """Assert that solve_with_python_loop is accurate."""
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend import ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 @testing.parametrize(
-    "strategy", [ivpsolvers.strategy_filter, ivpsolvers.strategy_smoother]
+    "strategy", [probdiffeq.strategy_filter, probdiffeq.strategy_smoother]
 )
 def test_python_loop_output_matches_reference(fact, strategy):
     ivp = ode.ivp_lotka_volterra()
@@ -27,14 +27,14 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     vf, u0, (t0, t1) = ivp
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    init, transition, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, transition, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     strategy = strategy_fun(ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
 
     # Adaptive solvers need an error estimate
-    errorest = ivpsolvers.errorest_schober_bosch(
+    errorest = probdiffeq.errorest_schober_bosch(
         prior=transition, ssm=ssm, correction=ts0, atol=1e-2, rtol=1e-2
     )
     return ivpsolve.solve_adaptive_save_every_step(
