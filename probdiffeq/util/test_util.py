@@ -1,5 +1,7 @@
+"""Test utilities."""
+
 import probdiffeq.ivpsolve
-from probdiffeq.backend import functools, tree_array_util, warnings
+from probdiffeq.backend import control_flow, functools, tree_array_util, warnings
 from probdiffeq.backend.typing import TypeVar
 
 T = TypeVar("T")
@@ -26,7 +28,14 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
         control = probdiffeq.ivpsolve.control_proportional_integral()
 
     loop = probdiffeq.ivpsolve.RejectionLoop(
-        solver=solver, clip_dt=clip_dt, control=control, errorest=errorest
+        solver=solver,
+        clip_dt=clip_dt,
+        control=control,
+        errorest=errorest,
+        # We do not expose this option to the user
+        # because we do not want to suggest that this function
+        # uses meaningful looping to begin with.
+        while_loop=control_flow.while_loop,
     )
 
     def solve(
