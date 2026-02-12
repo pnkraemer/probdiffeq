@@ -1,7 +1,8 @@
 """Tests for interaction with the solution API."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, ode, testing
+from probdiffeq.backend import containers, functools, ode, testing
+from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import Array
 
 
@@ -25,12 +26,10 @@ def fixture_pn_solution(fact):
     ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
-    )
-    return ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, solver=solver, errorest=errorest
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    save_at = np.linspace(t0, t1, endpoint=True, num=5)
+    return functools.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 
 
 def test_u_inherits_data_structure(pn_solution):

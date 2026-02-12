@@ -1396,20 +1396,25 @@ class solver(_ProbabilisticSolver):
 
 
 @containers.dataclass
-class errorest_schober_bosch(Generic[T]):
-    atol: float
-    rtol: float
+class errorest_schober_bosch:
     prior: Any
     ssm: Any
     correction: Any
-    norm_ord: Any = None
+    norm_order: Any = None
 
-    def init_errorest(self) -> T:
-        return self.correction.init()
+    def init_errorest(self) -> tuple:
+        return (self.correction.init(),)
 
     def estimate_error_norm(
-        self, state: T, previous: ProbDiffEqSol, proposed: ProbDiffEqSol, dt: float
-    ) -> tuple[float, T]:
+        self,
+        state: tuple,
+        previous: ProbDiffEqSol,
+        proposed: ProbDiffEqSol,
+        *,
+        dt: float,
+        atol: float,
+        rtol: float,
+    ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1418,17 +1423,32 @@ class errorest_schober_bosch(Generic[T]):
         # Estimate the error
         mean = self.ssm.stats.mean(previous.u.marginals)
         mean_extra = self.ssm.conditional.apply(mean, transition)
+        (state,) = state
         error, state = self._linearize_and_estimate(mean_extra, state, t=proposed.t)
 
-        # Normalise the error
+        # Compute a reference
         u0 = tree_util.tree_leaves(previous.u.mean)[0]
         u1 = tree_util.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
+
+        # Turn the unscaled absolute error into a relative one
         error = tree_util.ravel_pytree(error)[0]
         reference = tree_util.ravel_pytree(reference)[0]
         error_abs = dt * error
-        error_norm = self._error_scale_and_normalize(error_abs, reference)
-        return error_norm, state
+        normalize = atol + rtol * np.abs(reference)
+        error_rel = error_abs / normalize
+
+        # Compute the of the error
+
+        def rms(s):
+            return linalg.vector_norm(s, order=self.norm_order) / np.sqrt(s.size)
+
+        error_norm = rms(error_rel)
+
+        # Scale the error norm with the error contraction rate and return
+        error_contraction_rate = self.ssm.num_derivatives + 1
+        error_power = error_norm ** (-1.0 / error_contraction_rate)
+        return error_power, (state,)
 
     def _linearize_and_estimate(self, rv, state, /, t):
         f_wrapped = functools.partial(self.correction.vector_field, t=t)
@@ -1441,14 +1461,3 @@ class errorest_schober_bosch(Generic[T]):
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, state
-
-    def _error_scale_and_normalize(self, error_abs, reference):
-        normalize = self.atol + self.rtol * np.abs(reference)
-        error_relative = error_abs / normalize
-
-        dim = np.atleast_1d(reference).size
-        error_norm = linalg.vector_norm(error_relative, order=self.norm_ord)
-        error_norm_rel = error_norm / np.sqrt(dim)
-
-        error_contraction_rate = self.ssm.num_derivatives + 1
-        return error_norm_rel ** (-1.0 / error_contraction_rate)

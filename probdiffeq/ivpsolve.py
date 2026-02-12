@@ -5,7 +5,6 @@ from probdiffeq.backend import (
     control_flow,
     functools,
     linalg,
-    tree_array_util,
     tree_util,
     warnings,
 )
@@ -45,44 +44,24 @@ class Solver(Protocol[T]):
     step: Callable[[Solution[T]], Solution[T]]
 
 
-@functools.partial(
-    functools.jit, static_argnames=["solver", "errorest", "control", "clip_dt"]
-)
-def solve_adaptive_terminal_values(
-    u: T, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
-) -> Solution[T]:
-    """Simulate the terminal values of an initial value problem."""
-    save_at = np.asarray([t0, t1])
-    solution = solve_adaptive_save_at(
-        u,
-        save_at=save_at,
-        solver=solver,
-        errorest=errorest,
-        dt0=dt0,
-        control=control,
-        clip_dt=clip_dt,
-        eps=eps,
-        warn=False,  # Turn off warnings because any solver goes for terminal values
+def solve_adaptive_terminal_values(solver, errorest, control=None, clip_dt=False):
+    # Turn off warnings because any solver goes for terminal values
+    solver = solve_adaptive_save_at(
+        solver=solver, errorest=errorest, control=control, clip_dt=clip_dt, warn=False
     )
-    return tree_util.tree_map(lambda s: s[-1], solution)
+
+    def solve(u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8) -> Solution[T]:
+        """Simulate the terminal values of an initial value problem."""
+        save_at = np.asarray([t0, t1])
+        solution = solver(u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps)
+        return tree_util.tree_map(lambda s: s[-1], solution)
+
+    return solve
 
 
-@functools.partial(
-    functools.jit, static_argnames=["solver", "errorest", "control", "clip_dt", "warn"]
-)
 def solve_adaptive_save_at(
-    u: T,
-    /,
-    *,
-    save_at,
-    solver,
-    errorest,
-    dt0=0.1,
-    control=None,
-    clip_dt=False,
-    eps=1e-8,
-    warn=True,
-) -> Solution[T]:
+    *, solver, errorest, control=None, clip_dt=False, warn=True
+) -> Callable[[T, Array, float, float, float], Solution[T]]:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
     This algorithm implements the method by Krämer (2025). Please consider citing it
@@ -117,87 +96,54 @@ def solve_adaptive_save_at(
         control = control_proportional_integral()
 
     loop = RejectionLoop(
-        solver=solver, eps=eps, clip_dt=clip_dt, control=control, errorest=errorest
+        solver=solver, clip_dt=clip_dt, control=control, errorest=errorest
     )
 
-    def advance(sol_and_state: tuple, t_next) -> tuple[tuple, Any]:
-        """Advance the adaptive solver to the next checkpoint.
+    def solve(u: T, save_at: Array, atol: float, rtol: float, dt0=0.1, eps=1e-8):
+        def advance(sol_and_state: tuple, t_next) -> tuple[tuple, Any]:
+            """Advance the adaptive solver to the next checkpoint.
 
-        Note: we may already be beyond the checkpoint in which case
-        the rejection loop automatically interpolates.
-        """
+            Note: we may already be beyond the checkpoint in which case
+            the rejection loop automatically interpolates.
+            """
 
-        @tree_util.register_dataclass
-        @containers.dataclass
-        class AdvanceState:
-            do_continue: bool
-            solution: Any
-            adaptive: Any
+            @tree_util.register_dataclass
+            @containers.dataclass
+            class AdvanceState:
+                do_continue: bool
+                solution: Any
+                loopstate: Any
 
-        def cond_fun(c: AdvanceState) -> bool:
-            return c.do_continue
+            def cond_fun(c: AdvanceState) -> bool:
+                return c.do_continue
 
-        def body_fun(state: AdvanceState) -> AdvanceState:
-            solution, state_new = loop.loop(state.adaptive, t1=t_next)
-            do_continue = state_new.step_from.t + loop.eps < t_next
-            return AdvanceState(do_continue, solution, state_new)
+            def body_fun(state: AdvanceState) -> AdvanceState:
+                solution, state_new = loop.loop(
+                    state.loopstate, t1=t_next, atol=atol, rtol=rtol, eps=eps
+                )
+                do_continue = state_new.step_from.t + eps < t_next
+                return AdvanceState(do_continue, solution, state_new)
 
-        # Always step >=1x into the rejection loop
-        init = AdvanceState(True, *sol_and_state)
-        advanced = control_flow.while_loop(cond_fun, body_fun, init=init)
-        return (advanced.solution, advanced.adaptive), advanced.solution
+            # Always step >=1x into the rejection loop
+            init = AdvanceState(True, *sol_and_state)
+            advanced = control_flow.while_loop(cond_fun, body_fun, init=init)
+            return (advanced.solution, advanced.loopstate), advanced.solution
 
-    # Initialise the adaptive solver
-    solution0 = solver.init(t=save_at[0], u=u)
-    state = loop.init(solution0, dt=dt0)
+        # Initialise the adaptive solver
+        solution0 = solver.init(t=save_at[0], u=u)
+        state = loop.init(solution0, dt=dt0)
 
-    # Advance to one checkpoint after the other
-    init = (solution0, state)
-    xs = save_at[1:]
-    (_solution, _state), solution = control_flow.scan(
-        advance, init=init, xs=xs, reverse=False
-    )
+        # Advance to one checkpoint after the other
+        init = (solution0, state)
+        xs = save_at[1:]
+        (_solution, _state), solution = control_flow.scan(
+            advance, init=init, xs=xs, reverse=False
+        )
 
-    # Stack the initial value into the solution and return
-    return solver.userfriendly_output(solution0=solution0, solution=solution)
+        # Stack the initial value into the solution and return
+        return solver.userfriendly_output(solution0=solution0, solution=solution)
 
-
-def solve_adaptive_save_every_step(
-    u: T, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
-) -> Solution[T]:
-    """Solve an initial value problem and save every step.
-
-    This function uses a native-Python while loop.
-
-    !!! warning
-        Not JITable, not reverse-mode-differentiable.
-    """
-    if not solver.is_suitable_for_save_every_step:
-        msg = f"Strategy {solver} should not be used in solve_adaptive_save_every_step."
-        warnings.warn(msg, stacklevel=1)
-
-    if control is None:
-        control = control_proportional_integral()
-
-    loop = RejectionLoop(
-        solver=solver, eps=eps, clip_dt=clip_dt, control=control, errorest=errorest
-    )
-
-    t0, t1 = np.asarray(t0), np.asarray(t1)
-    solution0 = functools.jit(solver.init)(t=t0, u=u)
-    state = functools.jit(loop.init)(solution0, dt=dt0)
-
-    rejection_loop_apply = functools.jit(loop.loop)
-
-    solutions = []
-    while state.step_from.t < t1:
-        solution, state = rejection_loop_apply(state, t1=t1)
-        solutions.append(solution)
-
-    solutions = tree_array_util.tree_stack(solutions)
-    return functools.jit(solver.userfriendly_output)(
-        solution0=solution0, solution=solutions
-    )
+    return solve
 
 
 @functools.partial(functools.jit, static_argnames=["solver"])
@@ -304,9 +250,6 @@ class RejectionLoop:
 
     solver: Any
 
-    eps: float
-    """A small value to determine whether $t \\approx t_1$ or not."""
-
     clip_dt: bool = containers.dataclass_field(metadata={"static": True})
     """Whether or not to clip the timestep before stepping."""
 
@@ -328,7 +271,9 @@ class RejectionLoop:
             errorest_interp_from=state_errorest,
         )
 
-    def loop(self, state0: _TimeStepState, *, t1) -> tuple[Any, _TimeStepState]:
+    def loop(
+        self, state0: _TimeStepState, *, t1, atol, rtol, eps
+    ) -> tuple[Any, _TimeStepState]:
         """Repeatedly attempt a step until the controller is happy.
 
         Notably:
@@ -337,22 +282,23 @@ class RejectionLoop:
         - If we step beyond t1, this function interpolates to t1.
         """
         # If t1 is in the future, enter the rejection loop (otherwise do nothing)
-        is_before_t1 = state0.step_from.t + self.eps < t1
-        state = control_flow.cond(is_before_t1, self.step, lambda s: s[0], (state0, t1))
+        is_before_t1 = state0.step_from.t + eps < t1
+        args = (state0, t1, atol, rtol)
+        state = control_flow.cond(is_before_t1, self.step, lambda s: s[0], args)
 
         # Interpolate
-        is_before_t1 = state.step_from.t + self.eps < t1
-        is_after_t1 = state.step_from.t > t1 + self.eps
+        is_before_t1 = state.step_from.t + eps < t1
+        is_after_t1 = state.step_from.t > t1 + eps
         branch_idx = np.where(is_before_t1, 0, np.where(is_after_t1, 1, 2))
         options = (self.interp_skip, self.interp_beyond_t1, self.interp_at_t1)
         return control_flow.switch(branch_idx, options, (state, t1))
 
-    def step(self, s_and_t1):
+    def step(self, s_and_t1_and_tols):
         """Do a rejection-loop step.
 
         Keep attempting steps until one is accepted.
         """
-        s, t1 = s_and_t1
+        s, t1, atol, rtol = s_and_t1_and_tols
 
         def cond(state: _RejectionLoopState) -> bool:
             # error_norm_proposed is EEst ** (-1/rate), thus "<"
@@ -360,7 +306,7 @@ class RejectionLoop:
 
         init = self.step_init_loopstate(s)
         state_new = control_flow.while_loop(
-            cond, lambda x: self.step_attempt(x, t1), init
+            cond, lambda x: self.step_attempt(x, t1=t1, atol=atol, rtol=rtol), init
         )
         return self.step_extract_timestepstate(state_new)
 
@@ -381,7 +327,9 @@ class RejectionLoop:
             errorest_proposed=_ones_like(s0.errorest_step_from),  # irrelevant
         )
 
-    def step_attempt(self, state: _RejectionLoopState, t1) -> _RejectionLoopState:
+    def step_attempt(
+        self, state: _RejectionLoopState, *, t1, atol, rtol
+    ) -> _RejectionLoopState:
         """Attempt a step.
 
         Perform a step with an IVP solver and
@@ -402,6 +350,8 @@ class RejectionLoop:
             previous=state.step_from,
             proposed=state_proposed,
             dt=dt,
+            atol=atol,
+            rtol=rtol,
         )
 
         # Propose a new step
