@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 import optax
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, probdiffeq, stats
+from probdiffeq import ivpsolve, probdiffeq
 
 # +
 if not backend.has_been_selected:
@@ -53,17 +53,25 @@ def vf(y, t, *, p):  # noqa: ARG001
     return f(y, *p)
 
 
+tcoeffs = (u0, vf(u0, t0, p=f_args))
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+    tcoeffs, output_scale=10.0, ssm_fact="isotropic"
+)
+ts0 = probdiffeq.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
+strategy = probdiffeq.strategy_smoother(ssm=ssm)
+
+
 def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
-    output_scale = 10.0
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-        tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
+        tcoeffs, output_scale=10.0, ssm_fact="isotropic"
     )
     ts0 = probdiffeq.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
     strategy = probdiffeq.strategy_smoother(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    return ivpsolve.solve_fixed_grid(init, grid=ts, solver=solver, ssm=ssm)
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    return solve(init, grid=ts)
 
 
 parameter_true = f_args + 0.05
@@ -72,7 +80,7 @@ parameter_guess = f_args
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 solution_true = solve(parameter_true)
-data = solution_true.u[0]
+data = solution_true.u.mean[0]
 plt.plot(ts, data, "P-")
 plt.show()
 # -
@@ -81,7 +89,7 @@ plt.show()
 
 solution_guess = solve(parameter_guess)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
-plt.plot(ts, solution_guess.u[0])
+plt.plot(ts, solution_guess.u.mean[0])
 plt.show()
 
 
@@ -97,11 +105,10 @@ plt.show()
 def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
     """Evaluate the data fit as a function of the parameters."""
     sol_ = solve(parameters_)
-    return -1.0 * stats.log_marginal_likelihood(
+    return -1.0 * strategy.log_marginal_likelihood(
         data,
         standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
         posterior=sol_.posterior,
-        ssm=sol_.ssm,
     )
 
 
@@ -155,5 +162,5 @@ for i in range(chunk_size):
 
 solution_better = solve(p)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
-plt.plot(ts, solution_better.u[0])
+plt.plot(ts, solution_better.u.mean[0])
 plt.show()
