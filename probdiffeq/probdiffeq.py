@@ -83,6 +83,13 @@ class ProbDiffEqSol(Generic[C, T]):
     or running means of the MLE calibration.
     """
 
+    fun_evals: Any
+    """Function evaluations.
+    
+    Used to cache observation models between solver steps
+    and error estimates.
+    """
+
 
 def prior_wiener_integrated(
     tcoeffs: C,
@@ -882,31 +889,25 @@ class _Correction:
         return corrected, observed, linearization_state
 
 
-def correction_ts0(vector_field, *, ssm, ode_order=1, damp: float = 0.0) -> _Correction:
+def correction_ts0(ssm, ode_order=1, damp: float = 0.0) -> _Correction:
     """Zeroth-order Taylor linearisation."""
-    linearize = ssm.linearise.ode_taylor_0th(ode_order=ode_order, damp=damp)
-    return _Correction(
-        name="TS0",
-        vector_field=vector_field,
-        ode_order=ode_order,
-        ssm=ssm,
-        linearize=linearize,
-        re_linearize=False,
-    )
+    return ssm.linearise.ode_taylor_0th(ode_order=ode_order, damp=damp)
+    # return _Correction(
+    #     name="TS0",
+    #     vector_field=vector_field,
+    #     ode_order=ode_order,
+    #     ssm=ssm,
+    #     linearize=linearize,
+    #     re_linearize=False,
+    # )
 
 
 def correction_ts1(
-    vector_field,
-    *,
-    ssm,
-    ode_order=1,
-    damp: float = 0.0,
-    jvp_probes=10,
-    jvp_probes_seed=1,
+    *, ssm, ode_order=1, damp: float = 0.0, jvp_probes=10, jvp_probes_seed=1
 ) -> _Correction:
     """First-order Taylor linearisation."""
     assert jvp_probes > 0
-    linearize = ssm.linearise.ode_taylor_1st(
+    return ssm.linearise.ode_taylor_1st(
         ode_order=ode_order,
         damp=damp,
         jvp_probes=jvp_probes,
@@ -954,6 +955,7 @@ def correction_slr1(
 
 @containers.dataclass
 class _ProbabilisticSolver:
+    vector_field: Callable
     strategy: _Strategy
     prior: Callable
     ssm: Any
@@ -1067,6 +1069,7 @@ class _ProbabilisticSolver:
             output_scale=interp_to.output_scale,
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
+            fun_evals=interp_to.fun_evals,
         )
 
         interpolated = ProbDiffEqSol(
@@ -1078,6 +1081,7 @@ class _ProbabilisticSolver:
             output_scale=interp_to.output_scale,
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
+            fun_evals=interp_to.fun_evals,
         )
 
         interp_from = ProbDiffEqSol(
@@ -1089,6 +1093,7 @@ class _ProbabilisticSolver:
             output_scale=interp_from.output_scale,
             auxiliary=interp_from.auxiliary,
             num_steps=interp_from.num_steps,
+            fun_evals=interp_from.fun_evals,
         )
 
         interp_res = _InterpRes(step_from=step_from, interp_from=interp_from)
@@ -1111,6 +1116,7 @@ class _ProbabilisticSolver:
             output_scale=interp_from.output_scale,  # incorrect?
             auxiliary=interp_from.auxiliary,  # incorrect?
             num_steps=interp_from.num_steps,  # incorrect?
+            fun_evals=interp_from.fun_evals,
         )
         sol = ProbDiffEqSol(
             t=interp_to.t,
@@ -1121,6 +1127,7 @@ class _ProbabilisticSolver:
             output_scale=interp_to.output_scale,
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
+            fun_evals=interp_to.fun_evals,
         )
         acc = ProbDiffEqSol(
             t=interp_to.t,
@@ -1131,6 +1138,7 @@ class _ProbabilisticSolver:
             output_scale=interp_to.output_scale,
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
+            fun_evals=interp_to.fun_evals,
         )
         return sol, _InterpRes(step_from=acc, interp_from=prev)
 
@@ -1149,6 +1157,11 @@ class solver_mle(_ProbabilisticSolver):
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
         output_scale_running = 9 * output_scale_prior
         auxiliary = (correction_state, output_scale_running, 0)
+
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        fun_evals, correction_state = self.correction.update(
+            f_wrapped, estimate.marginals, correction_state
+        )
         return ProbDiffEqSol(
             t=t,
             u=estimate,
@@ -1156,6 +1169,7 @@ class solver_mle(_ProbabilisticSolver):
             auxiliary=auxiliary,
             output_scale=output_scale_prior,
             num_steps=0,
+            fun_evals=fun_evals,
         )
 
     def step(self, state, *, dt):
@@ -1186,12 +1200,17 @@ class solver_mle(_ProbabilisticSolver):
         hidden, prediction = self.strategy.predict(
             posterior=state.posterior, transition=transition
         )
+        t = state.t + dt
+
+        # Linearize
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        linearized, correction_state = self.correction.update(
+            f_wrapped, hidden.marginals, correction_state
+        )
 
         # Do the full correction step
-        t = state.t + dt
-        updates, observed, correction_state = self.correction.updates(
-            hidden.marginals, correction_state, t=t
-        )
+        observed, reverted = self.ssm.conditional.revert(hidden.marginals, linearized)
+        updates = reverted.noise
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
         )
@@ -1211,6 +1230,7 @@ class solver_mle(_ProbabilisticSolver):
             output_scale=state.output_scale,
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
+            fun_evals=linearized,
         )
 
     def userfriendly_output(
@@ -1238,6 +1258,7 @@ class solver_mle(_ProbabilisticSolver):
             output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
+            fun_evals=solution.fun_evals,
         )
 
 
@@ -1250,6 +1271,11 @@ class solver_dynamic(_ProbabilisticSolver):
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         auxiliary = (correction_state,)
+
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        fun_evals, correction_state = self.correction.update(
+            f_wrapped, estimate.marginals, correction_state
+        )
         return ProbDiffEqSol(
             t=t,
             u=estimate,
@@ -1257,6 +1283,7 @@ class solver_dynamic(_ProbabilisticSolver):
             auxiliary=auxiliary,
             output_scale=output_scale,
             num_steps=0,
+            fun_evals=fun_evals,
         )
 
     def step(self, state: ProbDiffEqSol, *, dt):
@@ -1269,7 +1296,13 @@ class solver_dynamic(_ProbabilisticSolver):
         hidden = self.ssm.conditional.apply(mean, transition)
 
         t = state.t + dt
-        _, observed, _ = self.correction.updates(hidden, correction_state, t=t)
+
+        # Linearize
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        linearized, correction_state = self.correction.update(
+            f_wrapped, hidden, correction_state
+        )
+        observed = self.ssm.conditional.marginalise(hidden, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
 
         # Do the full extrapolation with the calibrated output scale
@@ -1278,10 +1311,14 @@ class solver_dynamic(_ProbabilisticSolver):
             posterior=state.posterior, transition=transition
         )
 
-        # Do the full correction step
-        updates, _, correction_state = self.correction.updates(
-            estimate.marginals, correction_state, t=t
+        # Relinearise (TODO: optional?)
+        re_linearized, correction_state = self.correction.update(
+            f_wrapped, estimate.marginals, correction_state
         )
+
+        # Complete the update
+        _, reverted = self.ssm.conditional.revert(estimate.marginals, re_linearized)
+        updates = reverted.noise
         estimate, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
         )
@@ -1294,6 +1331,7 @@ class solver_dynamic(_ProbabilisticSolver):
             num_steps=state.num_steps + 1,
             auxiliary=(correction_state,),
             output_scale=output_scale,
+            fun_evals=linearized0,
         )
 
     def userfriendly_output(self, *, solution: ProbDiffEqSol, solution0: ProbDiffEqSol):
@@ -1318,6 +1356,7 @@ class solver_dynamic(_ProbabilisticSolver):
             output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
+            fun_evals=solution.fun_evals,
         )
 
 
@@ -1395,10 +1434,79 @@ class solver(_ProbabilisticSolver):
 
 
 @containers.dataclass
-class errorest_schober_bosch:
+class errorest_schober_bosch_cached:
+    # Same as errorest_schober_bosch, but no additional
+    # vector field evaluations.
+
     prior: Any
     ssm: Any
+    norm_order: Any = None
+
+    def init_errorest(self) -> tuple:
+        return ()
+
+    def estimate_error_norm(
+        self,
+        state: tuple,
+        previous: ProbDiffEqSol,
+        proposed: ProbDiffEqSol,
+        *,
+        dt: float,
+        atol: float,
+        rtol: float,
+    ) -> tuple[float, tuple]:
+        # Discretize; The output scale is set to one
+        # since the error is multiplied with a local scale estimate anyway
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        transition = self.prior(dt, output_scale)
+
+        # Estimate the error
+        mean = self.ssm.stats.mean(previous.u.marginals)
+        mean_extra = self.ssm.conditional.apply(mean, transition)
+        error = self._linearize_and_estimate(
+            mean_extra, t=proposed.t, linearized=proposed.fun_evals
+        )
+
+        # Compute a reference
+        u0 = tree_util.tree_leaves(previous.u.mean)[0]
+        u1 = tree_util.tree_leaves(proposed.u.mean)[0]
+        reference = np.maximum(np.abs(u0), np.abs(u1))
+
+        # Turn the unscaled absolute error into a relative one
+        error = tree_util.ravel_pytree(error)[0]
+        reference = tree_util.ravel_pytree(reference)[0]
+        error_abs = dt * error
+        normalize = atol + rtol * np.abs(reference)
+        error_rel = error_abs / normalize
+
+        # Compute the of the error
+
+        def rms(s):
+            return linalg.vector_norm(s, order=self.norm_order) / np.sqrt(s.size)
+
+        error_norm = rms(error_rel)
+
+        # Scale the error norm with the error contraction rate and return
+        error_contraction_rate = self.ssm.num_derivatives + 1
+        error_power = error_norm ** (-1.0 / error_contraction_rate)
+        return error_power, ()
+
+    def _linearize_and_estimate(self, rv, /, t, *, linearized):
+        observed = self.ssm.conditional.marginalise(rv, linearized)
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+        stdev = self.ssm.stats.standard_deviation(observed)
+
+        error_estimate_unscaled = np.squeeze(stdev)
+        error_estimate = output_scale * error_estimate_unscaled
+        return error_estimate
+
+
+@containers.dataclass
+class errorest_schober_bosch:
+    vector_field: Any
     correction: Any
+    prior: Any
+    ssm: Any
     norm_order: Any = None
 
     def init_errorest(self) -> tuple:
@@ -1422,7 +1530,6 @@ class errorest_schober_bosch:
         # Estimate the error
         mean = self.ssm.stats.mean(previous.u.marginals)
         mean_extra = self.ssm.conditional.apply(mean, transition)
-        (state,) = state
         error, state = self._linearize_and_estimate(mean_extra, state, t=proposed.t)
 
         # Compute a reference
@@ -1450,10 +1557,10 @@ class errorest_schober_bosch:
         return error_power, (state,)
 
     def _linearize_and_estimate(self, rv, state, /, t):
-        f_wrapped = functools.partial(self.correction.vector_field, t=t)
-        cond, state = self.correction.linearize.update(f_wrapped, rv, state)
-        observed = self.ssm.conditional.marginalise(rv, cond)
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        linearized, state = self.correction.update(f_wrapped, rv, state)
 
+        observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
         stdev = self.ssm.stats.standard_deviation(observed)
 

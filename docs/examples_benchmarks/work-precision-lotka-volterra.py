@@ -153,9 +153,11 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
         tcoeffs, ssm_fact=implementation
     )
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    corr = correction(vf_probdiffeq, ssm=ssm)
-    solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=corr, ssm=ssm)
+    corr = correction(ssm=ssm)
+    solver = probdiffeq.solver_mle(
+        vf_probdiffeq, strategy=strategy, prior=ibm, correction=corr, ssm=ssm
+    )
+    errorest = probdiffeq.errorest_schober_bosch_cached(prior=ibm, ssm=ssm)
 
     control = ivpsolve.control_proportional_integral()
     solve = ivpsolve.solve_adaptive_terminal_values(
