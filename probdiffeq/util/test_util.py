@@ -1,10 +1,8 @@
+import probdiffeq.ivpsolve
 from probdiffeq.backend import functools, tree_array_util, warnings
-from probdiffeq.ivpsolve import (
-    RejectionLoop,
-    Solution,
-    T,
-    control_proportional_integral,
-)
+from probdiffeq.backend.typing import TypeVar
+
+T = TypeVar("T")
 
 
 def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False):
@@ -23,14 +21,17 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
     if not solver.is_suitable_for_save_every_step:
         msg = f"Strategy {solver} should not be used in solve_adaptive_save_every_step."
         warnings.warn(msg, stacklevel=1)
-    if control is None:
-        control = control_proportional_integral()
 
-    loop = RejectionLoop(
+    if control is None:
+        control = probdiffeq.ivpsolve.control_proportional_integral()
+
+    loop = probdiffeq.ivpsolve.RejectionLoop(
         solver=solver, clip_dt=clip_dt, control=control, errorest=errorest
     )
 
-    def solve(u: T, t0, t1, *, atol, rtol, dt0=0.1, eps=1e-8) -> Solution[T]:
+    def solve(
+        u: T, t0, t1, *, atol, rtol, dt0=0.1, eps=1e-8
+    ) -> probdiffeq.ivpsolve.Solution[T]:
         solution0 = functools.jit(solver.init)(t=t0, u=u)
         state = functools.jit(loop.init)(solution0, dt=dt0)
 

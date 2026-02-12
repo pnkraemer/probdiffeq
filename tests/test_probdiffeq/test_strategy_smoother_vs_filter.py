@@ -24,7 +24,8 @@ def fixture_filter_solution(solver_setup):
     ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    return ivpsolve.solve_fixed_grid(init, grid=solver_setup["grid"], solver=solver)
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    return solve(init, grid=solver_setup["grid"])
 
 
 @testing.fixture(name="smoother_solution")
@@ -36,7 +37,8 @@ def fixture_smoother_solution(solver_setup):
     ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    return ivpsolve.solve_fixed_grid(init, grid=solver_setup["grid"], solver=solver)
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    return solve(init, grid=solver_setup["grid"])
 
 
 def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):

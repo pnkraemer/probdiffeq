@@ -80,8 +80,8 @@ def test_raises_error_for_filter(fact):
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=3)
-    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
-
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    sol = solve(init, grid=grid)
     data = tree_util.tree_map(lambda s: s + 0.1, sol.u.mean[0])
     std = tree_util.tree_map(np.ones_like, sol.u.std[0])
     with testing.raises(TypeError, match="ilter"):

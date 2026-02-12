@@ -6,6 +6,7 @@ That is, when called with correct adaptive- and checkpoint-setups.
 from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
+from probdiffeq.util import test_util
 
 
 @testing.fixture(name="solver_setup")
@@ -24,17 +25,10 @@ def fixture_solution_smoother(solver_setup):
     ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
-    )
-    return ivpsolve.solve_adaptive_save_every_step(
-        init,
-        t0=solver_setup["t0"],
-        t1=solver_setup["t1"],
-        dt0=0.1,
-        errorest=errorest,
-        solver=solver,
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solve = test_util.solve_adaptive_save_every_step(errorest=errorest, solver=solver)
+    t0, t1 = solver_setup["t0"], solver_setup["t1"]
+    return solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-3, rtol=1e-3)
 
 
 def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
@@ -44,14 +38,11 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
 
     save_at = solution_smoother.t
-    solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
-        init, save_at=save_at, errorest=errorest, solver=solver, dt0=0.1
-    )
+    solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+    solution_fixedpoint = solve(init, save_at=save_at, dt0=0.1, atol=1e-3, rtol=1e-3)
 
     sol_fp, sol_sm = solution_fixedpoint, solution_smoother  # alias for brevity
     assert testing.allclose(sol_fp.t, sol_sm.t)
@@ -94,12 +85,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ts0 = probdiffeq.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy_fp = probdiffeq.strategy_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy_fp, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
-    )
-    solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, errorest=errorest, solver=solver, dt0=0.1
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+    solution_fixedpoint = solve(init, save_at=ts, dt0=0.1, atol=1e-3, rtol=1e-3)
 
     # Extract the interior points of the save_at solution
     # (because only there is the interpolated solution defined)

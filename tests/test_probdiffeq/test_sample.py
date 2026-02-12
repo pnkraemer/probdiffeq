@@ -1,7 +1,8 @@
 """Tests for sampling behaviour."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import ode, random, testing, tree_util
+from probdiffeq.backend import functools, ode, random, testing, tree_util
+from probdiffeq.backend import numpy as np
 
 
 @testing.fixture(name="approximation_and_strategy")
@@ -12,15 +13,13 @@ def fixture_approximation_and_strategy(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
-    )
-    sol = ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, solver=solver, errorest=errorest
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    save_at = np.linspace(t0, t1, endpoint=True, num=7)
+    sol = functools.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
     return sol, strategy
 
 

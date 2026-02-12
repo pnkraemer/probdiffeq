@@ -3,6 +3,7 @@
 from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
+from probdiffeq.util import test_util
 
 
 @testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
@@ -16,22 +17,18 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(
-        prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
-    )
+    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
-    save_every = ivpsolve.solve_adaptive_save_every_step(
-        init, t0=t0, t1=t1, errorest=errorest, solver=solver, dt0=0.1
-    )
+    solve = test_util.solve_adaptive_save_every_step(errorest=errorest, solver=solver)
+    save_every = solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
     offgrid = functools.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
     u_interpolated = offgrid(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
-    save_at = ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, errorest=errorest, solver=solver, dt0=0.1
-    )
+    solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+    save_at = solve(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
     u_save_at = tree_util.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
@@ -66,7 +63,8 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
-    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    sol = solve(init, grid=grid)
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
@@ -95,7 +93,8 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, endpoint=True, num=5)
-    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    sol = solve(init, grid=grid)
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
