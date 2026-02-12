@@ -501,17 +501,19 @@ class strategy_smoother(_Strategy[MarkovSeq]):
         return ProbTaylorCoeffs(u, u_std, marginals), posterior
 
     def finalize(self, *, posterior0: MarkovSeq, posterior: MarkovSeq, output_scale):
-        # Calibrate
-        scale0 = output_scale[-1, ...]
-        init0 = self.ssm.stats.rescale_cholesky(posterior0.init, scale0)
+        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+
+        init0 = self.ssm.stats.rescale_cholesky(posterior0.init, output_scale)
         conditional0 = self.ssm.conditional.rescale_noise(
-            posterior0.conditional, scale0
+            posterior0.conditional, output_scale
         )
         posterior0 = MarkovSeq(init0, conditional0)
 
-        scale = output_scale
-        init = self.ssm.stats.rescale_cholesky(posterior.init, scale)
-        conditional = self.ssm.conditional.rescale_noise(posterior.conditional, scale)
+        # Calibrate
+        init = self.ssm.stats.rescale_cholesky(posterior.init, output_scale)
+        conditional = self.ssm.conditional.rescale_noise(
+            posterior.conditional, output_scale
+        )
         posterior = MarkovSeq(init, conditional)
 
         # Marginalise
@@ -626,8 +628,12 @@ class strategy_filter(_Strategy):
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
+        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+
+        # No rescaling because no calibration at the initial step
+        posterior0 = self.ssm.stats.rescale_cholesky(posterior0, output_scale)
+
         # Calibrate
-        posterior0 = self.ssm.stats.rescale_cholesky(posterior0, output_scale[-1, ...])
         posterior = self.ssm.stats.rescale_cholesky(posterior, output_scale)
 
         # Stack
@@ -711,12 +717,14 @@ class strategy_fixedpoint(_Strategy[MarkovSeq]):
         return estimate, posterior
 
     def finalize(self, *, posterior0: MarkovSeq, posterior: MarkovSeq, output_scale):
-        # Calibrate
-        init = self.ssm.stats.rescale_cholesky(posterior0.init, output_scale[-1, ...])
+        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+        init = self.ssm.stats.rescale_cholesky(posterior0.init, output_scale)
         conditional = self.ssm.conditional.rescale_noise(
             posterior0.conditional, output_scale
         )
         posterior0 = MarkovSeq(init, conditional)
+
+        # Calibrate the time series
         init = self.ssm.stats.rescale_cholesky(posterior.init, output_scale)
         conditional = self.ssm.conditional.rescale_noise(
             posterior.conditional, output_scale
@@ -1140,7 +1148,7 @@ class solver_mle(_ProbabilisticSolver):
         correction_state = self.correction.init()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
-        output_scale_running = 0 * output_scale_prior
+        output_scale_running = 9 * output_scale_prior
         auxiliary = (correction_state, output_scale_running, 0)
         return ProbDiffEqSol(
             t=t,
@@ -1154,8 +1162,26 @@ class solver_mle(_ProbabilisticSolver):
     def step(self, state, *, dt):
         (correction_state, output_scale_running, num_data) = state.auxiliary
 
+        # # Discretise
+        # output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        # transition = self.prior(dt, state.output_scale)
+
+        # # Do the full extrapolation step (reuse the transition)
+        # hidden, prediction = self.strategy.predict(
+        #     posterior=state.posterior, transition=transition
+        # )
+
+        # t = state.t + dt
+        # updates, _, correction_state = self.correction.updates(
+        #     hidden.marginals, correction_state, t=t
+        # )
+        # u, posterior = self.strategy.apply_updates(
+        #     prediction=prediction, updates=updates
+        # )
+
         # Discretize
-        transition = self.prior(dt, state.output_scale)
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        transition = self.prior(dt, output_scale)
 
         # Do the full prediction step
         hidden, prediction = self.strategy.predict(
@@ -1167,7 +1193,7 @@ class solver_mle(_ProbabilisticSolver):
         updates, observed, correction_state = self.correction.updates(
             hidden.marginals, correction_state, t=t
         )
-        estimate, posterior = self.strategy.apply_updates(
+        u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
         )
 
@@ -1181,7 +1207,7 @@ class solver_mle(_ProbabilisticSolver):
         auxiliary = (correction_state, output_scale_running, num_data + 1)
         return ProbDiffEqSol(
             t=t,
-            u=estimate,
+            u=u,
             posterior=posterior,
             output_scale=state.output_scale,
             auxiliary=auxiliary,
@@ -1191,8 +1217,12 @@ class solver_mle(_ProbabilisticSolver):
     def userfriendly_output(
         self, *, solution0: ProbDiffEqSol, solution: ProbDiffEqSol
     ) -> ProbDiffEqSol:
+        assert solution.t.ndim > 0
+
         # This is the MLE solver, so we take the calibrated scale
         _, output_scale, _ = solution.auxiliary
+        ones = np.ones_like(output_scale)
+        output_scale = output_scale[-1]
 
         init = solution0.posterior
         posterior = solution.posterior
@@ -1200,6 +1230,7 @@ class solver_mle(_ProbabilisticSolver):
             posterior0=init, posterior=posterior, output_scale=output_scale
         )
 
+        output_scale = ones * output_scale[None, ...]
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbDiffEqSol(
             t=ts,
@@ -1269,7 +1300,8 @@ class solver_dynamic(_ProbabilisticSolver):
     def userfriendly_output(self, *, solution: ProbDiffEqSol, solution0: ProbDiffEqSol):
         # This is the dynamic solver,
         # and all covariances have been calibrated already
-        output_scale = np.ones_like(solution.output_scale)
+        ones = np.ones_like(solution.output_scale)
+        output_scale = ones[-1, ...]
 
         init = solution0.posterior
         posterior = solution.posterior
@@ -1278,12 +1310,13 @@ class solver_dynamic(_ProbabilisticSolver):
         )
 
         # TODO: stack the calibrated output scales?
+        output_scale = ones
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbDiffEqSol(
             t=ts,
             u=estimate,
             posterior=posterior,
-            output_scale=solution.output_scale,
+            output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
         )
@@ -1309,7 +1342,8 @@ class solver(_ProbabilisticSolver):
         (correction_state,) = state.auxiliary
 
         # Discretise
-        transition = self.prior(dt, state.output_scale)
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        transition = self.prior(dt, output_scale)
 
         # Do the full extrapolation step (reuse the transition)
         hidden, prediction = self.strategy.predict(
@@ -1323,11 +1357,12 @@ class solver(_ProbabilisticSolver):
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
         )
+
         return ProbDiffEqSol(
             t=t,
             u=u,
             posterior=posterior,
-            output_scale=state.output_scale,
+            output_scale=output_scale,
             auxiliary=(correction_state,),
             num_steps=state.num_steps + 1,
         )
@@ -1335,19 +1370,24 @@ class solver(_ProbabilisticSolver):
     def userfriendly_output(
         self, *, solution0: ProbDiffEqSol, solution: ProbDiffEqSol
     ) -> ProbDiffEqSol:
+        assert solution.t.ndim > 0
+
         # This is the uncalibrated solver, so scale=1
-        output_scale = np.ones_like(solution.output_scale)
+        ones = np.ones_like(solution.output_scale)
+        output_scale = np.ones_like(solution.output_scale[-1])
 
         init = solution0.posterior
         posterior = solution.posterior
-        estimate, posterior = self.strategy.finalize(
+        u, posterior = self.strategy.finalize(
             posterior0=init, posterior=posterior, output_scale=output_scale
         )
+
+        output_scale = ones * output_scale[None, ...]
 
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbDiffEqSol(
             t=ts,
-            u=estimate,
+            u=u,
             posterior=posterior,
             output_scale=output_scale,
             num_steps=solution.num_steps,
@@ -1356,18 +1396,18 @@ class solver(_ProbabilisticSolver):
 
 
 @containers.dataclass
-class errorest_schober:
+class errorest_schober_bosch:
+    atol: float
+    rtol: float
     prior: Any
     ssm: Any
     correction: Any
-    atol: float = 1e-4
-    rtol: float = 1e-2
     norm_ord: Any = None
 
-    def init(self) -> T:
+    def init_errorest(self) -> T:
         return self.correction.init()
 
-    def estimate(
+    def estimate_error_norm(
         self, state: T, previous: ProbDiffEqSol, proposed: ProbDiffEqSol, dt: float
     ) -> tuple[float, T]:
         # Discretize; The output scale is set to one
@@ -1378,7 +1418,7 @@ class errorest_schober:
         # Estimate the error
         mean = self.ssm.stats.mean(previous.u.marginals)
         mean_extra = self.ssm.conditional.apply(mean, transition)
-        error, state = self.linearize_and_estimate(mean_extra, state, t=proposed.t)
+        error, state = self._linearize_and_estimate(mean_extra, state, t=proposed.t)
 
         # Normalise the error
         u0 = tree_util.tree_leaves(previous.u.mean)[0]
@@ -1387,22 +1427,22 @@ class errorest_schober:
         error = tree_util.ravel_pytree(error)[0]
         reference = tree_util.ravel_pytree(reference)[0]
         error_abs = dt * error
-        error_norm = self.error_scale_and_normalize(error_abs, reference)
+        error_norm = self._error_scale_and_normalize(error_abs, reference)
         return error_norm, state
 
-    def linearize_and_estimate(self, rv, state, /, t):
+    def _linearize_and_estimate(self, rv, state, /, t):
         f_wrapped = functools.partial(self.correction.vector_field, t=t)
         cond, state = self.correction.linearize.update(f_wrapped, rv, state)
         observed = self.ssm.conditional.marginalise(rv, cond)
 
-        zero_data = np.zeros(())
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(zero_data, rv=observed)
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
         stdev = self.ssm.stats.standard_deviation(observed)
+
         error_estimate_unscaled = np.squeeze(stdev)
         error_estimate = output_scale * error_estimate_unscaled
         return error_estimate, state
 
-    def error_scale_and_normalize(self, error_abs, reference):
+    def _error_scale_and_normalize(self, error_abs, reference):
         normalize = self.atol + self.rtol * np.abs(reference)
         error_relative = error_abs / normalize
 

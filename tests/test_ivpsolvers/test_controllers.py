@@ -1,6 +1,6 @@
 """Test the controllers."""
 
-from probdiffeq import ivpsolvers
+from probdiffeq import ivpsolve
 from probdiffeq.backend import testing
 
 
@@ -8,10 +8,10 @@ from probdiffeq.backend import testing
 @testing.parametrize("error_power", [3.142])
 @testing.parametrize("num_applies", [4])
 def test_equivalence_pi_vs_i(dt, error_power, num_applies):
-    ctrl_pi = ivpsolvers.control_proportional_integral(
+    ctrl_pi = ivpsolve.control_proportional_integral(
         power_integral_unscaled=1.0, power_proportional_unscaled=0.0
     )
-    ctrl_i = ivpsolvers.control_integral()
+    ctrl_i = ivpsolve.control_integral()
 
     x_pi = ctrl_pi.init(dt)
     dt_pi = dt

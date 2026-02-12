@@ -34,7 +34,7 @@ def python_loop_solution(ivp, *, fact, strategy_fun):
     solver = ivpsolvers.solver_mle(strategy, prior=transition, correction=ts0, ssm=ssm)
 
     # Adaptive solvers need an error estimate
-    errorest = ivpsolvers.errorest_schober(
+    errorest = ivpsolvers.errorest_schober_bosch(
         prior=transition, ssm=ssm, correction=ts0, atol=1e-2, rtol=1e-2
     )
     return ivpsolve.solve_adaptive_save_every_step(

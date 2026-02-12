@@ -25,7 +25,7 @@ def fixture_pn_solution(fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober(
+    errorest = ivpsolvers.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     return ivpsolve.solve_adaptive_save_every_step(

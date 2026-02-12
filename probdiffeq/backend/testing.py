@@ -67,8 +67,10 @@ def _allclose(a, b, /, *, atol: float | None, rtol: float | None):
     a = jnp.asarray(1.0 * a)
     b = jnp.asarray(1.0 * b)
 
-    # numpy.allclose uses defaults atol=1e-8 and rtol=1e-5;
-    # we mirror this as atol=sqrt(tol) and rtol slightly larger.
+    # numpy.allclose uses defaults atol=1e-8 and rtol=1e-5,
+    # which can be too restrictive in single precision.
+    # we mirror this by selecting tolerances proportional
+    # to the square root of the machine epsilon.
     tol = jnp.sqrt(jnp.finfo(b.dtype).eps)
     if atol is None:
         atol = tol

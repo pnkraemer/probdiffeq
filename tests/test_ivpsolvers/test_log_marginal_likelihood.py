@@ -16,7 +16,7 @@ def fixture_solution(fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober(
+    errorest = ivpsolvers.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     save_at = np.linspace(t0, t1, endpoint=True, num=4)
@@ -83,7 +83,7 @@ def test_raises_error_for_filter(fact):
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=3)
-    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver, ssm=ssm)
+    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
 
     data = tree_util.tree_map(lambda s: s + 0.1, sol.u.mean[0])
     std = tree_util.tree_map(np.ones_like, sol.u.std[0])

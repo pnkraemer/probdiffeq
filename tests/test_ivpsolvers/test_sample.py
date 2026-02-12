@@ -15,7 +15,7 @@ def fixture_approximation_and_strategy(fact):
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
-    errorest = ivpsolvers.errorest_schober(
+    errorest = ivpsolvers.errorest_schober_bosch(
         prior=ibm, correction=ts0, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     sol = ivpsolve.solve_adaptive_save_every_step(

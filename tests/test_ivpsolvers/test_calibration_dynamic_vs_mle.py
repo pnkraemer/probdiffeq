@@ -21,7 +21,7 @@ def test_exponential_approximated_well(fact):
     solver = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=20)
-    approximation = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver, ssm=ssm)
+    approximation = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
 
     solution = ode.odeint_and_save_at(
         vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5

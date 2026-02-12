@@ -3,7 +3,7 @@
 That is, when called with correct adaptive- and checkpoint-setups.
 """
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, ivpsolvers, taylor
 from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
@@ -24,15 +24,16 @@ def fixture_solution_smoother(solver_setup):
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = ivpsolvers.strategy_smoother(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive = ivpsolvers.adaptive(atol=1e-3, rtol=1e-3, ssm=ssm)
+    errorest = ivpsolvers.errorest_schober_bosch(
+        prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
+    )
     return ivpsolve.solve_adaptive_save_every_step(
         init,
         t0=solver_setup["t0"],
         t1=solver_setup["t1"],
         dt0=0.1,
-        adaptive=adaptive,
+        errorest=errorest,
         solver=solver,
-        ssm=ssm,
     )
 
 
@@ -43,18 +44,20 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive = ivpsolvers.adaptive(atol=1e-3, rtol=1e-3, ssm=ssm)
+    errorest = ivpsolvers.errorest_schober_bosch(
+        prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
+    )
 
     save_at = solution_smoother.t
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
-        init, save_at=save_at, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
+        init, save_at=save_at, errorest=errorest, solver=solver, dt0=0.1
     )
 
     sol_fp, sol_sm = solution_fixedpoint, solution_smoother  # alias for brevity
     assert testing.allclose(sol_fp.t, sol_sm.t)
-    assert testing.allclose(sol_fp.u, sol_sm.u)
-    assert testing.allclose(sol_fp.u_std, sol_sm.u_std)
-    assert testing.allclose(sol_fp.marginals, sol_sm.marginals)
+    assert testing.allclose(sol_fp.u.mean, sol_sm.u.mean)
+    assert testing.allclose(sol_fp.u.std, sol_sm.u.std)
+    assert testing.allclose(sol_fp.u.marginals, sol_sm.u.marginals)
     assert testing.allclose(sol_fp.output_scale, sol_sm.output_scale)
     assert testing.allclose(sol_fp.num_steps, sol_sm.num_steps)
     assert testing.allclose(sol_fp.posterior.init, sol_sm.posterior.init)
@@ -62,8 +65,8 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     # The backward conditionals use different parametrisations
     # but implement the same transitions
     cond_fp, cond_sm = sol_fp.posterior.conditional, sol_sm.posterior.conditional
-    cond_fp = functools.vmap(sol_fp.ssm.conditional.preconditioner_apply)(cond_fp)
-    cond_sm = functools.vmap(sol_sm.ssm.conditional.preconditioner_apply)(cond_sm)
+    cond_fp = functools.vmap(ssm.conditional.preconditioner_apply)(cond_fp)
+    cond_sm = functools.vmap(ssm.conditional.preconditioner_apply)(cond_sm)
     assert testing.allclose(cond_fp, cond_sm)
 
 
@@ -80,9 +83,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
-    interpolated = stats.offgrid_marginals_searchsorted(
-        ts=ts[1:-1], solution=solution_smoother, solver=solver_smoother
+    offgrid = functools.partial(
+        solver_smoother.offgrid_marginals, solution=solution_smoother
     )
+    interpolated = functools.vmap(offgrid)(ts[1:-1])
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
@@ -90,23 +94,25 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ts0 = ivpsolvers.correction_ts0(solver_setup["vf"], ssm=ssm)
     strategy_fp = ivpsolvers.strategy_fixedpoint(ssm=ssm)
     solver = ivpsolvers.solver(strategy_fp, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive = ivpsolvers.adaptive(atol=1e-3, rtol=1e-3, ssm=ssm)
+    errorest = ivpsolvers.errorest_schober_bosch(
+        prior=ibm, correction=ts0, atol=1e-3, rtol=1e-3, ssm=ssm
+    )
     solution_fixedpoint = ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, adaptive=adaptive, solver=solver, dt0=0.1, ssm=ssm
+        init, save_at=ts, errorest=errorest, solver=solver, dt0=0.1
     )
 
     # Extract the interior points of the save_at solution
     # (because only there is the interpolated solution defined)
-    u_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u)
-    u_std_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u_std)
+    u_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.mean)
+    u_std_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.std)
     marginals_fixedpoint = tree_util.tree_map(
-        lambda s: s[1:-1], solution_fixedpoint.marginals
+        lambda s: s[1:-1], solution_fixedpoint.u.marginals
     )
 
-    assert testing.allclose(u_fixedpoint, interpolated[0])
-    assert testing.allclose(u_std_fixedpoint, interpolated[1])
+    assert testing.allclose(u_fixedpoint, interpolated.mean)
+    assert testing.allclose(u_std_fixedpoint, interpolated.std)
 
     # Compare QOI and marginals
     marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = functools.vmap(marginals_allclose_func)
-    assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated[2]))
+    assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated.marginals))

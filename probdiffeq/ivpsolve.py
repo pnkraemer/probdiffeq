@@ -45,6 +45,9 @@ class Solver(Protocol[T]):
     step: Callable[[Solution[T]], Solution[T]]
 
 
+@functools.partial(
+    functools.jit, static_argnames=["solver", "errorest", "control", "clip_dt"]
+)
 def solve_adaptive_terminal_values(
     u: T, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
 ) -> Solution[T]:
@@ -64,6 +67,9 @@ def solve_adaptive_terminal_values(
     return tree_util.tree_map(lambda s: s[-1], solution)
 
 
+@functools.partial(
+    functools.jit, static_argnames=["solver", "errorest", "control", "clip_dt", "warn"]
+)
 def solve_adaptive_save_at(
     u: T,
     /,
@@ -178,8 +184,8 @@ def solve_adaptive_save_every_step(
     )
 
     t0, t1 = np.asarray(t0), np.asarray(t1)
-    solution0 = solver.init(t=t0, u=u)
-    state = loop.init(solution0, dt=dt0)
+    solution0 = functools.jit(solver.init)(t=t0, u=u)
+    state = functools.jit(loop.init)(solution0, dt=dt0)
 
     rejection_loop_apply = functools.jit(loop.loop)
 
@@ -189,10 +195,13 @@ def solve_adaptive_save_every_step(
         solutions.append(solution)
 
     solutions = tree_array_util.tree_stack(solutions)
-    return solver.userfriendly_output(solution0=solution0, solution=solutions)
+    return functools.jit(solver.userfriendly_output)(
+        solution0=solution0, solution=solutions
+    )
 
 
-def solve_fixed_grid(u: T, /, *, grid, solver, ssm) -> Solution[T]:
+@functools.partial(functools.jit, static_argnames=["solver"])
+def solve_fixed_grid(u: T, /, *, grid, solver) -> Solution[T]:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
@@ -309,7 +318,7 @@ class RejectionLoop:
     def init(self, state_solver, dt) -> _TimeStepState:
         """Initialise the adaptive solver state."""
         state_control = self.control.init(dt)
-        state_errorest = self.errorest.init()
+        state_errorest = self.errorest.init_errorest()
         return _TimeStepState(
             dt=dt,
             step_from=state_solver,
@@ -388,8 +397,11 @@ class RejectionLoop:
         # Perform the actual step.
         state_proposed = self.solver.step(state=state.step_from, dt=dt)
 
-        error_power, errorstate = self.errorest.estimate(
-            state.errorest_step_from, state.step_from, proposed=state_proposed, dt=dt
+        error_power, errorstate = self.errorest.estimate_error_norm(
+            state.errorest_step_from,
+            previous=state.step_from,
+            proposed=state_proposed,
+            dt=dt,
         )
 
         # Propose a new step

@@ -16,7 +16,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
-    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver, ssm=ssm)
+    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
@@ -45,7 +45,8 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, endpoint=True, num=5)
-    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver, ssm=ssm)
+    sol = ivpsolve.solve_fixed_grid(init, grid=grid, solver=solver)
+
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)

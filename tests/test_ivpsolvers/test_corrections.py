@@ -48,7 +48,7 @@ def fixture_solution(correction_impl, fact):
 
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober(
+    errorest = ivpsolvers.errorest_schober_bosch(
         prior=ibm, correction=corr, atol=1e-2, rtol=1e-2, ssm=ssm
     )
     return ivpsolve.solve_adaptive_terminal_values(

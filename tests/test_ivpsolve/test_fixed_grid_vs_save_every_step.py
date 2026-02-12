@@ -21,7 +21,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = ivpsolvers.errorest_schober(
+    errorest = ivpsolvers.errorest_schober_bosch(
         prior=ibm, correction=ts0, ssm=ssm, atol=1e-2, rtol=1e-2
     )
 
@@ -31,9 +31,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result(fact):
     assert isinstance(solution_adaptive.u.mean, Taylor)
 
     grid_adaptive = solution_adaptive.t
-    solution_fixed = ivpsolve.solve_fixed_grid(
-        init, grid=grid_adaptive, solver=solver, ssm=ssm
-    )
+    solution_fixed = ivpsolve.solve_fixed_grid(init, grid=grid_adaptive, solver=solver)
     assert testing.allclose(solution_adaptive, solution_fixed)
 
     # Assert u and u_std have matching shapes (that was wrong before)
