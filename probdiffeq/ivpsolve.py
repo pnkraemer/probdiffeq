@@ -10,14 +10,44 @@ from probdiffeq.backend import (
     warnings,
 )
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Any, Callable, Generic, NamedArg, TypeVar
+from probdiffeq.backend.typing import (
+    Any,
+    Array,
+    ArrayLike,
+    Callable,
+    Generic,
+    NamedArg,
+    Protocol,
+    TypeVar,
+)
 
 T = TypeVar("T")
+S = TypeVar("S")
+
+# T_co = TypeVar('T_co', covariant=True)
+
+
+class Solver(Protocol[T]):
+    # TODO: is the target not a separate output?
+    #   Why is it a part of the ProbDiffEqSol output?
+    init: Callable[[ArrayLike, T], S]
+    step: Callable[[S], S]
+
+
+class Solution(Protocol[T]):
+    """An IVP solution protocol.
+
+    This means that all IVP solutions returned by the present
+    solvers have the following fields.
+    """
+
+    t: Array
+    u: T
 
 
 def solve_adaptive_terminal_values(
-    u, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
-):
+    u: T, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
+) -> Solution[T]:
     """Simulate the terminal values of an initial value problem."""
     save_at = np.asarray([t0, t1])
     solution = solve_adaptive_save_at(
@@ -35,7 +65,7 @@ def solve_adaptive_terminal_values(
 
 
 def solve_adaptive_save_at(
-    ssm_init,
+    u: T,
     /,
     *,
     save_at,
@@ -46,7 +76,7 @@ def solve_adaptive_save_at(
     clip_dt=False,
     eps=1e-8,
     warn=True,
-):
+) -> Solution[T]:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
     This algorithm implements the method by Krämer (2025). Please consider citing it
@@ -112,7 +142,7 @@ def solve_adaptive_save_at(
         return (advanced.solution, advanced.adaptive), advanced.solution
 
     # Initialise the adaptive solver
-    solution0 = solver.init(save_at[0], ssm_init)
+    solution0 = solver.init(t=save_at[0], u=u)
     state = loop.init(solution0, dt=dt0)
 
     # Advance to one checkpoint after the other
@@ -127,18 +157,8 @@ def solve_adaptive_save_at(
 
 
 def solve_adaptive_save_every_step(
-    ssm_init,
-    /,
-    *,
-    t0,
-    t1,
-    solver,
-    errorest,
-    dt0=0.1,
-    control=None,
-    clip_dt=False,
-    eps=1e-8,
-):
+    u: T, /, *, t0, t1, solver, errorest, dt0=0.1, control=None, clip_dt=False, eps=1e-8
+) -> Solution[T]:
     """Solve an initial value problem and save every step.
 
     This function uses a native-Python while loop.
@@ -158,7 +178,7 @@ def solve_adaptive_save_every_step(
     )
 
     t0, t1 = np.asarray(t0), np.asarray(t1)
-    solution0 = solver.init(t0, ssm_init)
+    solution0 = solver.init(t=t0, u=u)
     state = loop.init(solution0, dt=dt0)
 
     rejection_loop_apply = functools.jit(loop.loop)
@@ -172,7 +192,7 @@ def solve_adaptive_save_every_step(
     return solver.userfriendly_output(solution0=solution0, solution=solutions)
 
 
-def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm):
+def solve_fixed_grid(u: T, /, *, grid, solver, ssm) -> Solution[T]:
     """Solve an initial value problem on a fixed, pre-determined grid."""
     # Compute the solution
 
@@ -181,7 +201,7 @@ def solve_fixed_grid(ssm_init, /, *, grid, solver, ssm):
         return s_new, s_new
 
     t0 = grid[0]
-    state0 = solver.init(t0, ssm_init)
+    state0 = solver.init(t=t0, u=u)
     _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
     return solver.userfriendly_output(solution0=state0, solution=result)

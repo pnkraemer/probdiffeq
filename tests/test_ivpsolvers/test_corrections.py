@@ -48,15 +48,17 @@ def fixture_solution(correction_impl, fact):
 
     strategy = ivpsolvers.strategy_filter(ssm=ssm)
     solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
+    errorest = ivpsolvers.errorest_schober(
+        prior=ibm, correction=corr, atol=1e-2, rtol=1e-2, ssm=ssm
+    )
     return ivpsolve.solve_adaptive_terminal_values(
-        init, t0=t0, t1=t1, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+        init, t0=t0, t1=t1, solver=solver, errorest=errorest
     )
 
 
 def test_terminal_value_simulation_matches_reference(solution):
     expected = reference_solution(solution.t)
-    received = solution.u[0]
+    received = solution.u.mean[0]
     assert testing.allclose(received, expected, rtol=1e-2)
 
 

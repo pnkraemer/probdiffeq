@@ -23,9 +23,13 @@ from probdiffeq.backend.typing import (
 from probdiffeq.impl import impl
 from probdiffeq.util import filter_util
 
-R = TypeVar("R")
 C = TypeVar("C", bound=Sequence)
 T = TypeVar("T")
+
+
+# TODO: if we can't expose Normal() or Conditional() types
+#   from the implementation,
+#  maybe we can make these into protocols?
 
 
 @tree_util.register_dataclass
@@ -39,27 +43,27 @@ class MarkovSeq(Generic[T]):
 
 @tree_util.register_dataclass
 @containers.dataclass
-class ProbTaylorCoeffs(Generic[R, T]):
+class ProbTaylorCoeffs(Generic[C, T]):
     """A probabilistic description of Taylor coefficients.
 
     Includes means, standard deviations, and marginals.
     Common solution target for probabilistic solvers.
     """
 
-    mean: R
-    std: R
+    mean: C
+    std: C
     marginals: T
 
 
 @tree_util.register_dataclass
 @containers.dataclass
-class ProbDiffEqSol(Generic[R, T]):
+class ProbDiffEqSol(Generic[C, T]):
     """The probabilistic numerical solution of an initial value problem (IVP)."""
 
     t: Array
     """The current time-step."""
 
-    u: ProbTaylorCoeffs[R, T]
+    u: ProbTaylorCoeffs[C, T]
     """The current ODE solution estimate."""
 
     posterior: T | MarkovSeq[T]
@@ -126,8 +130,8 @@ def prior_wiener_integrated_discrete(ts, *args, **kwargs):
 # TODO: AdaState carries the same two fields. Combine?
 @tree_util.register_dataclass
 @containers.dataclass
-class _InterpRes(Generic[R]):
-    step_from: R
+class _InterpRes(Generic[T]):
+    step_from: T
     """The new 'step_from' field.
 
     At time `max(t, s1.t)`.
@@ -135,7 +139,7 @@ class _InterpRes(Generic[R]):
     in future interpolations, or continue time-stepping from here.
     """
 
-    interp_from: R
+    interp_from: T
     """The new `interp_from` field.
 
     At time `t`. Use this as the right-most reference state

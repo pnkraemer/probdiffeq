@@ -113,8 +113,8 @@ def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
     (uncalibrated_solution, mle_solution), ssm = uncalibrated_and_mle_solution
 
     # Assert the means are identical, but the stds & scales are not
-    assert testing.allclose(uncalibrated_solution.u, mle_solution.u)
+    assert testing.allclose(uncalibrated_solution.u.mean, mle_solution.u.mean)
     assert not testing.allclose(
         uncalibrated_solution.output_scale, mle_solution.output_scale
     )
-    assert not testing.allclose(uncalibrated_solution.u_std, mle_solution.u_std)
+    assert not testing.allclose(uncalibrated_solution.u.std, mle_solution.u.std)
