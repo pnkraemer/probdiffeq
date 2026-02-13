@@ -5,57 +5,20 @@ from probdiffeq.backend import functools, ode, testing, tree_util
 from probdiffeq.backend import numpy as np
 
 
-@testing.case
-def case_strategy_filter():
-    return probdiffeq.strategy_filter
-
-
-@testing.case
-def case_strategy_fixedpoint():
-    return probdiffeq.strategy_fixedpoint
-
-
-@testing.case
-def case_solver_solver():
-    return probdiffeq.solver
-
-
-@testing.case
-def case_solver_mle():
-    return probdiffeq.solver_mle
-
-
-@testing.case
-def case_solver_dynamic():
-    return probdiffeq.solver_dynamic
-
-
-@testing.case
-def case_constraint_ode_ts0():
-    return probdiffeq.constraint_ode_ts0
-
-
-@testing.case
-def case_correction_ts1():
-    return probdiffeq.correction_ts1
-
-
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-@testing.parametrize_with_cases("strategy_factory", ".", prefix="case_strategy_")
-@testing.parametrize_with_cases("solver_factory", ".", prefix="case_solver_")
-@testing.parametrize_with_cases("correction_factory", ".", prefix="case_correction_")
-def test_output_matches_reference(
-    fact, solver_factory, correction_factory, strategy_factory
-):
+def test_output_matches_reference(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
-    # Build a solver
+    # Don't try all solvers because they're tested in a different file.
+    # This test here is only to assert that terminal-value simulation works.
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    strat = strategy_factory(ssm=ssm)
-    corr = correction_factory(vf, ssm=ssm)
-    solver = solver_factory(strategy=strat, prior=iwp, correction=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual(prior=iwp, ssm=ssm, correction=corr)
+    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    constraint = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    solver = probdiffeq.solver_dynamic(
+        vf, strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+    )
+    errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
 
     # Compute the PN solution
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)

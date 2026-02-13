@@ -877,16 +877,16 @@ class _Information:
 
 def constraint_ode_ts0(ssm, ode_order=1) -> _Information:
     """ODE constraint with zeroth-order Taylor linearisation."""
-    return ssm.linearise.ode_taylor_0th(ode_order=ode_order)
+    return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
 
 
-# TODO: expose a "jacobian" option to choose between fwd and rev mode
 def constraint_ode_ts1(
     *, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1
 ) -> _Information:
     """ODE constraint with first-order Taylor linearisation."""
+    # TODO: expose a "jacobian" option to choose between fwd and rev mode
     assert jvp_probes > 0
-    return ssm.linearise.ode_taylor_1st(
+    return ssm.linearize.ode_taylor_1st(
         ode_order=ode_order, jvp_probes=jvp_probes, jvp_probes_seed=jvp_probes_seed
     )
 
@@ -895,14 +895,14 @@ def constraint_ode_slr0(
     *, ssm, cubature_fun=cubature_third_order_spherical
 ) -> _Information:
     """ODE constraint with zeroth-order statistical linear regression."""
-    return ssm.linearise.ode_statistical_0th(cubature_fun)
+    return ssm.linearize.ode_statistical_0th(cubature_fun)
 
 
 def constraint_ode_slr1(
     *, ssm, cubature_fun=cubature_third_order_spherical
 ) -> _Information:
     """ODE constraint with first-order statistical linear regression."""
-    return ssm.linearise.ode_statistical_1st(cubature_fun)
+    return ssm.linearize.ode_statistical_1st(cubature_fun)
 
 
 @containers.dataclass
@@ -1263,7 +1263,7 @@ class solver_dynamic(_ProbabilisticSolver):
         transition = self.prior(dt, output_scale)
         u, prediction = self.strategy.predict(state.posterior, transition=transition)
 
-        # Relinearise (TODO: optional? Skip entirely?)
+        # Relinearize (TODO: optional? Skip entirely?)
         fx, lin_state = self.constraint.linearize(
             f_wrapped, u.marginals, state=lin_state, damp=damp
         )

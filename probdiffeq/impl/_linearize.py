@@ -5,16 +5,18 @@ from probdiffeq.impl import _conditional, _normal
 from probdiffeq.util import cholesky_util
 
 
+class Linearization:
+    """Linearization API."""
+
+    def init_linearization(self):
+        raise NotImplementedError
+
+    def linearize(self, fun, rv, state: None, *, damp: float):
+        raise NotImplementedError
+
+
 @containers.dataclass
-class _Linearization:
-    """Linearisation API."""
-
-    init: Callable
-    apply: Callable
-
-
-@containers.dataclass
-class DenseTs0:
+class DenseTs0(Linearization):
     ode_order: int
     ode_shape: tuple
     unravel: Callable
@@ -42,7 +44,7 @@ class DenseTs0:
 
 
 @containers.dataclass
-class DenseTs1:
+class DenseTs1(Linearization):
     ode_order: int
     ode_shape: tuple
     unravel: Callable
@@ -76,7 +78,7 @@ class DenseTs1:
 
 
 @containers.dataclass
-class DenseSlr0:
+class DenseSlr0(Linearization):
     cubature_rule: Any
     ode_shape: tuple
     unravel: Callable
@@ -102,7 +104,7 @@ class DenseSlr0:
         def vf_flat(u):
             return tree_util.ravel_pytree(fun(unravel(u)))[0]
 
-        # Linearise
+        # linearize
         noise = self.slr0(vf_flat, linearisation_pt)
         mean, cov_lower = noise.mean, noise.cholesky
 
@@ -124,7 +126,7 @@ class DenseSlr0:
         return cond, None
 
     def slr0(self, fn, x):
-        """Linearise a function with zeroth-order statistical linear regression.
+        """Linearize a function with zeroth-order statistical linear regression.
 
         !!! warning "Warning: highly EXPERIMENTAL feature!"
             This feature is highly experimental.
@@ -149,7 +151,7 @@ class DenseSlr0:
 
 
 @containers.dataclass
-class DenseSlr1:
+class DenseSlr1(Linearization):
     cubature_rule: Any
     ode_shape: tuple
     unravel: Callable
@@ -202,7 +204,7 @@ class DenseSlr1:
         return cond, None
 
     def slr1(self, fn, x):
-        """Linearise a function with first-order statistical linear regression."""
+        """Linearize a function with first-order statistical linear regression."""
         # Create sigma-points
         pts_centered = self.cubature_rule.points @ x.cholesky.T
         pts = x.mean[None, :] + pts_centered
@@ -224,7 +226,7 @@ class DenseSlr1:
 
 
 @containers.dataclass
-class IsotropicTs0:
+class IsotropicTs0(Linearization):
     ode_order: int
     unravel: Callable
 
@@ -253,7 +255,7 @@ class IsotropicTs0:
 
 
 @containers.dataclass
-class IsotropicTs1:
+class IsotropicTs1(Linearization):
     ode_order: int
     unravel: Callable
     jvp_probes: int
@@ -305,7 +307,7 @@ class IsotropicTs1:
 
 
 @containers.dataclass
-class BlockDiagTs0:
+class BlockDiagTs0(Linearization):
     ode_order: int
     unravel: Callable
 
@@ -336,7 +338,7 @@ class BlockDiagTs0:
 
 
 @containers.dataclass
-class BlockDiagTs1:
+class BlockDiagTs1(Linearization):
     ode_order: int
     unravel: Callable
     jvp_probes_seed: int
@@ -389,57 +391,55 @@ class BlockDiagTs1:
         return cond, key
 
 
-class LinearisationBackend(abc.ABC):
+class LinearizationBackend(abc.ABC):
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order: int) -> _Linearization:
+    def ode_taylor_0th(self, ode_order: int):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, ode_order: int) -> _Linearization:
+    def ode_taylor_1st(self, ode_order: int):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_1st(self, cubature_fun: Callable) -> _Linearization:
+    def ode_statistical_1st(self, cubature_fun: Callable):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_0th(self, cubature_fun: Callable) -> _Linearization:
+    def ode_statistical_0th(self, cubature_fun: Callable):
         raise NotImplementedError
 
 
-class DenseLinearisation(LinearisationBackend):
+class DenseLinearization(LinearizationBackend):
     def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order) -> _Linearization:
+    def ode_taylor_0th(self, ode_order):
         return DenseTs0(
             ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
-    def ode_taylor_1st(
-        self, ode_order, jvp_probes: int, jvp_probes_seed: int
-    ) -> _Linearization:
+    def ode_taylor_1st(self, ode_order, jvp_probes: int, jvp_probes_seed: int):
         del jvp_probes
         del jvp_probes_seed
         return DenseTs1(
             ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
-    def ode_statistical_1st(self, cubature_fun) -> _Linearization:
+    def ode_statistical_1st(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         return DenseSlr1(
             cubature_rule=cubature_rule, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
-    def ode_statistical_0th(self, cubature_fun) -> _Linearization:
+    def ode_statistical_0th(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
         return DenseSlr0(
             cubature_rule=cubature_rule, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
 
-class IsotropicLinearisation(LinearisationBackend):
+class IsotropicLinearization(LinearizationBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
@@ -453,7 +453,7 @@ class IsotropicLinearisation(LinearisationBackend):
             jvp_probes_seed=jvp_probes_seed,
         )
 
-    def ode_taylor_0th(self, ode_order) -> _Linearization:
+    def ode_taylor_0th(self, ode_order):
         return IsotropicTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_statistical_0th(self, cubature_fun):
@@ -463,11 +463,11 @@ class IsotropicLinearisation(LinearisationBackend):
         raise NotImplementedError
 
 
-class BlockDiagLinearisation(LinearisationBackend):
+class BlockDiagLinearization(LinearizationBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order) -> _Linearization:
+    def ode_taylor_0th(self, ode_order):
         return BlockDiagTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_taylor_1st(self, ode_order, jvp_probes: int, jvp_probes_seed: int):

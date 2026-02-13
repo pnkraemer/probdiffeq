@@ -39,7 +39,7 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
     )
 
     def solve(
-        u: T, t0, t1, *, atol, rtol, dt0=0.1, eps=1e-8
+        u: T, t0, t1, *, atol, rtol, dt0=0.1, eps=1e-8, damp=0.0
     ) -> probdiffeq.ivpsolve.Solution[T]:
         solution0 = functools.jit(solver.init)(t=t0, u=u)
         state = functools.jit(loop.init)(solution0, dt=dt0)
@@ -49,7 +49,7 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
         solutions = []
         while state.step_from.t < t1:
             solution, state = rejection_loop_apply(
-                state, t1=t1, eps=eps, atol=atol, rtol=rtol
+                state, t1=t1, eps=eps, atol=atol, rtol=rtol, damp=damp
             )
             solutions.append(solution)
 

@@ -172,9 +172,9 @@ def solve_adaptive_save_at(
 def solve_fixed_grid(*, solver) -> Callable:
     """Solve an initial value problem on a fixed, pre-determined grid."""
 
-    def solve(u: T, /, *, grid) -> Solution[T]:
+    def solve(u: T, /, *, grid, damp: float = 0.0) -> Solution[T]:
         def body_fn(s, dt):
-            s_new = solver.step(state=s, dt=dt)
+            s_new = solver.step(state=s, dt=dt, damp=damp)
             return s_new, s_new
 
         t0 = grid[0]
